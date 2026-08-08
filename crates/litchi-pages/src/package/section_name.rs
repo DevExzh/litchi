@@ -14,7 +14,7 @@ use thiserror::Error;
 use super::{
     MAX_SECTIONS, NativeSectionReference, Package, PackageError, SECTION_MESSAGE_TYPE,
     decode_body_storage, effective_text_limit, find_object, native_section_references,
-    root_references, validate_section_table_wire,
+    root_references_with_limits, validate_section_table_wire_with_limits,
 };
 use crate::{SectionSelector, section};
 
@@ -590,19 +590,22 @@ fn section_identifier_at(
     position: Position,
 ) -> Result<NonZeroU64, SectionNameError> {
     let components = package.state.source.components();
-    let root = root_references(components).map_err(map_package_error)?;
+    let limits = package.state.source.limits();
+    let root = root_references_with_limits(components, limits).map_err(map_package_error)?;
     let body_identifier = root.body.ok_or(SectionNameError::UnsupportedSource)?;
     let body =
         find_object(components, body_identifier.get()).ok_or(SectionNameError::InvalidSource)?;
-    let max_text_bytes = effective_text_limit(package.state.source.limits());
+    let max_text_bytes = effective_text_limit(limits);
     let (native, payload) = decode_body_storage(
         &body.messages,
         body_identifier,
         MAX_SECTIONS,
         max_text_bytes,
+        limits,
     )
     .map_err(map_package_error)?;
-    validate_section_table_wire(payload, &native, body_identifier).map_err(map_package_error)?;
+    validate_section_table_wire_with_limits(payload, &native, body_identifier, limits)
+        .map_err(map_package_error)?;
     let section_references = native_section_references(&native, root.initial_section, MAX_SECTIONS)
         .map_err(map_package_error)?;
     section_references

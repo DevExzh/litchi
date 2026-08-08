@@ -866,3 +866,52 @@ source. This advances a complete focused mutation vertical but does not satisfy
 durable patch serialization, atomic filesystem save, the aggregate peak-memory
 policy, fuzz/sanitizer gates, migration of the remaining Keynote editor surface,
 or deletion of `litchi-iwa`.
+
+## 2026-08-08 focused Pages section-text ownership
+
+`litchi-pages` now owns selector-first read and, for rooted exact sources with
+one unambiguous native body storage, whole-value set/clear, checked UTF-16 span
+replacement, exact-source patch application, and inverse replay for text owned
+by an existing Pages body section. The supported API retains only a
+semantic section position plus archive-free text values and spans. Native body
+storage IDs, section-table references, component names, package entries,
+protobuf messages, raw wire records, and exact authorization artifacts remain
+private. Whole-body editing is intentionally a single-section convenience;
+multi-section callers select the section whose text they mean to change.
+
+The mutation core has moved down to `litchi-iwa-text-wire`, where the focused
+Pages owner and migration host share one bounded raw-storage splice without
+depending on each other. The kernel preserves unknown and untouched raw
+records, adjusts the complete recognized positional-table family, and reports
+removed-reference provenance. Pages refuses a splice that consumes section,
+footnote, or inline-object structure; graph deletion is not smuggled into a
+plain-text API. A private Buffa lazy projection validates the document/body and
+section-boundary graph after strict raw preflight, while raw source bytes remain
+the preservation authority. Rooted exact sources with one unambiguous native
+body storage rewrite one body component, fully reopen under retained limits,
+and verify section text, neighboring sections, object count, and
+root/section-reference topology before publication. No-ops share
+the source allocation, including on legacy packages, and changed legacy nested
+packages fail closed.
+Changed no-root/fallback bodies also fail closed until their physical ownership
+has an explicit preservation-safe mutation boundary.
+
+The migration-host section-text methods remain available as compatibility
+surfaces while their raw-ID callers, dependent-content cleanup behavior, and
+legacy normalization cases are migrated deliberately. Headers, footers,
+floating text, text boxes, section creation/deletion, footnote/attachment graph
+mutation, and the other Pages editors also remain host work. The new focused
+example and root-facade smoke move ordinary callers to semantic selectors and
+typed spans, but no manifest edge is removed: all 16 ordered debts remain.
+
+Rust integration and strict scoped Clippy evidence covers the transaction,
+shared rewrite kernel, public example, root exports, exact no-op, and inverse
+paths. Pages 14.4 also opened the Rust-authored emoji-bearing output without a
+repair warning, saved it as a new native artifact, closed and reopened that
+exact path, and rendered the complete requested text. Rust then recovered the
+same semantic value, while a focused no-op and inverse over the Pages-resaved
+artifact were byte-identical to it. Durable patch serialization, atomic file
+publication, aggregate peak-memory policy, fuzz/sanitizer completion, an
+app-authored multi-section/boundary-shift gate, native clear/range and rich
+dependent-content gates, the remaining examples/tests, and the complete host
+deletion gate remain open.

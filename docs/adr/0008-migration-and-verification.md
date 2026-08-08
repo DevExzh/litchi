@@ -7515,3 +7515,94 @@ latency/RSS/allocation-performance result, or fuzz/sanitizer completion. Prost
 is still used privately to validate bounded opaque Color and PathSource
 payloads, the legacy transition writer and broader Keynote graph editors remain
 available, and all 16 ordered dependency debts remain deletion blockers.
+
+## 2026-08-08 amendment: focused Pages section-text transaction evidence
+
+`litchi-pages::Package` now exposes selector-first `section_text`,
+`edit_section_text`, single-section `edit_body_text`, exact patch application,
+and inverse replay. Its public root and the root `litchi::pages` facade export
+the format-owned edit/commit/patch/diagnostic/error/limit family plus the
+shared `TextPosition` and insertion-capable `TextSpan`. The production example
+`litchi-pages/examples/edit_section_text.rs` parses paths with `args_os`,
+accepts exact-name or semantic-index selection and set/clear/range modes,
+constructs ranges as checked UTF-16 spans, publishes with create-new,
+`write_all`, and `sync_all`, and can publish an exact inverse. It imports no
+migration-host, raw-ID, generated-message, or Prost API.
+
+The shared `litchi-iwa-text-wire` rewrite kernel performs one bounded splice
+over raw `TSWP.StorageArchive` records. Its resource profile independently
+caps input and output bytes, fields, nesting, text fragments and text bytes,
+all positional-table entries, reference occurrences, and aggregate rewrite
+work. It preserves wholly untouched text fragments and unknown wire records,
+uses UTF-16 scalar boundaries, updates all recognized position-bearing tables
+according to their native policy, and reports both field-specific and
+aggregate reference deltas. A semantic no-op validates the source but retains
+its exact bytes instead of normalizing it. Pages adds selector resolution,
+section-relative to body-relative mapping, reserved-structure and dependent
+content refusal, exact-provenance authorization, one-component reassembly,
+complete retained-limit reopening, and semantic/topology readback.
+
+The new 1,235-byte derived Pages body schema contains three singular messages
+for document body references, section-boundary entries, and references. Buffa
+0.9.1 emits the expected five-file 93,867-byte generated closure; the build
+caps it at 96 KiB, prohibits generated repeated storage and production
+encoding, and checks every routed declaration against the canonical
+TP/TSWP/TSP schemas. Strict preflight rejects missing required reference
+identifiers, duplicate selected singulars, wrong wire types, noncanonical
+selected keys/lengths/varints, zero identifiers, excessive fields/work/bytes,
+and insufficient recursion before forcing Buffa's lazy values. Buffa is a
+borrowed semantic cross-check and never the preservation representation.
+
+Eight focused integration tests cover astral UTF-16 replacement and boundary
+shifts, exact and legacy no-op source sharing, the single-section body
+convenience on the native fixture, raw unknown field and IWA-header
+preservation, untouched ZIP members, exact inverse restoration, selector and
+span failures, surrogate splits, reserved controls, hidden dependent
+references, set/clear/delete neighbor preservation, retained output limits,
+and malformed known-table refusal. The shared kernel adds deterministic
+coverage for cross-fragment edits, insertion affinity, all positional-table
+policies against a Prost oracle, conservative reference provenance,
+noncanonical untouched framing, and typed malformed input. The focused
+transaction test, production example, and root facade pass warning-denied
+Clippy with dependency lints excluded. The new crate-root doctest compiles and
+passes.
+
+The direct root Pages facade passes all four tests, including compile-time
+availability of every `SectionText*` type and both shared UTF-16 values,
+exact-source no-op sharing, a name-selected insertion, and exact inverse
+restoration.
+
+The production example also executed all three CLI modes against
+`test-data/iwork/pages/basic.pages`
+(`21107bc9323fba6f1589152454c0b0b0cc8e239313c6a369bc4a891116601b42`).
+The set, clear, and empty-span range outputs are retained under
+`/private/tmp/litchi-pages-example.KdlErn/` with respective SHA-256 values
+`0170017eec66373a428ee4a2599b50e4cfe5008d54cbc0daef66cb67e4307ffb`,
+`63c2aa20f6064b9a8c5a536475d1a71b34175f4c6924a4d384f24c39fd5155e6`,
+and `dd0405249a56e3e2b535e6a9541f02feda6299ce1a0959f4d68f7e44a0ae307a`;
+each separately published inverse is byte-identical to the source.
+
+The native acceptance gate used Pages 14.4 to open the Rust-authored set output
+without a repair warning and visibly rendered the complete three-line value
+`Litchi Pages text migration 🚀`, `Buffa lazy view verified`, and `2026-08-08`.
+Pages then saved that document as
+`/private/tmp/litchi-pages-text-20260808.Z5SKz0/pages-resaved.pages`
+(`e2e7a9e67e499e2f8f003f091c8ade7fabbe2c59a577fcfe90fd3bd69022965a`),
+closed it, and reopened that exact path without repair or loss of the requested
+text. The Rust migration-host reader recovered the exact three-line value from the
+Pages-resaved artifact. Running the focused example's semantic no-op and
+inverse paths against that native-resaved package produced byte-identical
+artifacts with the same SHA-256. The original changed transaction's inverse
+also remained byte-identical to the source fixture.
+
+This native run covers the single-section `set` path on `basic.pages`. The
+multi-section boundary-shift path has deterministic synthetic coverage, but an
+app-authored multi-section artifact, native clear/range operations, and rich
+footnote/inline-object refusal cases remain explicit native gates.
+
+This work does not claim durable patch serialization, atomic filesystem
+publication, aggregate peak-memory measurement, fuzz/sanitizer completion, or
+full host retirement. The raw-ID migration-host methods remain compatibility
+surfaces, changed legacy nested packages remain unsupported by the focused
+transaction, changed no-root/fallback bodies remain unsupported, and all 16
+ordered dependency debts remain open.

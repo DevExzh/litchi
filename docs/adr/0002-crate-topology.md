@@ -1148,3 +1148,48 @@ changed legacy nested-`Index.zip` sources, which the exact-source transaction
 deliberately refuses. No dependency edge is retired in this slice; the ledger
 remains at 63 workspace packages, 223 internal declarations, and 16 ordered
 migration debts.
+
+## 2026-08-08 amendment: focused Pages section-text ownership
+
+`litchi-pages::Package` now owns selector-first section-body text reads and
+rooted exact-source text transactions through `section_text`, `edit_section_text`,
+the single-section `edit_body_text` convenience, `apply_section_text`, and the
+format-owned `SectionTextEdit`, `SectionTextCommit`, `SectionTextPatch`,
+diagnostics, error, and limit types. `litchi-pages` re-exports the shared
+archive-free `TextPosition` and insertion-capable `TextSpan`; callers select a
+section by exact semantic name or checked position and never exchange a body
+storage identifier, object number, component name, protobuf value, or package
+member.
+
+The byte-preserving `TSWP.StorageArchive` splice kernel is owned below the
+concrete format in `litchi-iwa-text-wire`. It bounds fields, fragments,
+positional-table entries, nested messages, references, text, output, and total
+rewrite work; adjusts every recognized position-bearing table according to its
+schema policy; retains untouched raw records; and reports reference deltas
+without deciding application ownership. Pages retains the section-boundary,
+dependent-content, exact-package, and publication policy. The migration host
+also consumes this downward kernel without making `litchi-pages` depend on
+`litchi-iwa`.
+
+Private Buffa lazy views validate the known document-to-body references,
+section-boundary references, and text-storage projection only after strict
+bounded raw preflight. Generated Buffa and Prost values remain private and are
+not used to publish a rewritten message. The accepted raw records remain the
+preservation authority for unknown and untouched content. On a rooted exact
+source with one unambiguous native body storage, a changed candidate replaces
+one body payload while preserving its IWA object header, reassembles one
+component, reopens the complete package under the retained limits, and
+performs semantic and native-topology readback before publication.
+
+The focused transaction refuses edits that would consume native section
+breaks, footnote anchors, inline-object markers, or their owned reference
+metadata; graph deletion remains a separate Pages capability. Exact no-ops,
+including legacy nested-`Index.zip` sources, share the original immutable
+source. Changed legacy sources remain `UnsupportedSource`, and the host's
+normalizing raw-ID methods remain compatibility-only while that provenance
+case has no preservation-safe owner. Changed no-root/fallback bodies are also
+unsupported until their physical ownership has an explicit mutation boundary.
+This slice transfers a substantial Pages mutation vertical but removes no
+manifest edge: the inventory remains 63
+workspace packages, 223 internal dependency declarations, and 16 ordered
+migration debts.

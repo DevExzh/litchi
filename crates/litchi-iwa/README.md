@@ -45,6 +45,11 @@ println!("{}", structured.summary());
   explicit password-protected document rejection
 - Semantic editors for Numbers sheets/tables/cells/formulas, Pages
   body/header/footer/text-box text, and Keynote slides/placeholders/text boxes/speaker notes
+- `litchi-pages::Package` selector-first section-text reads and, for rooted
+  exact sources with one unambiguous native body storage,
+  set/clear/UTF-16-span transactions with reversible patches. Checked
+  `TextPosition` and insertion-capable `TextSpan` values keep byte offsets,
+  native object identifiers, and protobuf records out of the public API.
 - Native-style ordinary shape duplication across Pages, Numbers, and Keynote
   with independent rich-text storage, fresh UUID mappings, preserved opaque
   fields, and app-specific selection offsets
@@ -1072,7 +1077,9 @@ document_options.set_automatic_hyphenation(Some(true));
 document_options.set_ligatures_enabled(Some(false));
 pages.set_document_options(document_options)?;
 let section_id = pages.sections()[0].object_id;
-pages.set_section_text(section_id, "Updated body")?;
+// Selector-first section-text editing now lives in litchi-pages; see
+// litchi-pages/examples/edit_section_text.rs. The legacy raw-ID path remains
+// available here only as a compatibility surface.
 let first_header = pages
     .header_footers()?
     .into_iter()
@@ -1446,12 +1453,20 @@ Pages sections can be appended by cloning a reachable section's layout and
 template references at the current UTF-16 body end, then removed without
 deleting body text. Both operations patch only the repeated section-boundary
 record and retain unknown protobuf fields. Body insertion keeps the mandatory
-initial section boundary at index zero. Section-scoped text supports read,
-UTF-16 range replacement, whole-value update, and clear operations without
-exposing the native U+0004 separators. Boundary positions and header/footer
-locations are refreshed after every edit. Global whole-body replacement is
-restricted to single-section documents so it cannot silently orphan section
-graphs; use `edit_pages_section_text` for native multi-section files.
+initial section boundary at index zero. Selector-first section-scoped text
+read, UTF-16 span replacement, whole-value update, and clear now live in
+`litchi-pages::Package`; see `litchi-pages/examples/edit_section_text.rs`.
+For a rooted exact source with one unambiguous native body storage, the changed
+transaction excludes native U+0004 separators and dependent footnote or
+inline-object anchors, preserves unrelated raw records, and publishes only
+after a retained-limit reopen and semantic readback. Global whole-body editing
+is a single-section convenience so it cannot silently orphan section graphs.
+Private Buffa lazy views validate known body-graph fields while raw records
+remain the unknown-content preservation authority.
+The legacy `PagesEditor` raw-ID methods remain a compatibility surface while
+changed nested-`Index.zip` packages still require the migration host.
+Changed no-root/fallback bodies are likewise unsupported until their physical
+ownership has an explicit preservation-safe mutation boundary.
 
 Pages page dimensions, margins, scale, orientation, and vertical-layout flags
 are also patched directly in the protobuf wire stream. Unknown Apple fields

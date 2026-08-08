@@ -72,6 +72,12 @@ impl Border {
     ///
     /// The scalar color, width, and offset values are already validated by
     /// their respective semantic leaves before they reach this constructor.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::EmptyBorder`] when no edge is selected, or
+    /// [`Error::RoundedCornersRequireAllSides`] when rounded corners are
+    /// requested without all four edges.
     pub fn new(
         color: Rgba,
         width: Width,
@@ -153,6 +159,11 @@ impl IndentPoints {
     pub const ZERO: Self = Self(0.0);
 
     /// Construct a finite, nonnegative indentation distance.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::IndentNonFinite`] for NaN or infinity and
+    /// [`Error::IndentNegative`] for a negative distance.
     pub fn from_points(points: f32) -> Result<Self> {
         if !points.is_finite() {
             return Err(Error::IndentNonFinite);
@@ -218,6 +229,11 @@ impl SpacingPoints {
     pub const ZERO: Self = Self(0.0);
 
     /// Construct a finite, nonnegative paragraph-spacing distance.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::SpacingNonFinite`] for NaN or infinity and
+    /// [`Error::SpacingNegative`] for a negative distance.
     pub fn from_points(points: f32) -> Result<Self> {
         if !points.is_finite() {
             return Err(Error::SpacingNonFinite);
@@ -279,6 +295,12 @@ impl LineSpacingMultiple {
     pub const DOUBLE: Self = Self(2.0);
 
     /// Construct a finite multiplier greater than zero.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::LineSpacingMultipleNonFinite`] for NaN or infinity
+    /// and [`Error::LineSpacingMultipleNonPositive`] for zero or a negative
+    /// multiplier.
     pub fn new(value: f32) -> Result<Self> {
         if !value.is_finite() {
             return Err(Error::LineSpacingMultipleNonFinite);
@@ -309,6 +331,12 @@ pub struct LineSpacingPoints(f32);
 
 impl LineSpacingPoints {
     /// Construct a finite line-spacing distance greater than zero.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::LineSpacingPointsNonFinite`] for NaN or infinity and
+    /// [`Error::LineSpacingPointsNonPositive`] for zero or a negative
+    /// distance.
     pub fn from_points(points: f32) -> Result<Self> {
         if !points.is_finite() {
             return Err(Error::LineSpacingPointsNonFinite);

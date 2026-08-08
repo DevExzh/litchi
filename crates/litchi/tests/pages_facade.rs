@@ -5,9 +5,12 @@ use std::path::PathBuf;
 
 use litchi::Document;
 use litchi::pages::{
-    Package, SectionSelector,
+    Package, SectionSelector, SectionTextCommit, SectionTextDiagnostics, SectionTextEdit,
+    SectionTextError, SectionTextLimitKind, SectionTextPatch, TextPosition, TextSpan,
     section::{PageNumber, PageNumbering, Start},
 };
+
+fn assert_send_sync<T: Send + Sync>() {}
 
 fn fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/iwork/pages/basic.pages")
@@ -118,6 +121,43 @@ fn section_pagination_transaction_reaches_pages_facade() -> Result<(), Box<dyn s
     let restored = commit
         .package()
         .apply_section_pagination(&commit.patch().inverse())?;
+    assert_eq!(restored.package().source_bytes(), package.source_bytes());
+    Ok(())
+}
+
+#[test]
+fn section_text_transaction_reaches_pages_facade() -> Result<(), Box<dyn std::error::Error>> {
+    assert_send_sync::<SectionTextCommit>();
+    assert_send_sync::<SectionTextDiagnostics>();
+    assert_send_sync::<SectionTextEdit<'static>>();
+    assert_send_sync::<SectionTextError>();
+    assert_send_sync::<SectionTextLimitKind>();
+    assert_send_sync::<SectionTextPatch>();
+    assert_send_sync::<TextPosition>();
+
+    let package = Package::open(fixture_path())?;
+    let selector = SectionSelector::index(0);
+    let original = package.section_text(selector)?.to_owned();
+    let source_pointer = package.source_bytes().as_ptr();
+
+    let mut noop = package.edit_section_text(selector)?;
+    noop.set(&original)?;
+    let noop = noop.commit()?;
+    assert!(noop.patch().is_noop());
+    assert_eq!(noop.package().source_bytes().as_ptr(), source_pointer);
+
+    let prefix = "Facade section: ";
+    let mut edit = package.edit_section_text(SectionSelector::name("Blank"))?;
+    edit.replace(TextSpan::from_utf16_indexes(0, 0)?, prefix)?;
+    let commit = edit.commit()?;
+    assert!(commit.diagnostics().changed());
+    assert_eq!(
+        commit.package().section_text(SectionSelector::index(0))?,
+        format!("{prefix}{original}")
+    );
+
+    let inverse = commit.patch().inverse();
+    let restored = commit.package().apply_section_text(&inverse)?;
     assert_eq!(restored.package().source_bytes(), package.source_bytes());
     Ok(())
 }

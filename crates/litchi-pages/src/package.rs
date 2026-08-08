@@ -6,10 +6,11 @@
 
 mod section_name;
 mod section_pagination;
+mod section_text;
 
 use std::collections::BTreeSet;
 use std::fmt;
-use std::fs;
+use std::fs::{Metadata as FileMetadata, OpenOptions};
 use std::io::Read;
 use std::mem::size_of;
 use std::num::NonZeroU64;
@@ -18,10 +19,16 @@ use std::sync::Arc;
 
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_archive::{ComponentCatalog, SourceCatalog};
-use litchi_iwa_common::wire::{WireFieldView, WireView};
+use litchi_iwa_common::{
+    WireLimits,
+    wire::{WireFieldView, WireView},
+};
 #[cfg(feature = "internal-iwork-source")]
 use litchi_iwa_detect::{Format, PreparedSource};
-use litchi_iwa_protos::{tp, tswp};
+use litchi_iwa_protos::{
+    pages_body_codec::{self, DecodeOptions as PagesBodyDecodeOptions},
+    tswp,
+};
 use litchi_iwa_text::storage::{Run, Storage};
 use plist::Value;
 use prost::Message;
@@ -39,6 +46,10 @@ pub use section_name::{
 pub use section_pagination::{
     SectionPaginationCommit, SectionPaginationDiagnostics, SectionPaginationEdit,
     SectionPaginationError, SectionPaginationLimitKind, SectionPaginationPatch,
+};
+pub use section_text::{
+    SectionTextCommit, SectionTextDiagnostics, SectionTextEdit, SectionTextError,
+    SectionTextLimitKind, SectionTextPatch,
 };
 
 const SECTION_MESSAGE_TYPE: u32 = 10_011;
@@ -163,9 +174,60 @@ struct BoundaryPoint {
     preceding_character: Option<char>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FileSnapshot {
+    length: u64,
+    modified: Option<std::time::SystemTime>,
+    #[cfg(unix)]
+    device: u64,
+    #[cfg(unix)]
+    inode: u64,
+    #[cfg(unix)]
+    mode: u32,
+    #[cfg(unix)]
+    modified_seconds: i64,
+    #[cfg(unix)]
+    modified_nanoseconds: i64,
+    #[cfg(unix)]
+    changed_seconds: i64,
+    #[cfg(unix)]
+    changed_nanoseconds: i64,
+}
+
 struct StorageAccumulator {
     text: String,
     runs: Vec<Run>,
+}
+
+enum StorageWireLimitsError {
+    Physical(litchi_iwa_archive::Error),
+    Wire(litchi_iwa_text_wire::RewriteError),
+}
+
+impl FileSnapshot {
+    fn from_metadata(metadata: &FileMetadata) -> Self {
+        #[cfg(unix)]
+        use std::os::unix::fs::MetadataExt;
+
+        Self {
+            length: metadata.len(),
+            modified: metadata.modified().ok(),
+            #[cfg(unix)]
+            device: metadata.dev(),
+            #[cfg(unix)]
+            inode: metadata.ino(),
+            #[cfg(unix)]
+            mode: metadata.mode(),
+            #[cfg(unix)]
+            modified_seconds: metadata.mtime(),
+            #[cfg(unix)]
+            modified_nanoseconds: metadata.mtime_nsec(),
+            #[cfg(unix)]
+            changed_seconds: metadata.ctime(),
+            #[cfg(unix)]
+            changed_nanoseconds: metadata.ctime_nsec(),
+        }
+    }
 }
 
 impl Package {
@@ -187,8 +249,9 @@ impl Package {
     /// Returns [`PackageError`] when the source is not a regular file, exceeds
     /// the selected bounds, or cannot be decoded as a valid Pages package.
     pub fn open_with_limits(path: impl AsRef<Path>, limits: Limits) -> PackageResult<Self> {
-        let bytes = read_path(path.as_ref(), limits)?;
-        Self::from_bytes_with_limits(&bytes, limits)
+        let source_bytes = read_path(path.as_ref(), limits)?;
+        let source_catalog = SourceCatalog::from_shared_bytes_with_limits(source_bytes, limits)?;
+        Self::from_source_catalog(source_catalog)
     }
 
     /// Parse a Pages package from ZIP bytes.
@@ -243,9 +306,15 @@ impl Package {
         let metadata = Metadata::from_catalog(source.package())?;
         let components = source.components();
         let object_count = validate_components(components)?;
-        let root_references = root_references(components)?;
+        let root_references = root_references_with_limits(components, limits)?;
         let text_limit = effective_text_limit(limits);
-        let document = decode_document(components, root_references, MAX_SECTIONS, text_limit)?;
+        let document = decode_document(
+            components,
+            root_references,
+            MAX_SECTIONS,
+            text_limit,
+            limits,
+        )?;
 
         Ok(Self {
             state: Arc::new(State {
@@ -489,6 +558,7 @@ pub fn __semantic_document_from_prepared_source(
         &components,
         max_sections.min(MAX_SECTIONS),
         max_text_bytes.min(effective_text_limit(limits)),
+        limits,
     )
 }
 
@@ -515,55 +585,179 @@ fn decode_semantic_components(
     components: &ComponentCatalog,
     max_sections: usize,
     max_text_bytes: usize,
+    limits: Limits,
 ) -> PackageResult<Document> {
     validate_components(components)?;
-    let root_references = root_references(components)?;
-    decode_document(components, root_references, max_sections, max_text_bytes)
+    let root_references = root_references_with_limits(components, limits)?;
+    decode_document(
+        components,
+        root_references,
+        max_sections,
+        max_text_bytes,
+        limits,
+    )
 }
 
-fn read_path(path: &Path, limits: Limits) -> PackageResult<Vec<u8>> {
-    let metadata = fs::symlink_metadata(path)?;
-    if metadata.file_type().is_symlink() {
-        return Err(PackageError::InvalidFormat(format!(
-            "Pages package source must not be a symbolic link: {}",
-            path.display()
-        )));
+#[cfg(any(unix, windows))]
+fn read_path(path: &Path, limits: Limits) -> PackageResult<Arc<[u8]>> {
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+
+        // Keep the final component pinned and prevent a FIFO from blocking
+        // before descriptor metadata can reject it.
+        options.custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_NONBLOCK);
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+
+        // Open the final reparse point itself so descriptor metadata can
+        // reject symlinks and junctions without a path-check/open race.
+        const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
+        const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+        options.custom_flags(FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS);
+    }
+
+    let mut file = options.open(path).map_err(|error| {
+        #[cfg(unix)]
+        if error.raw_os_error() == Some(libc::ELOOP) {
+            return PackageError::InvalidFormat(
+                "Pages package source must not be a symbolic link".to_owned(),
+            );
+        }
+        PackageError::Io(error)
+    })?;
+    let metadata = file.metadata()?;
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0000_0400;
+        if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+            return Err(PackageError::InvalidFormat(
+                "Pages package source must not be a symbolic link or junction".to_owned(),
+            ));
+        }
     }
     if !metadata.is_file() {
-        return Err(PackageError::InvalidFormat(format!(
-            "Pages package source must be a regular file: {}",
-            path.display()
-        )));
+        return Err(PackageError::InvalidFormat(
+            "Pages package source must be a regular file".to_owned(),
+        ));
     }
-    if metadata.len() > limits.max_input_bytes() {
+    let before = FileSnapshot::from_metadata(&metadata);
+    let source = read_source_with_reported_length(&mut file, before.length, limits)?;
+    let after = FileSnapshot::from_metadata(&file.metadata()?);
+    let observed_length = u64::try_from(source.len()).map_err(|_error| {
+        PackageError::InvalidFormat("Pages package input length does not fit u64".to_owned())
+    })?;
+    ensure_source_unchanged(before, after, observed_length)?;
+    Ok(source)
+}
+
+#[cfg(not(any(unix, windows)))]
+fn read_path(_path: &Path, _limits: Limits) -> PackageResult<Arc<[u8]>> {
+    Err(PackageError::InvalidFormat(
+        "descriptor-first Pages package opening is unsupported on this platform".to_owned(),
+    ))
+}
+
+fn ensure_source_unchanged(
+    before: FileSnapshot,
+    after: FileSnapshot,
+    observed_length: u64,
+) -> PackageResult<()> {
+    if before != after || observed_length != before.length {
+        return Err(PackageError::InvalidFormat(
+            "Pages package source changed while it was being read".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+fn read_source_with_reported_length(
+    reader: &mut impl Read,
+    reported_length: u64,
+    limits: Limits,
+) -> PackageResult<Arc<[u8]>> {
+    if reported_length > limits.max_input_bytes() {
         return Err(PackageError::InvalidFormat(format!(
             "Pages package input exceeds the {} byte limit",
             limits.max_input_bytes()
         )));
     }
 
-    let capacity = usize::try_from(metadata.len()).map_err(|_error| {
-        PackageError::InvalidFormat("Pages package input length does not fit usize".to_owned())
+    let maximum = usize::try_from(limits.max_input_bytes()).map_err(|_error| {
+        PackageError::InvalidFormat("Pages package input limit does not fit usize".to_owned())
     })?;
+    let capacity = usize::try_from(reported_length)
+        .map_err(|_error| {
+            PackageError::InvalidFormat("Pages package input length does not fit usize".to_owned())
+        })?
+        .min(64 * 1024);
     let mut bytes = Vec::new();
     bytes.try_reserve_exact(capacity).map_err(|_error| {
         PackageError::InvalidFormat("could not allocate Pages input".to_owned())
     })?;
 
-    let maximum = limits.max_input_bytes().saturating_add(1);
-    fs::File::open(path)?
-        .take(maximum)
-        .read_to_end(&mut bytes)?;
-    let length = u64::try_from(bytes.len()).map_err(|_error| {
-        PackageError::InvalidFormat("Pages package input length does not fit u64".to_owned())
-    })?;
-    if length > limits.max_input_bytes() {
-        return Err(PackageError::InvalidFormat(format!(
-            "Pages package input exceeds the {} byte limit",
-            limits.max_input_bytes()
-        )));
+    let mut buffer = [0_u8; 8 * 1024];
+    loop {
+        let remaining = maximum.checked_sub(bytes.len()).ok_or_else(|| {
+            PackageError::InvalidFormat("Pages package input length exceeds usize".to_owned())
+        })?;
+        if remaining == 0 {
+            let mut extra = [0_u8; 1];
+            if read_retrying_interrupted(reader, &mut extra)? != 0 {
+                return Err(PackageError::InvalidFormat(format!(
+                    "Pages package input exceeds the {} byte limit",
+                    limits.max_input_bytes()
+                )));
+            }
+            break;
+        }
+
+        let read_limit = remaining.min(buffer.len());
+        let read = read_retrying_interrupted(reader, &mut buffer[..read_limit])?;
+        if read == 0 {
+            break;
+        }
+        let required = bytes.len().checked_add(read).ok_or_else(|| {
+            PackageError::InvalidFormat("Pages package input length exceeds usize".to_owned())
+        })?;
+        reserve_source_growth(&mut bytes, required, maximum)?;
+        bytes.extend_from_slice(&buffer[..read]);
     }
-    Ok(bytes)
+    Ok(bytes.into())
+}
+
+fn read_retrying_interrupted(reader: &mut impl Read, buffer: &mut [u8]) -> std::io::Result<usize> {
+    loop {
+        match reader.read(buffer) {
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {},
+            result => return result,
+        }
+    }
+}
+
+fn reserve_source_growth(
+    bytes: &mut Vec<u8>,
+    required: usize,
+    maximum: usize,
+) -> PackageResult<()> {
+    if required <= bytes.capacity() {
+        return Ok(());
+    }
+
+    let doubled = bytes.capacity().checked_mul(2).unwrap_or(maximum);
+    let target = required.max(doubled).min(maximum);
+    let additional = target.checked_sub(bytes.len()).ok_or_else(|| {
+        PackageError::InvalidFormat("Pages package input length exceeds usize".to_owned())
+    })?;
+    bytes
+        .try_reserve_exact(additional)
+        .map_err(|_error| PackageError::InvalidFormat("could not allocate Pages input".to_owned()))
 }
 
 fn metadata_entry<'a>(catalog: &'a Catalog, name: &str) -> PackageResult<Option<&'a [u8]>> {
@@ -678,7 +872,10 @@ fn validate_components(components: &ComponentCatalog) -> PackageResult<usize> {
     Ok(object_count)
 }
 
-fn root_references(components: &ComponentCatalog) -> PackageResult<RootReferences> {
+fn root_references_with_limits(
+    components: &ComponentCatalog,
+    limits: Limits,
+) -> PackageResult<RootReferences> {
     let component = components.get("Index/Document.iwa").ok_or_else(|| {
         PackageError::InvalidFormat("Pages package does not contain Index/Document.iwa".to_owned())
     })?;
@@ -687,26 +884,44 @@ fn root_references(components: &ComponentCatalog) -> PackageResult<RootReference
         .object(1)
         .ok_or_else(|| PackageError::InvalidFormat("Pages root object 1 is missing".to_owned()))?;
     let payload = unique_message_payload(&object.messages, 10_000, "Pages root object 1")?;
-    let root = tp::DocumentArchive::decode(payload).map_err(|error| {
-        PackageError::InvalidFormat(format!("Pages root type-10000 payload is invalid: {error}"))
-    })?;
-    validate_optional_reference_field(
-        payload,
-        4,
-        root.body_storage.as_ref(),
-        "Pages root body-storage reference",
-    )?;
-    validate_optional_reference_field(
-        payload,
-        5,
-        root.section.as_ref(),
-        "Pages root initial-section reference",
-    )?;
+    let root = pages_body_codec::decode_document_body(payload, pages_body_options(limits)?)
+        .map_err(|error| {
+            PackageError::InvalidFormat(format!(
+                "Pages root type-10000 payload is invalid: {error}"
+            ))
+        })?;
 
     Ok(RootReferences {
-        body: nonzero_reference(root.body_storage, "Pages root body-storage reference")?,
-        initial_section: nonzero_reference(root.section, "Pages root initial-section reference")?,
+        body: root
+            .body_storage()
+            .map(pages_body_codec::ReferenceSnapshot::identifier),
+        initial_section: root
+            .initial_section()
+            .map(pages_body_codec::ReferenceSnapshot::identifier),
     })
+}
+
+fn pages_body_options(limits: Limits) -> PackageResult<PagesBodyDecodeOptions> {
+    let archive_limits = limits.effective_archive_limits()?;
+    let wire_limits = WireLimits::default();
+    let recursion_limit = u32::try_from(
+        archive_limits
+            .max_header_nesting()
+            .min(wire_limits.max_nesting()),
+    )
+    .map_err(|_error| {
+        PackageError::InvalidFormat("Pages projection nesting limit does not fit u32".to_owned())
+    })?;
+    Ok(PagesBodyDecodeOptions::new(
+        archive_limits
+            .max_message_bytes()
+            .min(wire_limits.max_input_bytes()),
+        archive_limits
+            .max_header_fields()
+            .min(wire_limits.max_fields()),
+        wire_limits.max_rewrite_work(),
+        recursion_limit,
+    ))
 }
 
 fn decode_document(
@@ -714,6 +929,7 @@ fn decode_document(
     root_references: RootReferences,
     max_sections: usize,
     max_text_bytes: usize,
+    limits: Limits,
 ) -> PackageResult<Document> {
     if let Some(identifier) = root_references.body {
         let object = find_object(components, identifier.get()).ok_or_else(|| {
@@ -721,9 +937,14 @@ fn decode_document(
                 "Pages body storage object {identifier} is missing"
             ))
         })?;
-        let (native, payload) =
-            decode_body_storage(&object.messages, identifier, max_sections, max_text_bytes)?;
-        validate_section_table_wire(payload, &native, identifier)?;
+        let (native, payload) = decode_body_storage(
+            &object.messages,
+            identifier,
+            max_sections,
+            max_text_bytes,
+            limits,
+        )?;
+        validate_section_table_wire_with_limits(payload, &native, identifier, limits)?;
         let section_references =
             native_section_references(&native, root_references.initial_section, max_sections)?;
         if section_references.is_empty() && max_sections == 0 {
@@ -772,9 +993,21 @@ fn decode_body_storage(
     identifier: NonZeroU64,
     max_sections: usize,
     max_text_bytes: usize,
+    limits: Limits,
 ) -> PackageResult<(tswp::StorageArchive, &[u8])> {
     let payload = unique_text_payload(messages, identifier)?;
-    preflight_body_wire(payload, identifier, max_sections, max_text_bytes)?;
+    let wire_limits = storage_rewrite_limits(limits).map_err(|limit_error| match limit_error {
+        StorageWireLimitsError::Physical(physical_error) => PackageError::Archive(physical_error),
+        StorageWireLimitsError::Wire(wire_error) => PackageError::InvalidFormat(format!(
+            "Pages body object {identifier} text validation limits are invalid: {wire_error}"
+        )),
+    })?;
+    litchi_iwa_text_wire::validate_storage_with_limits(payload, wire_limits).map_err(|error| {
+        PackageError::InvalidFormat(format!(
+            "Pages body object {identifier} text payload failed bounded validation: {error}"
+        ))
+    })?;
+    preflight_body_wire(payload, identifier, max_sections, max_text_bytes, limits)?;
     let native = tswp::StorageArchive::decode(payload).map_err(|error| {
         PackageError::InvalidFormat(format!(
             "Pages body object {identifier} text payload is invalid: {error}"
@@ -789,6 +1022,7 @@ fn preflight_body_wire(
     body_identifier: NonZeroU64,
     max_sections: usize,
     max_text_bytes: usize,
+    limits: Limits,
 ) -> PackageResult<()> {
     let context = format!("Pages body object {body_identifier}");
     let view = parse_wire(payload, &context)?;
@@ -839,6 +1073,7 @@ fn preflight_body_wire(
     };
     let table_view = parse_wire(wire_table_field.payload(), &context)?;
     let mut entry_count = 0usize;
+    let boundary_options = pages_body_options(limits)?;
     for field in table_view.fields().filter(|field| field.number() == 1) {
         validate_wire_field(field, 2, &context)?;
         entry_count = entry_count.checked_add(1).ok_or_else(|| {
@@ -851,7 +1086,12 @@ fn preflight_body_wire(
             }
             .into());
         }
-        preflight_section_table_entry(field.payload(), entry_count - 1, body_identifier)?;
+        preflight_section_table_entry(
+            field.payload(),
+            entry_count - 1,
+            body_identifier,
+            boundary_options,
+        )?;
     }
     Ok(())
 }
@@ -860,72 +1100,22 @@ fn preflight_section_table_entry(
     payload: &[u8],
     entry_index: usize,
     body_identifier: NonZeroU64,
+    options: PagesBodyDecodeOptions,
 ) -> PackageResult<()> {
     let context = format!("Pages body object {body_identifier} section table entry {entry_index}");
-    let view = parse_wire(payload, &context)?;
-    let character_index = unique_wire_field(&view, 1, 0, true, &context)?
-        .ok_or_else(|| PackageError::InvalidFormat(format!("{context} has no character index")))?;
-    let index = decode_canonical_varint(character_index.payload(), &context)?;
-    if u32::try_from(index).is_err() {
-        return Err(PackageError::InvalidFormat(format!(
-            "{context} character index exceeds u32"
-        )));
-    }
-    let section = unique_wire_field(&view, 2, 2, true, &context)?.ok_or_else(|| {
+    let boundary = pages_body_codec::decode_section_boundary(payload, options)
+        .map_err(|error| PackageError::InvalidFormat(format!("{context} is invalid: {error}")))?;
+    boundary.section().ok_or_else(|| {
         PackageError::InvalidFormat(format!("{context} has no section reference"))
     })?;
-    let identifier = decode_reference_identifier(section.payload(), &context)?;
-    if identifier == 0 {
-        return Err(PackageError::InvalidFormat(format!(
-            "{context} has a zero section reference"
-        )));
-    }
     Ok(())
 }
 
-fn nonzero_reference(
-    reference: Option<litchi_iwa_protos::tsp::Reference>,
-    context: &str,
-) -> PackageResult<Option<NonZeroU64>> {
-    reference
-        .map(|native_reference| {
-            NonZeroU64::new(native_reference.identifier)
-                .ok_or_else(|| PackageError::InvalidFormat(format!("{context} is zero")))
-        })
-        .transpose()
-}
-
-fn validate_optional_reference_field(
-    payload: &[u8],
-    field_number: u32,
-    decoded: Option<&litchi_iwa_protos::tsp::Reference>,
-    context: &str,
-) -> PackageResult<()> {
-    let view = parse_wire(payload, context)?;
-    let optional_field = unique_wire_field(&view, field_number, 2, false, context)?;
-    match (optional_field, decoded) {
-        (Some(wire_field), Some(reference)) => {
-            let identifier = decode_reference_identifier(wire_field.payload(), context)?;
-            if identifier != reference.identifier {
-                return Err(PackageError::InvalidFormat(format!(
-                    "{context} changed while decoding"
-                )));
-            }
-        },
-        (None, None) => {},
-        _ => {
-            return Err(PackageError::InvalidFormat(format!(
-                "{context} presence changed while decoding"
-            )));
-        },
-    }
-    Ok(())
-}
-
-fn validate_section_table_wire(
+fn validate_section_table_wire_with_limits(
     payload: &[u8],
     decoded: &tswp::StorageArchive,
     body_identifier: NonZeroU64,
+    limits: Limits,
 ) -> PackageResult<()> {
     let context = format!("Pages body object {body_identifier} section table");
     let view = parse_wire(payload, &context)?;
@@ -943,6 +1133,7 @@ fn validate_section_table_wire(
     let table_view = parse_wire(wire_field.payload(), &context)?;
     let mut decoded_entries = native_table.entries.iter();
     let mut entry_index = 0usize;
+    let boundary_options = pages_body_options(limits)?;
     for entry_field in table_view
         .fields()
         .filter(|candidate| candidate.number() == 1)
@@ -956,6 +1147,7 @@ fn validate_section_table_wire(
             decoded_entry,
             entry_index,
             body_identifier,
+            boundary_options,
         )?;
         entry_index = entry_index.checked_add(1).ok_or_else(|| {
             PackageError::InvalidFormat("Pages section entry count overflows usize".to_owned())
@@ -974,23 +1166,20 @@ fn validate_section_table_entry_wire(
     decoded: &tswp::object_attribute_table::ObjectAttribute,
     entry_index: usize,
     body_identifier: NonZeroU64,
+    options: PagesBodyDecodeOptions,
 ) -> PackageResult<()> {
     let context = format!("Pages body object {body_identifier} section table entry {entry_index}");
-    let view = parse_wire(payload, &context)?;
-    let character_index = unique_wire_field(&view, 1, 0, true, &context)?
-        .ok_or_else(|| PackageError::InvalidFormat(format!("{context} has no character index")))?;
-    let wire_index = decode_canonical_varint(character_index.payload(), &context)?;
-    if wire_index != u64::from(decoded.character_index) {
+    let boundary = pages_body_codec::decode_section_boundary(payload, options)
+        .map_err(|error| PackageError::InvalidFormat(format!("{context} is invalid: {error}")))?;
+    if boundary.character_index() != decoded.character_index {
         return Err(PackageError::InvalidFormat(format!(
             "{context} character index changed while decoding"
         )));
     }
 
-    let object = unique_wire_field(&view, 2, 2, false, &context)?;
-    match (object, decoded.object.as_ref()) {
-        (Some(field), Some(reference)) => {
-            let identifier = decode_reference_identifier(field.payload(), &context)?;
-            if identifier != reference.identifier {
+    match (boundary.section(), decoded.object.as_ref()) {
+        (Some(reference), Some(decoded_reference)) => {
+            if reference.identifier().get() != decoded_reference.identifier {
                 return Err(PackageError::InvalidFormat(format!(
                     "{context} section reference changed while decoding"
                 )));
@@ -1054,26 +1243,6 @@ fn validate_wire_field(
             field.number()
         ))
     })
-}
-
-fn decode_reference_identifier(payload: &[u8], context: &str) -> PackageResult<u64> {
-    let view = parse_wire(payload, context)?;
-    let field = unique_wire_field(&view, 1, 0, true, context)?
-        .ok_or_else(|| PackageError::InvalidFormat(format!("{context} has no identifier")))?;
-    decode_canonical_varint(field.payload(), context)
-}
-
-fn decode_canonical_varint(payload: &[u8], context: &str) -> PackageResult<u64> {
-    let (value, length) =
-        litchi_iwa_common::varint::decode_varint_from_bytes(payload).map_err(|error| {
-            PackageError::InvalidFormat(format!("{context} has invalid varint: {error}"))
-        })?;
-    if length != payload.len() || length != litchi_iwa_common::varint::encoded_len(value) {
-        return Err(PackageError::InvalidFormat(format!(
-            "{context} has a noncanonical varint"
-        )));
-    }
-    Ok(value)
 }
 
 fn native_section_references(
@@ -1643,7 +1812,7 @@ fn unique_text_payload(
 ) -> PackageResult<&[u8]> {
     let mut payload = None;
     for message in messages {
-        if matches!(message.type_, 2001 | 2022)
+        if is_body_text_message_type(message.type_)
             && payload.replace(message.data.as_slice()).is_some()
         {
             return Err(PackageError::InvalidFormat(format!(
@@ -1683,18 +1852,89 @@ fn effective_text_limit(limits: Limits) -> usize {
     limits.max_iwa_stream_bytes().min(DEFAULT_MAX_TEXT_BYTES)
 }
 
+fn storage_rewrite_limits(
+    limits: Limits,
+) -> Result<litchi_iwa_text_wire::RewriteLimits, StorageWireLimitsError> {
+    let archive_limits = limits
+        .effective_archive_limits()
+        .map_err(StorageWireLimitsError::Physical)?;
+    let maximum = archive_limits.max_message_bytes();
+    let common = WireLimits::default();
+    let fields = common.max_fields().min(archive_limits.max_header_fields());
+    let nesting = common
+        .max_nesting()
+        .min(archive_limits.max_header_nesting());
+    let fragments = fields.min(litchi_iwa_text_wire::MAX_FRAGMENTS);
+    let table_entries = fields;
+    let object_references = fields.min(archive_limits.max_metadata_items());
+    litchi_iwa_text_wire::RewriteLimits::new(
+        maximum,
+        fields,
+        nesting,
+        fragments,
+        effective_text_limit(limits),
+        table_entries,
+        object_references,
+        maximum,
+        common.max_rewrite_work(),
+    )
+    .map_err(StorageWireLimitsError::Wire)
+}
+
+const fn is_body_text_message_type(type_id: u32) -> bool {
+    matches!(type_id, 2001 | 2022)
+}
+
 const fn is_storage_message_type(type_id: u32) -> bool {
     matches!(type_id, 2001..=2014 | 2022)
 }
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+    use std::io::{self, Cursor, Write};
+
     use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
-    use litchi_iwa_protos::tsp::Reference;
     use litchi_iwa_protos::tswp::{ObjectAttributeTable, object_attribute_table::ObjectAttribute};
+    use litchi_iwa_protos::{tp, tsp::Reference};
     use soapberry_zip::office::StreamingArchiveWriter;
 
     use super::*;
+
+    struct InterruptedOnce<R> {
+        inner: R,
+        pending: bool,
+    }
+
+    impl<R> InterruptedOnce<R> {
+        const fn new(inner: R) -> Self {
+            Self {
+                inner,
+                pending: true,
+            }
+        }
+    }
+
+    impl<R: Read> Read for InterruptedOnce<R> {
+        fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+            if self.pending {
+                self.pending = false;
+                return Err(io::ErrorKind::Interrupted.into());
+            }
+            self.inner.read(buffer)
+        }
+    }
+
+    fn limits_with_input_bytes(max_input_bytes: u64) -> PackageResult<Limits> {
+        let defaults = Limits::default();
+        Ok(Limits::new(
+            max_input_bytes,
+            defaults.max_entries(),
+            defaults.max_entry_bytes(),
+            defaults.max_total_bytes(),
+            defaults.max_iwa_stream_bytes(),
+        )?)
+    }
 
     fn package_bytes(
         body: Option<&str>,
@@ -1853,6 +2093,203 @@ mod tests {
     }
 
     #[test]
+    fn bounded_reader_accepts_exact_limit_and_detects_growth() -> PackageResult<()> {
+        let limits = limits_with_input_bytes(4)?;
+
+        let mut exact = Cursor::new([1_u8, 2, 3, 4]);
+        assert_eq!(
+            read_source_with_reported_length(&mut exact, 4, limits)?.as_ref(),
+            &[1, 2, 3, 4]
+        );
+        assert_eq!(exact.position(), 4);
+
+        let mut initially_empty = Cursor::new([1_u8, 2, 3, 4]);
+        assert_eq!(
+            read_source_with_reported_length(&mut initially_empty, 0, limits)?.as_ref(),
+            &[1, 2, 3, 4]
+        );
+        assert_eq!(initially_empty.position(), 4);
+
+        let growing_bytes = vec![0x5a_u8; 20 * 1024];
+        let growing_limits = limits_with_input_bytes(20 * 1024)?;
+        let mut growing = Cursor::new(growing_bytes.as_slice());
+        assert_eq!(
+            read_source_with_reported_length(&mut growing, 0, growing_limits)?.as_ref(),
+            growing_bytes
+        );
+
+        let mut grew_over_limit = Cursor::new([1_u8, 2, 3, 4, 5]);
+        let growth_error = read_source_with_reported_length(&mut grew_over_limit, 0, limits)
+            .err()
+            .unwrap_or_else(|| panic!("one byte beyond the input limit must fail"));
+        assert!(
+            growth_error
+                .to_string()
+                .contains("Pages package input exceeds the 4 byte limit")
+        );
+        assert_eq!(grew_over_limit.position(), 5);
+
+        let mut overreported = Cursor::new([1_u8, 2, 3, 4, 5]);
+        let reported_length_error = read_source_with_reported_length(&mut overreported, 5, limits)
+            .err()
+            .unwrap_or_else(|| panic!("an oversized reported length must fail"));
+        assert!(reported_length_error.to_string().contains("4 byte limit"));
+        assert_eq!(overreported.position(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn bounded_reader_retries_interrupted_reads() -> PackageResult<()> {
+        let limits = limits_with_input_bytes(4)?;
+        let mut reader = InterruptedOnce::new(Cursor::new([1_u8, 2, 3, 4]));
+
+        assert_eq!(
+            read_source_with_reported_length(&mut reader, 0, limits)?.as_ref(),
+            &[1, 2, 3, 4]
+        );
+        assert!(!reader.pending);
+        Ok(())
+    }
+
+    #[test]
+    fn descriptor_stability_rejects_length_mismatch_and_mutation() -> PackageResult<()> {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("stable.pages");
+        fs::write(&path, [1_u8, 2, 3, 4])?;
+        let file = OpenOptions::new().read(true).write(true).open(&path)?;
+        let before = FileSnapshot::from_metadata(&file.metadata()?);
+
+        ensure_source_unchanged(before, before, 4)?;
+        let length_error = ensure_source_unchanged(before, before, 3)
+            .err()
+            .unwrap_or_else(|| panic!("an observed-length mismatch must fail"));
+        assert!(length_error.to_string().contains("changed while"));
+
+        file.set_len(5)?;
+        let after = FileSnapshot::from_metadata(&file.metadata()?);
+        let mutation_error = ensure_source_unchanged(before, after, 4)
+            .err()
+            .unwrap_or_else(|| panic!("a descriptor mutation must fail"));
+        assert!(mutation_error.to_string().contains("changed while"));
+        assert!(
+            !mutation_error
+                .to_string()
+                .contains(path.to_string_lossy().as_ref())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn path_reader_retains_one_shared_source_allocation() -> PackageResult<()> {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("valid-pages-package.pages");
+        let expected = package_bytes(Some("Shared source"), true, false)?;
+        let mut file = fs::File::create(&path)?;
+        file.write_all(&expected)?;
+        file.sync_all()?;
+
+        let limits = Limits::default();
+        let source = read_path(&path, limits)?;
+        let source_pointer = source.as_ptr();
+        let catalog = SourceCatalog::from_shared_bytes_with_limits(Arc::clone(&source), limits)?;
+        assert_eq!(catalog.source_bytes().as_ptr(), source_pointer);
+        assert_eq!(catalog.source_bytes(), expected);
+
+        let package = Package::open(&path)?;
+        assert_eq!(package.text()?, "Shared source");
+        Ok(())
+    }
+
+    #[test]
+    fn path_errors_reject_non_files_without_disclosing_paths() -> PackageResult<()> {
+        let directory = tempfile::tempdir()?;
+        let secret_directory = directory.path().join("private-pages-path-do-not-leak");
+        fs::create_dir(&secret_directory)?;
+
+        let directory_error = Package::open(&secret_directory)
+            .err()
+            .unwrap_or_else(|| panic!("a directory must not be accepted as a Pages package"));
+        assert!(directory_error.to_string().contains("regular file"));
+        assert!(
+            !directory_error
+                .to_string()
+                .contains("private-pages-path-do-not-leak")
+        );
+        assert!(
+            !directory_error
+                .to_string()
+                .contains(secret_directory.to_string_lossy().as_ref())
+        );
+
+        let missing = directory.path().join("private-missing-path-do-not-leak");
+        let missing_error = Package::open(&missing)
+            .err()
+            .unwrap_or_else(|| panic!("a missing path must fail"));
+        assert!(
+            !missing_error
+                .to_string()
+                .contains("private-missing-path-do-not-leak")
+        );
+        assert!(
+            !missing_error
+                .to_string()
+                .contains(missing.to_string_lossy().as_ref())
+        );
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unix_path_reader_rejects_symlinks_and_fifos_without_disclosure() -> PackageResult<()> {
+        use std::os::unix::fs::symlink;
+        use std::process::Command;
+
+        let directory = tempfile::tempdir()?;
+        let target = directory.path().join("target.pages");
+        fs::write(&target, [0_u8])?;
+
+        let symlink_path = directory.path().join("private-pages-symlink-do-not-leak");
+        symlink(&target, &symlink_path)?;
+        let symlink_error = Package::open(&symlink_path)
+            .err()
+            .unwrap_or_else(|| panic!("a symbolic link must not be followed"));
+        assert!(matches!(&symlink_error, PackageError::InvalidFormat(_)));
+        assert!(
+            !symlink_error
+                .to_string()
+                .contains("private-pages-symlink-do-not-leak")
+        );
+        assert!(
+            !symlink_error
+                .to_string()
+                .contains(symlink_path.to_string_lossy().as_ref())
+        );
+
+        let fifo_path = directory.path().join("private-pages-fifo-do-not-leak");
+        let status = Command::new("mkfifo").arg(&fifo_path).status()?;
+        if !status.success() {
+            return Err(PackageError::InvalidFormat(
+                "test could not create a Pages FIFO".to_owned(),
+            ));
+        }
+        let fifo_error = Package::open(&fifo_path)
+            .err()
+            .unwrap_or_else(|| panic!("a FIFO must not be accepted as a Pages package"));
+        assert!(fifo_error.to_string().contains("regular file"));
+        assert!(
+            !fifo_error
+                .to_string()
+                .contains("private-pages-fifo-do-not-leak")
+        );
+        assert!(
+            !fifo_error
+                .to_string()
+                .contains(fifo_path.to_string_lossy().as_ref())
+        );
+        Ok(())
+    }
+
+    #[test]
     fn package_decodes_root_text_metadata_and_shared_snapshots() -> PackageResult<()> {
         let package = Package::from_bytes(&package_bytes(Some("Pages body"), true, true)?)?;
 
@@ -1876,6 +2313,77 @@ mod tests {
             package.semantic_document(),
             snapshot.semantic_document()
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn package_root_projection_requires_unique_base_envelope() -> PackageResult<()> {
+        let missing_super = archive_package_bytes(
+            vec![
+                ArchiveObject::new(
+                    1,
+                    vec![RawMessage {
+                        type_: 10_000,
+                        data: vec![0x22, 0x02, 0x08, 0x2a],
+                    }],
+                )
+                .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
+            ],
+            false,
+        )?;
+        let missing_error = Package::from_bytes(&missing_super)
+            .err()
+            .unwrap_or_else(|| panic!("a Pages root without its base envelope must fail"));
+        assert!(
+            missing_error
+                .to_string()
+                .contains("TP.DocumentArchive.super")
+        );
+
+        let duplicate_body = archive_package_bytes(
+            vec![
+                ArchiveObject::new(
+                    1,
+                    vec![RawMessage {
+                        type_: 10_000,
+                        data: vec![0x22, 0x02, 0x08, 0x2a, 0x22, 0x02, 0x08, 0x2b, 0x7a, 0x00],
+                    }],
+                )
+                .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
+            ],
+            false,
+        )?;
+        let duplicate_error = Package::from_bytes(&duplicate_body)
+            .err()
+            .unwrap_or_else(|| panic!("duplicate Pages body references must fail"));
+        assert!(
+            duplicate_error
+                .to_string()
+                .contains("TP.DocumentArchive.body_storage")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn section_boundary_projection_rejects_ambiguous_references() -> PackageResult<()> {
+        let decoded = ObjectAttribute {
+            character_index: 0,
+            object: Some(Reference {
+                identifier: 42,
+                ..Reference::default()
+            }),
+        };
+        let duplicate_reference = [0x08, 0x00, 0x12, 0x02, 0x08, 0x2a, 0x12, 0x02, 0x08, 0x2b];
+        let error = validate_section_table_entry_wire(
+            &duplicate_reference,
+            &decoded,
+            0,
+            NonZeroU64::MIN,
+            pages_body_options(Limits::default())?,
+        )
+        .err()
+        .unwrap_or_else(|| panic!("duplicate section references must fail strict projection"));
+        assert!(error.to_string().contains("ObjectAttribute.object"));
         Ok(())
     }
 
@@ -1976,8 +2484,12 @@ mod tests {
         let (components, limits) = semantic_components_from_prepared_source(prepared)?;
         assert!(weak_source.upgrade().is_none());
 
-        let document =
-            decode_semantic_components(&components, MAX_SECTIONS, effective_text_limit(limits))?;
+        let document = decode_semantic_components(
+            &components,
+            MAX_SECTIONS,
+            effective_text_limit(limits),
+            limits,
+        )?;
         assert_eq!(document.plain_text(), "Single parse");
         Ok(())
     }
@@ -2196,7 +2708,7 @@ mod tests {
         assert!(
             duplicate_boundary
                 .to_string()
-                .contains("multiple section boundaries")
+                .contains("duplicate or unsorted")
         );
 
         let missing_break = sectioned_package_bytes(

@@ -152,7 +152,7 @@ pub mod raw {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::ZeroId`] when `value` is zero.
+    /// Returns [`super::Error::ZeroId`] when `value` is zero.
     pub fn from_native_id(value: u64) -> Result<ParagraphStyleId> {
         ParagraphStyleId::from_raw(value)
     }

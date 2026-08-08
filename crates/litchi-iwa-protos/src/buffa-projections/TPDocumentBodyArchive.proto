@@ -1,0 +1,32 @@
+// Wire-only Buffa projection derived from these canonical IWA declarations:
+//
+// - `TSPMessages.proto`: the three scalar fields of `TSP.Reference`;
+// - `TPArchives.proto`: `TP.DocumentArchive.body_storage` (field 4) and
+//   `section` (field 5);
+// - `TSWPArchives.proto`: the two fields of
+//   `TSWP.ObjectAttributeTable.ObjectAttribute`, used as a section boundary.
+//
+// `TP.DocumentArchive.super`, field 15, is deliberately absent. The strict
+// adapter checks its required outer framing but leaves its payload opaque.
+// Section-table repetition is routed from caller-owned source bytes, so this
+// projection contains no collection-valued message field and never owns an
+// input-width collection. Caller-owned IWA bytes remain authoritative.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message Reference {
+  required uint64 identifier = 1;
+  optional int32 deprecated_type = 2;
+  optional bool deprecated_is_external = 3;
+}
+
+message PagesDocumentBodyArchive {
+  optional .LitchiIwaProjection.Reference body_storage = 4;
+  optional .LitchiIwaProjection.Reference initial_section = 5;
+}
+
+message PagesSectionBoundaryEntry {
+  required uint32 character_index = 1;
+  optional .LitchiIwaProjection.Reference section = 2;
+}

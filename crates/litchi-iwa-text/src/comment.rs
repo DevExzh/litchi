@@ -78,7 +78,7 @@ pub mod raw {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::ZeroCommentId`] for the native zero sentinel.
+    /// Returns [`super::Error::ZeroCommentId`] for the native zero sentinel.
     pub const fn comment_id(identifier: u64) -> Result<TextCommentId> {
         TextCommentId::from_raw(identifier)
     }
@@ -93,7 +93,7 @@ pub mod raw {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::ZeroReplyId`] for the native zero sentinel.
+    /// Returns [`super::Error::ZeroReplyId`] for the native zero sentinel.
     pub const fn reply_id(identifier: u64) -> Result<TextCommentReplyId> {
         TextCommentReplyId::from_raw(identifier)
     }

@@ -7,6 +7,14 @@
 
 #![forbid(unsafe_code)]
 
+mod rewrite;
+
+pub use rewrite::{
+    RemovedObjectReference, RewriteBehavior, RewriteError, RewriteLimits, RewriteResult,
+    StorageRewrite, StorageValidation, rewrite_storage_text_with_behavior_and_limits,
+    rewrite_storage_text_with_limits, validate_storage_with_limits,
+};
+
 use std::{cell::Cell, mem::size_of};
 
 use litchi_iwa_common::{WireLimits, wire::WireDescent, wire::preflight_wire_tree_with_limits};

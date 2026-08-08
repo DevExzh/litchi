@@ -35,4 +35,4 @@ pub use character::{
 pub use font::{Font, Name, NameError};
 pub use highlight::{TextHighlight, TextHighlightId};
 pub use language::{Error as LanguageError, TextLanguage, TextLanguageRun, TextLanguageTag};
-pub use position::{Error as PositionError, TextPosition, TextRange};
+pub use position::{Error as PositionError, TextPosition, TextRange, TextSpan};

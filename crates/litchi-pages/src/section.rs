@@ -437,9 +437,25 @@ impl Section {
     }
 
     /// Returns whether the section has no modeled content.
+    ///
+    /// Empty rich-text storages are native container artifacts rather than
+    /// semantic content. Heading and paragraph presence remains modeled
+    /// content, preserving their structural meaning even when their text is
+    /// empty.
     #[must_use]
     pub const fn is_empty(&self) -> bool {
-        self.heading.is_none() && self.paragraphs.is_empty() && self.text_storages.is_empty()
+        if self.heading.is_some() || !self.paragraphs.is_empty() {
+            return false;
+        }
+
+        let mut index = 0;
+        while index < self.text_storages.len() {
+            if !self.text_storages[index].is_empty() {
+                return false;
+            }
+            index += 1;
+        }
+        true
     }
 
     /// Return the rendered section length when all additions are representable.
@@ -742,6 +758,51 @@ mod tests {
             "Introduction\nFirst paragraph\nStorage text"
         );
         assert_eq!(section.checked_text_len(), Some(section.plain_text().len()));
+    }
+
+    #[test]
+    fn section_without_text_storages_is_semantically_empty() {
+        let section = Section::new(0, SectionType::Body);
+
+        assert!(section.text_storages().is_empty());
+        assert_eq!(section.plain_text(), "");
+        assert!(section.is_empty());
+    }
+
+    #[test]
+    fn one_empty_text_storage_is_semantically_empty() {
+        let mut builder = Section::builder(0, SectionType::Body);
+        builder.push_text_storage(Storage::new());
+        let section = builder.build();
+
+        assert_eq!(section.text_storages().len(), 1);
+        assert_eq!(section.plain_text(), "");
+        assert!(section.is_empty());
+    }
+
+    #[test]
+    fn multiple_empty_text_storages_are_semantically_empty() {
+        let mut builder = Section::builder(0, SectionType::Body);
+        builder.push_text_storage(Storage::new());
+        builder.push_text_storage(Storage::from_text(String::new()));
+        builder.push_text_storage(Storage::new());
+        let section = builder.build();
+
+        assert_eq!(section.text_storages().len(), 3);
+        assert_eq!(section.plain_text(), "");
+        assert!(section.is_empty());
+    }
+
+    #[test]
+    fn any_nonempty_text_storage_makes_section_nonempty() {
+        let mut builder = Section::builder(0, SectionType::Body);
+        builder.push_text_storage(Storage::new());
+        builder.push_text_storage(Storage::from_text("content".to_owned()));
+        builder.push_text_storage(Storage::new());
+        let section = builder.build();
+
+        assert_eq!(section.plain_text(), "content");
+        assert!(!section.is_empty());
     }
 
     #[test]

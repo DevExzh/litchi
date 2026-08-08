@@ -32,7 +32,7 @@ use std::io::Read;
 use std::mem::size_of;
 
 use litchi_iwa_common::wire::{
-    WireDescent, WirePreflight, WireVisit, parse_wire_fields_with_limits,
+    WireDescent, WireField, WirePreflight, WireVisit, parse_wire_fields_with_limits,
     preflight_wire_tree_with_limits,
 };
 use litchi_iwa_common::{Error as WireError, LimitKind as WireLimitKind, WireLimits};
@@ -712,14 +712,14 @@ impl ArchiveObject {
         check_message_length(message.data.len(), limits)?;
 
         let canonical_before = encode_archive_info(&self.archive_info, limits)?;
-        let source_header = match (
+        let (source_header, retained_source_header) = match (
             self.original_header.as_deref(),
             self.original_canonical_header.as_deref(),
         ) {
             (Some(original), Some(canonical)) if canonical == canonical_before.as_slice() => {
-                original
+                (original, true)
             },
-            _ => canonical_before.as_slice(),
+            _ => (canonical_before.as_slice(), false),
         };
         // Re-apply the caller's current limit profile to retained raw bytes.
         // An object may have been opened under a broader profile.
@@ -745,8 +745,15 @@ impl ArchiveObject {
                     "raw ArchiveInfo rewrite changed unrelated metadata",
                 ));
             }
-            validate_raw_object_size(self, rewritten_header.len(), limits)?;
-            encode_archive_info(&self.archive_info, limits)
+            let canonical = encode_archive_info(&self.archive_info, limits)?;
+            let published_header_length = if retained_source_header && rewritten_header != canonical
+            {
+                rewritten_header.len()
+            } else {
+                canonical.len()
+            };
+            validate_raw_object_size(self, published_header_length, limits)?;
+            Ok(canonical)
         })();
         let canonical_after = match verification {
             Ok(canonical) => canonical,
@@ -756,13 +763,151 @@ impl ArchiveObject {
             },
         };
 
-        if rewritten_header == canonical_after {
-            self.original_header = None;
-            self.original_canonical_header = None;
-        } else {
+        if retained_source_header && rewritten_header != canonical_after {
             self.original_header = Some(rewritten_header.into_boxed_slice());
             self.original_canonical_header = Some(canonical_after.into_boxed_slice());
+        } else {
+            self.original_header = None;
+            self.original_canonical_header = None;
         }
+        Ok(old)
+    }
+
+    /// Replace one payload and prune selected object references while
+    /// preserving every untouched `ArchiveInfo` byte.
+    ///
+    /// The identifiers are removed from the selected `MessageInfo`'s
+    /// top-level object references and from the object references of every
+    /// nested `FieldInfo`. Packed and unpacked uint64 fields may be mixed;
+    /// retained values keep their original encoding and order. Duplicate
+    /// identifiers in `identifiers` are harmless. An empty slice delegates to
+    /// [`Self::replace_message_preserving_header`] exactly.
+    ///
+    /// This physical primitive does not prove graph exclusivity. The caller
+    /// must establish that every supplied identifier has no surviving
+    /// payload or opaque-field ownership and that removing it from *all* of
+    /// the selected message's reference metadata is semantically valid.
+    pub fn replace_message_pruning_object_references_preserving_header(
+        &mut self,
+        index: usize,
+        message: RawMessage,
+        identifiers: &[u64],
+    ) -> Result<RawMessage> {
+        self.replace_message_pruning_object_references_preserving_header_with_limits(
+            index,
+            message,
+            identifiers,
+            Limits::default(),
+        )
+    }
+
+    /// Replace one payload and prune selected object references while
+    /// preserving untouched `ArchiveInfo` bytes under explicit limits.
+    ///
+    /// All raw and neutral metadata is prepared and validated before the
+    /// object is mutated, so every error leaves the object unchanged. The
+    /// caller retains the graph-ownership proof described by
+    /// [`Self::replace_message_pruning_object_references_preserving_header`].
+    pub fn replace_message_pruning_object_references_preserving_header_with_limits(
+        &mut self,
+        index: usize,
+        message: RawMessage,
+        identifiers: &[u64],
+        limits: Limits,
+    ) -> Result<RawMessage> {
+        if identifiers.is_empty() {
+            return self.replace_message_preserving_header_with_limits(index, message, limits);
+        }
+
+        let limits = limits.validate()?;
+        if identifiers.len() > limits.max_metadata_items() {
+            return Err(limit(
+                LimitKind::MetadataItems,
+                identifiers.len(),
+                limits.max_metadata_items(),
+            ));
+        }
+        self.validate_with_limits(limits)?;
+        let current_info = self
+            .archive_info
+            .message_infos
+            .get(index)
+            .ok_or_else(|| Error::invalid_archive(index, "message index is out of bounds"))?;
+        let replacement_length = u32::try_from(message.data.len())
+            .map_err(|_| Error::invalid_archive(index, "message payload exceeds u32"))?;
+        check_message_length(message.data.len(), limits)?;
+
+        let mut removals = HashSet::new();
+        removals.try_reserve(identifiers.len()).map_err(|_| {
+            Error::allocation("IWA object-reference removal set", identifiers.len())
+        })?;
+        removals.extend(identifiers.iter().copied());
+
+        let canonical_before = encode_archive_info(&self.archive_info, limits)?;
+        let (source_header, retained_source_header) = match (
+            self.original_header.as_deref(),
+            self.original_canonical_header.as_deref(),
+        ) {
+            (Some(original), Some(canonical)) if canonical == canonical_before.as_slice() => {
+                (original, true)
+            },
+            _ => (canonical_before.as_slice(), false),
+        };
+        // The retained header may have been admitted by a broader profile.
+        // Revalidate its complete nested wire tree under the caller's limits.
+        preflight_header(source_header, HeaderKind::ArchiveInfo, limits)?;
+        let rewritten_header = rewrite_message_metadata_and_prune_object_references_in_header(
+            source_header,
+            self.archive_info.message_infos.len(),
+            index,
+            current_info.type_,
+            current_info.length,
+            message.type_,
+            replacement_length,
+            &removals,
+            limits,
+        )?;
+
+        let rewritten_info = ArchiveInfo::decode_with_limits(&rewritten_header, limits)?;
+        verify_pruned_archive_info(
+            &self.archive_info,
+            &rewritten_info,
+            index,
+            message.type_,
+            replacement_length,
+            &removals,
+        )?;
+        let canonical_after = encode_archive_info(&rewritten_info, limits)?;
+        let retain_rewritten_header = retained_source_header && rewritten_header != canonical_after;
+        let published_header_length = if retain_rewritten_header {
+            rewritten_header.len()
+        } else {
+            canonical_after.len()
+        };
+        validate_raw_object_size_with_replacement(
+            self,
+            index,
+            message.data.len(),
+            published_header_length,
+            limits,
+        )?;
+        let (original_header, original_canonical_header) = if retain_rewritten_header {
+            (
+                Some(rewritten_header.into_boxed_slice()),
+                Some(canonical_after.into_boxed_slice()),
+            )
+        } else {
+            (None, None)
+        };
+
+        let message_slot = self
+            .messages
+            .get_mut(index)
+            .ok_or_else(|| Error::invalid_archive(index, "message index is out of bounds"))?;
+        let old = std::mem::replace(message_slot, message);
+        self.archive_info = rewritten_info;
+        self.original_header = original_header;
+        self.original_canonical_header = original_canonical_header;
         Ok(old)
     }
 
@@ -1153,6 +1298,14 @@ impl Default for Archive {
     }
 }
 
+#[derive(Debug)]
+enum HeaderFieldRewrite {
+    Retain,
+    Remove,
+    Varint(u64),
+    LengthDelimited(Vec<u8>),
+}
+
 fn rewrite_message_metadata_in_header(
     source: &[u8],
     message_index: usize,
@@ -1338,6 +1491,527 @@ fn rewrite_effective_message_scalars(
     Ok(output)
 }
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the raw rewrite verifies source cardinality and both old and new required scalars"
+)]
+fn rewrite_message_metadata_and_prune_object_references_in_header(
+    source: &[u8],
+    expected_message_count: usize,
+    message_index: usize,
+    current_type: u32,
+    current_length: u32,
+    replacement_type: u32,
+    replacement_length: u32,
+    removals: &HashSet<u64>,
+    limits: Limits,
+) -> Result<Vec<u8>> {
+    let wire_limits = header_wire_limits(limits)?;
+    let fields = parse_wire_fields_with_limits(source, wire_limits)
+        .map_err(|error| map_wire_error(error, HeaderKind::ArchiveInfo))?;
+    let mut message_count = 0usize;
+    let mut target = None;
+    for (field_index, field) in fields.iter().copied().enumerate() {
+        if field.number() != 2 {
+            continue;
+        }
+        if field.wire_type() != 2 {
+            return Err(Error::invalid_archive(
+                message_index,
+                "ArchiveInfo contains an ambiguous MessageInfo field",
+            ));
+        }
+        if message_count == message_index {
+            target = Some((field_index, field));
+        }
+        message_count = message_count.checked_add(1).ok_or_else(|| {
+            Error::invalid_archive(message_index, "message metadata count overflow")
+        })?;
+    }
+    if message_count != expected_message_count {
+        return Err(Error::invalid_archive(
+            message_index,
+            "raw and neutral MessageInfo counts differ",
+        ));
+    }
+    let (target_index, target_field) = target.ok_or_else(|| {
+        Error::invalid_archive(
+            message_index,
+            "message metadata is missing from ArchiveInfo",
+        )
+    })?;
+    let message_source = target_field
+        .payload(source)
+        .map_err(|error| map_wire_error(error, HeaderKind::ArchiveInfo))?;
+    let Some(rewritten_message) = rewrite_effective_message_scalars_and_object_references(
+        message_source,
+        current_type,
+        current_length,
+        replacement_type,
+        replacement_length,
+        removals,
+        wire_limits,
+        limits,
+        message_index,
+    )?
+    else {
+        return try_copy_bytes(source, "IWA preserved ArchiveInfo header");
+    };
+
+    let mut rewrites = retained_field_rewrites(fields.len())?;
+    assign_header_field_rewrite(
+        &mut rewrites,
+        target_index,
+        HeaderFieldRewrite::LengthDelimited(rewritten_message),
+        message_index,
+    )?;
+    assemble_header_field_rewrites(
+        source,
+        &fields,
+        &rewrites,
+        HeaderKind::ArchiveInfo,
+        limits,
+        message_index,
+        "IWA pruned ArchiveInfo header",
+    )
+}
+
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the raw rewrite verifies both old and new required MessageInfo scalars"
+)]
+fn rewrite_effective_message_scalars_and_object_references(
+    source: &[u8],
+    current_type: u32,
+    current_length: u32,
+    replacement_type: u32,
+    replacement_length: u32,
+    removals: &HashSet<u64>,
+    wire_limits: WireLimits,
+    limits: Limits,
+    message_index: usize,
+) -> Result<Option<Vec<u8>>> {
+    let fields = parse_wire_fields_with_limits(source, wire_limits)
+        .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
+    let type_field = effective_required_varint_field(
+        source,
+        &fields,
+        1,
+        u64::from(current_type),
+        message_index,
+        "MessageInfo type field is missing",
+        "raw and neutral MessageInfo types differ",
+    )?;
+    let length_field = effective_required_varint_field(
+        source,
+        &fields,
+        3,
+        u64::from(current_length),
+        message_index,
+        "MessageInfo length field is missing",
+        "raw and neutral MessageInfo lengths differ",
+    )?;
+
+    let mut rewrites = retained_field_rewrites(fields.len())?;
+    if current_type != replacement_type {
+        assign_header_field_rewrite(
+            &mut rewrites,
+            type_field,
+            HeaderFieldRewrite::Varint(u64::from(replacement_type)),
+            message_index,
+        )?;
+    }
+    if current_length != replacement_length {
+        assign_header_field_rewrite(
+            &mut rewrites,
+            length_field,
+            HeaderFieldRewrite::Varint(u64::from(replacement_length)),
+            message_index,
+        )?;
+    }
+
+    for (field_index, field) in fields.iter().copied().enumerate() {
+        match field.number() {
+            4 => {
+                if field.wire_type() != 2 {
+                    return Err(Error::invalid_archive(
+                        message_index,
+                        "MessageInfo contains an ambiguous FieldInfo field",
+                    ));
+                }
+                let field_info = field
+                    .payload(source)
+                    .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
+                if let Some(rewritten) = rewrite_field_info_object_references(
+                    field_info,
+                    removals,
+                    wire_limits,
+                    limits,
+                    message_index,
+                )? {
+                    assign_header_field_rewrite(
+                        &mut rewrites,
+                        field_index,
+                        HeaderFieldRewrite::LengthDelimited(rewritten),
+                        message_index,
+                    )?;
+                }
+            },
+            5 => {
+                let rewrite =
+                    rewrite_object_reference_field(source, field, removals, message_index)?;
+                assign_header_field_rewrite(&mut rewrites, field_index, rewrite, message_index)?;
+            },
+            _ => {},
+        }
+    }
+
+    if rewrites
+        .iter()
+        .all(|rewrite| matches!(rewrite, HeaderFieldRewrite::Retain))
+    {
+        return Ok(None);
+    }
+    assemble_header_field_rewrites(
+        source,
+        &fields,
+        &rewrites,
+        HeaderKind::MessageInfo,
+        limits,
+        message_index,
+        "IWA pruned MessageInfo header",
+    )
+    .map(Some)
+}
+
+fn rewrite_field_info_object_references(
+    source: &[u8],
+    removals: &HashSet<u64>,
+    wire_limits: WireLimits,
+    limits: Limits,
+    message_index: usize,
+) -> Result<Option<Vec<u8>>> {
+    let fields = parse_wire_fields_with_limits(source, wire_limits)
+        .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
+    let mut rewrites = retained_field_rewrites(fields.len())?;
+    for (field_index, field) in fields.iter().copied().enumerate() {
+        if field.number() == 4 {
+            let rewrite = rewrite_object_reference_field(source, field, removals, message_index)?;
+            assign_header_field_rewrite(&mut rewrites, field_index, rewrite, message_index)?;
+        }
+    }
+    if rewrites
+        .iter()
+        .all(|rewrite| matches!(rewrite, HeaderFieldRewrite::Retain))
+    {
+        return Ok(None);
+    }
+    assemble_header_field_rewrites(
+        source,
+        &fields,
+        &rewrites,
+        HeaderKind::MessageInfo,
+        limits,
+        message_index,
+        "IWA pruned FieldInfo header",
+    )
+    .map(Some)
+}
+
+fn effective_required_varint_field(
+    source: &[u8],
+    fields: &[WireField],
+    number: u32,
+    expected: u64,
+    message_index: usize,
+    missing_reason: &'static str,
+    mismatch_reason: &'static str,
+) -> Result<usize> {
+    let mut effective = None;
+    for (field_index, field) in fields.iter().copied().enumerate() {
+        if field.number() != number {
+            continue;
+        }
+        if field.wire_type() != 0 {
+            return Err(Error::invalid_archive(
+                message_index,
+                "MessageInfo contains an ambiguous required scalar",
+            ));
+        }
+        let payload = field
+            .payload(source)
+            .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
+        let (value, encoded_length) = litchi_iwa_common::decode_varint_from_bytes(payload)
+            .map_err(|_| Error::invalid_archive(message_index, "malformed required scalar"))?;
+        if encoded_length != payload.len() {
+            return Err(Error::invalid_archive(
+                message_index,
+                "required scalar has trailing bytes",
+            ));
+        }
+        effective = Some((field_index, value));
+    }
+    let (field_index, value) =
+        effective.ok_or_else(|| Error::invalid_archive(message_index, missing_reason))?;
+    if value != expected {
+        return Err(Error::invalid_archive(message_index, mismatch_reason));
+    }
+    Ok(field_index)
+}
+
+fn rewrite_object_reference_field(
+    source: &[u8],
+    field: WireField,
+    removals: &HashSet<u64>,
+    message_index: usize,
+) -> Result<HeaderFieldRewrite> {
+    let payload = field
+        .payload(source)
+        .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
+    match field.wire_type() {
+        0 => {
+            let (value, encoded_length) = litchi_iwa_common::decode_varint_from_bytes(payload)
+                .map_err(|_| {
+                    Error::invalid_archive(message_index, "malformed unpacked object reference")
+                })?;
+            if encoded_length != payload.len() {
+                return Err(Error::invalid_archive(
+                    message_index,
+                    "unpacked object reference has trailing bytes",
+                ));
+            }
+            Ok(if removals.contains(&value) {
+                HeaderFieldRewrite::Remove
+            } else {
+                HeaderFieldRewrite::Retain
+            })
+        },
+        2 => rewrite_packed_object_references(payload, removals, message_index),
+        _ => Err(Error::invalid_archive(
+            message_index,
+            "object-reference field has an ambiguous wire type",
+        )),
+    }
+}
+
+fn rewrite_packed_object_references(
+    payload: &[u8],
+    removals: &HashSet<u64>,
+    message_index: usize,
+) -> Result<HeaderFieldRewrite> {
+    let mut cursor = 0usize;
+    let mut retained_length = 0usize;
+    let mut changed = false;
+    while cursor < payload.len() {
+        let (value, encoded_length) = litchi_iwa_common::decode_varint_from_bytes(
+            payload.get(cursor..).ok_or_else(|| {
+                Error::invalid_archive(message_index, "packed reference range is invalid")
+            })?,
+        )
+        .map_err(|_| Error::invalid_archive(message_index, "malformed packed object reference"))?;
+        let end = cursor.checked_add(encoded_length).ok_or_else(|| {
+            Error::invalid_archive(message_index, "packed reference range overflow")
+        })?;
+        if removals.contains(&value) {
+            changed = true;
+        } else {
+            retained_length = retained_length.checked_add(encoded_length).ok_or_else(|| {
+                Error::invalid_archive(message_index, "packed reference length overflow")
+            })?;
+        }
+        cursor = end;
+    }
+    if !changed {
+        return Ok(HeaderFieldRewrite::Retain);
+    }
+
+    let mut retained = Vec::new();
+    retained
+        .try_reserve_exact(retained_length)
+        .map_err(|_| Error::allocation("IWA retained packed object references", retained_length))?;
+    cursor = 0;
+    while cursor < payload.len() {
+        let remaining = payload.get(cursor..).ok_or_else(|| {
+            Error::invalid_archive(message_index, "packed reference range is invalid")
+        })?;
+        let (value, encoded_length) = litchi_iwa_common::decode_varint_from_bytes(remaining)
+            .map_err(|_| {
+                Error::invalid_archive(message_index, "malformed packed object reference")
+            })?;
+        let end = cursor.checked_add(encoded_length).ok_or_else(|| {
+            Error::invalid_archive(message_index, "packed reference range overflow")
+        })?;
+        if !removals.contains(&value) {
+            retained.extend_from_slice(payload.get(cursor..end).ok_or_else(|| {
+                Error::invalid_archive(message_index, "packed reference range is invalid")
+            })?);
+        }
+        cursor = end;
+    }
+    if retained.len() != retained_length {
+        return Err(Error::invalid_archive(
+            message_index,
+            "packed reference rewrite length mismatch",
+        ));
+    }
+    Ok(HeaderFieldRewrite::LengthDelimited(retained))
+}
+
+fn retained_field_rewrites(length: usize) -> Result<Vec<HeaderFieldRewrite>> {
+    let mut rewrites = Vec::new();
+    rewrites
+        .try_reserve_exact(length)
+        .map_err(|_| Error::allocation("IWA header field rewrites", length))?;
+    rewrites.extend((0..length).map(|_| HeaderFieldRewrite::Retain));
+    Ok(rewrites)
+}
+
+fn assign_header_field_rewrite(
+    rewrites: &mut [HeaderFieldRewrite],
+    index: usize,
+    rewrite: HeaderFieldRewrite,
+    message_index: usize,
+) -> Result<()> {
+    let slot = rewrites
+        .get_mut(index)
+        .ok_or_else(|| Error::invalid_archive(message_index, "header rewrite index is invalid"))?;
+    *slot = rewrite;
+    Ok(())
+}
+
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the assembler retains source-bound fields under format-level limits and diagnostics"
+)]
+fn assemble_header_field_rewrites(
+    source: &[u8],
+    fields: &[WireField],
+    rewrites: &[HeaderFieldRewrite],
+    header: HeaderKind,
+    limits: Limits,
+    message_index: usize,
+    resource: &'static str,
+) -> Result<Vec<u8>> {
+    if fields.len() != rewrites.len() {
+        return Err(Error::invalid_archive(
+            message_index,
+            "header field rewrite count mismatch",
+        ));
+    }
+    let mut output_length = 0usize;
+    for (field, rewrite) in fields.iter().copied().zip(rewrites) {
+        let field_length = match rewrite {
+            HeaderFieldRewrite::Retain => field
+                .raw(source)
+                .map_err(|error| map_wire_error(error, header))?
+                .len(),
+            HeaderFieldRewrite::Remove => 0,
+            HeaderFieldRewrite::Varint(value) => {
+                let key_length = field
+                    .key(source)
+                    .map_err(|error| map_wire_error(error, header))?
+                    .len();
+                let preferred_width = field
+                    .payload(source)
+                    .map_err(|error| map_wire_error(error, header))?
+                    .len();
+                key_length
+                    .checked_add(encoded_varint_width(*value, preferred_width))
+                    .ok_or_else(|| {
+                        Error::invalid_archive(message_index, "header rewrite overflow")
+                    })?
+            },
+            HeaderFieldRewrite::LengthDelimited(payload) => {
+                let key_length = field
+                    .key(source)
+                    .map_err(|error| map_wire_error(error, header))?
+                    .len();
+                let prefix_width = field
+                    .payload_start()
+                    .checked_sub(field.key_end())
+                    .ok_or_else(|| {
+                        Error::invalid_archive(message_index, "field prefix range is invalid")
+                    })?;
+                let encoded_length = u64::try_from(payload.len()).map_err(|_| {
+                    Error::invalid_archive(message_index, "field payload length exceeds u64")
+                })?;
+                key_length
+                    .checked_add(encoded_varint_width(encoded_length, prefix_width))
+                    .and_then(|length| length.checked_add(payload.len()))
+                    .ok_or_else(|| {
+                        Error::invalid_archive(message_index, "header rewrite overflow")
+                    })?
+            },
+        };
+        output_length = output_length
+            .checked_add(field_length)
+            .ok_or_else(|| Error::invalid_archive(message_index, "header rewrite overflow"))?;
+    }
+    check_header_length(output_length, limits)?;
+
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_length)
+        .map_err(|_| Error::allocation(resource, output_length))?;
+    for (field, rewrite) in fields.iter().copied().zip(rewrites) {
+        match rewrite {
+            HeaderFieldRewrite::Retain => output.extend_from_slice(
+                field
+                    .raw(source)
+                    .map_err(|error| map_wire_error(error, header))?,
+            ),
+            HeaderFieldRewrite::Remove => {},
+            HeaderFieldRewrite::Varint(value) => {
+                output.extend_from_slice(
+                    field
+                        .key(source)
+                        .map_err(|error| map_wire_error(error, header))?,
+                );
+                let preferred_width = field
+                    .payload(source)
+                    .map_err(|error| map_wire_error(error, header))?
+                    .len();
+                let mut encoded = [0u8; MAX_VARINT_BYTES];
+                output.extend_from_slice(encode_varint_with_width(
+                    *value,
+                    preferred_width,
+                    &mut encoded,
+                ));
+            },
+            HeaderFieldRewrite::LengthDelimited(payload) => {
+                output.extend_from_slice(
+                    field
+                        .key(source)
+                        .map_err(|error| map_wire_error(error, header))?,
+                );
+                let prefix_width = field
+                    .payload_start()
+                    .checked_sub(field.key_end())
+                    .ok_or_else(|| {
+                        Error::invalid_archive(message_index, "field prefix range is invalid")
+                    })?;
+                let encoded_length = u64::try_from(payload.len()).map_err(|_| {
+                    Error::invalid_archive(message_index, "field payload length exceeds u64")
+                })?;
+                let mut encoded = [0u8; MAX_VARINT_BYTES];
+                output.extend_from_slice(encode_varint_with_width(
+                    encoded_length,
+                    prefix_width,
+                    &mut encoded,
+                ));
+                output.extend_from_slice(payload);
+            },
+        }
+    }
+    if output.len() != output_length {
+        return Err(Error::invalid_archive(
+            message_index,
+            "header rewrite length mismatch",
+        ));
+    }
+    Ok(output)
+}
+
 fn encoded_varint_width(value: u64, preferred_width: usize) -> usize {
     let canonical = if value == 0 {
         1
@@ -1406,6 +2080,152 @@ fn validate_raw_object_size(
         }
     }
     Ok(())
+}
+
+fn validate_raw_object_size_with_replacement(
+    object: &ArchiveObject,
+    message_index: usize,
+    replacement_length: usize,
+    header_length: usize,
+    limits: Limits,
+) -> Result<()> {
+    if message_index >= object.messages.len() {
+        return Err(Error::invalid_archive(
+            message_index,
+            "message index is out of bounds",
+        ));
+    }
+    check_header_length(header_length, limits)?;
+    let mut object_length = varint_len(header_length)?
+        .checked_add(header_length)
+        .ok_or_else(|| Error::invalid_archive(message_index, "object prefix overflow"))?;
+    for (index, message) in object.messages.iter().enumerate() {
+        let payload_length = if index == message_index {
+            replacement_length
+        } else {
+            message.data.len()
+        };
+        object_length = object_length
+            .checked_add(payload_length)
+            .ok_or_else(|| Error::invalid_archive(message_index, "object length overflow"))?;
+        if object_length > limits.max_object_bytes() {
+            return Err(limit(
+                LimitKind::ObjectBytes,
+                object_length,
+                limits.max_object_bytes(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn verify_pruned_archive_info(
+    before: &ArchiveInfo,
+    after: &ArchiveInfo,
+    message_index: usize,
+    replacement_type: u32,
+    replacement_length: u32,
+    removals: &HashSet<u64>,
+) -> Result<()> {
+    if before.identifier != after.identifier
+        || before.should_merge != after.should_merge
+        || before.message_infos.len() != after.message_infos.len()
+    {
+        return Err(Error::invalid_archive(
+            message_index,
+            "raw ArchiveInfo rewrite changed unrelated metadata",
+        ));
+    }
+    let before_target = before
+        .message_infos
+        .get(message_index)
+        .ok_or_else(|| Error::invalid_archive(message_index, "message index is out of bounds"))?;
+    let after_target = after.message_infos.get(message_index).ok_or_else(|| {
+        Error::invalid_archive(message_index, "rewritten message metadata is missing")
+    })?;
+    for (index, (before_info, after_info)) in before
+        .message_infos
+        .iter()
+        .zip(&after.message_infos)
+        .enumerate()
+    {
+        if index != message_index && before_info != after_info {
+            return Err(Error::invalid_archive(
+                message_index,
+                "raw ArchiveInfo rewrite changed another MessageInfo",
+            ));
+        }
+    }
+    verify_pruned_message_info(
+        before_target,
+        after_target,
+        replacement_type,
+        replacement_length,
+        removals,
+        message_index,
+    )
+}
+
+fn verify_pruned_message_info(
+    before: &MessageInfo,
+    after: &MessageInfo,
+    replacement_type: u32,
+    replacement_length: u32,
+    removals: &HashSet<u64>,
+    message_index: usize,
+) -> Result<()> {
+    if after.type_ != replacement_type
+        || after.length != replacement_length
+        || before.versions != after.versions
+        || before.data_references != after.data_references
+        || before.base_message_index != after.base_message_index
+        || before.diff_merge_version != after.diff_merge_version
+        || before.diff_field_path != after.diff_field_path
+        || before.fields_to_remove != after.fields_to_remove
+        || before.diff_read_version != after.diff_read_version
+        || before.field_infos.len() != after.field_infos.len()
+        || !references_match_after_pruning(
+            &before.object_references,
+            &after.object_references,
+            removals,
+        )
+    {
+        return Err(Error::invalid_archive(
+            message_index,
+            "rewritten MessageInfo does not match the requested edit",
+        ));
+    }
+
+    for (before_field, after_field) in before.field_infos.iter().zip(&after.field_infos) {
+        if before_field.path != after_field.path
+            || before_field.r#type != after_field.r#type
+            || before_field.unknown_field_rule != after_field.unknown_field_rule
+            || before_field.data_references != after_field.data_references
+            || before_field.known_field_rule != after_field.known_field_rule
+            || before_field.known_field_version != after_field.known_field_version
+            || before_field.known_field_feature_identifier
+                != after_field.known_field_feature_identifier
+            || !references_match_after_pruning(
+                &before_field.object_references,
+                &after_field.object_references,
+                removals,
+            )
+        {
+            return Err(Error::invalid_archive(
+                message_index,
+                "rewritten FieldInfo does not match the requested reference pruning",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn references_match_after_pruning(before: &[u64], after: &[u64], removals: &HashSet<u64>) -> bool {
+    before
+        .iter()
+        .copied()
+        .filter(|identifier| !removals.contains(identifier))
+        .eq(after.iter().copied())
 }
 
 fn restore_replaced_message(
@@ -2082,8 +2902,17 @@ fn encode_varint(mut value: u64, output: &mut [u8; MAX_VARINT_BYTES]) -> &[u8] {
 
 #[cfg(test)]
 mod tests {
-    use super::{Archive, ArchiveObject, Error, RawMessage};
-    use crate::Result;
+    use super::{
+        Archive, ArchiveObject, Error, RawMessage, encode_archive_info, encode_varint,
+        encode_varint_with_width,
+    };
+    use crate::{LimitKind, Limits, Result};
+
+    struct ReferencePruningFixture {
+        source: Vec<u8>,
+        header: Vec<u8>,
+        expected_header: Vec<u8>,
+    }
 
     #[test]
     fn canonical_headers_use_compact_retention_path() -> Result<()> {
@@ -2109,5 +2938,337 @@ mod tests {
         assert!(object.original_canonical_header.is_none());
         assert_eq!(parsed.to_bytes()?, encoded);
         Ok(())
+    }
+
+    #[test]
+    fn canonical_message_length_width_change_and_inverse_restore_exact_bytes() -> Result<()> {
+        let original_message = RawMessage {
+            type_: 2,
+            data: vec![0x11; 127],
+        };
+        let source = Archive {
+            objects: vec![ArchiveObject::new(1, vec![original_message.clone()])?],
+        }
+        .to_bytes()?;
+        let mut edited = Archive::parse(&source)?;
+        let replacement = RawMessage {
+            type_: 2,
+            data: vec![0x22; 128],
+        };
+
+        let old = edited.objects[0].replace_message_preserving_header(0, replacement.clone())?;
+        assert_eq!(old, original_message);
+        let expected = Archive {
+            objects: vec![ArchiveObject::new(1, vec![replacement.clone()])?],
+        }
+        .to_bytes()?;
+        assert_eq!(edited.to_bytes()?, expected);
+        assert!(edited.objects[0].original_header.is_none());
+        assert!(edited.objects[0].original_canonical_header.is_none());
+
+        let replaced = edited.objects[0].replace_message_preserving_header(0, old)?;
+        assert_eq!(replaced, replacement);
+        assert_eq!(edited.to_bytes()?, source);
+        assert!(edited.objects[0].original_header.is_none());
+        assert!(edited.objects[0].original_canonical_header.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn canonical_last_reference_pruning_and_inverse_restore_exact_bytes() -> Result<()> {
+        let original_message = RawMessage {
+            type_: 2,
+            data: vec![3, 4],
+        };
+        let mut original_object = ArchiveObject::new(1, vec![original_message.clone()])?;
+        let Some(original_info) = original_object.archive_info.message_infos.get_mut(0) else {
+            return Err(Error::invalid_archive(
+                0,
+                "test object is missing message metadata",
+            ));
+        };
+        original_info.object_references.push(77);
+        let source_archive = Archive {
+            objects: vec![original_object],
+        };
+        let source = source_archive.to_bytes()?;
+        let mut edited = Archive::parse(&source)?;
+
+        let replacement = RawMessage {
+            type_: 9,
+            data: vec![5, 6, 7],
+        };
+        let old = edited.objects[0].replace_message_pruning_object_references_preserving_header(
+            0,
+            replacement.clone(),
+            &[77],
+        )?;
+        assert_eq!(old, original_message);
+        assert!(edited.objects[0].original_header.is_none());
+        assert!(edited.objects[0].original_canonical_header.is_none());
+
+        let expected = Archive {
+            objects: vec![ArchiveObject::new(1, vec![replacement.clone()])?],
+        }
+        .to_bytes()?;
+        assert_eq!(edited.to_bytes()?, expected);
+
+        let Some(edited_info) = edited.objects[0].archive_info.message_infos.get_mut(0) else {
+            return Err(Error::invalid_archive(
+                0,
+                "edited test object is missing message metadata",
+            ));
+        };
+        edited_info.object_references.push(77);
+        let replaced = edited.objects[0].replace_message_preserving_header(0, old)?;
+        assert_eq!(replaced, replacement);
+        assert_eq!(edited.to_bytes()?, source);
+        Ok(())
+    }
+
+    #[test]
+    fn reference_pruning_preserves_all_untouched_header_encodings() -> Result<()> {
+        let fixture = reference_pruning_fixture()?;
+        let mut archive = Archive::parse(&fixture.source)?;
+        let old = archive.objects[0].replace_message_pruning_object_references_preserving_header(
+            0,
+            RawMessage {
+                type_: 9,
+                data: vec![0x5a; 130],
+            },
+            &[10, 12, 14, 10],
+        )?;
+        assert_eq!(old.type_, 7);
+        assert_eq!(old.data, [0xde, 0xad, 0xbe]);
+
+        let encoded = archive.to_bytes()?;
+        let (header, payload) = split_test_archive(&encoded)?;
+        assert_eq!(header, fixture.expected_header);
+        assert_eq!(payload, vec![0x5a; 130]);
+
+        let info = &archive.objects[0].archive_info.message_infos[0];
+        assert_eq!(info.type_, 9);
+        assert_eq!(info.length, 130);
+        // The duplicate retained identifier and its two distinct raw
+        // encodings survive in source order.
+        assert_eq!(info.object_references, [13, 13]);
+        assert_eq!(info.field_infos[0].object_references, [99, 100]);
+        assert_eq!(info.field_infos[1].object_references, [77, 78]);
+        assert_eq!(
+            archive.objects[0].original_header.as_deref(),
+            Some(fixture.expected_header.as_slice())
+        );
+
+        let reparsed = Archive::parse(&encoded)?;
+        assert_eq!(
+            reparsed.objects[0].archive_info,
+            archive.objects[0].archive_info
+        );
+        assert_eq!(reparsed.to_bytes()?, encoded);
+        Ok(())
+    }
+
+    #[test]
+    fn empty_reference_removal_delegates_to_preserving_replacement() -> Result<()> {
+        let fixture = reference_pruning_fixture()?;
+        let parsed = Archive::parse(&fixture.source)?;
+        let mut delegated = parsed.objects[0].clone();
+        let mut existing = parsed.objects[0].clone();
+        let replacement = RawMessage {
+            type_: 9,
+            data: vec![0x44; 130],
+        };
+
+        let delegated_old = delegated.replace_message_pruning_object_references_preserving_header(
+            0,
+            replacement.clone(),
+            &[],
+        )?;
+        let existing_old = existing.replace_message_preserving_header(0, replacement)?;
+        assert_eq!(delegated_old, existing_old);
+        assert_eq!(delegated, existing);
+        Ok(())
+    }
+
+    #[test]
+    fn reference_pruning_failures_are_atomic() -> Result<()> {
+        let fixture = reference_pruning_fixture()?;
+        let mut archive = Archive::parse(&fixture.source)?;
+        let before_limit = archive.objects[0].clone();
+        let limits = Limits::default()
+            .with_header_bytes(fixture.header.len())?
+            .with_object_bytes(fixture.source.len())?;
+        let limit_error = archive.objects[0]
+            .replace_message_pruning_object_references_preserving_header_with_limits(
+                0,
+                RawMessage {
+                    type_: 9,
+                    data: vec![0x5a; 130],
+                },
+                &[10],
+                limits,
+            )
+            .err();
+        assert!(matches!(
+            limit_error,
+            Some(Error::Limit {
+                kind: LimitKind::ObjectBytes,
+                ..
+            })
+        ));
+        assert_eq!(archive.objects[0], before_limit);
+
+        for malformed_message in [
+            vec![
+                0x08, 0x02, 0x12, 0x03, 0x01, 0x00, 0x05, 0x18, 0x01, 0x29, 1, 2, 3, 4, 5, 6, 7, 8,
+            ],
+            vec![
+                0x08, 0x02, 0x12, 0x03, 0x01, 0x00, 0x05, 0x18, 0x01, 0x2a, 0x01, 0x80,
+            ],
+        ] {
+            let mut object = ArchiveObject::new(
+                1,
+                vec![RawMessage {
+                    type_: 2,
+                    data: vec![0xcc],
+                }],
+            )?;
+            let canonical = encode_archive_info(&object.archive_info, Limits::default())?;
+            let mut raw_header = vec![0x08, 0x01];
+            push_length_delimited(&mut raw_header, &[0x12], 1, &malformed_message)?;
+            object.original_header = Some(raw_header.into_boxed_slice());
+            object.original_canonical_header = Some(canonical.into_boxed_slice());
+            let before = object.clone();
+
+            let malformed_error = object
+                .replace_message_pruning_object_references_preserving_header(
+                    0,
+                    RawMessage {
+                        type_: 2,
+                        data: vec![0xdd],
+                    },
+                    &[1],
+                )
+                .err();
+            assert!(malformed_error.is_some());
+            assert_eq!(object, before);
+        }
+        Ok(())
+    }
+
+    fn reference_pruning_fixture() -> Result<ReferencePruningFixture> {
+        let mut changed_field = Vec::new();
+        changed_field.extend_from_slice(&[0xa0, 0x01, 0x81, 0x00]);
+        changed_field.extend_from_slice(&[0x20, 0x8a, 0x00]);
+        changed_field.extend_from_slice(&[0xa0, 0x00, 0xe3, 0x00]);
+        push_length_delimited(&mut changed_field, &[0x22], 2, &[0x0c, 0xe4, 0x00, 0x0e])?;
+        push_length_delimited(&mut changed_field, &[0x0a], 2, &[])?;
+        push_length_delimited(&mut changed_field, &[0xaa, 0x01], 2, &[0xde, 0xad])?;
+
+        let mut expected_changed_field = Vec::new();
+        expected_changed_field.extend_from_slice(&[0xa0, 0x01, 0x81, 0x00]);
+        expected_changed_field.extend_from_slice(&[0xa0, 0x00, 0xe3, 0x00]);
+        push_length_delimited(&mut expected_changed_field, &[0x22], 2, &[0xe4, 0x00])?;
+        push_length_delimited(&mut expected_changed_field, &[0x0a], 2, &[])?;
+        push_length_delimited(&mut expected_changed_field, &[0xaa, 0x01], 2, &[0xde, 0xad])?;
+
+        let mut untouched_field = Vec::new();
+        push_length_delimited(&mut untouched_field, &[0x0a], 1, &[])?;
+        push_length_delimited(&mut untouched_field, &[0xa2, 0x00], 2, &[0xcd, 0x00, 0x4e])?;
+        untouched_field.extend_from_slice(&[0xb5, 0x0c, 1, 2, 3, 4]);
+
+        let mut message = Vec::new();
+        message.extend_from_slice(&[0xcd, 0x0c, 9, 8, 7, 6]);
+        message.extend_from_slice(&[0x08, 0x01, 0x88, 0x00, 0x87, 0x00]);
+        push_length_delimited(&mut message, &[0x12], 2, &[0x01, 0x00, 0x05])?;
+        message.extend_from_slice(&[0x18, 0x01, 0x98, 0x00, 0x83, 0x00]);
+        message.extend_from_slice(&[0x28, 0x8a, 0x00]);
+        message.extend_from_slice(&[0xa8, 0x00, 0x8d, 0x00]);
+        push_length_delimited(&mut message, &[0x2a], 2, &[0x0c, 0x8d, 0x00, 0x0e])?;
+        push_length_delimited(&mut message, &[0x2a], 2, &[0x0a, 0x0c])?;
+        push_length_delimited(&mut message, &[0xa2, 0x00], 2, &changed_field)?;
+        push_length_delimited(&mut message, &[0x22], 2, &untouched_field)?;
+        push_length_delimited(&mut message, &[0xa2, 0x06], 2, &[0xfe, 0xed])?;
+
+        let mut expected_message = Vec::new();
+        expected_message.extend_from_slice(&[0xcd, 0x0c, 9, 8, 7, 6]);
+        expected_message.extend_from_slice(&[0x08, 0x01, 0x88, 0x00, 0x89, 0x00]);
+        push_length_delimited(&mut expected_message, &[0x12], 2, &[0x01, 0x00, 0x05])?;
+        expected_message.extend_from_slice(&[0x18, 0x01, 0x98, 0x00, 0x82, 0x01]);
+        expected_message.extend_from_slice(&[0xa8, 0x00, 0x8d, 0x00]);
+        push_length_delimited(&mut expected_message, &[0x2a], 2, &[0x8d, 0x00])?;
+        push_length_delimited(&mut expected_message, &[0x2a], 2, &[])?;
+        push_length_delimited(
+            &mut expected_message,
+            &[0xa2, 0x00],
+            2,
+            &expected_changed_field,
+        )?;
+        push_length_delimited(&mut expected_message, &[0x22], 2, &untouched_field)?;
+        push_length_delimited(&mut expected_message, &[0xa2, 0x06], 2, &[0xfe, 0xed])?;
+
+        let mut header = vec![
+            0x08, 0x01, 0x88, 0x00, 0xaa, 0x00, 0xd1, 0x06, 1, 2, 3, 4, 5, 6, 7, 8,
+        ];
+        push_length_delimited(&mut header, &[0x92, 0x00], 2, &message)?;
+        header.extend_from_slice(&[0xda, 0x06, 0x81, 0x00, 0xee, 0x18, 0x81, 0x00]);
+
+        let mut expected_header = vec![
+            0x08, 0x01, 0x88, 0x00, 0xaa, 0x00, 0xd1, 0x06, 1, 2, 3, 4, 5, 6, 7, 8,
+        ];
+        push_length_delimited(&mut expected_header, &[0x92, 0x00], 2, &expected_message)?;
+        expected_header.extend_from_slice(&[0xda, 0x06, 0x81, 0x00, 0xee, 0x18, 0x81, 0x00]);
+
+        let mut source = Vec::new();
+        let mut prefix = [0u8; 10];
+        source.extend_from_slice(encode_varint(header.len() as u64, &mut prefix));
+        source.extend_from_slice(&header);
+        source.extend_from_slice(&[0xde, 0xad, 0xbe]);
+        Ok(ReferencePruningFixture {
+            source,
+            header,
+            expected_header,
+        })
+    }
+
+    fn push_length_delimited(
+        output: &mut Vec<u8>,
+        key: &[u8],
+        prefix_width: usize,
+        payload: &[u8],
+    ) -> Result<()> {
+        let additional = key
+            .len()
+            .checked_add(prefix_width)
+            .and_then(|length| length.checked_add(payload.len()))
+            .ok_or_else(|| Error::invalid_archive(0, "test field length overflow"))?;
+        output
+            .try_reserve(additional)
+            .map_err(|_| Error::allocation("test length-delimited field", additional))?;
+        output.extend_from_slice(key);
+        let mut prefix = [0u8; 10];
+        output.extend_from_slice(encode_varint_with_width(
+            payload.len() as u64,
+            prefix_width,
+            &mut prefix,
+        ));
+        output.extend_from_slice(payload);
+        Ok(())
+    }
+
+    fn split_test_archive(data: &[u8]) -> Result<(&[u8], &[u8])> {
+        let (header_length, prefix_length) = super::decode_varint(data)?;
+        let header_length = usize::try_from(header_length)
+            .map_err(|_| Error::invalid_archive(0, "test header length exceeds usize"))?;
+        let header_end = prefix_length
+            .checked_add(header_length)
+            .ok_or_else(|| Error::invalid_archive(0, "test header range overflow"))?;
+        let header = data
+            .get(prefix_length..header_end)
+            .ok_or_else(|| Error::invalid_archive(0, "test header range is invalid"))?;
+        let payload = data
+            .get(header_end..)
+            .ok_or_else(|| Error::invalid_archive(0, "test payload range is invalid"))?;
+        Ok((header, payload))
     }
 }

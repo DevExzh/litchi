@@ -16,6 +16,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/group_node_category_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_show_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_slide_transition_codec.rs");
+    println!("cargo:rerun-if-changed=src/pages_body_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_section_codec.rs");
 
     let mut proto_files = fs::read_dir(proto_directory)?
@@ -38,6 +39,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         proto_directory,
         buffa_projection_directory,
     )?;
+    enforce_pages_body_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_pages_section_projection_provenance(proto_directory, buffa_projection_directory)?;
 
     prost_build::Config::new()
@@ -189,6 +191,26 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_pages_section_projection_budget(&buffa_pages_section_out_directory)?;
+
+    // Pages root/body traversal needs only two root references and one
+    // streamed section-boundary entry. The enclosing section table stays out
+    // of generated code, and strict preflight owns every ingress limit.
+    let buffa_pages_body_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-pages-body");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TPDocumentBodyArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_pages_body_out_directory)
+        .include_file("iwa_pages_body_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_pages_body_projection_budget(&buffa_pages_body_out_directory)?;
 
     Ok(())
 }
@@ -408,6 +430,66 @@ fn enforce_pages_section_projection_provenance(
     {
         return Err(
             "derived Pages section projection drifted from TP.SectionArchive fields 20--22, exceeded its 1 KiB source budget, introduced generated repeated storage, or added production encoding"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
+fn enforce_pages_body_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const TSP_REFERENCE: &str = "message Reference {\n  required uint64 identifier = 1;\n  optional int32 deprecated_type = 2;\n  optional bool deprecated_is_external = 3;\n}";
+    const TP_FIELDS: [&str; 3] = [
+        "required .TSA.DocumentArchive super = 15;",
+        "optional .TSP.Reference body_storage = 4;",
+        "optional .TSP.Reference section = 5;",
+    ];
+    const TSWP_BOUNDARY: &str = "message ObjectAttribute {\n    required uint32 character_index = 1;\n    optional .TSP.Reference object = 2;\n  }";
+    const PROJECTION_REFERENCE: &str = "message Reference {\n  required uint64 identifier = 1;\n  optional int32 deprecated_type = 2;\n  optional bool deprecated_is_external = 3;\n}";
+    const PROJECTION_DOCUMENT: &str = "message PagesDocumentBodyArchive {\n  optional .LitchiIwaProjection.Reference body_storage = 4;\n  optional .LitchiIwaProjection.Reference initial_section = 5;\n}";
+    const PROJECTION_BOUNDARY: &str = "message PagesSectionBoundaryEntry {\n  required uint32 character_index = 1;\n  optional .LitchiIwaProjection.Reference section = 2;\n}";
+    const ROUTER_DECLARATIONS: [&str; 9] = [
+        "const DOCUMENT_BODY_STORAGE_FIELD: u32 = 4;",
+        "const DOCUMENT_INITIAL_SECTION_FIELD: u32 = 5;",
+        "const DOCUMENT_SUPER_FIELD: u32 = 15;",
+        "const BOUNDARY_CHARACTER_INDEX_FIELD: u32 = 1;",
+        "const BOUNDARY_SECTION_FIELD: u32 = 2;",
+        "const REFERENCE_IDENTIFIER_FIELD: u32 = 1;",
+        "const REFERENCE_DEPRECATED_TYPE_FIELD: u32 = 2;",
+        "const REFERENCE_DEPRECATED_EXTERNAL_FIELD: u32 = 3;",
+        "const MAX_RECURSION_LIMIT: u32 = 64;",
+    ];
+
+    let tsp = fs::read_to_string(proto_directory.join("TSPMessages.proto"))?;
+    let pages = fs::read_to_string(proto_directory.join("TPArchives.proto"))?;
+    let text = fs::read_to_string(proto_directory.join("TSWPArchives.proto"))?;
+    let projection = fs::read_to_string(projection_directory.join("TPDocumentBodyArchive.proto"))?;
+    let codec = fs::read_to_string("src/pages_body_codec.rs")?;
+    let production_codec = codec
+        .split_once("#[cfg(test)]")
+        .map_or(codec.as_str(), |(production, _tests)| production);
+    if tsp.matches(TSP_REFERENCE).count() != 1
+        || !TP_FIELDS
+            .iter()
+            .all(|declaration| pages.matches(declaration).count() == 1)
+        || text.matches(TSWP_BOUNDARY).count() != 1
+        || projection.matches(PROJECTION_REFERENCE).count() != 1
+        || projection.matches(PROJECTION_DOCUMENT).count() != 1
+        || projection.matches(PROJECTION_BOUNDARY).count() != 1
+        || !ROUTER_DECLARATIONS
+            .iter()
+            .all(|declaration| codec.matches(declaration).count() == 1)
+        || projection.len() > 3 * 1024
+        || projection.contains("repeated ")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+    {
+        return Err(
+            "derived Pages body projection/router drifted from canonical TP/TSWP/TSP fields, exceeded its 3 KiB source budget, introduced generated repeated storage, or added production encoding"
                 .into(),
         );
     }
@@ -731,6 +813,45 @@ fn enforce_pages_section_projection_budget(directory: &Path) -> Result<(), Box<d
     if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || generated_repeated_views != 0 {
         return Err(format!(
             "Pages section projection generated {files} files/{bytes} bytes/{generated_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_pages_body_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    // Buffa 0.9.1 emits 93,867 bytes for the three singular message shells.
+    // Leave only a small generator/formatter allowance so another schema
+    // closure cannot enter this focused projection unnoticed.
+    const MAX_GENERATED_BYTES: u64 = 96 * 1024;
+
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut generated_repeated_views = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("generated byte count overflow")?;
+        generated_repeated_views = generated_repeated_views
+            .checked_add(
+                fs::read_to_string(entry.path())?
+                    .matches("LazyRepeatedView")
+                    .count(),
+            )
+            .ok_or("generated repeated-view count overflow")?;
+    }
+
+    if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || generated_repeated_views != 0 {
+        return Err(format!(
+            "Pages body projection generated {files} files/{bytes} bytes/{generated_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
         )
         .into());
     }

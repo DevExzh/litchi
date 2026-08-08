@@ -1,21 +1,12 @@
 //! Transactional editing of shared iWork text storage objects.
 
+use std::collections::HashSet;
 use std::ops::Range;
 use std::path::Path;
 
-use prost::Message;
-
 use crate::archive::RawMessage;
-use crate::protobuf::tswp::{
-    ObjectAttributeTable, OverlappingFieldAttributeTable, ParaDataAttributeTable, StorageArchive,
-    StringAttributeTable,
-};
+use crate::protobuf::tswp::StorageArchive;
 use crate::shapes::RgbaColor;
-use crate::wire::{
-    parse_wire_fields, patch_length_delimited_field, patch_nested_varint_field, patch_varint_field,
-    repeated_length_delimited_payloads, rewrite_repeated_length_delimited_fields,
-    transform_length_delimited_field,
-};
 use crate::{Error, IWorkPackage, Result};
 
 use super::TextStorageId;
@@ -2418,578 +2409,192 @@ pub(super) fn replace_storage_text(
 ) -> Result<()> {
     let located = locate_text_storage_with_archive(package, object_id)?;
     let location = located.location;
-    let archive = located.archive;
     let archive_name = location.archive_name;
     let message_index = location.message_index;
     let message_type = location.message_type;
-    let mut storage = location.storage;
-    let mut removed_references = std::collections::HashSet::new();
-    update_parsed_archive(package, &archive_name, archive, |archive| {
+    let object = located
+        .archive
+        .object(object_id)
+        .ok_or_else(|| Error::ParseError(format!("Text storage object {object_id} not found")))?;
+    let message_info = object
+        .archive_info
+        .message_infos
+        .get(message_index)
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "text storage object {object_id} has no metadata for message {message_index}"
+            ))
+        })?;
+    let original = object
+        .messages
+        .get(message_index)
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "text storage object {object_id} has no payload at message {message_index}"
+            ))
+        })?
+        .data
+        .as_slice();
+    let package_limits = package.limits();
+    let retained_archive_limits = package_limits.archive_limits();
+    let archive_limits = retained_archive_limits.with_archive_bytes(
+        package_limits
+            .max_iwa_stream_bytes()
+            .min(retained_archive_limits.max_archive_bytes()),
+    )?;
+    let default_rewrite_limits = litchi_iwa_text_wire::RewriteLimits::default();
+    let message_bytes = default_rewrite_limits
+        .max_message_bytes()
+        .min(archive_limits.max_message_bytes());
+    let rewrite_limits = litchi_iwa_text_wire::RewriteLimits::new(
+        message_bytes,
+        default_rewrite_limits.max_fields(),
+        default_rewrite_limits.max_nesting(),
+        default_rewrite_limits.max_fragments(),
+        default_rewrite_limits.max_text_bytes().min(message_bytes),
+        default_rewrite_limits.max_table_entries(),
+        default_rewrite_limits.max_object_references(),
+        default_rewrite_limits.max_output_bytes().min(message_bytes),
+        default_rewrite_limits.max_rewrite_work(),
+    )
+    .map_err(|error| {
+        Error::InvalidFormat(format!("TSWP text-storage rewrite limit failed: {error}"))
+    })?;
+    let rewrite = litchi_iwa_text_wire::rewrite_storage_text_with_behavior_and_limits(
+        original,
+        range,
+        replacement,
+        litchi_iwa_text_wire::RewriteBehavior::ReplaceSelection,
+        rewrite_limits,
+    )
+    .map_err(|error| Error::InvalidFormat(format!("TSWP text-storage rewrite failed: {error}")))?;
+    if !rewrite.changed() {
+        return Ok(());
+    }
+
+    let prunable_references = proven_prunable_storage_references(
+        message_info,
+        rewrite.removed_object_references(),
+        rewrite.removed_object_references_by_field(),
+        rewrite.object_reference_occurrences_before(),
+        rewrite.has_unknown_wire_fields(),
+    );
+    // Object cleanup is authorized only for references whose metadata ownership
+    // was proven here and which remain unreferenced after the header rewrite.
+    let cleanup_references = prunable_references.iter().copied().collect::<HashSet<_>>();
+    let data = rewrite.into_bytes();
+    update_parsed_archive(package, &archive_name, located.archive, |archive| {
         let object = archive.object_mut(object_id).ok_or_else(|| {
             Error::ParseError(format!("Text storage object {object_id} not found"))
         })?;
-        let original = object.messages[message_index].data.as_slice();
-        let previous_references = storage_object_references(&storage);
-        let current = storage.text.concat();
-        let start = utf16_to_byte_index(&current, range.start)?;
-        let end = utf16_to_byte_index(&current, range.end)?;
-        let mut updated = String::with_capacity(
-            current
-                .len()
-                .saturating_sub(end - start)
-                .saturating_add(replacement.len()),
-        );
-        updated.push_str(&current[..start]);
-        updated.push_str(replacement);
-        updated.push_str(&current[end..]);
-
-        let replacement_units = replacement.encode_utf16().count();
-        adjust_storage_attributes(&mut storage, range.clone(), replacement_units)?;
-        storage.text = if updated.is_empty() {
-            if current.is_empty() {
-                storage.text.clone()
-            } else {
-                Vec::new()
-            }
-        } else {
-            vec![updated]
-        };
-        let data = patch_storage_text_wire(original, &range, replacement_units, &storage)?;
-        if StorageArchive::decode(data.as_slice())? != storage {
-            return Err(Error::InvalidFormat(
-                "TSWP text-storage wire patch failed validation".to_owned(),
-            ));
-        }
-        let current_references = storage_object_references(&storage);
-        removed_references = previous_references
-            .into_iter()
-            .filter(|identifier| !current_references.contains(identifier))
-            .collect::<std::collections::HashSet<_>>();
-        object.replace_message(
+        object.replace_message_pruning_object_references_preserving_header_with_limits(
             message_index,
             RawMessage {
                 type_: message_type,
                 data,
             },
+            &prunable_references,
+            archive_limits,
         )?;
-        object.archive_info.message_infos[message_index]
-            .object_references
-            .retain(|identifier| !removed_references.contains(identifier));
-        for field in &mut object.archive_info.message_infos[message_index].field_infos {
-            field
-                .object_references
-                .retain(|identifier| !removed_references.contains(identifier));
-        }
         Ok(())
     })?;
-    remove_unreferenced_hyperlink_objects(package, &archive_name, &removed_references)?;
-    remove_unreferenced_date_time_objects(package, &archive_name, &removed_references)?;
-    remove_unreferenced_number_attachment_objects(package, &archive_name, &removed_references)?;
-    remove_unreferenced_bookmark_objects(package, &archive_name, &removed_references)?;
-    remove_unreferenced_highlight_objects(package, &archive_name, &removed_references)
+    let cleanup_candidates = metadata_unreferenced_candidates(package, &cleanup_references)?;
+    remove_unreferenced_hyperlink_objects(package, &archive_name, &cleanup_candidates)?;
+    remove_unreferenced_date_time_objects(package, &archive_name, &cleanup_candidates)?;
+    remove_unreferenced_number_attachment_objects(package, &archive_name, &cleanup_candidates)?;
+    remove_unreferenced_bookmark_objects(package, &archive_name, &cleanup_candidates)?;
+    remove_unreferenced_highlight_objects(package, &archive_name, &cleanup_candidates)
 }
 
-fn utf16_to_byte_index(text: &str, target: usize) -> Result<usize> {
-    if target == 0 {
-        return Ok(0);
+fn proven_prunable_storage_references(
+    message_info: &crate::archive::MessageInfo,
+    aggregate_removals: &[u64],
+    field_removals: &[litchi_iwa_text_wire::RemovedObjectReference],
+    reference_occurrences_before: &[u64],
+    has_unknown_wire_fields: bool,
+) -> Vec<u64> {
+    // An opaque field at any traversed schema level can own the same identifier.
+    if has_unknown_wire_fields {
+        return Vec::new();
     }
-    let mut units = 0usize;
-    for (byte_index, character) in text.char_indices() {
-        if units == target {
-            return Ok(byte_index);
+    let mut indexed = message_info.object_references.clone();
+    indexed.sort_unstable();
+    let top_level_references_are_complete = indexed == reference_occurrences_before;
+    // Field-local deltas are insufficient: only identifiers absent from every
+    // known storage reference after the rewrite can be removed from metadata.
+    let mut identifiers = aggregate_removals.to_vec();
+    identifiers.sort_unstable();
+    identifiers.dedup();
+    identifiers.retain(|identifier| {
+        let top_level_occurrence = message_info.object_references.contains(identifier);
+        if top_level_occurrence && !top_level_references_are_complete {
+            return false;
         }
-        units += character.len_utf16();
-        if units > target {
-            return Err(Error::ParseError(format!(
-                "UTF-16 index {target} splits a surrogate pair"
-            )));
-        }
-    }
-    if units == target {
-        Ok(text.len())
-    } else {
-        Err(Error::ParseError(format!(
-            "UTF-16 index {target} exceeds text length {units}"
-        )))
-    }
-}
-
-fn adjust_storage_attributes(
-    storage: &mut StorageArchive,
-    range: Range<usize>,
-    replacement_units: usize,
-) -> Result<()> {
-    for table in [
-        &mut storage.table_para_style,
-        &mut storage.table_list_style,
-        &mut storage.table_char_style,
-        &mut storage.table_layout_style,
-    ] {
-        adjust_object_table(table, &range, replacement_units, true)?;
-    }
-    for table in [
-        &mut storage.table_para_data,
-        &mut storage.table_para_starts,
-        &mut storage.table_para_bidi,
-    ] {
-        adjust_para_table(table, &range, replacement_units)?;
-    }
-    for table in [&mut storage.table_language, &mut storage.table_dictation] {
-        adjust_string_table(table, &range, replacement_units)?;
-    }
-    for table in [
-        &mut storage.table_attachment,
-        &mut storage.table_bookmark,
-        &mut storage.table_footnote,
-        &mut storage.table_rubyfield,
-        &mut storage.table_insertion,
-        &mut storage.table_deletion,
-        &mut storage.table_tatechuyoko,
-    ] {
-        adjust_object_table(table, &range, replacement_units, false)?;
-    }
-    if storage
-        .table_attachment
-        .as_ref()
-        .is_some_and(|table| table.entries.is_empty())
-    {
-        storage.table_attachment = None;
-    }
-    if storage
-        .table_footnote
-        .as_ref()
-        .is_some_and(|table| table.entries.is_empty())
-    {
-        storage.table_footnote = None;
-    }
-    normalize_ranged_object_table(&mut storage.table_bookmark);
-    adjust_object_table(
-        &mut storage.table_smartfield,
-        &range,
-        replacement_units,
-        false,
-    )?;
-    normalize_ranged_object_table(&mut storage.table_smartfield);
-    adjust_object_table(
-        &mut storage.table_highlight,
-        &range,
-        replacement_units,
-        false,
-    )?;
-    normalize_ranged_object_table(&mut storage.table_highlight);
-    // A drop-cap record is a paragraph-start boundary. Numbers commonly emits
-    // an explicit index-zero entry with no style reference as a sentinel, and
-    // replacing the paragraph text must not erase that structural marker.
-    adjust_object_table(
-        &mut storage.table_drop_cap_style,
-        &range,
-        replacement_units,
-        true,
-    )?;
-    // A section boundary identifies the section owning text inserted exactly
-    // at that boundary. In particular, the mandatory first boundary must stay
-    // at UTF-16 index zero when text is inserted into an empty Pages body.
-    adjust_object_table(&mut storage.table_section, &range, replacement_units, true)?;
-    for table in [
-        &mut storage.table_overlapping_highlight,
-        &mut storage.table_pencil_annotation,
-    ] {
-        adjust_overlapping_table(table, &range, replacement_units)?;
-    }
-    Ok(())
-}
-
-fn patch_storage_text_wire(
-    original: &[u8],
-    range: &Range<usize>,
-    replacement_units: usize,
-    storage: &StorageArchive,
-) -> Result<Vec<u8>> {
-    let text = storage
-        .text
-        .iter()
-        .map(|value| value.as_bytes().to_vec())
-        .collect::<Vec<_>>();
-    let mut data = rewrite_repeated_length_delimited_fields(original, 3, &text)?;
-    for field in [5, 7, 8, 12, 17, 28] {
-        data = transform_optional_table(&data, field, |table| {
-            adjust_index_table_wire(table, range, replacement_units, true)
-        })?;
-    }
-    let attachment_tables = repeated_length_delimited_payloads(&data, 9)?;
-    if attachment_tables.len() > 1 {
-        return Err(Error::InvalidFormat(format!(
-            "singular TSWP storage table field 9 occurs {} times",
-            attachment_tables.len()
-        )));
-    }
-    if let Some(table) = attachment_tables.first() {
-        let adjusted = adjust_index_table_wire(table, range, replacement_units, false)?;
-        let replacement =
-            (!repeated_length_delimited_payloads(&adjusted, 1)?.is_empty()).then_some(adjusted);
-        data = patch_length_delimited_field(&data, 9, true, replacement.as_deref())?;
-    }
-    let footnote_tables = repeated_length_delimited_payloads(&data, 16)?;
-    if footnote_tables.len() > 1 {
-        return Err(Error::InvalidFormat(format!(
-            "singular TSWP storage table field 16 occurs {} times",
-            footnote_tables.len()
-        )));
-    }
-    if let Some(table) = footnote_tables.first() {
-        let adjusted = adjust_index_table_wire(table, range, replacement_units, false)?;
-        let replacement =
-            (!repeated_length_delimited_payloads(&adjusted, 1)?.is_empty()).then_some(adjusted);
-        data = patch_length_delimited_field(&data, 16, true, replacement.as_deref())?;
-    }
-    for field in [18, 21, 22, 27] {
-        data = transform_optional_table(&data, field, |table| {
-            adjust_index_table_wire(table, range, replacement_units, false)
-        })?;
-    }
-    for field in [11, 15, 23] {
-        let tables = repeated_length_delimited_payloads(&data, field)?;
-        if tables.len() > 1 {
-            return Err(Error::InvalidFormat(format!(
-                "singular TSWP storage table field {field} occurs {} times",
-                tables.len()
-            )));
-        }
-        if let Some(table) = tables.first() {
-            let adjusted = adjust_index_table_wire(table, range, replacement_units, false)?;
-            let normalized = normalize_ranged_object_table_wire(&adjusted)?;
-            data = patch_length_delimited_field(&data, field, true, normalized.as_deref())?;
-        }
-    }
-    for field in [6, 14, 19, 20, 24] {
-        data = transform_optional_table(&data, field, |table| {
-            adjust_index_table_wire(table, range, replacement_units, true)
-        })?;
-    }
-    for field in [25, 26] {
-        data = transform_optional_table(&data, field, |table| {
-            adjust_overlapping_table_wire(table, range, replacement_units)
-        })?;
-    }
-    Ok(data)
-}
-
-fn normalize_ranged_object_table(table: &mut Option<ObjectAttributeTable>) {
-    let Some(entries) = table.as_mut().map(|table| &mut table.entries) else {
-        return;
-    };
-    let Some(first_object) = entries.iter().position(|entry| entry.object.is_some()) else {
-        *table = None;
-        return;
-    };
-    if first_object > 1 {
-        entries.drain(..first_object - 1);
-    }
-    if entries[0].object.is_none() {
-        entries[0].character_index = 0;
-    } else if entries[0].character_index != 0 {
-        entries.insert(
-            0,
-            crate::protobuf::tswp::object_attribute_table::ObjectAttribute {
-                character_index: 0,
-                object: None,
-            },
-        );
-    }
-}
-
-fn normalize_ranged_object_table_wire(table: &[u8]) -> Result<Option<Vec<u8>>> {
-    let mut entries = repeated_length_delimited_payloads(table, 1)?
-        .into_iter()
-        .map(|raw| {
-            let entry =
-                crate::protobuf::tswp::object_attribute_table::ObjectAttribute::decode(raw)?;
-            Ok((entry, raw.to_vec()))
-        })
-        .collect::<Result<Vec<_>>>()?;
-    let Some(first_object) = entries.iter().position(|(entry, _)| entry.object.is_some()) else {
-        return Ok(None);
-    };
-    if first_object > 1 {
-        entries.drain(..first_object - 1);
-    }
-    if entries[0].0.object.is_none() {
-        entries[0].0.character_index = 0;
-        entries[0].1 = patch_varint_field(&entries[0].1, 1, true, Some(0))?;
-    } else if entries[0].0.character_index != 0 {
-        let sentinel = crate::protobuf::tswp::object_attribute_table::ObjectAttribute {
-            character_index: 0,
-            object: None,
-        };
-        let raw = sentinel.encode_to_vec();
-        entries.insert(0, (sentinel, raw));
-    }
-    let entries = entries.into_iter().map(|(_, raw)| raw).collect::<Vec<_>>();
-    rewrite_repeated_length_delimited_fields(table, 1, &entries).map(Some)
-}
-
-fn transform_optional_table<F>(data: &[u8], field_number: u32, transform: F) -> Result<Vec<u8>>
-where
-    F: FnOnce(&[u8]) -> Result<Vec<u8>>,
-{
-    match repeated_length_delimited_payloads(data, field_number)?.len() {
-        0 => Ok(data.to_vec()),
-        1 => transform_length_delimited_field(data, field_number, transform),
-        count => Err(Error::InvalidFormat(format!(
-            "singular TSWP storage table field {field_number} occurs {count} times"
-        ))),
-    }
-}
-
-fn adjust_index_table_wire(
-    table: &[u8],
-    range: &Range<usize>,
-    replacement_units: usize,
-    retain_start_boundary: bool,
-) -> Result<Vec<u8>> {
-    let mut entries = repeated_length_delimited_payloads(table, 1)?
-        .into_iter()
-        .enumerate()
-        .filter_map(|(order, entry)| {
-            let index = required_u32_varint(entry, 1);
-            match index.and_then(|index| {
-                adjust_index(index, range, replacement_units, retain_start_boundary)
-            }) {
-                Ok(Some(index)) => Some(
-                    patch_varint_field(entry, 1, true, Some(u64::from(index)))
-                        .map(|entry| (index, order, entry)),
-                ),
-                Ok(None) => None,
-                Err(error) => Some(Err(error)),
+        let mut found = false;
+        for field in &message_info.field_infos {
+            if !field.object_references.contains(identifier) {
+                continue;
             }
-        })
-        .collect::<Result<Vec<_>>>()?;
-    entries.sort_by_key(|(index, order, _)| (*index, *order));
-    entries.dedup_by_key(|(index, _, _)| *index);
-    let entries = entries
-        .into_iter()
-        .map(|(_, _, entry)| entry)
-        .collect::<Vec<_>>();
-    rewrite_repeated_length_delimited_fields(table, 1, &entries)
-}
-
-fn adjust_overlapping_table_wire(
-    table: &[u8],
-    replacement: &Range<usize>,
-    replacement_units: usize,
-) -> Result<Vec<u8>> {
-    let entries = repeated_length_delimited_payloads(table, 1)?
-        .into_iter()
-        .filter_map(|entry| {
-            let adjusted = (|| {
-                let ranges = repeated_length_delimited_payloads(entry, 1)?;
-                if ranges.len() != 1 {
-                    return Err(Error::InvalidFormat(format!(
-                        "TSWP overlapping attribute range occurs {} times",
-                        ranges.len()
-                    )));
-                }
-                let start = usize::try_from(required_u32_varint(ranges[0], 1)?)
-                    .map_err(|_| Error::ParseError("Text attribute index overflow".to_owned()))?;
-                let length = usize::try_from(required_u32_varint(ranges[0], 2)?)
-                    .map_err(|_| Error::ParseError("Text attribute length overflow".to_owned()))?;
-                let end = start
-                    .checked_add(length)
-                    .ok_or_else(|| Error::ParseError("Text attribute range overflow".to_owned()))?;
-                if end <= replacement.start {
-                    return Ok(Some(entry.to_vec()));
-                }
-                if start >= replacement.end {
-                    let shifted = shift_index(start, replacement, replacement_units)?;
-                    return patch_nested_varint_field(
-                        entry,
-                        &[1, 1],
-                        true,
-                        Some(u64::from(shifted)),
-                    )
-                    .map(Some);
-                }
-                Ok(None)
-            })();
-            match adjusted {
-                Ok(Some(entry)) => Some(Ok(entry)),
-                Ok(None) => None,
-                Err(error) => Some(Err(error)),
+            found = true;
+            let Some(storage_field) = exact_storage_table_reference_path(&field.path.path) else {
+                return false;
+            };
+            if field.effective_type() != crate::archive::FieldType::ObjectReference
+                || !field_removals.iter().any(|removal| {
+                    removal.identifier() == *identifier
+                        && removal.storage_field_number() == storage_field
+                })
+            {
+                return false;
             }
-        })
-        .collect::<Result<Vec<_>>>()?;
-    rewrite_repeated_length_delimited_fields(table, 1, &entries)
-}
-
-fn required_u32_varint(data: &[u8], field_number: u32) -> Result<u32> {
-    let fields = parse_wire_fields(data)?;
-    let matches = fields
-        .iter()
-        .filter(|field| field.number() == field_number)
-        .collect::<Vec<_>>();
-    if matches.len() != 1 || matches[0].wire_type() != 0 {
-        return Err(Error::InvalidFormat(format!(
-            "required protobuf varint field {field_number} occurs {} times or has the wrong wire type",
-            matches.len()
-        )));
-    }
-    let field = matches[0];
-    let (value, length) =
-        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end()..field.end()])
-            .map_err(|error| Error::InvalidFormat(format!("invalid protobuf varint: {error}")))?;
-    if field.key_end() + length != field.end() {
-        return Err(Error::InvalidFormat(
-            "protobuf varint field has trailing bytes".to_owned(),
-        ));
-    }
-    u32::try_from(value).map_err(|_| Error::InvalidFormat("protobuf varint exceeds u32".to_owned()))
-}
-
-fn adjust_object_table(
-    table: &mut Option<ObjectAttributeTable>,
-    range: &Range<usize>,
-    replacement_units: usize,
-    retain_start_boundary: bool,
-) -> Result<()> {
-    let Some(table) = table else {
-        return Ok(());
-    };
-    table.entries = table
-        .entries
-        .drain(..)
-        .filter_map(|mut entry| {
-            adjust_index(
-                entry.character_index,
-                range,
-                replacement_units,
-                retain_start_boundary,
-            )
-            .transpose()
-            .map(|result| {
-                result.map(|index| {
-                    entry.character_index = index;
-                    entry
-                })
-            })
-        })
-        .collect::<Result<Vec<_>>>()?;
-    deduplicate_object_entries(&mut table.entries);
-    Ok(())
-}
-
-fn adjust_para_table(
-    table: &mut Option<ParaDataAttributeTable>,
-    range: &Range<usize>,
-    replacement_units: usize,
-) -> Result<()> {
-    let Some(table) = table else {
-        return Ok(());
-    };
-    table.entries = table
-        .entries
-        .drain(..)
-        .filter_map(|mut entry| {
-            adjust_index(entry.character_index, range, replacement_units, true)
-                .transpose()
-                .map(|result| {
-                    result.map(|index| {
-                        entry.character_index = index;
-                        entry
-                    })
-                })
-        })
-        .collect::<Result<Vec<_>>>()?;
-    table.entries.sort_by_key(|entry| entry.character_index);
-    table.entries.dedup_by_key(|entry| entry.character_index);
-    Ok(())
-}
-
-fn adjust_string_table(
-    table: &mut Option<StringAttributeTable>,
-    range: &Range<usize>,
-    replacement_units: usize,
-) -> Result<()> {
-    let Some(table) = table else {
-        return Ok(());
-    };
-    table.entries = table
-        .entries
-        .drain(..)
-        .filter_map(|mut entry| {
-            adjust_index(entry.character_index, range, replacement_units, true)
-                .transpose()
-                .map(|result| {
-                    result.map(|index| {
-                        entry.character_index = index;
-                        entry
-                    })
-                })
-        })
-        .collect::<Result<Vec<_>>>()?;
-    table.entries.sort_by_key(|entry| entry.character_index);
-    table.entries.dedup_by_key(|entry| entry.character_index);
-    Ok(())
-}
-
-fn adjust_overlapping_table(
-    table: &mut Option<OverlappingFieldAttributeTable>,
-    replacement: &Range<usize>,
-    replacement_units: usize,
-) -> Result<()> {
-    let Some(table) = table else {
-        return Ok(());
-    };
-    let mut adjusted = Vec::new();
-    for mut entry in table.entries.drain(..) {
-        let start = entry.range.location as usize;
-        let end = start
-            .checked_add(entry.range.length as usize)
-            .ok_or_else(|| Error::ParseError("Text attribute range overflow".to_string()))?;
-        if end <= replacement.start {
-            adjusted.push(entry);
-        } else if start >= replacement.end {
-            entry.range.location = shift_index(start, replacement, replacement_units)?;
-            adjusted.push(entry);
         }
-        // An annotation intersecting replaced text is intentionally removed.
-    }
-    table.entries = adjusted;
-    Ok(())
+        found || top_level_occurrence
+    });
+    identifiers
 }
 
-fn adjust_index(
-    index: u32,
-    range: &Range<usize>,
-    replacement_units: usize,
-    retain_start_boundary: bool,
-) -> Result<Option<u32>> {
-    let index_usize = index as usize;
-    if index_usize < range.start || (retain_start_boundary && index_usize == range.start) {
-        return Ok(Some(index));
-    }
-    if index_usize < range.end {
-        return Ok(None);
-    }
-    Ok(Some(shift_index(index_usize, range, replacement_units)?))
+fn exact_storage_table_reference_path(path: &[u32]) -> Option<u32> {
+    let [storage_field, 1, 2] = path else {
+        return None;
+    };
+    matches!(
+        storage_field,
+        5 | 7 | 8 | 9 | 11 | 12 | 15 | 16 | 17 | 18 | 21 | 22 | 23 | 25 | 26 | 27 | 28
+    )
+    .then_some(*storage_field)
 }
 
-fn shift_index(index: usize, range: &Range<usize>, replacement_units: usize) -> Result<u32> {
-    let removed = range.end - range.start;
-    let shifted = if replacement_units >= removed {
-        index.checked_add(replacement_units - removed)
-    } else {
-        index.checked_sub(removed - replacement_units)
+fn metadata_unreferenced_candidates(
+    package: &IWorkPackage,
+    candidates: &HashSet<u64>,
+) -> Result<HashSet<u64>> {
+    if candidates.is_empty() {
+        return Ok(HashSet::new());
     }
-    .ok_or_else(|| Error::ParseError("Text attribute index overflow".to_string()))?;
-    u32::try_from(shifted)
-        .map_err(|_| Error::ParseError("Text attribute index exceeds u32".to_string()))
-}
-
-fn deduplicate_object_entries(
-    entries: &mut Vec<crate::protobuf::tswp::object_attribute_table::ObjectAttribute>,
-) {
-    entries.sort_by_key(|entry| entry.character_index);
-    entries.dedup_by_key(|entry| entry.character_index);
+    let mut referenced = HashSet::new();
+    for archive_name in package.iwa_entry_names() {
+        let archive = package.archive(archive_name)?;
+        for object in archive.objects {
+            for info in object.archive_info.message_infos {
+                for identifier in info.object_references {
+                    if candidates.contains(&identifier) {
+                        referenced.insert(identifier);
+                    }
+                }
+                for field in info.field_infos {
+                    for identifier in field.object_references {
+                        if candidates.contains(&identifier) {
+                            referenced.insert(identifier);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(candidates
+        .difference(&referenced)
+        .copied()
+        .collect::<HashSet<_>>())
 }
 
 pub(crate) fn storage_object_references(storage: &StorageArchive) -> Vec<u64> {
@@ -3041,10 +2646,14 @@ pub(crate) fn storage_object_references(storage: &StorageArchive) -> Vec<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::archive::{Archive, ArchiveObject};
+    use crate::archive::{Archive, ArchiveObject, FieldInfo, FieldType};
     use crate::protobuf::tsp::{Range as TspRange, Reference};
     use crate::protobuf::tswp::object_attribute_table::ObjectAttribute;
     use crate::protobuf::tswp::overlapping_field_attribute_table::OverlappingFieldAttribute;
+    use crate::protobuf::tswp::{ObjectAttributeTable, OverlappingFieldAttributeTable};
+    use prost::Message;
+
+    const UNKNOWN_ARCHIVE_HEADER_FIELD: &[u8] = &[0x92, 0x06, 0x04, 0xde, 0xad, 0xbe, 0xef];
 
     #[test]
     fn storage_discovery_rejects_malformed_recognized_payload() {
@@ -3273,6 +2882,223 @@ mod tests {
     }
 
     #[test]
+    fn exclusive_table_reference_is_pruned_without_normalizing_unknown_header_bytes() {
+        let storage = StorageArchive {
+            text: vec!["AB".to_owned()],
+            table_attachment: Some(ObjectAttributeTable {
+                entries: vec![attribute(1, 91)],
+            }),
+            ..Default::default()
+        };
+        let mut editor = IWorkTextEditor::from_package(test_package_with_reference_metadata(
+            storage,
+            Vec::new(),
+            vec![reference_field(vec![9, 1, 2], 91)],
+        ));
+
+        editor
+            .replace_text(
+                TextStorageId::new(42).expect("valid test storage ID"),
+                1..2,
+                "longer",
+            )
+            .unwrap();
+
+        let archive = editor.package().archive("Index/Document.iwa").unwrap();
+        let raw = archive.to_bytes().unwrap();
+        assert!(archive_header(&raw).ends_with(UNKNOWN_ARCHIVE_HEADER_FIELD));
+        let object = archive.object(42).unwrap();
+        assert!(
+            object.archive_info.message_infos[0].field_infos[0]
+                .object_references
+                .is_empty()
+        );
+        let storage = StorageArchive::decode(object.messages[0].data.as_slice()).unwrap();
+        assert_eq!(storage.text, ["Alonger"]);
+        assert!(storage.table_attachment.is_none());
+    }
+
+    #[test]
+    fn reference_shared_with_opaque_field_info_is_retained_conservatively() {
+        let storage = StorageArchive {
+            text: vec!["AB".to_owned()],
+            table_attachment: Some(ObjectAttributeTable {
+                entries: vec![attribute(1, 91)],
+            }),
+            ..Default::default()
+        };
+        let mut editor = IWorkTextEditor::from_package(test_package_with_reference_metadata(
+            storage,
+            Vec::new(),
+            vec![
+                reference_field(vec![9, 1, 2], 91),
+                reference_field(vec![99], 91),
+            ],
+        ));
+
+        editor
+            .replace_text(
+                TextStorageId::new(42).expect("valid test storage ID"),
+                1..2,
+                "longer",
+            )
+            .unwrap();
+
+        let archive = editor.package().archive("Index/Document.iwa").unwrap();
+        let raw = archive.to_bytes().unwrap();
+        assert!(archive_header(&raw).ends_with(UNKNOWN_ARCHIVE_HEADER_FIELD));
+        let object = archive.object(42).unwrap();
+        let field_infos = &object.archive_info.message_infos[0].field_infos;
+        assert_eq!(field_infos[0].object_references, [91]);
+        assert_eq!(field_infos[1].object_references, [91]);
+        let storage = StorageArchive::decode(object.messages[0].data.as_slice()).unwrap();
+        assert!(storage.table_attachment.is_none());
+    }
+
+    #[test]
+    fn complete_known_top_level_reference_multiset_is_safe_to_prune() {
+        let storage = StorageArchive {
+            text: vec!["AB".to_owned()],
+            table_attachment: Some(ObjectAttributeTable {
+                entries: vec![attribute(1, 91)],
+            }),
+            ..Default::default()
+        };
+        let mut editor = IWorkTextEditor::from_package(test_package_with_reference_metadata(
+            storage,
+            vec![91],
+            Vec::new(),
+        ));
+
+        editor
+            .replace_text(
+                TextStorageId::new(42).expect("valid test storage ID"),
+                1..2,
+                "longer",
+            )
+            .unwrap();
+
+        let archive = editor.package().archive("Index/Document.iwa").unwrap();
+        let object = archive.object(42).unwrap();
+        assert!(
+            object.archive_info.message_infos[0]
+                .object_references
+                .is_empty()
+        );
+        assert!(
+            archive_header(&archive.to_bytes().unwrap()).ends_with(UNKNOWN_ARCHIVE_HEADER_FIELD)
+        );
+    }
+
+    #[test]
+    fn reference_retained_by_another_storage_field_is_not_pruned() {
+        let storage = StorageArchive {
+            text: vec!["AB".to_owned()],
+            table_char_style: Some(ObjectAttributeTable {
+                entries: vec![attribute(0, 91)],
+            }),
+            table_attachment: Some(ObjectAttributeTable {
+                entries: vec![attribute(1, 91)],
+            }),
+            ..Default::default()
+        };
+        let mut editor = IWorkTextEditor::from_package(test_package_with_reference_metadata(
+            storage,
+            vec![91, 91],
+            Vec::new(),
+        ));
+
+        editor
+            .replace_text(
+                TextStorageId::new(42).expect("valid test storage ID"),
+                1..2,
+                "longer",
+            )
+            .unwrap();
+
+        let archive = editor.package().archive("Index/Document.iwa").unwrap();
+        let object = archive.object(42).unwrap();
+        assert_eq!(
+            object.archive_info.message_infos[0].object_references,
+            [91, 91]
+        );
+        let storage = StorageArchive::decode(object.messages[0].data.as_slice()).unwrap();
+        assert!(storage.table_attachment.is_none());
+        assert_eq!(
+            storage.table_char_style.unwrap().entries[0]
+                .object
+                .unwrap()
+                .identifier,
+            91
+        );
+    }
+
+    #[test]
+    fn same_text_replacement_still_removes_intersecting_object_attributes() {
+        let storage = StorageArchive {
+            text: vec!["AB".to_owned()],
+            table_smartfield: Some(ObjectAttributeTable {
+                entries: vec![attribute(0, 91)],
+            }),
+            ..Default::default()
+        };
+        let mut editor = IWorkTextEditor::from_package(test_package_with_reference_metadata(
+            storage,
+            vec![91],
+            Vec::new(),
+        ));
+
+        editor
+            .replace_text(
+                TextStorageId::new(42).expect("valid test storage ID"),
+                0..1,
+                "A",
+            )
+            .unwrap();
+
+        let archive = editor.package().archive("Index/Document.iwa").unwrap();
+        let object = archive.object(42).unwrap();
+        let storage = StorageArchive::decode(object.messages[0].data.as_slice()).unwrap();
+        assert!(storage.table_smartfield.is_none());
+        assert!(
+            object.archive_info.message_infos[0]
+                .object_references
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn unknown_storage_field_blocks_all_reference_pruning() {
+        let storage = StorageArchive {
+            text: vec!["AB".to_owned()],
+            table_attachment: Some(ObjectAttributeTable {
+                entries: vec![attribute(1, 91)],
+            }),
+            ..Default::default()
+        };
+        let mut data = storage.encode_to_vec();
+        append_unknown_varint(&mut data, 99, 91);
+        let mut editor = IWorkTextEditor::from_package(test_package_with_raw_reference_metadata(
+            data,
+            vec![91],
+            vec![reference_field(vec![9, 1, 2], 91)],
+        ));
+
+        editor
+            .replace_text(
+                TextStorageId::new(42).expect("valid test storage ID"),
+                1..2,
+                "longer",
+            )
+            .unwrap();
+
+        let archive = editor.package().archive("Index/Document.iwa").unwrap();
+        let message_info = &archive.object(42).unwrap().archive_info.message_infos[0];
+        assert_eq!(message_info.object_references, [91]);
+        assert_eq!(message_info.field_infos[0].object_references, [91]);
+    }
+
+    #[test]
     fn invalid_surrogate_boundary_is_transactional() {
         let storage = StorageArchive {
             text: vec!["🚀".to_string()],
@@ -3290,6 +3116,29 @@ mod tests {
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);
+    }
+
+    #[test]
+    fn generic_editor_preserves_structural_control_insertion_compatibility() {
+        let storage = StorageArchive {
+            text: vec!["AB".to_owned()],
+            ..Default::default()
+        };
+        let mut editor = IWorkTextEditor::from_package(test_package(storage));
+
+        editor
+            .replace_text(
+                TextStorageId::new(42).expect("valid test storage ID"),
+                1..1,
+                "\u{4}\u{e}",
+            )
+            .unwrap();
+
+        let archive = editor.package().archive("Index/Document.iwa").unwrap();
+        let storage =
+            StorageArchive::decode(archive.object(42).unwrap().messages[0].data.as_slice())
+                .unwrap();
+        assert_eq!(storage.text, ["A\u{4}\u{e}B"]);
     }
 
     #[test]
@@ -3511,6 +3360,35 @@ mod tests {
         data.extend(litchi_iwa_common::varint::encode_varint(value));
     }
 
+    fn reference_field(path: Vec<u32>, identifier: u64) -> FieldInfo {
+        let mut field = FieldInfo::new(path);
+        field.r#type = Some(FieldType::ObjectReference);
+        field.object_references = vec![identifier];
+        field
+    }
+
+    fn archive_header(data: &[u8]) -> &[u8] {
+        let (header_length, prefix_length) =
+            litchi_iwa_common::varint::decode_varint_from_bytes(data).unwrap();
+        let header_length = usize::try_from(header_length).unwrap();
+        &data[prefix_length..prefix_length + header_length]
+    }
+
+    fn append_unknown_archive_header(data: &[u8]) -> Vec<u8> {
+        let (header_length, prefix_length) =
+            litchi_iwa_common::varint::decode_varint_from_bytes(data).unwrap();
+        let header_length = usize::try_from(header_length).unwrap();
+        let payload_start = prefix_length + header_length;
+        let mut header = data[prefix_length..payload_start].to_vec();
+        header.extend_from_slice(UNKNOWN_ARCHIVE_HEADER_FIELD);
+        let mut rewritten = litchi_iwa_common::varint::encode_varint(
+            u64::try_from(header.len()).expect("test header length fits u64"),
+        );
+        rewritten.extend_from_slice(&header);
+        rewritten.extend_from_slice(&data[payload_start..]);
+        rewritten
+    }
+
     fn test_package(storage: StorageArchive) -> IWorkPackage {
         test_package_with_messages(vec![RawMessage {
             type_: 2001,
@@ -3520,14 +3398,49 @@ mod tests {
 
     fn test_package_with_messages(messages: Vec<RawMessage>) -> IWorkPackage {
         let object = ArchiveObject::new(42, messages).unwrap();
+        test_package_with_object(object)
+    }
+
+    fn test_package_with_reference_metadata(
+        storage: StorageArchive,
+        object_references: Vec<u64>,
+        field_infos: Vec<FieldInfo>,
+    ) -> IWorkPackage {
+        test_package_with_raw_reference_metadata(
+            storage.encode_to_vec(),
+            object_references,
+            field_infos,
+        )
+    }
+
+    fn test_package_with_raw_reference_metadata(
+        data: Vec<u8>,
+        object_references: Vec<u64>,
+        field_infos: Vec<FieldInfo>,
+    ) -> IWorkPackage {
+        let mut object = ArchiveObject::new(42, vec![RawMessage { type_: 2001, data }]).unwrap();
+        object.archive_info.message_infos[0].object_references = object_references;
+        object.archive_info.message_infos[0].field_infos = field_infos;
+        let source = Archive {
+            objects: vec![object],
+        }
+        .to_bytes()
+        .unwrap();
+        let source = append_unknown_archive_header(&source);
+        let archive = Archive::parse(&source).unwrap();
+        test_package_with_archive(archive)
+    }
+
+    fn test_package_with_object(object: ArchiveObject) -> IWorkPackage {
+        test_package_with_archive(Archive {
+            objects: vec![object],
+        })
+    }
+
+    fn test_package_with_archive(archive: Archive) -> IWorkPackage {
         let mut package = IWorkPackage::new();
         package
-            .replace_archive(
-                "Index/Document.iwa",
-                &Archive {
-                    objects: vec![object],
-                },
-            )
+            .replace_archive("Index/Document.iwa", &archive)
             .unwrap();
         package
     }

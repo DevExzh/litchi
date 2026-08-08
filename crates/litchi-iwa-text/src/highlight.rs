@@ -54,7 +54,7 @@ pub mod raw {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::ZeroId`] when `identifier` is zero.
+    /// Returns [`super::Error::ZeroId`] when `identifier` is zero.
     pub const fn from_object_id(identifier: u64) -> Result<TextHighlightId> {
         TextHighlightId::from_raw(identifier)
     }

@@ -920,3 +920,45 @@ This capability owns `TP.SectionArchive` fields 20--22 only. Header/footer
 inheritance and first-page flags, section background, section names, template
 references, section creation/deletion/order, and legacy package normalization
 remain separate capabilities with independent preservation and native gates.
+
+## 2026-08-08 amendment: Pages section-text semantics
+
+Pages section text is selected through `SectionSelector` and returned by
+`Package::section_text` as the exact semantic text owned by that section. The
+value excludes the native U+0004 delimiter before a following section. Exact
+names remain case-sensitive and ambiguity is a typed error; an index resolves
+immediately to the checked semantic `Position` retained by the edit and patch.
+The public model contains no global body-storage coordinate, raw object ID, or
+native section-table entry.
+
+`TextPosition` is a UTF-16 code-unit boundary. `TextSpan` is an ordered,
+half-open pair of positions that may be empty, so the same type describes both
+a replacement selection and an insertion point. Construction rejects indexes
+outside the compact native domain and reversed endpoints; the Pages adapter
+then rejects endpoints beyond the selected section or between a scalar's
+surrogate pair. Byte indexes and native absolute body offsets remain private.
+
+`Package::edit_section_text` stages exactly one unambiguous splice. `replace`
+is the primitive; `insert`, `delete`, `set`, and `clear` are typed conveniences.
+The source text stays borrowed until staging requires an owned replacement.
+Reserved U+0004 section breaks, U+000E footnote anchors, and U+FFFC inline
+objects cannot be synthesized or consumed by this capability. If an edit would
+remove dependent reference metadata it fails with `DependentContent` rather
+than silently deleting another semantic graph. `edit_body_text` is only a
+single-section convenience and therefore cannot flatten a multi-section body.
+
+A successful patch exposes its semantic section position, original span, and
+complete before/after section text. Exact source and target artifacts stay
+private; fingerprints are diagnostics and exact bytes authorize application.
+An inverse swaps the artifacts, semantic precondition, and replacement span so
+it can restore the original package byte-for-byte. Semantic no-ops share the
+source allocation and report zero touched components. Changed edits publish
+only after bounded full-package reopening plus section text, neighboring
+section, object-count, and root/section-reference topology verification.
+
+This surface authorizes one existing section-body splice only. It does not
+create, remove, or reorder sections; delete footnote or attachment graphs;
+edit headers, footers, floating text, or text boxes; normalize legacy nested
+packages; change a no-root/fallback body whose physical ownership is not
+rooted; serialize durable patches; or publish files atomically. Those remain
+separate capabilities and migration gates.
