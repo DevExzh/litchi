@@ -217,12 +217,13 @@ impl Package {
     #[cfg(feature = "internal-iwork-source")]
     #[doc(hidden)]
     pub fn __from_prepared_source(source: PreparedSource) -> PackageResult<Self> {
-        if source.format() != Format::Pages {
-            return Err(PackageError::InvalidFormat(
-                "prepared iWork source is not a Pages document".to_owned(),
-            ));
-        }
-        Self::from_source_catalog(source.__into_source_catalog())
+        validate_prepared_format(&source)?;
+        let source_catalog = source.__into_source_catalog().ok_or_else(|| {
+            PackageError::InvalidFormat(
+                "directory-backed Pages sources support semantic projection only".to_owned(),
+            )
+        })?;
+        Self::from_source_catalog(source_catalog)
     }
 
     fn from_source_catalog(source: SourceCatalog) -> PackageResult<Self> {
@@ -232,7 +233,7 @@ impl Package {
         let object_count = validate_components(components)?;
         let root_references = root_references(components)?;
         let text_limit = effective_text_limit(limits);
-        let document = decode_document(components, root_references, text_limit)?;
+        let document = decode_document(components, root_references, MAX_SECTIONS, text_limit)?;
 
         Ok(Self {
             state: Arc::new(State {
@@ -441,6 +442,62 @@ impl StorageAccumulator {
     }
 }
 
+/// Consume a prepared Pages source into an archive-free semantic document.
+///
+/// This unstable coordinator handoff deliberately discards the physical
+/// package catalog before semantic decoding begins. The caller-selected
+/// section and text limits can tighten, but never relax, Pages' hard semantic
+/// caps or the physical IWA-stream limit retained by the prepared source.
+///
+/// # Errors
+///
+/// Returns [`PackageError`] when the prepared source belongs to another iWork
+/// application, its Pages graph is malformed, or projection exceeds an
+/// effective admission bound.
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+pub fn __semantic_document_from_prepared_source(
+    source: PreparedSource,
+    max_sections: usize,
+    max_text_bytes: usize,
+) -> PackageResult<Document> {
+    let (components, limits) = semantic_components_from_prepared_source(source)?;
+    decode_semantic_components(
+        &components,
+        max_sections.min(MAX_SECTIONS),
+        max_text_bytes.min(effective_text_limit(limits)),
+    )
+}
+
+#[cfg(feature = "internal-iwork-source")]
+fn validate_prepared_format(source: &PreparedSource) -> PackageResult<()> {
+    if source.format() != Format::Pages {
+        return Err(PackageError::InvalidFormat(
+            "prepared iWork source is not a Pages document".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(feature = "internal-iwork-source")]
+fn semantic_components_from_prepared_source(
+    source: PreparedSource,
+) -> PackageResult<(Arc<ComponentCatalog>, Limits)> {
+    validate_prepared_format(&source)?;
+    Ok(source.__into_components())
+}
+
+#[cfg(feature = "internal-iwork-source")]
+fn decode_semantic_components(
+    components: &ComponentCatalog,
+    max_sections: usize,
+    max_text_bytes: usize,
+) -> PackageResult<Document> {
+    validate_components(components)?;
+    let root_references = root_references(components)?;
+    decode_document(components, root_references, max_sections, max_text_bytes)
+}
+
 fn read_path(path: &Path, limits: Limits) -> PackageResult<Vec<u8>> {
     let metadata = fs::symlink_metadata(path)?;
     if metadata.file_type().is_symlink() {
@@ -632,6 +689,7 @@ fn root_references(components: &ComponentCatalog) -> PackageResult<RootReference
 fn decode_document(
     components: &ComponentCatalog,
     root_references: RootReferences,
+    max_sections: usize,
     max_text_bytes: usize,
 ) -> PackageResult<Document> {
     if let Some(identifier) = root_references.body {
@@ -640,10 +698,18 @@ fn decode_document(
                 "Pages body storage object {identifier} is missing"
             ))
         })?;
-        let (native, payload) = decode_body_storage(&object.messages, identifier, max_text_bytes)?;
+        let (native, payload) =
+            decode_body_storage(&object.messages, identifier, max_sections, max_text_bytes)?;
         validate_section_table_wire(payload, &native, identifier)?;
         let section_references =
-            native_section_references(&native, root_references.initial_section)?;
+            native_section_references(&native, root_references.initial_section, max_sections)?;
+        if section_references.is_empty() && max_sections == 0 {
+            return Err(SemanticError::TooManySections {
+                actual: 1,
+                limit: max_sections,
+            }
+            .into());
+        }
         return project_native_body(
             components,
             native,
@@ -660,7 +726,7 @@ fn decode_document(
     }
 
     let body = {
-        let storages = extract_storages(components, max_text_bytes)?;
+        let storages = extract_storages(components, max_sections, max_text_bytes)?;
         (!storages.is_empty())
             .then(|| Body::with_max_text_bytes(storages, max_text_bytes))
             .transpose()?
@@ -681,10 +747,11 @@ fn find_object(
 fn decode_body_storage(
     messages: &[litchi_iwa_core::RawMessage],
     identifier: NonZeroU64,
+    max_sections: usize,
     max_text_bytes: usize,
 ) -> PackageResult<(tswp::StorageArchive, &[u8])> {
     let payload = unique_text_payload(messages, identifier)?;
-    preflight_body_wire(payload, identifier, max_text_bytes)?;
+    preflight_body_wire(payload, identifier, max_sections, max_text_bytes)?;
     let native = tswp::StorageArchive::decode(payload).map_err(|error| {
         PackageError::InvalidFormat(format!(
             "Pages body object {identifier} text payload is invalid: {error}"
@@ -697,6 +764,7 @@ fn decode_body_storage(
 fn preflight_body_wire(
     payload: &[u8],
     body_identifier: NonZeroU64,
+    max_sections: usize,
     max_text_bytes: usize,
 ) -> PackageResult<()> {
     let context = format!("Pages body object {body_identifier}");
@@ -753,10 +821,10 @@ fn preflight_body_wire(
         entry_count = entry_count.checked_add(1).ok_or_else(|| {
             PackageError::InvalidFormat(format!("{context} section count overflows usize"))
         })?;
-        if entry_count > MAX_SECTIONS {
+        if entry_count > max_sections {
             return Err(SemanticError::TooManySections {
                 actual: entry_count,
-                limit: MAX_SECTIONS,
+                limit: max_sections,
             }
             .into());
         }
@@ -988,6 +1056,7 @@ fn decode_canonical_varint(payload: &[u8], context: &str) -> PackageResult<u64> 
 fn native_section_references(
     body: &tswp::StorageArchive,
     initial_section: Option<NonZeroU64>,
+    max_sections: usize,
 ) -> PackageResult<Vec<NativeSectionReference>> {
     let table_entries = body
         .table_section
@@ -999,10 +1068,10 @@ fn native_section_references(
         .ok_or_else(|| {
             PackageError::InvalidFormat("Pages section count overflows usize".to_owned())
         })?;
-    if maximum_count > MAX_SECTIONS.saturating_add(1) {
+    if maximum_count > max_sections.saturating_add(1) {
         return Err(SemanticError::TooManySections {
             actual: maximum_count,
-            limit: MAX_SECTIONS,
+            limit: max_sections,
         }
         .into());
     }
@@ -1070,10 +1139,10 @@ fn native_section_references(
             references[0].character_index
         )));
     }
-    if references.len() > MAX_SECTIONS {
+    if references.len() > max_sections {
         return Err(SemanticError::TooManySections {
             actual: references.len(),
-            limit: MAX_SECTIONS,
+            limit: max_sections,
         }
         .into());
     }
@@ -1475,6 +1544,7 @@ fn range_containing_empty_offset(ranges: &[TextRange], offset: usize) -> Option<
 
 fn extract_storages(
     components: &ComponentCatalog,
+    max_sections: usize,
     max_text_bytes: usize,
 ) -> PackageResult<Vec<Storage>> {
     let mut storages = Vec::new();
@@ -1499,6 +1569,13 @@ fn extract_storages(
                 };
                 if storage.is_empty() {
                     continue;
+                }
+                if max_sections == 0 {
+                    return Err(SemanticError::TooManySections {
+                        actual: 1,
+                        limit: max_sections,
+                    }
+                    .into());
                 }
                 if storages.len() == MAX_BODY_STORAGES {
                     return Err(SemanticError::TooManyBodyStorages {
@@ -1799,6 +1876,196 @@ mod tests {
             direct.sections()[0].plain_text()
         );
         assert_eq!(handed_off.metadata().title, direct.metadata().title);
+        Ok(())
+    }
+
+    #[cfg(feature = "internal-iwork-source")]
+    #[test]
+    fn semantic_prepared_source_handoff_matches_package_projection() -> PackageResult<()> {
+        let bytes = sectioned_package_bytes(
+            vec!["A\u{0004}B".to_owned()],
+            &[(0, 43), (2, 44)],
+            None,
+            vec![
+                (43, vec![section_payload(Some("One"))]),
+                (44, vec![section_payload(Some("Two"))]),
+            ],
+        )?;
+        let direct = Package::from_bytes(&bytes)?;
+        let prepared = PreparedSource::from_bytes(&bytes)
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
+            .ok_or_else(|| {
+                PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
+            })?;
+
+        let document = __semantic_document_from_prepared_source(
+            prepared,
+            MAX_SECTIONS,
+            DEFAULT_MAX_TEXT_BYTES,
+        )?;
+
+        assert_eq!(document.plain_text(), direct.text()?);
+        assert_eq!(document.sections().len(), direct.sections().len());
+        for (semantic, packaged) in document.sections().iter().zip(direct.sections()) {
+            assert_eq!(semantic.index(), packaged.index());
+            assert_eq!(semantic.name(), packaged.name());
+            assert_eq!(semantic.plain_text(), packaged.plain_text());
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "internal-iwork-source")]
+    #[test]
+    fn semantic_prepared_source_releases_physical_source() -> PackageResult<()> {
+        let source: Arc<[u8]> = package_bytes(Some("Detached"), true, true)?.into();
+        let weak_source = Arc::downgrade(&source);
+        let prepared = PreparedSource::from_shared_bytes(Arc::clone(&source))
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
+            .ok_or_else(|| {
+                PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
+            })?;
+        drop(source);
+        assert!(weak_source.upgrade().is_some());
+
+        let document = __semantic_document_from_prepared_source(
+            prepared,
+            MAX_SECTIONS,
+            DEFAULT_MAX_TEXT_BYTES,
+        )?;
+
+        assert!(weak_source.upgrade().is_none());
+        assert_eq!(document.plain_text(), "Detached");
+        Ok(())
+    }
+
+    #[cfg(feature = "internal-iwork-source")]
+    #[test]
+    fn semantic_component_boundary_has_no_physical_source_to_parse_again() -> PackageResult<()> {
+        let source: Arc<[u8]> = package_bytes(Some("Single parse"), true, false)?.into();
+        let weak_source = Arc::downgrade(&source);
+        let prepared = PreparedSource::from_shared_bytes(Arc::clone(&source))
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
+            .ok_or_else(|| {
+                PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
+            })?;
+        drop(source);
+
+        let (components, limits) = semantic_components_from_prepared_source(prepared)?;
+        assert!(weak_source.upgrade().is_none());
+
+        let document =
+            decode_semantic_components(&components, MAX_SECTIONS, effective_text_limit(limits))?;
+        assert_eq!(document.plain_text(), "Single parse");
+        Ok(())
+    }
+
+    #[cfg(feature = "internal-iwork-source")]
+    #[test]
+    fn semantic_prepared_source_rejects_malformed_pages_graph() -> PackageResult<()> {
+        let root = tp::DocumentArchive {
+            body_storage: Some(Reference {
+                identifier: 42,
+                ..Reference::default()
+            }),
+            ..tp::DocumentArchive::default()
+        };
+        let bytes = archive_package_bytes(
+            vec![
+                ArchiveObject::new(
+                    1,
+                    vec![RawMessage {
+                        type_: 10_000,
+                        data: root.encode_to_vec(),
+                    }],
+                )
+                .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
+            ],
+            false,
+        )?;
+        let prepared = PreparedSource::from_bytes(&bytes)
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
+            .ok_or_else(|| {
+                PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
+            })?;
+
+        let error = __semantic_document_from_prepared_source(
+            prepared,
+            MAX_SECTIONS,
+            DEFAULT_MAX_TEXT_BYTES,
+        )
+        .err()
+        .unwrap_or_else(|| panic!("missing Pages body should fail"));
+
+        assert!(
+            error
+                .to_string()
+                .contains("body storage object 42 is missing")
+        );
+        Ok(())
+    }
+
+    #[cfg(feature = "internal-iwork-source")]
+    #[test]
+    fn semantic_prepared_source_enforces_exact_and_one_over_text_limits() -> PackageResult<()> {
+        let bytes = package_bytes(Some("12345"), true, false)?;
+        let exact = PreparedSource::from_bytes(&bytes)
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
+            .ok_or_else(|| {
+                PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
+            })?;
+        let document = __semantic_document_from_prepared_source(exact, MAX_SECTIONS, 5)?;
+        assert_eq!(document.plain_text(), "12345");
+
+        let one_over = PreparedSource::from_bytes(&bytes)
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
+            .ok_or_else(|| {
+                PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
+            })?;
+        let error = __semantic_document_from_prepared_source(one_over, MAX_SECTIONS, 4)
+            .err()
+            .unwrap_or_else(|| panic!("one-over text should fail during wire preflight"));
+        assert!(matches!(
+            error,
+            PackageError::Semantic(SemanticError::TextTooLarge { limit: 4 })
+        ));
+        Ok(())
+    }
+
+    #[cfg(feature = "internal-iwork-source")]
+    #[test]
+    fn semantic_prepared_source_enforces_exact_and_one_over_section_limits() -> PackageResult<()> {
+        let bytes = sectioned_package_bytes(
+            vec!["A\u{0004}B".to_owned()],
+            &[(0, 43), (2, 44)],
+            None,
+            vec![
+                (43, vec![section_payload(Some("One"))]),
+                (44, vec![section_payload(Some("Two"))]),
+            ],
+        )?;
+        let exact = PreparedSource::from_bytes(&bytes)
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
+            .ok_or_else(|| {
+                PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
+            })?;
+        let document = __semantic_document_from_prepared_source(exact, 2, DEFAULT_MAX_TEXT_BYTES)?;
+        assert_eq!(document.sections().len(), 2);
+
+        let one_over = PreparedSource::from_bytes(&bytes)
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
+            .ok_or_else(|| {
+                PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
+            })?;
+        let error = __semantic_document_from_prepared_source(one_over, 1, DEFAULT_MAX_TEXT_BYTES)
+            .err()
+            .unwrap_or_else(|| panic!("one-over section should fail during wire preflight"));
+        assert!(matches!(
+            error,
+            PackageError::Semantic(SemanticError::TooManySections {
+                actual: 2,
+                limit: 1
+            })
+        ));
         Ok(())
     }
 

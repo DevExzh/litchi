@@ -54,12 +54,27 @@ class IworkPublicApiGateTests(unittest.TestCase):
             (
                 "cargo",
                 "rustdoc",
-                "--locked",
                 "--package",
                 "litchi",
                 "--no-default-features",
                 "--features",
                 "iwork",
+                "--",
+                "-Zunstable-options",
+                "--output-format",
+                "json",
+            ),
+        )
+        self.assertEqual(
+            public_api.isolation_rustdoc_command(),
+            (
+                "cargo",
+                "rustdoc",
+                "--package",
+                "litchi",
+                "--no-default-features",
+                "--features",
+                "pages,keynote,numbers",
                 "--",
                 "-Zunstable-options",
                 "--output-format",
@@ -123,6 +138,16 @@ class IworkPublicApiGateTests(unittest.TestCase):
             )
         )
 
+        public_field = document()
+        public_field["index"]["2"]["inner"]["struct"]["fields"] = ["4"]
+        public_field["index"]["4"] = {
+            "name": "object_id",
+            "inner": {"struct_field": {"primitive": "u64"}},
+        }
+        field_failure = public_api.violations(public_field)
+        self.assertEqual(len(field_failure), 1)
+        self.assertIn("raw identifier as `object_id`", field_failure[0])
+
     def test_rejects_physical_capability_names(self) -> None:
         names = (
             "raw",
@@ -152,6 +177,22 @@ class IworkPublicApiGateTests(unittest.TestCase):
         failures = public_api.violations(document(leak="serde::private::Value"))
         self.assertEqual(len(failures), 1)
         self.assertIn("non-allowlisted crate `serde::private::Value`", failures[0])
+
+        local_failure = public_api.violations(document(leak="litchi::pages::Package"))
+        self.assertEqual(len(local_failure), 1)
+        self.assertIn(
+            "type outside the iWork facade `litchi::pages::Package`",
+            local_failure[0],
+        )
+
+    def test_leaf_features_must_not_publish_the_aggregate_module(self) -> None:
+        isolated = document()
+        isolated["paths"].pop("1")
+        self.assertEqual(public_api.isolation_violations(isolated), [])
+        self.assertEqual(
+            public_api.isolation_violations(document()),
+            ["public module `litchi::iwork` is available without the `iwork` feature"],
+        )
 
     def test_requires_the_public_iwork_namespace(self) -> None:
         missing = document()

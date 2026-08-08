@@ -11,7 +11,9 @@ use std::fmt;
 use std::fs::File;
 use std::io::{Cursor, Read};
 use std::path::Path;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
+#[cfg(test)]
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use litchi_iwa_archive::{ComponentCatalog, Limits as ArchiveLimits, SourceCatalog};
 use litchi_iwa_common::{
@@ -29,6 +31,7 @@ use litchi_iwa_text_wire::{
     DEFAULT_MAX_WIRE_FRAGMENTS as DEFAULT_MAX_TEXT_FRAGMENTS, Error as TextWireError,
     Limits as TextWireLimits,
 };
+use once_cell::sync::OnceCell;
 use prost::Message;
 use thiserror::Error;
 
@@ -253,11 +256,54 @@ impl fmt::Debug for Package {
 
 #[derive(Debug)]
 struct State {
-    source: SourceCatalog,
+    source: PhysicalSource,
     options: ReadOptions,
     object_index: Box<[ObjectLocator]>,
     total_objects: usize,
-    semantic: OnceLock<Document>,
+    semantic: OnceCell<Document>,
+    #[cfg(test)]
+    semantic_decode_attempts: AtomicUsize,
+    #[cfg(all(test, feature = "internal-iwork-source"))]
+    source_classification_attempts: usize,
+}
+
+#[derive(Debug)]
+enum PhysicalSource {
+    Package(SourceCatalog),
+    #[cfg(feature = "internal-iwork-source")]
+    Semantic(Arc<ComponentCatalog>),
+}
+
+impl PhysicalSource {
+    fn components(&self) -> &ComponentCatalog {
+        match self {
+            Self::Package(source) => source.components(),
+            #[cfg(feature = "internal-iwork-source")]
+            Self::Semantic(components) => components,
+        }
+    }
+
+    fn package_source(&self) -> &SourceCatalog {
+        match self {
+            Self::Package(source) => source,
+            #[cfg(feature = "internal-iwork-source")]
+            Self::Semantic(_) => {
+                panic!("semantic-only Keynote decoder has no physical package source")
+            },
+        }
+    }
+
+    fn package(&self) -> &litchi_iwa_archive::package::Catalog {
+        self.package_source().package()
+    }
+
+    fn source_bytes(&self) -> &[u8] {
+        self.package_source().source_bytes()
+    }
+
+    fn shared_source(&self) -> Arc<[u8]> {
+        self.package_source().shared_source()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -391,14 +437,18 @@ impl Package {
         if source.format() != Format::Keynote {
             return Err(ReadError::NotKeynote);
         }
-        Self::from_source_catalog(source.__into_source_catalog(), semantic)
+        let source_catalog = source.__into_source_catalog().ok_or_else(|| {
+            ReadError::InvalidFormat(
+                "directory-backed Keynote sources support semantic projection only".to_owned(),
+            )
+        })?;
+        Self::from_classified_source_catalog(source_catalog, semantic, 0)
     }
 
     fn from_source_catalog(
         source_catalog: SourceCatalog,
         semantic: SemanticLimits,
     ) -> ReadResult<Self> {
-        let options = ReadOptions::new(source_catalog.limits(), semantic);
         match litchi_iwa_detect::component_catalog(source_catalog.components())? {
             Some(Format::Keynote) => {},
             Some(_) => return Err(ReadError::NotKeynote),
@@ -409,18 +459,55 @@ impl Package {
             },
         }
 
-        let (object_index, total_objects) = build_object_index(
-            source_catalog.components(),
-            options.semantic().max_objects(),
-        )?;
+        Self::from_classified_source_catalog(source_catalog, semantic, 1)
+    }
+
+    fn from_classified_source_catalog(
+        source_catalog: SourceCatalog,
+        semantic: SemanticLimits,
+        source_classification_attempts: usize,
+    ) -> ReadResult<Self> {
+        debug_assert!(source_classification_attempts <= 1);
+        let (object_index, total_objects) =
+            build_object_index(source_catalog.components(), semantic.max_objects())?;
+        let options = ReadOptions::new(source_catalog.limits(), semantic);
 
         let package = Self {
             state: Arc::new(State {
-                source: source_catalog,
+                source: PhysicalSource::Package(source_catalog),
                 options,
                 object_index,
                 total_objects,
-                semantic: OnceLock::new(),
+                semantic: OnceCell::new(),
+                #[cfg(test)]
+                semantic_decode_attempts: AtomicUsize::new(0),
+                #[cfg(all(test, feature = "internal-iwork-source"))]
+                source_classification_attempts,
+            }),
+        };
+        package.root_show_identifier()?;
+        Ok(package)
+    }
+
+    #[cfg(feature = "internal-iwork-source")]
+    fn from_classified_components(
+        components: Arc<ComponentCatalog>,
+        archive: ArchiveLimits,
+        semantic: SemanticLimits,
+    ) -> ReadResult<Self> {
+        let (object_index, total_objects) =
+            build_object_index(&components, semantic.max_objects())?;
+        let package = Self {
+            state: Arc::new(State {
+                source: PhysicalSource::Semantic(components),
+                options: ReadOptions::new(archive, semantic),
+                object_index,
+                total_objects,
+                semantic: OnceCell::new(),
+                #[cfg(test)]
+                semantic_decode_attempts: AtomicUsize::new(0),
+                #[cfg(all(test, feature = "internal-iwork-source"))]
+                source_classification_attempts: 0,
             }),
         };
         package.root_show_identifier()?;
@@ -587,15 +674,9 @@ impl Package {
     }
 
     fn semantic_document(&self) -> ReadResult<&Document> {
-        if let Some(document) = self.state.semantic.get() {
-            return Ok(document);
-        }
-        let document = Document::from_show(self.decode_show()?);
-        drop(self.state.semantic.set(document));
         self.state
             .semantic
-            .get()
-            .ok_or_else(|| ReadError::Decode("semantic snapshot was not initialized".to_owned()))
+            .get_or_try_init(|| Ok(Document::from_show(self.decode_show()?)))
     }
 
     fn root_show_identifier(&self) -> ReadResult<u64> {
@@ -625,6 +706,16 @@ impl Package {
     }
 
     fn decode_show(&self) -> ReadResult<Show> {
+        #[cfg(test)]
+        {
+            self.state
+                .semantic_decode_attempts
+                .fetch_add(1, Ordering::Relaxed);
+            // Make check/decode/set implementations reliably overlap in the
+            // concurrency regression. The production build has no delay.
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+
         let show_identifier = self.root_show_identifier()?;
         let mut builder = Show::builder();
         if show_identifier == 0 {
@@ -1068,6 +1159,30 @@ impl Package {
             map_wire_preflight_error(error, "Keynote semantic payload", SemanticPath::Package)
         })
     }
+}
+
+/// Consume a prepared Keynote source into an archive-free semantic document.
+///
+/// This unstable coordinator handoff releases exact package bytes and logical
+/// sidecars before the lazy Keynote graph is projected. It supports both ZIP
+/// inputs and app-authored package directories because only the retained IWA
+/// component snapshot crosses this boundary.
+///
+/// # Errors
+///
+/// Returns [`ReadError`] when the source belongs to another application or
+/// its Keynote graph is malformed or exceeds the supplied semantic limits.
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+pub fn __semantic_document_from_prepared_source(
+    source: PreparedSource,
+    semantic: SemanticLimits,
+) -> ReadResult<Document> {
+    if source.format() != Format::Keynote {
+        return Err(ReadError::NotKeynote);
+    }
+    let (components, archive) = source.__into_components();
+    Package::from_classified_components(components, archive, semantic)?.semantic_snapshot()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2163,11 +2278,18 @@ fn property(dictionary: &plist::Dictionary, key: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use std::io::{Cursor, Write};
+    use std::sync::Barrier;
+    use std::thread;
 
     use super::*;
     use tempfile::NamedTempFile;
 
     fn assert_send_sync<T: Send + Sync>() {}
+
+    fn native_fixture_path() -> std::path::PathBuf {
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/keynote/basic.key")
+    }
 
     fn assert_input_limit(error: &ReadError, observed: u64, maximum: u64) {
         assert!(matches!(
@@ -2183,6 +2305,109 @@ mod tests {
     #[test]
     fn package_handles_are_send_sync() {
         assert_send_sync::<Package>();
+    }
+
+    #[cfg(feature = "internal-iwork-source")]
+    #[test]
+    fn prepared_source_skips_redundant_keynote_classification()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let source: Arc<[u8]> = std::fs::read(native_fixture_path())?.into();
+        let Some(prepared) = PreparedSource::from_shared_bytes(Arc::clone(&source))? else {
+            panic!("the native fixture must be recognized as Keynote");
+        };
+
+        let prepared_package =
+            Package::__from_prepared_source(prepared, SemanticLimits::default())?;
+        assert_eq!(prepared_package.state.source_classification_attempts, 0);
+
+        let direct_package = Package::from_bytes(&source)?;
+        assert_eq!(direct_package.state.source_classification_attempts, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn semantic_initialization_is_single_flight_for_concurrent_readers()
+    -> Result<(), Box<dyn std::error::Error>> {
+        const WORKERS: usize = 16;
+
+        let package = Package::open(native_fixture_path())?;
+        let barrier = Arc::new(Barrier::new(WORKERS));
+        let pointers = thread::scope(|scope| {
+            let mut handles = Vec::with_capacity(WORKERS);
+            for _ in 0..WORKERS {
+                let package = package.snapshot();
+                let barrier = Arc::clone(&barrier);
+                handles.push(scope.spawn(move || {
+                    barrier.wait();
+                    package
+                        .slides()
+                        .map(|slides| slides.as_ptr() as usize)
+                        .map_err(|error| error.to_string())
+                }));
+            }
+
+            let mut pointers = Vec::with_capacity(WORKERS);
+            for handle in handles {
+                let result = handle
+                    .join()
+                    .map_err(|_panic| "concurrent semantic reader panicked".to_owned())?;
+                pointers.push(result?);
+            }
+            Ok::<_, String>(pointers)
+        })
+        .map_err(std::io::Error::other)?;
+
+        assert!(pointers.windows(2).all(|pair| pair[0] == pair[1]));
+        assert_eq!(
+            package
+                .state
+                .semantic_decode_attempts
+                .load(Ordering::Relaxed),
+            1
+        );
+        assert!(package.state.semantic.get().is_some());
+        Ok(())
+    }
+
+    #[test]
+    fn failed_semantic_initialization_remains_retryable() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let bytes = std::fs::read(native_fixture_path())?;
+        let semantic = SemanticLimits::new(
+            MAX_OBJECTS,
+            MAX_SLIDES,
+            MAX_REFERENCES,
+            MAX_TEXT_STORAGES,
+            MAX_TEXT_FRAGMENTS,
+            1,
+        )?;
+        let package = Package::from_bytes_with_options(
+            &bytes,
+            ReadOptions::new(Limits::default(), semantic),
+        )?;
+
+        for _ in 0..2 {
+            let Err(error) = package.show() else {
+                panic!("the native fixture must exceed a one-byte semantic text limit");
+            };
+            assert!(matches!(
+                error,
+                ReadError::SemanticLimit {
+                    kind: SemanticLimitKind::TextBytes,
+                    maximum: 1,
+                    ..
+                }
+            ));
+            assert!(package.state.semantic.get().is_none());
+        }
+        assert_eq!(
+            package
+                .state
+                .semantic_decode_attempts
+                .load(Ordering::Relaxed),
+            2
+        );
+        Ok(())
     }
 
     #[test]

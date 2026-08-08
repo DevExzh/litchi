@@ -4,7 +4,7 @@ use litchi_core::ReadAt;
 use litchi_iwa_core::{Archive, SnappyStream};
 
 use crate::package::{Catalog, SourceProvenance};
-use crate::zip::{ZipArchive, is_iwa_name, parse_iwa_components};
+use crate::zip::{ZipArchive, is_iwa_name, parse_directory_index_components, parse_iwa_components};
 use crate::{Limits, Result};
 
 /// One parsed `.iwa` component in deterministic member-name order.
@@ -73,6 +73,51 @@ impl ComponentCatalog {
         let archive = ZipArchive::new_with_limits(bytes, validated_limits)?;
         let components = parse_iwa_components(&archive, validated_limits)?.into_boxed_slice();
         Ok(Self { components })
+    }
+
+    pub(crate) fn from_directory_index_zip(bytes: &[u8], limits: Limits) -> Result<Self> {
+        let validated_limits = limits.validate()?;
+        let input_size = u64::try_from(bytes.len()).map_err(|_error| {
+            crate::Error::InvalidBundle(
+                "directory bundle Index.zip length does not fit u64".to_owned(),
+            )
+        })?;
+        validated_limits.check_input_size(input_size, "directory bundle Index.zip")?;
+        let archive = ZipArchive::new_with_limits(bytes, validated_limits)?;
+        let components =
+            parse_directory_index_components(&archive, validated_limits)?.into_boxed_slice();
+        Ok(Self { components })
+    }
+
+    pub(crate) fn from_logical_entries<'a>(
+        entries: impl IntoIterator<Item = (&'a str, &'a [u8])>,
+        limits: Limits,
+    ) -> Result<Self> {
+        let validated_limits = limits.validate()?;
+        let mut components = Vec::new();
+        let mut decompressed_iwa_bytes = 0;
+        for (name, data) in entries {
+            if !is_iwa_name(name) {
+                continue;
+            }
+            if let Some((component, decompressed_bytes)) =
+                parse_component(name, data, validated_limits)?
+            {
+                decompressed_iwa_bytes = validated_limits
+                    .charge_iwa_total_bytes(decompressed_iwa_bytes, decompressed_bytes)?;
+                components
+                    .try_reserve(1)
+                    .map_err(|_error| crate::Error::Allocation {
+                        resource: "directory IWA component catalog",
+                        amount: 1,
+                    })?;
+                components.push(component);
+            }
+        }
+        components.sort_unstable_by(|left, right| left.name().cmp(right.name()));
+        Ok(Self {
+            components: components.into_boxed_slice(),
+        })
     }
 
     /// Return the number of parsed components.

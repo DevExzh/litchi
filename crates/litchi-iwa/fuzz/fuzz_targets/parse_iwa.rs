@@ -6,10 +6,10 @@ fuzz_target!(|data: &[u8]| {
     let _ = litchi_iwa::detect::bytes(data);
 
     if let Ok(doc) = litchi_iwa::Document::from_bytes(data) {
-        // Exercise downstream decoders: text extraction, structured data,
-        // and media stats all walk the snappy + protobuf object graph.
+        // The migration host temporarily retains text and media coverage.
+        // Structured aggregation is fuzzed through the supported root
+        // `litchi::iwork` coordinator in `crates/litchi/fuzz`.
         let _ = doc.text();
-        let _ = doc.extract_structured_data();
         let _ = doc.media_stats();
     }
 });

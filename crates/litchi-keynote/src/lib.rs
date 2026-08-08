@@ -49,6 +49,9 @@ pub use build::{AnimationType, Build};
 pub use chart::ChartSelector;
 pub use document::Document;
 pub use error::{Error, Result};
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+pub use package::__semantic_document_from_prepared_source;
 pub use package::{
     Commit, Diagnostics, Edit, EditError, Limits, MAX_OBJECTS, MAX_REFERENCES, MAX_SLIDES,
     MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES, Package, Patch, PayloadLimitKind,

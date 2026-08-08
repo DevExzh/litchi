@@ -494,6 +494,10 @@ name = "read_office_files"
 required-features = ["docx", "pptx", "xlsx", "ooxml-common"]
 
 [[example]]
+name = "read_iwork"
+required-features = ["iwork"]
+
+[[example]]
 name = "read_xlsb"
 required-features = ["xlsb"]
 

@@ -3,19 +3,98 @@
 use std::sync::{Arc, Weak};
 
 use litchi::iwork::{
-    CellView, Document, ErrorKind, Format, Options, Resource, SectionKind, SnapshotLimits,
-    SourceLimits, Stage, TextRole, Value,
+    Cell, CellView, Document, Error, ErrorKind, Format, Options, Resource, Section, SectionKind,
+    Slide, Snapshot, SnapshotLimits, SourceLimits, Stage, Summary, Table, Text, TextRole, Value,
+    ValueKind,
 };
 
 const PAGES: &[u8] = include_bytes!("../../../test-data/iwork/pages/basic.pages");
 const KEYNOTE: &[u8] = include_bytes!("../../../test-data/iwork/keynote/basic.key");
 const NUMBERS: &[u8] = include_bytes!("../../../test-data/iwork/numbers/basic.numbers");
 
-fn assert_send_sync<T: Send + Sync>() {}
+fn assert_send_sync_static<T: Send + Sync + 'static>() {}
+
+#[test]
+fn public_values_have_the_expected_thread_and_lifetime_bounds() {
+    assert_send_sync_static::<Document>();
+    assert_send_sync_static::<Snapshot>();
+    assert_send_sync_static::<Table>();
+    assert_send_sync_static::<Slide>();
+    assert_send_sync_static::<Section>();
+    assert_send_sync_static::<Summary>();
+    assert_send_sync_static::<Format>();
+    assert_send_sync_static::<Options>();
+    assert_send_sync_static::<SourceLimits>();
+    assert_send_sync_static::<SnapshotLimits>();
+    assert_send_sync_static::<Error>();
+    assert_send_sync_static::<ErrorKind>();
+    assert_send_sync_static::<Stage>();
+    assert_send_sync_static::<Resource>();
+    assert_send_sync_static::<SectionKind>();
+    assert_send_sync_static::<TextRole>();
+    assert_send_sync_static::<ValueKind>();
+    assert_send_sync_static::<Cell<'static>>();
+    assert_send_sync_static::<CellView<'static>>();
+    assert_send_sync_static::<Text<'static>>();
+    assert_send_sync_static::<Value<'static>>();
+    assert_send_sync_static::<litchi::iwork::Result<Snapshot>>();
+}
+
+#[test]
+fn semantic_handles_outlive_documents_and_intermediate_snapshots() {
+    fn detached_snapshot(value: &[u8]) -> Snapshot {
+        let document = Document::from_bytes(value)
+            .unwrap_or_else(|error| panic!("native fixture must decode: {error}"));
+        document.snapshot()
+    }
+
+    fn detached_table() -> Table {
+        let snapshot = detached_snapshot(NUMBERS);
+        snapshot
+            .table(0)
+            .unwrap_or_else(|| panic!("Numbers fixture must have one table"))
+    }
+
+    fn detached_slide() -> Slide {
+        let snapshot = detached_snapshot(KEYNOTE);
+        snapshot
+            .slide(0)
+            .unwrap_or_else(|| panic!("Keynote fixture must have one slide"))
+    }
+
+    fn detached_section() -> Section {
+        let snapshot = detached_snapshot(PAGES);
+        snapshot
+            .section(0)
+            .unwrap_or_else(|| panic!("Pages fixture must have one section"))
+    }
+
+    let table = detached_table();
+    let slide = detached_slide();
+    let section = detached_section();
+
+    assert_eq!(table.name(), "Table 1");
+    assert_eq!(
+        table.cell(1, 1),
+        Some(CellView::Stored(Value::Text(
+            "Litchi native Numbers fixture"
+        )))
+    );
+    assert_eq!(slide.title(), Some("Litchi native Keynote fixture"));
+    assert_eq!(section.name(), Some("Blank"));
+
+    let table_reader = std::thread::spawn(move || assert_eq!(table.position(), 0));
+    let slide_reader = std::thread::spawn(move || assert_eq!(slide.position(), 0));
+    let section_reader = std::thread::spawn(move || assert_eq!(section.position(), 0));
+    for reader in [table_reader, slide_reader, section_reader] {
+        reader
+            .join()
+            .unwrap_or_else(|_panic| panic!("detached semantic handle reader panicked"));
+    }
+}
 
 #[test]
 fn pages_fixture_has_focused_semantics_and_detached_handles() {
-    assert_send_sync::<Document>();
     let document = Document::from_bytes(PAGES)
         .unwrap_or_else(|error| panic!("native Pages fixture must decode: {error}"));
     assert_eq!(document.format(), Format::Pages);
@@ -251,7 +330,7 @@ fn physical_and_text_limits_are_inclusive_and_report_one_over() {
             .err()
             .unwrap_or_else(|| panic!("one-over semantic text must fail"));
     assert_eq!(text_error.kind(), ErrorKind::LimitExceeded);
-    assert_eq!(text_error.stage(), Stage::Validation);
+    assert_eq!(text_error.stage(), Stage::Semantic);
     assert_eq!(text_error.format(), Some(Format::Pages));
     assert_eq!(text_error.resource(), Some(Resource::TextBytes));
     assert_eq!(text_error.observed(), Some(text.len() as u64));

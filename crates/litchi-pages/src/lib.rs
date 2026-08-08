@@ -22,6 +22,9 @@ pub mod selector;
 pub use document::{
     Body, DEFAULT_MAX_TEXT_BYTES, Document, Error, MAX_BODY_STORAGES, MAX_SECTIONS, Result, Root,
 };
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+pub use package::__semantic_document_from_prepared_source;
 pub use package::{Limits, Package, PackageError, PackageResult, Stats};
 pub use section::{Section, SectionType};
 pub use selector::{SectionSelector, SelectorError, SelectorResult};

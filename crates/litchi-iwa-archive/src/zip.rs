@@ -509,6 +509,33 @@ pub(crate) fn parse_iwa_components(
     Ok(components)
 }
 
+/// Parse the direct IWA members of a directory bundle's `Index.zip`.
+///
+/// Unlike a complete single-file iWork package, the `Index.zip` stored beside
+/// a directory bundle is already the index container. Accepting another
+/// nested `Index.zip` here would erase one physical provenance boundary and
+/// could make the nested bytes look like the complete directory artifact.
+pub(crate) fn parse_directory_index_components(
+    archive: &ZipArchive<'_>,
+    limits: Limits,
+) -> Result<Vec<Component>> {
+    let validated_limits = limits.validate()?;
+    if is_encrypted(archive) {
+        return Err(Error::Encrypted);
+    }
+    if let Some(name) = nested_index_name(archive)? {
+        return Err(Error::InvalidBundle(format!(
+            "directory bundle Index.zip contains nested index {name}"
+        )));
+    }
+    if !archive.file_names().any(is_iwa_name) {
+        return Err(Error::InvalidBundle(
+            "directory bundle Index.zip contains no IWA components".to_owned(),
+        ));
+    }
+    parse_direct_iwa_components(archive, validated_limits)
+}
+
 fn parse_direct_iwa_components(archive: &ZipArchive<'_>, limits: Limits) -> Result<Vec<Component>> {
     let mut components = Vec::new();
     let mut decompressed_iwa_bytes = 0;

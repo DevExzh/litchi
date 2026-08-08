@@ -21,6 +21,10 @@ pub enum ErrorKind {
     LimitExceeded,
     /// Memory could not be reserved before publishing semantic state.
     Allocation,
+    /// The package is encrypted and cannot be decoded by this reader.
+    Encrypted,
+    /// A source changed while one immutable package snapshot was being formed.
+    SourceChanged,
     /// An internal invariant was violated.
     Invariant,
 }
@@ -45,14 +49,24 @@ pub enum Stage {
 pub enum Resource {
     /// Complete packaged input bytes.
     InputBytes,
+    /// Complete bytes produced by package reassembly.
+    OutputBytes,
     /// Number of packaged entries.
     Entries,
+    /// Bytes retained by one packaged member name.
+    MemberNameBytes,
+    /// Aggregate packaged-header metadata bytes.
+    MetadataBytes,
+    /// Compressed bytes retained by one packaged entry.
+    CompressedEntryBytes,
     /// Bytes retained by one packaged entry.
     EntryBytes,
     /// Aggregate expanded package bytes.
     ExpandedBytes,
     /// Bytes decoded for one internal package unit.
     DecodedBytes,
+    /// Aggregate decoded bytes across internal package units.
+    AggregateDecodedBytes,
     /// Semantic Numbers tables.
     Tables,
     /// Semantic Keynote slides.
@@ -157,6 +171,28 @@ impl Error {
         )
     }
 
+    pub(super) const fn encrypted() -> Self {
+        Self::new(
+            ErrorKind::Encrypted,
+            Stage::Detection,
+            None,
+            None,
+            None,
+            None,
+        )
+    }
+
+    pub(super) const fn source_changed() -> Self {
+        Self::new(
+            ErrorKind::SourceChanged,
+            Stage::Input,
+            None,
+            None,
+            None,
+            None,
+        )
+    }
+
     pub(super) const fn invariant(format: Option<Format>, stage: Stage) -> Self {
         Self::new(ErrorKind::Invariant, stage, format, None, None, None)
     }
@@ -221,6 +257,12 @@ impl fmt::Display for Error {
                 self.maximum,
             ),
             ErrorKind::Allocation => formatter.write_str("iWork semantic allocation failed"),
+            ErrorKind::Encrypted => {
+                formatter.write_str("password-protected iWork documents are not supported")
+            },
+            ErrorKind::SourceChanged => {
+                formatter.write_str("iWork source changed while it was being captured")
+            },
             ErrorKind::Invariant => formatter.write_str("iWork semantic invariant failed"),
         }
     }

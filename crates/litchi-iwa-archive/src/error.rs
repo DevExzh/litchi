@@ -98,6 +98,13 @@ pub enum Error {
         observed: SourceVersion,
     },
 
+    /// A directory bundle changed while its logical index was being captured.
+    #[error("iWork directory source changed while {context}")]
+    DirectoryChanged {
+        /// The bounded acquisition phase that observed the change.
+        context: &'static str,
+    },
+
     /// The bounded reassembler cannot safely preserve this physical ZIP
     /// layout or edit this member without changing semantics.
     #[error("iWork archive reassembly is unsupported: {0}")]

@@ -171,18 +171,18 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 struct Components {
-    catalog: ComponentCatalog,
+    catalog: Arc<ComponentCatalog>,
 }
 
 impl Components {
     fn from_bytes(bytes: &[u8], limits: Limits) -> Result<Self> {
         Ok(Self {
-            catalog: ComponentCatalog::from_bytes_with_limits(bytes, limits)?,
+            catalog: Arc::new(ComponentCatalog::from_bytes_with_limits(bytes, limits)?),
         })
     }
 
     #[cfg(feature = "internal-iwork-source")]
-    fn from_catalog(catalog: ComponentCatalog) -> Self {
+    fn from_catalog(catalog: Arc<ComponentCatalog>) -> Self {
         Self { catalog }
     }
 
@@ -679,9 +679,8 @@ pub fn __compatibility_tables_from_prepared_source(
     if source.format() != Format::Numbers {
         return Err(Error::NotNumbers);
     }
-    let source_catalog = source.__into_source_catalog();
-    let archive_limits = source_catalog.limits();
-    let components = Components::from_catalog(source_catalog.into_components());
+    let (catalog, archive_limits) = source.__into_components();
+    let components = Components::from_catalog(catalog);
     compatibility_tables_from_components(&components, archive_limits, semantic)
 }
 

@@ -478,10 +478,13 @@ compatibility tests that have not reached the concrete packages. Its 17
 internal workspace dependencies are all explicit ordered debt, with no
 canonical edge. Physical preservation and comparison examples have moved to
 `litchi-iwa-archive`. The root `litchi::iwork` coordinator now owns supported,
-immutable-ZIP cross-format reading and publishes only root-owned archive-free
-semantic views. The host structured path remains temporary migration debt for
-uncovered frozen-directory and logical-entry sources plus outstanding
-parity/property/fuzz/example ownership; it is not the supported root boundary.
+immutable cross-format reading from regular ZIP files, borrowed/shared bytes,
+and frozen app-authored package directories, and publishes only root-owned
+archive-free semantic views. Directory ingress is an index-only semantic
+snapshot and is deliberately not exact-package or edit provenance. The host
+structured path remains temporary migration debt for uncovered frozen logical-
+entry coordination plus outstanding parity/property/fuzz execution and editor
+ownership; it is not the supported root boundary.
 [ADR 0028](0028-iwa-monolith-exit.md) is the authoritative exit gate.
 
 ## Conversion and interchange

@@ -99,6 +99,18 @@ pub struct EntryStore {
     state: Arc<EntryStoreState>,
 }
 
+/// An immutable, cheaply shareable snapshot of ordered package entries.
+///
+/// Freezing or snapshotting an [`EntryStore`] shares its exact entry table,
+/// name index, names, and payloads. A later mutation of the originating store
+/// detaches through copy-on-write and cannot change this view. The frozen view
+/// intentionally exposes no mutable access or conversion back into a mutable
+/// store.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct FrozenEntryStore {
+    state: Arc<EntryStoreState>,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct EntryStoreState {
     entries: Vec<Entry>,
@@ -136,6 +148,20 @@ impl EntryStore {
         Ok(Self {
             state: Arc::new(EntryStoreState { entries, positions }),
         })
+    }
+
+    /// Consume this table into an immutable view without copying its state.
+    #[must_use]
+    pub fn freeze(self) -> FrozenEntryStore {
+        FrozenEntryStore { state: self.state }
+    }
+
+    /// Capture an immutable view without copying entries, names, or payloads.
+    #[must_use]
+    pub fn snapshot(&self) -> FrozenEntryStore {
+        FrozenEntryStore {
+            state: Arc::clone(&self.state),
+        }
     }
 
     /// Return the number of ordered entries.
@@ -238,6 +264,44 @@ impl EntryStore {
         let entry = state.entries.remove(position);
         state.rebuild_positions();
         Some(entry)
+    }
+}
+
+impl FrozenEntryStore {
+    /// Return the number of ordered entries.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.state.entries.len()
+    }
+
+    /// Return whether the frozen table has no entries.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.state.entries.is_empty()
+    }
+
+    /// Iterate over entries in their preserved order without allocating.
+    pub fn iter(&self) -> impl Iterator<Item = &Entry> {
+        self.state.entries.iter()
+    }
+
+    /// Find an entry position by exact name.
+    #[must_use]
+    pub fn position(&self, name: &str) -> Option<usize> {
+        self.state.positions.get(name).copied()
+    }
+
+    /// Borrow an entry by its exact name.
+    #[must_use]
+    pub fn get(&self, name: &str) -> Option<&Entry> {
+        self.position(name)
+            .and_then(|position| self.get_at(position))
+    }
+
+    /// Borrow an entry by ordered position.
+    #[must_use]
+    pub fn get_at(&self, position: usize) -> Option<&Entry> {
+        self.state.entries.get(position)
     }
 }
 
@@ -472,7 +536,7 @@ impl Patch {
 
 #[cfg(test)]
 mod tests {
-    use super::{Entry, EntryChangeKind, EntryStore, Error, Patch};
+    use super::{Entry, EntryChangeKind, EntryStore, Error, FrozenEntryStore, Patch};
 
     fn entry(name: &str, data: &[u8]) -> Entry {
         Entry::new(name.to_owned(), data.to_vec())
@@ -571,6 +635,77 @@ mod tests {
 
         assert_eq!(source.get("a").map(Entry::data), Some([1].as_slice()));
         assert_eq!(edited.get("a").map(Entry::data), Some([2].as_slice()));
+    }
+
+    #[test]
+    fn frozen_snapshots_share_state_and_are_isolated_from_later_mutation() {
+        let mut store = EntryStore::try_from_entries(vec![entry("b", &[2]), entry("a", &[1])])
+            .unwrap_or_else(|error| panic!("valid entries rejected: {error}"));
+        let original_payload = store
+            .get("b")
+            .unwrap_or_else(|| panic!("source entry is missing"))
+            .data()
+            .as_ptr();
+        let frozen = store.snapshot();
+
+        assert!(std::sync::Arc::ptr_eq(&store.state, &frozen.state));
+        assert_eq!(frozen.len(), 2);
+        assert!(!frozen.is_empty());
+        assert_eq!(frozen.position("b"), Some(0));
+        assert_eq!(frozen.position("a"), Some(1));
+        assert_eq!(frozen.get_at(1).map(Entry::name), Some("a"));
+        assert_eq!(
+            frozen.iter().map(Entry::name).collect::<Vec<_>>(),
+            ["b", "a"]
+        );
+        assert_eq!(
+            frozen
+                .get("b")
+                .unwrap_or_else(|| panic!("frozen entry is missing"))
+                .data()
+                .as_ptr(),
+            original_payload
+        );
+
+        assert_eq!(store.replace_data(0, vec![9]), Some(vec![2]));
+        assert!(!std::sync::Arc::ptr_eq(&store.state, &frozen.state));
+        assert_eq!(store.get("b").map(Entry::data), Some([9].as_slice()));
+        assert_eq!(frozen.get("b").map(Entry::data), Some([2].as_slice()));
+        assert_eq!(
+            frozen
+                .get("b")
+                .unwrap_or_else(|| panic!("frozen entry is missing"))
+                .data()
+                .as_ptr(),
+            original_payload
+        );
+    }
+
+    #[test]
+    fn freezing_moves_the_exact_state_and_is_send_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+
+        let store = EntryStore::try_from_entries(vec![entry("a", &[1])])
+            .unwrap_or_else(|error| panic!("valid entry rejected: {error}"));
+        let state = std::sync::Arc::clone(&store.state);
+        let payload = store
+            .get("a")
+            .unwrap_or_else(|| panic!("source entry is missing"))
+            .data()
+            .as_ptr();
+
+        let frozen = store.freeze();
+
+        assert_send_sync::<FrozenEntryStore>();
+        assert!(std::sync::Arc::ptr_eq(&state, &frozen.state));
+        assert_eq!(
+            frozen
+                .get("a")
+                .unwrap_or_else(|| panic!("frozen entry is missing"))
+                .data()
+                .as_ptr(),
+            payload
+        );
     }
 
     #[test]

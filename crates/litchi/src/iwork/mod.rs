@@ -26,7 +26,7 @@ mod error;
 mod limits;
 mod model;
 
-use std::{fmt, sync::Arc};
+use std::{fmt, path::Path, sync::Arc};
 
 pub use error::{Error, ErrorKind, Resource, Result, Stage};
 pub use limits::{Options, SnapshotLimits, SourceLimits};
@@ -66,6 +66,34 @@ impl fmt::Display for Format {
 }
 
 impl Document {
+    /// Open a packaged iWork file or app-authored package directory.
+    ///
+    /// The path is snapshotted once under the default finite resource
+    /// profile. Later semantic access performs no ambient filesystem reads.
+    ///
+    /// # Errors
+    ///
+    /// Returns a facade-owned [`Error`] when the path is inaccessible,
+    /// unsafe, unrecognized, malformed, changes during capture, or exceeds a
+    /// configured resource ceiling.
+    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        Self::open_with_options(path, Options::default())
+    }
+
+    /// Open a packaged iWork file or app-authored package directory under
+    /// explicit checked options.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::open`].
+    pub fn open_with_options(path: impl AsRef<Path>, options: Options) -> Result<Self> {
+        let physical = options.source().detector()?;
+        let prepared = litchi_iwa_detect::PreparedSource::from_path_with_limits(path, physical)
+            .map_err(map_detection)?
+            .ok_or_else(Error::unrecognized)?;
+        decode(prepared, options.snapshot())
+    }
+
     /// Read borrowed package bytes under the default finite resource profile.
     ///
     /// The bytes are copied once into immutable shared ownership before any
@@ -148,11 +176,12 @@ fn decode(prepared: litchi_iwa_detect::PreparedSource, limits: SnapshotLimits) -
     let aggregate = limits.aggregate()?;
     match prepared.format() {
         litchi_iwa_detect::Format::Pages => {
-            let document = {
-                let package =
-                    litchi_pages::Package::__from_prepared_source(prepared).map_err(map_pages)?;
-                package.semantic_document().clone()
-            };
+            let document = litchi_pages::__semantic_document_from_prepared_source(
+                prepared,
+                limits.max_sections(),
+                limits.max_text_bytes(),
+            )
+            .map_err(map_pages)?;
             let data = litchi_iwa_structured::StructuredData::from_pages_document_with_limits(
                 document, aggregate,
             )
@@ -161,11 +190,9 @@ fn decode(prepared: litchi_iwa_detect::PreparedSource, limits: SnapshotLimits) -
         },
         litchi_iwa_detect::Format::Keynote => {
             let semantic = keynote_limits(limits)?;
-            let document = {
-                let package = litchi_keynote::Package::__from_prepared_source(prepared, semantic)
+            let document =
+                litchi_keynote::__semantic_document_from_prepared_source(prepared, semantic)
                     .map_err(map_keynote)?;
-                package.semantic_snapshot().map_err(map_keynote)?
-            };
             let data = litchi_iwa_structured::StructuredData::from_keynote_document_with_limits(
                 document, aggregate,
             )
@@ -221,10 +248,51 @@ fn map_detection(error: litchi_iwa_detect::Error) -> Error {
         litchi_iwa_detect::Error::Io(_error) => {
             Error::new(ErrorKind::Io, Stage::Input, None, None, None, None)
         },
+        litchi_iwa_detect::Error::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => Error::limit(
+            None,
+            Stage::Detection,
+            detection_resource(kind),
+            observed,
+            maximum,
+        ),
+        litchi_iwa_detect::Error::InvalidLimits => Error::new(
+            ErrorKind::InvalidOptions,
+            Stage::Validation,
+            None,
+            None,
+            None,
+            None,
+        ),
+        litchi_iwa_detect::Error::Allocation { amount } => {
+            Error::allocation(None, Stage::Detection, usize_u64(amount))
+        },
+        litchi_iwa_detect::Error::Encrypted => Error::encrypted(),
+        litchi_iwa_detect::Error::SourceChanged => Error::source_changed(),
         litchi_iwa_detect::Error::IwaCore(_)
         | litchi_iwa_detect::Error::IwaCommon(_)
         | litchi_iwa_detect::Error::InvalidFormat(_)
         | litchi_iwa_detect::Error::Archive(_) => Error::invalid_data(None, Stage::Detection),
+        _ => Error::invalid_data(None, Stage::Detection),
+    }
+}
+
+fn detection_resource(kind: litchi_iwa_detect::LimitKind) -> Resource {
+    match kind {
+        litchi_iwa_detect::LimitKind::InputBytes => Resource::InputBytes,
+        litchi_iwa_detect::LimitKind::OutputBytes => Resource::OutputBytes,
+        litchi_iwa_detect::LimitKind::Entries => Resource::Entries,
+        litchi_iwa_detect::LimitKind::MemberNameBytes => Resource::MemberNameBytes,
+        litchi_iwa_detect::LimitKind::MetadataBytes => Resource::MetadataBytes,
+        litchi_iwa_detect::LimitKind::CompressedEntryBytes => Resource::CompressedEntryBytes,
+        litchi_iwa_detect::LimitKind::EntryBytes => Resource::EntryBytes,
+        litchi_iwa_detect::LimitKind::TotalBytes => Resource::ExpandedBytes,
+        litchi_iwa_detect::LimitKind::IwaStreamBytes => Resource::DecodedBytes,
+        litchi_iwa_detect::LimitKind::IwaTotalBytes => Resource::AggregateDecodedBytes,
+        _ => Resource::SemanticWork,
     }
 }
 
@@ -471,5 +539,80 @@ mod tests {
         assert_eq!(error.resource(), Some(Resource::InputBytes));
         assert_eq!(error.observed(), Some(2));
         assert_eq!(error.maximum(), Some(1));
+    }
+
+    #[test]
+    fn detector_failures_map_to_exact_content_free_root_categories() {
+        let resources = [
+            (
+                litchi_iwa_detect::LimitKind::InputBytes,
+                Resource::InputBytes,
+            ),
+            (
+                litchi_iwa_detect::LimitKind::OutputBytes,
+                Resource::OutputBytes,
+            ),
+            (litchi_iwa_detect::LimitKind::Entries, Resource::Entries),
+            (
+                litchi_iwa_detect::LimitKind::MemberNameBytes,
+                Resource::MemberNameBytes,
+            ),
+            (
+                litchi_iwa_detect::LimitKind::MetadataBytes,
+                Resource::MetadataBytes,
+            ),
+            (
+                litchi_iwa_detect::LimitKind::CompressedEntryBytes,
+                Resource::CompressedEntryBytes,
+            ),
+            (
+                litchi_iwa_detect::LimitKind::EntryBytes,
+                Resource::EntryBytes,
+            ),
+            (
+                litchi_iwa_detect::LimitKind::TotalBytes,
+                Resource::ExpandedBytes,
+            ),
+            (
+                litchi_iwa_detect::LimitKind::IwaStreamBytes,
+                Resource::DecodedBytes,
+            ),
+            (
+                litchi_iwa_detect::LimitKind::IwaTotalBytes,
+                Resource::AggregateDecodedBytes,
+            ),
+        ];
+        for (kind, resource) in resources {
+            let error = map_detection(litchi_iwa_detect::Error::LimitExceeded {
+                kind,
+                observed: 9,
+                maximum: 8,
+            });
+            assert_eq!(error.kind(), ErrorKind::LimitExceeded);
+            assert_eq!(error.stage(), Stage::Detection);
+            assert_eq!(error.resource(), Some(resource));
+            assert_eq!(error.observed(), Some(9));
+            assert_eq!(error.maximum(), Some(8));
+            assert!(std::error::Error::source(&error).is_none());
+        }
+
+        let encrypted = map_detection(litchi_iwa_detect::Error::Encrypted);
+        assert_eq!(encrypted.kind(), ErrorKind::Encrypted);
+        assert_eq!(encrypted.stage(), Stage::Detection);
+        assert!(std::error::Error::source(&encrypted).is_none());
+
+        let allocation = map_detection(litchi_iwa_detect::Error::Allocation { amount: 17 });
+        assert_eq!(allocation.kind(), ErrorKind::Allocation);
+        assert_eq!(allocation.stage(), Stage::Detection);
+        assert_eq!(allocation.resource(), Some(Resource::Memory));
+        assert_eq!(allocation.observed(), Some(17));
+
+        let changed = map_detection(litchi_iwa_detect::Error::SourceChanged);
+        assert_eq!(changed.kind(), ErrorKind::SourceChanged);
+        assert_eq!(changed.stage(), Stage::Input);
+
+        let invalid = map_detection(litchi_iwa_detect::Error::InvalidLimits);
+        assert_eq!(invalid.kind(), ErrorKind::InvalidOptions);
+        assert_eq!(invalid.stage(), Stage::Validation);
     }
 }

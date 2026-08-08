@@ -9,21 +9,25 @@
     reason = "Detection classifiers stay beside the ingress routines they support."
 )]
 
-use litchi_iwa_archive::{self, ComponentCatalog, DetectionRoot, SourceCatalog};
+use litchi_iwa_archive::{
+    self, ComponentCatalog, DetectionRoot, DirectoryMarkers, FrozenDirectoryBundle, SourceCatalog,
+};
 use litchi_iwa_common::wire::{WireField, parse_wire_fields};
 use litchi_iwa_core::{Archive, SnappyLimits, SnappyStream};
 use std::{
     fmt,
-    fs::{self, File},
+    fs::{self, File, Metadata, OpenOptions},
     io::{Read, Seek, SeekFrom},
     path::Path,
     sync::Arc,
+    time::SystemTime,
 };
 
 const MAX_INPUT_BYTES: u64 = 1024 * 1024 * 1024;
 
 /// Errors returned by a bounded iWork detection attempt.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// A filesystem or stream operation failed.
     Io(std::io::Error),
@@ -35,6 +39,72 @@ pub enum Error {
     InvalidFormat(String),
     /// ZIP ingress or bundle structure was rejected.
     Archive(String),
+    /// A physical package resource ceiling was exceeded.
+    LimitExceeded {
+        /// Content-free physical resource category.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A caller supplied an invalid physical resource profile.
+    InvalidLimits,
+    /// A bounded physical allocation failed before a source was published.
+    Allocation {
+        /// Elements or bytes requested by the failed allocation.
+        amount: usize,
+    },
+    /// The package uses an encrypted iWork container marker.
+    Encrypted,
+    /// A positional or directory source changed while it was being captured.
+    SourceChanged,
+}
+
+/// Physical resource category reported by [`Error::LimitExceeded`].
+///
+/// This detector-owned vocabulary prevents callers from depending on the ZIP,
+/// Snappy, or neutral IWA implementations used below the detection boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Complete packaged input bytes.
+    InputBytes,
+    /// Complete bytes produced by package reassembly.
+    OutputBytes,
+    /// Number of packaged members.
+    Entries,
+    /// Bytes in one packaged member name.
+    MemberNameBytes,
+    /// Aggregate packaged-header metadata bytes.
+    MetadataBytes,
+    /// Compressed bytes in one packaged member.
+    CompressedEntryBytes,
+    /// Expanded bytes in one packaged member.
+    EntryBytes,
+    /// Aggregate expanded package bytes.
+    TotalBytes,
+    /// Decoded bytes in one IWA component.
+    IwaStreamBytes,
+    /// Aggregate decoded bytes across IWA components.
+    IwaTotalBytes,
+}
+
+impl fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::InputBytes => "input bytes",
+            Self::OutputBytes => "output bytes",
+            Self::Entries => "package entries",
+            Self::MemberNameBytes => "member name bytes",
+            Self::MetadataBytes => "package metadata bytes",
+            Self::CompressedEntryBytes => "compressed entry bytes",
+            Self::EntryBytes => "entry bytes",
+            Self::TotalBytes => "expanded package bytes",
+            Self::IwaStreamBytes => "decoded IWA component bytes",
+            Self::IwaTotalBytes => "aggregate decoded IWA bytes",
+        })
+    }
 }
 
 /// Result type for iWork detection.
@@ -48,6 +118,27 @@ impl fmt::Display for Error {
             Self::IwaCommon(error) => error.fmt(formatter),
             Self::InvalidFormat(message) => write!(formatter, "Invalid IWA format: {message}"),
             Self::Archive(message) => write!(formatter, "Archive parsing error: {message}"),
+            Self::LimitExceeded {
+                kind,
+                observed,
+                maximum,
+            } => write!(
+                formatter,
+                "iWork detection {kind} limit exceeded: observed {observed}, maximum {maximum}"
+            ),
+            Self::InvalidLimits => formatter.write_str("invalid iWork detection limits"),
+            Self::Allocation { amount } => {
+                write!(
+                    formatter,
+                    "iWork detection allocation failed for {amount} units"
+                )
+            },
+            Self::Encrypted => {
+                formatter.write_str("password-protected iWork documents are not supported")
+            },
+            Self::SourceChanged => {
+                formatter.write_str("iWork source changed while it was being captured")
+            },
         }
     }
 }
@@ -58,7 +149,13 @@ impl std::error::Error for Error {
             Self::Io(error) => Some(error),
             Self::IwaCore(error) => Some(error),
             Self::IwaCommon(error) => Some(error),
-            Self::InvalidFormat(_) | Self::Archive(_) => None,
+            Self::InvalidFormat(_)
+            | Self::Archive(_)
+            | Self::LimitExceeded { .. }
+            | Self::InvalidLimits
+            | Self::Allocation { .. }
+            | Self::Encrypted
+            | Self::SourceChanged => None,
         }
     }
 }
@@ -71,7 +168,23 @@ impl From<std::io::Error> for Error {
 
 impl From<litchi_iwa_core::Error> for Error {
     fn from(error: litchi_iwa_core::Error) -> Self {
-        Self::IwaCore(error)
+        match error {
+            litchi_iwa_core::Error::InvalidLimits { .. } => Self::InvalidLimits,
+            litchi_iwa_core::Error::Limit {
+                observed, maximum, ..
+            } => Self::LimitExceeded {
+                kind: LimitKind::IwaStreamBytes,
+                observed: usize_u64(observed),
+                maximum: usize_u64(maximum),
+            },
+            litchi_iwa_core::Error::Io(io_error) => Self::Io(io_error),
+            litchi_iwa_core::Error::Allocation { requested, .. } => {
+                Self::Allocation { amount: requested }
+            },
+            other @ (litchi_iwa_core::Error::InvalidArchive { .. }
+            | litchi_iwa_core::Error::HeaderCodec { .. }
+            | litchi_iwa_core::Error::Snappy { .. }) => Self::IwaCore(other),
+        }
     }
 }
 
@@ -99,9 +212,14 @@ pub enum Format {
 /// avoids a second ZIP traversal or Snappy/IWA decode. The physical catalog is
 /// deliberately not exposed by the ordinary detection API.
 pub struct PreparedSource {
-    catalog: SourceCatalog,
+    backing: PreparedBacking,
     format: Format,
     limits: Limits,
+}
+
+enum PreparedBacking {
+    Package(SourceCatalog),
+    Directory(FrozenDirectoryBundle),
 }
 
 impl fmt::Debug for PreparedSource {
@@ -174,12 +292,87 @@ impl PreparedSource {
         Self::from_catalog(catalog, limits)
     }
 
+    /// Prepare a packaged file or app-authored directory bundle.
+    ///
+    /// Regular files are opened once, read through a bounded stable file
+    /// handle, and classified from the retained package catalog. Directories
+    /// are frozen through the archive-owned index adapter and classified from
+    /// those same retained components. Symbolic links and special nodes are
+    /// rejected. No semantic adapter reopens the path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the path is missing, unsafe, malformed, changes
+    /// during capture, or exceeds a physical resource ceiling. An accessible
+    /// regular file or directory that is not recognized as iWork returns
+    /// `Ok(None)`.
+    pub fn from_path(value: impl AsRef<Path>) -> Result<Option<Self>> {
+        Self::from_path_with_limits(value, Limits::default())
+    }
+
+    /// Prepare a packaged file or app-authored directory bundle under
+    /// explicit physical limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::from_path`].
+    pub fn from_path_with_limits(value: impl AsRef<Path>, limits: Limits) -> Result<Option<Self>> {
+        let path = value.as_ref();
+        match kind(path)? {
+            Kind::File => {
+                let source = read_stable_package_file(path, limits)?;
+                Self::from_shared_bytes_with_limits(source, limits)
+            },
+            Kind::Dir => {
+                let directory =
+                    FrozenDirectoryBundle::open_with_limits(path, archive_limits(limits)?)
+                        .map_err(map_archive_error)?;
+                Self::from_directory(directory, limits)
+            },
+            Kind::Missing => Err(Error::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "iWork source path does not exist",
+            ))),
+        }
+    }
+
     fn from_catalog(catalog: SourceCatalog, limits: Limits) -> Result<Option<Self>> {
         let Some(format) = component_catalog(catalog.components())? else {
             return Ok(None);
         };
         Ok(Some(Self {
-            catalog,
+            backing: PreparedBacking::Package(catalog),
+            format,
+            limits,
+        }))
+    }
+
+    fn from_directory(directory: FrozenDirectoryBundle, limits: Limits) -> Result<Option<Self>> {
+        let Some(format) = component_catalog(directory.components())? else {
+            if marker_outcome(directory.markers()) != Outcome::None {
+                return Err(Error::InvalidFormat(
+                    "iWork directory marker has no canonical application root".to_owned(),
+                ));
+            }
+            return Ok(None);
+        };
+        match marker_outcome(directory.markers()) {
+            Outcome::None => {},
+            Outcome::Found(marker) if marker == format => {},
+            Outcome::Found(_) => {
+                return Err(Error::InvalidFormat(
+                    "iWork directory marker conflicts with the canonical application root"
+                        .to_owned(),
+                ));
+            },
+            Outcome::Conflict => {
+                return Err(Error::InvalidFormat(
+                    "iWork directory contains conflicting application markers".to_owned(),
+                ));
+            },
+        }
+        Ok(Some(Self {
+            backing: PreparedBacking::Directory(directory),
             format,
             limits,
         }))
@@ -197,27 +390,162 @@ impl PreparedSource {
         self.limits
     }
 
-    /// Consume this source into its physical catalog for a focused adapter.
+    /// Consume a packaged source into its physical catalog for a focused
+    /// preserve-mode adapter.
     ///
     /// This is an explicitly unstable cross-crate handoff. Application code
     /// should pass `PreparedSource` to a format owner instead of depending on
     /// archive vocabulary directly.
     #[doc(hidden)]
     #[must_use]
-    pub fn __into_source_catalog(self) -> SourceCatalog {
-        self.catalog
+    pub fn __into_source_catalog(self) -> Option<SourceCatalog> {
+        match self.backing {
+            PreparedBacking::Package(catalog) => Some(catalog),
+            PreparedBacking::Directory(_) => None,
+        }
+    }
+
+    /// Consume any prepared source into its semantic component snapshot and
+    /// the physical limits that authorized it.
+    ///
+    /// This unstable handoff intentionally erases exact-package provenance.
+    /// It is appropriate only for archive-free semantic projections.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn __into_components(self) -> (Arc<ComponentCatalog>, litchi_iwa_archive::Limits) {
+        match self.backing {
+            PreparedBacking::Package(catalog) => {
+                let limits = catalog.limits();
+                (Arc::new(catalog.into_components()), limits)
+            },
+            PreparedBacking::Directory(directory) => {
+                let limits = directory.limits();
+                (directory.into_components(), limits)
+            },
+        }
+    }
+}
+
+fn marker_outcome(markers: DirectoryMarkers) -> Outcome {
+    classify(markers.pages(), markers.keynote(), markers.numbers())
+}
+
+fn read_stable_package_file(path: &Path, limits: Limits) -> Result<Arc<[u8]>> {
+    let _checked = archive_limits(limits)?;
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_NONBLOCK);
+    }
+    let mut file = options.open(path)?;
+    let before = FileSnapshot::from_metadata(&file.metadata()?);
+    if !before.is_regular_file() {
+        return Err(Error::InvalidFormat(
+            "iWork source path is not a regular file".to_owned(),
+        ));
+    }
+    if before.len > limits.max_input_bytes {
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::InputBytes,
+            observed: before.len,
+            maximum: limits.max_input_bytes,
+        });
+    }
+
+    let capacity =
+        usize::try_from(before.len).map_err(|_error| Error::Allocation { amount: usize::MAX })?;
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(capacity)
+        .map_err(|_error| Error::Allocation { amount: capacity })?;
+    file.by_ref()
+        .take(limits.max_input_bytes.saturating_add(1))
+        .read_to_end(&mut bytes)?;
+    let observed = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+    if observed > limits.max_input_bytes {
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::InputBytes,
+            observed,
+            maximum: limits.max_input_bytes,
+        });
+    }
+
+    let after = FileSnapshot::from_metadata(&file.metadata()?);
+    let path_after = match fs::symlink_metadata(path) {
+        Ok(metadata) => FileSnapshot::from_metadata(&metadata),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Err(Error::SourceChanged);
+        },
+        Err(error) => return Err(Error::Io(error)),
+    };
+    if before != after || after != path_after || observed != before.len {
+        return Err(Error::SourceChanged);
+    }
+    Ok(bytes.into())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FileSnapshot {
+    len: u64,
+    modified: Option<SystemTime>,
+    is_file: bool,
+    #[cfg(unix)]
+    device: u64,
+    #[cfg(unix)]
+    inode: u64,
+    #[cfg(unix)]
+    mode: u32,
+    #[cfg(unix)]
+    modified_seconds: i64,
+    #[cfg(unix)]
+    modified_nanoseconds: i64,
+    #[cfg(unix)]
+    changed_seconds: i64,
+    #[cfg(unix)]
+    changed_nanoseconds: i64,
+}
+
+impl FileSnapshot {
+    fn from_metadata(metadata: &Metadata) -> Self {
+        #[cfg(unix)]
+        use std::os::unix::fs::MetadataExt;
+
+        Self {
+            len: metadata.len(),
+            modified: metadata.modified().ok(),
+            is_file: metadata.is_file(),
+            #[cfg(unix)]
+            device: metadata.dev(),
+            #[cfg(unix)]
+            inode: metadata.ino(),
+            #[cfg(unix)]
+            mode: metadata.mode(),
+            #[cfg(unix)]
+            modified_seconds: metadata.mtime(),
+            #[cfg(unix)]
+            modified_nanoseconds: metadata.mtime_nsec(),
+            #[cfg(unix)]
+            changed_seconds: metadata.ctime(),
+            #[cfg(unix)]
+            changed_nanoseconds: metadata.ctime_nsec(),
+        }
+    }
+
+    const fn is_regular_file(self) -> bool {
+        self.is_file
     }
 }
 
 fn check_prepared_candidate(value: &[u8], limits: Limits) -> Result<bool> {
-    let input_size = u64::try_from(value.len()).map_err(|error| {
-        Error::InvalidFormat(format!("iWork input length exceeds u64: {error}"))
-    })?;
+    let input_size = u64::try_from(value.len()).unwrap_or(u64::MAX);
     if input_size > limits.max_input_bytes {
-        return Err(Error::InvalidFormat(format!(
-            "iWork detection input is {input_size} bytes, exceeding the {} byte limit",
-            limits.max_input_bytes
-        )));
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::InputBytes,
+            observed: input_size,
+            maximum: limits.max_input_bytes,
+        });
     }
     Ok(is_zip_signature(value))
 }
@@ -272,39 +600,22 @@ impl Limits {
             || max_total_size == 0
             || max_iwa_stream_size == 0
         {
-            return Err(Error::InvalidFormat(
-                "iWork detection limits must be non-zero".to_owned(),
-            ));
+            return Err(Error::InvalidLimits);
         }
         if max_input_bytes > Self::HARD_MAX_INPUT_BYTES {
-            return Err(Error::InvalidFormat(format!(
-                "iWork detection input limit exceeds {} bytes",
-                Self::HARD_MAX_INPUT_BYTES
-            )));
+            return Err(Error::InvalidLimits);
         }
         if max_files > Self::HARD_MAX_FILES {
-            return Err(Error::InvalidFormat(format!(
-                "iWork detection file limit exceeds {} entries",
-                Self::HARD_MAX_FILES
-            )));
+            return Err(Error::InvalidLimits);
         }
         if max_entry_size > Self::HARD_MAX_ENTRY_SIZE {
-            return Err(Error::InvalidFormat(format!(
-                "iWork detection entry limit exceeds {} bytes",
-                Self::HARD_MAX_ENTRY_SIZE
-            )));
+            return Err(Error::InvalidLimits);
         }
         if max_total_size > Self::HARD_MAX_TOTAL_SIZE {
-            return Err(Error::InvalidFormat(format!(
-                "iWork detection total-size limit exceeds {} bytes",
-                Self::HARD_MAX_TOTAL_SIZE
-            )));
+            return Err(Error::InvalidLimits);
         }
         if max_iwa_stream_size > Self::HARD_MAX_IWA_STREAM_SIZE {
-            return Err(Error::InvalidFormat(format!(
-                "iWork detection IWA limit exceeds {} bytes",
-                Self::HARD_MAX_IWA_STREAM_SIZE
-            )));
+            return Err(Error::InvalidLimits);
         }
 
         Ok(Self {
@@ -389,14 +700,13 @@ pub fn bytes(value: &[u8]) -> Result<Option<Format>> {
 /// Returns a typed error when the package is malformed, ambiguous, encrypted,
 /// or exceeds the supplied resource ceilings.
 pub fn bytes_with_limits(value: &[u8], limits: Limits) -> Result<Option<Format>> {
-    let input_size = u64::try_from(value.len()).map_err(|error| {
-        Error::InvalidFormat(format!("iWork input length exceeds u64: {error}"))
-    })?;
+    let input_size = u64::try_from(value.len()).unwrap_or(u64::MAX);
     if input_size > limits.max_input_bytes {
-        return Err(Error::InvalidFormat(format!(
-            "iWork detection input is {input_size} bytes, exceeding the {} byte limit",
-            limits.max_input_bytes
-        )));
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::InputBytes,
+            observed: input_size,
+            maximum: limits.max_input_bytes,
+        });
     }
     if !is_zip_signature(value) {
         return Ok(None);
@@ -473,10 +783,8 @@ fn map_archive_error(archive_error: litchi_iwa_archive::Error) -> Error {
     match archive_error {
         litchi_iwa_archive::Error::Io(io_error) => Error::Io(io_error),
         litchi_iwa_archive::Error::Iwa(iwa_error) => Error::from(iwa_error),
-        litchi_iwa_archive::Error::Encrypted => {
-            Error::InvalidFormat("password-protected iWork documents are not supported".to_owned())
-        },
-        litchi_iwa_archive::Error::InvalidLimits(message) => Error::InvalidFormat(message),
+        litchi_iwa_archive::Error::Encrypted => Error::Encrypted,
+        litchi_iwa_archive::Error::InvalidLimits(_) => Error::InvalidLimits,
         litchi_iwa_archive::Error::Zip { message }
         | litchi_iwa_archive::Error::InvalidBundle(message) => {
             Error::Archive(format!("iWork archive ingress: {message}"))
@@ -485,19 +793,37 @@ fn map_archive_error(archive_error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::InvalidFormat(format!(
-            "iWork archive {kind} limit exceeded: observed {observed}, maximum {maximum}"
-        )),
-        litchi_iwa_archive::Error::Allocation { resource, amount } => {
-            Error::IwaCommon(litchi_iwa_common::Error::Allocation { resource, amount })
+        } => Error::LimitExceeded {
+            kind: map_archive_limit(kind),
+            observed,
+            maximum,
         },
-        litchi_iwa_archive::Error::SourceChanged { expected, observed } => Error::Archive(format!(
-            "iWork archive source changed during read: expected {expected:?}, observed {observed:?}"
-        )),
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        litchi_iwa_archive::Error::SourceChanged { .. }
+        | litchi_iwa_archive::Error::DirectoryChanged { .. } => Error::SourceChanged,
         litchi_iwa_archive::Error::Reassembly(message) => {
             Error::Archive(format!("iWork archive reassembly: {message}"))
         },
     }
+}
+
+const fn map_archive_limit(kind: litchi_iwa_archive::LimitKind) -> LimitKind {
+    match kind {
+        litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+        litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+        litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
+        litchi_iwa_archive::LimitKind::MemberNameBytes => LimitKind::MemberNameBytes,
+        litchi_iwa_archive::LimitKind::MetadataBytes => LimitKind::MetadataBytes,
+        litchi_iwa_archive::LimitKind::CompressedEntryBytes => LimitKind::CompressedEntryBytes,
+        litchi_iwa_archive::LimitKind::EntryBytes => LimitKind::EntryBytes,
+        litchi_iwa_archive::LimitKind::TotalBytes => LimitKind::TotalBytes,
+        litchi_iwa_archive::LimitKind::IwaStreamBytes => LimitKind::IwaStreamBytes,
+        litchi_iwa_archive::LimitKind::IwaTotalBytes => LimitKind::IwaTotalBytes,
+    }
+}
+
+fn usize_u64(value: usize) -> u64 {
+    u64::try_from(value).unwrap_or(u64::MAX)
 }
 
 fn classify_root(root: &DetectionRoot) -> Result<Option<Format>> {
@@ -1227,7 +1553,9 @@ mod tests {
         assert_eq!(prepared.format(), Format::Pages);
         assert_eq!(prepared.limits(), limits);
 
-        let catalog = prepared.__into_source_catalog();
+        let catalog = prepared
+            .__into_source_catalog()
+            .expect("byte-prepared sources retain a package catalog");
         assert!(Arc::ptr_eq(&bytes, &catalog.shared_source()));
         assert_eq!(catalog.limits().max_input_bytes(), limits.max_input_bytes());
         assert_eq!(catalog.limits().max_entries(), limits.max_files());
@@ -1267,7 +1595,83 @@ mod tests {
             ("Index/Document.iwa", &root),
             ("Metadata/.iwpv2", b"encryption metadata"),
         ]);
-        assert!(bytes(&encrypted).is_err());
+        assert!(matches!(bytes(&encrypted), Err(Error::Encrypted)));
+    }
+
+    #[test]
+    fn archive_failures_keep_content_free_typed_categories() {
+        let kinds = [
+            (
+                litchi_iwa_archive::LimitKind::InputBytes,
+                LimitKind::InputBytes,
+            ),
+            (
+                litchi_iwa_archive::LimitKind::OutputBytes,
+                LimitKind::OutputBytes,
+            ),
+            (litchi_iwa_archive::LimitKind::Entries, LimitKind::Entries),
+            (
+                litchi_iwa_archive::LimitKind::MemberNameBytes,
+                LimitKind::MemberNameBytes,
+            ),
+            (
+                litchi_iwa_archive::LimitKind::MetadataBytes,
+                LimitKind::MetadataBytes,
+            ),
+            (
+                litchi_iwa_archive::LimitKind::CompressedEntryBytes,
+                LimitKind::CompressedEntryBytes,
+            ),
+            (
+                litchi_iwa_archive::LimitKind::EntryBytes,
+                LimitKind::EntryBytes,
+            ),
+            (
+                litchi_iwa_archive::LimitKind::TotalBytes,
+                LimitKind::TotalBytes,
+            ),
+            (
+                litchi_iwa_archive::LimitKind::IwaStreamBytes,
+                LimitKind::IwaStreamBytes,
+            ),
+            (
+                litchi_iwa_archive::LimitKind::IwaTotalBytes,
+                LimitKind::IwaTotalBytes,
+            ),
+        ];
+        for (archive_kind, expected) in kinds {
+            let error = map_archive_error(litchi_iwa_archive::Error::Limit {
+                kind: archive_kind,
+                observed: 9,
+                maximum: 8,
+            });
+            assert!(matches!(
+                error,
+                Error::LimitExceeded {
+                    kind,
+                    observed: 9,
+                    maximum: 8,
+                } if kind == expected
+            ));
+        }
+
+        let errors = [
+            map_archive_error(litchi_iwa_archive::Error::Encrypted),
+            map_archive_error(litchi_iwa_archive::Error::InvalidLimits(
+                "private implementation detail".to_owned(),
+            )),
+            map_archive_error(litchi_iwa_archive::Error::Allocation {
+                resource: "private implementation detail",
+                amount: 17,
+            }),
+        ];
+        assert!(matches!(errors[0], Error::Encrypted));
+        assert!(matches!(errors[1], Error::InvalidLimits));
+        assert!(matches!(errors[2], Error::Allocation { amount: 17 }));
+        for error in &errors {
+            assert!(std::error::Error::source(error).is_none());
+            assert!(!error.to_string().contains("private implementation detail"));
+        }
     }
 
     #[test]

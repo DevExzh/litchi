@@ -447,3 +447,74 @@ Consequently `litchi-iwa::Document::extract_structured_data`, its structured
 modules, dependency, and boundary-debt entry remain until those gates close.
 No performance gain, complete Buffa laziness, directory parity, or resave
 fidelity is inferred from the new dependency shape.
+
+## 2026-08-08 frozen path ingress and semantic-only projection
+
+The supported root coordinator now accepts filesystem paths through
+`litchi::iwork::Document::open[_with_options]`. A regular file is opened once
+with no-follow and nonblocking flags on Unix, bounded before publication, and
+checked for descriptor/path identity, type, length, modification, and change
+metadata around the read. A directory is captured once by the archive-owned
+`FrozenDirectoryBundle`. Exactly one direct `Index.zip` or loose `Index/`
+representation is allowed; symlinks, special nodes, nested loose directories,
+dual representations, marker conflicts, unstable manifests, and observable
+source replacement fail closed. Component order is normalized and every
+physical, aggregate-IWA, and allocation limit is applied before publishing the
+snapshot. The detector classifies the same retained components subsequently
+consumed by the chosen format owner and preserves content-free limit,
+allocation, encryption, invalid-profile, and source-change categories through
+the root error boundary.
+
+Directory provenance is intentionally narrower than ZIP provenance. The
+frozen value owns only the semantic index representation and application-marker
+evidence. `Metadata/`, `Data/`, previews, and unknown root sidecars are outside
+that adapter. It cannot expose exact package bytes, enter preserve-mode edits,
+or claim directory reassembly fidelity. The filesystem cannot provide a
+cross-file atomic snapshot without an external filesystem snapshot or lock;
+the adapter instead rejects every observable change during its bounded capture
+and performs no later filesystem reads.
+
+All three root branches now consume a component-only semantic handoff. Pages
+releases the package catalog before root/reference validation and applies the
+root section and text ceilings during its first semantic construction. Numbers
+shares the retained component catalog through `Arc` and preserves the global
+orphan-compatible table projection. Keynote uses a private component-backed
+semantic decoder, so directory reads do not construct package metadata or edit
+state. Its lazy semantic cache now uses fallible single-flight initialization:
+concurrent first readers perform one decode, failures remain retryable, and a
+prepared source bypasses redundant format classification. The package-oriented
+Pages and Keynote constructors remain available for exact ZIP metadata and
+editing, but safely reject directory-backed prepared sources.
+
+Native directory oracles were produced from disposable copies of the three
+checked-in fixtures in the real Pages, Numbers, and Keynote applications using
+the application's Package file type. Each package directory was saved, closed,
+reopened from Recents, checked for the same visible Pages lines, Numbers table
+and B2/B3 values, or Keynote title/body/date, and closed without another save.
+No repair or conversion UI appeared. The 46 regular members and their hashes
+are checked in under `test-data/iwork/directory`; the original ZIP fixture
+hashes remained unchanged. Root integration tests prove ZIP/directory semantic
+parity for all three formats, exact and one-under directory input ceilings,
+typed missing/link/special/mixed-source failures, and stable semantic handles
+after the captured directory has been removed.
+
+Root-owned migration infrastructure also advanced. `crates/litchi` now owns a
+feature-gated `read_iwork` example that uses the bounded path API and a fuzz
+package whose only parser dependency is `litchi` with `iwork`; the legacy fuzz
+target no longer calls the host aggregate method. The public API gate compiles
+thread/lifetime assertions and feature isolation in addition to checking
+rustdoc JSON. It intentionally does not use `--locked`, because this library
+workspace excludes `Cargo.lock` from version control and the gate must work in
+a clean checkout. The root fuzz harness compiles and records native seed hashes,
+but a sanitizer campaign is not claimed when `cargo-fuzz` is unavailable.
+
+`litchi-iwa-package::EntryStore` now has cheap immutable `freeze` and `snapshot`
+views with copy-on-write isolation, deterministic positions, and `Send + Sync`
+coverage. That is only the storage seam: it has not yet been admitted through
+one root prepared-source coordinator or proven against all host logical-entry
+behavior. The monolith structured adapter and its dependency debt therefore
+remain. Deletion still requires the frozen logical-entry route, retained
+host-versus-focused parity oracles for every removed behavior, completed fuzz
+execution, and migration of the remaining editors/tests/examples that depend
+on broader host semantics. This slice does not claim complete Buffa conversion;
+the remaining focused Prost graph decoders stay tracked migration work.

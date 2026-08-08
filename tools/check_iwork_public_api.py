@@ -22,6 +22,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_JSON = ROOT / "target" / "doc" / "litchi.json"
 IWORK_PATH = ("litchi", "iwork")
+ISOLATION_FEATURES = ("pages", "keynote", "numbers")
 FORBIDDEN_CRATES = frozenset(
     {
         "buffa",
@@ -50,16 +51,36 @@ CAPABILITY_TOKENS = frozenset({"archive", "catalog", "component", "components", 
 
 
 def rustdoc_command() -> tuple[str, ...]:
-    """Return the deterministic rustdoc invocation used by the gate."""
+    """Return the root-facade rustdoc invocation used by the gate.
+
+    This library workspace intentionally does not version ``Cargo.lock``, so
+    ``--locked`` would make the gate fail in every clean checkout.
+    """
     return (
         "cargo",
         "rustdoc",
-        "--locked",
         "--package",
         "litchi",
         "--no-default-features",
         "--features",
         "iwork",
+        "--",
+        "-Zunstable-options",
+        "--output-format",
+        "json",
+    )
+
+
+def isolation_rustdoc_command() -> tuple[str, ...]:
+    """Compile all leaf facades without enabling the aggregate facade."""
+    return (
+        "cargo",
+        "rustdoc",
+        "--package",
+        "litchi",
+        "--no-default-features",
+        "--features",
+        ",".join(ISOLATION_FEATURES),
         "--",
         "-Zunstable-options",
         "--output-format",
@@ -229,6 +250,13 @@ def violations(document: Mapping[str, Any]) -> list[str]:
                     failures.add(
                         f"{display} exposes forbidden type `{'::'.join(referenced_path)}`"
                     )
+                elif crate_name == IWORK_PATH[0] and referenced_path[
+                    : len(IWORK_PATH)
+                ] != IWORK_PATH:
+                    failures.add(
+                        f"{display} exposes type outside the iWork facade "
+                        f"`{'::'.join(referenced_path)}`"
+                    )
                 elif (
                     crate_name != IWORK_PATH[0]
                     and crate_name not in ALLOWED_EXTERNAL_CRATES
@@ -262,6 +290,27 @@ def violations(document: Mapping[str, Any]) -> list[str]:
     return sorted(failures)
 
 
+def isolation_violations(document: Mapping[str, Any]) -> list[str]:
+    """Reject the aggregate module when only concrete leaf features are on."""
+    paths_value = document.get("paths")
+    if not isinstance(paths_value, dict):
+        return ["invalid rustdoc JSON: expected object-valued `paths`"]
+    if any(_path_entry_path(entry) == IWORK_PATH for entry in paths_value.values()):
+        return [
+            "public module `litchi::iwork` is available without the `iwork` feature"
+        ]
+    return []
+
+
+def load_document(json_path: Path) -> Mapping[str, Any]:
+    """Read one rustdoc JSON document or terminate with a stable diagnostic."""
+    try:
+        return json.loads(json_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        print(f"failed to read rustdoc JSON {json_path}: {error}", file=sys.stderr)
+        raise SystemExit(2) from error
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -286,11 +335,7 @@ def main(argv: list[str] | None = None) -> int:
             return completed.returncode
         json_path = DEFAULT_JSON
 
-    try:
-        document = json.loads(json_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        print(f"failed to read rustdoc JSON {json_path}: {error}", file=sys.stderr)
-        return 2
+    document = load_document(json_path)
 
     failures = violations(document)
     if failures:
@@ -299,7 +344,27 @@ def main(argv: list[str] | None = None) -> int:
             print(f"- {failure}", file=sys.stderr)
         return 1
 
-    print("litchi::iwork public API contains no forbidden implementation types or raw IDs")
+    checked_isolation = args.json is None
+    if checked_isolation:
+        completed = subprocess.run(
+            isolation_rustdoc_command(),
+            cwd=ROOT,
+            env=environment(),
+            check=False,
+        )
+        if completed.returncode != 0:
+            return completed.returncode
+        isolation_failures = isolation_violations(load_document(DEFAULT_JSON))
+        if isolation_failures:
+            print("litchi::iwork feature-isolation violations:", file=sys.stderr)
+            for failure in isolation_failures:
+                print(f"- {failure}", file=sys.stderr)
+            return 1
+
+    message = "litchi::iwork public API contains no forbidden implementation types or raw IDs"
+    if checked_isolation:
+        message += "; leaf features do not publish the aggregate facade"
+    print(message)
     return 0
 
 

@@ -13,12 +13,16 @@
 #![forbid(unsafe_code)]
 
 mod catalog;
+mod directory;
 mod error;
 mod limits;
 pub mod package;
 mod zip;
 
 pub use catalog::{Component, ComponentCatalog, SourceCatalog};
+pub use directory::{
+    DirectoryMarkers, DirectoryProvenance, FrozenDirectoryBundle, FrozenDirectoryEntry,
+};
 pub use error::{Error, LimitKind, Result};
 pub use limits::Limits;
 pub use package::SourceProvenance;
