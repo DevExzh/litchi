@@ -17,6 +17,10 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parse and retain one bounded chart part without normalizing its bytes.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn from_xml(xml: impl Into<Vec<u8>>) -> Result<Self> {
         let xml = xml.into();
         let value = codec::read(&xml)?;
@@ -27,11 +31,16 @@ impl Snapshot {
     }
 
     /// Create a source snapshot from a detached typed chart value.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn new(value: Chart) -> Result<Self> {
         let mut xml = Vec::new();
         crate::chart::writer::write(&mut xml, &value).map_err(|error| {
             Error::Io(std::io::Error::new(std::io::ErrorKind::InvalidData, error))
         })?;
+        drop(value);
         Self::from_xml(xml)
     }
 
@@ -75,40 +84,66 @@ impl Transaction {
 
     /// Set or clear the chart title while retaining existing rich formatting
     /// and extension children when the representation is unchanged.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn set_title(&mut self, title: Option<TitleText>) -> Result<&mut Self> {
         let candidate = codec::set_chart_title(&self.working_xml, title.as_ref())?;
+        drop(title);
         self.apply(candidate)
     }
 
     /// Set or clear the chart-space language.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn set_language(&mut self, language: Option<&str>) -> Result<&mut Self> {
         let candidate = codec::set_language(&self.working_xml, language)?;
         self.apply(candidate)
     }
 
     /// Set or clear the built-in chart style.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn set_style(&mut self, style: Option<u32>) -> Result<&mut Self> {
         let candidate = codec::set_style(&self.working_xml, style)?;
         self.apply(candidate)
     }
 
     /// Set the chart blank-cell display mode.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn set_display_blanks(&mut self, mode: DisplayBlanks) -> Result<&mut Self> {
         let candidate = codec::set_display_blanks(&self.working_xml, mode)?;
         self.apply(candidate)
     }
 
     /// Set or clear a series title selected by its stable index.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn set_series_title(
         &mut self,
         series_index: u32,
         title: Option<TitleText>,
     ) -> Result<&mut Self> {
         let candidate = codec::set_series_title(&self.working_xml, series_index, title.as_ref())?;
+        drop(title);
         self.apply(candidate)
     }
 
     /// Set one shared data-label switch on a series.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn set_series_data_label_flag(
         &mut self,
         series_index: u32,
@@ -121,6 +156,10 @@ impl Transaction {
     }
 
     /// Remove one explicit shared data-label switch from a series.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn clear_series_data_label_flag(
         &mut self,
         series_index: u32,
@@ -131,6 +170,10 @@ impl Transaction {
     }
 
     /// Set or clear the shared data-label separator on a series.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn set_series_data_label_separator(
         &mut self,
         series_index: u32,
@@ -141,10 +184,15 @@ impl Transaction {
             series_index,
             separator.as_deref(),
         )?;
+        drop(separator);
         self.apply(candidate)
     }
 
     /// Set or clear the numeric range of an axis selected by its ID.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn set_axis_range(
         &mut self,
         axis_id: u32,
@@ -157,6 +205,10 @@ impl Transaction {
     }
 
     /// Set the position of an axis selected by its ID.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn set_axis_position(&mut self, axis_id: u32, position: AxisPosition) -> Result<&mut Self> {
         let candidate = codec::set_axis_position(&self.working_xml, axis_id, position)?;
         self.apply(candidate)
@@ -169,6 +221,10 @@ impl Transaction {
     }
 
     /// Publish the edit and return its exact snapshot plus reversible patch.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn commit(self) -> Result<Commit> {
         let snapshot = if self.is_changed() {
             Snapshot::from_xml(self.working_xml)?
@@ -258,6 +314,10 @@ impl Patch {
     }
 
     /// Apply only to the exact source snapshot from which this patch came.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.xml.as_ref() != self.before.as_ref() {
             return Err(Error::Invalid(

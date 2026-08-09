@@ -21,7 +21,7 @@ fn contextual_views_keep_legacy_operations_and_separate_content_from_styles() {
 
     document
         .content_mut()
-        .update_paragraph(0, "changed")
+        .replace_paragraph_at(litchi_core::Position::new(0), "changed")
         .unwrap();
     assert_eq!(document.paragraphs()[0].text().unwrap(), "changed");
 }
@@ -41,7 +41,9 @@ fn contextual_content_editor_can_reborrow_for_reads() {
 fn appending_line_break_uses_odf_inline_markup_and_preserves_rich_content() {
     let mut document = MutableDocument::new();
     document.add_paragraph("before").unwrap();
-    document.append_line_break(0).unwrap();
+    document
+        .append_line_break_at(litchi_core::Position::new(0))
+        .unwrap();
 
     let output = Document::from_bytes(document.to_bytes().unwrap()).unwrap();
     assert_eq!(output.paragraphs().unwrap()[0].text().unwrap(), "before\n");
@@ -56,7 +58,9 @@ fn appending_line_break_uses_odf_inline_markup_and_preserves_rich_content() {
     writer.add_file("content.xml", rich_xml.as_bytes()).unwrap();
     let source = Document::from_bytes(writer.finish_to_bytes().unwrap()).unwrap();
     let mut mutable = MutableDocument::from_document(source).unwrap();
-    mutable.append_line_break(0).unwrap();
+    mutable
+        .append_line_break_at(litchi_core::Position::new(0))
+        .unwrap();
 
     let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
     assert_eq!(
@@ -72,5 +76,9 @@ fn appending_line_break_uses_odf_inline_markup_and_preserves_rich_content() {
 fn appending_line_break_reports_a_missing_document_paragraph() {
     let mut document = MutableDocument::new();
     document.add_paragraph("only").unwrap();
-    assert!(document.append_line_break(1).is_err());
+    assert!(
+        document
+            .append_line_break_at(litchi_core::Position::new(1))
+            .is_err()
+    );
 }

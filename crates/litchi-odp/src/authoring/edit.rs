@@ -1,4 +1,4 @@
-//! Source-checked, failure-atomic ODP slide, shape, media, and RDF edits.
+//! Unified source-checked ODP slide, media, chart, design, annotation, and RDF edits.
 
 use super::mutable::MutablePresentation;
 use crate::core::OwnedPackage;
@@ -15,6 +15,44 @@ const MAX_DRAFT_BYTES: usize = 128 * 1024 * 1024;
 const MAX_SLIDES: usize = 65_536;
 const MAX_TEXT_BYTES: usize = 16 * 1024 * 1024;
 const MAX_XML_PARTS: usize = 65_536;
+const DURABLE_PATCH_MAGIC: &[u8; 16] = b"LITCHI-ODP-PATCH";
+const DURABLE_PATCH_VERSION: u16 = 1;
+
+/// Semantic dependency domain touched by a root package patch.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[non_exhaustive]
+pub enum Domain {
+    /// Slide, shape, or embedded-media projection.
+    Slides,
+    /// RDF metadata graphs.
+    Rdf,
+    /// Embedded chart occurrences or parts.
+    Charts,
+    /// Presentation layouts, master pages, or their slide assignments.
+    Design,
+    /// Slide- or shape-anchored annotations.
+    Annotations,
+}
+
+/// Conservative non-mutating merge assessment for two package patches.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MergePlan {
+    conflicts: Vec<Domain>,
+}
+
+impl MergePlan {
+    /// Return semantic domains requiring an explicit merge decision.
+    #[must_use]
+    pub fn conflicts(&self) -> &[Domain] {
+        &self.conflicts
+    }
+
+    /// Return whether the two patches are provably independent at this API layer.
+    #[must_use]
+    pub fn is_independent(&self) -> bool {
+        self.conflicts.is_empty()
+    }
+}
 
 /// An immutable presentation package and its parsed slide projection.
 #[derive(Clone)]
@@ -109,6 +147,9 @@ impl Snapshot {
             draft: MutablePresentation::from_presentation(&presentation)?,
             changed: false,
             rdf: None,
+            charts: None,
+            design: None,
+            annotations: None,
             media_bytes: 0,
             resource_bytes: self.resource_bytes,
             source_resource_bytes: self.resource_bytes,
@@ -152,6 +193,9 @@ pub struct Transaction {
     draft: MutablePresentation,
     changed: bool,
     rdf: Option<RdfDraft>,
+    charts: Option<ChartDraft>,
+    design: Option<DesignDraft>,
+    annotations: Option<AnnotationDraft>,
     media_bytes: usize,
     resource_bytes: usize,
     source_resource_bytes: usize,
@@ -195,6 +239,134 @@ struct RdfDraft {
     original_graphs: Vec<crate::rdf::Graph>,
     graphs: Vec<crate::rdf::Graph>,
     operations: Vec<RdfOperation>,
+}
+
+#[derive(Clone)]
+enum ChartSelector {
+    Index(usize),
+    Name(String),
+}
+
+#[derive(Clone)]
+enum ChartPage {
+    Index(usize),
+    Name(String),
+}
+
+impl ChartSelector {
+    fn from_borrowed(selector: crate::charts::Selector<'_>) -> Self {
+        match selector {
+            crate::charts::Selector::Index(index) => Self::Index(index),
+            crate::charts::Selector::Name(name) => Self::Name(name.to_string()),
+        }
+    }
+
+    fn borrowed(&self) -> crate::charts::Selector<'_> {
+        match self {
+            Self::Index(index) => crate::charts::Selector::Index(*index),
+            Self::Name(name) => crate::charts::Selector::Name(name),
+        }
+    }
+}
+
+impl ChartPage {
+    fn from_borrowed(page: crate::charts::Page<'_>) -> Self {
+        match page {
+            crate::charts::Page::Index(index) => Self::Index(index),
+            crate::charts::Page::Name(name) => Self::Name(name.to_string()),
+        }
+    }
+
+    fn borrowed(&self) -> crate::charts::Page<'_> {
+        match self {
+            Self::Index(index) => crate::charts::Page::Index(*index),
+            Self::Name(name) => crate::charts::Page::Name(name),
+        }
+    }
+}
+
+#[derive(Clone)]
+enum ChartOperation {
+    Replace {
+        selector: ChartSelector,
+        part: crate::charts::Part,
+    },
+    Remove {
+        selector: ChartSelector,
+    },
+    Add {
+        page: ChartPage,
+        name: String,
+        storage: crate::charts::Storage,
+        part: crate::charts::Part,
+    },
+}
+
+struct ChartDraft {
+    bytes: Arc<Vec<u8>>,
+    original: Vec<crate::charts::Chart>,
+    charts: Vec<crate::charts::Chart>,
+    operations: Vec<ChartOperation>,
+    limits: crate::charts::Limits,
+}
+
+#[derive(Clone)]
+enum DesignOperation {
+    AddLayout(crate::layout::Layout),
+    ReplaceLayout(crate::layout::Layout),
+    RemoveLayout {
+        name: String,
+        replacement: Option<String>,
+    },
+    ReorderLayouts(Vec<String>),
+    AddMaster(crate::MasterPage),
+    ReplaceMaster(crate::MasterPage),
+    RemoveMaster {
+        name: String,
+        replacement: Option<String>,
+    },
+    ReorderMasters(Vec<String>),
+    AssignSlideMaster {
+        slide_index: usize,
+        name: Option<String>,
+    },
+    AssignSlideLayout {
+        slide_index: usize,
+        name: Option<String>,
+    },
+}
+
+struct DesignDraft {
+    bytes: Arc<Vec<u8>>,
+    original_layouts: crate::layout::Collection,
+    layouts: crate::layout::Collection,
+    original_masters: Vec<crate::MasterPage>,
+    masters: Vec<crate::MasterPage>,
+    original_pages: crate::page::Collection,
+    pages: crate::page::Collection,
+    operations: Vec<DesignOperation>,
+}
+
+#[derive(Clone)]
+enum AnnotationOperation {
+    Add {
+        anchor: crate::annotation::Anchor,
+        annotation: crate::annotation::Annotation,
+    },
+    Replace {
+        index: usize,
+        annotation: crate::annotation::Annotation,
+    },
+    Remove {
+        index: usize,
+    },
+}
+
+struct AnnotationDraft {
+    bytes: Arc<Vec<u8>>,
+    original: Vec<crate::annotation::Info>,
+    annotations: Vec<crate::annotation::Info>,
+    operations: Vec<AnnotationOperation>,
 }
 
 impl Transaction {
@@ -557,6 +729,321 @@ impl Transaction {
         )
     }
 
+    /// Inspect embedded charts in the current package transaction draft.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when chart discovery encounters malformed or over-budget content.
+    pub fn charts(&mut self) -> Result<&[crate::charts::Chart]> {
+        self.ensure_charts()?;
+        self.charts
+            .as_ref()
+            .map(|draft| draft.charts.as_slice())
+            .ok_or_else(|| invalid_error("ODP chart draft initialization failed"))
+    }
+
+    /// Replace one embedded chart part selected by exact name or checked position.
+    ///
+    /// Every occurrence sharing the selected package part is updated together.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing or ambiguous selector, malformed chart XML, or a limit.
+    pub fn replace_chart<'a, S>(&mut self, selector: S, part: crate::charts::Part) -> Result<()>
+    where
+        S: Into<crate::charts::Selector<'a>>,
+    {
+        let owned_selector = ChartSelector::from_borrowed(selector.into());
+        let snapshot = self.chart_snapshot()?;
+        let mut edit = snapshot.edit();
+        edit.replace(owned_selector.borrowed(), part.clone())?;
+        let commit = edit.commit()?;
+        self.stage_chart(
+            commit.snapshot().bytes().to_vec(),
+            commit.snapshot().charts().to_vec(),
+            ChartOperation::Replace {
+                selector: owned_selector,
+                part,
+            },
+        )
+    }
+
+    /// Remove one embedded chart selected by exact name or checked position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing or ambiguous selector or malformed chart package content.
+    pub fn remove_chart<'a, S>(&mut self, selector: S) -> Result<crate::charts::Chart>
+    where
+        S: Into<crate::charts::Selector<'a>>,
+    {
+        let owned_selector = ChartSelector::from_borrowed(selector.into());
+        let snapshot = self.chart_snapshot()?;
+        let mut edit = snapshot.edit();
+        let removed = edit.remove(owned_selector.borrowed())?;
+        let commit = edit.commit()?;
+        self.stage_chart(
+            commit.snapshot().bytes().to_vec(),
+            commit.snapshot().charts().to_vec(),
+            ChartOperation::Remove {
+                selector: owned_selector,
+            },
+        )?;
+        Ok(removed)
+    }
+
+    /// Add a named embedded chart to an exact-name or checked-position page.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing or ambiguous page, duplicate chart name, malformed part,
+    /// or resource-limit breach.
+    pub fn add_chart<'a, P>(
+        &mut self,
+        page: P,
+        name: impl Into<String>,
+        storage: crate::charts::Storage,
+        part: crate::charts::Part,
+    ) -> Result<usize>
+    where
+        P: Into<crate::charts::Page<'a>>,
+    {
+        let owned_page = ChartPage::from_borrowed(page.into());
+        let chart_name = name.into();
+        let snapshot = self.chart_snapshot()?;
+        let mut edit = snapshot.edit();
+        let index = edit.add(
+            owned_page.borrowed(),
+            chart_name.clone(),
+            storage,
+            part.clone(),
+        )?;
+        let commit = edit.commit()?;
+        self.stage_chart(
+            commit.snapshot().bytes().to_vec(),
+            commit.snapshot().charts().to_vec(),
+            ChartOperation::Add {
+                page: owned_page,
+                name: chart_name,
+                storage,
+                part,
+            },
+        )?;
+        Ok(index)
+    }
+
+    /// Inspect named presentation page layouts in the current package draft.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `styles.xml` is missing, malformed, or over budget.
+    pub fn layouts(&mut self) -> Result<&crate::layout::Collection> {
+        self.ensure_design()?;
+        self.design
+            .as_ref()
+            .map(|draft| &draft.layouts)
+            .ok_or_else(|| invalid_error("ODP design draft initialization failed"))
+    }
+
+    /// Inspect master pages in the current package draft.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `styles.xml` is missing, malformed, or over budget.
+    pub fn master_pages(&mut self) -> Result<&[crate::MasterPage]> {
+        self.ensure_design()?;
+        self.design
+            .as_ref()
+            .map(|draft| draft.masters.as_slice())
+            .ok_or_else(|| invalid_error("ODP design draft initialization failed"))
+    }
+
+    /// Add one named presentation page layout.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid or duplicate layout or malformed package dependencies.
+    pub fn add_layout(&mut self, layout: &crate::layout::Layout) -> Result<()> {
+        self.stage_design_operation(DesignOperation::AddLayout(layout.clone()))
+    }
+
+    /// Replace one named presentation page layout.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the layout is invalid or does not exist.
+    pub fn replace_page_layout(&mut self, layout: &crate::layout::Layout) -> Result<()> {
+        self.stage_design_operation(DesignOperation::ReplaceLayout(layout.clone()))
+    }
+
+    /// Remove one layout and optionally retarget all modeled incoming references.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when either name is invalid or the replacement does not exist.
+    pub fn remove_page_layout(&mut self, name: &str, replacement: Option<&str>) -> Result<()> {
+        self.stage_design_operation(DesignOperation::RemoveLayout {
+            name: name.to_string(),
+            replacement: replacement.map(str::to_string),
+        })
+    }
+
+    /// Reorder every named presentation layout using an exact dependency-checked name list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the list is incomplete, duplicated, or contains an unknown name.
+    pub fn reorder_layouts(&mut self, names: &[String]) -> Result<()> {
+        self.stage_design_operation(DesignOperation::ReorderLayouts(names.to_vec()))
+    }
+
+    /// Add one named master page.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid XML, duplicate identity, or dangling dependencies.
+    pub fn add_master_page(&mut self, master: &crate::MasterPage) -> Result<()> {
+        self.stage_design_operation(DesignOperation::AddMaster(master.clone()))
+    }
+
+    /// Replace one named master page.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid XML, missing identity, or dangling dependencies.
+    pub fn replace_master_page(&mut self, master: &crate::MasterPage) -> Result<()> {
+        self.stage_design_operation(DesignOperation::ReplaceMaster(master.clone()))
+    }
+
+    /// Remove one master page and optionally retarget modeled incoming references.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when either name is invalid or the replacement does not exist.
+    pub fn remove_master_page(&mut self, name: &str, replacement: Option<&str>) -> Result<()> {
+        self.stage_design_operation(DesignOperation::RemoveMaster {
+            name: name.to_string(),
+            replacement: replacement.map(str::to_string),
+        })
+    }
+
+    /// Reorder every master page using an exact dependency-checked name list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the list is incomplete, duplicated, or contains an unknown name.
+    pub fn reorder_master_pages(&mut self, names: &[String]) -> Result<()> {
+        self.stage_design_operation(DesignOperation::ReorderMasters(names.to_vec()))
+    }
+
+    /// Assign or clear a slide's master-page dependency by checked zero-based position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an out-of-range slide or missing master.
+    pub fn assign_slide_master_page(
+        &mut self,
+        slide_index: usize,
+        master_name: Option<&str>,
+    ) -> Result<()> {
+        self.stage_design_operation(DesignOperation::AssignSlideMaster {
+            slide_index,
+            name: master_name.map(str::to_string),
+        })
+    }
+
+    /// Assign or clear a slide's presentation-layout dependency by checked position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an out-of-range slide or missing layout.
+    pub fn assign_slide_page_layout(
+        &mut self,
+        slide_index: usize,
+        layout_name: Option<&str>,
+    ) -> Result<()> {
+        self.stage_design_operation(DesignOperation::AssignSlideLayout {
+            slide_index,
+            name: layout_name.map(str::to_string),
+        })
+    }
+
+    /// Inspect slide- and shape-anchored annotations in the current package draft.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed annotation XML, anchors, or resource limits.
+    pub fn annotations(&mut self) -> Result<&[crate::annotation::Info]> {
+        self.ensure_annotations()?;
+        self.annotations
+            .as_ref()
+            .map(|draft| draft.annotations.as_slice())
+            .ok_or_else(|| invalid_error("ODP annotation draft initialization failed"))
+    }
+
+    /// Add an annotation at a checked page or uniquely named shape anchor.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing or ambiguous anchor, duplicate name, or invalid body.
+    pub fn add_annotation(
+        &mut self,
+        anchor: &crate::annotation::Anchor,
+        annotation: &crate::annotation::Annotation,
+    ) -> Result<usize> {
+        self.ensure_annotations()?;
+        let current = self.annotation_bytes()?;
+        let mut presentation = Presentation::from_shared_bytes(current)?;
+        let index = presentation.add_annotation(anchor, annotation)?;
+        self.stage_annotation(
+            Arc::new(presentation.to_bytes()?),
+            AnnotationOperation::Add {
+                anchor: anchor.clone(),
+                annotation: annotation.clone(),
+            },
+        )?;
+        Ok(index)
+    }
+
+    /// Replace one annotation selected by checked zero-based document order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an out-of-range position, duplicate name, or invalid body.
+    pub fn replace_annotation(
+        &mut self,
+        index: usize,
+        annotation: &crate::annotation::Annotation,
+    ) -> Result<()> {
+        self.ensure_annotations()?;
+        let current = self.annotation_bytes()?;
+        let mut presentation = Presentation::from_shared_bytes(current)?;
+        presentation.replace_annotation(index, annotation)?;
+        self.stage_annotation(
+            Arc::new(presentation.to_bytes()?),
+            AnnotationOperation::Replace {
+                index,
+                annotation: annotation.clone(),
+            },
+        )
+    }
+
+    /// Remove one annotation selected by checked zero-based document order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the position is out of range or package content is malformed.
+    pub fn remove_annotation(&mut self, index: usize) -> Result<()> {
+        self.ensure_annotations()?;
+        let current = self.annotation_bytes()?;
+        let mut presentation = Presentation::from_shared_bytes(current)?;
+        presentation.remove_annotation(index)?;
+        self.stage_annotation(
+            Arc::new(presentation.to_bytes()?),
+            AnnotationOperation::Remove { index },
+        )
+    }
+
     /// Validate, serialize, reparse, and atomically publish the staged draft.
     ///
     /// # Errors
@@ -568,7 +1055,40 @@ impl Transaction {
             .rdf
             .as_ref()
             .is_some_and(|draft| !draft.operations.is_empty());
-        if !self.changed && !rdf_changed {
+        let charts_changed = self
+            .charts
+            .as_ref()
+            .is_some_and(|draft| !draft.operations.is_empty());
+        let design_changed = self
+            .design
+            .as_ref()
+            .is_some_and(|draft| !draft.operations.is_empty());
+        let annotations_changed = self
+            .annotations
+            .as_ref()
+            .is_some_and(|draft| !draft.operations.is_empty());
+        let mut domains = Vec::new();
+        if self.changed {
+            domains.push(Domain::Slides);
+        }
+        if rdf_changed {
+            domains.push(Domain::Rdf);
+        }
+        if charts_changed {
+            domains.push(Domain::Charts);
+        }
+        if design_changed {
+            domains.push(Domain::Design);
+        }
+        if annotations_changed {
+            domains.push(Domain::Annotations);
+        }
+        if !self.changed
+            && !rdf_changed
+            && !charts_changed
+            && !design_changed
+            && !annotations_changed
+        {
             return Ok(Commit::unchanged(self.source));
         }
         let mut bytes = if self.changed {
@@ -576,10 +1096,38 @@ impl Transaction {
         } else {
             Arc::clone(&self.source.bytes)
         };
+        if self.changed {
+            let slide_candidate = Snapshot::from_shared_bytes(Arc::clone(&bytes))?;
+            if slide_candidate.slides() != self.draft.slides() {
+                return invalid("ODP transaction readback differs from the staged slide model");
+            }
+        }
+        if let Some(design) = &self.design
+            && !design.operations.is_empty()
+        {
+            if self.changed {
+                for operation in &design.operations {
+                    bytes = Arc::new(apply_design_operation(Arc::clone(&bytes), operation)?);
+                }
+            } else {
+                bytes = Arc::clone(&design.bytes);
+            }
+        }
+        if let Some(annotations) = &self.annotations
+            && !annotations.operations.is_empty()
+        {
+            if self.changed || design_changed {
+                for operation in &annotations.operations {
+                    bytes = Arc::new(apply_annotation_operation(Arc::clone(&bytes), operation)?);
+                }
+            } else {
+                bytes = Arc::clone(&annotations.bytes);
+            }
+        }
         if let Some(rdf) = &self.rdf
             && !rdf.operations.is_empty()
         {
-            if self.changed {
+            if self.changed || design_changed || annotations_changed {
                 for operation in &rdf.operations {
                     let package = OwnedPackage::from_shared_bytes(Arc::clone(&bytes))?;
                     bytes = Arc::new(apply_rdf_operation(&package, operation)?);
@@ -591,6 +1139,24 @@ impl Transaction {
                 bytes = Arc::clone(&rdf.bytes);
             }
         }
+        if let Some(charts) = &self.charts
+            && !charts.operations.is_empty()
+        {
+            if self.changed || design_changed || annotations_changed || rdf_changed {
+                for operation in &charts.operations {
+                    bytes = Arc::new(apply_chart_operation(
+                        Arc::clone(&bytes),
+                        charts.limits,
+                        operation,
+                    )?);
+                    if bytes.len() > MAX_PACKAGE_BYTES {
+                        return invalid("ODP chart transaction exceeds the 128 MiB package limit");
+                    }
+                }
+            } else {
+                bytes = Arc::clone(&charts.bytes);
+            }
+        }
         let reopened = OwnedPackage::from_shared_bytes(Arc::clone(&bytes))?;
         validate_compact_xml_parts(&reopened)?;
         self.draft.verify_embedded_media(&reopened)?;
@@ -599,13 +1165,35 @@ impl Transaction {
         {
             return invalid("ODP transaction RDF readback differs from the staged graph model");
         }
-        let snapshot = Snapshot::from_owned_package(bytes, reopened)?;
-        if snapshot.slides() != self.draft.slides() {
-            return invalid("ODP transaction readback differs from the staged slide model");
+        if let Some(charts) = &self.charts {
+            let reopened_charts =
+                crate::charts::Snapshot::from_shared_bytes(Arc::clone(&bytes), charts.limits)?;
+            if !root_charts_equal(reopened_charts.charts(), &charts.charts) {
+                return invalid("ODP transaction chart readback differs from the staged model");
+            }
         }
+        if let Some(design) = &self.design {
+            let presentation = Presentation::from_shared_bytes(Arc::clone(&bytes))?;
+            if presentation.layouts()? != design.layouts
+                || !root_masters_equal(&presentation.master_pages()?, &design.masters)
+                || !root_design_pages_equal(&presentation.pages()?, &design.pages)
+            {
+                return invalid("ODP transaction design readback differs from the staged model");
+            }
+        }
+        if let Some(annotations) = &self.annotations {
+            let presentation = Presentation::from_shared_bytes(Arc::clone(&bytes))?;
+            if !root_annotations_equal(&presentation.annotations()?, &annotations.annotations) {
+                return invalid(
+                    "ODP transaction annotation readback differs from the staged model",
+                );
+            }
+        }
+        let snapshot = Snapshot::from_owned_package(bytes, reopened)?;
         let patch = Patch {
             before: self.source,
             after: snapshot.clone(),
+            domains: Arc::from(domains),
         };
         Ok(Commit {
             snapshot,
@@ -661,6 +1249,177 @@ impl Transaction {
         }
         draft.bytes = candidate;
         draft.graphs = graphs;
+        draft.operations.push(operation);
+        Ok(())
+    }
+
+    fn ensure_charts(&mut self) -> Result<()> {
+        if self.charts.is_none() {
+            let limits = crate::charts::Limits::default();
+            let snapshot =
+                crate::charts::Snapshot::from_shared_bytes(Arc::clone(&self.source.bytes), limits)?;
+            let charts = snapshot.charts().to_vec();
+            self.charts = Some(ChartDraft {
+                bytes: Arc::clone(&self.source.bytes),
+                original: charts.clone(),
+                charts,
+                operations: Vec::new(),
+                limits,
+            });
+        }
+        Ok(())
+    }
+
+    fn chart_snapshot(&mut self) -> Result<crate::charts::Snapshot> {
+        self.ensure_charts()?;
+        let draft = self
+            .charts
+            .as_ref()
+            .ok_or_else(|| invalid_error("ODP chart draft initialization failed"))?;
+        crate::charts::Snapshot::from_shared_bytes(Arc::clone(&draft.bytes), draft.limits)
+    }
+
+    fn stage_chart(
+        &mut self,
+        bytes: Vec<u8>,
+        charts: Vec<crate::charts::Chart>,
+        operation: ChartOperation,
+    ) -> Result<()> {
+        if bytes.len() > MAX_PACKAGE_BYTES {
+            return invalid("ODP chart transaction exceeds the 128 MiB package limit");
+        }
+        let source_bytes = Arc::clone(&self.source.bytes);
+        let draft = self
+            .charts
+            .as_mut()
+            .ok_or_else(|| invalid_error("ODP chart draft initialization failed"))?;
+        if root_charts_equal(&charts, &draft.charts) {
+            return Ok(());
+        }
+        if root_charts_equal(&charts, &draft.original) {
+            draft.bytes = source_bytes;
+            draft.charts = charts;
+            draft.operations.clear();
+            return Ok(());
+        }
+        draft.bytes = Arc::new(bytes);
+        draft.charts = charts;
+        draft.operations.push(operation);
+        Ok(())
+    }
+
+    fn ensure_design(&mut self) -> Result<()> {
+        if self.design.is_none() {
+            let presentation = Presentation::from_shared_bytes(Arc::clone(&self.source.bytes))?;
+            let layouts = presentation.layouts()?;
+            let masters = presentation.master_pages()?;
+            let pages = presentation.pages()?;
+            self.design = Some(DesignDraft {
+                bytes: Arc::clone(&self.source.bytes),
+                original_layouts: layouts.clone(),
+                layouts,
+                original_masters: masters.clone(),
+                masters,
+                original_pages: pages.clone(),
+                pages,
+                operations: Vec::new(),
+            });
+        }
+        Ok(())
+    }
+
+    fn stage_design_operation(&mut self, operation: DesignOperation) -> Result<()> {
+        self.ensure_design()?;
+        let current = self
+            .design
+            .as_ref()
+            .map(|draft| Arc::clone(&draft.bytes))
+            .ok_or_else(|| invalid_error("ODP design draft initialization failed"))?;
+        let bytes = Arc::new(apply_design_operation(current, &operation)?);
+        if bytes.len() > MAX_PACKAGE_BYTES {
+            return invalid("ODP design transaction exceeds the 128 MiB package limit");
+        }
+        let presentation = Presentation::from_shared_bytes(Arc::clone(&bytes))?;
+        let layouts = presentation.layouts()?;
+        let masters = presentation.master_pages()?;
+        let pages = presentation.pages()?;
+        let source_bytes = Arc::clone(&self.source.bytes);
+        let draft = self
+            .design
+            .as_mut()
+            .ok_or_else(|| invalid_error("ODP design draft initialization failed"))?;
+        if layouts == draft.layouts
+            && root_masters_equal(&masters, &draft.masters)
+            && pages == draft.pages
+        {
+            return Ok(());
+        }
+        if layouts == draft.original_layouts
+            && root_masters_equal(&masters, &draft.original_masters)
+            && pages == draft.original_pages
+        {
+            draft.bytes = source_bytes;
+            draft.layouts = layouts;
+            draft.masters = masters;
+            draft.pages = pages;
+            draft.operations.clear();
+            return Ok(());
+        }
+        draft.bytes = bytes;
+        draft.layouts = layouts;
+        draft.masters = masters;
+        draft.pages = pages;
+        draft.operations.push(operation);
+        Ok(())
+    }
+
+    fn ensure_annotations(&mut self) -> Result<()> {
+        if self.annotations.is_none() {
+            let presentation = Presentation::from_shared_bytes(Arc::clone(&self.source.bytes))?;
+            let annotations = presentation.annotations()?;
+            self.annotations = Some(AnnotationDraft {
+                bytes: Arc::clone(&self.source.bytes),
+                original: annotations.clone(),
+                annotations,
+                operations: Vec::new(),
+            });
+        }
+        Ok(())
+    }
+
+    fn annotation_bytes(&self) -> Result<Arc<Vec<u8>>> {
+        self.annotations
+            .as_ref()
+            .map(|draft| Arc::clone(&draft.bytes))
+            .ok_or_else(|| invalid_error("ODP annotation draft initialization failed"))
+    }
+
+    fn stage_annotation(
+        &mut self,
+        bytes: Arc<Vec<u8>>,
+        operation: AnnotationOperation,
+    ) -> Result<()> {
+        if bytes.len() > MAX_PACKAGE_BYTES {
+            return invalid("ODP annotation transaction exceeds the 128 MiB package limit");
+        }
+        let presentation = Presentation::from_shared_bytes(Arc::clone(&bytes))?;
+        let annotations = presentation.annotations()?;
+        let source_bytes = Arc::clone(&self.source.bytes);
+        let draft = self
+            .annotations
+            .as_mut()
+            .ok_or_else(|| invalid_error("ODP annotation draft initialization failed"))?;
+        if annotations == draft.annotations {
+            return Ok(());
+        }
+        if annotations == draft.original {
+            draft.bytes = source_bytes;
+            draft.annotations = annotations;
+            draft.operations.clear();
+            return Ok(());
+        }
+        draft.bytes = bytes;
+        draft.annotations = annotations;
         draft.operations.push(operation);
         Ok(())
     }
@@ -737,6 +1496,7 @@ impl Commit {
         let patch = Patch {
             before: snapshot.clone(),
             after: snapshot.clone(),
+            domains: Arc::from([]),
         };
         Self {
             snapshot,
@@ -775,6 +1535,7 @@ impl Commit {
 pub struct Patch {
     before: Snapshot,
     after: Snapshot,
+    domains: Arc<[Domain]>,
 }
 
 impl Patch {
@@ -796,6 +1557,7 @@ impl Patch {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
+            domains: Arc::clone(&self.domains),
         }
     }
 
@@ -803,6 +1565,275 @@ impl Patch {
     #[must_use]
     pub fn is_noop(&self) -> bool {
         same_source(&self.before, &self.after)
+    }
+
+    /// Borrow the sorted semantic dependency domains changed by this patch.
+    #[must_use]
+    pub fn domains(&self) -> &[Domain] {
+        &self.domains
+    }
+
+    /// Produce a conservative, non-mutating join plan against another patch.
+    ///
+    /// RDF-only work is independent from other modeled domains. All edits that
+    /// can rewrite `content.xml` are conservatively reported as conflicts until
+    /// a semantic operation compositor is available.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless both patches accept the exact same source package.
+    pub fn plan_join(&self, other: &Self) -> Result<MergePlan> {
+        if !same_source(&self.before, &other.before) {
+            return invalid("ODP patch join requires an exact common source");
+        }
+        let mut conflicts = Vec::new();
+        for domain in self.domains.iter().copied() {
+            if other.domains.contains(&domain)
+                || (domain != Domain::Rdf
+                    && other
+                        .domains
+                        .iter()
+                        .any(|other_domain| *other_domain != Domain::Rdf))
+            {
+                conflicts.push(domain);
+            }
+        }
+        conflicts.sort_unstable();
+        conflicts.dedup();
+        Ok(MergePlan { conflicts })
+    }
+
+    /// Join two patch intents into a non-mutating merge plan.
+    ///
+    /// This deliberately does not publish a package: even an independent plan
+    /// must be replayed from semantic operations so neither target archive wins
+    /// by accident.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless both patches accept the exact same source package.
+    pub fn join(&self, other: &Self) -> Result<MergePlan> {
+        self.plan_join(other)
+    }
+
+    /// Plan a conservative three-way merge rooted at an exact base snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when either side was not authored against `base`.
+    pub fn plan_three_way(base: &Snapshot, left: &Self, right: &Self) -> Result<MergePlan> {
+        if !same_source(base, &left.before) || !same_source(base, &right.before) {
+            return invalid("ODP three-way merge patches do not share the supplied base");
+        }
+        left.plan_join(right)
+    }
+
+    /// Build a non-mutating three-way merge plan from an exact common base.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when either side was not authored against `base`.
+    pub fn three_way(base: &Snapshot, left: &Self, right: &Self) -> Result<MergePlan> {
+        Self::plan_three_way(base, left, right)
+    }
+
+    /// Serialize this exact reversible patch into a deterministic bounded binary envelope.
+    ///
+    /// The envelope retains both complete package artifacts so stale-source authorization and
+    /// byte-exact inversion remain available after process boundaries.
+    ///
+    /// # Errors
+    ///
+    /// Returns an allocation or size error when the bounded envelope cannot be materialized.
+    pub fn to_durable_bytes(&self) -> Result<Vec<u8>> {
+        let before_len = self.before.bytes().len();
+        let after_len = self.after.bytes().len();
+        let capacity = DURABLE_PATCH_MAGIC
+            .len()
+            .checked_add(2 + 1 + 8 + 8)
+            .and_then(|size| size.checked_add(before_len))
+            .and_then(|size| size.checked_add(after_len))
+            .ok_or_else(|| invalid_error("ODP durable patch size overflow"))?;
+        let maximum = MAX_PACKAGE_BYTES
+            .checked_mul(2)
+            .and_then(|size| size.checked_add(64))
+            .ok_or_else(|| invalid_error("ODP durable patch limit overflow"))?;
+        if capacity > maximum {
+            return invalid("ODP durable patch exceeds its package-derived size limit");
+        }
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(capacity)
+            .map_err(|source| Error::Allocation {
+                resource: "ODP durable patch envelope",
+                source,
+            })?;
+        output.extend_from_slice(DURABLE_PATCH_MAGIC);
+        output.extend_from_slice(&DURABLE_PATCH_VERSION.to_le_bytes());
+        output.push(domain_bits(&self.domains));
+        output.extend_from_slice(&u64::try_from(before_len).unwrap_or(u64::MAX).to_le_bytes());
+        output.extend_from_slice(&u64::try_from(after_len).unwrap_or(u64::MAX).to_le_bytes());
+        output.extend_from_slice(self.before.bytes());
+        output.extend_from_slice(self.after.bytes());
+        Ok(output)
+    }
+
+    /// Rehydrate a deterministic durable patch with full package validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a malformed version, unknown domain, oversized artifact, trailing
+    /// bytes, or invalid ODP source/target package.
+    pub fn from_durable_bytes(bytes: &[u8]) -> Result<Self> {
+        let header_len = DURABLE_PATCH_MAGIC.len() + 2 + 1 + 8 + 8;
+        if bytes.len() < header_len || &bytes[..DURABLE_PATCH_MAGIC.len()] != DURABLE_PATCH_MAGIC {
+            return invalid("invalid ODP durable patch magic or truncated header");
+        }
+        let mut offset = DURABLE_PATCH_MAGIC.len();
+        let version = read_u16(bytes, &mut offset)?;
+        if version != DURABLE_PATCH_VERSION {
+            return invalid(format!("unsupported ODP durable patch version {version}"));
+        }
+        let bits = *bytes
+            .get(offset)
+            .ok_or_else(|| invalid_error("truncated ODP durable patch domains"))?;
+        offset += 1;
+        let domains = domains_from_bits(bits)?;
+        let before_len = read_len(bytes, &mut offset)?;
+        let after_len = read_len(bytes, &mut offset)?;
+        if before_len > MAX_PACKAGE_BYTES || after_len > MAX_PACKAGE_BYTES {
+            return invalid("ODP durable patch contains an oversized package");
+        }
+        let expected = offset
+            .checked_add(before_len)
+            .and_then(|size| size.checked_add(after_len))
+            .ok_or_else(|| invalid_error("ODP durable patch length overflow"))?;
+        if expected != bytes.len() {
+            return invalid("ODP durable patch length does not match its envelope");
+        }
+        let before_end = offset + before_len;
+        let before = Snapshot::from_bytes(bytes[offset..before_end].to_vec())?;
+        let after = Snapshot::from_bytes(bytes[before_end..].to_vec())?;
+        Ok(Self {
+            before,
+            after,
+            domains: Arc::from(domains),
+        })
+    }
+}
+
+/// Entry- and byte-bounded undo/redo history for immutable ODP snapshots.
+pub struct History {
+    entries: Vec<Snapshot>,
+    cursor: usize,
+    max_entries: usize,
+    max_bytes: usize,
+    retained_bytes: usize,
+}
+
+impl History {
+    /// Create history rooted at one immutable snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for zero limits or a byte budget smaller than the root package.
+    pub fn new(initial: Snapshot, max_entries: usize, max_bytes: usize) -> Result<Self> {
+        if max_entries == 0 || max_bytes == 0 {
+            return invalid("ODP history limits must be positive");
+        }
+        if initial.bytes().len() > max_bytes {
+            return invalid("ODP history byte budget cannot retain its initial snapshot");
+        }
+        let retained_bytes = initial.bytes().len();
+        Ok(Self {
+            entries: vec![initial],
+            cursor: 0,
+            max_entries,
+            max_bytes,
+            retained_bytes,
+        })
+    }
+
+    /// Borrow the current immutable snapshot.
+    #[must_use]
+    pub fn current(&self) -> &Snapshot {
+        &self.entries[self.cursor]
+    }
+
+    /// Record a commit whose exact source is the current history snapshot.
+    ///
+    /// Redo entries are discarded only after source validation succeeds. Oldest
+    /// entries are evicted deterministically to enforce both configured limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a stale commit or a target package larger than the byte budget.
+    pub fn record(&mut self, commit: &Commit) -> Result<()> {
+        if !same_source(self.current(), &commit.patch.before) {
+            return invalid("ODP history commit source is not current");
+        }
+        if !commit.changed {
+            return Ok(());
+        }
+        let target_bytes = commit.snapshot.bytes().len();
+        if target_bytes > self.max_bytes {
+            return invalid("ODP history target exceeds the byte budget");
+        }
+        if self.cursor + 1 < self.entries.len() {
+            for removed in self.entries.drain(self.cursor + 1..) {
+                self.retained_bytes = self.retained_bytes.saturating_sub(removed.bytes().len());
+            }
+        }
+        self.entries.push(commit.snapshot.clone());
+        self.retained_bytes = self
+            .retained_bytes
+            .checked_add(target_bytes)
+            .ok_or_else(|| invalid_error("ODP history byte count overflow"))?;
+        self.cursor = self.entries.len() - 1;
+        while self.entries.len() > self.max_entries || self.retained_bytes > self.max_bytes {
+            let removed = self.entries.remove(0);
+            self.retained_bytes = self.retained_bytes.saturating_sub(removed.bytes().len());
+            self.cursor = self.cursor.saturating_sub(1);
+        }
+        Ok(())
+    }
+
+    /// Move to the previous retained snapshot.
+    #[must_use]
+    pub fn undo(&mut self) -> Option<&Snapshot> {
+        if self.cursor == 0 {
+            return None;
+        }
+        self.cursor -= 1;
+        Some(self.current())
+    }
+
+    /// Move to the next retained snapshot.
+    #[must_use]
+    pub fn redo(&mut self) -> Option<&Snapshot> {
+        if self.cursor + 1 >= self.entries.len() {
+            return None;
+        }
+        self.cursor += 1;
+        Some(self.current())
+    }
+
+    /// Return the number of retained immutable snapshots.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Return whether no snapshots are retained.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Return the exact package-byte accounting used by the history budget.
+    #[must_use]
+    pub const fn retained_bytes(&self) -> usize {
+        self.retained_bytes
     }
 }
 
@@ -827,6 +1858,63 @@ fn select(slides: &[Slide], selector: Selector<'_>) -> Result<Option<usize>> {
 
 fn same_source(left: &Snapshot, right: &Snapshot) -> bool {
     Arc::ptr_eq(&left.bytes, &right.bytes) || left.bytes == right.bytes
+}
+
+fn domain_bits(domains: &[Domain]) -> u8 {
+    domains.iter().fold(0u8, |bits, domain| {
+        bits | match domain {
+            Domain::Slides => 1 << 0,
+            Domain::Rdf => 1 << 1,
+            Domain::Charts => 1 << 2,
+            Domain::Design => 1 << 3,
+            Domain::Annotations => 1 << 4,
+        }
+    })
+}
+
+fn domains_from_bits(bits: u8) -> Result<Vec<Domain>> {
+    if bits & !0b1_1111 != 0 {
+        return invalid("ODP durable patch contains an unknown semantic domain");
+    }
+    let mut domains = Vec::new();
+    for (mask, domain) in [
+        (1 << 0, Domain::Slides),
+        (1 << 1, Domain::Rdf),
+        (1 << 2, Domain::Charts),
+        (1 << 3, Domain::Design),
+        (1 << 4, Domain::Annotations),
+    ] {
+        if bits & mask != 0 {
+            domains.push(domain);
+        }
+    }
+    Ok(domains)
+}
+
+fn read_u16(bytes: &[u8], offset: &mut usize) -> Result<u16> {
+    let end = offset
+        .checked_add(2)
+        .ok_or_else(|| invalid_error("ODP durable patch offset overflow"))?;
+    let value = bytes
+        .get(*offset..end)
+        .ok_or_else(|| invalid_error("truncated ODP durable patch version"))?;
+    *offset = end;
+    Ok(u16::from_le_bytes([value[0], value[1]]))
+}
+
+fn read_len(bytes: &[u8], offset: &mut usize) -> Result<usize> {
+    let end = offset
+        .checked_add(8)
+        .ok_or_else(|| invalid_error("ODP durable patch offset overflow"))?;
+    let value = bytes
+        .get(*offset..end)
+        .ok_or_else(|| invalid_error("truncated ODP durable patch length"))?;
+    *offset = end;
+    let decoded = u64::from_le_bytes([
+        value[0], value[1], value[2], value[3], value[4], value[5], value[6], value[7],
+    ]);
+    usize::try_from(decoded)
+        .map_err(|error| invalid_error(format!("ODP durable patch length is not native: {error}")))
 }
 
 fn ensure_editable_source(package: &OwnedPackage) -> Result<()> {
@@ -874,6 +1962,119 @@ fn apply_rdf_operation(package: &OwnedPackage, operation: &RdfOperation) -> Resu
             crate::rdf::move_triple(package, path, *from, *to)
         },
     }
+}
+
+fn apply_chart_operation(
+    bytes: Arc<Vec<u8>>,
+    limits: crate::charts::Limits,
+    operation: &ChartOperation,
+) -> Result<Vec<u8>> {
+    let snapshot = crate::charts::Snapshot::from_shared_bytes(bytes, limits)?;
+    let mut edit = snapshot.edit();
+    match operation {
+        ChartOperation::Replace { selector, part } => {
+            edit.replace(selector.borrowed(), part.clone())?;
+        },
+        ChartOperation::Remove { selector } => {
+            let _removed = edit.remove(selector.borrowed())?;
+        },
+        ChartOperation::Add {
+            page,
+            name,
+            storage,
+            part,
+        } => {
+            let _index = edit.add(page.borrowed(), name.clone(), *storage, part.clone())?;
+        },
+    }
+    edit.commit()
+        .map(|commit| commit.snapshot().bytes().to_vec())
+}
+
+fn root_charts_equal(left: &[crate::charts::Chart], right: &[crate::charts::Chart]) -> bool {
+    left.len() == right.len()
+        && left.iter().zip(right).all(|(left_chart, right_chart)| {
+            left_chart.frame() == right_chart.frame()
+                && left_chart.storage() == right_chart.storage()
+                && left_chart.part() == right_chart.part()
+        })
+}
+
+fn apply_design_operation(bytes: Arc<Vec<u8>>, operation: &DesignOperation) -> Result<Vec<u8>> {
+    let mut presentation = Presentation::from_shared_bytes(bytes)?;
+    match operation {
+        DesignOperation::AddLayout(layout) => presentation.add_layout(layout)?,
+        DesignOperation::ReplaceLayout(layout) => presentation.replace_page_layout(layout)?,
+        DesignOperation::RemoveLayout { name, replacement } => {
+            presentation.remove_page_layout(name, replacement.as_deref())?;
+        },
+        DesignOperation::ReorderLayouts(names) => presentation.reorder_layouts(names)?,
+        DesignOperation::AddMaster(master) => presentation.add_master_page(master)?,
+        DesignOperation::ReplaceMaster(master) => presentation.replace_master_page(master)?,
+        DesignOperation::RemoveMaster { name, replacement } => {
+            presentation.remove_master_page(name, replacement.as_deref())?;
+        },
+        DesignOperation::ReorderMasters(names) => presentation.reorder_master_pages(names)?,
+        DesignOperation::AssignSlideMaster { slide_index, name } => {
+            presentation.assign_slide_master_page(*slide_index, name.as_deref())?;
+        },
+        DesignOperation::AssignSlideLayout { slide_index, name } => {
+            presentation.assign_slide_page_layout(*slide_index, name.as_deref())?;
+        },
+    }
+    presentation.to_bytes()
+}
+
+fn root_masters_equal(left: &[crate::MasterPage], right: &[crate::MasterPage]) -> bool {
+    left.len() == right.len()
+        && left.iter().zip(right).all(|(left_master, right_master)| {
+            left_master.master_page == right_master.master_page
+                && left_master.page_layout_name == right_master.page_layout_name
+                && left_master.header_name == right_master.header_name
+                && left_master.footer_name == right_master.footer_name
+                && left_master.date_time_name == right_master.date_time_name
+        })
+}
+
+fn root_design_pages_equal(
+    actual: &crate::page::Collection,
+    expected: &crate::page::Collection,
+) -> bool {
+    expected.pages().iter().all(|expected_page| {
+        actual
+            .page(expected_page.slide_index)
+            .is_some_and(|actual_page| actual_page == expected_page)
+    })
+}
+
+fn apply_annotation_operation(
+    bytes: Arc<Vec<u8>>,
+    operation: &AnnotationOperation,
+) -> Result<Vec<u8>> {
+    let mut presentation = Presentation::from_shared_bytes(bytes)?;
+    match operation {
+        AnnotationOperation::Add { anchor, annotation } => {
+            let _index = presentation.add_annotation(anchor, annotation)?;
+        },
+        AnnotationOperation::Replace { index, annotation } => {
+            presentation.replace_annotation(*index, annotation)?;
+        },
+        AnnotationOperation::Remove { index } => presentation.remove_annotation(*index)?,
+    }
+    presentation.to_bytes()
+}
+
+fn root_annotations_equal(
+    left: &[crate::annotation::Info],
+    right: &[crate::annotation::Info],
+) -> bool {
+    left.len() == right.len()
+        && left.iter().zip(right).all(|(left_info, right_info)| {
+            left_info.index == right_info.index
+                && left_info.anchor == right_info.anchor
+                && left_info.annotation.attributes() == right_info.annotation.attributes()
+                && left_info.annotation.children() == right_info.annotation.children()
+        })
 }
 
 fn bounded_candidate(current: usize, removed: usize, added: usize, limit: usize) -> Result<usize> {

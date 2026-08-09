@@ -148,6 +148,10 @@ impl SmartArt {
     }
 
     /// Parse `SmartArt` data XML (dgm:data).
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn parse_data_xml(xml: &str) -> Result<Vec<DiagramNode>> {
         let xml = litchi_ooxml_common::mce::process_str(xml)?;
         let mut reader = Reader::from_str(xml.as_ref());
@@ -268,10 +272,6 @@ pub fn generate_smartart_data_xml(smartart: &SmartArt) -> String {
     // category from the layout definition's catLst instead, so we follow that
     // pattern and use an empty string for loCatId.
     let (lo_type_id, lo_cat_id) = match smartart.diagram_type {
-        DiagramType::List => (
-            "urn:microsoft.com/office/officeart/2005/8/layout/default",
-            "",
-        ),
         DiagramType::Process => (
             "urn:microsoft.com/office/officeart/2005/8/layout/process1",
             "",
@@ -293,7 +293,7 @@ pub fn generate_smartart_data_xml(smartart: &SmartArt) -> String {
             "urn:microsoft.com/office/officeart/2005/8/layout/pyramid1",
             "",
         ),
-        DiagramType::Picture | DiagramType::Unknown => (
+        DiagramType::List | DiagramType::Picture | DiagramType::Unknown => (
             "urn:microsoft.com/office/officeart/2005/8/layout/default",
             "",
         ),
@@ -380,8 +380,8 @@ pub fn generate_smartart_data_xml(smartart: &SmartArt) -> String {
         // One presentation point per logical node, each associated with that
         // node and using a simple bullet-enabled layout.
         for (idx, _) in smartart.nodes.iter().enumerate() {
-            let node_id = (idx + 1) as i32;
-            let pres_id = first_node_pres_id + idx as i32;
+            let node_id = index_i32(idx.saturating_add(1));
+            let pres_id = first_node_pres_id.saturating_add(index_i32(idx));
             xml.push_str(&format!(
                 r#"<dgm:pt modelId="{pres_id}" type="pres"><dgm:prSet presAssocID="{node_id}" presName="node" presStyleLbl="node0" presStyleIdx="0" presStyleCnt="1"><dgm:presLayoutVars><dgm:bulletEnabled val="1"/></dgm:presLayoutVars></dgm:prSet><dgm:spPr/></dgm:pt>"#,
             ));
@@ -394,9 +394,9 @@ pub fn generate_smartart_data_xml(smartart: &SmartArt) -> String {
         let base_partrans_id = 2000_i32;
         let base_sibtrans_id = 2100_i32;
         for (idx, _) in flat_nodes.iter().enumerate() {
-            let cxn_model_id = 100 + idx as i32;
-            let par_pt_id = base_partrans_id + idx as i32;
-            let sib_pt_id = base_sibtrans_id + idx as i32;
+            let cxn_model_id = 100_i32.saturating_add(index_i32(idx));
+            let par_pt_id = base_partrans_id.saturating_add(index_i32(idx));
+            let sib_pt_id = base_sibtrans_id.saturating_add(index_i32(idx));
 
             xml.push_str(&format!(
                 r#"<dgm:pt modelId="{par_pt_id}" type="parTrans" cxnId="{cxn_model_id}"><dgm:prSet/><dgm:spPr/></dgm:pt>"#,
@@ -417,7 +417,7 @@ pub fn generate_smartart_data_xml(smartart: &SmartArt) -> String {
     // hierarchical diagrams. We use the flattened node list and connect each
     // node to its recorded parent (0 = document root).
     for (idx, (node_id, parent_id, _)) in flat_nodes.iter().enumerate() {
-        let cxn_model_id = 100 + idx as i32;
+        let cxn_model_id = 100_i32.saturating_add(index_i32(idx));
 
         // Compute srcOrd as the index of this child among siblings with the
         // same parent.
@@ -432,8 +432,8 @@ pub fn generate_smartart_data_xml(smartart: &SmartArt) -> String {
         if has_presentation_model && node_count > 0 {
             let base_partrans_id = 2000_i32;
             let base_sibtrans_id = 2100_i32;
-            let par_pt_id = base_partrans_id + idx as i32;
-            let sib_pt_id = base_sibtrans_id + idx as i32;
+            let par_pt_id = base_partrans_id.saturating_add(index_i32(idx));
+            let sib_pt_id = base_sibtrans_id.saturating_add(index_i32(idx));
 
             xml.push_str(&format!(
                 r#"<dgm:cxn modelId="{cxn_model_id}" srcId="{parent_id}" destId="{node_id}" srcOrd="{src_ord}" destOrd="0" parTransId="{par_pt_id}" sibTransId="{sib_pt_id}"/>"#,
@@ -463,8 +463,8 @@ pub fn generate_smartart_data_xml(smartart: &SmartArt) -> String {
 
         // presOf connections: each logical node -> its presentation node.
         for (idx, (node_id, _, _)) in flat_nodes.iter().enumerate() {
-            let pres_id = first_node_pres_id + idx as i32;
-            let cxn_id = 300 + idx as i32;
+            let pres_id = first_node_pres_id.saturating_add(index_i32(idx));
+            let cxn_id = 300_i32.saturating_add(index_i32(idx));
             xml.push_str(&format!(
                 r#"<dgm:cxn modelId="{cxn_id}" type="presOf" srcId="{node_id}" destId="{pres_id}" srcOrd="0" destOrd="0" presId="{pres_layout_id}"/>"#,
             ));
@@ -473,8 +473,8 @@ pub fn generate_smartart_data_xml(smartart: &SmartArt) -> String {
         // presParOf connections: diagram presentation node -> each
         // presentation node for simple linear ordering.
         for (idx, _) in flat_nodes.iter().enumerate() {
-            let pres_id = first_node_pres_id + idx as i32;
-            let cxn_id = 500 + idx as i32;
+            let pres_id = first_node_pres_id.saturating_add(index_i32(idx));
+            let cxn_id = 500_i32.saturating_add(index_i32(idx));
             xml.push_str(&format!(
                 r#"<dgm:cxn modelId="{cxn_id}" type="presParOf" srcId="{diagram_pres_id}" destId="{pres_id}" srcOrd="{idx}" destOrd="0" presId="{pres_layout_id}"/>"#,
             ));
@@ -501,14 +501,13 @@ pub fn generate_smartart_layout_xml(smartart: &SmartArt) -> String {
     // loTypeId we emit in the root dgm:prSet so that the data model correctly
     // binds to this embedded layout definition.
     let layout_type_id = match smartart.diagram_type {
-        DiagramType::List => "urn:microsoft.com/office/officeart/2005/8/layout/default",
         DiagramType::Process => "urn:microsoft.com/office/officeart/2005/8/layout/process1",
         DiagramType::Cycle => "urn:microsoft.com/office/officeart/2005/8/layout/cycle2",
         DiagramType::Hierarchy => "urn:microsoft.com/office/officeart/2005/8/layout/orgChart1",
         DiagramType::Relationship => "urn:microsoft.com/office/officeart/2005/8/layout/venn1",
         DiagramType::Matrix => "urn:microsoft.com/office/officeart/2005/8/layout/matrix3",
         DiagramType::Pyramid => "urn:microsoft.com/office/officeart/2005/8/layout/pyramid1",
-        DiagramType::Picture | DiagramType::Unknown => {
+        DiagramType::List | DiagramType::Picture | DiagramType::Unknown => {
             "urn:microsoft.com/office/officeart/2005/8/layout/default"
         },
     };
@@ -518,14 +517,13 @@ pub fn generate_smartart_layout_xml(smartart: &SmartArt) -> String {
 
     // Category type for the layout, aligned with loCatId in the data model.
     let cat_type = match smartart.diagram_type {
-        DiagramType::List => "list",
         DiagramType::Process => "process",
         DiagramType::Cycle => "cycle",
         DiagramType::Hierarchy => "hierarchy",
         DiagramType::Relationship => "relationship",
         DiagramType::Matrix => "matrix",
         DiagramType::Pyramid => "pyramid",
-        DiagramType::Picture | DiagramType::Unknown => "list",
+        DiagramType::List | DiagramType::Picture | DiagramType::Unknown => "list",
     };
 
     // Per-diagram node geometry used in the layout tree. This controls the
@@ -534,11 +532,13 @@ pub fn generate_smartart_layout_xml(smartart: &SmartArt) -> String {
     // pyramid, etc.).
     let node_shape_type = match smartart.diagram_type {
         DiagramType::Process => "chevron",
-        DiagramType::Cycle => "ellipse",
-        DiagramType::Relationship => "ellipse",
+        DiagramType::Cycle | DiagramType::Relationship => "ellipse",
         DiagramType::Matrix => "roundRect",
         DiagramType::Pyramid => "trapezoid",
-        _ => "rect",
+        DiagramType::List
+        | DiagramType::Hierarchy
+        | DiagramType::Picture
+        | DiagramType::Unknown => "rect",
     };
 
     // Diagram types for which we provide a full SmartArt-style layout tree
@@ -699,7 +699,13 @@ pub fn generate_smartart_layout_xml(smartart: &SmartArt) -> String {
         let spacing = match smartart.diagram_type {
             DiagramType::Process => 150,
             DiagramType::Hierarchy => 200,
-            _ => 100,
+            DiagramType::List
+            | DiagramType::Cycle
+            | DiagramType::Relationship
+            | DiagramType::Matrix
+            | DiagramType::Pyramid
+            | DiagramType::Picture
+            | DiagramType::Unknown => 100,
         };
         xml.push_str(r#"<dgm:constr type="primFontSz" val="65"/>"#);
         xml.push_str(&format!(r#"<dgm:constr type="sp" val="{spacing}"/>"#));
@@ -747,11 +753,11 @@ pub fn generate_smartart_drawing_xml(
 
     // Generate shapes for each node
     let node_count = smartart.nodes.len().max(1);
-    let node_width = width / node_count as i64;
+    let node_width = width / index_i64(node_count);
     let node_height = height * 8 / 10; // 80% height
 
     for (idx, node) in smartart.nodes.iter().enumerate() {
-        let node_x = x + (idx as i64 * node_width);
+        let node_x = x + index_i64(idx).saturating_mul(node_width);
         let node_y = y + (height - node_height) / 2;
 
         // Use a numeric modelId per shape. ST_ModelId is a union of xsd:int and
@@ -773,9 +779,9 @@ pub fn generate_smartart_drawing_xml(
         let model_id: i32 = if has_presentation_model {
             let base_pres_id = 1000_i32;
             let first_node_pres_id = base_pres_id + 1;
-            first_node_pres_id + idx as i32
+            first_node_pres_id.saturating_add(index_i32(idx))
         } else {
-            (idx + 1) as i32
+            index_i32(idx.saturating_add(1))
         };
 
         xml.push_str(&format!("<dsp:sp modelId=\"{model_id}\">"));
@@ -803,7 +809,12 @@ pub fn generate_smartart_drawing_xml(
             DiagramType::Process => "chevron",
             DiagramType::Cycle => "ellipse",
             DiagramType::Hierarchy => "rect",
-            _ => "roundRect",
+            DiagramType::List
+            | DiagramType::Relationship
+            | DiagramType::Matrix
+            | DiagramType::Pyramid
+            | DiagramType::Picture
+            | DiagramType::Unknown => "roundRect",
         };
         xml.push_str(&format!(
             r#"<a:prstGeom prst="{shape_type}"><a:avLst/></a:prstGeom>"#
@@ -854,6 +865,14 @@ pub fn generate_smartart_drawing_xml(
     xml.push_str("</dsp:drawing>");
 
     xml
+}
+
+fn index_i32(value: usize) -> i32 {
+    i32::try_from(value).unwrap_or(i32::MAX)
+}
+
+fn index_i64(value: usize) -> i64 {
+    i64::try_from(value).unwrap_or(i64::MAX)
 }
 
 /// Generate `SmartArt` colors XML.

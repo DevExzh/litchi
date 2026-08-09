@@ -43,6 +43,10 @@ const OMML_NAMESPACE: &[u8] = OMML_NAMESPACE_URI.as_bytes();
 const STRICT_OMML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/math";
 
 /// Decode a numeric or predefined XML entity reference.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn decode_xml_reference(reference: &BytesRef<'_>) -> Result<String> {
     if let Some(character) = reference
         .resolve_char_ref()
@@ -94,6 +98,10 @@ pub fn is_drawingml_chart_name(
         )
 }
 
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn unqualified_attribute_value(
     element: &BytesStart<'_>,
     name: &[u8],
@@ -153,6 +161,10 @@ pub fn is_omml_name(namespace: &ResolveResult<'_>, name: QName<'_>, local_name: 
 }
 
 /// Locate exact `<oMath>` byte ranges in transitional or strict OMML XML.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn scan_omml_formula_ranges<E>(
     xml_bytes: &[u8],
     mut emit: impl FnMut(u32, u32) -> std::result::Result<(), E>,
@@ -173,8 +185,9 @@ where
     let mut capture: Option<(usize, usize)> = None;
 
     loop {
-        let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_| XmlError::Invalid("OMML offset does not fit usize".to_string()))?;
+        let event_start = usize::try_from(reader.buffer_position()).map_err(|error| {
+            XmlError::Invalid(format!("OMML offset does not fit usize: {error}"))
+        })?;
         let event = {
             let (namespace, event) = reader
                 .read_resolved_event()
@@ -191,11 +204,21 @@ where
                 },
                 Event::End(_) if capture.is_some() => ScanEvent::End,
                 Event::Eof => ScanEvent::Eof,
-                _ => ScanEvent::Other,
+                Event::Start(_)
+                | Event::End(_)
+                | Event::Empty(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => ScanEvent::Other,
             }
         };
-        let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_| XmlError::Invalid("OMML offset does not fit usize".to_string()))?;
+        let event_end = usize::try_from(reader.buffer_position()).map_err(|error| {
+            XmlError::Invalid(format!("OMML offset does not fit usize: {error}"))
+        })?;
 
         match event {
             ScanEvent::Start => capture = Some((event_start, 1)),
@@ -251,13 +274,17 @@ where
         .ok_or_else(|| XmlError::Invalid("invalid OMML formula range".to_string()))?;
     emit(
         u32::try_from(start)
-            .map_err(|_| XmlError::Invalid("OMML offset exceeds u32".to_string()))?,
+            .map_err(|error| XmlError::Invalid(format!("OMML offset exceeds u32: {error}")))?,
         u32::try_from(length)
-            .map_err(|_| XmlError::Invalid("OMML length exceeds u32".to_string()))?,
+            .map_err(|error| XmlError::Invalid(format!("OMML length exceeds u32: {error}")))?,
     )
 }
 
 /// Copy exact OMML formula XML into the string-based public API representation.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn extract_omml_formulas(xml_bytes: &[u8]) -> Result<Vec<String>> {
     let mut formulas = Vec::new();
     scan_omml_formula_ranges(xml_bytes, |start, length| {
@@ -267,16 +294,24 @@ pub fn extract_omml_formulas(xml_bytes: &[u8]) -> Result<Vec<String>> {
     Ok(formulas)
 }
 
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn omml_formula_xml(xml_bytes: &[u8], start: u32, length: u32) -> Result<String> {
-    let start = start as usize;
-    let end = start
-        .checked_add(length as usize)
-        .ok_or_else(|| XmlError::Invalid("OMML formula range overflows".to_string()))?;
+    let start = usize::try_from(start)
+        .map_err(|error| XmlError::Invalid(format!("OMML offset exceeds usize: {error}")))?;
+    let end =
+        start
+            .checked_add(usize::try_from(length).map_err(|error| {
+                XmlError::Invalid(format!("OMML length exceeds usize: {error}"))
+            })?)
+            .ok_or_else(|| XmlError::Invalid("OMML formula range overflows".to_string()))?;
     let formula = xml_bytes
         .get(start..end)
         .ok_or_else(|| XmlError::Invalid("invalid OMML formula range".to_string()))?;
     Ok(std::str::from_utf8(formula)
-        .map_err(|_| XmlError::Invalid("OMML formula is not UTF-8".to_string()))?
+        .map_err(|error| XmlError::Invalid(format!("OMML formula is not UTF-8: {error}")))?
         .to_owned())
 }
 

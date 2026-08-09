@@ -65,6 +65,10 @@ impl Coordinate {
     pub const ZERO: Self = Self(Repr::Emu(0));
 
     /// Construct a checked unqualified EMU coordinate.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub const fn emu(value: i64) -> Result<Self, ParseError> {
         if value < MIN_EMU || value > MAX_EMU {
             Err(ParseError::OutOfRange { value })
@@ -133,6 +137,10 @@ impl Extent {
     pub const ZERO: Self = Self(0);
 
     /// Construct a checked extent in EMUs.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub const fn emu(value: i64) -> Result<Self, ParseError> {
         if value < 0 || value > MAX_EMU {
             Err(ParseError::ExtentOutOfRange { value })

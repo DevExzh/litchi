@@ -7,8 +7,6 @@
 //! state. The emitted order follows the `CT_TextBody` sequence documented by
 //! [MS-ODRAWXML] and the `SpreadsheetDrawing` example in 3rdparty/specs/.
 
-use std::fmt::Write as _;
-
 use litchi_core::xml::escape::escape_xml;
 
 use super::{Body, Paragraph, Properties, Run};
@@ -32,7 +30,7 @@ pub fn write_contents(xml: &mut String, properties: &Properties, paragraphs: &[P
         for run in &paragraph.runs {
             xml.push_str("<a:r>");
             write_run_properties(xml, run);
-            let _ = write!(xml, "<a:t>{}</a:t>", escape_xml(&run.text));
+            xml.push_str(&format!("<a:t>{}</a:t>", escape_xml(&run.text)));
             xml.push_str("</a:r>");
         }
         xml.push_str("</a:p>");
@@ -41,28 +39,30 @@ pub fn write_contents(xml: &mut String, properties: &Properties, paragraphs: &[P
 
 fn write_properties(xml: &mut String, properties: &Properties) {
     xml.push_str("<a:bodyPr");
-    let _ = write!(
-        xml,
+    xml.push_str(&format!(
         r#" lIns="{}" tIns="{}" rIns="{}" bIns="{}""#,
         properties.insets.left,
         properties.insets.top,
         properties.insets.right,
         properties.insets.bottom
-    );
+    ));
     if properties.vertical_anchor != Anchor::Top {
-        let _ = write!(xml, r#" anchor="{}""#, properties.vertical_anchor.token());
+        xml.push_str(&format!(
+            r#" anchor="{}""#,
+            properties.vertical_anchor.token()
+        ));
     }
     if properties.anchor_center {
         xml.push_str(r#" anchorCtr="1""#);
     }
     if properties.direction != Direction::Horizontal {
-        let _ = write!(xml, r#" vert="{}""#, properties.direction.token());
+        xml.push_str(&format!(r#" vert="{}""#, properties.direction.token()));
     }
     if properties.wrap == Wrap::None {
         xml.push_str(r#" wrap="none""#);
     }
     if properties.column_count != Columns::ONE {
-        let _ = write!(xml, r#" numCol="{}""#, properties.column_count);
+        xml.push_str(&format!(r#" numCol="{}""#, properties.column_count));
     }
     if properties.space_first_last_paragraph {
         xml.push_str(r#" spcFirstLastPara="1""#);
@@ -85,7 +85,7 @@ fn write_run_properties(xml: &mut String, run: &Run) {
     }
     xml.push_str("<a:rPr");
     if let Some(size) = run.font_size {
-        let _ = write!(xml, r#" sz="{size}""#);
+        xml.push_str(&format!(r#" sz="{size}""#));
     }
     if let Some(bold) = run.bold {
         xml.push_str(if bold { r#" b="1""# } else { r#" b="0""# });
@@ -94,7 +94,7 @@ fn write_run_properties(xml: &mut String, run: &Run) {
         xml.push_str(if italic { r#" i="1""# } else { r#" i="0""# });
     }
     if let Some(underline) = run.underline {
-        let _ = write!(xml, r#" u="{}""#, underline.dml());
+        xml.push_str(&format!(r#" u="{}""#, underline.dml()));
     }
     xml.push_str("/>");
 }

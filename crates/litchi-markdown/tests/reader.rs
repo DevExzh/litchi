@@ -1,4 +1,7 @@
-use litchi_markdown::reader::{BlockKind, Dialect, Error, ReadLimits, Snapshot};
+use litchi_markdown::reader::{
+    BlockKind, Dialect, Error, History, HistoryLimits, InlineKind, JoinError, Patch,
+    PatchEnvelopeLimits, ReadLimits, ReferenceKind, Snapshot,
+};
 
 #[test]
 fn commonmark_block_corpus_is_classified_in_source_order() -> Result<(), Error> {
@@ -113,6 +116,247 @@ fn literal_edit_helpers_cannot_inject_markdown_blocks() -> Result<(), Error> {
         commit.snapshot().block(0).map(|block| block.kind()),
         Some(BlockKind::Paragraph)
     );
+    Ok(())
+}
+
+#[test]
+fn inline_ast_and_reference_graph_retain_exact_ranges() -> Result<(), Error> {
+    let source = "Text *em **strong** [link][id]* and `code` ![alt](img.png \"t\") <b>x</b>.[^n]\n\n[id]: /target \"title\"\n\n[^n]: note";
+    let snapshot = Snapshot::read_with(source, Dialect::GitHubFlavored, ReadLimits::DEFAULT)?;
+    let paragraph = snapshot
+        .block(0)
+        .ok_or(Error::BlockNotFound { position: 0 })?;
+    let inlines: Vec<_> = paragraph.inlines().collect();
+    assert!(
+        inlines
+            .iter()
+            .any(|inline| inline.kind() == InlineKind::Emphasis)
+    );
+    assert!(
+        inlines
+            .iter()
+            .any(|inline| inline.kind() == InlineKind::Strong)
+    );
+    assert!(
+        inlines
+            .iter()
+            .any(|inline| inline.kind() == InlineKind::Link)
+    );
+    assert!(
+        inlines
+            .iter()
+            .any(|inline| inline.kind() == InlineKind::Image)
+    );
+    assert!(
+        inlines
+            .iter()
+            .any(|inline| inline.kind() == InlineKind::Code)
+    );
+    assert!(
+        inlines
+            .iter()
+            .any(|inline| inline.kind() == InlineKind::Html)
+    );
+    for inline in inlines {
+        assert_eq!(&source[inline.range()], inline.source());
+    }
+
+    let references: Vec<_> = snapshot.references().collect();
+    assert_eq!(references.len(), 5);
+    assert!(references.iter().any(|reference| {
+        reference.kind() == ReferenceKind::Link
+            && reference.label() == Some("id")
+            && reference.destination() == Some("/target")
+    }));
+    assert!(references.iter().any(|reference| {
+        reference.kind() == ReferenceKind::Image
+            && reference.destination() == Some("img.png")
+            && reference.title() == Some("t")
+    }));
+    assert!(references.iter().any(|reference| {
+        reference.kind() == ReferenceKind::FootnoteDefinition && reference.label() == Some("n")
+    }));
+    Ok(())
+}
+
+#[test]
+fn multi_operation_edits_are_atomic_ordered_and_overlap_checked() -> Result<(), Error> {
+    let source = Snapshot::read("one\n\ntwo\n\nthree")?;
+    let mut edit = source.edit();
+    edit.replace_block(2, "THREE")?
+        .replace_block(0, "ONE")?
+        .append_block("four")?
+        .append_block("five")?;
+    let commit = edit.commit()?;
+    assert_eq!(
+        commit.snapshot().source(),
+        "ONE\n\ntwo\n\nTHREE\n\nfour\n\nfive"
+    );
+    assert_eq!(commit.patch().operation_count(), 4);
+    assert_eq!(commit.diagnostics().touched_blocks(), 4);
+
+    let mut overlap = source.edit();
+    overlap.replace_block(1, "changed")?;
+    assert!(matches!(
+        overlap.remove_block(1),
+        Err(Error::OverlappingOperation { position: 1 })
+    ));
+    Ok(())
+}
+
+#[test]
+fn referenced_definitions_require_dependency_closure() -> Result<(), Error> {
+    let source = Snapshot::read("[use][id]\n\n[id]: /old")?;
+    let mut blocked = source.edit();
+    blocked.remove_block(1)?;
+    assert!(matches!(
+        blocked.commit(),
+        Err(Error::ReferenceDependency { ref label }) if label == "id"
+    ));
+
+    let mut update = source.edit();
+    update.replace_block(1, "[id]: /new")?;
+    let updated = update.commit()?;
+    assert!(updated.snapshot().references().any(|reference| {
+        reference.kind() == ReferenceKind::Link && reference.destination() == Some("/new")
+    }));
+
+    let mut closure = source.edit();
+    closure.remove_block(0)?.remove_block(1)?;
+    assert_eq!(closure.commit()?.snapshot().source(), "\n");
+    Ok(())
+}
+
+#[test]
+fn bounded_history_is_commit_coupled_and_reversible() -> Result<(), Error> {
+    let source = Snapshot::read("one")?;
+    let mut history = History::new(
+        source.clone(),
+        HistoryLimits {
+            max_entries: 2,
+            max_patch_bytes: 1_024,
+        },
+    )?;
+    let mut edit = source.edit();
+    edit.replace_block(0, "two")?;
+    history.apply(edit.commit()?)?;
+    assert_eq!(history.current().source(), "two");
+    assert!(history.undo()?);
+    assert_eq!(history.current().source(), "one");
+    assert!(history.redo()?);
+    assert_eq!(history.current().source(), "two");
+
+    let stale = Snapshot::read("stale")?;
+    let mut stale_edit = stale.edit();
+    stale_edit.replace_block(0, "other")?;
+    assert!(matches!(
+        history.apply(stale_edit.commit()?),
+        Err(Error::PatchConflict)
+    ));
+    Ok(())
+}
+
+#[test]
+fn durable_patch_json_is_deterministic_bounded_and_semantically_verified() -> Result<(), Error> {
+    let source = Snapshot::read("one\n\ntwo")?;
+    let mut edit = source.edit();
+    edit.replace_block(0, "ONE")?.append_block("three")?;
+    let commit = edit.commit()?;
+    let limits = PatchEnvelopeLimits::DEFAULT;
+    let first = commit.patch().to_json(limits)?;
+    let second = commit.patch().to_json(limits)?;
+    assert_eq!(first, second);
+    let decoded = Patch::from_json(&first, limits)?;
+    assert_eq!(
+        source.apply(&decoded)?.snapshot().source(),
+        "ONE\n\ntwo\n\nthree"
+    );
+
+    let inverse_json = commit.patch().inverse().to_json(limits)?;
+    let inverse = Patch::from_json(&inverse_json, limits)?;
+    assert_eq!(commit.snapshot().apply(&inverse)?.snapshot(), &source);
+
+    let tampered = first.replace("\"replacement\":\"ONE\"", "\"replacement\":\"wrong\"");
+    assert!(matches!(
+        Patch::from_json(&tampered, limits),
+        Err(Error::InvalidPatchEnvelope { .. })
+    ));
+    assert!(matches!(
+        Patch::from_json(
+            &first,
+            PatchEnvelopeLimits {
+                max_json_bytes: 8,
+                ..limits
+            }
+        ),
+        Err(Error::PatchEnvelopeTooLarge { .. })
+    ));
+    Ok(())
+}
+
+#[test]
+fn independent_patch_join_reports_structured_conflicts() -> Result<(), Error> {
+    let source = Snapshot::read("one\n\ntwo\n\nthree")?;
+    let mut left_edit = source.edit();
+    left_edit
+        .replace_block(0, "ONE")?
+        .append_block("left tail")?;
+    let left = left_edit.commit()?;
+    let mut right_edit = source.edit();
+    right_edit
+        .replace_block(2, "THREE")?
+        .append_block("right tail")?;
+    let right = right_edit.commit()?;
+    let joined = left
+        .patch()
+        .join(right.patch())
+        .map_err(|join_error| match join_error {
+            JoinError::Validation(validation_error) => validation_error,
+            JoinError::Conflicts(_) => Error::PatchConflict,
+        })?;
+    assert_eq!(
+        joined.snapshot().source(),
+        "ONE\n\ntwo\n\nTHREE\n\nleft tail\n\nright tail"
+    );
+
+    let mut conflict_edit = source.edit();
+    conflict_edit.replace_block(0, "different")?;
+    let conflict_patch = conflict_edit.commit()?;
+    let conflicts = match left.patch().join(conflict_patch.patch()) {
+        Err(JoinError::Conflicts(conflicts)) => conflicts,
+        Err(JoinError::Validation(error)) => return Err(error),
+        Ok(_) => return Err(Error::PatchConflict),
+    };
+    assert_eq!(conflicts.conflicts().len(), 1);
+    assert_eq!(conflicts.conflicts()[0].position(), 0);
+    Ok(())
+}
+
+#[test]
+fn three_way_merge_plan_never_mutates_its_base() -> Result<(), Error> {
+    let base = Snapshot::read("a\n\nb\n\nc")?;
+    let mut left_edit = base.edit();
+    left_edit.replace_block(0, "A")?;
+    let left = left_edit.commit()?;
+    let mut right_edit = base.edit();
+    right_edit.replace_block(2, "C")?;
+    let right = right_edit.commit()?;
+    let plan = left.patch().plan_merge(right.patch())?;
+    assert!(plan.conflicts().is_empty());
+    assert_eq!(
+        plan.merged_commit()
+            .map(|commit| commit.snapshot().source()),
+        Some("A\n\nb\n\nC")
+    );
+    assert_eq!(base.source(), "a\n\nb\n\nc");
+
+    let mut overlap_edit = base.edit();
+    overlap_edit.replace_block(0, "other")?;
+    let overlap = overlap_edit.commit()?;
+    let conflict_plan = left.patch().plan_merge(overlap.patch())?;
+    assert!(conflict_plan.merged_commit().is_none());
+    assert_eq!(conflict_plan.conflicts().conflicts()[0].position(), 0);
+    assert_eq!(base.source(), "a\n\nb\n\nc");
     Ok(())
 }
 

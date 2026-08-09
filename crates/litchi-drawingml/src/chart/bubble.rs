@@ -62,6 +62,10 @@ impl Scale {
 
     /// Creates a checked scale percentage.
     #[inline]
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub const fn new(value: u16) -> Result<Self, ScaleError> {
         if value <= Self::MAX {
             Ok(Self(value))

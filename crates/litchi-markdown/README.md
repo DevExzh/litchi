@@ -9,6 +9,14 @@ reversible block edits, plus the `ToMarkdown` trait and configuration types
 used by Litchi's higher-level format adapters. It deliberately has no knowledge
 of any concrete document format.
 
+Snapshots expose source-ranged block and inline views plus a deterministic
+link/image/footnote reference graph. Transactions can stage multiple disjoint
+block replacements and appends, validate reference-definition dependencies,
+and publish atomically into bounded undo/redo history. Versioned JSON patches
+carry bounded, replay-verified semantic operations; independently prepared
+patches can be joined or inspected through a non-mutating three-way merge plan
+with deterministic structured conflicts.
+
 ```rust
 use litchi_markdown::reader::Snapshot;
 

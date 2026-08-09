@@ -18,6 +18,10 @@ use super::model::{
 };
 
 /// Parse a Custom XML Data Storage Properties part with bounded MCE handling.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn read_props(xml: &[u8]) -> Result<Props> {
     require_at_most("custom XML properties bytes", xml.len(), MAX_PROPS_BYTES)?;
     let mut capabilities = Capabilities::ooxml_baseline();
@@ -37,6 +41,10 @@ pub fn read_props(xml: &[u8]) -> Result<Props> {
 }
 
 /// Serialize properties in stable schema order.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn write_props(props: &Props, conformance: Conformance) -> Result<Vec<u8>> {
     validate_props(props)?;
     let output_len = props_output_len(props, conformance)?;
@@ -192,6 +200,10 @@ fn item_id_span(source: &[u8]) -> Result<Option<(usize, usize)>> {
 }
 
 /// Validate a typed properties value without serializing it.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn validate_props(props: &Props) -> Result<()> {
     if !valid_guid(&props.id) {
         return invalid(format!("custom XML itemID '{}' is not ST_Guid", props.id));
@@ -241,6 +253,10 @@ pub fn valid_guid(value: &str) -> bool {
 }
 
 /// Validate a bounded XML payload and return its expanded document-element name.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn validate_payload(xml: &[u8]) -> Result<Name> {
     require_at_most("custom XML payload bytes", xml.len(), MAX_PART_BYTES)?;
     let mut reader = NsReader::from_reader(xml);
@@ -342,8 +358,12 @@ pub fn validate_payload(xml: &[u8]) -> Result<Name> {
 }
 
 /// Validate that a Custom XML data-part content type is a well-formed XML media type.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn validate_content_type(content_type: &str) -> Result<()> {
-    let parsed = ContentType::new(content_type).map_err(|_| Error::ContentType {
+    let parsed = ContentType::new(content_type).map_err(|_error| Error::ContentType {
         expected: "a well-formed XML media type".into(),
         actual: content_type.into(),
     })?;

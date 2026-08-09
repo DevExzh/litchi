@@ -1004,8 +1004,9 @@ pub(crate) fn parse_bubble_chart<R: BufRead>(
             b"showNegBubbles" => show_negative_bubbles = parse_bool_attr(element)?,
             b"sizeRepresents" => {
                 let value = get_attr(element, b"val").unwrap_or_else(|| b"area".to_vec());
-                size = BubbleSize::from_xml(&value)
-                    .map_err(|_| invalid_attribute("chart bubble size representation", &value))?;
+                size = BubbleSize::from_xml(&value).map_err(|_error| {
+                    invalid_attribute("chart bubble size representation", &value)
+                })?;
             },
             _ => {},
         }

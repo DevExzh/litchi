@@ -69,3 +69,20 @@ fn semantic_whitespace_is_preserved_exactly() {
     .unwrap();
     assert_eq!(drawing.content_xml(), SEMANTIC_WHITESPACE_CONTENT);
 }
+
+#[test]
+fn otg_templates_are_explicit_and_preserved_across_edits() {
+    let bytes = Builder::new().build_template().unwrap();
+    assert!(Drawing::from_bytes(bytes.clone()).is_err());
+    let template = Drawing::from_template_bytes(bytes).unwrap();
+    assert!(template.is_template());
+    let mut edit = template.edit();
+    edit.add_page(Page::new("Template page")).unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.snapshot().is_template());
+    assert_eq!(commit.snapshot().pages()[0].name(), Some("Template page"));
+    let durable = commit.patch().durable().unwrap();
+    let reopened = durable.apply(template.snapshot()).unwrap();
+    assert!(reopened.is_template());
+    assert_eq!(reopened.as_bytes(), commit.snapshot().as_bytes());
+}

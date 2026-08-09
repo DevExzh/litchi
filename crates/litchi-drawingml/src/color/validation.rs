@@ -57,11 +57,16 @@ pub(super) fn parse_positive_percentage(value: &str, kind: &'static str) -> Resu
             "DrawingML {kind} cannot be negative"
         )));
     }
-    positive_percentage(value as u32, kind)
+    let value = u32::try_from(value).map_err(|error| {
+        Error::Invalid(format!(
+            "DrawingML {kind} cannot be represented as a positive percentage: {error}"
+        ))
+    })?;
+    positive_percentage(value, kind)
 }
 
 pub(super) fn parse_angle(value: &str) -> Result<i32> {
-    value.trim().parse::<i32>().map_err(|_| {
+    value.trim().parse::<i32>().map_err(|_error| {
         Error::Invalid(format!(
             "DrawingML angles must be signed 60000ths of a degree: {value:?}"
         ))
@@ -69,7 +74,7 @@ pub(super) fn parse_angle(value: &str) -> Result<i32> {
 }
 
 pub(super) fn parse_positive_angle(value: &str) -> Result<u32> {
-    let value = value.trim().parse::<u32>().map_err(|_| {
+    let value = value.trim().parse::<u32>().map_err(|_error| {
         Error::Invalid(format!(
             "DrawingML positive angles must be unsigned 60000ths of a degree: {value:?}"
         ))
@@ -112,17 +117,22 @@ fn parse_scaled(value: &str, kind: &'static str) -> Result<i32> {
         let whole = if whole.is_empty() {
             0
         } else {
-            whole.parse::<u64>().map_err(|_| {
+            whole.parse::<u64>().map_err(|_error| {
                 Error::Invalid(format!("invalid DrawingML {kind} percent: {value:?}%"))
             })?
         };
         let fraction = if fraction.is_empty() {
             0
         } else {
-            let parsed = fraction.parse::<u32>().map_err(|_| {
+            let parsed = fraction.parse::<u32>().map_err(|_error| {
                 Error::Invalid(format!("invalid DrawingML {kind} percent: {value:?}%"))
             })?;
-            parsed * 10_u32.pow(3 - fraction.len() as u32)
+            let digits = u32::try_from(fraction.len()).map_err(|error| {
+                Error::Invalid(format!(
+                    "DrawingML {kind} percent precision is invalid: {error}"
+                ))
+            })?;
+            parsed * 10_u32.pow(3 - digits)
         };
         let scaled = whole
             .checked_mul(1000)
@@ -142,7 +152,7 @@ fn parse_scaled(value: &str, kind: &'static str) -> Result<i32> {
         return Ok(signed);
     }
 
-    value.parse::<i32>().map_err(|_| {
+    value.parse::<i32>().map_err(|_error| {
         Error::Invalid(format!(
             "DrawingML {kind} must be an integer thousandth of a percent: {value:?}"
         ))
@@ -253,7 +263,11 @@ pub(crate) fn validated_fragment(xml: &[u8]) -> Result<&[u8]> {
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 

@@ -526,7 +526,12 @@ pub(super) fn validate_trendline(trendline: &Trendline) -> std::io::Result<()> {
                 "moving-average trendline period must be 2-255",
             ));
         },
-        _ => {},
+        TrendlineType::Exponential
+        | TrendlineType::Linear
+        | TrendlineType::Logarithmic
+        | TrendlineType::MovingAverage
+        | TrendlineType::Polynomial
+        | TrendlineType::Power => {},
     }
     if !matches!(trendline.trendline_type, TrendlineType::Polynomial) && trendline.order.is_some() {
         return Err(invalid_chart_input(
@@ -632,7 +637,11 @@ pub(super) fn validate_error_bar(error_bar: &ErrorBar) -> std::io::Result<()> {
         ErrorBarValueType::StdErr | ErrorBarValueType::Custom if error_bar.value.is_some() => Err(
             invalid_chart_input("standard-error and custom error bars cannot have a scalar value"),
         ),
-        _ => Ok(()),
+        ErrorBarValueType::Fixed
+        | ErrorBarValueType::Percentage
+        | ErrorBarValueType::StdDev
+        | ErrorBarValueType::StdErr
+        | ErrorBarValueType::Custom => Ok(()),
     }
 }
 

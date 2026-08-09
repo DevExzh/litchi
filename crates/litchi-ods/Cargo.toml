@@ -14,6 +14,7 @@ litchi-odf-common = { workspace = true }
 fast-float2 = { workspace = true }
 phf = { workspace = true }
 quick-xml = { workspace = true }
+serde_json = { workspace = true }
 smallvec = { workspace = true }
 
 [dev-dependencies]

@@ -19,6 +19,10 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parse and retain a bounded transform fragment.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn from_xml(xml: impl Into<Vec<u8>>) -> Result<Self> {
         let xml = xml.into();
         let value = codec::read(&xml)?;
@@ -29,8 +33,14 @@ impl Snapshot {
     }
 
     /// Create a canonical snapshot from a detached transform value.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn new(value: Transform) -> Result<Self> {
-        Self::from_xml(codec::write(&value)?)
+        let xml = codec::write(&value)?;
+        drop(value);
+        Self::from_xml(xml)
     }
 
     /// Borrow the exact source bytes retained by this snapshot.
@@ -82,6 +92,10 @@ impl Transaction {
 
     /// Replace the complete typed transform after validating its output
     /// budget.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn set(&mut self, value: Transform) -> Result<&mut Self> {
         validation::validate(&value)?;
         self.working = value;
@@ -145,6 +159,10 @@ impl Transaction {
     }
 
     /// Validate and publish the edit without changing the source snapshot.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn commit(self) -> Result<Commit> {
         validation::validate(&self.working)?;
         let xml = if self.base.value == self.working {
@@ -231,6 +249,10 @@ impl Patch {
     }
 
     /// Apply the patch only when the target has the expected semantic state.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.value != self.before {
             return Err(Error::Invalid(

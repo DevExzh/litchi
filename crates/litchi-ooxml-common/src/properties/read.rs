@@ -69,6 +69,10 @@ impl CoreProperty {
 ///
 /// Absence is valid and remains distinguishable from a present empty document.
 /// A present relationship or part that violates OPC M4.1-M4.5 fails closed.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn read(package: &OpcPackage) -> Result<Option<Props>> {
     let graph = graph::inspect(package)?;
     let Some(part_name) = graph.part else {
@@ -244,7 +248,7 @@ pub(super) fn decode(xml: &str) -> Result<(Props, Dialect)> {
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Comment(_) | Event::Decl(_) | Event::PI(_) => {},
         }
         buffer.clear();
     }
@@ -654,7 +658,7 @@ fn property_name(property: CoreProperty) -> &'static [u8] {
 fn bound_namespace<'a>(namespace: &'a ResolveResult<'a>) -> Option<&'a [u8]> {
     match namespace {
         ResolveResult::Bound(Namespace(value)) => Some(*value),
-        _ => None,
+        ResolveResult::Unbound | ResolveResult::Unknown(_) => None,
     }
 }
 

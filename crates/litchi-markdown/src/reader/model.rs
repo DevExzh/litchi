@@ -33,6 +33,8 @@ pub struct ReadLimits {
     pub max_blocks: usize,
     /// Maximum simultaneous block and inline container nesting.
     pub max_nesting_depth: usize,
+    /// Maximum structural operations in one atomic edit.
+    pub max_operations: usize,
 }
 
 impl ReadLimits {
@@ -43,6 +45,7 @@ impl ReadLimits {
         max_events: 1_000_000,
         max_blocks: 100_000,
         max_nesting_depth: 256,
+        max_operations: 10_000,
     };
 
     pub(crate) fn validate(self) -> Result<(), Error> {
@@ -52,6 +55,7 @@ impl ReadLimits {
             ("max_events", self.max_events),
             ("max_blocks", self.max_blocks),
             ("max_nesting_depth", self.max_nesting_depth),
+            ("max_operations", self.max_operations),
         ] {
             if value == 0 {
                 return Err(Error::InvalidLimit { name });
@@ -102,6 +106,55 @@ pub enum BlockKind {
     LinkDefinition,
 }
 
+/// A lossless inline-node classification in parser preorder.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum InlineKind {
+    /// Literal text; lexical escapes remain available through [`Inline::source`].
+    Text,
+    /// Emphasized content.
+    Emphasis,
+    /// Strongly emphasized content.
+    Strong,
+    /// GFM strikethrough content.
+    Strikethrough,
+    /// An inline code span.
+    Code,
+    /// A link of any supported source form.
+    Link,
+    /// An image.
+    Image,
+    /// Raw inline HTML.
+    Html,
+    /// A GFM footnote reference.
+    FootnoteReference,
+    /// A soft source line break.
+    SoftBreak,
+    /// An explicit hard line break.
+    HardBreak,
+    /// A GFM task-list checkbox marker.
+    TaskListMarker {
+        /// Whether the source marker is checked.
+        checked: bool,
+    },
+}
+
+/// A reference-graph edge or definition.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ReferenceKind {
+    /// A link destination or reference use.
+    Link,
+    /// An image destination or reference use.
+    Image,
+    /// A footnote use.
+    Footnote,
+    /// A link reference definition.
+    LinkDefinition,
+    /// A footnote definition.
+    FootnoteDefinition,
+}
+
 /// A borrowed exact-source top-level block.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Block<'snapshot> {
@@ -126,6 +179,130 @@ impl<'snapshot> Block<'snapshot> {
     #[must_use]
     pub fn source(&self) -> &'snapshot str {
         &self.source[self.record.range.clone()]
+    }
+
+    /// Iterate over inline nodes contained by this block in parser preorder.
+    #[must_use]
+    pub fn inlines(&self) -> Inlines<'snapshot> {
+        Inlines {
+            source: self.source,
+            records: self.record.inlines.iter(),
+        }
+    }
+}
+
+/// A borrowed lossless inline node.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Inline<'snapshot> {
+    source: &'snapshot str,
+    record: &'snapshot InlineRecord,
+}
+
+impl<'snapshot> Inline<'snapshot> {
+    /// Parser nesting depth relative to the containing block.
+    #[must_use]
+    pub const fn depth(&self) -> usize {
+        self.record.depth
+    }
+
+    /// Inline classification.
+    #[must_use]
+    pub const fn kind(&self) -> InlineKind {
+        self.record.kind
+    }
+
+    /// Exact byte range in the complete source.
+    #[must_use]
+    pub fn range(&self) -> Range<usize> {
+        self.record.range.clone()
+    }
+
+    /// Exact inline source including delimiters and escapes.
+    #[must_use]
+    pub fn source(&self) -> &'snapshot str {
+        &self.source[self.record.range.clone()]
+    }
+}
+
+/// Iterator over inline nodes in parser preorder.
+#[derive(Clone, Debug)]
+pub struct Inlines<'snapshot> {
+    source: &'snapshot str,
+    records: std::slice::Iter<'snapshot, InlineRecord>,
+}
+
+impl ExactSizeIterator for Inlines<'_> {}
+
+impl<'snapshot> Iterator for Inlines<'snapshot> {
+    type Item = Inline<'snapshot>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.records.next().map(|record| Inline {
+            source: self.source,
+            record,
+        })
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.records.size_hint()
+    }
+}
+
+/// A borrowed reference-graph entry.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Reference<'snapshot> {
+    record: &'snapshot ReferenceRecord,
+}
+
+impl Reference<'_> {
+    /// Resolved destination for links/images, if any.
+    #[must_use]
+    pub fn destination(&self) -> Option<&str> {
+        self.record.destination.as_deref()
+    }
+
+    /// Normalized reference or footnote label, if any.
+    #[must_use]
+    pub fn label(&self) -> Option<&str> {
+        self.record.label.as_deref()
+    }
+
+    /// Reference role.
+    #[must_use]
+    pub const fn kind(&self) -> ReferenceKind {
+        self.record.kind
+    }
+
+    /// Exact source range of this use or definition.
+    #[must_use]
+    pub fn range(&self) -> Range<usize> {
+        self.record.range.clone()
+    }
+
+    /// Optional interpreted source title.
+    #[must_use]
+    pub fn title(&self) -> Option<&str> {
+        self.record.title.as_deref()
+    }
+}
+
+/// Iterator over the source-ordered reference graph.
+#[derive(Clone, Debug)]
+pub struct References<'snapshot> {
+    records: std::slice::Iter<'snapshot, ReferenceRecord>,
+}
+
+impl ExactSizeIterator for References<'_> {}
+
+impl<'snapshot> Iterator for References<'snapshot> {
+    type Item = Reference<'snapshot>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.records.next().map(|record| Reference { record })
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.records.size_hint()
     }
 }
 
@@ -265,6 +442,14 @@ impl Snapshot {
     pub fn limits(&self) -> ReadLimits {
         self.state.limits
     }
+
+    /// Iterate over resolved uses and definitions in deterministic source order.
+    #[must_use]
+    pub fn references(&self) -> References<'_> {
+        References {
+            records: self.state.references.iter(),
+        }
+    }
 }
 
 impl fmt::Debug for Snapshot {
@@ -355,6 +540,46 @@ pub enum Error {
     /// The bounded edit already contains an operation.
     #[error("Markdown edit already has a staged operation")]
     OperationAlreadyStaged,
+    /// Two operations target the same immutable base block.
+    #[error("Markdown edit already targets block position {position}")]
+    OverlappingOperation {
+        /// Conflicting zero-based base position.
+        position: usize,
+    },
+    /// The transaction would exceed its operation budget.
+    #[error("Markdown edit operation count exceeds limit {limit}")]
+    OperationLimitExceeded {
+        /// Configured maximum.
+        limit: usize,
+    },
+    /// A referenced definition would be removed while a use remains.
+    #[error("Markdown definition '{label}' remains referenced outside the edit closure")]
+    ReferenceDependency {
+        /// Normalized link or footnote label.
+        label: String,
+    },
+    /// A bounded history cannot retain another commit.
+    #[error("Markdown history {resource} exceeds limit {limit}")]
+    HistoryLimitExceeded {
+        /// Stable bounded resource.
+        resource: &'static str,
+        /// Configured maximum.
+        limit: usize,
+    },
+    /// A durable patch envelope exceeds its caller-selected byte limit.
+    #[error("Markdown patch envelope has {actual} bytes; limit is {limit}")]
+    PatchEnvelopeTooLarge {
+        /// Observed bytes.
+        actual: usize,
+        /// Configured maximum.
+        limit: usize,
+    },
+    /// A durable patch envelope is malformed or unsupported.
+    #[error("invalid Markdown patch envelope: {reason}")]
+    InvalidPatchEnvelope {
+        /// Stable parse or version failure.
+        reason: String,
+    },
     /// Commit was requested without staging an operation.
     #[error("Markdown edit has no staged operation")]
     NoStagedOperation,
@@ -379,12 +604,30 @@ pub enum Error {
 pub(crate) struct BlockRecord {
     pub(crate) kind: BlockKind,
     pub(crate) range: Range<usize>,
+    pub(crate) inlines: Box<[InlineRecord]>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct InlineRecord {
+    pub(crate) kind: InlineKind,
+    pub(crate) range: Range<usize>,
+    pub(crate) depth: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ReferenceRecord {
+    pub(crate) kind: ReferenceKind,
+    pub(crate) range: Range<usize>,
+    pub(crate) label: Option<String>,
+    pub(crate) destination: Option<String>,
+    pub(crate) title: Option<String>,
 }
 
 #[derive(Debug)]
 pub(crate) struct State {
     pub(crate) source: Arc<str>,
     pub(crate) blocks: Box<[BlockRecord]>,
+    pub(crate) references: Box<[ReferenceRecord]>,
     pub(crate) dialect: Dialect,
     pub(crate) limits: ReadLimits,
 }

@@ -23,6 +23,10 @@ const CORE_CLOSE: &str = "</cp:coreProperties>";
 ///
 /// Existing nonstandard target paths, relationship IDs, and Strict versus
 /// Transitional dialects are retained. Returns whether package bytes changed.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn write(package: &mut OpcPackage, props: Props) -> Result<bool> {
     sync(package, &props)
 }
@@ -31,6 +35,10 @@ pub fn write(package: &mut OpcPackage, props: Props) -> Result<bool> {
 ///
 /// Absence is a successful no-op. Shared or ambiguous parts are rejected before
 /// mutation. Signatures are removed only after a real package mutation.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn clear(package: &mut OpcPackage) -> Result<bool> {
     let graph = graph::inspect(package)?;
     let Some(part_name) = graph.part else {
@@ -353,8 +361,10 @@ impl BoundedXml {
             });
         }
         let mut bytes = Vec::new();
-        bytes.try_reserve_exact(capacity).map_err(|_| {
-            Error::Invalid("core-properties XML output allocation failed".to_owned())
+        bytes.try_reserve_exact(capacity).map_err(|error| {
+            Error::Invalid(format!(
+                "core-properties XML output allocation failed: {error}"
+            ))
         })?;
         Ok(Self { bytes })
     }
@@ -380,8 +390,10 @@ impl BoundedXml {
                 actual: length,
             });
         }
-        self.bytes.try_reserve_exact(value.len()).map_err(|_| {
-            Error::Invalid("core-properties XML output allocation failed".to_owned())
+        self.bytes.try_reserve_exact(value.len()).map_err(|error| {
+            Error::Invalid(format!(
+                "core-properties XML output allocation failed: {error}"
+            ))
         })?;
         self.bytes.extend_from_slice(value);
         Ok(())
@@ -398,8 +410,9 @@ impl BoundedXml {
     }
 
     fn finish(self) -> Result<String> {
-        String::from_utf8(self.bytes)
-            .map_err(|_| Error::Invalid("core-properties XML output was not UTF-8".to_owned()))
+        String::from_utf8(self.bytes).map_err(|error| {
+            Error::Invalid(format!("core-properties XML output was not UTF-8: {error}"))
+        })
     }
 }
 

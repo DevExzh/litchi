@@ -159,7 +159,13 @@ impl<R: BufRead> ChartXmlReader<R> {
                         "{description} cannot contain a document type"
                     )));
                 },
-                _ => {},
+                Event::Empty(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::GeneralRef(_) => {},
             }
             let finished = matches!(event, Event::End(_)) && self.depth < fragment_depth;
             writer
@@ -330,7 +336,13 @@ impl<R: BufRead> ChartXmlReader<R> {
                 "chart XML has no complete chartSpace root".to_string(),
             )),
             Event::Eof => Ok(Event::Eof),
-            _ => Ok(event),
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => Ok(event),
         }
     }
 }

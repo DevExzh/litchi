@@ -1,3 +1,5 @@
+mod support;
+
 use litchi_ods::names::{Definition, Expression, Range, Scope};
 use litchi_ods::{Builder, Spreadsheet};
 
@@ -23,13 +25,12 @@ fn named_definitions_round_trip_in_order_and_scope() {
     let expression = Expression::new("TaxRate", "of:=0.2", global()).unwrap();
     let local = Range::new("Input", "$Sheet1.$C$1", sheet("Sheet1")).unwrap();
 
-    let mut builder = Builder::new().content_xml(CONTENT);
-    builder.add_range(range).unwrap();
-    builder.add_expression(expression).unwrap();
-    builder.add_range(local).unwrap();
-    let bytes = builder.build().unwrap();
-
+    let compact_content = support::compact_xml_fixture(CONTENT);
+    let bytes = support::raw_package(&[("content.xml", compact_content.as_bytes(), "text/xml")]);
     let mut spreadsheet = Spreadsheet::from_bytes(bytes).unwrap();
+    spreadsheet.add_range(range).unwrap();
+    spreadsheet.add_expression(expression).unwrap();
+    spreadsheet.add_range(local).unwrap();
     assert_eq!(
         spreadsheet
             .definitions()

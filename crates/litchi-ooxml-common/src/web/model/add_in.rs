@@ -19,6 +19,10 @@ pub struct AddIn {
 }
 
 impl AddIn {
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn new(id: impl Into<String>, reference: Reference) -> Result<Self> {
         let value = Self {
             id: id.into(),
@@ -45,11 +49,19 @@ impl AddIn {
         self
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn bind(mut self, binding: Binding) -> Result<Self> {
         self.push_binding(binding)?;
         Ok(self)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn push_binding(&mut self, binding: Binding) -> Result<&mut Self> {
         validate_binding(&binding)?;
         if self.bindings.len() >= MAX_WEB_EXTENSION_ITEMS {
@@ -73,6 +85,10 @@ impl AddIn {
         Ok(self)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn upsert_binding(&mut self, binding: Binding) -> Result<&mut Self> {
         validate_binding(&binding)?;
         if let Some(index) = self
@@ -122,11 +138,19 @@ impl AddIn {
         Some(self.bindings.remove(index))
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn prop(mut self, property: Property) -> Result<Self> {
         self.push_property(property)?;
         Ok(self)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn push_property(&mut self, property: Property) -> Result<&mut Self> {
         if self.properties.len() >= MAX_WEB_EXTENSION_ITEMS {
             return limit(
@@ -146,6 +170,10 @@ impl AddIn {
         Ok(self)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn upsert_property(&mut self, property: Property) -> Result<&mut Self> {
         require_nonempty("property name", &property.name)?;
         if let Some(index) = self
@@ -182,6 +210,10 @@ impl AddIn {
         Some(self.properties.remove(index))
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn push_reference(&mut self, reference: Reference) -> Result<&mut Self> {
         validate_store_reference(&reference)?;
         if self.alternate_references.len() >= MAX_WEB_EXTENSION_ITEMS {
@@ -203,6 +235,10 @@ impl AddIn {
         Ok(self)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn upsert_reference(&mut self, reference: Reference) -> Result<&mut Self> {
         validate_store_reference(&reference)?;
         if reference.id == self.reference.id {
@@ -280,6 +316,10 @@ impl AddIn {
         &self.reference
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn set_reference(&mut self, reference: Reference) -> Result<&mut Self> {
         validate_store_reference(&reference)?;
         if self
@@ -325,6 +365,10 @@ impl AddIn {
         self.extension_list.as_ref()
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn set_ext(&mut self, extension: ExtList) -> Result<&mut Self> {
         validate_extension_list(Some(&extension), &[ExtKind::AddIn])?;
         self.extension_list = Some(extension);

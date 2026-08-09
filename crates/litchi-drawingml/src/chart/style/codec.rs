@@ -68,6 +68,10 @@ struct Node {
 }
 
 /// Parse and validate a `cs:chartStyle` XML document.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn parse(xml: &[u8]) -> Result<Document> {
     let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
     let mut document = parse_document(processed.as_ref())?;
@@ -162,6 +166,10 @@ fn parse_document(xml: &[u8]) -> Result<Document> {
 }
 
 /// Parse and validate a `cs:colorStyle` XML document.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn parse_color(xml: &[u8]) -> Result<ColorDocument> {
     let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
     let mut document = parse_color_document(processed.as_ref())?;
@@ -176,7 +184,6 @@ fn parse_color_document(xml: &[u8]) -> Result<ColorDocument> {
     let method = required_attribute(&root, "meth", &ignorable)?.to_owned();
     check_string(&method, 256, "chart color style method")?;
     let effective_method = match method.as_str() {
-        "cycle" => ColorMethod::Cycle,
         "withinLinear" => ColorMethod::WithinLinear,
         "acrossLinear" => ColorMethod::AcrossLinear,
         "withinLinearReversed" => ColorMethod::WithinLinearReversed,
@@ -312,7 +319,7 @@ fn parse_required_reference(
         .ok_or_else(|| invalid_error(format!("missing cs:{expected}")))?;
     let index = required_attribute(node, "idx", ignorable)?
         .parse::<u32>()
-        .map_err(|_| invalid_error(format!("invalid {expected} index")))?;
+        .map_err(|_error| invalid_error(format!("invalid {expected} index")))?;
     let modifiers = modifiers(node, ignorable)?;
     reject_attributes(node, &["idx", "mods"], ignorable, expected)?;
     let (color, style_color) = parse_reference_colors(node, ignorable)?;
@@ -419,7 +426,7 @@ fn parse_marker_layout(node: &Node, ignorable: &HashSet<String>) -> Result<Marke
         .map(|value| {
             value
                 .parse::<u8>()
-                .map_err(|_| invalid_error("invalid marker size"))
+                .map_err(|_error| invalid_error("invalid marker size"))
         })
         .transpose()?;
     if size.is_some_and(|value| !(2..=72).contains(&value)) {
@@ -631,7 +638,7 @@ fn parse_tree(xml: &[u8]) -> Result<Node> {
                 return invalid("DTD and processing instructions are rejected in chart styles");
             },
             Event::Eof => break,
-            _ => {},
+            Event::Comment(_) | Event::Decl(_) | Event::GeneralRef(_) => {},
         }
     }
     if !stack.is_empty() {
@@ -830,7 +837,7 @@ fn optional_u32_attribute(
         .map(|value| {
             value
                 .parse::<u32>()
-                .map_err(|_| invalid_error(format!("invalid {} {name}", node.name)))
+                .map_err(|_error| invalid_error(format!("invalid {} {name}", node.name)))
         })
         .transpose()
 }
@@ -913,7 +920,7 @@ fn validate_hex_rgb(value: &str) -> Result<()> {
 fn validate_integer(value: &str, label: &str) -> Result<()> {
     value
         .parse::<i64>()
-        .map_err(|_| invalid_error(format!("invalid {label}")))?;
+        .map_err(|_error| invalid_error(format!("invalid {label}")))?;
     Ok(())
 }
 

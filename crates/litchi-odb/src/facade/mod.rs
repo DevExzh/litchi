@@ -97,13 +97,29 @@ impl Database {
         crate::authoring::producer_extensions(self.content_xml())
     }
 
+    /// Inventories signatures and manifest-declared encryption without
+    /// validating, decrypting, or executing protected content.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the package entries cannot be inspected.
+    pub fn protection_status(&self) -> Result<crate::ProtectionStatus> {
+        self.package.protection_status()
+    }
+
     /// Starts a source-bound unified database-front-end transaction.
     ///
     /// Connection targets, query commands, component links, and producer
     /// extensions remain inert data and are never opened or executed.
     #[must_use]
     pub fn edit(&self) -> crate::Edit<'_> {
-        crate::Edit::new(self)
+        crate::Edit::new(self, crate::EditPolicy::default())
+    }
+
+    /// Starts a unified transaction with explicit protected-package policy.
+    #[must_use]
+    pub fn edit_with_policy(&self, policy: crate::EditPolicy) -> crate::Edit<'_> {
+        crate::Edit::new(self, policy)
     }
 
     /// Consumes the snapshot and returns the raw package bytes.

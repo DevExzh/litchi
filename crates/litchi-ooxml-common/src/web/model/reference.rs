@@ -64,6 +64,10 @@ impl Reference {
     /// File-system references require a location and must be created with
     /// [`Self::file`]. Keeping the location in the constructor prevents the
     /// safe model from representing the store-less form rejected by Office.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn new(id: impl Into<String>, version: impl Into<String>, store: Store) -> Result<Self> {
         if store == Store::FileSystem {
             return invalid(
@@ -82,6 +86,10 @@ impl Reference {
     }
 
     /// Create a validated file-system reference with its required location.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn file(
         id: impl Into<String>,
         version: impl Into<String>,
@@ -99,6 +107,10 @@ impl Reference {
     }
 
     /// Add or replace the optional provider-specific location.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn location(mut self, value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         require_nonempty("reference location", &value)?;
@@ -131,12 +143,20 @@ impl Reference {
         self.extension_list.as_ref()
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn set_ext(&mut self, extension: ExtList) -> Result<&mut Self> {
         validate_extension_list(Some(&extension), &[ExtKind::AddIn])?;
         self.extension_list = Some(extension);
         Ok(self)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn with_ext(mut self, extension: ExtList) -> Result<Self> {
         self.set_ext(extension)?;
         Ok(self)
@@ -154,6 +174,10 @@ pub struct Property {
 }
 
 impl Property {
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn new(name: impl Into<String>, value: impl Into<String>) -> Result<Self> {
         let value = Self {
             name: name.into(),
@@ -220,6 +244,10 @@ pub struct Binding {
 }
 
 impl Binding {
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn new(
         id: impl Into<String>,
         kind: impl AsRef<str>,
@@ -260,12 +288,20 @@ impl Binding {
         self.extension_list.as_ref()
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn set_ext(&mut self, extension: ExtList) -> Result<&mut Self> {
         validate_extension_list(Some(&extension), &[ExtKind::AddIn])?;
         self.extension_list = Some(extension);
         Ok(self)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn with_ext(mut self, extension: ExtList) -> Result<Self> {
         self.set_ext(extension)?;
         Ok(self)

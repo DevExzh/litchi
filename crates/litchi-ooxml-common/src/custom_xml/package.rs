@@ -16,6 +16,10 @@ use super::snapshot::{PartState, Snapshot};
 use super::validation;
 
 /// Discover and validate every explicit Custom XML Data Storage relationship.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn discover(package: &OpcPackage) -> Result<Vec<Item>> {
     let mut items = Vec::new();
     scan(
@@ -59,6 +63,10 @@ pub fn discover(package: &OpcPackage) -> Result<Vec<Item>> {
 /// All fallible graph and XML work happens before package mutation. Defensive
 /// rollback also covers an unexpected insertion or relationship failure, so an
 /// error never exposes a partially-created Custom XML item.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn add(package: &mut OpcPackage, item: NewItem) -> Result<()> {
     validate_content_type(&item.content_type)?;
     validate_payload(&item.xml)?;

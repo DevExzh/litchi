@@ -15,7 +15,7 @@
 use litchi_core::sheet::traits::WorkbookTrait;
 use litchi_xlsb::{
     Workbook,
-    cell_values::{CellError, Reference, StyleIndex, Value},
+    cell_values::{CellError, CellFormula, Reference, StyleIndex, Value},
 };
 use std::fs::File;
 use std::io::Cursor;
@@ -235,6 +235,145 @@ fn real_fixture_style_index_edit_is_contextually_validated() {
             .expect("edited cell")
             .style(),
         replacement
+    );
+}
+
+#[test]
+fn real_fixture_structural_crud_and_length_changing_formula_and_string_reopen() {
+    let mut workbook =
+        Workbook::new(File::open(fixture("test-data/ooxml/xlsb/Simple.xlsb")).expect("fixture"))
+            .expect("workbook");
+    let sheet = 0;
+    let string_ref = Reference::new(10_000, 100).expect("string reference");
+    let formula_ref = Reference::new(10_000, 101).expect("formula reference");
+    let before = workbook.cell_values(sheet).expect("snapshot");
+    assert!(before.cell(string_ref).expect("string lookup").is_none());
+    assert!(before.cell(formula_ref).expect("formula lookup").is_none());
+
+    let mut create = before.edit();
+    create
+        .insert(
+            string_ref,
+            StyleIndex::new(0).expect("style"),
+            Value::InlineString("short".to_string()),
+        )
+        .expect("insert string");
+    create
+        .insert_formula(
+            formula_ref,
+            StyleIndex::new(0).expect("style"),
+            Value::FormulaNumberCache(2.0),
+            CellFormula::new(0, vec![0x1E, 2, 0], vec![]).expect("integer formula"),
+        )
+        .expect("insert formula");
+    let created = create.commit().expect("create commit");
+    workbook
+        .apply_cell_values(sheet, &created)
+        .expect("create publication");
+
+    let mut change = workbook
+        .edit_cell_values(sheet)
+        .expect("edit created cells");
+    change
+        .set_inline_string(
+            string_ref,
+            "a substantially longer inline value".to_string(),
+        )
+        .expect("length-changing string");
+    let mut number_formula = vec![0x1F];
+    number_formula.extend_from_slice(&3.5_f64.to_le_bytes());
+    change
+        .set_formula(
+            formula_ref,
+            CellFormula::new(0x0002, number_formula, vec![]).expect("number formula"),
+        )
+        .expect("length-changing formula tokens");
+    change
+        .set_formula_number_cache(formula_ref, 3.5)
+        .expect("formula cache");
+    let changed = change.commit().expect("change commit");
+    workbook
+        .apply_cell_values(sheet, &changed)
+        .expect("change publication");
+
+    let mut bytes = Cursor::new(Vec::new());
+    workbook.save(&mut bytes).expect("save changed workbook");
+    let mut reopened = Workbook::new(Cursor::new(bytes.into_inner())).expect("reopen changed");
+    let snapshot = reopened.cell_values(sheet).expect("changed snapshot");
+    assert_eq!(
+        snapshot
+            .cell(string_ref)
+            .expect("lookup")
+            .expect("string")
+            .value(),
+        &Value::InlineString("a substantially longer inline value".to_string())
+    );
+    assert_eq!(
+        snapshot
+            .cell(formula_ref)
+            .expect("lookup")
+            .expect("formula")
+            .value(),
+        &Value::FormulaNumberCache(3.5)
+    );
+
+    let mut remove = snapshot.edit();
+    remove.remove(string_ref).expect("remove string");
+    remove.remove(formula_ref).expect("remove formula");
+    let removed = remove.commit().expect("remove commit");
+    reopened
+        .apply_cell_values(sheet, &removed)
+        .expect("remove publication");
+    let mut bytes = Cursor::new(Vec::new());
+    reopened.save(&mut bytes).expect("save removed workbook");
+    let final_workbook = Workbook::new(Cursor::new(bytes.into_inner())).expect("final reopen");
+    let final_snapshot = final_workbook.cell_values(sheet).expect("final snapshot");
+    assert!(final_snapshot.cell(string_ref).expect("lookup").is_none());
+    assert!(final_snapshot.cell(formula_ref).expect("lookup").is_none());
+}
+
+#[test]
+fn real_fixture_publication_rejects_missing_style_and_shared_string_dependencies() {
+    let workbook =
+        Workbook::new(File::open(fixture("test-data/ooxml/xlsb/Simple.xlsb")).expect("fixture"))
+            .expect("workbook");
+    let sheet = 0;
+    let reference = Reference::new(10_001, 100).expect("reference");
+
+    let mut invalid_style_workbook =
+        Workbook::new(File::open(fixture("test-data/ooxml/xlsb/Simple.xlsb")).expect("fixture"))
+            .expect("workbook");
+    let mut invalid_style = workbook.edit_cell_values(sheet).expect("edit");
+    invalid_style
+        .insert(
+            reference,
+            StyleIndex::new(0x00FF_FFFF).expect("wire style"),
+            Value::Number(1.0),
+        )
+        .expect("insert");
+    let commit = invalid_style.commit().expect("worksheet commit");
+    assert!(
+        invalid_style_workbook
+            .apply_cell_values(sheet, &commit)
+            .is_err()
+    );
+
+    let mut invalid_shared_workbook =
+        Workbook::new(File::open(fixture("test-data/ooxml/xlsb/Simple.xlsb")).expect("fixture"))
+            .expect("workbook");
+    let mut invalid_shared = workbook.edit_cell_values(sheet).expect("edit");
+    invalid_shared
+        .insert(
+            reference,
+            StyleIndex::new(0).expect("style"),
+            Value::SharedStringIndex(u32::MAX),
+        )
+        .expect("insert");
+    let commit = invalid_shared.commit().expect("worksheet commit");
+    assert!(
+        invalid_shared_workbook
+            .apply_cell_values(sheet, &commit)
+            .is_err()
     );
 }
 

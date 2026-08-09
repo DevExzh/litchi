@@ -16,11 +16,19 @@ const MAX_PART_NAME_BYTES: usize = 64 * 1024 * 1024;
 const MAX_IMAGE_GC_EDGES: usize = 262_144;
 
 /// Read both Ribbon family slots with safe default limits.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn load(package: &OpcPackage) -> Result<Set<'_>> {
     load_with(package, &Limits::standard())
 }
 
 /// Read both Ribbon family slots with explicit resource limits.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn load_with<'a>(package: &'a OpcPackage, limits: &Limits) -> Result<Set<'a>> {
     let mut scanned = 0usize;
     reject_part_sourced_ribbons(package, &mut scanned)?;
@@ -60,11 +68,19 @@ pub fn load_with<'a>(package: &'a OpcPackage, limits: &Limits) -> Result<Set<'a>
 ///
 /// The XML allocation is moved into the OPC part. A byte-identical update is
 /// a true no-op and preserves package signatures. Input must be UTF-8 XML.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn put(package: &mut OpcPackage, version: Version, xml: Vec<u8>) -> Result<()> {
     put_with(package, version, xml, &Limits::standard())
 }
 
 /// Create or replace one Ribbon family using explicit resource limits.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn put_with(
     package: &mut OpcPackage,
     version: Version,
@@ -138,6 +154,10 @@ pub fn put_with(
 /// The complete deletion plan is resolved before mutation. Shared Ribbon or
 /// image parts remain in the package. An absent family returns `Ok(false)` and
 /// preserves signatures.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn remove(package: &mut OpcPackage, family: Family) -> Result<bool> {
     let (relationship_id, ribbon_part, images) = {
         let ribbons = load(package)?;

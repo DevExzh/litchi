@@ -1,7 +1,6 @@
 #![allow(
-    clippy::shadow_reuse,
     clippy::unwrap_used,
-    reason = "tests use staged state names and panic on unexpected errors for concise assertions"
+    reason = "tests panic on unexpected errors for concise assertions"
 )]
 
 use litchi_odc::{

@@ -1,10 +1,7 @@
 //! Immutable master-document package ownership.
 
 use litchi_core::{Error, Metadata, Result};
-use litchi_odf_common::{
-    compact_xml,
-    core::{OwnedPackage, PackageWriter, family::Package},
-};
+use litchi_odf_common::core::{OwnedPackage, PackageWriter, family::Package};
 use std::{path::Path, sync::Arc};
 
 pub(crate) const MIMETYPE: &str = "application/vnd.oasis.opendocument.text-master";
@@ -18,6 +15,12 @@ struct State {
     semantics: crate::codec::Semantics,
     styles: Vec<crate::style::Definition>,
     resources: crate::resource::Graph,
+}
+
+pub(crate) struct ResourceWrite {
+    pub(crate) path: String,
+    pub(crate) media_type: String,
+    pub(crate) bytes: Vec<u8>,
 }
 
 /// An immutable, validated package snapshot.
@@ -88,47 +91,86 @@ impl Snapshot {
     }
 
     pub(crate) fn with_meta_xml(&self, meta_xml: &str) -> Result<Self> {
-        compact_xml::validate(meta_xml.as_bytes()).map_err(Error::from)?;
-        self.rebuild(self.content_xml(), Some(meta_xml))
+        self.rebuild(self.content_xml(), None, Some(meta_xml), &[], &[])
     }
 
     pub(crate) fn with_content_xml(&self, content_xml: &str) -> Result<Self> {
-        compact_xml::validate(content_xml.as_bytes()).map_err(Error::from)?;
-        self.rebuild(content_xml, None)
+        self.rebuild(content_xml, None, None, &[], &[])
     }
 
-    pub(crate) fn with_parts(
+    pub(crate) fn with_transaction_parts(
         &self,
         content_xml: &str,
+        replacement_styles_xml: Option<&str>,
         replacement_meta_xml: Option<&str>,
+        removed_resources: &[String],
+        resource_writes: &[ResourceWrite],
     ) -> Result<Self> {
-        compact_xml::validate(content_xml.as_bytes()).map_err(Error::from)?;
-        if let Some(meta_xml) = replacement_meta_xml {
-            compact_xml::validate(meta_xml.as_bytes()).map_err(Error::from)?;
-        }
-        self.rebuild(content_xml, replacement_meta_xml)
+        self.rebuild(
+            content_xml,
+            replacement_styles_xml,
+            replacement_meta_xml,
+            removed_resources,
+            resource_writes,
+        )
     }
 
-    fn rebuild(&self, content_xml: &str, replacement_meta_xml: Option<&str>) -> Result<Self> {
+    fn rebuild(
+        &self,
+        content_xml: &str,
+        replacement_styles_xml: Option<&str>,
+        replacement_meta_xml: Option<&str>,
+        removed_resources: &[String],
+        resource_writes: &[ResourceWrite],
+    ) -> Result<Self> {
         let archive = self.0.package.package();
-        ensure_editable_xml(archive, &self.files()?)?;
+        ensure_editable(archive, &self.files()?)?;
         let mut writer = PackageWriter::new_bounded(MAX_OUTPUT_BYTES);
         writer.set_mimetype(MIMETYPE)?;
-        add_preserving_media_type(&mut writer, archive, "content.xml", content_xml.as_bytes())?;
-        if let Some(styles_xml) = self.styles_xml() {
-            add_preserving_media_type(&mut writer, archive, "styles.xml", styles_xml.as_bytes())?;
-        }
-        if let Some(meta_xml) = replacement_meta_xml {
-            add_preserving_media_type(&mut writer, archive, "meta.xml", meta_xml.as_bytes())?;
-        } else if archive.has_file("meta.xml")? {
+        let compact_content = crate::codec::compact_source_xml(content_xml)?;
+        add_preserving_media_type(
+            &mut writer,
+            archive,
+            "content.xml",
+            compact_content.as_bytes(),
+        )?;
+        if let Some(styles_xml) = replacement_styles_xml.or_else(|| self.styles_xml()) {
+            let compact_styles = crate::codec::compact_source_xml(styles_xml)?;
             add_preserving_media_type(
                 &mut writer,
                 archive,
-                "meta.xml",
-                &archive.get_file("meta.xml")?,
+                "styles.xml",
+                compact_styles.as_bytes(),
             )?;
         }
-        writer.copy_auxiliary_files_from(archive)?;
+        if let Some(meta_xml) = replacement_meta_xml {
+            let compact_meta = crate::codec::compact_source_xml(meta_xml)?;
+            add_preserving_media_type(&mut writer, archive, "meta.xml", compact_meta.as_bytes())?;
+        } else if archive.has_file("meta.xml")? {
+            let source_meta =
+                String::from_utf8(archive.get_file("meta.xml")?).map_err(|error| {
+                    Error::InvalidFormat(format!("ODM meta.xml is not UTF-8: {error}"))
+                })?;
+            let compact_meta = crate::codec::compact_source_xml(&source_meta)?;
+            add_preserving_media_type(&mut writer, archive, "meta.xml", compact_meta.as_bytes())?;
+        }
+        let mut excluded = Vec::new();
+        excluded
+            .try_reserve(
+                removed_resources
+                    .len()
+                    .saturating_add(resource_writes.len()),
+            )
+            .map_err(|source| Error::Allocation {
+                resource: "ODM resource exclusions",
+                source,
+            })?;
+        excluded.extend_from_slice(removed_resources);
+        excluded.extend(resource_writes.iter().map(|write| write.path.clone()));
+        writer.copy_auxiliary_files_from_except(archive, &excluded, &[])?;
+        for write in resource_writes {
+            writer.add_file_with_media_type(&write.path, &write.bytes, &write.media_type)?;
+        }
         Self::from_bytes(writer.finish_to_bounded_bytes()?)
     }
 
@@ -170,9 +212,17 @@ impl Snapshot {
     pub(crate) fn resources(&self) -> &crate::resource::Graph {
         &self.0.resources
     }
+
+    pub(crate) fn resource_bytes(&self, path: &str) -> Result<Vec<u8>> {
+        self.0.package.package().get_file(path)
+    }
+
+    pub(crate) fn local_section_references(&self) -> &[(String, std::ops::Range<usize>)] {
+        self.0.semantics.local_section_references()
+    }
 }
 
-fn ensure_editable_xml(archive: &OwnedPackage, files: &[String]) -> Result<()> {
+fn ensure_editable(archive: &OwnedPackage, files: &[String]) -> Result<()> {
     let package = archive.package()?;
     if package.manifest().has_encrypted_entries() {
         return Err(Error::Unsupported(
@@ -188,20 +238,6 @@ fn ensure_editable_xml(archive: &OwnedPackage, files: &[String]) -> Result<()> {
         return Err(Error::Unsupported(
             "ODM package edits refuse signed packages".to_string(),
         ));
-    }
-    for path in files {
-        let xml_media_type = package
-            .manifest()
-            .get_entry(path)
-            .is_some_and(|entry| entry.media_type.contains("xml"));
-        if Path::new(path)
-            .extension()
-            .is_some_and(|extension| extension.eq_ignore_ascii_case("xml"))
-            || path.ends_with(".rdf")
-            || xml_media_type
-        {
-            compact_xml::validate(&archive.get_file(path)?).map_err(Error::from)?;
-        }
     }
     Ok(())
 }

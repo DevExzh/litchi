@@ -48,11 +48,19 @@ impl Pane {
         self
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn width(mut self, width: f64) -> Result<Self> {
         self.set_width(width)?;
         Ok(self)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn set_width(&mut self, width: f64) -> Result<&mut Self> {
         if !width.is_finite() || width <= 0.0 {
             return invalid("task-pane width must be finite and positive".into());
@@ -61,11 +69,19 @@ impl Pane {
         Ok(self)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn dock(mut self, state: impl AsRef<str>) -> Result<Self> {
         self.set_dock(state)?;
         Ok(self)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn set_dock(&mut self, state: impl AsRef<str>) -> Result<&mut Self> {
         self.dock_state = Dock::parse(state.as_ref())?;
         Ok(self)
@@ -82,6 +98,10 @@ impl Pane {
     }
 
     /// Attach an embedded image using shared storage and a semantic part name.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn embed(
         mut self,
         part_name: impl AsRef<str>,
@@ -93,6 +113,10 @@ impl Pane {
     }
 
     /// Attach or replace the embedded image in place.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn set_image(
         &mut self,
         part_name: impl AsRef<str>,
@@ -147,12 +171,20 @@ impl Pane {
     }
 
     /// Retain an external image link without resolving or contacting it.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn linked(mut self, target: impl Into<String>) -> Result<Self> {
         self.set_external_link(target)?;
         Ok(self)
     }
 
     /// Attach or replace an inert external image link in place.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn set_external_link(&mut self, target: impl Into<String>) -> Result<&mut Self> {
         let target = target.into();
         validate_external_uri_reference(&target)?;
@@ -186,6 +218,10 @@ impl Pane {
     }
 
     /// Attach an internal linked image without exposing its relationship ID.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn linked_image(
         mut self,
         part_name: impl AsRef<str>,
@@ -197,6 +233,10 @@ impl Pane {
     }
 
     /// Attach or replace an internal linked image in place.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn set_linked_image(
         &mut self,
         part_name: impl AsRef<str>,
@@ -267,16 +307,28 @@ impl Pane {
     }
 
     /// Append one validated `DrawingML` effect.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn effect(mut self, effect: Effect) -> Result<Self> {
         self.push_effect(effect)?;
         Ok(self)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn push_effect(&mut self, effect: Effect) -> Result<&mut Self> {
         self.snapshot_mut().push_effect(effect)?;
         Ok(self)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn replace_effect(&mut self, index: usize, effect: Effect) -> Result<Option<Effect>> {
         let Some(snapshot) = self.add_in.snapshot.as_mut() else {
             return Ok(None);
@@ -450,6 +502,10 @@ impl Pane {
         self.extension_list.as_ref()
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn set_ext(&mut self, extension: ExtList) -> Result<&mut Self> {
         validate_extension_list(Some(&extension), &[ExtKind::TaskPane])?;
         self.extension_list = Some(extension);

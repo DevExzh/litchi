@@ -2,15 +2,10 @@
 
 use litchi_core::{Error, Metadata, Result};
 use litchi_odf_common::core::family::Package;
-use std::{
-    io::{Cursor, Write},
-    path::Path,
-    sync::Arc,
-};
+use std::{path::Path, sync::Arc};
 
 pub(crate) const MIMETYPE: &str = litchi_odf_common::constants::ODF_DATABASE;
 const BODY_MARKER: &str = "<";
-const MAX_OUTPUT_BYTES: usize = 256 * 1024 * 1024;
 
 struct State {
     package: Package,
@@ -54,6 +49,22 @@ impl Snapshot {
         self.0.package.files()
     }
 
+    pub(crate) fn protection_status(&self) -> Result<crate::ProtectionStatus> {
+        let files = self.files()?;
+        let signed = files.iter().any(|path| {
+            let lower = path.to_ascii_lowercase();
+            lower.starts_with("meta-inf/") && lower.contains("signatures")
+        });
+        let encrypted = self
+            .0
+            .package
+            .package()
+            .package()?
+            .manifest()
+            .has_encrypted_entries();
+        Ok(crate::ProtectionStatus::new(signed, encrypted))
+    }
+
     pub(crate) fn into_bytes(self) -> Vec<u8> {
         match Arc::try_unwrap(self.0) {
             Ok(state) => state.package.into_bytes(),
@@ -78,48 +89,7 @@ impl Snapshot {
         // is therefore lossless input, not generated output that needs the
         // fresh-authoring compactness gate.
         crate::codec::validate(content)?;
-        Self::from_bytes(rebuild_archive(self.as_bytes(), content)?)
+        let bytes = super::splice::rebuild_content(self.0.package.package(), content)?;
+        Self::from_bytes(bytes)
     }
-}
-
-fn rebuild_archive(source: &[u8], content: &str) -> Result<Vec<u8>> {
-    let mut archive = zip::ZipArchive::new(Cursor::new(source))
-        .map_err(|error| Error::ZipError(error.to_string()))?;
-    let mut output = Cursor::new(Vec::new());
-    {
-        let mut writer = zip::ZipWriter::new(&mut output);
-        for index in 0..archive.len() {
-            let file = archive
-                .by_index_raw(index)
-                .map_err(|error| Error::ZipError(error.to_string()))?;
-            if file.name() == "content.xml" {
-                let mut options =
-                    zip::write::SimpleFileOptions::default().compression_method(file.compression());
-                if let Some(mode) = file.unix_mode() {
-                    options = options.unix_permissions(mode);
-                }
-                if let Some(modified) = file.last_modified() {
-                    options = options.last_modified_time(modified);
-                }
-                writer
-                    .start_file("content.xml", options)
-                    .and_then(|()| writer.write_all(content.as_bytes()).map_err(Into::into))
-                    .map_err(|error: zip::result::ZipError| Error::ZipError(error.to_string()))?;
-            } else {
-                writer
-                    .raw_copy_file(file)
-                    .map_err(|error| Error::ZipError(error.to_string()))?;
-            }
-        }
-        writer
-            .finish()
-            .map_err(|error| Error::ZipError(error.to_string()))?;
-    }
-    let bytes = output.into_inner();
-    if bytes.len() > MAX_OUTPUT_BYTES {
-        return Err(Error::InvalidFormat(
-            "ODB rebuilt package exceeds the output limit".to_string(),
-        ));
-    }
-    Ok(bytes)
 }

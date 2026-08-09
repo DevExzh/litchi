@@ -122,6 +122,166 @@ fn document_patch_publishes_atomically_and_reopens() {
 }
 
 #[test]
+fn durable_document_patch_preserves_hyperlink_graph_and_reopens_exactly() {
+    let source_xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>multi</w:t></w:r><w:r><w:t> run</w:t></w:r></w:p><w:p><w:hyperlink r:id="rIdHyper" w:tooltip="kept"><w:r><w:rPr><w:u/></w:rPr><w:t>linked</w:t></w:r></w:hyperlink></w:p><w:tbl><w:tr><w:tc><w:tcPr><w:shd w:fill="FFFF00"/></w:tcPr><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:sectPr/></w:body></w:document>"#;
+    let document_uri = PackURI::new("/word/document.xml").unwrap();
+    let mut package = Package::new().unwrap();
+    package
+        .edit_opc(|opc| {
+            let main = opc.get_part_mut(&document_uri)?;
+            main.set_blob(source_xml.to_vec());
+            main.rels_mut().try_add_relationship(
+                litchi_opc::constants::relationship_type::HYPERLINK.to_owned(),
+                "https://example.invalid/preserved".to_owned(),
+                "rIdHyper".to_owned(),
+                TargetMode::External,
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let relationships_before = document_relationship_inventory(&package);
+
+    let source = package.document_snapshot().unwrap();
+    let mut edit = source.edit();
+    edit.replace_paragraph_text(litchi_core::Position::new(0), "changed multi run")
+        .unwrap()
+        .replace_hyperlink_text(
+            litchi_core::Position::new(1),
+            litchi_core::Position::new(0),
+            "changed link",
+        )
+        .unwrap()
+        .replace_table_cell_text(
+            litchi_core::Position::new(0),
+            litchi_core::Position::new(0),
+            litchi_core::Position::new(0),
+            "changed cell",
+        )
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let limits = litchi_core::patch::PatchLimits::new(
+        litchi_core::patch::BlobLimits::new(1, 1024 * 1024, 1024 * 1024),
+        2 * 1024 * 1024,
+        16,
+        8,
+        64 * 1024,
+        1024 * 1024,
+    );
+    let durable = commit.patch().to_durable(limits).unwrap();
+    let wire = durable.to_deterministic_json().unwrap();
+    let decoded =
+        litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+            &wire, limits,
+        )
+        .unwrap();
+
+    let published = package.apply_durable_document_patch(&decoded).unwrap();
+    assert_eq!(published.xml_bytes(), commit.snapshot().xml_bytes());
+    assert_eq!(
+        document_relationship_inventory(&package),
+        relationships_before
+    );
+
+    let mut output = Cursor::new(Vec::new());
+    package.to_plain_stream(&mut output).unwrap();
+    let mut reopened = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    assert_eq!(
+        reopened.document_snapshot().unwrap().xml_bytes(),
+        commit.snapshot().xml_bytes()
+    );
+    assert_eq!(
+        document_relationship_inventory(&reopened),
+        relationships_before
+    );
+
+    reopened
+        .apply_durable_document_patch(&decoded.inverse())
+        .unwrap();
+    assert_eq!(
+        reopened.opc.main_document_part().unwrap().blob(),
+        source_xml
+    );
+    assert_eq!(
+        document_relationship_inventory(&reopened),
+        relationships_before
+    );
+}
+
+#[test]
+fn durable_hyperlink_edit_round_trips_real_open_xml_sdk_fixture() {
+    let fixture = include_bytes!(
+        "../../../../../3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/Hyperlink.docx"
+    );
+    let mut package = Package::from_reader(Cursor::new(fixture.as_slice())).unwrap();
+    let relationships_before = document_relationship_inventory(&package);
+    let source = package.document_snapshot().unwrap();
+    let mut selected = None;
+    'paragraphs: for paragraph in 0..source.paragraph_count() {
+        for hyperlink in 0..16 {
+            let mut edit = source.edit();
+            if edit
+                .replace_hyperlink_text(
+                    litchi_core::Position::new(paragraph),
+                    litchi_core::Position::new(hyperlink),
+                    "fixture hyperlink edited",
+                )
+                .is_ok()
+            {
+                selected = Some(edit.commit().unwrap());
+                break 'paragraphs;
+            }
+        }
+    }
+    let commit = selected.expect("fixture must contain one directly editable hyperlink");
+    let limits = litchi_core::patch::PatchLimits::new(
+        litchi_core::patch::BlobLimits::new(1, 4 * 1024 * 1024, 4 * 1024 * 1024),
+        8 * 1024 * 1024,
+        32,
+        8,
+        64 * 1024,
+        4 * 1024 * 1024,
+    );
+    let durable = commit.patch().to_durable(limits).unwrap();
+    package.apply_durable_document_patch(&durable).unwrap();
+    assert_eq!(
+        document_relationship_inventory(&package),
+        relationships_before
+    );
+
+    package
+        .apply_durable_document_patch(&durable.inverse())
+        .unwrap();
+    assert_eq!(
+        package.document_snapshot().unwrap().xml_bytes(),
+        source.xml_bytes()
+    );
+    assert_eq!(
+        document_relationship_inventory(&package),
+        relationships_before
+    );
+}
+
+fn document_relationship_inventory(package: &Package) -> Vec<(String, String, String, bool)> {
+    let mut relationships = package
+        .opc
+        .main_document_part()
+        .unwrap()
+        .rels()
+        .iter()
+        .map(|relationship| {
+            (
+                relationship.r_id().to_owned(),
+                relationship.reltype().to_owned(),
+                relationship.target_ref().to_owned(),
+                relationship.target_mode() == TargetMode::External,
+            )
+        })
+        .collect::<Vec<_>>();
+    relationships.sort();
+    relationships
+}
+
+#[test]
 fn failed_stream_keeps_document_and_properties_retryable() {
     let mut package = Package::new().unwrap();
     package

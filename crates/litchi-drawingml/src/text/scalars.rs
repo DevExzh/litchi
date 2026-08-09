@@ -26,6 +26,10 @@ impl Coordinate32 {
     }
 
     /// Construct an exact physical measurement.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn measure(number: &str, unit: Unit) -> Result<Self, ParseError> {
         Ok(Self(Coordinate::measure(number, unit)?))
     }
@@ -105,7 +109,7 @@ impl TryFrom<i64> for Coordinate32 {
     type Error = ParseError;
 
     fn try_from(value: i64) -> Result<Self, Self::Error> {
-        let narrowed = i32::try_from(value).map_err(|_| ParseError::OutOfRange {
+        let narrowed = i32::try_from(value).map_err(|_error| ParseError::OutOfRange {
             domain: "DrawingML Coordinate32",
             value,
             min: i64::from(i32::MIN),
@@ -139,6 +143,10 @@ impl Columns {
     pub const ONE: Self = Self(Self::MIN);
 
     /// Construct a checked column count.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub const fn new(value: u8) -> Result<Self, ParseError> {
         if value < Self::MIN || value > Self::MAX {
             Err(ParseError::OutOfRange {
@@ -178,7 +186,7 @@ impl FromStr for Columns {
         let parsed = value
             .trim_matches(super::codec::xsd_whitespace)
             .parse::<u32>()
-            .map_err(|_| ParseError::InvalidNumber("DrawingML text column count"))?;
+            .map_err(|_error| ParseError::InvalidNumber("DrawingML text column count"))?;
         Self::try_from(parsed)
     }
 }
@@ -187,7 +195,7 @@ impl TryFrom<u32> for Columns {
     type Error = ParseError;
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
-        let narrowed = u8::try_from(value).map_err(|_| ParseError::OutOfRange {
+        let narrowed = u8::try_from(value).map_err(|_error| ParseError::OutOfRange {
             domain: "DrawingML text column count",
             value: i64::from(value),
             min: i64::from(Self::MIN),
@@ -208,6 +216,10 @@ impl TextSize {
     pub const MAX: u32 = 400_000;
 
     /// Construct a checked font size in hundredths of a point.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub const fn new(value: u32) -> Result<Self, ParseError> {
         if value < Self::MIN || value > Self::MAX {
             Err(ParseError::OutOfRange {
@@ -241,7 +253,7 @@ impl FromStr for TextSize {
         let parsed = value
             .trim_matches(super::codec::xsd_whitespace)
             .parse::<u32>()
-            .map_err(|_| ParseError::InvalidNumber("DrawingML text size"))?;
+            .map_err(|_error| ParseError::InvalidNumber("DrawingML text size"))?;
         Self::new(parsed)
     }
 }

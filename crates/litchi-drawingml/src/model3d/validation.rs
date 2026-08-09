@@ -86,6 +86,10 @@ pub enum Error {
 }
 
 /// Validate the typed model and its retained scene sequence.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn validate(metadata: &Metadata) -> Result<(), Error> {
     validate_counts(metadata)?;
     validate_reference(&metadata.reference, "model")?;
@@ -207,6 +211,10 @@ pub fn validate(metadata: &Metadata) -> Result<(), Error> {
 }
 
 /// Validate semantic metadata against a host-provided package relationship graph.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn validate_relationships<R: Resolver + ?Sized>(
     metadata: &Metadata,
     resolver: &R,
@@ -412,7 +420,11 @@ pub(crate) fn validate_inert_fragment(value: &Inert) -> Result<(), Error> {
                 return Err(Error::Inert("document-level markup is forbidden".into()));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }

@@ -54,12 +54,17 @@ Password-to-open input is owned by non-cloneable, zeroizing `Password` and is
 supplied through `OpenOptions::with_password`; it is redacted in diagnostics.
 `Document::text` preserves stored source text. `body_text::Snapshot` also
 projects ordinary main-story paragraphs as stored, accepted, or rejected text.
-Its source-checked transaction permits only a same-UTF-16-length replacement
-inside one Unicode piece, leaving CLX, FKP, PLCF, FIB, and table-stream bytes
-unchanged; compressed/cross-piece, structural, and tracked-text paragraphs are
-typed refusals rather than approximate DOC rewrites. Paragraph selection uses
-the format-neutral `litchi_core::Position`, with collection resolution returning
-a typed not-found refusal.
+Its bounded source-checked transaction supports length-changing replacements
+across multiple ordinary paragraphs and direct-bold changes atomically. It
+appends Unicode pieces, rebuilds CLX/CHPX data, shifts modeled main/all-story CP
+tables, updates the main-story count, and performs both CFB and full DOC reopen
+validation before publication. Structural or tracked text, mixed character
+formatting, interior modeled CP boundaries, and known unmodeled CP-indexed structures
+are typed refusals. The same semantic changes drive source-checked reversible
+patches, deterministic durable patches, disjoint composition, and bounded
+undo/redo history. Paragraph selection uses the format-neutral
+`litchi_core::Position`, with collection resolution returning a typed not-found
+refusal.
 
 ## Core Word binary document model
 
@@ -92,7 +97,7 @@ a typed not-found refusal.
 | Feature family | Status | Read | Write | Notes |
 |----------------|--------|------|-------|-------|
 | CP, PLC, STTB, SPRM/PRL, and property storage primitives | ✅ | ✅ | ✅ | [MS-DOC] 2.2 defines character positions, piece and property storage, string tables, and single-property modifiers used by the typed model |
-| Piece table, compressed/uncompressed Unicode text, FKPs, BTEs, and BinTable | ✅ | ✅ | ✅ | Core text and formatting indices are decoded and generated with bounds checks and unknown property data retained where applicable. `body_text::{Snapshot, Edit, Commit, Patch}` adds a source-checked reversible replacement seam for one same-shape ordinary Unicode body paragraph; anything requiring a piece/FKP/PLCF rewrite remains a typed refusal. |
+| Piece table, compressed/uncompressed Unicode text, FKPs, BTEs, and BinTable | ✅ | ✅ | ✅ | Core text and formatting indices are decoded and generated with bounds checks and unknown property data retained where applicable. `body_text::{Snapshot, Edit, Commit, Patch}` adds bounded multi-paragraph length-changing text plus direct-bold transactions, modeled CLX/CHPX/PLCF/FIB updates, full reopen validation, reversible and durable patches, disjoint composition, and bounded history; unmodeled dependencies are refused before mutation. |
 | Main, footnote, endnote, header, comment, textbox, and header-textbox parts | ✅ | ✅ | ✅ | [MS-DOC] 2.3 story ranges and the corresponding PLCs are exposed through typed document, note, comment, header/footer, picture, shape, and textbox APIs |
 | Bookmark PLCs and names | ✅ | ✅ | ✅ | Range and point bookmarks are typed and editable, including repair/validation behavior for malformed ranges |
 | Field PLCs and non-Plcfld text-only fields | ✅ | ✅ | ✅ | Native field delimiters, instruction/result text, marker positions, nesting, and the five text-only field families are reconstructed and authored with balanced graphs |

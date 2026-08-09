@@ -18,8 +18,9 @@ mod package;
 mod tests;
 
 pub use edit::{
-    ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DefaultsEdit, Edit, JoinError,
-    JoinFailure, NewSheet, PackageChange, Patch, RowEdit, State, TabEdit, WorksheetEdit,
+    ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DefaultsEdit, DurablePatch, Edit,
+    JoinError, JoinFailure, MergeChoice, MergeLimits, NewSheet, PackageChange, Patch, RowEdit,
+    SealedPatch, State, TabEdit, ThreeWayPlan, WorksheetEdit,
 };
 /// Finite step and retained-weight bounds for [`History`].
 pub use litchi_core::patch::HistoryLimits;

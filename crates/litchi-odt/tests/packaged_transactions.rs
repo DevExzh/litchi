@@ -9,7 +9,10 @@ use litchi_odt::{
     },
     protection::Policy,
     rdf::{Object, Subject, Triple},
-    transaction::{OperationResult, ParagraphSelector, Position},
+    transaction::{
+        EnvelopeKind, HistoryLimits, MergeChoice, MergePlan, OperationResult, ParagraphSelector,
+        Position, SubEditJoinFailure,
+    },
 };
 
 fn source() -> Document {
@@ -171,6 +174,10 @@ fn changed_transactions_refuse_signed_and_encrypted_envelopes() {
     let signed = Document::from_bytes(signed_writer.finish_to_bytes().unwrap()).unwrap();
     let signed_snapshot = signed.snapshot().unwrap();
     assert_eq!(
+        signed_snapshot.envelope_kind().unwrap(),
+        EnvelopeKind::Signed
+    );
+    assert_eq!(
         signed_snapshot
             .edit()
             .commit()
@@ -201,6 +208,10 @@ fn changed_transactions_refuse_signed_and_encrypted_envelopes() {
     let encrypted_bytes = encrypted_writer.finish_to_bytes().unwrap();
     let encrypted = Document::from_bytes_with_password(encrypted_bytes, "secret").unwrap();
     let encrypted_snapshot = encrypted.snapshot().unwrap();
+    assert_eq!(
+        encrypted_snapshot.envelope_kind().unwrap(),
+        EnvelopeKind::Encrypted
+    );
     let encrypted_noop = encrypted_snapshot.edit().commit().unwrap();
     assert_eq!(
         encrypted_noop.snapshot().as_bytes(),
@@ -400,4 +411,156 @@ fn durable_patch_parser_rejects_noncanonical_json() {
     assert!(
         litchi_odt::transaction::DurablePatch::from_deterministic_json(&foreign_format).is_err()
     );
+}
+
+#[test]
+fn semantic_durable_patch_replays_paragraph_runs_and_hyperlinks() {
+    let source = source();
+    let snapshot = source.snapshot().unwrap();
+    let mut edit = snapshot.edit();
+    edit.insert_paragraph(Position::new(1), "second")
+        .unwrap()
+        .replace_paragraph(Position::new(0), "first")
+        .unwrap()
+        .append_run(Position::new(0), " styled", Some("Emphasis"))
+        .unwrap()
+        .append_hyperlink(Position::new(1), "https://example.invalid/review", "review")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let mut repeated = snapshot.edit();
+    repeated
+        .insert_paragraph(Position::new(1), "second")
+        .unwrap()
+        .replace_paragraph(Position::new(0), "first")
+        .unwrap()
+        .append_run(Position::new(0), " styled", Some("Emphasis"))
+        .unwrap()
+        .append_hyperlink(Position::new(1), "https://example.invalid/review", "review")
+        .unwrap();
+    assert_eq!(
+        repeated.commit().unwrap().snapshot().as_bytes(),
+        commit.snapshot().as_bytes()
+    );
+    let durable = commit.patch().durable().unwrap();
+    let wire = durable.to_deterministic_json().unwrap();
+    let wire_text = std::str::from_utf8(&wire).unwrap();
+    assert!(wire_text.contains("paragraph.insert"));
+    assert!(wire_text.contains("paragraph.replace"));
+    assert!(wire_text.contains("run.append"));
+    assert!(wire_text.contains("hyperlink.append"));
+    assert!(!wire_text.contains("document.replace"));
+
+    let reopened = durable.apply(&snapshot).unwrap().document().unwrap();
+    let paragraphs = reopened.paragraphs().unwrap();
+    assert_eq!(paragraphs[0].text().unwrap(), "first styled");
+    assert_eq!(paragraphs[1].text().unwrap(), "secondreview");
+    assert_eq!(
+        reopened.hyperlinks().unwrap()[0].1,
+        "https://example.invalid/review"
+    );
+    assert_eq!(
+        durable
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap()
+            .as_bytes(),
+        snapshot.as_bytes()
+    );
+}
+
+#[test]
+fn deterministic_join_reports_exact_conflicts_and_commits_in_identifier_order() {
+    let mut document = MutableDocument::new();
+    document.add_paragraph("zero").unwrap();
+    document.add_paragraph("one").unwrap();
+    let snapshot = Document::from_bytes(document.to_bytes().unwrap())
+        .unwrap()
+        .snapshot()
+        .unwrap();
+
+    let mut joined = snapshot.joined_edit();
+    let mut second = snapshot.edit();
+    second.replace_paragraph(Position::new(1), "ONE").unwrap();
+    joined.join("z-second", second).unwrap();
+    let mut first = snapshot.edit();
+    first.replace_paragraph(Position::new(0), "ZERO").unwrap();
+    joined.join("a-first", first).unwrap();
+
+    let mut overlapping = snapshot.edit();
+    overlapping.append_run(Position::new(0), "!", None).unwrap();
+    // A whole-paragraph replacement and an inline append intentionally share
+    // one paragraph effect key through conservative conflict ownership.
+    let conflict = match joined.join("overlap", overlapping) {
+        Ok(_) => panic!("overlapping ODT edits must conflict"),
+        Err(conflict) => conflict,
+    };
+    assert!(matches!(conflict.failure(), SubEditJoinFailure::Overlap(_)));
+    assert!(!conflict.conflicts().unwrap().is_empty());
+
+    let committed = joined.commit().unwrap();
+    let paragraphs = committed
+        .snapshot()
+        .document()
+        .unwrap()
+        .paragraphs()
+        .unwrap();
+    assert_eq!(paragraphs[0].text().unwrap(), "ZERO");
+    assert_eq!(paragraphs[1].text().unwrap(), "ONE");
+}
+
+#[test]
+fn three_way_plan_is_non_applying_and_requires_explicit_conflict_resolution() {
+    let snapshot = source().snapshot().unwrap();
+    let mut left = snapshot.joined_edit();
+    let mut left_edit = snapshot.edit();
+    left_edit
+        .replace_paragraph(Position::new(0), "left")
+        .unwrap();
+    left.join("left", left_edit).unwrap();
+
+    let mut right = snapshot.joined_edit();
+    let mut right_edit = snapshot.edit();
+    right_edit
+        .append_run(Position::new(0), " right", None)
+        .unwrap();
+    right.join("right", right_edit).unwrap();
+
+    let mut plan = MergePlan::new(left, right).unwrap();
+    assert_eq!(plan.conflicts().len(), 1);
+    assert_eq!(
+        snapshot.document().unwrap().text().unwrap(),
+        "Unique paragraph"
+    );
+    plan.resolve(MergeChoice::Left);
+    let joined = match plan.finish() {
+        Ok(joined) => joined,
+        Err(_) => panic!("resolved ODT merge plan must finish"),
+    };
+    let merged = joined.commit().unwrap();
+    assert_eq!(
+        merged.snapshot().document().unwrap().text().unwrap(),
+        "left"
+    );
+}
+
+#[test]
+fn bounded_history_rejects_stale_edits_and_fully_reopens_undo_redo() {
+    let snapshot = source().snapshot().unwrap();
+    let mut history = snapshot.history(HistoryLimits::new(4, 64 * 1024 * 1024));
+    let stale = history.edit();
+    let mut current = history.edit();
+    current
+        .replace_paragraph(Position::new(0), "committed")
+        .unwrap();
+    history.commit(current).unwrap();
+    assert_eq!(history.document().unwrap().text().unwrap(), "committed");
+    assert!(history.commit(stale).is_err());
+    assert_eq!(history.document().unwrap().text().unwrap(), "committed");
+    assert!(history.undo());
+    assert_eq!(
+        history.document().unwrap().text().unwrap(),
+        "Unique paragraph"
+    );
+    assert!(history.redo());
+    assert_eq!(history.document().unwrap().text().unwrap(), "committed");
 }

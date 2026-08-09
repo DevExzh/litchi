@@ -1,0 +1,71 @@
+#![allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design"
+)]
+
+use litchi_rtf::{
+    Document,
+    edit::{Error, Limits, TextSpan},
+};
+use std::path::{Path, PathBuf};
+
+fn corpus(relative: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join(relative)
+}
+
+#[test]
+fn large_libreoffice_producer_artifacts_round_trip_exactly() {
+    let fixtures = [
+        "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf158982.rtf",
+        "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/watermark.rtf",
+        "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/all_gaps_word.rtf",
+    ];
+    let mut accepted = 0usize;
+    for fixture in fixtures {
+        let bytes = std::fs::read(corpus(fixture)).unwrap();
+        if let Ok(document) = Document::from_bytes(&bytes) {
+            accepted = accepted.saturating_add(1);
+            assert_eq!(document.to_bytes().unwrap(), bytes, "fixture: {fixture}");
+            let commit = document.edit().commit().unwrap();
+            assert!(commit.snapshot().same_snapshot(&document));
+            assert_eq!(commit.snapshot().to_bytes().unwrap(), bytes);
+        }
+    }
+    assert!(accepted > 0, "no large producer fixture was accepted");
+}
+
+#[test]
+fn hostile_large_corpus_is_bounded_and_never_normalized_on_open() {
+    let fixtures = [
+        "test-data/libreoffice-core/sw/qa/core/data/rtf/fail/forcepoint-4.rtf",
+        "test-data/libreoffice-core/sw/qa/core/data/rtf/fail/forcepoint-5.rtf",
+        "test-data/libreoffice-core/sw/qa/writerfilter/filters-test/data/pass/TCI-TN65GP-DDRHDLL-partial.rtf",
+    ];
+    for fixture in fixtures {
+        let bytes = std::fs::read(corpus(fixture)).unwrap();
+        if let Ok(document) = Document::from_bytes(&bytes) {
+            assert_eq!(document.to_bytes().unwrap(), bytes, "fixture: {fixture}");
+        }
+    }
+}
+
+#[test]
+fn hostile_operation_fanout_stops_at_the_caller_bound() {
+    let body = "x".repeat(600);
+    let source = Document::parse(&format!(r"{{\rtf1\ansi {body}}}")).unwrap();
+    let mut edit = source.edit_with_limits(Limits::new(256));
+    for position in 0..256 {
+        edit.replace_text(TextSpan::new(position, position).unwrap(), "y")
+            .unwrap();
+    }
+    assert!(matches!(
+        edit.replace_text(TextSpan::new(300, 300).unwrap(), "z"),
+        Err(Error::OperationLimit {
+            observed: 257,
+            limit: 256
+        })
+    ));
+}

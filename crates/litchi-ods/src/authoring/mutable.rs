@@ -46,6 +46,46 @@ impl MutableSpreadsheet {
         &self.spreadsheet
     }
 
+    /// Capture the exact package as the unified immutable transaction owner.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when package bounds or complete facade readback fail.
+    pub fn document_snapshot(&self) -> Result<crate::document::Snapshot> {
+        self.spreadsheet.document_snapshot()
+    }
+
+    /// Apply one durable exact-source unified package patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for stale lineage, security refusal, package bounds, or candidate
+    /// readback failure.
+    pub fn apply_document_patch(&mut self, patch: &crate::document::Patch) -> Result<()> {
+        self.spreadsheet.apply_document_patch(patch)
+    }
+
+    /// Clone-stage all supported ODS owners and publish them as one immutable package commit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the closure, security checks, durable patch, package rebuild, or
+    /// complete typed readback fails. The attached facade remains unchanged on failure.
+    pub fn edit_document<F>(&mut self, update: F) -> Result<crate::document::Patch>
+    where
+        F: FnOnce(&mut crate::document::Edit) -> Result<()>,
+    {
+        let snapshot = self.document_snapshot()?;
+        let mut edit = snapshot.edit();
+        update(&mut edit)?;
+        let commit = edit.commit()?;
+        let patch = commit.patch().clone();
+        if commit.changed() {
+            self.spreadsheet = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+        }
+        Ok(patch)
+    }
+
     /// Borrow the compact cross-format metadata projection.
     #[must_use]
     pub fn metadata(&self) -> &litchi_core::Metadata {

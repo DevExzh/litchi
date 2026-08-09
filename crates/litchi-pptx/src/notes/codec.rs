@@ -118,21 +118,29 @@ impl Slide {
     pub fn text(&self) -> Result<Option<String>> {
         let processed = process_ooxml(&self.data)?;
         let mut reader = Reader::from_reader(processed.as_ref());
-        reader.config_mut().trim_text(true);
+        reader.config_mut().trim_text(false);
         let mut in_text = false;
+        let mut seen_text = false;
         let mut value = String::new();
         loop {
             match reader.read_event() {
                 Ok(Event::Start(element)) if element.local_name().as_ref() == b"t" => {
+                    if seen_text && !value.is_empty() {
+                        value.push('\n');
+                    }
+                    seen_text = true;
                     in_text = true;
                 },
                 Ok(Event::Text(text)) if in_text => {
                     let decoded = text.decode().map_err(xml_error)?;
                     let decoded = quick_xml::escape::unescape(&decoded).map_err(xml_error)?;
-                    if !value.is_empty() {
-                        value.push('\n');
-                    }
                     value.push_str(&decoded);
+                },
+                Ok(Event::CData(text)) if in_text => {
+                    value.push_str(&text.decode().map_err(xml_error)?);
+                },
+                Ok(Event::GeneralRef(reference)) if in_text => {
+                    value.push_str(&litchi_ooxml_common::xml::decode_xml_reference(&reference)?);
                 },
                 Ok(Event::End(element)) if element.local_name().as_ref() == b"t" => in_text = false,
                 Ok(Event::Eof) => break,

@@ -3,6 +3,10 @@
 use std::{fmt, fmt::Write as _};
 
 /// Write the Office 2014 creation-ID extension with escaped content.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn write_creation_id(xml: &mut String, creation_id: &str) -> fmt::Result {
     let creation_id = quick_xml::escape::escape(creation_id);
     write!(

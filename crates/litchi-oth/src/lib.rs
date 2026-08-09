@@ -8,8 +8,9 @@ mod model;
 mod package;
 
 pub use facade::{
-    Block, Builder, Commit, Edit, History, JoinError, JoinFailure, ParagraphChange, Patch,
-    Template, TextBody,
+    Block, Builder, Commit, Edit, HeadingChange, History, JoinError, JoinFailure, ListChange,
+    MergeConflict, MergePlan, ParagraphChange, Patch, SecurityPolicy, SecurityReport, Template,
+    TextBody,
 };
 pub use model::block::Content as ContentBlock;
 pub use model::{

@@ -1,20 +1,22 @@
-//! Lossless, length-stable edits of existing worksheet cell fields.
+//! Lossless structural edits of worksheet cell records.
 //!
 //! The owner inventories all ordinary scalar cell families from `[MS-XLSB]`
 //! sections 2.4.319-330 plus formula cached-result records from sections
-//! 2.4.684-687. Edits retain the existing record family and byte length: RK
-//! values must remain exactly representable, strings retain their UTF-16 code-
-//! unit count, and formulas themselves are never changed or evaluated. Cell
-//! creation, rich-string rewrites, and shared-string-table mutation remain out
-//! of scope. Unknown records and all fields outside the selected value/style
-//! bytes remain exact.
+//! 2.4.684-687. Existing values retain their BIFF12 record family, while
+//! explicit insert/remove operations author or remove complete records.
+//! Length-changing strings and inert formula token/cache changes rebuild only
+//! selected records; unknown records remain byte-exact. Row spans and worksheet
+//! dimensions expand with structural insertions, and whole-workbook publication
+//! validates style, shared-string, formula, and package dependency closure.
+//! Patches carry deterministic semantic deltas, exact before/after images,
+//! bounded durable transfer, three-way conflict reporting, and undo/redo.
 
 pub mod workbook;
 mod worksheet;
 
 pub use worksheet::{
-    CellError, Commit, Edit, Limits, Number, Patch, Reference, Snapshot, StoredCell, StyleIndex,
-    Value,
+    CellError, CellFormula, Change, Commit, Edit, History, Limits, MergeConflict, MergeOutcome,
+    Number, Patch, Reference, Snapshot, StoredCell, StyleIndex, TransferLimits, Value,
 };
 
 pub use crate::package::error::{Error, Result};

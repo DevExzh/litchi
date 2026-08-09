@@ -52,6 +52,10 @@ impl Patch {
     }
 
     /// Apply atomically after checking the complete captured source graph.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn apply(&self, target: &mut OpcPackage) -> Result<bool> {
         let current = Snapshot::load_scoped(target, &self.before.scope_names())?;
         if !self.before.same_source(&current) {

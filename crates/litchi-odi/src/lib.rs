@@ -20,11 +20,16 @@ mod flat;
 mod history;
 mod model;
 mod package;
+mod semantic;
 
-pub use editing::FrameEditor;
+pub use editing::{FrameEditor, MetadataEditor};
 pub use facade::{
     Builder, Commit, Edit, Image, MetadataChange, MetadataFields, Patch, ResourceChange,
 };
 pub use flat::{FlatImage, FlatImageCommit, FlatImagePatch, FlatImageTransaction, FrameChange};
-pub use history::{History, HistoryArtifact};
+pub use history::{CommittedTransition, History, HistoryArtifact};
 pub use model::{frame, map, resource, source};
+pub use semantic::{
+    ArtifactKind, Conflict, ConflictKind, FrameProperty, MetadataProperty, OperationKey,
+    ResourceValue, SecurityPolicy, SemanticOperation, SemanticPatch, SemanticPlan, SemanticValue,
+};

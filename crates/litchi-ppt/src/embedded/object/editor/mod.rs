@@ -110,6 +110,20 @@ impl Editor {
         mutation::replace_persisted_record(self, persist_id, record)
     }
 
+    /// Stages a complete record under a caller-allocated unused persist ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the identifier is invalid or already live, or
+    /// when the record is not one complete bounded PPT record.
+    pub(crate) fn insert_persisted_record(
+        &mut self,
+        persist_id: u32,
+        record: Vec<u8>,
+    ) -> Result<()> {
+        mutation::insert_persisted_record(self, persist_id, record)
+    }
+
     /// Returns the typed embedded-object collection represented by this edit.
     #[must_use]
     pub fn objects(&self) -> &Collection {

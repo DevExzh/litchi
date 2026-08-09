@@ -189,7 +189,7 @@ impl PointType {
             Self::ParentTransition(connection) | Self::SiblingTransition(connection) => {
                 Some(connection)
             },
-            _ => None,
+            Self::Node | Self::Document | Self::Assistant | Self::Presentation => None,
         }
     }
 }
@@ -393,6 +393,10 @@ impl DiagramDataModel {
 
     /// Adds a point, rejecting duplicate identifiers and a second document
     /// root before changing the model.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn add_point(&mut self, point: Point) -> Result<()> {
         if self.points.len() >= MAX_POINTS {
             return Err(limit("diagram point count"));
@@ -419,6 +423,10 @@ impl DiagramDataModel {
     }
 
     /// Adds a connection after checking its identifier and endpoint references.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn add_connection(&mut self, connection: Connection) -> Result<()> {
         if self.connections.len() >= MAX_CONNECTIONS {
             return Err(limit("diagram connection count"));
@@ -482,7 +490,9 @@ impl DiagramDataModel {
                         parent_transition,
                         sibling_transition,
                     } => parent_transition == id || sibling_transition == id,
-                    _ => false,
+                    ConnectionType::Presentation(_)
+                    | ConnectionType::PresentationParent
+                    | ConnectionType::Unknown => false,
                 };
             if depends_on_point {
                 removed_connections.insert(connection.id);

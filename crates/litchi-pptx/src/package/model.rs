@@ -153,6 +153,87 @@ impl Package {
         })
     }
 
+    /// Capture one immutable transaction root for an opened presentation.
+    ///
+    /// The root composes existing slide ordering, checked shape text, and
+    /// existing notes text without hydrating the legacy mutable writer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a newly authored or dirty mutable presentation,
+    /// malformed package topology, unsupported notes dependencies, or bounds.
+    pub fn opened_presentation(&self) -> Result<crate::opened::Snapshot> {
+        self.opened_presentation_with_limits(crate::opened::Limits::default())
+    }
+
+    /// Capture an opened-presentation transaction root with explicit bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package is not a coherent, already-opened
+    /// presentation under the supplied finite policy.
+    pub fn opened_presentation_with_limits(
+        &self,
+        limits: crate::opened::Limits,
+    ) -> Result<crate::opened::Snapshot> {
+        self.ensure_graph_current("opened_presentation")?;
+        if self.mutable_pres.is_some() {
+            return Err(Error::UnsafeEdit {
+                operation: "opened_presentation",
+                reason: "save and reopen the authored presentation before starting an opened-package transaction",
+            });
+        }
+        crate::opened::capture(&self.opc, limits)
+    }
+
+    /// Start one detached transaction over an immutable opened root.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error under the same conditions as [`Self::opened_presentation`].
+    pub fn opened_presentation_transaction(&self) -> Result<crate::opened::Transaction> {
+        Ok(self.opened_presentation()?.edit())
+    }
+
+    /// Publish one opened-presentation commit atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when any write-set resource is stale, package policy
+    /// rejects mutation, or the candidate graph cannot be fully validated.
+    pub fn apply_opened_presentation_commit(
+        &mut self,
+        commit: crate::opened::Commit,
+    ) -> Result<crate::opened::Snapshot> {
+        let (_snapshot, patch) = commit.into_parts();
+        self.apply_opened_presentation_patch(&patch)
+    }
+
+    /// Publish one durable opened-presentation patch atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for stale resources, malformed topology, unsupported
+    /// dependencies, or rejected package mutation policy.
+    pub fn apply_opened_presentation_patch(
+        &mut self,
+        patch: &crate::opened::Patch,
+    ) -> Result<crate::opened::Snapshot> {
+        self.ensure_graph_current("apply_opened_presentation_patch")?;
+        if self.mutable_pres.is_some() {
+            return Err(Error::UnsafeEdit {
+                operation: "apply_opened_presentation_patch",
+                reason: "opened-presentation patches require an already-opened package",
+            });
+        }
+        let changed = !patch.is_empty();
+        let snapshot = self.edit_typed(|opc| crate::opened::apply(opc, patch))?;
+        if changed {
+            self.mutable_pres = None;
+        }
+        Ok(snapshot)
+    }
+
     /// Capture one slide's inert `[MS-PPTX]` change-tracking identifiers.
     ///
     /// The snapshot includes the slide creation ID and each shape modification

@@ -301,6 +301,10 @@ impl Props {
     ///
     /// Prefer [`write()`] when an OPC package is available because it preserves
     /// an existing Strict package's namespace and relationship family.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn xml(&self) -> Result<String> {
         write::encode(self, Dialect::Transitional)
     }
@@ -375,6 +379,10 @@ impl Stage<'_> {
 
 impl Slot {
     /// Reads and validates the package graph while retaining absence exactly.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn load(package: &OpcPackage) -> Result<Self> {
         Ok(Self {
             props: read(package)?,
@@ -412,6 +420,10 @@ impl Slot {
     ///
     /// A failed flush leaves the slot dirty so the caller can repair the value
     /// and retry. A byte-identical write is a true no-op.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn flush(&mut self, package: &mut OpcPackage) -> Result<bool> {
         let staged = self.stage(package)?;
         let changed = staged.changed();
@@ -425,6 +437,10 @@ impl Slot {
     /// [`Stage::commit`] only after publication succeeds. The returned guard
     /// is tied to this exact slot, so another slot cannot be committed by
     /// mistake.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn stage(&mut self, package: &mut OpcPackage) -> Result<Stage<'_>> {
         if !self.dirty {
             return Ok(Stage {

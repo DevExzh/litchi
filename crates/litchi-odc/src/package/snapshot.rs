@@ -14,6 +14,8 @@ struct State {
     content: FlatChart,
     limits: crate::Limits,
     resources: Vec<crate::Resource>,
+    signed: bool,
+    encrypted: bool,
 }
 
 pub(crate) struct ResourceReplacement<'a> {
@@ -22,6 +24,7 @@ pub(crate) struct ResourceReplacement<'a> {
     pub(crate) bytes: Option<&'a [u8]>,
 }
 
+#[derive(Clone, Copy)]
 pub(crate) enum StylesReplacement<'a> {
     Unchanged,
     Replace(&'a str),
@@ -58,14 +61,20 @@ impl Snapshot {
     }
 
     fn from_package(package: Package, limits: crate::Limits) -> Result<Self> {
+        if let Some(styles) = package.styles_xml() {
+            crate::codec::validate_styles(styles, limits)?;
+        }
         let content =
             FlatChart::from_content_xml(package.content_xml().as_bytes().to_vec(), limits)?;
         let resources = scan_resources(&package, limits)?;
+        let (signed, encrypted) = scan_security(&package)?;
         Ok(Self(Arc::new(State {
             package,
             content,
             limits,
             resources,
+            signed,
+            encrypted,
         })))
     }
 
@@ -104,6 +113,14 @@ impl Snapshot {
         &self.0.resources
     }
 
+    pub(crate) fn is_signed(&self) -> bool {
+        self.0.signed
+    }
+
+    pub(crate) fn is_encrypted(&self) -> bool {
+        self.0.encrypted
+    }
+
     pub(crate) fn resource_bytes(&self, index: usize) -> Result<Vec<u8>> {
         let resource =
             self.0.resources.get(index).ok_or_else(|| {
@@ -122,18 +139,17 @@ impl Snapshot {
         styles: StylesReplacement<'_>,
         replacements: &[ResourceReplacement<'_>],
     ) -> Result<Self> {
-        ensure_compact_rewrite_source(self)?;
-        let files = self.files()?;
-        if files.iter().any(|path| {
-            matches!(
-                path.as_str(),
-                "META-INF/documentsignatures.xml" | "META-INF/macrosignatures.xml"
-            )
-        }) {
+        if self.0.signed {
             return Err(Error::InvalidFormat(
                 "ODC package edits refuse signed packages".to_string(),
             ));
         }
+        if self.0.encrypted {
+            return Err(Error::Unsupported(
+                "ODC package edits refuse encrypted package members".to_string(),
+            ));
+        }
+        ensure_compact_rewrite_source(self)?;
         let compact_limits =
             compact_xml::Limits::new(self.0.limits.max_content_bytes(), self.0.limits.max_depth())
                 .map_err(Error::from)?;
@@ -155,6 +171,7 @@ impl Snapshot {
             StylesReplacement::Replace(xml) => {
                 compact_xml::validate_with_limits(xml.as_bytes(), compact_limits)
                     .map_err(Error::from)?;
+                crate::codec::validate_styles(xml, self.0.limits)?;
                 writer.add_file("styles.xml", xml.as_bytes())?;
             },
             StylesReplacement::Remove => {},
@@ -209,6 +226,15 @@ fn scan_resources(package: &Package, limits: crate::Limits) -> Result<Vec<crate:
         ));
     }
     Ok(resources)
+}
+
+fn scan_security(package: &Package) -> Result<(bool, bool)> {
+    let archive = package.package().package()?;
+    let signed = archive.files()?.iter().any(|path| {
+        path.strip_prefix("META-INF/")
+            .is_some_and(|name| name.to_ascii_lowercase().contains("signatures"))
+    });
+    Ok((signed, archive.manifest().has_encrypted_entries()))
 }
 
 fn ensure_compact_rewrite_source(source: &Snapshot) -> Result<()> {

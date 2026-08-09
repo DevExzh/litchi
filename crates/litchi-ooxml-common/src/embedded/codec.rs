@@ -14,6 +14,10 @@ pub(super) const XLSB_WORKSHEET: &str = "application/vnd.ms-excel.worksheet";
 
 /// Inventory embedded parts with the safe general-purpose resource policy.
 #[inline]
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn scan(package: &OpcPackage) -> Result<Vec<Entry<'_>>> {
     scan_with(package, &Limits::default())
 }
@@ -24,6 +28,10 @@ pub fn scan(package: &OpcPackage) -> Result<Vec<Entry<'_>>> {
 /// independent of the package's internal hash-map order. Duplicate internal
 /// targets remain distinct entries, while their payload relationship graph is
 /// validated and charged exactly once under its canonical package part name.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn scan_with<'a>(package: &'a OpcPackage, limits: &Limits) -> Result<Vec<Entry<'a>>> {
     for relationship in package.rels().iter() {
         if kind(relationship.reltype()).is_some() {

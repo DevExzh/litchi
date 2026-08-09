@@ -147,6 +147,10 @@ impl Patch {
     ///
     /// Returns `true` when the package changed. Source checks, destination-name
     /// checks, and relationship staging all finish before the first mutation.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn apply(&self, package: &mut OpcPackage) -> Result<bool> {
         if self.is_empty() {
             return Ok(false);

@@ -5,7 +5,8 @@ use std::path::Path;
 
 pub use crate::authoring::Builder;
 pub use crate::package::{
-    Change, Commit, GeometryChange, History, HistoryLimits, LayerChange, NameChange, Patch,
+    Change, Commit, ControlReferenceChange, DurablePatch, GeometryChange, History, HistoryLimits,
+    JoinedEdits, LayerChange, Lineage, MergePlan, NameChange, Patch, PathChange, PreparedEdit,
     ResourceChange, Snapshot, StructureChange, StyleChange, TextChange, Transaction,
 };
 
@@ -24,6 +25,15 @@ impl Drawing {
         Snapshot::open(path).map(|package| Self { package })
     }
 
+    /// Opens an OTG drawing template from a file path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package is unreadable or is not a structurally valid OTG.
+    pub fn open_template(path: impl AsRef<Path>) -> Result<Self> {
+        Snapshot::open_template(path).map(|package| Self { package })
+    }
+
     /// Opens a drawing package from in-memory bytes.
     ///
     /// # Errors
@@ -31,6 +41,15 @@ impl Drawing {
     /// Returns an error when the package is not a structurally valid ODG.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         Snapshot::from_bytes(bytes).map(|package| Self { package })
+    }
+
+    /// Opens an OTG drawing template from in-memory bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package is not a structurally valid OTG.
+    pub fn from_template_bytes(bytes: Vec<u8>) -> Result<Self> {
+        Snapshot::from_template_bytes(bytes).map(|package| Self { package })
     }
 
     /// Returns the exact `content.xml` document.
@@ -79,6 +98,12 @@ impl Drawing {
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         self.package.as_bytes()
+    }
+
+    /// Whether this drawing is an OTG template.
+    #[must_use]
+    pub fn is_template(&self) -> bool {
+        self.package.is_template()
     }
 
     /// Lists safe package member names.

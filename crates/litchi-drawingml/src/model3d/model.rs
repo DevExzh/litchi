@@ -41,6 +41,10 @@ pub struct Id(Box<str>);
 
 impl Id {
     /// Construct a checked relationship identifier.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn new(value: impl AsRef<str>) -> Result<Self, ValueError> {
         let value = value.as_ref();
         if value.is_empty() || value.len() > MAX_RELATIONSHIP_ID_BYTES || !is_ncname(value) {
@@ -120,6 +124,10 @@ impl Reference {
     }
 
     /// Create an embedded reference from an ordinary lexical ID.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn embedded(value: impl AsRef<str>) -> Result<Self, ValueError> {
         Ok(Self {
             embedded: Some(Id::new(value)?),
@@ -128,6 +136,10 @@ impl Reference {
     }
 
     /// Create a linked reference from an ordinary lexical ID.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn linked(value: impl AsRef<str>) -> Result<Self, ValueError> {
         Ok(Self {
             embedded: None,
@@ -153,6 +165,10 @@ pub struct Namespace {
 
 impl Namespace {
     /// Construct a namespace declaration. `None` denotes the default prefix.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn new(prefix: Option<&str>, uri: impl AsRef<str>) -> Result<Self, ValueError> {
         if let Some(prefix) = prefix
             && !prefix.is_empty()
@@ -229,6 +245,10 @@ impl Inert {
         &self.namespace
     }
 
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "the wire decoder transfers ownership of renderer strings into the bounded model"
+    )]
     pub(super) fn from_wire(
         xml: Vec<u8>,
         local_name: impl Into<Box<str>>,
@@ -268,6 +288,10 @@ pub struct Raster {
 
 impl Raster {
     /// Construct a raster metadata value without a preview relationship.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn new(
         renderer_name: impl AsRef<str>,
         renderer_version: impl AsRef<str>,
@@ -311,8 +335,8 @@ impl Raster {
         namespaces: Vec<Namespace>,
     ) -> Result<Self, ValueError> {
         Ok(Self {
-            renderer_name: bounded_text(&renderer_name, "renderer name")?,
-            renderer_version: bounded_text(&renderer_version, "renderer version")?,
+            renderer_name: bounded_owned_text(renderer_name, "renderer name")?,
+            renderer_version: bounded_owned_text(renderer_version, "renderer version")?,
             children,
             namespaces,
         })
@@ -427,4 +451,14 @@ fn bounded_text(value: &str, field: &'static str) -> Result<Box<str>, ValueError
         });
     }
     Ok(value.into())
+}
+
+fn bounded_owned_text(value: String, field: &'static str) -> Result<Box<str>, ValueError> {
+    if value.len() > MAX_RENDERER_TEXT_BYTES {
+        return Err(ValueError::TooLong {
+            field,
+            limit: MAX_RENDERER_TEXT_BYTES,
+        });
+    }
+    Ok(value.into_boxed_str())
 }

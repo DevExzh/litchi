@@ -378,11 +378,12 @@ pub(super) fn bounded_percentage_u32_attr(
     maximum: u32,
 ) -> Result<u32> {
     let value = get_attr(element, b"val").ok_or_else(|| missing_attribute(description))?;
-    let text = std::str::from_utf8(&value).map_err(|_| invalid_attribute(description, &value))?;
+    let text =
+        std::str::from_utf8(&value).map_err(|_error| invalid_attribute(description, &value))?;
     let digits = text.strip_suffix('%').unwrap_or(text);
     let parsed = digits
         .parse::<u32>()
-        .map_err(|_| invalid_attribute(description, &value))?;
+        .map_err(|_error| invalid_attribute(description, &value))?;
     if !(minimum..=maximum).contains(&parsed) {
         return Err(Error::Invalid(format!(
             "{description} must be between {minimum} and {maximum}"
@@ -398,11 +399,12 @@ pub(super) fn bounded_percentage_i32_attr(
     maximum: i32,
 ) -> Result<i32> {
     let value = get_attr(element, b"val").ok_or_else(|| missing_attribute(description))?;
-    let text = std::str::from_utf8(&value).map_err(|_| invalid_attribute(description, &value))?;
+    let text =
+        std::str::from_utf8(&value).map_err(|_error| invalid_attribute(description, &value))?;
     let digits = text.strip_suffix('%').unwrap_or(text);
     let parsed = digits
         .parse::<i32>()
-        .map_err(|_| invalid_attribute(description, &value))?;
+        .map_err(|_error| invalid_attribute(description, &value))?;
     if !(minimum..=maximum).contains(&parsed) {
         return Err(Error::Invalid(format!(
             "{description} must be between {minimum} and {maximum}"

@@ -6,7 +6,69 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::codec;
-use crate::model::Element;
+use crate::model::{Content, Element};
+
+/// Maximum UTF-8 bytes accepted by the validated opaque `StarMath` boundary.
+pub const MAX_STARMATH_SOURCE_BYTES: usize = 1024 * 1024;
+/// Maximum semantic operations retained by one commit or durable patch.
+pub const MAX_SEMANTIC_OPERATIONS: usize = 4_096;
+/// Maximum recent commit records retained by an in-memory Formula snapshot.
+pub const MAX_COMMIT_HISTORY: usize = 64;
+/// Maximum approximate semantic evidence retained across recent commits.
+pub const MAX_COMMIT_HISTORY_BYTES: usize = 8 * 1024 * 1024;
+
+const HISTORY_MAGIC: &[u8] = b"LITCHI-ODF-HISTORY\0\x01";
+const PATCH_MAGIC: &[u8] = b"LITCHI-ODF-PATCH\0\x01";
+
+/// Validated, inert `StarMath` source.
+///
+/// `StarMath` is a `LibreOffice` language rather than an `ODF` or `MathML`
+/// grammar.
+/// This type deliberately validates only a bounded XML-safe opaque payload and
+/// a recognized syntax version; it never claims to parse or evaluate source.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OpaqueStarMath {
+    source: String,
+    version: StarMathVersion,
+}
+
+impl OpaqueStarMath {
+    /// Validate source at the explicit opaque-language boundary.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when source exceeds the fixed byte ceiling or contains
+    /// a character forbidden by XML 1.0.
+    pub fn new(version: StarMathVersion, source: impl Into<String>) -> Result<Self> {
+        let source_text = source.into();
+        if source_text.len() > MAX_STARMATH_SOURCE_BYTES {
+            return Err(invalid(format!(
+                "StarMath source exceeds {MAX_STARMATH_SOURCE_BYTES} bytes"
+            )));
+        }
+        if !source_text.chars().all(is_xml_character) {
+            return Err(invalid(
+                "StarMath source contains a character forbidden by XML 1.0",
+            ));
+        }
+        Ok(Self {
+            source: source_text,
+            version,
+        })
+    }
+
+    /// Inert source text.
+    #[must_use]
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+
+    /// Declared syntax version.
+    #[must_use]
+    pub const fn version(&self) -> StarMathVersion {
+        self.version
+    }
+}
 
 /// `LibreOffice` `StarMath` syntax version carried by a `MathML` annotation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -45,6 +107,41 @@ pub struct StarMathAnnotation<'element> {
     version: StarMathVersion,
 }
 
+/// One bounded semantic commit retained with a published snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CommitRecord {
+    bytes: usize,
+    changes: Arc<[SemanticChange]>,
+    source: Revision,
+    target: Revision,
+}
+
+impl CommitRecord {
+    /// Approximate retained semantic evidence bytes.
+    #[must_use]
+    pub const fn retained_bytes(&self) -> usize {
+        self.bytes
+    }
+
+    /// Ordered durable operations published by the commit.
+    #[must_use]
+    pub fn changes(&self) -> &[SemanticChange] {
+        &self.changes
+    }
+
+    /// Exact source package revision.
+    #[must_use]
+    pub const fn source_revision(&self) -> Revision {
+        self.source
+    }
+
+    /// Exact target package revision.
+    #[must_use]
+    pub const fn target_revision(&self) -> Revision {
+        self.target
+    }
+}
+
 impl<'element> StarMathAnnotation<'element> {
     /// Underlying `MathML` `annotation` element.
     #[must_use]
@@ -63,11 +160,22 @@ impl<'element> StarMathAnnotation<'element> {
     pub const fn version(&self) -> StarMathVersion {
         self.version
     }
+
+    /// Enter the checked opaque `StarMath` boundary.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the retained annotation exceeds the opaque-source
+    /// bound or contains an invalid XML character.
+    pub fn to_opaque(&self) -> Result<OpaqueStarMath> {
+        OpaqueStarMath::new(self.version, self.source.clone())
+    }
 }
 
 /// An immutable-or-transactionally-edited `OpenDocument` Formula package.
 #[derive(Clone)]
 pub struct Formula {
+    history: Arc<[CommitRecord]>,
     package: crate::package::Package,
     root: Arc<Element>,
     limits: codec::Limits,
@@ -198,6 +306,7 @@ impl Formula {
     ) -> Result<Self> {
         check_package_bytes(package.as_bytes().len(), limits)?;
         Ok(Self {
+            history: Arc::from(Vec::new().into_boxed_slice()),
             package,
             root: Arc::new(root),
             limits,
@@ -214,6 +323,14 @@ impl Formula {
     #[must_use]
     pub fn revision(&self) -> Revision {
         Revision::from_bytes(self.as_bytes())
+    }
+
+    /// Recent semantic commits coupled to this in-memory snapshot.
+    ///
+    /// The oldest record is evicted after [`MAX_COMMIT_HISTORY`] entries.
+    #[must_use]
+    pub fn commit_history(&self) -> &[CommitRecord] {
+        &self.history
     }
 
     /// Return the finite limits retained for reparsing edited candidates.
@@ -285,6 +402,55 @@ impl Formula {
                 })
             })
             .collect()
+    }
+
+    fn with_commit_record(mut self, source: &Self, changes: &[SemanticChange]) -> Result<Self> {
+        if changes.is_empty() {
+            self.history = Arc::clone(&source.history);
+            return Ok(self);
+        }
+        if changes.len() > MAX_SEMANTIC_OPERATIONS {
+            return Err(invalid(format!(
+                "Formula commit exceeds {MAX_SEMANTIC_OPERATIONS} semantic operations"
+            )));
+        }
+        let source_revision = source.revision();
+        let target_revision = self.revision();
+        if self.history.last().is_some_and(|record| {
+            record.source == source_revision && record.target == target_revision
+        }) {
+            return Ok(self);
+        }
+        let retained_bytes = changes.iter().try_fold(0_usize, |total, change| {
+            total
+                .checked_add(change.retained_bytes())
+                .ok_or_else(|| invalid("Formula commit history byte count overflow"))
+        })?;
+        if retained_bytes > MAX_COMMIT_HISTORY_BYTES {
+            return Err(invalid(format!(
+                "Formula commit history exceeds {MAX_COMMIT_HISTORY_BYTES} retained bytes"
+            )));
+        }
+        let mut history = source.history.to_vec();
+        let mut history_bytes = history.iter().try_fold(0_usize, |total, record| {
+            total
+                .checked_add(record.bytes)
+                .ok_or_else(|| invalid("Formula history byte count overflow"))
+        })?;
+        while history.len() >= MAX_COMMIT_HISTORY
+            || history_bytes.saturating_add(retained_bytes) > MAX_COMMIT_HISTORY_BYTES
+        {
+            let removed = history.remove(0);
+            history_bytes = history_bytes.saturating_sub(removed.bytes);
+        }
+        history.push(CommitRecord {
+            bytes: retained_bytes,
+            changes: Arc::from(changes.to_vec().into_boxed_slice()),
+            source: source_revision,
+            target: target_revision,
+        });
+        self.history = Arc::from(history.into_boxed_slice());
+        Ok(self)
     }
 
     /// Return the exact package MIME type.
@@ -366,6 +532,61 @@ impl Edit<'_> {
     #[must_use]
     pub fn changes(&self) -> &[SemanticChange] {
         &self.changes
+    }
+
+    /// Plan transfer of another edit created from the same source snapshot.
+    ///
+    /// This method never mutates either edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the edits do not share byte-exact source and
+    /// resource limits.
+    pub fn plan_join(&self, other: &Self) -> Result<DependencyTransfer> {
+        self.require_same_source(other)?;
+        Ok(DependencyTransfer::plan(&other.changes, &self.changes))
+    }
+
+    /// Atomically join a non-conflicting independent edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a stale source, a dependency conflict, an
+    /// operation bound, or an invalid joined `MathML` candidate. This edit is
+    /// unchanged on failure.
+    pub fn join(&mut self, other: &Self) -> Result<()> {
+        let transfer = self.plan_join(other)?;
+        if let Some(conflict) = transfer.conflicts().first() {
+            return Err(invalid(format!(
+                "Formula sub-edit conflict {:?} at path {:?}",
+                conflict.kind(),
+                conflict.path().indices()
+            )));
+        }
+        let operation_count = self
+            .changes
+            .len()
+            .checked_add(transfer.operations().len())
+            .ok_or_else(|| invalid("Formula semantic operation count overflow"))?;
+        if operation_count > MAX_SEMANTIC_OPERATIONS {
+            return Err(invalid(format!(
+                "Formula join exceeds {MAX_SEMANTIC_OPERATIONS} semantic operations"
+            )));
+        }
+        let mut candidate = self.root().clone();
+        for change in transfer.operations() {
+            candidate = apply_semantic_change(&candidate, change)?;
+        }
+        let validated = validate_candidate(&candidate, self.source.limits)?;
+        let mut joined_changes = self.changes.clone();
+        joined_changes.extend_from_slice(transfer.operations());
+        self.replacement = (validated.as_ref() != self.source.root()).then_some(validated);
+        self.changes = if self.replacement.is_some() {
+            joined_changes
+        } else {
+            Vec::new()
+        };
+        Ok(())
     }
 
     /// Insert one element child at a stable child-element path.
@@ -514,12 +735,23 @@ impl Edit<'_> {
     /// Returns an error when the formula has no recognized `StarMath`
     /// annotation or the resulting tree violates retained limits.
     pub fn set_starmath_source(&mut self, version: StarMathVersion, source: &str) -> Result<()> {
+        let starmath = OpaqueStarMath::new(version, source)?;
+        self.set_starmath(&starmath)
+    }
+
+    /// Replace the first recognized annotation with validated opaque source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the formula has no recognized annotation or the
+    /// resulting tree violates retained limits.
+    pub fn set_starmath(&mut self, starmath: &OpaqueStarMath) -> Result<()> {
         let path = find_starmath_path(self.root())
             .ok_or_else(|| invalid("Formula has no recognized StarMath annotation"))?;
         self.mutate_element(&path, ChangeKind::SetText, |annotation| {
-            annotation.set_attribute(None, "encoding", version.encoding())?;
+            annotation.set_attribute(None, "encoding", starmath.version().encoding())?;
             annotation.clear_content();
-            annotation.push_text(source);
+            annotation.push_text(starmath.source());
             Ok(())
         })
     }
@@ -546,10 +778,15 @@ impl Edit<'_> {
         let Some(replacement) = self.replacement else {
             return Ok(Commit::unchanged(self.source.clone()));
         };
+        if self.changes.len() > MAX_SEMANTIC_OPERATIONS {
+            return Err(invalid(format!(
+                "Formula commit exceeds {MAX_SEMANTIC_OPERATIONS} semantic operations"
+            )));
+        }
         let xml = codec::serialize(&replacement);
         let package = self.source.package.replace_content(xml.as_bytes())?;
-        let snapshot = Formula::from_package(package, self.source.limits)?;
-        if snapshot.root() != replacement.as_ref() {
+        let reopened = Formula::from_package(package, self.source.limits)?;
+        if reopened.root() != replacement.as_ref() {
             return Err(Error::InvalidFormat(
                 "Formula root edit failed semantic readback".to_string(),
             ));
@@ -558,6 +795,8 @@ impl Edit<'_> {
             before: Arc::clone(&self.source.root),
             after: replacement,
         };
+        let snapshot = reopened.with_commit_record(self.source, &self.changes)?;
+        let record = snapshot.history.last().cloned();
         Ok(Commit {
             snapshot: snapshot.clone(),
             patch: Patch {
@@ -570,6 +809,7 @@ impl Edit<'_> {
                 changed: true,
                 candidate_reopened: true,
             },
+            record,
         })
     }
 
@@ -590,6 +830,16 @@ impl Edit<'_> {
             );
         }
         Ok(())
+    }
+
+    fn require_same_source(&self, other: &Self) -> Result<()> {
+        if self.source.as_bytes() == other.source.as_bytes()
+            && self.source.limits == other.source.limits
+        {
+            Ok(())
+        } else {
+            Err(invalid("Formula sub-edits do not share an exact source"))
+        }
     }
 
     fn stage(&mut self, validated: Arc<Element>, change: SemanticChange) {
@@ -659,6 +909,94 @@ pub enum ChangeKind {
     SetText,
 }
 
+/// Why an independent semantic operation cannot be transferred.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum DependencyConflictKind {
+    ConcurrentInsert,
+    RemovedDependency,
+    ReplacedDependency,
+    SameTarget,
+}
+
+/// One conflict found without mutating either independent edit.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DependencyConflict {
+    dependency_index: usize,
+    incoming_index: usize,
+    kind: DependencyConflictKind,
+    path: NodePath,
+}
+
+impl DependencyConflict {
+    /// Existing/dependency operation index.
+    #[must_use]
+    pub const fn dependency_index(&self) -> usize {
+        self.dependency_index
+    }
+
+    /// Incoming operation index.
+    #[must_use]
+    pub const fn incoming_index(&self) -> usize {
+        self.incoming_index
+    }
+
+    /// Conflict category.
+    #[must_use]
+    pub const fn kind(&self) -> DependencyConflictKind {
+        self.kind
+    }
+
+    /// Incoming path at the point where transfer stopped.
+    #[must_use]
+    pub const fn path(&self) -> &NodePath {
+        &self.path
+    }
+}
+
+/// Non-mutating dependency-transfer result for independent operations.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct DependencyTransfer {
+    conflicts: Vec<DependencyConflict>,
+    operations: Vec<SemanticChange>,
+}
+
+impl DependencyTransfer {
+    /// Plan path transfer without changing either operation sequence.
+    #[must_use]
+    pub fn plan(incoming: &[SemanticChange], dependencies: &[SemanticChange]) -> Self {
+        let mut operations = Vec::with_capacity(incoming.len());
+        let mut conflicts = Vec::new();
+        for (incoming_index, change) in incoming.iter().enumerate() {
+            match transfer_change(change, incoming_index, dependencies) {
+                Ok(transferred) => operations.push(transferred),
+                Err(conflict) => conflicts.push(conflict),
+            }
+        }
+        Self {
+            conflicts,
+            operations,
+        }
+    }
+
+    /// Conflicts discovered during planning.
+    #[must_use]
+    pub fn conflicts(&self) -> &[DependencyConflict] {
+        &self.conflicts
+    }
+
+    /// Successfully transferred operations, in incoming order.
+    #[must_use]
+    pub fn operations(&self) -> &[SemanticChange] {
+        &self.operations
+    }
+
+    /// Whether every incoming operation transferred.
+    #[must_use]
+    pub fn is_complete(&self) -> bool {
+        self.conflicts.is_empty()
+    }
+}
+
 /// One reversible, path-addressed `MathML` semantic operation.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SemanticChange {
@@ -723,6 +1061,16 @@ impl SemanticChange {
             after: self.before.clone(),
         }
     }
+
+    fn retained_bytes(&self) -> usize {
+        let path_bytes = self.path.indices().len().saturating_mul(size_of::<usize>());
+        [self.before.as_ref(), self.after.as_ref()]
+            .into_iter()
+            .flatten()
+            .fold(path_bytes, |total, element| {
+                total.saturating_add(element_retained_bytes(element))
+            })
+    }
 }
 
 /// The semantic before/after roots carried by a reversible patch.
@@ -772,6 +1120,7 @@ pub struct Commit {
     snapshot: Formula,
     patch: Patch,
     diagnostics: Diagnostics,
+    record: Option<CommitRecord>,
 }
 
 impl Commit {
@@ -788,6 +1137,7 @@ impl Commit {
                 changed: false,
                 candidate_reopened: false,
             },
+            record: None,
         }
     }
 
@@ -813,6 +1163,12 @@ impl Commit {
     #[must_use]
     pub const fn diagnostics(&self) -> Diagnostics {
         self.diagnostics
+    }
+
+    /// Commit-coupled semantic record, absent for an exact no-op.
+    #[must_use]
+    pub const fn record(&self) -> Option<&CommitRecord> {
+        self.record.as_ref()
     }
 
     /// Consume this commit into the published snapshot.
@@ -849,7 +1205,9 @@ impl Patch {
                 "Formula patch source does not match its expected snapshot".to_string(),
             ));
         }
-        Ok(self.target.clone())
+        self.target
+            .clone()
+            .with_commit_record(source, &self.changes)
     }
 
     /// The semantic root change, or `None` for an exact no-op.
@@ -874,6 +1232,16 @@ impl Patch {
     #[must_use]
     pub fn target_revision(&self) -> Revision {
         Revision::from_bytes(self.target.as_bytes())
+    }
+
+    /// Plan a three-way semantic join without publishing package bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless both patches use `base` as their byte-exact
+    /// source or the non-conflicting candidate fails validation.
+    pub fn plan_three_way(base: &Formula, left: &Self, right: &Self) -> Result<ThreeWayPlan> {
+        ThreeWayPlan::new(base, left, right)
     }
 
     /// Serialize this patch into a durable, bounded binary envelope.
@@ -904,7 +1272,7 @@ impl Patch {
         let source = Formula::from_bytes(reader.read_blob()?.to_vec())?;
         let target = Formula::from_bytes(reader.read_blob()?.to_vec())?;
         let count = reader.read_usize()?;
-        if count > source.limits().nodes() {
+        if count > source.limits().nodes().min(MAX_SEMANTIC_OPERATIONS) {
             return Err(invalid("Formula patch has too many semantic changes"));
         }
         let mut changes = Vec::with_capacity(count);
@@ -974,6 +1342,111 @@ impl Patch {
     }
 }
 
+/// Non-mutating three-way plan over two patches from one exact base.
+#[derive(Clone)]
+pub struct ThreeWayPlan {
+    base: Formula,
+    candidate: Option<Arc<Element>>,
+    changes: Vec<SemanticChange>,
+    conflicts: Vec<DependencyConflict>,
+    left: Revision,
+    right: Revision,
+}
+
+impl ThreeWayPlan {
+    fn new(base: &Formula, left: &Patch, right: &Patch) -> Result<Self> {
+        if !left.is_applicable_to(base) || !right.is_applicable_to(base) {
+            return Err(invalid(
+                "Formula three-way patches do not share the supplied exact base",
+            ));
+        }
+        let transfer = DependencyTransfer::plan(right.changes(), left.changes());
+        let operation_count = left
+            .changes()
+            .len()
+            .checked_add(transfer.operations().len())
+            .ok_or_else(|| invalid("Formula three-way operation count overflow"))?;
+        if operation_count > MAX_SEMANTIC_OPERATIONS {
+            return Err(invalid(format!(
+                "Formula three-way plan exceeds {MAX_SEMANTIC_OPERATIONS} operations"
+            )));
+        }
+        let mut changes = left.changes().to_vec();
+        changes.extend_from_slice(transfer.operations());
+        let candidate = if transfer.is_complete() {
+            let mut root = base.root().clone();
+            for change in &changes {
+                root = apply_semantic_change(&root, change)?;
+            }
+            Some(validate_candidate(&root, base.limits())?)
+        } else {
+            None
+        };
+        Ok(Self {
+            base: base.clone(),
+            candidate,
+            changes,
+            conflicts: transfer.conflicts,
+            left: left.target_revision(),
+            right: right.target_revision(),
+        })
+    }
+
+    /// Validated joined root, absent when conflicts remain.
+    #[must_use]
+    pub fn candidate_root(&self) -> Option<&Element> {
+        self.candidate.as_deref()
+    }
+
+    /// Planned operations in publication order.
+    #[must_use]
+    pub fn changes(&self) -> &[SemanticChange] {
+        &self.changes
+    }
+
+    /// Conflicts found without changing any package.
+    #[must_use]
+    pub fn conflicts(&self) -> &[DependencyConflict] {
+        &self.conflicts
+    }
+
+    /// Left target revision used for this plan.
+    #[must_use]
+    pub const fn left_revision(&self) -> Revision {
+        self.left
+    }
+
+    /// Whether this plan can be published.
+    #[must_use]
+    pub fn is_publishable(&self) -> bool {
+        self.candidate.is_some() && self.conflicts.is_empty()
+    }
+
+    /// Atomically publish a conflict-free plan and fully reopen the package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when conflicts exist or publication/readback fails.
+    pub fn publish(&self) -> Result<Commit> {
+        let candidate = self
+            .candidate
+            .as_ref()
+            .ok_or_else(|| invalid("Formula three-way plan has unresolved conflicts"))?;
+        let edit = Edit {
+            source: &self.base,
+            replacement: Some(Arc::clone(candidate)),
+            changes: self.changes.clone(),
+        };
+        edit.commit()
+    }
+
+    /// Right target revision used for this plan.
+    #[must_use]
+    pub const fn right_revision(&self) -> Revision {
+        self.right
+    }
+}
+
 /// Stable FNV-1a fingerprint of exact package bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Revision(u64);
@@ -1001,9 +1474,6 @@ impl Revision {
 pub struct History {
     patches: Vec<Patch>,
 }
-
-const HISTORY_MAGIC: &[u8] = b"LITCHI-ODF-HISTORY\0\x01";
-const PATCH_MAGIC: &[u8] = b"LITCHI-ODF-PATCH\0\x01";
 
 impl History {
     /// Create an empty history.
@@ -1249,6 +1719,29 @@ fn element_at<'element>(root: &'element Element, path: &[usize]) -> Result<&'ele
     Ok(current)
 }
 
+fn element_retained_bytes(root: &Element) -> usize {
+    let mut retained = 0_usize;
+    let mut pending = vec![root];
+    while let Some(element) = pending.pop() {
+        retained = retained
+            .saturating_add(element.local_name().len())
+            .saturating_add(element.namespace_uri().map_or(0, str::len));
+        for attribute in element.attributes() {
+            retained = retained
+                .saturating_add(attribute.local_name().len())
+                .saturating_add(attribute.namespace_uri().map_or(0, str::len))
+                .saturating_add(attribute.value().len());
+        }
+        for content in element.content() {
+            match content {
+                Content::Text(text) => retained = retained.saturating_add(text.len()),
+                Content::Element(child) => pending.push(child),
+            }
+        }
+    }
+    retained
+}
+
 fn apply_semantic_change(root: &Element, change: &SemanticChange) -> Result<Element> {
     match change.kind {
         ChangeKind::Insert => {
@@ -1301,6 +1794,90 @@ fn apply_semantic_change(root: &Element, change: &SemanticChange) -> Result<Elem
                 Ok(())
             })
         },
+    }
+}
+
+fn transfer_change(
+    change: &SemanticChange,
+    incoming_index: usize,
+    dependencies: &[SemanticChange],
+) -> std::result::Result<SemanticChange, DependencyConflict> {
+    let mut transferred = change.clone();
+    for (dependency_index, dependency) in dependencies.iter().enumerate() {
+        if let Err(kind) = transfer_path(&mut transferred.path.0, transferred.kind, dependency) {
+            return Err(DependencyConflict {
+                dependency_index,
+                incoming_index,
+                kind,
+                path: transferred.path,
+            });
+        }
+    }
+    Ok(transferred)
+}
+
+fn transfer_path(
+    path: &mut [usize],
+    incoming_kind: ChangeKind,
+    dependency: &SemanticChange,
+) -> std::result::Result<(), DependencyConflictKind> {
+    if incoming_kind != ChangeKind::Insert
+        && path.len() < dependency.path.indices().len()
+        && dependency.path.indices().starts_with(path)
+    {
+        return Err(DependencyConflictKind::ReplacedDependency);
+    }
+    match dependency.kind {
+        ChangeKind::Insert => {
+            let Some((inserted_index, parent)) = dependency.path.0.split_last() else {
+                return Err(DependencyConflictKind::ReplacedDependency);
+            };
+            if incoming_kind == ChangeKind::Insert && path == dependency.path.indices() {
+                return Err(DependencyConflictKind::ConcurrentInsert);
+            }
+            adjust_after_insert(path, parent, *inserted_index);
+            Ok(())
+        },
+        ChangeKind::Remove => {
+            let Some((removed_index, parent)) = dependency.path.0.split_last() else {
+                return Err(DependencyConflictKind::RemovedDependency);
+            };
+            let removed_path = dependency.path.indices();
+            let targets_removed_descendant = path.starts_with(removed_path)
+                && (incoming_kind != ChangeKind::Insert || path.len() > removed_path.len());
+            if targets_removed_descendant {
+                return Err(DependencyConflictKind::RemovedDependency);
+            }
+            adjust_after_remove(path, parent, *removed_index);
+            Ok(())
+        },
+        ChangeKind::Replace => {
+            if path == dependency.path.indices() || path.starts_with(dependency.path.indices()) {
+                Err(DependencyConflictKind::ReplacedDependency)
+            } else {
+                Ok(())
+            }
+        },
+        ChangeKind::SetAttribute | ChangeKind::RemoveAttribute | ChangeKind::SetText => {
+            if path == dependency.path.indices() {
+                Err(DependencyConflictKind::SameTarget)
+            } else {
+                Ok(())
+            }
+        },
+    }
+}
+
+fn adjust_after_insert(path: &mut [usize], parent: &[usize], inserted_index: usize) {
+    if path.len() > parent.len() && path.starts_with(parent) && path[parent.len()] >= inserted_index
+    {
+        path[parent.len()] = path[parent.len()].saturating_add(1);
+    }
+}
+
+fn adjust_after_remove(path: &mut [usize], parent: &[usize], removed_index: usize) {
+    if path.len() > parent.len() && path.starts_with(parent) && path[parent.len()] > removed_index {
+        path[parent.len()] = path[parent.len()].saturating_sub(1);
     }
 }
 
@@ -1357,6 +1934,13 @@ fn validate_candidate(root: &Element, limits: codec::Limits) -> Result<Arc<Eleme
 
 fn invalid(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
+}
+
+fn is_xml_character(character: char) -> bool {
+    matches!(character, '\u{9}' | '\u{A}' | '\u{D}')
+        || ('\u{20}'..='\u{D7FF}').contains(&character)
+        || ('\u{E000}'..='\u{FFFD}').contains(&character)
+        || ('\u{10000}'..='\u{10FFFF}').contains(&character)
 }
 
 fn check_package_bytes(actual: usize, limits: codec::Limits) -> Result<()> {

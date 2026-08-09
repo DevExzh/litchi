@@ -8,6 +8,7 @@ use quick_xml::{
     reader::NsReader,
 };
 use std::borrow::Cow;
+use std::ops::Range;
 
 use crate::style::{Definition, Origin};
 
@@ -32,23 +33,61 @@ fn parse_part(xml: &str, origin: Origin, definitions: &mut Vec<Definition>) -> R
     }
     let mut reader = NsReader::from_reader(xml.as_bytes());
     let mut depth = 0usize;
+    let mut active = Vec::new();
     loop {
+        let event_start = position(&reader)?;
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| invalid(format!("invalid ODM style XML: {error}")))?;
         let style_namespace =
             matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == STYLE);
         let event = event.into_owned();
+        let event_end = position(&reader)?;
         match event {
             Event::Start(element) => {
                 depth = checked_depth(depth)?;
-                observe_style(&reader, style_namespace, &element, origin, definitions)?;
+                if let Some(index) = observe_style(
+                    &reader,
+                    style_namespace,
+                    &element,
+                    origin,
+                    definitions,
+                    event_start..event_end,
+                    xml.as_bytes()
+                        .get(event_start..event_end)
+                        .ok_or_else(|| invalid("ODM style event span is outside its XML part"))?,
+                )? {
+                    active.push((depth, index));
+                }
             },
             Event::Empty(element) => {
                 let _virtual_depth = checked_depth(depth)?;
-                observe_style(&reader, style_namespace, &element, origin, definitions)?;
+                let _definition = observe_style(
+                    &reader,
+                    style_namespace,
+                    &element,
+                    origin,
+                    definitions,
+                    event_start..event_end,
+                    xml.as_bytes()
+                        .get(event_start..event_end)
+                        .ok_or_else(|| invalid("ODM style event span is outside its XML part"))?,
+                )?;
             },
             Event::End(_) => {
+                if active
+                    .last()
+                    .is_some_and(|(style_depth, _)| *style_depth == depth)
+                {
+                    let (_style_depth, index) = active
+                        .pop()
+                        .ok_or_else(|| invalid("ODM style nesting underflow"))?;
+                    definitions
+                        .get_mut(index)
+                        .ok_or_else(|| invalid("ODM style definition disappeared"))?
+                        .source_span
+                        .end = event_end;
+                }
                 depth = depth
                     .checked_sub(1)
                     .ok_or_else(|| invalid("ODM style XML depth underflow"))?;
@@ -79,9 +118,11 @@ fn observe_style(
     element: &BytesStart<'_>,
     origin: Origin,
     definitions: &mut Vec<Definition>,
-) -> Result<()> {
+    source_span: Range<usize>,
+    tag: &[u8],
+) -> Result<Option<usize>> {
     if !style_namespace || element.local_name().as_ref() != b"style" {
-        return Ok(());
+        return Ok(None);
     }
     let Some(name) = attribute(reader, element, b"name")? else {
         return Err(invalid("ODM style:style has no style:name"));
@@ -111,8 +152,100 @@ fn observe_style(
         family,
         parent,
         origin,
+        source_span,
+        name_span: {
+            let key = attribute_key(reader, element, b"name")?
+                .ok_or_else(|| invalid("ODM style name source spelling disappeared"))?;
+            let (start, end) = attribute_value_span(tag, &key)?;
+            start..end
+        },
     });
-    Ok(())
+    let definition = definitions.len() - 1;
+    let tag_start = definitions[definition].source_span.start;
+    definitions[definition].name_span.start += tag_start;
+    definitions[definition].name_span.end += tag_start;
+    Ok(Some(definition))
+}
+
+fn attribute_key(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    local: &[u8],
+) -> Result<Option<Vec<u8>>> {
+    let mut key = None;
+    for raw in element.attributes() {
+        let attribute =
+            raw.map_err(|error| invalid(format!("invalid ODM style attribute: {error}")))?;
+        let (namespace, name) = reader.resolver().resolve_attribute(attribute.key);
+        if matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == STYLE)
+            && name.as_ref() == local
+            && key.replace(attribute.key.as_ref().to_vec()).is_some()
+        {
+            return Err(invalid(
+                "duplicate namespace-equivalent ODM style attribute",
+            ));
+        }
+    }
+    Ok(key)
+}
+
+fn attribute_value_span(tag: &[u8], wanted: &[u8]) -> Result<(usize, usize)> {
+    let mut cursor = 1usize;
+    while cursor < tag.len()
+        && !tag[cursor].is_ascii_whitespace()
+        && !matches!(tag[cursor], b'/' | b'>')
+    {
+        cursor += 1;
+    }
+    while cursor < tag.len() {
+        while cursor < tag.len() && tag[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        if cursor >= tag.len() || matches!(tag[cursor], b'/' | b'>') {
+            break;
+        }
+        let name_start = cursor;
+        while cursor < tag.len()
+            && !tag[cursor].is_ascii_whitespace()
+            && !matches!(tag[cursor], b'=' | b'/' | b'>')
+        {
+            cursor += 1;
+        }
+        let name_end = cursor;
+        while cursor < tag.len() && tag[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        if tag.get(cursor) != Some(&b'=') {
+            return Err(invalid("ODM style attribute is missing '='"));
+        }
+        cursor += 1;
+        while cursor < tag.len() && tag[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        let quote = *tag
+            .get(cursor)
+            .filter(|quote| matches!(quote, b'\'' | b'"'))
+            .ok_or_else(|| invalid("ODM style attribute is not quoted"))?;
+        cursor += 1;
+        let value_start = cursor;
+        while cursor < tag.len() && tag[cursor] != quote {
+            cursor += 1;
+        }
+        if cursor >= tag.len() {
+            return Err(invalid("ODM style attribute is unterminated"));
+        }
+        let value_end = cursor;
+        cursor += 1;
+        if &tag[name_start..name_end] == wanted {
+            return Ok((value_start, value_end));
+        }
+    }
+    Err(invalid("ODM style attribute source span is missing"))
+}
+
+fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
+    usize::try_from(reader.buffer_position())
+        .map_err(|_range_error| invalid("ODM style source position exceeds the platform range"))
 }
 
 fn attribute(

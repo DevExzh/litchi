@@ -44,14 +44,30 @@ pub enum ChangeKind {
     ProducerExtension,
 }
 
+/// The CRUD direction of one semantic effect.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ChangeAction {
+    Create,
+    Update,
+    Remove,
+}
+
 /// One ordered semantic effect in a unified transaction.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Change {
+    action: ChangeAction,
     kind: ChangeKind,
     target: String,
 }
 
 impl Change {
+    /// Returns whether the target is created, updated, or removed.
+    #[must_use]
+    pub const fn action(&self) -> ChangeAction {
+        self.action
+    }
+
     /// Returns the semantic family affected by this operation.
     #[must_use]
     pub const fn kind(&self) -> ChangeKind {
@@ -71,15 +87,17 @@ impl Change {
 /// driver, follows a component link, or executes a stored command.
 pub struct Edit<'source> {
     source: &'source Database,
+    policy: crate::EditPolicy,
     content: String,
     changes: Vec<Change>,
     legacy_query: Option<QueryChange>,
 }
 
 impl<'source> Edit<'source> {
-    pub(crate) fn new(source: &'source Database) -> Self {
+    pub(crate) fn new(source: &'source Database, policy: crate::EditPolicy) -> Self {
         Self {
             source,
+            policy,
             content: source.content_xml().to_owned(),
             changes: Vec::new(),
             legacy_query: None,
@@ -98,9 +116,71 @@ impl<'source> Edit<'source> {
         &self.changes
     }
 
+    /// Copies one bounded inert table declaration from another snapshot.
+    ///
+    /// Foreign-key targets remain semantic names; this operation never opens
+    /// either database connection or copies database rows.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source catalog is invalid, the table is
+    /// absent, or the destination cannot accept the declaration.
+    pub fn transfer_table_from(&mut self, source: &Database, name: &str) -> Result<()> {
+        let catalog = source.catalog()?;
+        let table = catalog
+            .table(name)?
+            .ok_or_else(|| Error::InvalidFormat("ODB transfer table does not exist".to_string()))?;
+        self.add_table(table.clone())
+    }
+
+    /// Copies one bounded inert stored-query declaration from another
+    /// snapshot without parsing or executing its command.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source catalog is invalid, the query is
+    /// absent, or the destination cannot accept the declaration.
+    pub fn transfer_query_from(&mut self, source: &Database, name: &str) -> Result<()> {
+        let catalog = source.catalog()?;
+        let query = catalog
+            .query(name)?
+            .ok_or_else(|| Error::InvalidFormat("ODB transfer query does not exist".to_string()))?;
+        self.add_query(
+            Query::new(query.name(), query.command())
+                .with_escape_processing(query.escape_processing()),
+        )
+    }
+
+    /// Copies one unambiguous inert form/report declaration from another
+    /// snapshot without following its component link.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source catalog is invalid, the selector is
+    /// absent or ambiguous, or the destination cannot accept the declaration.
+    pub fn transfer_component_from(
+        &mut self,
+        source: &Database,
+        kind: ComponentKind,
+        name: &str,
+    ) -> Result<()> {
+        let catalog = source.catalog()?;
+        let mut matches = catalog
+            .components()
+            .iter()
+            .filter(|component| component.kind() == kind && component.name() == Some(name));
+        let component = matches.next().ok_or_else(|| {
+            Error::InvalidFormat("ODB transfer component does not exist".to_string())
+        })?;
+        if matches.next().is_some() {
+            return invalid("ODB transfer component selector is ambiguous");
+        }
+        self.add_component(component.clone())
+    }
+
     /// Adds a table presentation or schema definition at the collection tail.
     pub fn add_table(&mut self, table: Table) -> Result<()> {
-        validate_name(table.name(), "table")?;
+        validate_table(&table)?;
         if find_named_table(&scan(&self.content)?, table.name())?.is_some() {
             return invalid("ODB table already exists");
         }
@@ -135,12 +215,12 @@ impl<'source> Edit<'source> {
                 }
             },
         }
-        self.record(ChangeKind::Table, table.name())
+        self.record(ChangeAction::Create, ChangeKind::Table, table.name())
     }
 
     /// Replaces one complete table declaration while preserving adjacent XML.
     pub fn replace_table(&mut self, name: &str, table: Table) -> Result<()> {
-        validate_name(table.name(), "table")?;
+        validate_table(&table)?;
         let nodes = scan(&self.content)?;
         let site = find_named_table(&nodes, name)?
             .ok_or_else(|| Error::InvalidFormat("ODB table does not exist".to_string()))?;
@@ -158,26 +238,67 @@ impl<'source> Edit<'source> {
             site.full.clone(),
             &serialize_table(&table, &prefix),
         )?;
-        self.record(ChangeKind::Table, name)
+        self.record(ChangeAction::Update, ChangeKind::Table, name)
     }
 
     /// Removes one unambiguous table declaration.
     pub fn remove_table(&mut self, name: &str) -> Result<()> {
+        self.remove_table_with(name, crate::DependencyDisposition::Refuse)
+    }
+
+    /// Removes a table under an explicit modeled-dependency disposition.
+    pub fn remove_table_with(
+        &mut self,
+        name: &str,
+        disposition: crate::DependencyDisposition,
+    ) -> Result<()> {
         let nodes = scan(&self.content)?;
         let site = find_named_table(&nodes, name)?
             .ok_or_else(|| Error::InvalidFormat("ODB table does not exist".to_string()))?;
-        if nodes.iter().any(|node| {
-            node.local == "key"
-                && attribute(node, DATABASE_NAMESPACE, "referenced-table-name")
-                    .is_some_and(|value| value == name)
-                && !ancestors(&nodes, node).any(|ancestor| ancestor.id == site.id)
-        }) {
+        let incoming = nodes
+            .iter()
+            .filter(|node| {
+                node.local == "key"
+                    && attribute(node, DATABASE_NAMESPACE, "referenced-table-name")
+                        .is_some_and(|value| value == name)
+                    && !ancestors(&nodes, node).any(|ancestor| ancestor.id == site.id)
+            })
+            .collect::<Vec<_>>();
+        if !incoming.is_empty() && disposition == crate::DependencyDisposition::Refuse {
             return Err(Error::Unsupported(
-                "ODB table removal would orphan an incoming relation".to_string(),
+                "ODB table removal requires an incoming-relation disposition".to_string(),
             ));
         }
-        replace_span(&mut self.content, site.full.clone(), "")?;
-        self.record(ChangeKind::Table, name)
+        if disposition == crate::DependencyDisposition::Cascade {
+            let mut edits = incoming
+                .iter()
+                .map(|key| TextEdit {
+                    range: key.full.clone(),
+                    value: String::new(),
+                })
+                .collect::<Vec<_>>();
+            edits.push(TextEdit {
+                range: site.full.clone(),
+                value: String::new(),
+            });
+            apply_edits(&mut self.content, edits)?;
+            for key in incoming {
+                let owner = ancestors(&nodes, key)
+                    .find(|node| node.local == "table-definition")
+                    .and_then(|node| attribute(node, DATABASE_NAMESPACE, "name"));
+                let key_name = attribute(key, DATABASE_NAMESPACE, "name");
+                if let (Some(owner), Some(key_name)) = (owner, key_name) {
+                    self.record(
+                        ChangeAction::Remove,
+                        ChangeKind::Key,
+                        &format!("{owner}/{key_name}"),
+                    )?;
+                }
+            }
+        } else {
+            replace_span(&mut self.content, site.full.clone(), "")?;
+        }
+        self.record(ChangeAction::Remove, ChangeKind::Table, name)
     }
 
     /// Renames a table and all modeled foreign-key table references atomically.
@@ -213,12 +334,12 @@ impl<'source> Edit<'source> {
             }
         }
         apply_edits(&mut self.content, edits)?;
-        self.record(ChangeKind::Table, name)
+        self.record(ChangeAction::Update, ChangeKind::Table, name)
     }
 
     /// Adds a column to a table at the collection tail.
     pub fn add_column(&mut self, table: &str, column: Column) -> Result<()> {
-        validate_name(column.name(), "column")?;
+        validate_column(&column)?;
         let nodes = scan(&self.content)?;
         let table_site = find_named_table(&nodes, table)?
             .ok_or_else(|| Error::InvalidFormat("ODB table does not exist".to_string()))?;
@@ -242,12 +363,16 @@ impl<'source> Edit<'source> {
             &fragment,
             &prefix,
         )?;
-        self.record(ChangeKind::Column, &format!("{table}/{}", column.name()))
+        self.record(
+            ChangeAction::Create,
+            ChangeKind::Column,
+            &format!("{table}/{}", column.name()),
+        )
     }
 
     /// Replaces one complete column declaration.
     pub fn replace_column(&mut self, table: &str, name: &str, column: Column) -> Result<()> {
-        validate_name(column.name(), "column")?;
+        validate_column(&column)?;
         let nodes = scan(&self.content)?;
         let table_site = find_named_table(&nodes, table)?
             .ok_or_else(|| Error::InvalidFormat("ODB table does not exist".to_string()))?;
@@ -261,23 +386,64 @@ impl<'source> Edit<'source> {
         let prefix = prefixes(&self.content)?.database;
         let fragment = serialize_column(&column, table_site.local == "table-definition", &prefix);
         replace_span(&mut self.content, site.full.clone(), &fragment)?;
-        self.record(ChangeKind::Column, &format!("{table}/{name}"))
+        self.record(
+            ChangeAction::Update,
+            ChangeKind::Column,
+            &format!("{table}/{name}"),
+        )
     }
 
     /// Removes one table column.
     pub fn remove_column(&mut self, table: &str, name: &str) -> Result<()> {
+        self.remove_column_with(table, name, crate::DependencyDisposition::Refuse)
+    }
+
+    /// Removes a column under an explicit key/index dependency disposition.
+    pub fn remove_column_with(
+        &mut self,
+        table: &str,
+        name: &str,
+        disposition: crate::DependencyDisposition,
+    ) -> Result<()> {
         let nodes = scan(&self.content)?;
         let table_site = find_named_table(&nodes, table)?
             .ok_or_else(|| Error::InvalidFormat("ODB table does not exist".to_string()))?;
         let site = find_named_child(&nodes, table_site, column_element(table_site), name)?
             .ok_or_else(|| Error::InvalidFormat("ODB column does not exist".to_string()))?;
-        if column_is_referenced(&nodes, table_site, name) {
+        let dependents = column_dependents(&nodes, table_site, table, name);
+        if !dependents.is_empty() && disposition == crate::DependencyDisposition::Refuse {
             return Err(Error::Unsupported(
-                "ODB column removal would orphan a key or index reference".to_string(),
+                "ODB column removal requires a key/index dependency disposition".to_string(),
             ));
         }
-        replace_span(&mut self.content, site.full.clone(), "")?;
-        self.record(ChangeKind::Column, &format!("{table}/{name}"))
+        if disposition == crate::DependencyDisposition::Cascade {
+            let mut edits = dependents
+                .iter()
+                .map(|dependent| TextEdit {
+                    range: dependent.node.full.clone(),
+                    value: String::new(),
+                })
+                .collect::<Vec<_>>();
+            edits.push(TextEdit {
+                range: site.full.clone(),
+                value: String::new(),
+            });
+            apply_edits(&mut self.content, edits)?;
+            for dependent in dependents {
+                self.record(
+                    ChangeAction::Remove,
+                    dependent.kind,
+                    &format!("{}/{}", dependent.table, dependent.name),
+                )?;
+            }
+        } else {
+            replace_span(&mut self.content, site.full.clone(), "")?;
+        }
+        self.record(
+            ChangeAction::Remove,
+            ChangeKind::Column,
+            &format!("{table}/{name}"),
+        )
     }
 
     /// Renames a column and local key/index mappings atomically.
@@ -335,7 +501,11 @@ impl<'source> Edit<'source> {
             }
         }
         apply_edits(&mut self.content, edits)?;
-        self.record(ChangeKind::Column, &format!("{table}/{name}"))
+        self.record(
+            ChangeAction::Update,
+            ChangeKind::Column,
+            &format!("{table}/{name}"),
+        )
     }
 
     /// Adds a schema key. Foreign keys are the ODF relation representation.
@@ -343,7 +513,7 @@ impl<'source> Edit<'source> {
         let name = key
             .name()
             .ok_or_else(|| Error::InvalidFormat("ODB authored key requires a name".to_string()))?;
-        validate_name(name, "key")?;
+        validate_key(&key)?;
         let prefix = prefixes(&self.content)?.database;
         self.add_table_child(
             table,
@@ -360,7 +530,7 @@ impl<'source> Edit<'source> {
         let replacement_name = key
             .name()
             .ok_or_else(|| Error::InvalidFormat("ODB authored key requires a name".to_string()))?;
-        validate_name(replacement_name, "key")?;
+        validate_key(&key)?;
         let prefix = prefixes(&self.content)?.database;
         self.replace_table_child(
             table,
@@ -379,7 +549,7 @@ impl<'source> Edit<'source> {
 
     /// Adds an index to a schema table.
     pub fn add_index(&mut self, table: &str, index: Index) -> Result<()> {
-        validate_name(index.name(), "index")?;
+        validate_index(&index)?;
         let prefix = prefixes(&self.content)?.database;
         self.add_table_child(
             table,
@@ -393,7 +563,7 @@ impl<'source> Edit<'source> {
 
     /// Replaces an index declaration.
     pub fn replace_index(&mut self, table: &str, name: &str, index: Index) -> Result<()> {
-        validate_name(index.name(), "index")?;
+        validate_index(&index)?;
         let prefix = prefixes(&self.content)?.database;
         self.replace_table_child(
             table,
@@ -428,7 +598,7 @@ impl<'source> Edit<'source> {
             &fragment,
             &prefix,
         )?;
-        self.record(ChangeKind::Query, query.name())
+        self.record(ChangeAction::Create, ChangeKind::Query, query.name())
     }
 
     /// Replaces a stored query without interpreting its command.
@@ -447,7 +617,7 @@ impl<'source> Edit<'source> {
             site.full.clone(),
             &serialize_query(&query, &prefix),
         )?;
-        self.record(ChangeKind::Query, name)
+        self.record(ChangeAction::Update, ChangeKind::Query, name)
     }
 
     /// Removes a stored query.
@@ -456,7 +626,7 @@ impl<'source> Edit<'source> {
         let site = find_named_node(&nodes, "query", name)?
             .ok_or_else(|| Error::InvalidFormat("ODB query does not exist".to_string()))?;
         replace_span(&mut self.content, site.full.clone(), "")?;
-        self.record(ChangeKind::Query, name)
+        self.record(ChangeAction::Remove, ChangeKind::Query, name)
     }
 
     /// Replaces the inert command text stored for one exactly named query.
@@ -468,7 +638,7 @@ impl<'source> Edit<'source> {
         if let Some(change) = self.legacy_query.as_mut() {
             change.after_command = value;
         }
-        self.record(ChangeKind::Query, name)
+        self.record(ChangeAction::Update, ChangeKind::Query, name)
     }
 
     /// Sets or removes the stored `db:escape-processing` declaration.
@@ -479,11 +649,14 @@ impl<'source> Edit<'source> {
         if let Some(change) = self.legacy_query.as_mut() {
             change.after_escape_processing = value;
         }
-        self.record(ChangeKind::Query, name)
+        self.record(ChangeAction::Update, ChangeKind::Query, name)
     }
 
     /// Replaces, creates, or removes the inert database connection target.
     pub fn set_connection(&mut self, connection: Option<Connection>) -> Result<()> {
+        if let Some(value) = connection.as_ref() {
+            validate_connection(value)?;
+        }
         let nodes = scan(&self.content)?;
         let prefixes = prefixes(&self.content)?;
         let targets = nodes
@@ -499,6 +672,12 @@ impl<'source> Edit<'source> {
         if targets.len() > 1 {
             return invalid("ODB connection target is ambiguous");
         }
+        let action = match (targets.is_empty(), connection.is_some()) {
+            (true, true) => ChangeAction::Create,
+            (false, true) => ChangeAction::Update,
+            (false, false) => ChangeAction::Remove,
+            (true, false) => return Ok(()),
+        };
         match (targets.first().copied(), connection.as_ref()) {
             (Some(site), Some(value)) => {
                 let owner = connection_owner(&nodes, site);
@@ -532,9 +711,9 @@ impl<'source> Edit<'source> {
                     insert_child(&mut self.content, source, &wrapped)?;
                 }
             },
-            (None, None) => return Ok(()),
+            (None, None) => return invalid("ODB connection staging state is inconsistent"),
         }
-        self.record(ChangeKind::Connection, "connection")
+        self.record(action, ChangeKind::Connection, "connection")
     }
 
     /// Adds an inert form or report component.
@@ -542,7 +721,7 @@ impl<'source> Edit<'source> {
         let name = component.name().ok_or_else(|| {
             Error::InvalidFormat("ODB authored component requires a name".to_string())
         })?;
-        validate_name(name, "component")?;
+        validate_component(&component)?;
         let nodes = scan(&self.content)?;
         if find_component(&nodes, component.kind(), name)?.is_some() {
             return invalid("ODB component already exists");
@@ -559,7 +738,11 @@ impl<'source> Edit<'source> {
             &fragment,
             &prefix,
         )?;
-        self.record(ChangeKind::Component, &format!("{collection}/{name}"))
+        self.record(
+            ChangeAction::Create,
+            ChangeKind::Component,
+            &format!("{collection}/{name}"),
+        )
     }
 
     /// Replaces an inert form or report component.
@@ -575,7 +758,7 @@ impl<'source> Edit<'source> {
         let replacement_name = component.name().ok_or_else(|| {
             Error::InvalidFormat("ODB authored component requires a name".to_string())
         })?;
-        validate_name(replacement_name, "component")?;
+        validate_component(&component)?;
         let nodes = scan(&self.content)?;
         let site = find_component(&nodes, kind, name)?
             .ok_or_else(|| Error::InvalidFormat("ODB component does not exist".to_string()))?;
@@ -589,6 +772,7 @@ impl<'source> Edit<'source> {
             &serialize_component(&component, &prefixes),
         )?;
         self.record(
+            ChangeAction::Update,
             ChangeKind::Component,
             &format!("{}/{name}", component_collection(kind)),
         )
@@ -601,6 +785,7 @@ impl<'source> Edit<'source> {
             .ok_or_else(|| Error::InvalidFormat("ODB component does not exist".to_string()))?;
         replace_span(&mut self.content, site.full.clone(), "")?;
         self.record(
+            ChangeAction::Remove,
             ChangeKind::Component,
             &format!("{}/{name}", component_collection(kind)),
         )
@@ -628,7 +813,11 @@ impl<'source> Edit<'source> {
         let nodes = scan(&self.content)?;
         let database = unique_required_node(&nodes, "database")?;
         insert_child(&mut self.content, database, xml)?;
-        self.record(ChangeKind::ProducerExtension, &root.local)
+        self.record(
+            ChangeAction::Create,
+            ChangeKind::ProducerExtension,
+            &root.local,
+        )
     }
 
     /// Removes one unambiguous direct producer-extension child by namespace URI
@@ -650,7 +839,7 @@ impl<'source> Edit<'source> {
                 Error::InvalidFormat("ODB producer extension does not exist".to_string())
             })?;
         replace_span(&mut self.content, site.full.clone(), "")?;
-        self.record(ChangeKind::ProducerExtension, local)
+        self.record(ChangeAction::Remove, ChangeKind::ProducerExtension, local)
     }
 
     fn add_table_child(
@@ -676,7 +865,7 @@ impl<'source> Edit<'source> {
             fragment,
             &prefix,
         )?;
-        self.record(kind, &format!("{table}/{name}"))
+        self.record(ChangeAction::Create, kind, &format!("{table}/{name}"))
     }
 
     fn replace_table_child(
@@ -698,7 +887,7 @@ impl<'source> Edit<'source> {
             return invalid("ODB replacement table child name already exists");
         }
         replace_span(&mut self.content, site.full.clone(), fragment)?;
-        self.record(kind, &format!("{table}/{name}"))
+        self.record(ChangeAction::Update, kind, &format!("{table}/{name}"))
     }
 
     fn remove_table_child(&mut self, table: &str, local: &str, name: &str) -> Result<()> {
@@ -712,7 +901,7 @@ impl<'source> Edit<'source> {
         } else {
             ChangeKind::Index
         };
-        self.record(kind, &format!("{table}/{name}"))
+        self.record(ChangeAction::Remove, kind, &format!("{table}/{name}"))
     }
 
     fn set_named_db_attribute(
@@ -761,7 +950,7 @@ impl<'source> Edit<'source> {
         Ok(())
     }
 
-    fn record(&mut self, kind: ChangeKind, target: &str) -> Result<()> {
+    fn record(&mut self, action: ChangeAction, kind: ChangeKind, target: &str) -> Result<()> {
         if self.changes.len() >= MAX_OPERATIONS {
             return invalid("ODB transaction exceeds the operation limit");
         }
@@ -772,6 +961,7 @@ impl<'source> Edit<'source> {
                 source,
             })?;
         self.changes.push(Change {
+            action,
             kind,
             target: target.to_owned(),
         });
@@ -783,6 +973,27 @@ impl<'source> Edit<'source> {
     pub fn commit(self) -> Result<Commit> {
         if self.content == self.source.content_xml() {
             return Ok(Commit::unchanged(self.source.clone()));
+        }
+        let protection = self.source.protection_status()?;
+        if protection.is_signed()
+            && matches!(
+                self.policy.signature(),
+                crate::SignaturePolicy::PreserveExactOnly
+            )
+        {
+            return Err(Error::Unsupported(
+                "ODB signature policy permits exact no-ops only".to_string(),
+            ));
+        }
+        if protection.is_encrypted()
+            && matches!(
+                self.policy.encryption(),
+                crate::EncryptionPolicy::PreserveExactOnly
+            )
+        {
+            return Err(Error::Unsupported(
+                "ODB encryption policy permits exact no-ops only".to_string(),
+            ));
         }
         crate::codec::validate(&self.content)?;
         let snapshot = Database {
@@ -890,10 +1101,10 @@ impl Commit {
 /// A byte-exact source-checked reversible ODB patch.
 #[derive(Clone)]
 pub struct Patch {
-    source: Database,
-    target: Database,
-    changes: Vec<Change>,
-    legacy_query: Option<QueryChange>,
+    pub(super) source: Database,
+    pub(super) target: Database,
+    pub(super) changes: Vec<Change>,
+    pub(super) legacy_query: Option<QueryChange>,
 }
 
 impl Patch {
@@ -1825,11 +2036,69 @@ fn column_collection(table: &Node) -> &'static str {
     }
 }
 
-fn column_is_referenced(nodes: &[Node], table: &Node, name: &str) -> bool {
-    descendants(nodes, table).any(|node| {
-        matches!(node.local.as_str(), "key-column" | "index-column")
-            && attribute(node, DATABASE_NAMESPACE, "name").is_some_and(|value| value == name)
-    })
+struct Dependent<'a> {
+    node: &'a Node,
+    table: &'a str,
+    name: &'a str,
+    kind: ChangeKind,
+}
+
+fn column_dependents<'a>(
+    nodes: &'a [Node],
+    table: &'a Node,
+    table_name: &'a str,
+    name: &str,
+) -> Vec<Dependent<'a>> {
+    let mut dependents = Vec::new();
+    for owner in descendants(nodes, table).filter(|node| {
+        matches!(node.local.as_str(), "key" | "index")
+            && descendants(nodes, node).any(|column| {
+                matches!(column.local.as_str(), "key-column" | "index-column")
+                    && attribute(column, DATABASE_NAMESPACE, "name")
+                        .is_some_and(|value| value == name)
+            })
+    }) {
+        if let Some(owner_name) = attribute(owner, DATABASE_NAMESPACE, "name") {
+            dependents.push(Dependent {
+                node: owner,
+                table: table_name,
+                name: owner_name,
+                kind: if owner.local == "key" {
+                    ChangeKind::Key
+                } else {
+                    ChangeKind::Index
+                },
+            });
+        }
+    }
+    for key in nodes.iter().filter(|node| {
+        node.local == "key"
+            && attribute(node, DATABASE_NAMESPACE, "referenced-table-name")
+                .is_some_and(|value| value == table_name)
+            && descendants(nodes, node).any(|column| {
+                column.local == "key-column"
+                    && attribute(column, DATABASE_NAMESPACE, "related-column-name")
+                        .is_some_and(|value| value == name)
+            })
+    }) {
+        let owner_table = ancestors(nodes, key)
+            .find(|node| node.local == "table-definition")
+            .and_then(|node| attribute(node, DATABASE_NAMESPACE, "name"));
+        if let (Some(owner_table), Some(key_name)) =
+            (owner_table, attribute(key, DATABASE_NAMESPACE, "name"))
+            && !dependents
+                .iter()
+                .any(|dependent| dependent.node.id == key.id)
+        {
+            dependents.push(Dependent {
+                node: key,
+                table: owner_table,
+                name: key_name,
+                kind: ChangeKind::Key,
+            });
+        }
+    }
+    dependents
 }
 
 fn validate_extension(xml: &str) -> Result<()> {
@@ -1844,6 +2113,124 @@ fn validate_extension(xml: &str) -> Result<()> {
     let roots = nodes.iter().filter(|node| node.parent.is_none()).count();
     if roots != 1 {
         return invalid("ODB producer extension must contain exactly one element");
+    }
+    Ok(())
+}
+
+fn validate_table(table: &Table) -> Result<()> {
+    validate_name(table.name(), "table")?;
+    if table.kind() == TableKind::Representation
+        && (!table.keys().is_empty() || !table.indices().is_empty())
+    {
+        return invalid("ODB table representations cannot author schema keys or indices");
+    }
+    for column in table.columns() {
+        validate_column(column)?;
+    }
+    for key in table.keys() {
+        validate_key(key)?;
+        for mapping in key.columns() {
+            if let Some(name) = mapping.name()
+                && !table.columns().iter().any(|column| column.name() == name)
+            {
+                return invalid("ODB key maps an absent local column");
+            }
+        }
+    }
+    for index in table.indices() {
+        validate_index(index)?;
+        if index.columns().iter().any(|indexed| {
+            !table
+                .columns()
+                .iter()
+                .any(|column| column.name() == indexed.name())
+        }) {
+            return invalid("ODB index maps an absent local column");
+        }
+    }
+    Ok(())
+}
+
+fn validate_column(column: &Column) -> Result<()> {
+    validate_name(column.name(), "column")?;
+    if let Some(value) = column.type_name() {
+        validate_value(value, "column type name")?;
+    }
+    if column.precision() == Some(0) || column.scale() == Some(0) {
+        return invalid("ODB column precision and scale must be positive");
+    }
+    Ok(())
+}
+
+fn validate_key(key: &Key) -> Result<()> {
+    let name = key
+        .name()
+        .ok_or_else(|| Error::InvalidFormat("ODB authored key requires a name".to_string()))?;
+    validate_name(name, "key")?;
+    if key.columns().is_empty() {
+        return invalid("ODB authored key requires at least one column");
+    }
+    if key.kind() == crate::KeyKind::Foreign && key.referenced_table().is_none() {
+        return invalid("ODB foreign key requires a referenced table");
+    }
+    if key.kind() != crate::KeyKind::Foreign
+        && (key.referenced_table().is_some()
+            || key.update_rule().is_some()
+            || key.delete_rule().is_some())
+    {
+        return invalid("ODB non-foreign key cannot carry relation metadata");
+    }
+    if let Some(value) = key.referenced_table() {
+        validate_name(value, "referenced table")?;
+    }
+    for column in key.columns() {
+        let local = column.name().ok_or_else(|| {
+            Error::InvalidFormat("ODB authored key column requires a name".to_string())
+        })?;
+        validate_name(local, "key column")?;
+        if let Some(value) = column.related_column() {
+            validate_name(value, "related key column")?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_index(index: &Index) -> Result<()> {
+    validate_name(index.name(), "index")?;
+    if index.columns().is_empty() {
+        return invalid("ODB authored index requires at least one column");
+    }
+    for column in index.columns() {
+        validate_name(column.name(), "index column")?;
+    }
+    Ok(())
+}
+
+fn validate_connection(connection: &Connection) -> Result<()> {
+    match connection {
+        Connection::File(href) | Connection::Resource(href) => {
+            validate_value(href, "connection target")
+        },
+        Connection::Server { host, database } => {
+            validate_value(host, "connection host")?;
+            validate_value(database, "connection database")
+        },
+    }
+}
+
+fn validate_component(component: &Component) -> Result<()> {
+    let name = component.name().ok_or_else(|| {
+        Error::InvalidFormat("ODB authored component requires a name".to_string())
+    })?;
+    validate_name(name, "component")?;
+    for (kind, value) in [
+        ("component title", component.title()),
+        ("component description", component.description()),
+        ("component href", component.href()),
+    ] {
+        if let Some(value) = value {
+            validate_value(value, kind)?;
+        }
     }
     Ok(())
 }

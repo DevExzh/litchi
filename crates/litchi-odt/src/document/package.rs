@@ -726,11 +726,9 @@ impl Document {
         get_file(self, path)
     }
 
-    // Note: DELETE operations are available via `MutableDocument`. To modify this document:
-    //   1. Convert to MutableDocument:  `let mut mutable = MutableDocument::from_document(doc)?`
-    //   2. Perform modifications: `mutable.remove_paragraph(0)?`, `mutable.remove_table(1)?`, etc.
-    //   3. Save: `mutable.save("output.odt")?`
-    // Available methods: remove_paragraph, remove_table, update_paragraph, clear_content, etc.
+    // Ordinary paragraph edits should use `Document::edit()` and commit an
+    // immutable transaction. `MutableDocument` remains the compatibility
+    // surface for structural families that have not migrated yet.
 }
 
 pub(super) fn take(document: Document) -> OwnedPackage {

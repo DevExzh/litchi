@@ -8,14 +8,14 @@ use super::codec::{
     delete_piece_range, encode_revision, fib_pair, infer_moves, insert_piece, kind_order,
     merge_adjacent, metadata_from_sprms, parse_authors, parse_chpx, parse_clx, parse_cp_table,
     parse_papx, property_metadata, put_u32, read_units, reject_protection,
-    replace_papx_revision_sprms, replace_revision_sprms, restore_before_wall, revision_opcodes,
-    serialize_authors, serialize_clx, slice, split_transform_chpx, split_transform_papx,
-    strict_sprms, u16_at, u32_at, validate_metadata, validate_range,
+    replace_papx_revision_sprms, replace_revision_sprms, restore_before_wall, retain_sprms,
+    revision_opcodes, serialize_authors, serialize_clx, slice, split_transform_chpx,
+    split_transform_papx, strict_sprms, u16_at, u32_at, validate_metadata, validate_range,
 };
 use super::model::{CpTable, FcRun, PapxRun, RawPiece, Revision, RevisionKind, RevisionMetadata};
 use crate::package::{Error as PackageError, Result};
 use crate::sprm_operations::{
-    SPRM_C_DTTM_RMARK, SPRM_C_DTTM_RMARK_DEL, SPRM_C_F_RMARK, SPRM_C_F_RMARK_DEL,
+    SPRM_C_DTTM_RMARK, SPRM_C_DTTM_RMARK_DEL, SPRM_C_F_BOLD, SPRM_C_F_RMARK, SPRM_C_F_RMARK_DEL,
     SPRM_C_IBST_RMARK, SPRM_C_IBST_RMARK_DEL, SPRM_C_IDSL_RMARK, SPRM_C_IDSL_RMARK_DEL,
     SPRM_C_PROP_RMARK_CURRENT, SPRM_C_PROP_RMARK90, SPRM_C_RSID_PROP, SPRM_C_RSID_RM_DEL,
     SPRM_C_RSID_TEXT, SPRM_C_WALL, SPRM_P_F_IN_TABLE, SPRM_P_PROP_RMARK, SPRM_P_PROP_RMARK_CURRENT,
@@ -36,6 +36,7 @@ pub struct RevisionEditor {
     papx: Vec<PapxRun>,
     authors: Vec<String>,
     cp_tables: Vec<CpTable>,
+    unmodeled_cp_tables: Vec<usize>,
     main_ccp: u32,
     changed: bool,
 }
@@ -79,17 +80,57 @@ impl RevisionEditor {
         let chpx = parse_chpx(&word, &table)?;
         let papx = parse_papx(&word, &table)?;
         let authors = parse_authors(&word, &table)?;
-        let cp_tables = [
-            (PLCFANDREF, 30),
-            (PLCFFLD_MOM, 2),
-            (PLCFBKF, 4),
-            (PLCFBKL, 0),
-            (PLCFATNBKF, 4),
-            (PLCFATNBKL, 0),
-        ]
-        .into_iter()
-        .filter_map(|(index, size)| parse_cp_table(&word, &table, index, size).transpose())
-        .collect::<Result<Vec<_>>>()?;
+        // Each modeled entry is a PLCF in the main/all-story CP coordinate
+        // space. Fixed-size records stay opaque while their CP array moves.
+        let modeled_cp_tables = [
+            (2, 2),           // PlcffndRef / FRD
+            (PLCFANDREF, 30), // PlcfandRef / ATRD
+            (6, 12),          // PlcfSed / SED
+            (PLCFFLD_MOM, 2), // PlcffldMom / FLD
+            (PLCFBKF, 4),     // PlcfBkf / FBKF
+            (PLCFBKL, 0),     // PlcfBkl
+            (40, 26),         // PlcfSpaMom / SPA
+            (PLCFATNBKF, 4),  // PlcfAtnBkf / FBKF
+            (PLCFATNBKL, 0),  // PlcfAtnBkl
+            (46, 2),          // PlcfendRef / FRD
+            (54, 12),         // PlcfWKB / WKB
+            (55, 2),          // PlcfSpl / SPLS
+            (89, 4),          // PlcfAsumy / ASUMY
+            (90, 2),          // PlcfGram / SPLS
+            (93, 4),          // PlcfTch / TCH
+            (98, 2),          // PlcfLvc / LSPD
+            (115, 6),         // PlcfBkfFactoid / FBKFD
+            (117, 4),         // PlcfBklFactoid / FBKLD
+            (121, 6),         // PlcfBkfFcc / FBKFD
+            (122, 4),         // PlcfBklFcc / FBKLD
+            (124, 4),         // PlcfBkfBPRepairs / FBKF
+            (125, 0),         // PlcfBklBPRepairs
+            (132, 2),         // Plcffactoid / FactoidSpls
+            (138, 6),         // PlcfBkfSdt / FBKFD
+            (139, 4),         // PlcfBklSdt / FBKLD
+            (142, 6),         // PlcfBkfProt / BKF
+            (143, 0),         // PlcfBklProt
+        ];
+        let pair_count = usize::from(u16_at(&word, FIB_FC_LCB - 2)?);
+        let cp_tables = modeled_cp_tables
+            .into_iter()
+            .filter(|(index, _size)| *index < pair_count)
+            .filter_map(|(index, size)| parse_cp_table(&word, &table, index, size).transpose())
+            .collect::<Result<Vec<_>>>()?;
+        // Known CP-indexed tables whose coupled records are not owned here.
+        // Length-changing edits refuse these instead of silently leaving stale
+        // positions. Equal-length text and formatting edits remain safe.
+        // PlcfSea has producer-private records. The cookie and UIM records
+        // carry coupled character lengths that a CP-only splice cannot repair.
+        let unmodeled_cp_tables = [14, 101, 110, 116]
+            .into_iter()
+            .filter(|index| *index < pair_count)
+            .filter_map(|index| {
+                fib_pair(&word, index)
+                    .map(|(_offset, length)| (length != 0).then_some(index))
+                    .transpose()
+            })
+            .collect::<Result<Vec<_>>>()?;
         let editor = Self {
             package,
             word_path,
@@ -101,6 +142,7 @@ impl RevisionEditor {
             papx,
             authors,
             cp_tables,
+            unmodeled_cp_tables,
             main_ccp,
             changed: false,
         };
@@ -183,75 +225,146 @@ impl RevisionEditor {
         Ok(output)
     }
 
-    /// Replaces a same-length Unicode text interval without changing piece
-    /// descriptors, FKP pages, PLCFs, or any table-stream byte.
-    pub(crate) fn replace_unicode_text_same_length(
+    /// Known CP-indexed FIB tables outside the length-changing splice model.
+    #[must_use]
+    pub(crate) fn unmodeled_length_dependencies(&self) -> &[usize] {
+        &self.unmodeled_cp_tables
+    }
+
+    /// Whether all character runs in a non-empty range have byte-identical
+    /// direct formatting. Length-changing replacement can preserve only this
+    /// unambiguous dependency closure.
+    pub(crate) fn has_uniform_character_format(&self, start: u32, end: u32) -> Result<bool> {
+        let groups = self.character_groups(start, end)?;
+        Ok(groups.windows(2).all(|pair| pair[0] == pair[1]))
+    }
+
+    /// Returns a uniform direct bold override, or `None` when the selected
+    /// runs disagree or use a non-literal toggle value.
+    pub(crate) fn uniform_bold_override(
+        &self,
+        start: u32,
+        end: u32,
+    ) -> Result<Option<Option<bool>>> {
+        let groups = self.character_groups(start, end)?;
+        let mut uniform = None;
+        for group in groups {
+            let value = strict_sprms(group)?
+                .iter()
+                .rev()
+                .find(|sprm| sprm.opcode == SPRM_C_F_BOLD)
+                .and_then(super::super::sprm::Sprm::operand_byte);
+            let value = match value {
+                Some(0) => Some(false),
+                Some(1) => Some(true),
+                Some(_) => return Ok(None),
+                None => None,
+            };
+            match uniform {
+                Some(previous) if previous != value => return Ok(None),
+                Some(_) => {},
+                None => uniform = Some(value),
+            }
+        }
+        Ok(uniform)
+    }
+
+    /// Replaces a non-empty main-story range by appending one Unicode piece,
+    /// shifting modeled CP tables, rebuilding CHPX FKPs, and publishing a new
+    /// CLX. Callers must first prove a uniform character-format closure.
+    pub(crate) fn replace_plain_text(
         &mut self,
-        start_cp: u32,
-        end_cp: u32,
+        start: u32,
+        end: u32,
         replacement: &str,
     ) -> Result<()> {
-        if start_cp >= end_cp || end_cp > self.main_ccp {
-            return Err(corrupted("body paragraph range is outside the main story"));
-        }
-        let expected = end_cp - start_cp;
-        if replacement.encode_utf16().count() != expected as usize {
+        validate_range(start, end, self.main_ccp)?;
+        self.reject_destructive_interactions(start, end)?;
+        if !self.has_uniform_character_format(start, end)? {
             return Err(corrupted(
-                "replacement changes the body paragraph UTF-16 length",
+                "length-changing body replacement crosses character formatting runs",
             ));
         }
-        let piece = self
-            .pieces
-            .iter()
-            .find(|piece| start_cp >= piece.start && end_cp <= piece.end)
-            .ok_or_else(|| corrupted("body paragraph crosses a piece boundary"))?;
-        if !piece.unicode {
-            return Err(corrupted("body paragraph is stored in a compressed piece"));
+        let groups = self.character_groups(start, end)?;
+        let formatting = groups
+            .first()
+            .ok_or_else(|| corrupted("body replacement has no character formatting"))?
+            .to_vec();
+        let units = replacement.encode_utf16().collect::<Vec<_>>();
+        if units.len() > MAX_TEXT_UNITS {
+            return Err(corrupted("body replacement exceeds text resource limit"));
         }
-        let offset = piece
-            .fc
-            .checked_add(
-                start_cp
-                    .checked_sub(piece.start)
-                    .ok_or_else(|| corrupted("body paragraph CP underflow"))?
-                    .checked_mul(2)
-                    .ok_or_else(|| corrupted("body paragraph offset overflow"))?,
-            )
-            .ok_or_else(|| corrupted("body paragraph offset overflow"))?;
-        let offset = usize::try_from(offset)
-            .map_err(|_| corrupted("body paragraph offset exceeds usize"))?;
-        let byte_count = usize::try_from(expected)
-            .ok()
-            .and_then(|value| value.checked_mul(2))
-            .ok_or_else(|| corrupted("body paragraph byte count overflow"))?;
-        let target = self
-            .word
-            .get_mut(offset..offset + byte_count)
-            .ok_or_else(|| corrupted("body paragraph exceeds WordDocument"))?;
-        for (slot, unit) in target.chunks_exact_mut(2).zip(replacement.encode_utf16()) {
-            slot.copy_from_slice(&unit.to_le_bytes());
+        if units.len() != (end - start) as usize && !self.unmodeled_cp_tables.is_empty() {
+            return Err(corrupted(
+                "length-changing body replacement has unmodeled CP-indexed dependencies",
+            ));
         }
-        self.package
-            .put_stream(&self.word_path, self.word.clone())
-            .map_err(PackageError::from)?;
-        self.changed = true;
+
+        let mut candidate = self.clone();
+        let removed = end - start;
+        delete_piece_range(&mut candidate.pieces, start, end)?;
+        let added = u32::try_from(units.len())
+            .map_err(|_error| corrupted("body replacement length exceeds u32"))?;
+        if added != 0 {
+            let fc = align2(candidate.word.len())?;
+            candidate.word.resize(fc, 0);
+            for unit in units {
+                candidate.word.extend_from_slice(&unit.to_le_bytes());
+            }
+            insert_piece(
+                &mut candidate.pieces,
+                start,
+                added,
+                u32::try_from(fc).map_err(|_error| corrupted("body replacement FC exceeds u32"))?,
+            )?;
+            candidate.chpx.push(FcRun {
+                start: u32::try_from(fc)
+                    .map_err(|_error| corrupted("body replacement FC exceeds u32"))?,
+                end: u32::try_from(candidate.word.len())
+                    .map_err(|_error| corrupted("body replacement FC exceeds u32"))?,
+                grpprl: formatting,
+            });
+        }
+        candidate.shift_cp_tables(start, removed, added)?;
+        candidate.main_ccp = candidate
+            .main_ccp
+            .checked_sub(removed)
+            .and_then(|value| value.checked_add(added))
+            .ok_or_else(|| corrupted("main story CP replacement overflow"))?;
+        candidate.rewrite_chpx()?;
+        candidate.append_clx_and_cp_tables()?;
+        candidate.patch_sizes()?;
+        candidate.commit()?;
+        *self = candidate;
         Ok(())
     }
 
-    /// Whether one main-story interval is a single Unicode piece.
-    pub(crate) fn is_unicode_piece_range(&self, start_cp: u32, end_cp: u32) -> bool {
-        self.pieces
-            .iter()
-            .any(|piece| piece.unicode && start_cp >= piece.start && end_cp <= piece.end)
-    }
-
-    /// Number of CLX pieces touched by a non-empty main-story range.
-    #[must_use]
-    pub(crate) fn piece_count_for_range(&self, start_cp: u32, end_cp: u32) -> usize {
-        self.pieces
-            .iter()
-            .filter(|piece| piece.start < end_cp && start_cp < piece.end)
-            .count()
+    /// Sets or clears one direct bold override while retaining every other
+    /// character SPRM and rebuilding the affected CHPX FKPs.
+    pub(crate) fn set_character_bold_override(
+        &mut self,
+        start: u32,
+        end: u32,
+        value: Option<bool>,
+    ) -> Result<()> {
+        validate_range(start, end, self.main_ccp)?;
+        let intervals = self.fc_intervals(start, end)?;
+        let mut candidate = self.clone();
+        split_transform_chpx(&mut candidate.chpx, &intervals, |group| {
+            let mut output = retain_sprms(group, &[SPRM_C_F_BOLD])?;
+            if let Some(enabled) = value {
+                output.extend_from_slice(&SPRM_C_F_BOLD.to_le_bytes());
+                output.push(u8::from(enabled));
+            }
+            if output.len() > 255 {
+                return Err(corrupted("edited CHPX exceeds one-byte FKP limit"));
+            }
+            Ok(output)
+        })?;
+        candidate.rewrite_chpx()?;
+        candidate.commit()?;
+        *self = candidate;
+        Ok(())
     }
 
     /// Whether the paragraph ending at `cp` has the MS-DOC in-table flag.
@@ -291,6 +404,33 @@ impl RevisionEditor {
     #[must_use]
     pub(crate) const fn main_story_cp_len(&self) -> u32 {
         self.main_ccp
+    }
+
+    fn character_groups(&self, start: u32, end: u32) -> Result<Vec<&[u8]>> {
+        let intervals = self.fc_intervals(start, end)?;
+        let mut output = Vec::new();
+        for (interval_start, interval_end) in intervals {
+            let mut cursor = interval_start;
+            for run in &self.chpx {
+                let left = interval_start.max(run.start);
+                let right = interval_end.min(run.end);
+                if left >= right {
+                    continue;
+                }
+                if left > cursor {
+                    return Err(corrupted("CHPX formatting has a physical FC gap"));
+                }
+                output.push(run.grpprl.as_slice());
+                cursor = cursor.max(right);
+            }
+            if cursor < interval_end {
+                return Err(corrupted("CHPX formatting does not cover body text"));
+            }
+        }
+        if output.is_empty() {
+            return Err(corrupted("body text has no CHPX formatting"));
+        }
+        Ok(output)
     }
 
     /// Lists character and PAPX property revisions, merging adjacent runs with

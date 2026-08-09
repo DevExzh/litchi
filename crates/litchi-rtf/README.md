@@ -46,8 +46,9 @@ assert_eq!(
 - Compressed RTF (`MS-OXRTFCP`) encode/decode
 - Immutable, cheap-to-share `Document` snapshots for ordinary reads
 - Bounded source-checked `Document::edit()` transactions composing disjoint
-  UTF-8 body spans and paragraph-alignment properties, with atomic commits,
-  reversible deterministic patches, and budgeted undo/redo history
+  UTF-8 body spans, paragraph alignment, character bold ranges, and ordinary
+  paragraph insertion, with atomic commits, reversible deterministic patches,
+  core-backed sub-edit/three-way composition, and commit-coupled history
 - Lazy borrowed `text::Story`, paragraph, inline, and run traversal
 - Sparse-safe `font::Catalog` and checked `color::Palette` resource views
 - Semantic run font/color resolution without numeric table references
@@ -70,6 +71,10 @@ list:
 These directories are real internal module boundaries rather than file-only
 groupings. Existing public modules such as `text`, `field`, `table`, `picture`,
 and `review` remain stable through contextual re-exports.
+
+The attached mutable retained tree is isolated under the explicit advanced
+`raw` module. Ordinary application code reads immutable `Document` snapshots
+and publishes changes only through `Document::edit()` or composed sub-edits.
 
 `transport::decompress` enforces a finite 256 MiB expansion ceiling before
 allocation. Applications with a different document budget can call

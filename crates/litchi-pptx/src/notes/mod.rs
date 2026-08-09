@@ -6,6 +6,7 @@ mod package;
 mod transaction;
 mod validation;
 
+pub(crate) use codec::rewrite_text;
 pub use codec::{master_xml, write_text, write_text_with};
 pub use model::{Conformance, Graph, Link, Master, Slide, Theme};
 pub(crate) use package::{

@@ -1,9 +1,5 @@
 //! Shared frame-edit contract for flat and packaged ODI transactions.
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The public contract precedes its compact implementation macro."
-)]
-
+use crate::map::ImageMap;
 use crate::source::Source;
 use litchi_core::Result;
 
@@ -45,6 +41,20 @@ pub trait FrameEditor {
         width: Option<String>,
         height: Option<String>,
     ) -> Result<()>;
+    /// Replaces one optional typed client-side image map.
+    fn set_image_map(&mut self, frame: usize, value: Option<ImageMap>) -> Result<()>;
+    /// Replaces the lexical horizontal position.
+    fn set_x(&mut self, frame: usize, value: Option<String>) -> Result<()>;
+    /// Replaces the lexical vertical position.
+    fn set_y(&mut self, frame: usize, value: Option<String>) -> Result<()>;
+    /// Replaces the lexical width.
+    fn set_width(&mut self, frame: usize, value: Option<String>) -> Result<()>;
+    /// Replaces the lexical height.
+    fn set_height(&mut self, frame: usize, value: Option<String>) -> Result<()>;
+    /// Replaces the lexical relative width.
+    fn set_relative_width(&mut self, frame: usize, value: Option<String>) -> Result<()>;
+    /// Replaces the lexical relative height.
+    fn set_relative_height(&mut self, frame: usize, value: Option<String>) -> Result<()>;
 }
 
 macro_rules! impl_frame_editor {
@@ -92,9 +102,69 @@ macro_rules! impl_frame_editor {
             ) -> Result<()> {
                 <$type>::set_relative_size(self, frame, width, height)
             }
+            fn set_image_map(&mut self, frame: usize, value: Option<ImageMap>) -> Result<()> {
+                <$type>::set_image_map(self, frame, value)
+            }
+            fn set_x(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+                <$type>::set_x(self, frame, value)
+            }
+            fn set_y(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+                <$type>::set_y(self, frame, value)
+            }
+            fn set_width(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+                <$type>::set_width(self, frame, value)
+            }
+            fn set_height(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+                <$type>::set_height(self, frame, value)
+            }
+            fn set_relative_width(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+                <$type>::set_relative_width(self, frame, value)
+            }
+            fn set_relative_height(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+                <$type>::set_relative_height(self, frame, value)
+            }
         }
     };
 }
 
 impl_frame_editor!(crate::FlatImageTransaction);
 impl_frame_editor!(crate::Edit<'_>);
+
+/// Common metadata mutation contract for flat and packaged ODI transactions.
+pub trait MetadataEditor {
+    /// Replaces the document title.
+    fn set_title(&mut self, value: Option<String>) -> Result<()>;
+    /// Replaces the document author.
+    fn set_author(&mut self, value: Option<String>) -> Result<()>;
+    /// Replaces the document subject.
+    fn set_subject(&mut self, value: Option<String>) -> Result<()>;
+    /// Replaces the document description.
+    fn set_description(&mut self, value: Option<String>) -> Result<()>;
+    /// Replaces the comma-separated keyword value.
+    fn set_keywords(&mut self, value: Option<String>) -> Result<()>;
+}
+
+macro_rules! impl_metadata_editor {
+    ($type:ty) => {
+        impl MetadataEditor for $type {
+            fn set_title(&mut self, value: Option<String>) -> Result<()> {
+                <$type>::set_title(self, value)
+            }
+            fn set_author(&mut self, value: Option<String>) -> Result<()> {
+                <$type>::set_author(self, value)
+            }
+            fn set_subject(&mut self, value: Option<String>) -> Result<()> {
+                <$type>::set_subject(self, value)
+            }
+            fn set_description(&mut self, value: Option<String>) -> Result<()> {
+                <$type>::set_description(self, value)
+            }
+            fn set_keywords(&mut self, value: Option<String>) -> Result<()> {
+                <$type>::set_keywords(self, value)
+            }
+        }
+    };
+}
+
+impl_metadata_editor!(crate::FlatImageTransaction);
+impl_metadata_editor!(crate::Edit<'_>);

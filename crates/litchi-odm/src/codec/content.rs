@@ -2,7 +2,6 @@
 
 use litchi_core::Position;
 use litchi_core::{Error, Result};
-use litchi_odf_common::compact_xml;
 use quick_xml::{
     XmlVersion,
     events::{BytesStart, Event},
@@ -43,6 +42,7 @@ pub(crate) struct Semantics {
     references: Vec<crate::model::subdocument::Reference>,
     href_spans: Vec<Range<usize>>,
     tree: crate::model::section::Tree,
+    local_section_references: Vec<(String, Range<usize>)>,
 }
 
 impl Semantics {
@@ -56,6 +56,10 @@ impl Semantics {
 
     pub(crate) const fn tree(&self) -> &crate::model::section::Tree {
         &self.tree
+    }
+
+    pub(crate) fn local_section_references(&self) -> &[(String, Range<usize>)] {
+        &self.local_section_references
     }
 }
 
@@ -71,7 +75,6 @@ pub(crate) fn parse(xml: &str) -> Result<Semantics> {
             "content.xml exceeds the family limit".to_string(),
         ));
     }
-    compact_xml::validate(xml.as_bytes()).map_err(Error::from)?;
     parse_structure(xml)
 }
 
@@ -90,6 +93,7 @@ fn parse_structure(xml: &str) -> Result<Semantics> {
     let mut references = Vec::new();
     let mut href_spans = Vec::new();
     let mut section_source_depth = None;
+    let mut local_section_references = Vec::new();
     loop {
         let event_start = position(&reader)?;
         let (resolved_namespace, borrowed_event) = reader
@@ -119,6 +123,7 @@ fn parse_structure(xml: &str) -> Result<Semantics> {
                     &mut references,
                     &mut href_spans,
                     &mut section_source_depth,
+                    &mut local_section_references,
                     xml.as_bytes()
                         .get(event_start..event_end)
                         .ok_or_else(|| invalid("ODM XML event span is outside content.xml"))?,
@@ -145,6 +150,7 @@ fn parse_structure(xml: &str) -> Result<Semantics> {
                     &mut references,
                     &mut href_spans,
                     &mut section_source_depth,
+                    &mut local_section_references,
                     xml.as_bytes()
                         .get(event_start..event_end)
                         .ok_or_else(|| invalid("ODM XML event span is outside content.xml"))?,
@@ -163,6 +169,11 @@ fn parse_structure(xml: &str) -> Result<Semantics> {
                     if section.depth != depth {
                         return Err(invalid("ODM text:section nesting is malformed"));
                     }
+                    tree.sections
+                        .get_mut(section.position.get())
+                        .ok_or_else(|| invalid("ODM section disappeared from its tree"))?
+                        .source_span
+                        .end = event_end;
                 }
                 if master_depth == Some(depth) {
                     master_depth = None;
@@ -204,6 +215,7 @@ fn parse_structure(xml: &str) -> Result<Semantics> {
         references,
         href_spans,
         tree,
+        local_section_references,
     })
 }
 
@@ -229,6 +241,7 @@ fn observe(
     references: &mut Vec<crate::model::subdocument::Reference>,
     href_spans: &mut Vec<Range<usize>>,
     section_source_depth: &mut Option<usize>,
+    local_section_references: &mut Vec<(String, Range<usize>)>,
     tag: &[u8],
     tag_start: usize,
 ) -> Result<()> {
@@ -300,6 +313,9 @@ fn observe(
             }
         }
         let position = Position::new(tree.sections.len());
+        let name_key = attribute_key(reader, element, TEXT, b"name")?
+            .ok_or_else(|| invalid("ODM section name source spelling disappeared"))?;
+        let (name_start, name_end) = attribute_value_span(tag, &name_key)?;
         let parent = sections.last().map(|active| active.position);
         tree.sections
             .try_reserve(1)
@@ -315,6 +331,8 @@ fn observe(
             parent,
             children: Vec::new(),
             reference: None,
+            source_span: tag_start..tag_start + tag.len(),
+            name_span: tag_start + name_start..tag_start + name_end,
         });
         if let Some(parent_position) = parent {
             let parent_node = tree
@@ -417,6 +435,18 @@ fn observe(
                 .ok_or_else(|| invalid("ODM linked section disappeared from its tree"))?
                 .reference = Some(Position::new(references.len() - 1));
             href_spans.push(tag_start + span_start..tag_start + span_end);
+        } else if let Some(local_name) = source_section {
+            let key = attribute_key(reader, element, TEXT, b"section-name")?
+                .ok_or_else(|| invalid("ODM local section reference span is missing"))?;
+            let (span_start, span_end) = attribute_value_span(tag, &key)?;
+            local_section_references
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "ODM local section references",
+                    source,
+                })?;
+            local_section_references
+                .push((local_name, tag_start + span_start..tag_start + span_end));
         }
         if !empty {
             *section_source_depth = Some(depth);

@@ -45,6 +45,33 @@ impl Package {
         Ok(candidate)
     }
 
+    /// Apply a common durable semantic main-document patch atomically.
+    ///
+    /// The complete candidate facade is validated before publication. Direct
+    /// hyperlink relationships and every untouched OPC part remain unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns a durable-vocabulary, stale-source, semantic-precondition, or
+    /// package-validation error without publishing a partial mutation.
+    pub fn apply_durable_document_patch<Mode>(
+        &mut self,
+        patch: &litchi_core::patch::Patch<Mode>,
+    ) -> std::result::Result<crate::document::Snapshot, crate::document::TransactionError> {
+        let current = self.document_snapshot()?;
+        let candidate = current.apply_durable(patch)?;
+        if candidate.xml_bytes() == current.xml_bytes() {
+            return Ok(candidate);
+        }
+        let replacement = candidate.xml_bytes().to_vec();
+        self.edit_semantic_opc("apply_durable_document_patch", move |opc| {
+            let main_name = opc.main_document_part()?.partname().clone();
+            opc.get_part_mut(&main_name)?.set_blob(replacement);
+            Ok(())
+        })?;
+        Ok(candidate)
+    }
+
     /// Get a mutable document for writing and modification.
     ///
     /// This returns a `MutableDocument` that allows you to add and modify

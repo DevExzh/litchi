@@ -209,6 +209,10 @@ pub struct XmlMapInfoRef<'a> {
 
 impl<'a> XmlMapInfoRef<'a> {
     /// Project an owned common model using caller-selected descriptor bounds.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn from_owned_with_limits(
         value: &'a XmlMapInfo,
         limits: &XmlMapLimits,
@@ -219,17 +223,17 @@ impl<'a> XmlMapInfoRef<'a> {
             ));
         }
         let mut schemas = Vec::new();
-        schemas.try_reserve(value.schemas.len()).map_err(|_| {
-            crate::Error::SpreadsheetXmlMaps(
-                "custom XML maps schema descriptor allocation failed".into(),
-            )
+        schemas.try_reserve(value.schemas.len()).map_err(|error| {
+            crate::Error::SpreadsheetXmlMaps(format!(
+                "custom XML maps schema descriptor allocation failed: {error}"
+            ))
         })?;
         schemas.extend(value.schemas.iter().map(XmlSchemaRef::from));
         let mut maps = Vec::new();
-        maps.try_reserve(value.maps.len()).map_err(|_| {
-            crate::Error::SpreadsheetXmlMaps(
-                "custom XML maps map descriptor allocation failed".into(),
-            )
+        maps.try_reserve(value.maps.len()).map_err(|error| {
+            crate::Error::SpreadsheetXmlMaps(format!(
+                "custom XML maps map descriptor allocation failed: {error}"
+            ))
         })?;
         maps.extend(value.maps.iter().map(XmlMapRef::from));
         Ok(Self {

@@ -160,6 +160,10 @@ impl fmt::Display for Wrap {
 
 impl Underline {
     /// Parse an `a:rPr@u` `DrawingML` token.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn from_dml(value: &str) -> Result<Self, ParseError> {
         match value {
             "none" => Ok(Self::None),
@@ -210,6 +214,10 @@ impl Underline {
     }
 
     /// Parse a `w:u@w:val` `WordprocessingML` token.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn from_wml(value: &str) -> Result<Self, ParseError> {
         match value {
             "none" => Ok(Self::None),
@@ -261,6 +269,10 @@ impl Underline {
 }
 
 /// Parse an XML Schema boolean (`true`, `false`, `1`, or `0`).
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn parse_bool(value: &str) -> Result<bool, ParseError> {
     match value.trim_matches(xsd_whitespace) {
         "true" | "1" => Ok(true),
@@ -270,6 +282,10 @@ pub fn parse_bool(value: &str) -> Result<bool, ParseError> {
 }
 
 /// Parse `WordprocessingML` `ST_OnOff`, including transitional `on`/`off`.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn parse_on_off(value: &str) -> Result<bool, ParseError> {
     match value {
         "on" => Ok(true),

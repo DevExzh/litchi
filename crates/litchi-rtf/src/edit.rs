@@ -14,14 +14,89 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::ops::Range;
 
+mod composition;
+pub use composition::{
+    Composition, CompositionConflict, CompositionError, CompositionLimits, ConflictSet, MergePlan,
+    MergeResolution, Prepared,
+};
+
 /// Immutable RTF snapshot used by the transaction API.
 pub type Snapshot = Document;
 
-/// Explicit budgeted undo/redo retention for immutable RTF snapshots.
-pub type History = litchi_core::patch::History<Snapshot>;
-
 /// Finite step and retained-weight bounds for [`History`].
 pub use litchi_core::patch::HistoryLimits;
+
+/// Commit-coupled bounded undo/redo history for immutable RTF snapshots.
+pub struct History {
+    inner: litchi_core::patch::History<Snapshot>,
+}
+
+impl History {
+    /// Starts history at one immutable snapshot.
+    #[must_use]
+    pub fn new(current: Snapshot, limits: HistoryLimits) -> Self {
+        Self {
+            inner: litchi_core::patch::History::new(current, limits),
+        }
+    }
+
+    /// Current immutable snapshot.
+    #[must_use]
+    pub const fn current(&self) -> &Snapshot {
+        self.inner.current()
+    }
+
+    /// Whether an undo transition exists.
+    #[must_use]
+    pub fn can_undo(&self) -> bool {
+        self.inner.can_undo()
+    }
+
+    /// Whether a redo transition exists.
+    #[must_use]
+    pub fn can_redo(&self) -> bool {
+        self.inner.can_redo()
+    }
+
+    /// Commits an edit rooted at the current snapshot and records it atomically.
+    ///
+    /// # Errors
+    /// Returns a source, edit, or history-budget error without changing history.
+    pub fn commit(&mut self, edit: Edit) -> Result<Commit, Error> {
+        if !edit.source().same_snapshot(self.current()) {
+            return Err(Error::HistorySourceMismatch);
+        }
+        let commit = edit.commit()?;
+        self.record_commit(&commit)?;
+        Ok(commit)
+    }
+
+    /// Records an already validated commit rooted at the current snapshot.
+    ///
+    /// # Errors
+    /// Returns a source or budget error without changing history.
+    pub fn record_commit(&mut self, commit: &Commit) -> Result<(), Error> {
+        if !commit.patch.before.same_snapshot(self.current()) {
+            return Err(Error::HistorySourceMismatch);
+        }
+        if commit.diagnostics.changed {
+            self.inner
+                .record(commit.snapshot.clone(), commit.patch.history_weight())
+                .map_err(|error| Error::History(error.to_string()))?;
+        }
+        Ok(())
+    }
+
+    /// Moves to the preceding retained snapshot.
+    pub fn undo(&mut self) -> bool {
+        self.inner.undo()
+    }
+
+    /// Moves to the following retained snapshot.
+    pub fn redo(&mut self) -> bool {
+        self.inner.redo()
+    }
+}
 
 /// Default maximum number of operations staged in one edit.
 pub const DEFAULT_MAX_OPERATIONS: usize = 256;
@@ -119,6 +194,10 @@ pub enum Error {
     StalePrecondition(&'static str),
     /// A durable patch uses an unsupported format-owned vocabulary.
     DurablePatch(String),
+    /// An edit or commit does not originate from the history's current snapshot.
+    HistorySourceMismatch,
+    /// The common bounded history refused a transition.
+    History(String),
     /// Candidate parsing or validation failed.
     Rtf(RtfError),
     /// Candidate transport construction failed before publication.
@@ -169,6 +248,10 @@ impl fmt::Display for Error {
                 write!(formatter, "stale RTF patch precondition: {reason}")
             },
             Self::DurablePatch(reason) => write!(formatter, "invalid durable RTF patch: {reason}"),
+            Self::HistorySourceMismatch => {
+                formatter.write_str("RTF history source is not its current snapshot")
+            },
+            Self::History(reason) => write!(formatter, "RTF history refused commit: {reason}"),
             Self::Rtf(error) => error.fmt(formatter),
             Self::Write(error) => write!(formatter, "RTF candidate construction failed: {error}"),
             Self::PatchConflict => {
@@ -207,6 +290,55 @@ enum Operation {
         before: Alignment,
         after: Alignment,
     },
+    Bold {
+        span: TextSpan,
+        before: bool,
+        after: bool,
+    },
+    InsertParagraph {
+        position: usize,
+        span: TextSpan,
+        text: String,
+    },
+}
+
+impl Operation {
+    fn replacement_bytes(&self) -> usize {
+        match self {
+            Self::Text { after, .. } => after.len(),
+            Self::InsertParagraph { text, .. } => text.len().saturating_add(1),
+            Self::Alignment { .. } | Self::Bold { .. } => 0,
+        }
+    }
+
+    fn effect_keys(&self) -> Vec<String> {
+        match self {
+            Self::Text { structural, .. } if *structural => {
+                vec!["body:structure".to_string()]
+            },
+            Self::Text { .. } => vec!["body:text".to_string()],
+            Self::Alignment { position, .. } => {
+                vec![format!("body:paragraph:{position}:alignment")]
+            },
+            Self::Bold { span, .. } => {
+                vec![format!("body:character:{}-{}:bold", span.start, span.end)]
+            },
+            Self::InsertParagraph { .. } => vec!["body:structure".to_string()],
+        }
+    }
+
+    const fn span(&self) -> Option<TextSpan> {
+        match self {
+            Self::Text { span, .. }
+            | Self::Bold { span, .. }
+            | Self::InsertParagraph { span, .. } => Some(*span),
+            Self::Alignment { .. } => None,
+        }
+    }
+
+    const fn is_property(&self) -> bool {
+        matches!(self, Self::Alignment { .. } | Self::Bold { .. })
+    }
 }
 
 impl Edit {
@@ -302,11 +434,9 @@ impl Edit {
         }
         let incoming = self.operations.len();
         for (existing, operation) in self.operations.iter().enumerate() {
-            if let Operation::Text {
-                span: existing_span,
-                ..
-            } = operation
-                && spans_conflict(*existing_span, span)
+            if operation
+                .span()
+                .is_some_and(|existing_span| spans_conflict(existing_span, span))
             {
                 return Err(Error::Conflict { existing, incoming });
             }
@@ -319,6 +449,119 @@ impl Edit {
             structural,
         });
         Ok(self)
+    }
+
+    /// Stages bold state for one non-empty UTF-8 body span.
+    ///
+    /// The selected source range must have one effective bold state and may
+    /// not consume a paragraph boundary. Unknown or mixed character ranges
+    /// are refused rather than normalized.
+    ///
+    /// # Errors
+    /// Returns an error for invalid geometry, conflicts, structure changes,
+    /// mixed formatting, or finite bounds.
+    pub fn set_text_bold(&mut self, span: TextSpan, bold: bool) -> Result<&mut Self, Error> {
+        self.ensure_operation_room()?;
+        let body = self.source.text();
+        validate_span(body, span)?;
+        if span.is_empty()
+            || body
+                .get(span.start..span.end)
+                .is_some_and(|text| text.contains('\n'))
+        {
+            return Err(Error::UnsupportedSource(
+                "bold edits require non-empty text within one paragraph",
+            ));
+        }
+        if self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Text {
+                    structural: true,
+                    ..
+                } | Operation::InsertParagraph { .. }
+            )
+        }) {
+            return Err(Error::StructuralPropertyConflict);
+        }
+        let incoming = self.operations.len();
+        for (existing, operation) in self.operations.iter().enumerate() {
+            if operation
+                .span()
+                .is_some_and(|existing_span| spans_conflict(existing_span, span))
+            {
+                return Err(Error::Conflict { existing, incoming });
+            }
+        }
+        let before = bold_for_span(&self.source, span)?;
+        self.operations.push(Operation::Bold {
+            span,
+            before,
+            after: bold,
+        });
+        Ok(self)
+    }
+
+    /// Inserts one ordinary paragraph immediately after a checked paragraph.
+    ///
+    /// This is the transaction's explicit structural class. The inserted text
+    /// cannot contain another paragraph break; multiple disjoint insertions
+    /// may compose, while paragraph/character property edits conflict.
+    ///
+    /// # Errors
+    /// Returns an error for an invalid selector, newline-bearing input,
+    /// conflicts, or finite bounds.
+    pub fn insert_paragraph_after(
+        &mut self,
+        position: usize,
+        input: impl Into<String>,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_operation_room()?;
+        if self.operations.iter().any(Operation::is_property) {
+            return Err(Error::StructuralPropertyConflict);
+        }
+        let text = input.into();
+        if text.contains('\n') {
+            return Err(Error::UnsupportedSource(
+                "one structural insertion authors exactly one paragraph",
+            ));
+        }
+        let range = paragraph_range(&self.source, position)?;
+        let span = TextSpan::new(range.end, range.end)?;
+        let incoming = self.operations.len();
+        for (existing, operation) in self.operations.iter().enumerate() {
+            if operation
+                .span()
+                .is_some_and(|existing_span| spans_conflict(existing_span, span))
+            {
+                return Err(Error::Conflict { existing, incoming });
+            }
+        }
+        self.charge_replacement(text.len().saturating_add(1))?;
+        self.operations.push(Operation::InsertParagraph {
+            position,
+            span,
+            text,
+        });
+        Ok(self)
+    }
+
+    fn remove_paragraph_after(
+        &mut self,
+        position: usize,
+        expected: &str,
+    ) -> Result<&mut Self, Error> {
+        let owner = paragraph_range(&self.source, position)?;
+        let removed = paragraph_range(&self.source, position.saturating_add(1))?;
+        let actual = self
+            .source
+            .text()
+            .get(removed.clone())
+            .ok_or(Error::StalePrecondition("inserted paragraph disappeared"))?;
+        if actual != expected {
+            return Err(Error::StalePrecondition("inserted paragraph text differs"));
+        }
+        self.replace_text(TextSpan::new(owner.end, removed.end)?, "")
     }
 
     /// Stages the local alignment of one checked base-snapshot paragraph.
@@ -342,7 +585,7 @@ impl Edit {
                 Operation::Text {
                     structural: true,
                     ..
-                }
+                } | Operation::InsertParagraph { .. }
             )
         }) {
             return Err(Error::StructuralPropertyConflict);
@@ -412,25 +655,39 @@ impl Edit {
 
         let (replacement, projected_spans) = project_text(&self.source, &self.operations)?;
         let mut alignments = source_alignments(&self.source);
+        let base_bold = base_bold_for_edit(&self.source, &self.operations)?;
+        let mut projected_bold_ranges = Vec::new();
         let mut property_operation = false;
         for operation in &self.operations {
-            if let Operation::Alignment {
-                position, after, ..
-            } = operation
-            {
-                let count = alignments.len();
-                let slot = alignments
-                    .get_mut(*position)
-                    .ok_or(Error::ParagraphOutOfRange {
-                        position: *position,
-                        count,
-                    })?;
-                *slot = *after;
-                property_operation = true;
+            match operation {
+                Operation::Alignment {
+                    position, after, ..
+                } => {
+                    let count = alignments.len();
+                    let slot = alignments
+                        .get_mut(*position)
+                        .ok_or(Error::ParagraphOutOfRange {
+                            position: *position,
+                            count,
+                        })?;
+                    *slot = *after;
+                    property_operation = true;
+                },
+                Operation::Bold { span, after, .. } => {
+                    projected_bold_ranges
+                        .push((project_base_span(*span, &self.operations)?, *after));
+                    property_operation = true;
+                },
+                Operation::Text { .. } | Operation::InsertParagraph { .. } => {},
             }
         }
         let original_alignments = source_alignments(&self.source);
-        let did_change = replacement != self.source.text() || alignments != original_alignments;
+        let has_bold_delta = self.operations.iter().any(|operation| {
+            matches!(operation, Operation::Bold { before, after, .. } if before != after)
+        });
+        let did_change = replacement != self.source.text()
+            || alignments != original_alignments
+            || has_bold_delta;
         let semantic_delta = semantic_changes(&self.operations, &projected_spans);
         if !did_change {
             return Ok(Commit::new(
@@ -451,15 +708,32 @@ impl Edit {
                 "compressed RTF needs a transport-aware rewrite",
             ));
         }
-        self.source
-            .model()
-            .plain_body_text_editability()
-            .map_err(Error::UnsupportedSource)?;
+        let has_bold_operation = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::Bold { .. }));
+        if has_bold_operation {
+            self.source
+                .model()
+                .plain_body_bold_editability()
+                .map_err(Error::UnsupportedSource)?;
+        } else {
+            self.source
+                .model()
+                .plain_body_text_editability()
+                .map_err(Error::UnsupportedSource)?;
+        }
         let span =
             ordinary_body_source_span(source_bytes, self.source.text(), self.source.limits())?;
         validate_opaque_preservation(&self.source, source_bytes, &span)?;
         let replacement_bytes = if property_operation {
-            encoded_body_with_alignments(&replacement, &alignments, self.source.limits())?
+            encoded_body_with_properties(
+                &replacement,
+                &alignments,
+                base_bold,
+                &projected_bold_ranges,
+                self.source.limits(),
+            )?
         } else {
             encoded_body_text(&replacement, self.source.limits())?
         };
@@ -474,6 +748,13 @@ impl Edit {
             return Err(Error::UnsupportedSource(
                 "candidate paragraph alignment did not survive RTF validation",
             ));
+        }
+        for (bold_span, expected) in projected_bold_ranges {
+            if bold_for_span(&snapshot, bold_span)? != expected {
+                return Err(Error::UnsupportedSource(
+                    "candidate bold property did not survive RTF validation",
+                ));
+            }
         }
         Ok(Commit::new(
             self.source,
@@ -552,17 +833,21 @@ fn project_text(
                 after,
                 before: _,
                 structural: _,
-            } => Some((index, *span, after.as_str())),
-            Operation::Alignment { .. } => None,
+            } => Some((index, *span, after.as_str(), false)),
+            Operation::InsertParagraph { span, text, .. } => {
+                Some((index, *span, text.as_str(), true))
+            },
+            Operation::Alignment { .. } | Operation::Bold { .. } => None,
         })
         .collect::<Vec<_>>();
-    text_operations.sort_unstable_by_key(|(_, span, _)| (span.start, span.end));
+    text_operations.sort_unstable_by_key(|(_, span, _, _)| (span.start, span.end));
     let source_text = source.text();
     let mut final_len = source_text.len();
-    for (_, span, replacement) in &text_operations {
+    for (_, span, replacement, structural) in &text_operations {
+        let replacement_len = replacement.len().saturating_add(usize::from(*structural));
         final_len = final_len
             .checked_sub(span.end - span.start)
-            .and_then(|length| length.checked_add(replacement.len()))
+            .and_then(|length| length.checked_add(replacement_len))
             .ok_or(Error::InputTooLarge {
                 observed: usize::MAX,
                 limit: source.limits().max_source_bytes(),
@@ -584,7 +869,7 @@ fn project_text(
     projected
         .try_reserve_exact(text_operations.len())
         .map_err(|_error| Error::Write("could not reserve projected text spans".to_string()))?;
-    for (index, span, replacement) in text_operations {
+    for (index, span, replacement, structural) in text_operations {
         output.push_str(
             source_text
                 .get(cursor..span.start)
@@ -593,6 +878,9 @@ fn project_text(
                 ))?,
         );
         let projected_start = output.len();
+        if structural {
+            output.push('\n');
+        }
         output.push_str(replacement);
         projected.push((
             index,
@@ -615,6 +903,157 @@ fn source_alignments(source: &Snapshot) -> Vec<Alignment> {
         .paragraphs()
         .map(|paragraph| paragraph.format().alignment())
         .collect()
+}
+
+fn uniform_body_bold(source: &Snapshot) -> Result<bool, Error> {
+    let mut value = None;
+    for run in source.body().runs() {
+        let bold = run.format().bold();
+        if value.is_some_and(|existing| existing != bold) {
+            return Err(Error::UnsupportedSource(
+                "the body has mixed character formatting",
+            ));
+        }
+        value = Some(bold);
+    }
+    Ok(value.unwrap_or(false))
+}
+
+fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<bool, Error> {
+    let bold_spans = operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::Bold { span, .. } => Some(*span),
+            Operation::Text { .. }
+            | Operation::Alignment { .. }
+            | Operation::InsertParagraph { .. } => None,
+        })
+        .collect::<Vec<_>>();
+    if bold_spans.is_empty() {
+        return uniform_body_bold(source);
+    }
+    let mut body_position = 0usize;
+    let mut base = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_span = TextSpan {
+                start: run_position,
+                end: run_position.saturating_add(run.text().len()),
+            };
+            if !bold_spans
+                .iter()
+                .any(|span| spans_conflict(*span, run_span))
+            {
+                let value = run.format().bold();
+                if base.is_some_and(|existing| existing != value) {
+                    return Err(Error::UnsupportedSource(
+                        "unselected body text has mixed bold state",
+                    ));
+                }
+                base = Some(value);
+            }
+            run_position = run_span.end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    Ok(base.unwrap_or_else(|| {
+        operations
+            .iter()
+            .find_map(|operation| match operation {
+                Operation::Bold { after, .. } => Some(*after),
+                Operation::Text { .. }
+                | Operation::Alignment { .. }
+                | Operation::InsertParagraph { .. } => None,
+            })
+            .unwrap_or(false)
+    }))
+}
+
+fn bold_for_span(source: &Snapshot, span: TextSpan) -> Result<bool, Error> {
+    validate_span(source.text(), span)?;
+    let mut body_position = 0usize;
+    let mut covered = 0usize;
+    let mut value = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_end = run_position.saturating_add(run.text().len());
+            let start = run_position.max(span.start);
+            let end = run_end.min(span.end);
+            if start < end {
+                let bold = run.format().bold();
+                if value.is_some_and(|existing| existing != bold) {
+                    return Err(Error::UnsupportedSource(
+                        "the selected character span has mixed bold state",
+                    ));
+                }
+                value = Some(bold);
+                covered = covered.saturating_add(end - start);
+            }
+            run_position = run_end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    if covered != span.end.saturating_sub(span.start) {
+        return Err(Error::UnsupportedSource(
+            "the selected character span crosses non-text inline content",
+        ));
+    }
+    value.ok_or(Error::UnsupportedSource(
+        "the selected character span has no text run",
+    ))
+}
+
+fn project_base_span(span: TextSpan, operations: &[Operation]) -> Result<TextSpan, Error> {
+    Ok(TextSpan {
+        start: project_base_position(span.start, operations)?,
+        end: project_base_position(span.end, operations)?,
+    })
+}
+
+fn project_base_position(position: usize, operations: &[Operation]) -> Result<usize, Error> {
+    let mut changes = operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::Text { span, after, .. } => Some((*span, after.len())),
+            Operation::InsertParagraph { span, text, .. } => {
+                Some((*span, text.len().saturating_add(1)))
+            },
+            Operation::Alignment { .. } | Operation::Bold { .. } => None,
+        })
+        .collect::<Vec<_>>();
+    changes.sort_unstable_by_key(|(span, _)| (span.start, span.end));
+    let mut source_cursor = 0usize;
+    let mut projected_cursor = 0usize;
+    for (span, replacement_len) in changes {
+        if position <= span.start {
+            return projected_cursor
+                .checked_add(position.saturating_sub(source_cursor))
+                .ok_or(Error::InputTooLarge {
+                    observed: usize::MAX,
+                    limit: usize::MAX,
+                });
+        }
+        projected_cursor = projected_cursor
+            .checked_add(span.start.saturating_sub(source_cursor))
+            .and_then(|value| value.checked_add(replacement_len))
+            .ok_or(Error::InputTooLarge {
+                observed: usize::MAX,
+                limit: usize::MAX,
+            })?;
+        source_cursor = span.end;
+    }
+    projected_cursor
+        .checked_add(position.saturating_sub(source_cursor))
+        .ok_or(Error::InputTooLarge {
+            observed: usize::MAX,
+            limit: usize::MAX,
+        })
 }
 
 fn ordinary_body_source_span(
@@ -726,14 +1165,17 @@ fn encoded_body_text(text: &str, limits: crate::ParseLimits) -> Result<Vec<u8>, 
     Ok(output)
 }
 
-fn encoded_body_with_alignments(
+fn encoded_body_with_properties(
     text: &str,
     alignments: &[Alignment],
+    base_bold: bool,
+    bold_changes: &[(TextSpan, bool)],
     limits: crate::ParseLimits,
 ) -> Result<Vec<u8>, Error> {
     let extra = alignments
         .len()
         .checked_mul(4)
+        .and_then(|bytes| bytes.checked_add(bold_changes.len().saturating_mul(6)))
         .ok_or(Error::InputTooLarge {
             observed: usize::MAX,
             limit: limits.max_source_bytes(),
@@ -755,33 +1197,59 @@ fn encoded_body_with_alignments(
         .try_reserve_exact(required)
         .map_err(|_error| Error::Write("could not reserve formatted RTF bytes".to_string()))?;
     let mut paragraph = 0usize;
-    let mut start = 0usize;
-    for (newline, _) in text.match_indices('\n') {
+    let mut paragraph_start = 0usize;
+    loop {
+        let paragraph_end = text
+            .get(paragraph_start..)
+            .and_then(|remainder| remainder.find('\n'))
+            .map_or(text.len(), |offset| paragraph_start.saturating_add(offset));
+        if paragraph_start == text.len() && text.ends_with('\n') {
+            break;
+        }
         write_alignment(&mut output, alignments.get(paragraph).copied())?;
-        let fragment = text.get(start..newline).ok_or(Error::UnsupportedSource(
-            "paragraph boundary is not a UTF-8 text boundary",
-        ))?;
-        RtfWriter::new(&mut output)
-            .write_text(fragment)
-            .map_err(|error| Error::Write(error.to_string()))?;
+        let mut cursor = paragraph_start;
+        let mut paragraph_changes = bold_changes
+            .iter()
+            .copied()
+            .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
+            .collect::<Vec<_>>();
+        paragraph_changes.sort_unstable_by_key(|(span, _)| (span.start, span.end));
+        for (span, bold) in paragraph_changes {
+            write_encoded_fragment(&mut output, text, cursor..span.start)?;
+            write_bold(&mut output, bold);
+            write_encoded_fragment(&mut output, text, span.start..span.end)?;
+            write_bold(&mut output, base_bold);
+            cursor = span.end;
+        }
+        write_encoded_fragment(&mut output, text, cursor..paragraph_end)?;
+        paragraph = paragraph.saturating_add(1);
+        if paragraph_end == text.len() {
+            break;
+        }
         output.extend_from_slice(br"\par ");
-        paragraph = paragraph.saturating_add(1);
-        start = newline.saturating_add(1);
-    }
-    if start < text.len() || !text.ends_with('\n') {
-        write_alignment(&mut output, alignments.get(paragraph).copied())?;
-        let fragment = text.get(start..).ok_or(Error::UnsupportedSource(
-            "paragraph boundary is not a UTF-8 text boundary",
-        ))?;
-        RtfWriter::new(&mut output)
-            .write_text(fragment)
-            .map_err(|error| Error::Write(error.to_string()))?;
-        paragraph = paragraph.saturating_add(1);
+        paragraph_start = paragraph_end.saturating_add(1);
     }
     if paragraph != alignments.len() {
         return Err(Error::StructuralPropertyConflict);
     }
     Ok(output)
+}
+
+fn write_encoded_fragment(
+    output: &mut Vec<u8>,
+    text: &str,
+    range: Range<usize>,
+) -> Result<(), Error> {
+    let fragment = text.get(range).ok_or(Error::UnsupportedSource(
+        "property span is not a UTF-8 text boundary",
+    ))?;
+    RtfWriter::new(output)
+        .write_text(fragment)
+        .map_err(|error| Error::Write(error.to_string()))
+}
+
+fn write_bold(output: &mut Vec<u8>, bold: bool) {
+    output.extend_from_slice(if bold { br"\b " } else { br"\b0 " });
 }
 
 fn write_alignment(output: &mut Vec<u8>, alignment: Option<Alignment>) -> Result<(), Error> {
@@ -935,6 +1403,19 @@ enum Change {
         before: Alignment,
         after: Alignment,
     },
+    Bold {
+        span: TextSpan,
+        after_span: TextSpan,
+        before: bool,
+        after: bool,
+    },
+    InsertParagraph {
+        position: usize,
+        span: TextSpan,
+        after_span: TextSpan,
+        text: String,
+        removing: bool,
+    },
 }
 
 impl Change {
@@ -959,6 +1440,30 @@ impl Change {
                 position: *position,
                 before: *after,
                 after: *before,
+            },
+            Self::Bold {
+                span,
+                after_span,
+                before,
+                after,
+            } => Self::Bold {
+                span: *after_span,
+                after_span: *span,
+                before: *after,
+                after: *before,
+            },
+            Self::InsertParagraph {
+                position,
+                span,
+                after_span,
+                text,
+                removing,
+            } => Self::InsertParagraph {
+                position: *position,
+                span: *after_span,
+                after_span: *span,
+                text: text.clone(),
+                removing: !removing,
             },
         }
     }
@@ -998,7 +1503,32 @@ fn semantic_changes(
                 before: *before,
                 after: *after,
             }),
-            Operation::Text { .. } | Operation::Alignment { .. } => None,
+            Operation::Bold {
+                span,
+                before,
+                after,
+            } if before != after => Some(Change::Bold {
+                span: *span,
+                after_span: project_base_span(*span, operations).ok()?,
+                before: *before,
+                after: *after,
+            }),
+            Operation::InsertParagraph {
+                position,
+                span,
+                text,
+            } => projected_spans
+                .iter()
+                .find_map(|(projected_index, projected)| {
+                    (*projected_index == index).then_some(Change::InsertParagraph {
+                        position: *position,
+                        span: *span,
+                        after_span: *projected,
+                        text: text.clone(),
+                        removing: false,
+                    })
+                }),
+            Operation::Text { .. } | Operation::Alignment { .. } | Operation::Bold { .. } => None,
         })
         .collect()
 }
@@ -1131,6 +1661,52 @@ fn durable_operation(
                 Value::String(alignment_name(*after).to_string()),
             )
         },
+        Change::Bold {
+            span,
+            before,
+            after,
+            after_span: _,
+        } => {
+            preconditions.insert("bold".to_string(), Value::Bool(*before));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "character-bold.set",
+                format!("body:utf8:{}-{}", span.start, span.end),
+                preconditions,
+                Value::Bool(*after),
+            )
+        },
+        Change::InsertParagraph {
+            position,
+            text,
+            removing,
+            span: _,
+            after_span: _,
+        } => {
+            preconditions.insert(
+                "text".to_string(),
+                Value::String(if *removing {
+                    text.clone()
+                } else {
+                    String::new()
+                }),
+            );
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                if *removing {
+                    "paragraph.remove-after"
+                } else {
+                    "paragraph.insert-after"
+                },
+                format!("body:paragraph:{position}"),
+                preconditions,
+                if *removing {
+                    Value::Null
+                } else {
+                    Value::String(text.clone())
+                },
+            )
+        },
     }
 }
 
@@ -1212,6 +1788,45 @@ pub(crate) fn apply_durable<Mode>(
                     .and_then(parse_alignment)
                     .ok_or_else(|| Error::DurablePatch("invalid alignment value".to_string()))?;
                 edit.set_paragraph_alignment(position, replacement)?;
+            },
+            "character-bold.set" => {
+                let span = parse_text_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("bold")
+                    .and_then(Value::as_bool)
+                    .ok_or_else(|| Error::DurablePatch("missing bold precondition".to_string()))?;
+                if bold_for_span(source, span)? != expected {
+                    return Err(Error::StalePrecondition("character bold state differs"));
+                }
+                let replacement = operation
+                    .value
+                    .as_bool()
+                    .ok_or_else(|| Error::DurablePatch("bold value must be Boolean".to_string()))?;
+                edit.set_text_bold(span, replacement)?;
+            },
+            "paragraph.insert-after" => {
+                let position = parse_paragraph_target(&operation.target)?;
+                let replacement = operation.value.as_str().ok_or_else(|| {
+                    Error::DurablePatch("inserted paragraph text must be a string".to_string())
+                })?;
+                edit.insert_paragraph_after(position, replacement)?;
+            },
+            "paragraph.remove-after" => {
+                let position = parse_paragraph_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing inserted paragraph precondition".to_string())
+                    })?;
+                if !operation.value.is_null() {
+                    return Err(Error::DurablePatch(
+                        "paragraph removal value must be null".to_string(),
+                    ));
+                }
+                edit.remove_paragraph_after(position, expected)?;
             },
             _ => {
                 return Err(Error::DurablePatch(

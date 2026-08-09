@@ -2,14 +2,31 @@ use std::sync::Arc;
 
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 
-use super::model::{BlockKind, BlockRecord, Dialect, Error, ReadLimits, Snapshot, State};
+use super::model::{
+    BlockKind, BlockRecord, Dialect, Error, InlineKind, InlineRecord, ReadLimits, ReferenceKind,
+    ReferenceRecord, Snapshot, State,
+};
+
+struct OpenBlock {
+    kind: BlockKind,
+    start: usize,
+    inlines: Vec<InlineRecord>,
+    footnote_label: Option<String>,
+}
+
+struct OpenInline {
+    kind: InlineKind,
+    start: usize,
+    depth: usize,
+    reference: Option<ReferenceRecord>,
+}
 
 pub(crate) fn read(source: &str, dialect: Dialect, limits: ReadLimits) -> Result<Snapshot, Error> {
     validate_input(source, limits)?;
     let options = parser_options(dialect);
     let parser = Parser::new_ext(source, options);
-    let mut blocks = collect_reference_definitions(&parser, limits)?;
-    collect_event_blocks(parser, &mut blocks, limits)?;
+    let (mut blocks, mut references) = collect_reference_definitions(&parser, limits)?;
+    collect_event_blocks(parser, &mut blocks, &mut references, limits)?;
     for block in &mut blocks {
         expand_indented_start(source, block);
     }
@@ -18,6 +35,13 @@ pub(crate) fn read(source: &str, dialect: Dialect, limits: ReadLimits) -> Result
             .start
             .cmp(&right.range.start)
             .then_with(|| left.range.end.cmp(&right.range.end))
+    });
+    references.sort_by(|left, right| {
+        left.range
+            .start
+            .cmp(&right.range.start)
+            .then_with(|| left.range.end.cmp(&right.range.end))
+            .then_with(|| reference_order(left.kind).cmp(&reference_order(right.kind)))
     });
     if blocks.len() > limits.max_blocks {
         return Err(Error::BlockLimitExceeded {
@@ -29,6 +53,7 @@ pub(crate) fn read(source: &str, dialect: Dialect, limits: ReadLimits) -> Result
         state: Arc::new(State {
             source: retained_source,
             blocks: blocks.into_boxed_slice(),
+            references: references.into_boxed_slice(),
             dialect,
             limits,
         }),
@@ -82,12 +107,14 @@ fn block_kind(tag: &Tag<'_>) -> Option<BlockKind> {
 fn collect_event_blocks(
     parser: Parser<'_>,
     blocks: &mut Vec<BlockRecord>,
+    references: &mut Vec<ReferenceRecord>,
     limits: ReadLimits,
 ) -> Result<(), Error> {
     let mut event_count = 0usize;
     let mut tag_depth = 0usize;
     let mut block_depth = 0usize;
-    let mut root_block: Option<(BlockKind, usize)> = None;
+    let mut root_block: Option<OpenBlock> = None;
+    let mut open_inlines = Vec::<OpenInline>::new();
     for (event, range) in parser.into_offset_iter() {
         event_count = event_count.saturating_add(1);
         if event_count > limits.max_events {
@@ -106,22 +133,103 @@ fn collect_event_blocks(
                 }
                 if let Some(kind) = block_kind(&tag) {
                     if block_depth == 0 {
-                        root_block = Some((kind, range.start));
+                        let footnote_label = match &tag {
+                            Tag::FootnoteDefinition(label) => Some(label.to_string()),
+                            Tag::Paragraph
+                            | Tag::Heading { .. }
+                            | Tag::BlockQuote(_)
+                            | Tag::CodeBlock(_)
+                            | Tag::HtmlBlock
+                            | Tag::List(_)
+                            | Tag::Item
+                            | Tag::DefinitionList
+                            | Tag::DefinitionListTitle
+                            | Tag::DefinitionListDefinition
+                            | Tag::Table(_)
+                            | Tag::TableHead
+                            | Tag::TableRow
+                            | Tag::TableCell
+                            | Tag::Emphasis
+                            | Tag::Strong
+                            | Tag::Strikethrough
+                            | Tag::Superscript
+                            | Tag::Subscript
+                            | Tag::Link { .. }
+                            | Tag::Image { .. }
+                            | Tag::MetadataBlock(_) => None,
+                        };
+                        root_block = Some(OpenBlock {
+                            kind,
+                            start: range.start,
+                            inlines: Vec::new(),
+                            footnote_label,
+                        });
                     }
                     block_depth = block_depth.saturating_add(1);
                 }
+                if let Some(kind) = inline_kind(&tag) {
+                    let inline_depth = open_inlines.len();
+                    push_open_inline(
+                        &mut open_inlines,
+                        OpenInline {
+                            kind,
+                            start: range.start,
+                            depth: inline_depth,
+                            reference: inline_reference(&tag, range.clone()),
+                        },
+                    )?;
+                }
             },
             Event::End(end) => {
+                if is_inline_end(end)
+                    && let Some(mut inline) = open_inlines.pop()
+                {
+                    let node_range = inline.start..range.end;
+                    if let Some(reference) = inline.reference.as_mut() {
+                        reference.range = node_range.clone();
+                        push_reference(references, reference.clone())?;
+                    }
+                    if let Some(block) = root_block.as_mut() {
+                        push_inline(
+                            &mut block.inlines,
+                            InlineRecord {
+                                kind: inline.kind,
+                                range: node_range,
+                                depth: inline.depth,
+                            },
+                        )?;
+                    }
+                }
                 if is_block_end(end) {
                     block_depth = block_depth.saturating_sub(1);
                     if block_depth == 0
-                        && let Some((kind, start)) = root_block.take()
+                        && let Some(mut block) = root_block.take()
                     {
+                        block.inlines.sort_by(|left, right| {
+                            left.range
+                                .start
+                                .cmp(&right.range.start)
+                                .then_with(|| left.depth.cmp(&right.depth))
+                                .then_with(|| right.range.end.cmp(&left.range.end))
+                        });
+                        if let Some(label) = block.footnote_label.take() {
+                            push_reference(
+                                references,
+                                ReferenceRecord {
+                                    kind: ReferenceKind::FootnoteDefinition,
+                                    range: block.start..range.end,
+                                    label: Some(label),
+                                    destination: None,
+                                    title: None,
+                                },
+                            )?;
+                        }
                         push_block(
                             blocks,
                             BlockRecord {
-                                kind,
-                                range: start..range.end,
+                                kind: block.kind,
+                                range: block.start..range.end,
+                                inlines: block.inlines.into_boxed_slice(),
                             },
                             limits,
                         )?;
@@ -134,20 +242,56 @@ fn collect_event_blocks(
                 BlockRecord {
                     kind: BlockKind::ThematicBreak,
                     range,
+                    inlines: Box::new([]),
                 },
                 limits,
             )?,
-            Event::Text(_)
-            | Event::Code(_)
-            | Event::InlineMath(_)
-            | Event::DisplayMath(_)
-            | Event::Html(_)
-            | Event::InlineHtml(_)
-            | Event::FootnoteReference(_)
-            | Event::SoftBreak
-            | Event::HardBreak
-            | Event::Rule
-            | Event::TaskListMarker(_) => {},
+            Event::Text(_) => {
+                push_leaf(&mut root_block, InlineKind::Text, range, open_inlines.len())?;
+            },
+            Event::Code(_) => {
+                push_leaf(&mut root_block, InlineKind::Code, range, open_inlines.len())?;
+            },
+            Event::Html(_) | Event::InlineHtml(_) => {
+                push_leaf(&mut root_block, InlineKind::Html, range, open_inlines.len())?;
+            },
+            Event::FootnoteReference(label) => {
+                push_leaf(
+                    &mut root_block,
+                    InlineKind::FootnoteReference,
+                    range.clone(),
+                    open_inlines.len(),
+                )?;
+                push_reference(
+                    references,
+                    ReferenceRecord {
+                        kind: ReferenceKind::Footnote,
+                        range,
+                        label: Some(label.to_string()),
+                        destination: None,
+                        title: None,
+                    },
+                )?;
+            },
+            Event::SoftBreak => push_leaf(
+                &mut root_block,
+                InlineKind::SoftBreak,
+                range,
+                open_inlines.len(),
+            )?,
+            Event::HardBreak => push_leaf(
+                &mut root_block,
+                InlineKind::HardBreak,
+                range,
+                open_inlines.len(),
+            )?,
+            Event::TaskListMarker(checked) => push_leaf(
+                &mut root_block,
+                InlineKind::TaskListMarker { checked },
+                range,
+                open_inlines.len(),
+            )?,
+            Event::InlineMath(_) | Event::DisplayMath(_) | Event::Rule => {},
         }
     }
     Ok(())
@@ -156,7 +300,7 @@ fn collect_event_blocks(
 fn collect_reference_definitions(
     parser: &Parser<'_>,
     limits: ReadLimits,
-) -> Result<Vec<BlockRecord>, Error> {
+) -> Result<(Vec<BlockRecord>, Vec<ReferenceRecord>), Error> {
     let definitions = parser.reference_definitions();
     let count = definitions.iter().count();
     if count > limits.max_blocks {
@@ -165,17 +309,180 @@ fn collect_reference_definitions(
         });
     }
     let mut blocks = Vec::new();
+    let mut references = Vec::new();
     blocks
         .try_reserve_exact(count)
         .map_err(|allocation_error| Error::Allocation {
             resource: "Markdown block index",
             source: allocation_error,
         })?;
-    blocks.extend(definitions.iter().map(|(_, definition)| BlockRecord {
-        kind: BlockKind::LinkDefinition,
-        range: definition.span.clone(),
-    }));
-    Ok(blocks)
+    references
+        .try_reserve_exact(count)
+        .map_err(|allocation_error| Error::Allocation {
+            resource: "Markdown reference graph",
+            source: allocation_error,
+        })?;
+    for (label, definition) in definitions.iter() {
+        blocks.push(BlockRecord {
+            kind: BlockKind::LinkDefinition,
+            range: definition.span.clone(),
+            inlines: Box::new([]),
+        });
+        references.push(ReferenceRecord {
+            kind: ReferenceKind::LinkDefinition,
+            range: definition.span.clone(),
+            label: Some(label.to_owned()),
+            destination: Some(definition.dest.to_string()),
+            title: definition.title.as_ref().map(ToString::to_string),
+        });
+    }
+    Ok((blocks, references))
+}
+
+fn inline_kind(tag: &Tag<'_>) -> Option<InlineKind> {
+    match tag {
+        Tag::Emphasis => Some(InlineKind::Emphasis),
+        Tag::Strong => Some(InlineKind::Strong),
+        Tag::Strikethrough => Some(InlineKind::Strikethrough),
+        Tag::Link { .. } => Some(InlineKind::Link),
+        Tag::Image { .. } => Some(InlineKind::Image),
+        Tag::Paragraph
+        | Tag::Heading { .. }
+        | Tag::BlockQuote(_)
+        | Tag::CodeBlock(_)
+        | Tag::HtmlBlock
+        | Tag::List(_)
+        | Tag::Item
+        | Tag::FootnoteDefinition(_)
+        | Tag::DefinitionList
+        | Tag::DefinitionListTitle
+        | Tag::DefinitionListDefinition
+        | Tag::Table(_)
+        | Tag::TableHead
+        | Tag::TableRow
+        | Tag::TableCell
+        | Tag::Superscript
+        | Tag::Subscript
+        | Tag::MetadataBlock(_) => None,
+    }
+}
+
+fn inline_reference(tag: &Tag<'_>, range: std::ops::Range<usize>) -> Option<ReferenceRecord> {
+    match tag {
+        Tag::Link {
+            dest_url,
+            title,
+            id,
+            ..
+        } => Some(ReferenceRecord {
+            kind: ReferenceKind::Link,
+            range,
+            label: (!id.is_empty()).then(|| id.to_string()),
+            destination: Some(dest_url.to_string()),
+            title: (!title.is_empty()).then(|| title.to_string()),
+        }),
+        Tag::Image {
+            dest_url,
+            title,
+            id,
+            ..
+        } => Some(ReferenceRecord {
+            kind: ReferenceKind::Image,
+            range,
+            label: (!id.is_empty()).then(|| id.to_string()),
+            destination: Some(dest_url.to_string()),
+            title: (!title.is_empty()).then(|| title.to_string()),
+        }),
+        Tag::Paragraph
+        | Tag::Heading { .. }
+        | Tag::BlockQuote(_)
+        | Tag::CodeBlock(_)
+        | Tag::HtmlBlock
+        | Tag::List(_)
+        | Tag::Item
+        | Tag::FootnoteDefinition(_)
+        | Tag::DefinitionList
+        | Tag::DefinitionListTitle
+        | Tag::DefinitionListDefinition
+        | Tag::Table(_)
+        | Tag::TableHead
+        | Tag::TableRow
+        | Tag::TableCell
+        | Tag::Emphasis
+        | Tag::Strong
+        | Tag::Strikethrough
+        | Tag::Superscript
+        | Tag::Subscript
+        | Tag::MetadataBlock(_) => None,
+    }
+}
+
+const fn is_inline_end(end: TagEnd) -> bool {
+    matches!(
+        end,
+        TagEnd::Emphasis | TagEnd::Strong | TagEnd::Strikethrough | TagEnd::Link | TagEnd::Image
+    )
+}
+
+fn push_inline(inlines: &mut Vec<InlineRecord>, inline: InlineRecord) -> Result<(), Error> {
+    inlines
+        .try_reserve(1)
+        .map_err(|allocation_error| Error::Allocation {
+            resource: "Markdown inline index",
+            source: allocation_error,
+        })?;
+    inlines.push(inline);
+    Ok(())
+}
+
+fn push_leaf(
+    root: &mut Option<OpenBlock>,
+    kind: InlineKind,
+    range: std::ops::Range<usize>,
+    depth: usize,
+) -> Result<(), Error> {
+    let Some(block) = root.as_mut() else {
+        return Ok(());
+    };
+    if matches!(block.kind, BlockKind::CodeBlock { .. } | BlockKind::Html) {
+        return Ok(());
+    }
+    push_inline(&mut block.inlines, InlineRecord { kind, range, depth })
+}
+
+fn push_open_inline(inlines: &mut Vec<OpenInline>, inline: OpenInline) -> Result<(), Error> {
+    inlines
+        .try_reserve(1)
+        .map_err(|allocation_error| Error::Allocation {
+            resource: "Markdown inline parser stack",
+            source: allocation_error,
+        })?;
+    inlines.push(inline);
+    Ok(())
+}
+
+fn push_reference(
+    references: &mut Vec<ReferenceRecord>,
+    reference: ReferenceRecord,
+) -> Result<(), Error> {
+    references
+        .try_reserve(1)
+        .map_err(|allocation_error| Error::Allocation {
+            resource: "Markdown reference graph",
+            source: allocation_error,
+        })?;
+    references.push(reference);
+    Ok(())
+}
+
+const fn reference_order(kind: ReferenceKind) -> u8 {
+    match kind {
+        ReferenceKind::Link => 0,
+        ReferenceKind::Image => 1,
+        ReferenceKind::Footnote => 2,
+        ReferenceKind::LinkDefinition => 3,
+        ReferenceKind::FootnoteDefinition => 4,
+    }
 }
 
 const fn heading_level(level: HeadingLevel) -> u8 {

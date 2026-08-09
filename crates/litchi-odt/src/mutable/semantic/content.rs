@@ -1,5 +1,7 @@
 //! Contextual content access and mutation.
 
+#![deny(clippy::expect_used, clippy::unwrap_used)]
+
 use super::super::model::MutableDocument;
 use crate::elements::table::Table;
 use crate::elements::text::{Heading, List, Paragraph};
@@ -66,18 +68,47 @@ impl ContentMut<'_> {
     }
 
     /// Insert a plain paragraph at a top-level structural position.
+    #[deprecated(note = "use insert_paragraph_at with a checked semantic Position")]
     pub fn insert_paragraph(&mut self, index: usize, text: &str) -> Result<()> {
-        self.document.insert_paragraph(index, text)
+        self.document
+            .insert_paragraph_at(litchi_core::Position::new(index), text)
+    }
+
+    /// Insert a paragraph at a checked semantic paragraph position.
+    pub fn insert_paragraph_at(
+        &mut self,
+        position: litchi_core::Position,
+        text: &str,
+    ) -> Result<()> {
+        self.document.insert_paragraph_at(position, text)
     }
 
     /// Replace one top-level paragraph's plain text.
+    #[deprecated(note = "use replace_paragraph_at with a checked semantic Position")]
     pub fn update_paragraph(&mut self, index: usize, text: &str) -> Result<()> {
-        self.document.update_paragraph(index, text)
+        self.document
+            .replace_paragraph_at(litchi_core::Position::new(index), text)
+    }
+
+    /// Replace a paragraph at a checked semantic paragraph position.
+    pub fn replace_paragraph_at(
+        &mut self,
+        position: litchi_core::Position,
+        text: &str,
+    ) -> Result<()> {
+        self.document.replace_paragraph_at(position, text)
     }
 
     /// Remove one top-level paragraph and return its typed value.
+    #[deprecated(note = "use remove_paragraph_at with a checked semantic Position")]
     pub fn remove_paragraph(&mut self, index: usize) -> Result<Paragraph> {
-        self.document.remove_paragraph(index)
+        self.document
+            .remove_paragraph_at(litchi_core::Position::new(index))
+    }
+
+    /// Remove a paragraph at a checked semantic paragraph position.
+    pub fn remove_paragraph_at(&mut self, position: litchi_core::Position) -> Result<Paragraph> {
+        self.document.remove_paragraph_at(position)
     }
 
     /// Remove all top-level paragraphs while retaining other body elements.
@@ -117,8 +148,15 @@ impl ContentMut<'_> {
 
     /// Append an ODF `text:line-break` to a paragraph selected in document
     /// order, preserving its existing inline markup.
+    #[deprecated(note = "use append_line_break_at with a checked semantic Position")]
     pub fn append_line_break(&mut self, paragraph_index: usize) -> Result<()> {
-        self.document.append_line_break(paragraph_index)
+        self.document
+            .append_line_break_at(litchi_core::Position::new(paragraph_index))
+    }
+
+    /// Append a line break at a checked semantic paragraph position.
+    pub fn append_line_break_at(&mut self, paragraph: litchi_core::Position) -> Result<()> {
+        self.document.append_line_break_at(paragraph)
     }
 
     /// Set or clear an explicit page sequence in `content.xml`.

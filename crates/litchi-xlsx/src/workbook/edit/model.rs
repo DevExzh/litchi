@@ -14,7 +14,7 @@ use litchi_sheet::{Cell as Address, Column as ColumnIndex, Rect, Row as RowIndex
 use super::{Visibility, Workbook};
 use crate::cell::{Cell, Stored};
 use crate::column::{Flags as ColumnFlags, Outline, Props as ColumnProps, State as ColumnState};
-use crate::error::{Error, MergeEditBlock, Result, allocation};
+use crate::error::{Error, MergeEditBlock, Result, allocation, invalid};
 use crate::layout::{self, Defaults};
 use crate::raw::worksheet::edit::{
     Action, ColumnAction, DefaultsAction, DescentEffect, HeightEffect, MergePlan, OptionalEffect,
@@ -643,6 +643,12 @@ pub enum Change {
         before: ColumnState,
         after: ColumnState,
     },
+    /// Direct worksheet row and column page-break state changed.
+    PageBreaks {
+        sheet: Box<str>,
+        before: crate::page_breaks::PageBreaks,
+        after: crate::page_breaks::PageBreaks,
+    },
 }
 
 impl Change {
@@ -659,7 +665,8 @@ impl Change {
             | Self::Merge { sheet, .. }
             | Self::Cell { sheet, .. }
             | Self::Row { sheet, .. }
-            | Self::Column { sheet, .. } => sheet,
+            | Self::Column { sheet, .. }
+            | Self::PageBreaks { sheet, .. } => sheet,
         }
     }
 
@@ -678,7 +685,8 @@ impl Change {
             | Self::Merge { .. }
             | Self::Cell { .. }
             | Self::Row { .. }
-            | Self::Column { .. } => None,
+            | Self::Column { .. }
+            | Self::PageBreaks { .. } => None,
         }
     }
 
@@ -701,7 +709,8 @@ impl Change {
             | Self::Merge { .. }
             | Self::Cell { .. }
             | Self::Row { .. }
-            | Self::Column { .. } => None,
+            | Self::Column { .. }
+            | Self::PageBreaks { .. } => None,
         }
     }
 
@@ -720,7 +729,8 @@ impl Change {
             | Self::Merge { .. }
             | Self::Cell { .. }
             | Self::Row { .. }
-            | Self::Column { .. } => None,
+            | Self::Column { .. }
+            | Self::PageBreaks { .. } => None,
         }
     }
 
@@ -744,7 +754,8 @@ impl Change {
             | Self::Merge { .. }
             | Self::Cell { .. }
             | Self::Row { .. }
-            | Self::Column { .. } => None,
+            | Self::Column { .. }
+            | Self::PageBreaks { .. } => None,
         }
     }
 
@@ -795,7 +806,8 @@ impl Change {
             | Self::Web { .. }
             | Self::Merge { .. }
             | Self::Row { .. }
-            | Self::Column { .. } => None,
+            | Self::Column { .. }
+            | Self::PageBreaks { .. } => None,
         }
     }
 
@@ -816,7 +828,8 @@ impl Change {
             | Self::Web { .. }
             | Self::Merge { .. }
             | Self::Cell { .. }
-            | Self::Column { .. } => None,
+            | Self::Column { .. }
+            | Self::PageBreaks { .. } => None,
         }
     }
 
@@ -840,7 +853,8 @@ impl Change {
             | Self::Web { .. }
             | Self::Merge { .. }
             | Self::Cell { .. }
-            | Self::Row { .. } => None,
+            | Self::Row { .. }
+            | Self::PageBreaks { .. } => None,
         }
     }
 
@@ -862,6 +876,20 @@ impl Change {
             Self::Remove {
                 sheet, position, ..
             } => Some((*position, sheet)),
+            _ => None,
+        }
+    }
+
+    /// Direct page-break transition, when applicable.
+    #[must_use]
+    pub fn page_breaks(
+        &self,
+    ) -> Option<(
+        &crate::page_breaks::PageBreaks,
+        &crate::page_breaks::PageBreaks,
+    )> {
+        match self {
+            Self::PageBreaks { before, after, .. } => Some((before, after)),
             _ => None,
         }
     }
@@ -975,6 +1003,15 @@ impl Change {
                 before: after.clone(),
                 after: before.clone(),
             },
+            Self::PageBreaks {
+                sheet,
+                before,
+                after,
+            } => Self::PageBreaks {
+                sheet: sheet.clone(),
+                before: after.clone(),
+                after: before.clone(),
+            },
         }
     }
 
@@ -1065,6 +1102,11 @@ pub enum Conflict {
         position: usize,
         columns: Box<[ColumnIndex]>,
     },
+    /// Both branches replace page breaks on the same worksheet.
+    PageBreaks {
+        sheet: Box<str>,
+        position: usize,
+    },
 }
 
 impl Conflict {
@@ -1082,7 +1124,8 @@ impl Conflict {
             | Self::Merges { sheet, .. }
             | Self::Cells { sheet, .. }
             | Self::Rows { sheet, .. }
-            | Self::Columns { sheet, .. } => sheet,
+            | Self::Columns { sheet, .. }
+            | Self::PageBreaks { sheet, .. } => sheet,
         }
     }
 
@@ -1100,7 +1143,8 @@ impl Conflict {
             | Self::Merges { position, .. }
             | Self::Cells { position, .. }
             | Self::Rows { position, .. }
-            | Self::Columns { position, .. } => *position,
+            | Self::Columns { position, .. }
+            | Self::PageBreaks { position, .. } => *position,
         }
     }
 
@@ -1149,6 +1193,12 @@ impl Conflict {
         matches!(self, Self::Web { .. })
     }
 
+    /// Whether both edits replace page breaks on the same worksheet.
+    #[must_use]
+    pub const fn is_page_breaks(&self) -> bool {
+        matches!(self, Self::PageBreaks { .. })
+    }
+
     /// Structurally overlapping merged ranges, when applicable.
     #[must_use]
     pub fn merges(&self) -> Option<&[Rect]> {
@@ -1172,7 +1222,8 @@ impl Conflict {
             | Self::Web { .. }
             | Self::Merges { .. }
             | Self::Rows { .. }
-            | Self::Columns { .. } => None,
+            | Self::Columns { .. }
+            | Self::PageBreaks { .. } => None,
         }
     }
 
@@ -1190,7 +1241,8 @@ impl Conflict {
             | Self::Web { .. }
             | Self::Merges { .. }
             | Self::Cells { .. }
-            | Self::Columns { .. } => None,
+            | Self::Columns { .. }
+            | Self::PageBreaks { .. } => None,
         }
     }
 
@@ -1209,7 +1261,8 @@ impl Conflict {
             | Self::Web { .. }
             | Self::Merges { .. }
             | Self::Cells { .. }
-            | Self::Rows { .. } => None,
+            | Self::Rows { .. }
+            | Self::PageBreaks { .. } => None,
         }
     }
 
@@ -1220,7 +1273,8 @@ impl Conflict {
             | Self::Order { .. }
             | Self::Active { .. }
             | Self::Tab { .. }
-            | Self::Web { .. } => 1,
+            | Self::Web { .. }
+            | Self::PageBreaks { .. } => 1,
             Self::Defaults { fields, .. } => fields.bits().count_ones() as usize,
             Self::Merges { ranges, .. } => ranges.len(),
             Self::Cells { addresses, .. } => addresses.len(),
@@ -1436,10 +1490,10 @@ impl fmt::Debug for GraphChange {
 
 /// Versioned reversible patch produced by a successful transaction.
 ///
-/// The current representation is an in-memory source-checked patch. Its public
-/// changes are semantic and contain no native Office IDs; private deltas retain
-/// exact changed-part bytes and relationship fields until the deterministic
-/// wire format lands.
+/// The in-memory representation keeps semantic public changes free of native
+/// Office IDs while private deltas retain exact changed-part bytes and
+/// relationship fields. [`Patch::durable`] projects the committed source and
+/// target snapshots onto the common bounded deterministic wire.
 #[derive(Debug, Clone, Default)]
 pub struct Patch {
     pub(super) changes: Box<[Change]>,
@@ -1448,6 +1502,8 @@ pub struct Patch {
     pub(super) graph: Box<[GraphChange]>,
     pub(super) web: Option<common_web::Patch>,
     pub(super) style_guard: Option<StyleGuard>,
+    pub(super) source: Option<Workbook>,
+    pub(super) target: Option<Workbook>,
 }
 
 impl Patch {
@@ -1482,6 +1538,7 @@ impl Patch {
     }
 
     /// Build the inverse without copying part payloads.
+    #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
             changes: self
@@ -1526,18 +1583,35 @@ impl Patch {
                 .into_boxed_slice(),
             web: self.web.as_ref().map(common_web::Patch::inverse),
             style_guard: self.style_guard.clone(),
+            source: self.target.clone(),
+            target: self.source.clone(),
         }
+    }
+
+    /// Convert this exact in-memory patch to the bounded durable wire form.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when this patch was not produced by a transaction or
+    /// application commit, a package exceeds finite bounds, or the core wire
+    /// envelope cannot be constructed.
+    pub fn durable(&self) -> Result<super::DurablePatch> {
+        super::DurablePatch::from_patch(self)
     }
 
     pub(in crate::workbook) fn apply_to(&self, workbook: &Workbook) -> Result<Commit> {
         ensure_unsigned(workbook)?;
+        let source = workbook.clone();
         if let Some(guard) = &self.style_guard {
             guard.validate(workbook)?;
         }
         if self.parts.is_empty() && self.graph.is_empty() && self.web.is_none() {
+            let mut patch = self.clone();
+            patch.source = Some(workbook.clone());
+            patch.target = Some(workbook.clone());
             return Ok(Commit {
                 workbook: workbook.clone(),
-                patch: self.clone(),
+                patch,
             });
         }
         let mut package = workbook.inner.package.clone();
@@ -1576,6 +1650,8 @@ impl Patch {
         for change in &mut patch.changes {
             change.rebind_style(&workbook);
         }
+        patch.source = Some(source);
+        patch.target = Some(workbook.clone());
         Ok(Commit { workbook, patch })
     }
 }
@@ -1606,6 +1682,24 @@ impl Commit {
     #[must_use]
     pub fn into_parts(self) -> (Workbook, Patch) {
         (self.workbook, self.patch)
+    }
+
+    /// Record this committed snapshot in bounded undo/redo history.
+    ///
+    /// The retained transition weight is the complete canonical durable JSON
+    /// length. The history's current snapshot must satisfy the patch's exact
+    /// source precondition.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a stale history head, durable serialization
+    /// failure, or a transition heavier than the history budget.
+    pub fn record(&self, history: &mut crate::workbook::History) -> Result<Vec<Workbook>> {
+        let durable = self.patch.durable()?;
+        let next = durable.apply(history.current())?;
+        let weight = u64::try_from(durable.to_deterministic_json()?.len())
+            .map_err(|error| invalid(format!("durable patch weight exceeds u64: {error}")))?;
+        Ok(history.record(next, weight)?)
     }
 }
 

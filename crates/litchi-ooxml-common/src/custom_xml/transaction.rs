@@ -23,6 +23,10 @@ pub struct Transaction<'a> {
 
 impl<'a> Transaction<'a> {
     /// Capture the package graph and start an isolated transaction.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn new(target: &'a mut OpcPackage) -> Result<Self> {
         let before = Snapshot::load(target)?;
         Ok(Self {
@@ -45,6 +49,10 @@ impl<'a> Transaction<'a> {
     }
 
     /// Replace one inert data-part XML payload after bounded validation.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn set_xml(&mut self, index: usize, xml: Vec<u8>) -> Result<bool> {
         let root = validate_payload(&xml)?;
         let current = self
@@ -68,11 +76,19 @@ impl<'a> Transaction<'a> {
     }
 
     /// Contextual alias for [`Self::set_xml`].
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn set_item_xml(&mut self, index: usize, xml: Vec<u8>) -> Result<bool> {
         self.set_xml(index, xml)
     }
 
     /// Replace the declared XML content type while retaining payload bytes.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn set_content_type(&mut self, index: usize, content_type: String) -> Result<bool> {
         validate_content_type(&content_type)?;
         let current = self
@@ -100,6 +116,10 @@ impl<'a> Transaction<'a> {
     /// The typed `Props` projection is checked, but every unknown attribute,
     /// child, prefix, comment, and whitespace in the supplied payload remains
     /// byte-for-byte intact.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn set_properties_xml(&mut self, index: usize, xml: Vec<u8>) -> Result<bool> {
         let props = read_props(&xml)?;
         let current = self
@@ -130,6 +150,10 @@ impl<'a> Transaction<'a> {
     /// Replace the typed properties projection using the source conformance
     /// family. Use [`Self::set_properties_xml`] when custom XML lexical form
     /// and unknown markup must be authored explicitly.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn set_properties(&mut self, index: usize, props: Props) -> Result<bool> {
         validate_props(&props)?;
         let current = self
@@ -155,12 +179,20 @@ impl<'a> Transaction<'a> {
     }
 
     /// Contextual alias for [`Self::set_properties`].
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn set_props(&mut self, index: usize, props: Props) -> Result<bool> {
         self.set_properties(index, props)
     }
 
     /// Remove the known properties relationship and leave unknown data-part
     /// relationships untouched.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn remove_properties(&mut self, index: usize) -> Result<bool> {
         let current = self
             .draft
@@ -188,6 +220,10 @@ impl<'a> Transaction<'a> {
     }
 
     /// Add a new data relationship and its optional properties graph.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn insert(&mut self, value: NewItem) -> Result<usize> {
         let item = new_item(self.target, value)?;
         if self.draft.iter().any(|existing| {
@@ -226,6 +262,10 @@ impl<'a> Transaction<'a> {
 
     /// Remove one data relationship and clean up unreferenced owned parts at
     /// publication time.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn remove(&mut self, index: usize) -> Result<Option<Item>> {
         if index >= self.draft.len() {
             return Ok(None);
@@ -240,6 +280,10 @@ impl<'a> Transaction<'a> {
     }
 
     /// Validate and atomically publish the transaction.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn commit(self) -> Result<Commit> {
         let current = Snapshot::load_scoped(self.target, &self.before.scope_names())?;
         if !self.before.same_source(&current) {

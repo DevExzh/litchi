@@ -15,6 +15,10 @@ pub struct W3c(String);
 
 impl W3c {
     /// Validates and retains a W3CDTF lexical value.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         reject_oversized(&value)?;
@@ -86,6 +90,10 @@ pub struct DateTime(String);
 
 impl DateTime {
     /// Validates and retains an `xsd:dateTime` lexical value.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         reject_oversized(&value)?;
@@ -223,7 +231,7 @@ fn validate_date(value: &str, minimum: DatePrecision) -> Result<(Year<'_>, DateP
     }
     let month = remainder[..2]
         .parse::<u8>()
-        .map_err(|_| invalid("XML Schema date", value))?;
+        .map_err(|error| invalid_parse("XML Schema date", value, error))?;
     if !(1..=12).contains(&month) {
         return Err(invalid("XML Schema date", value));
     }
@@ -238,7 +246,7 @@ fn validate_date(value: &str, minimum: DatePrecision) -> Result<(Year<'_>, DateP
     }
     let day = remainder[3..]
         .parse::<u8>()
-        .map_err(|_| invalid("XML Schema date", value))?;
+        .map_err(|error| invalid_parse("XML Schema date", value, error))?;
     if day == 0 || day > days_in_month(year, month) {
         return Err(invalid("XML Schema date", value));
     }
@@ -267,13 +275,13 @@ fn validate_time(value: &str) -> Result<()> {
     };
     let hour = value[..2]
         .parse::<u8>()
-        .map_err(|_| invalid("XML Schema time", value))?;
+        .map_err(|error| invalid_parse("XML Schema time", value, error))?;
     let minute = value[3..5]
         .parse::<u8>()
-        .map_err(|_| invalid("XML Schema time", value))?;
+        .map_err(|error| invalid_parse("XML Schema time", value, error))?;
     let second = value[6..8]
         .parse::<u8>()
-        .map_err(|_| invalid("XML Schema time", value))?;
+        .map_err(|error| invalid_parse("XML Schema time", value, error))?;
     if hour > 24
         || minute > 59
         || second > 59
@@ -302,10 +310,10 @@ fn split_timezone(value: &str) -> Result<(&str, Option<&str>)> {
             }
             let hours = zone[1..3]
                 .parse::<u8>()
-                .map_err(|_| invalid("XML Schema timezone", zone))?;
+                .map_err(|error| invalid_parse("XML Schema timezone", zone, error))?;
             let minutes = zone[4..]
                 .parse::<u8>()
-                .map_err(|_| invalid("XML Schema timezone", zone))?;
+                .map_err(|error| invalid_parse("XML Schema timezone", zone, error))?;
             if hours > 14 || minutes > 59 || (hours == 14 && minutes != 0) {
                 return Err(invalid("XML Schema timezone", zone));
             }
@@ -358,6 +366,10 @@ fn parse_local(value: &str) -> Option<NaiveDateTime> {
 
 fn invalid(kind: &str, value: &str) -> Error {
     Error::Invalid(format!("invalid {kind} value '{value}'"))
+}
+
+fn invalid_parse(kind: &str, value: &str, error: impl fmt::Display) -> Error {
+    Error::Invalid(format!("invalid {kind} value '{value}': {error}"))
 }
 
 fn reject_oversized(value: &str) -> Result<()> {

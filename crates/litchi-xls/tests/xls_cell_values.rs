@@ -8,7 +8,7 @@
 use litchi_cfb::OleFile;
 use litchi_core::sheet::{Cell as _, CellValue};
 use litchi_xls::Workbook;
-use litchi_xls::cell_values::{Reference, Selector, Snapshot};
+use litchi_xls::cell_values::{Reference, Selector, Snapshot, Storage};
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
@@ -16,6 +16,50 @@ fn fixture(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/poi/test-data/spreadsheet")
         .join(name)
+}
+
+#[test]
+fn real_mulrk_field_edit_remains_packed() {
+    let path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ole/xls/FormulaSheetRange.xls");
+    let source = Snapshot::from_bytes(std::fs::read(path).expect("read MulRk fixture"))
+        .expect("parse MulRk fixture");
+    let (sheet_position, reference) = source
+        .worksheets()
+        .find_map(|sheet| {
+            sheet
+                .cells()
+                .find(|cell| cell.storage() == Storage::MulRk)
+                .map(|cell| (sheet.position(), cell.reference()))
+        })
+        .expect("fixture contains MulRk");
+    let mut edit = source.edit();
+    edit.set_value(
+        Selector::Position(sheet_position),
+        reference,
+        litchi_xls::cell_values::Value::Number(123.0),
+    )
+    .expect("stage exact RK value");
+    let commit = edit.commit().expect("commit MulRk field");
+    let cell = commit
+        .snapshot()
+        .worksheet(Selector::Position(sheet_position))
+        .expect("resolve sheet")
+        .expect("sheet exists")
+        .cell(reference)
+        .expect("unique cell")
+        .expect("cell exists");
+    assert_eq!(cell.storage(), Storage::MulRk);
+    assert_eq!(cell.value(), &litchi_xls::cell_values::Value::Number(123.0));
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.snapshot())
+            .expect("inverse MulRk patch")
+            .bytes(),
+        source.bytes()
+    );
 }
 
 #[test]
@@ -78,7 +122,14 @@ fn real_fixture_number_commit_reopens_and_preserves_other_streams() {
         .expect("edited cell");
     let actual = match cell.value() {
         CellValue::Float(value) | CellValue::DateTime(value) => *value,
-        value => panic!("edited Number reopened as unexpected value {value:?}"),
+        value @ (CellValue::Empty
+        | CellValue::Bool(_)
+        | CellValue::Int(_)
+        | CellValue::String(_)
+        | CellValue::Error(_)
+        | CellValue::Formula { .. }) => {
+            panic!("edited Number reopened as unexpected value {value:?}")
+        },
     };
     assert_eq!(actual.to_bits(), replacement.to_bits());
 
@@ -97,10 +148,10 @@ fn real_fixture_number_commit_reopens_and_preserves_other_streams() {
 }
 
 fn assert_other_streams_equal(before: &[u8], after: &[u8]) {
-    let mut before = OleFile::open(Cursor::new(before)).expect("source CFB");
-    let mut after = OleFile::open(Cursor::new(after)).expect("target CFB");
-    let before_paths = before.list_streams();
-    let after_paths = after.list_streams();
+    let mut source_ole = OleFile::open(Cursor::new(before)).expect("source CFB");
+    let mut target_ole = OleFile::open(Cursor::new(after)).expect("target CFB");
+    let before_paths = source_ole.list_streams();
+    let after_paths = target_ole.list_streams();
     assert_eq!(before_paths, after_paths);
     for path in before_paths {
         if path.len() == 1 && matches!(path[0].as_str(), "Workbook" | "Book") {
@@ -108,8 +159,8 @@ fn assert_other_streams_equal(before: &[u8], after: &[u8]) {
         }
         let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
         assert_eq!(
-            before.open_stream(&refs).expect("source stream"),
-            after.open_stream(&refs).expect("target stream"),
+            source_ole.open_stream(&refs).expect("source stream"),
+            target_ole.open_stream(&refs).expect("target stream"),
             "stream payload changed at {path:?}"
         );
     }

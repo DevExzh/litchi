@@ -50,4 +50,18 @@ impl<'a> Snapshot<'a> {
         };
         Ok(Some((left, right)))
     }
+
+    pub(super) fn worksheet_pair<'left, 'right>(
+        &self,
+        left: impl Into<Selector<'left>>,
+        right: impl Into<Selector<'right>>,
+    ) -> Result<Option<(Worksheet, Worksheet)>> {
+        let Some(left) = self.worksheet(left)? else {
+            return Ok(None);
+        };
+        let Some(right) = self.worksheet(right)? else {
+            return Ok(None);
+        };
+        Ok(Some((left, right)))
+    }
 }

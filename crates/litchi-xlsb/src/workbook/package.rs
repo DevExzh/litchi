@@ -33,8 +33,8 @@ const CHART_SHEET_RELATIONSHIP_TYPES: &[&str] = &[
 impl Workbook {
     /// Read source-bound, editable stored values on one worksheet.
     ///
-    /// This inventories ordinary scalar cells and formula cached results. It
-    /// neither creates cells nor changes formula tokens or storage families.
+    /// This inventories ordinary scalar cells, formula cached results, and
+    /// inert formula payloads for structural editing.
     ///
     /// # Errors
     ///
@@ -58,7 +58,7 @@ impl Workbook {
         cell_values::workbook::read_with_limits(&self.package, &uri, limits)
     }
 
-    /// Start a detached, source-checked edit of existing stored cell values.
+    /// Start a detached, source-checked structural cell edit.
     ///
     /// # Errors
     ///

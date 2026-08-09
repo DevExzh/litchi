@@ -999,22 +999,35 @@ impl<'a> RtfDocument<'a> {
     }
 
     pub(crate) fn plain_body_text_editability(&self) -> Result<(), &'static str> {
+        self.plain_body_editability(false)
+    }
+
+    pub(crate) fn plain_body_bold_editability(&self) -> Result<(), &'static str> {
+        self.plain_body_editability(true)
+    }
+
+    fn plain_body_editability(&self, allow_mixed_bold: bool) -> Result<(), &'static str> {
         if !self.body_story_events.is_empty() || !self.tables.is_empty() {
             return Err("the body contains tables or positioned structure");
         }
-        let formatting = self
+        let mut formatting = self
             .blocks
             .first()
             .map_or_else(Formatting::default, |block| block.formatting);
+        if allow_mixed_bold {
+            formatting.bold = false;
+        }
         let paragraph = self
             .blocks
             .first()
             .map_or_else(RtfParagraph::default, |block| block.paragraph);
-        if self
-            .blocks
-            .iter()
-            .any(|block| block.formatting != formatting || block.paragraph != paragraph)
-        {
+        if self.blocks.iter().any(|block| {
+            let mut candidate = block.formatting;
+            if allow_mixed_bold {
+                candidate.bold = false;
+            }
+            candidate != formatting || block.paragraph != paragraph
+        }) {
             return Err("the body has mixed run or paragraph formatting");
         }
         Ok(())

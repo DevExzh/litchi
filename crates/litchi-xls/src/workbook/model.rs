@@ -156,6 +156,12 @@ impl Default for OpenOptions<'_> {
 }
 
 impl<R: Read + Seek> Workbook<R> {
+    pub(crate) fn shared_strings_shared(&self) -> Arc<Vec<String>> {
+        self.shared_strings
+            .as_ref()
+            .map_or_else(|| Arc::new(Vec::new()), Arc::clone)
+    }
+
     /// Formatting defects repaired while opening this workbook.
     ///
     /// Always clean under [`Leniency::Strict`], because a strict open either

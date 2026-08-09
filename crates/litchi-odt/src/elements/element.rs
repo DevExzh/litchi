@@ -349,8 +349,10 @@ impl Element {
         output.push('<');
         output.push_str(&self.tag_name);
 
-        // Attributes
-        for (key, value) in &self.attributes {
+        // Hash-map iteration order must never leak into serialized ODF bytes.
+        let mut attributes = self.attributes.iter().collect::<Vec<_>>();
+        attributes.sort_unstable_by_key(|(key, _)| *key);
+        for (key, value) in attributes {
             output.push(' ');
             output.push_str(key);
             output.push_str("=\"");

@@ -306,10 +306,10 @@ pub use threaded_comments::{
     validate_timestamp, write_comments, write_persons,
 };
 pub use workbook::{
-    ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DateSystem, DefaultsEdit, Edit,
-    Flavor, History, HistoryLimits, JoinError, JoinFailure, NewSheet, PackageChange, Patch,
-    RowEdit, Selector, State, TabEdit, Visibility, Workbook, Worksheet, WorksheetEdit,
-    WorksheetKind,
+    ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DateSystem, DefaultsEdit,
+    DurablePatch, Edit, Flavor, History, HistoryLimits, JoinError, JoinFailure, MergeChoice,
+    MergeLimits, NewSheet, PackageChange, Patch, RowEdit, SealedPatch, Selector, State, TabEdit,
+    ThreeWayPlan, Visibility, Workbook, Worksheet, WorksheetEdit, WorksheetKind,
 };
 pub use workbook_metadata::{
     FutureMetadata, MetadataBehavior, MetadataBlock, MetadataRecord, MetadataType,

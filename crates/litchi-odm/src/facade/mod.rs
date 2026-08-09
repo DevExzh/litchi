@@ -40,10 +40,31 @@ impl Master {
             .map(Self::from_snapshot)
     }
 
-    pub(crate) fn with_parts(&self, content_xml: &str, meta_xml: Option<&str>) -> Result<Self> {
+    pub(crate) fn with_transaction_parts(
+        &self,
+        content_xml: &str,
+        styles_xml: Option<&str>,
+        meta_xml: Option<&str>,
+        removed_resources: &[String],
+        resource_writes: &[crate::package::ResourceWrite],
+    ) -> Result<Self> {
         self.package
-            .with_parts(content_xml, meta_xml)
+            .with_transaction_parts(
+                content_xml,
+                styles_xml,
+                meta_xml,
+                removed_resources,
+                resource_writes,
+            )
             .map(Self::from_snapshot)
+    }
+
+    pub(crate) fn resource_bytes(&self, path: &str) -> Result<Vec<u8>> {
+        self.package.resource_bytes(path)
+    }
+
+    pub(crate) fn local_section_references(&self) -> &[(String, std::ops::Range<usize>)] {
+        self.package.local_section_references()
     }
 
     pub(crate) fn href_span(&self, reference: usize) -> Option<&std::ops::Range<usize>> {
@@ -182,6 +203,15 @@ impl Master {
     #[must_use]
     pub fn edit(&self) -> crate::transaction::Edit<'_> {
         crate::transaction::Edit::new(self)
+    }
+
+    /// Starts one transaction under an explicit external-link/resource policy.
+    #[must_use]
+    pub fn edit_with_policy(
+        &self,
+        policy: crate::transaction::SecurityPolicy,
+    ) -> crate::transaction::Edit<'_> {
+        crate::transaction::Edit::with_policy(self, policy)
     }
 
     /// Applies a unified patch only to its exact source package.

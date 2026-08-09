@@ -14,12 +14,16 @@ mod package;
 
 pub use facade::{Builder, Drawing};
 pub use facade::{
-    Change as PackageChange, Commit as PackageCommit, GeometryChange as PackageGeometryChange,
-    History as PackageHistory, HistoryLimits as PackageHistoryLimits,
-    LayerChange as PackageLayerChange, NameChange as PackageNameChange, Patch as PackagePatch,
-    ResourceChange as PackageResourceChange, Snapshot as PackageSnapshot,
-    StructureChange as PackageStructureChange, StyleChange as PackageStyleChange,
-    TextChange as PackageTextChange, Transaction as PackageTransaction,
+    Change as PackageChange, Commit as PackageCommit,
+    ControlReferenceChange as PackageControlReferenceChange, DurablePatch as PackageDurablePatch,
+    GeometryChange as PackageGeometryChange, History as PackageHistory,
+    HistoryLimits as PackageHistoryLimits, JoinedEdits as PackageJoinedEdits,
+    LayerChange as PackageLayerChange, Lineage as PackageLineage, MergePlan as PackageMergePlan,
+    NameChange as PackageNameChange, Patch as PackagePatch, PathChange as PackagePathChange,
+    PreparedEdit as PackagePreparedEdit, ResourceChange as PackageResourceChange,
+    Snapshot as PackageSnapshot, StructureChange as PackageStructureChange,
+    StyleChange as PackageStyleChange, TextChange as PackageTextChange,
+    Transaction as PackageTransaction,
 };
 pub use flat::{
     FlatDrawing, FlatDrawingCommit, FlatDrawingEdit, FlatDrawingPatch, FlatPage, FlatShape,

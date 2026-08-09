@@ -6,7 +6,11 @@ use crate::model::{
     resource::Resource,
     shape::{Properties as ShapeProperties, Shape, ShapeKind},
 };
-use litchi_core::{Error, Metadata, Result};
+use litchi_core::{
+    BlobBundle, BlobLimits, CompositionLimits, DiagnosticFingerprint, Error, History,
+    HistoryLimits, JoinedSubEdits, Metadata, Patch as CorePatch, PatchLimits, PatchOperation,
+    Result, Reversible, ReversibleOperation, SubEdit,
+};
 use litchi_odf_common::{
     compact_xml,
     core::{PackageWriter, family::Package},
@@ -19,9 +23,10 @@ use quick_xml::{
     name::{Namespace, ResolveResult},
     reader::NsReader,
 };
-use std::{ops::Range, path::Path, sync::Arc};
+use std::{collections::BTreeMap, ops::Range, path::Path, sync::Arc};
 
 pub(crate) const MIMETYPE: &str = "application/vnd.oasis.opendocument.graphics";
+pub(crate) const TEMPLATE_MIMETYPE: &str = "application/vnd.oasis.opendocument.graphics-template";
 const BODY_MARKER: &str = "<office:drawing";
 const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
@@ -34,6 +39,7 @@ const MAX_LAYERS: usize = 16_384;
 const MAX_SHAPES: usize = 1_000_000;
 const MAX_TEXT_BYTES: usize = 16 * 1024 * 1024;
 const MAX_OUTPUT_BYTES: usize = 256 * 1024 * 1024;
+const DURABLE_FORMAT: &str = "litchi.odg";
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum NamespaceKind {
@@ -48,9 +54,12 @@ type TextSpans = Vec<Vec<Vec<Option<Range<usize>>>>>;
 type NameSpans = Vec<Vec<Option<Range<usize>>>>;
 type LayerSpans = Vec<Vec<Option<Range<usize>>>>;
 type GeometrySpans = Vec<Vec<[Option<Range<usize>>; 4]>>;
+type PathSpans = Vec<Vec<Option<Range<usize>>>>;
+type ControlSpans = Vec<Vec<Option<Range<usize>>>>;
 
 struct State {
     package: Package,
+    mimetype: &'static str,
     pages: Vec<Page>,
     layers: Vec<Layer>,
     resources: Vec<Resource>,
@@ -71,7 +80,19 @@ impl Snapshot {
     ///
     /// Returns an error when the package cannot be read or is not a structurally valid ODG.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_package(Package::open(path, MIMETYPE, BODY_MARKER, "ODG")?)
+        Self::from_package(Package::open(path, MIMETYPE, BODY_MARKER, "ODG")?, MIMETYPE)
+    }
+
+    /// Opens an `OpenDocument` drawing template from a filesystem path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package is unreadable or is not a structurally valid `OTG`.
+    pub fn open_template(path: impl AsRef<Path>) -> Result<Self> {
+        Self::from_package(
+            Package::open(path, TEMPLATE_MIMETYPE, BODY_MARKER, "OTG")?,
+            TEMPLATE_MIMETYPE,
+        )
     }
 
     /// Opens a package from owned bytes.
@@ -80,10 +101,25 @@ impl Snapshot {
     ///
     /// Returns an error when the package is not a structurally valid ODG.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_package(Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODG")?)
+        Self::from_package(
+            Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODG")?,
+            MIMETYPE,
+        )
     }
 
-    fn from_package(package: Package) -> Result<Self> {
+    /// Opens an `OpenDocument` drawing template from owned bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package is not a structurally valid `OTG`.
+    pub fn from_template_bytes(bytes: Vec<u8>) -> Result<Self> {
+        Self::from_package(
+            Package::from_bytes(bytes, TEMPLATE_MIMETYPE, BODY_MARKER, "OTG")?,
+            TEMPLATE_MIMETYPE,
+        )
+    }
+
+    fn from_package(package: Package, mimetype: &'static str) -> Result<Self> {
         let parsed = parse_content(package.content_xml())?;
         let layers = package
             .styles_xml()
@@ -96,6 +132,7 @@ impl Snapshot {
         let resources = scan_resources(&package)?;
         Ok(Self(Arc::new(State {
             package,
+            mimetype,
             pages: parsed.pages,
             layers,
             resources,
@@ -166,6 +203,12 @@ impl Snapshot {
         self.0.package.as_bytes()
     }
 
+    /// Whether this snapshot is an OTG drawing template.
+    #[must_use]
+    pub fn is_template(&self) -> bool {
+        self.0.mimetype == TEMPLATE_MIMETYPE
+    }
+
     /// Lists safe package entry names.
     ///
     /// # Errors
@@ -207,10 +250,33 @@ impl Snapshot {
         }
     }
 
-    /// Starts explicit bounded undo/redo history at this immutable snapshot.
+    /// Starts an empty deterministic composition for this exact snapshot.
     #[must_use]
-    pub fn history(&self, limits: litchi_core::patch::HistoryLimits) -> super::History {
-        super::History::new(self.clone(), limits)
+    pub fn joined_edits(&self, limits: CompositionLimits) -> JoinedEdits {
+        JoinedEdits::new(Lineage::new(self), limits)
+    }
+
+    /// Applies joined disjoint work atomically against this exact base.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for stale lineage, unsupported operations, security refusal, or failed
+    /// whole-package readback. No intermediate snapshot is published on failure.
+    pub fn apply_joined(&self, joined: JoinedEdits) -> Result<Snapshot> {
+        if !joined.lineage().matches(self) {
+            return invalid("joined ODG edits do not match the exact source snapshot");
+        }
+        let mut current = self.clone();
+        for edit in joined.into_sub_edits() {
+            current = apply_durable_patch(&current, edit.payload(), false)?;
+        }
+        Ok(current)
+    }
+
+    /// Starts explicit bounded undo/redo history at this snapshot.
+    #[must_use]
+    pub fn history(&self, limits: HistoryLimits) -> SnapshotHistory {
+        History::new(self.clone(), limits)
     }
 
     /// Consumes the snapshot and returns its source bytes.
@@ -511,6 +577,105 @@ impl Transaction {
             before: before_owned,
             after,
         }));
+        Ok(())
+    }
+
+    /// Changes an existing SVG path-data attribute without normalizing XML.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless the selected shape is a path with an existing,
+    /// losslessly addressable `svg:d` attribute.
+    pub fn set_shape_path_data(
+        &mut self,
+        page: usize,
+        shape: usize,
+        path_data: impl Into<String>,
+    ) -> Result<()> {
+        let after = path_data.into();
+        validate_path_data(&after)?;
+        let parsed = parse_content(&self.content)?;
+        let selected = parsed
+            .pages
+            .get(page)
+            .and_then(|value| value.shapes().get(shape))
+            .ok_or_else(|| Error::InvalidFormat("ODG shape selector is out of bounds".into()))?;
+        if selected.kind() != ShapeKind::Path {
+            return Err(Error::Unsupported(
+                "ODG path-data edit requires a draw:path shape".into(),
+            ));
+        }
+        let before = selected.path_data().ok_or_else(|| {
+            Error::Unsupported("ODG path-data edit requires an existing svg:d".into())
+        })?;
+        let span = parsed
+            .path_spans
+            .get(page)
+            .and_then(|values| values.get(shape))
+            .and_then(Option::as_ref)
+            .ok_or_else(|| Error::InvalidFormat("ODG shape path-data span is missing".into()))?;
+        if before == after {
+            return Ok(());
+        }
+        let before_owned = before.to_owned();
+        self.content = replace_xml_value(&self.content, span, &after)?;
+        self.changes.push(Change::Path(PathChange {
+            page,
+            shape,
+            before: before_owned,
+            after,
+        }));
+        Ok(())
+    }
+
+    /// Changes an existing inert form-control reference without activating it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless the selected control shape has an existing,
+    /// losslessly addressable `draw:control` attribute.
+    pub fn set_shape_control_reference(
+        &mut self,
+        page: usize,
+        shape: usize,
+        reference: impl Into<String>,
+    ) -> Result<()> {
+        let after = reference.into();
+        validate_bounded_value(&after, "ODG form-control reference")?;
+        let parsed = parse_content(&self.content)?;
+        let selected = parsed
+            .pages
+            .get(page)
+            .and_then(|value| value.shapes().get(shape))
+            .ok_or_else(|| Error::InvalidFormat("ODG shape selector is out of bounds".into()))?;
+        if selected.kind() != ShapeKind::Control {
+            return Err(Error::Unsupported(
+                "ODG form-control edit requires a draw:control shape".into(),
+            ));
+        }
+        let before = selected.control_reference().ok_or_else(|| {
+            Error::Unsupported("ODG form-control edit requires an existing draw:control".into())
+        })?;
+        let span = parsed
+            .control_spans
+            .get(page)
+            .and_then(|values| values.get(shape))
+            .and_then(Option::as_ref)
+            .ok_or_else(|| {
+                Error::InvalidFormat("ODG form-control source span is missing".into())
+            })?;
+        if before == after {
+            return Ok(());
+        }
+        let before_owned = before.to_owned();
+        self.content = replace_xml_value(&self.content, span, &after)?;
+        self.changes
+            .push(Change::ControlReference(ControlReferenceChange {
+                page,
+                shape,
+                before: before_owned,
+                after,
+            }));
         Ok(())
     }
 
@@ -860,7 +1025,12 @@ impl Transaction {
                 bytes: edit.after_bytes.as_deref(),
             })
             .collect::<Vec<_>>();
-        let snapshot = Snapshot::from_bytes(rebuild(&self.source, &self.content, &replacements)?)?;
+        let rebuilt = rebuild(&self.source, &self.content, &replacements)?;
+        let snapshot = if self.source.is_template() {
+            Snapshot::from_template_bytes(rebuilt)?
+        } else {
+            Snapshot::from_bytes(rebuilt)?
+        };
         if snapshot.content_xml() != self.content {
             return invalid("ODG package edit failed exact content readback");
         }
@@ -903,12 +1073,45 @@ impl Transaction {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Change {
+    ControlReference(ControlReferenceChange),
     Text(TextChange),
     Name(NameChange),
     Layer(LayerChange),
     Geometry(GeometryChange),
     Style(StyleChange),
+    Path(PathChange),
     Structure(StructureChange),
+}
+
+/// One reversible inert form-control reference change.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ControlReferenceChange {
+    page: usize,
+    shape: usize,
+    before: String,
+    after: String,
+}
+
+impl ControlReferenceChange {
+    #[must_use]
+    pub const fn page(&self) -> usize {
+        self.page
+    }
+
+    #[must_use]
+    pub const fn shape(&self) -> usize {
+        self.shape
+    }
+
+    #[must_use]
+    pub fn before(&self) -> &str {
+        &self.before
+    }
+
+    #[must_use]
+    pub fn after(&self) -> &str {
+        &self.after
+    }
 }
 
 /// One reversible semantic shape-text operation.
@@ -1058,6 +1261,37 @@ pub struct StyleChange {
     shape: usize,
     before: String,
     after: String,
+}
+
+/// One reversible SVG path-data change.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PathChange {
+    page: usize,
+    shape: usize,
+    before: String,
+    after: String,
+}
+
+impl PathChange {
+    #[must_use]
+    pub const fn page(&self) -> usize {
+        self.page
+    }
+
+    #[must_use]
+    pub const fn shape(&self) -> usize {
+        self.shape
+    }
+
+    #[must_use]
+    pub fn before(&self) -> &str {
+        &self.before
+    }
+
+    #[must_use]
+    pub fn after(&self) -> &str {
+        &self.after
+    }
 }
 
 impl StyleChange {
@@ -1264,10 +1498,12 @@ impl Patch {
     pub fn change(&self) -> Option<&TextChange> {
         self.changes.iter().find_map(|change| match change {
             Change::Text(value) => Some(value),
-            Change::Name(_)
+            Change::ControlReference(_)
+            | Change::Name(_)
             | Change::Layer(_)
             | Change::Geometry(_)
             | Change::Style(_)
+            | Change::Path(_)
             | Change::Structure(_) => None,
         })
     }
@@ -1277,10 +1513,12 @@ impl Patch {
     pub fn name_change(&self) -> Option<&NameChange> {
         self.changes.iter().find_map(|change| match change {
             Change::Name(value) => Some(value),
-            Change::Text(_)
+            Change::ControlReference(_)
+            | Change::Text(_)
             | Change::Layer(_)
             | Change::Geometry(_)
             | Change::Style(_)
+            | Change::Path(_)
             | Change::Structure(_) => None,
         })
     }
@@ -1290,10 +1528,12 @@ impl Patch {
     pub fn layer_change(&self) -> Option<&LayerChange> {
         self.changes.iter().find_map(|change| match change {
             Change::Layer(value) => Some(value),
-            Change::Text(_)
+            Change::ControlReference(_)
+            | Change::Text(_)
             | Change::Name(_)
             | Change::Geometry(_)
             | Change::Style(_)
+            | Change::Path(_)
             | Change::Structure(_) => None,
         })
     }
@@ -1346,15 +1586,523 @@ impl Patch {
                 .collect(),
         }
     }
+
+    /// Projects this exact-source patch into the shared durable semantic wire format.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a semantic operation exceeds the durable patch limits.
+    pub fn durable(&self) -> Result<DurablePatch> {
+        let limits = durable_limits();
+        let source = fingerprint(self.source.as_bytes());
+        let target = fingerprint(self.target.as_bytes());
+        if !self.resource_changes.is_empty()
+            || self
+                .changes
+                .iter()
+                .any(|change| matches!(change, Change::Structure(_)))
+        {
+            return package_replacement_patch(self, limits, &source, &target);
+        }
+        let mut operations = Vec::new();
+        for change in &self.changes {
+            operations.push(change_operation(change, limits, &source, &target)?);
+        }
+        CorePatch::<Reversible>::new(
+            limits,
+            DURABLE_FORMAT,
+            operations,
+            BlobBundle::new(limits.blobs()),
+            BlobBundle::new(limits.blobs()),
+        )
+        .map(|inner| DurablePatch { inner })
+        .map_err(durable_error)
+    }
+
+    /// Prepares this patch as an independently joinable sub-edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when durable projection or bounded effect construction fails.
+    pub fn prepare(
+        &self,
+        identifier: impl Into<String>,
+        limits: CompositionLimits,
+    ) -> Result<PreparedEdit> {
+        let durable = self.durable()?;
+        let writes = if durable
+            .operations()
+            .iter()
+            .any(|operation| operation.op == "package.replace")
+        {
+            vec!["package".to_string()]
+        } else {
+            durable
+                .operations()
+                .iter()
+                .map(|operation| format!("{}#{}", operation.target, operation.op))
+                .collect::<Vec<_>>()
+        };
+        SubEdit::new(
+            Lineage::new(&self.source),
+            limits,
+            identifier,
+            Vec::<String>::new(),
+            writes,
+            durable,
+        )
+        .map_err(|error| Error::InvalidFormat(format!("invalid ODG sub-edit: {error}")))
+    }
+}
+
+/// Exact ODG source lineage used by deterministic sub-edit composition.
+#[derive(Clone, PartialEq, Eq)]
+pub struct Lineage(Arc<[u8]>);
+
+impl Lineage {
+    fn new(snapshot: &Snapshot) -> Self {
+        Self(Arc::from(snapshot.as_bytes()))
+    }
+
+    fn matches(&self, snapshot: &Snapshot) -> bool {
+        self.0.as_ref() == snapshot.as_bytes()
+    }
+}
+
+/// One independently prepared ODG semantic patch.
+pub type PreparedEdit = SubEdit<Lineage, DurablePatch>;
+
+/// Deterministically ordered, provably disjoint ODG sub-edits.
+pub type JoinedEdits = JoinedSubEdits<Lineage, DurablePatch>;
+
+/// Non-mutating three-way ODG merge plan.
+pub type MergePlan = litchi_core::ThreeWayMergePlan<Lineage, DurablePatch>;
+
+/// Explicit bounded ODG undo/redo history.
+pub type SnapshotHistory = History<Snapshot>;
+
+/// A durable, versioned ODG semantic patch.
+#[derive(Clone)]
+pub struct DurablePatch {
+    inner: CorePatch<Reversible>,
+}
+
+impl DurablePatch {
+    /// Parses canonical deterministic JSON under the ODG patch limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for non-canonical, malformed, over-limit, or wrong-format input.
+    pub fn from_deterministic_json(bytes: &[u8]) -> Result<Self> {
+        let inner = CorePatch::<Reversible>::from_deterministic_json(bytes, durable_limits())
+            .map_err(durable_error)?;
+        if inner.format() != DURABLE_FORMAT {
+            return invalid("durable patch is not an ODG patch");
+        }
+        validate_durable_patch(&inner)?;
+        validate_durable_patch(&inner.inverse())?;
+        Ok(Self { inner })
+    }
+
+    /// Applies every operation after exact source precondition checks.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for stale source, unsupported operations, security refusal, or failed
+    /// whole-package readback.
+    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+        apply_durable_patch(source, self, true)
+    }
+
+    /// Returns the inverse durable patch.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            inner: self.inner.inverse(),
+        }
+    }
+
+    /// Forward semantic operations in deterministic order.
+    #[must_use]
+    pub fn operations(&self) -> &[PatchOperation] {
+        self.inner.operations()
+    }
+
+    /// Serializes canonical deterministic JSON.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the patch exceeds its retained serialization limits.
+    pub fn to_deterministic_json(&self) -> Result<Vec<u8>> {
+        self.inner.to_deterministic_json().map_err(durable_error)
+    }
+
+    /// Content-free diagnostic fingerprint of the canonical wire envelope.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when bounded canonical serialization fails.
+    pub fn fingerprint(&self) -> Result<DiagnosticFingerprint> {
+        self.inner.fingerprint().map_err(durable_error)
+    }
+}
+
+fn package_replacement_patch(
+    patch: &Patch,
+    limits: PatchLimits,
+    source: &str,
+    target: &str,
+) -> Result<DurablePatch> {
+    let mut forward_blobs = BlobBundle::new(limits.blobs());
+    let forward_id = forward_blobs
+        .insert(patch.target.as_bytes())
+        .map_err(durable_error)?;
+    let mut reverse_blobs = BlobBundle::new(limits.blobs());
+    let reverse_id = reverse_blobs
+        .insert(patch.source.as_bytes())
+        .map_err(durable_error)?;
+    let operation = reversible_operation(
+        limits,
+        "package.replace",
+        "package",
+        source,
+        target,
+        serde_json::Value::String(reverse_id.as_hex()),
+        serde_json::Value::String(forward_id.as_hex()),
+    )?;
+    CorePatch::<Reversible>::new(
+        limits,
+        DURABLE_FORMAT,
+        [operation],
+        forward_blobs,
+        reverse_blobs,
+    )
+    .map(|inner| DurablePatch { inner })
+    .map_err(durable_error)
+}
+
+fn change_operation(
+    change: &Change,
+    limits: PatchLimits,
+    source: &str,
+    target: &str,
+) -> Result<ReversibleOperation> {
+    let (name, page, shape, before, after) = match change {
+        Change::ControlReference(value) => (
+            "shape.control.set",
+            value.page,
+            value.shape,
+            serde_json::Value::String(value.before.clone()),
+            serde_json::Value::String(value.after.clone()),
+        ),
+        Change::Text(value) => (
+            "shape.text.set",
+            value.page,
+            value.shape,
+            serde_json::Value::String(value.before.clone()),
+            serde_json::Value::String(value.after.clone()),
+        ),
+        Change::Name(value) => (
+            "shape.name.set",
+            value.page,
+            value.shape,
+            serde_json::Value::String(value.before.clone()),
+            serde_json::Value::String(value.after.clone()),
+        ),
+        Change::Layer(value) => (
+            "shape.layer.set",
+            value.page,
+            value.shape,
+            serde_json::Value::String(value.before.clone()),
+            serde_json::Value::String(value.after.clone()),
+        ),
+        Change::Geometry(value) => (
+            "shape.geometry.set",
+            value.page,
+            value.shape,
+            serde_json::json!(value.before),
+            serde_json::json!(value.after),
+        ),
+        Change::Style(value) => (
+            "shape.style.set",
+            value.page,
+            value.shape,
+            serde_json::Value::String(value.before.clone()),
+            serde_json::Value::String(value.after.clone()),
+        ),
+        Change::Path(value) => (
+            "shape.path.set",
+            value.page,
+            value.shape,
+            serde_json::Value::String(value.before.clone()),
+            serde_json::Value::String(value.after.clone()),
+        ),
+        Change::Structure(_) => {
+            return invalid("structural ODG change requires package replacement projection");
+        },
+    };
+    reversible_operation(
+        limits,
+        name,
+        &format!("page/{page}/shape/{shape}"),
+        source,
+        target,
+        before,
+        after,
+    )
+}
+
+fn string_value(operation: &PatchOperation) -> Result<&str> {
+    operation
+        .value
+        .as_str()
+        .ok_or_else(|| Error::InvalidFormat("ODG durable patch value is not a string".to_string()))
+}
+
+fn geometry_value(value: &serde_json::Value) -> Result<[String; 4]> {
+    let values = value.as_array().ok_or_else(|| {
+        Error::InvalidFormat("ODG durable geometry value is not an array".to_string())
+    })?;
+    if values.len() != 4 {
+        return invalid("ODG durable geometry value must contain four attributes");
+    }
+    let parsed = values
+        .iter()
+        .map(|attribute| {
+            attribute.as_str().map(str::to_owned).ok_or_else(|| {
+                Error::InvalidFormat("ODG durable geometry attribute is not a string".to_string())
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    parsed
+        .try_into()
+        .map_err(|_values| Error::InvalidFormat("ODG durable geometry is invalid".to_string()))
+}
+
+fn durable_blob_id(value: &serde_json::Value) -> Result<&str> {
+    let identifier = value.as_str().ok_or_else(|| {
+        Error::InvalidFormat("ODG durable package blob identifier is not a string".to_string())
+    })?;
+    if identifier.len() != 64
+        || !identifier
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return invalid("ODG durable package blob identifier is invalid");
+    }
+    Ok(identifier)
+}
+
+fn durable_blob<'patch>(
+    patch: &'patch DurablePatch,
+    value: &serde_json::Value,
+) -> Result<&'patch [u8]> {
+    let identifier = durable_blob_id(value)?;
+    let blob_id = patch
+        .inner
+        .blobs()
+        .ids()
+        .find(|candidate| candidate.as_hex() == identifier)
+        .ok_or_else(|| Error::InvalidFormat("ODG durable package blob is missing".to_string()))?;
+    patch
+        .inner
+        .blobs()
+        .get(blob_id)
+        .ok_or_else(|| Error::InvalidFormat("ODG durable package blob is missing".to_string()))
+}
+
+fn apply_durable_patch(
+    source: &Snapshot,
+    patch: &DurablePatch,
+    check_source: bool,
+) -> Result<Snapshot> {
+    validate_durable_patch(&patch.inner)?;
+    let source_fingerprint = fingerprint(source.as_bytes());
+    if check_source
+        && patch.operations().iter().any(|operation| {
+            operation
+                .preconditions
+                .get("source")
+                .and_then(serde_json::Value::as_str)
+                != Some(source_fingerprint.as_str())
+        })
+    {
+        return invalid("ODG durable patch source does not match");
+    }
+    let mut current = source.clone();
+    for operation in patch.operations() {
+        if operation.op == "package.replace" {
+            ensure_compact_rewrite_source(&current)?;
+            refuse_signed_package(&current)?;
+            let blob = durable_blob(patch, &operation.value)?;
+            current = if current.is_template() {
+                Snapshot::from_template_bytes(blob.to_vec())?
+            } else {
+                Snapshot::from_bytes(blob.to_vec())?
+            };
+            continue;
+        }
+        let (page, shape) = parse_shape_target(&operation.target)?;
+        let mut edit = current.edit();
+        match operation.op.as_str() {
+            "shape.geometry.set" => {
+                let values = geometry_value(&operation.value)?;
+                edit.set_shape_geometry(
+                    page, shape, &values[0], &values[1], &values[2], &values[3],
+                )?;
+            },
+            "shape.control.set" => {
+                edit.set_shape_control_reference(page, shape, string_value(operation)?)?;
+            },
+            "shape.layer.set" => edit.set_shape_layer(page, shape, string_value(operation)?)?,
+            "shape.name.set" => edit.set_shape_name(page, shape, string_value(operation)?)?,
+            "shape.path.set" => edit.set_shape_path_data(page, shape, string_value(operation)?)?,
+            "shape.style.set" => {
+                edit.set_shape_style_name(page, shape, string_value(operation)?)?;
+            },
+            "shape.text.set" => edit.set_shape_text(page, shape, string_value(operation)?)?,
+            _ => return invalid("ODG durable patch operation is unsupported"),
+        }
+        current = edit.commit()?.into_snapshot();
+    }
+    Ok(current)
+}
+
+fn durable_error(error: litchi_core::PatchError) -> Error {
+    let message = error.to_string();
+    drop(error);
+    Error::InvalidFormat(format!("invalid ODG durable patch: {message}"))
+}
+
+fn durable_limits() -> PatchLimits {
+    PatchLimits::new(
+        BlobLimits::new(8, MAX_OUTPUT_BYTES, MAX_OUTPUT_BYTES),
+        4 * 1024 * 1024,
+        1_024,
+        32,
+        MAX_TEXT_BYTES,
+        32 * 1024 * 1024,
+    )
+}
+
+fn fingerprint(bytes: &[u8]) -> String {
+    DiagnosticFingerprint::of(bytes).as_hex()
+}
+
+fn reversible_operation(
+    limits: PatchLimits,
+    name: &str,
+    semantic_target: &str,
+    source: &str,
+    target: &str,
+    before: serde_json::Value,
+    after: serde_json::Value,
+) -> Result<ReversibleOperation> {
+    let forward = PatchOperation::new(
+        limits,
+        name,
+        semantic_target,
+        source_precondition(source),
+        after,
+    )
+    .map_err(durable_error)?;
+    let inverse = PatchOperation::new(
+        limits,
+        name,
+        semantic_target,
+        source_precondition(target),
+        before,
+    )
+    .map_err(durable_error)?;
+    Ok(ReversibleOperation::new(forward, inverse))
+}
+
+fn source_precondition(source: &str) -> BTreeMap<String, serde_json::Value> {
+    BTreeMap::from([(
+        "source".to_string(),
+        serde_json::Value::String(source.to_string()),
+    )])
+}
+
+fn parse_shape_target(target: &str) -> Result<(usize, usize)> {
+    let Some(remainder) = target.strip_prefix("page/") else {
+        return invalid("ODG durable patch target is invalid");
+    };
+    let Some((page_text, shape_text)) = remainder.split_once("/shape/") else {
+        return invalid("ODG durable patch target is invalid");
+    };
+    if shape_text.contains('/') {
+        return invalid("ODG durable patch target is invalid");
+    }
+    let page = page_text
+        .parse::<usize>()
+        .map_err(|_error| Error::InvalidFormat("ODG durable page target is invalid".to_string()))?;
+    let shape = shape_text.parse::<usize>().map_err(|_error| {
+        Error::InvalidFormat("ODG durable shape target is invalid".to_string())
+    })?;
+    Ok((page, shape))
+}
+
+fn validate_durable_patch(patch: &CorePatch<Reversible>) -> Result<()> {
+    for operation in patch.operations() {
+        if !matches!(
+            operation.op.as_str(),
+            "package.replace"
+                | "shape.geometry.set"
+                | "shape.control.set"
+                | "shape.layer.set"
+                | "shape.name.set"
+                | "shape.path.set"
+                | "shape.style.set"
+                | "shape.text.set"
+        ) {
+            return invalid("ODG durable patch operation is unsupported");
+        }
+        if operation.preconditions.len() != 1
+            || operation
+                .preconditions
+                .get("source")
+                .and_then(serde_json::Value::as_str)
+                .is_none_or(|value| value.len() != 64 || !value.is_ascii())
+        {
+            return invalid("ODG durable patch source precondition is invalid");
+        }
+        match operation.op.as_str() {
+            "package.replace" => {
+                if operation.target != "package" {
+                    return invalid("ODG durable package target is invalid");
+                }
+                let identifier = durable_blob_id(&operation.value)?;
+                if !patch
+                    .blobs()
+                    .ids()
+                    .any(|candidate| candidate.as_hex() == identifier)
+                {
+                    return invalid("ODG durable package blob is missing");
+                }
+            },
+            "shape.geometry.set" => {
+                parse_shape_target(&operation.target)?;
+                geometry_value(&operation.value)?;
+            },
+            _ => {
+                parse_shape_target(&operation.target)?;
+                string_value(operation)?;
+            },
+        }
+    }
+    Ok(())
 }
 
 struct Parsed {
+    control_spans: ControlSpans,
     pages: Vec<Page>,
     text_spans: TextSpans,
     name_spans: NameSpans,
     layer_spans: LayerSpans,
     layer_count: usize,
     geometry_spans: GeometrySpans,
+    path_spans: PathSpans,
     style_name_spans: Vec<Vec<Option<Range<usize>>>>,
     page_spans: Vec<Option<Range<usize>>>,
     page_insert_positions: Vec<Option<usize>>,
@@ -1397,11 +2145,13 @@ struct Scanner {
     layer_sets: Vec<(usize, Option<usize>)>,
     active_shapes: Vec<ActiveShape>,
     active_accessibility: Option<ActiveAccessibility>,
+    control_spans: ControlSpans,
     paragraph_depths: Vec<usize>,
     text_spans: TextSpans,
     name_spans: NameSpans,
     layer_spans: LayerSpans,
     geometry_spans: GeometrySpans,
+    path_spans: PathSpans,
     style_name_spans: Vec<Vec<Option<Range<usize>>>>,
     layer_count: usize,
     shape_count: usize,
@@ -1431,11 +2181,13 @@ impl Scanner {
             layer_sets: Vec::new(),
             active_shapes: Vec::new(),
             active_accessibility: None,
+            control_spans: Vec::new(),
             paragraph_depths: Vec::new(),
             text_spans: Vec::new(),
             name_spans: Vec::new(),
             layer_spans: Vec::new(),
             geometry_spans: Vec::new(),
+            path_spans: Vec::new(),
             style_name_spans: Vec::new(),
             layer_count: 0,
             shape_count: 0,
@@ -1563,9 +2315,11 @@ impl Scanner {
                 attribute(reader, element, DRAW, b"master-page-name")?,
             ));
             self.text_spans.push(Vec::new());
+            self.control_spans.push(Vec::new());
             self.name_spans.push(Vec::new());
             self.layer_spans.push(Vec::new());
             self.geometry_spans.push(Vec::new());
+            self.path_spans.push(Vec::new());
             self.style_name_spans.push(Vec::new());
             self.page_spans.push(None);
             self.page_insert_positions.push(None);
@@ -1607,9 +2361,11 @@ impl Scanner {
             let shape = self.pages[page].shapes().len();
             self.pages[page].push_shape(Shape::parsed(
                 ShapeProperties {
+                    control_reference: attribute(reader, element, DRAW, b"control")?,
                     geometry,
                     layer: attribute(reader, element, DRAW, b"layer")?,
                     name,
+                    path_data: attribute(reader, element, SVG, b"d")?,
                     style_name: attribute(reader, element, DRAW, b"style-name")?,
                     text_style_name: attribute(reader, element, DRAW, b"text-style-name")?,
                     z_index,
@@ -1618,6 +2374,9 @@ impl Scanner {
                 frame,
             ));
             self.text_spans[page].push(Vec::new());
+            self.control_spans[page].push(attribute_source_span(
+                reader, element, tag, tag_start, DRAW, b"control",
+            )?);
             self.name_spans[page].push(shape_name_span(reader, element, tag, tag_start)?);
             self.layer_spans[page].push(attribute_source_span(
                 reader, element, tag, tag_start, DRAW, b"layer",
@@ -1628,6 +2387,9 @@ impl Scanner {
                 attribute_source_span(reader, element, tag, tag_start, SVG, b"width")?,
                 attribute_source_span(reader, element, tag, tag_start, SVG, b"height")?,
             ]);
+            self.path_spans[page].push(attribute_source_span(
+                reader, element, tag, tag_start, SVG, b"d",
+            )?);
             self.style_name_spans[page].push(attribute_source_span(
                 reader,
                 element,
@@ -1838,11 +2600,13 @@ impl Scanner {
             return invalid("ODG content.xml has an incomplete drawing structure");
         }
         Ok(Parsed {
+            control_spans: self.control_spans,
             pages: self.pages,
             text_spans: self.text_spans,
             name_spans: self.name_spans,
             layer_spans: self.layer_spans,
             geometry_spans: self.geometry_spans,
+            path_spans: self.path_spans,
             style_name_spans: self.style_name_spans,
             layer_count: self.layer_count,
             page_spans: self.page_spans,
@@ -2066,18 +2830,10 @@ fn rebuild(
     content: &str,
     replacements: &[ResourceReplacement<'_>],
 ) -> Result<Vec<u8>> {
-    let files = source.files()?;
-    if files.iter().any(|path| {
-        matches!(
-            path.as_str(),
-            "META-INF/documentsignatures.xml" | "META-INF/macrosignatures.xml"
-        )
-    }) {
-        return invalid("ODG package edits refuse signed packages");
-    }
+    refuse_signed_package(source)?;
     let archive = source.0.package.package();
     let mut writer = PackageWriter::new_bounded(MAX_OUTPUT_BYTES);
-    writer.set_mimetype(MIMETYPE)?;
+    writer.set_mimetype(source.0.mimetype)?;
     writer.add_file("content.xml", content.as_bytes())?;
     for path in ["styles.xml", "meta.xml", "settings.xml"] {
         if archive.has_file(path)? {
@@ -2095,6 +2851,18 @@ fn rebuild(
         }
     }
     writer.finish_to_bounded_bytes()
+}
+
+fn refuse_signed_package(source: &Snapshot) -> Result<()> {
+    if source.files()?.iter().any(|path| {
+        matches!(
+            path.as_str(),
+            "META-INF/documentsignatures.xml" | "META-INF/macrosignatures.xml"
+        )
+    }) {
+        return invalid("ODG package edits refuse signed packages");
+    }
+    Ok(())
 }
 
 fn ensure_compact_rewrite_source(source: &Snapshot) -> Result<()> {
@@ -2277,6 +3045,10 @@ fn serialize_shape(shape: &Shape) -> Result<String> {
     );
     push_attribute(&mut xml, "draw:name", shape.name())?;
     push_attribute(&mut xml, "draw:layer", shape.layer())?;
+    if shape.control_reference().is_some() && shape.kind() != ShapeKind::Control {
+        return invalid("ODG draw:control is only supported on detached control shapes");
+    }
+    push_attribute(&mut xml, "draw:control", shape.control_reference())?;
     push_attribute(&mut xml, "draw:style-name", shape.style_name())?;
     push_attribute(&mut xml, "draw:text-style-name", shape.text_style_name())?;
     if let Some(z_index) = shape.z_index() {
@@ -2286,6 +3058,13 @@ fn serialize_shape(shape: &Shape) -> Result<String> {
     push_attribute(&mut xml, "svg:y", shape.y())?;
     push_attribute(&mut xml, "svg:width", shape.width())?;
     push_attribute(&mut xml, "svg:height", shape.height())?;
+    if shape.path_data().is_some() && shape.kind() != ShapeKind::Path {
+        return invalid("ODG svg:d is only supported on detached path shapes");
+    }
+    if let Some(path_data) = shape.path_data() {
+        validate_path_data(path_data)?;
+    }
+    push_attribute(&mut xml, "svg:d", shape.path_data())?;
     if shape.title().is_none() && shape.description().is_none() && shape.text().is_empty() {
         xml.push_str("/>");
         return Ok(xml);
@@ -2338,6 +3117,14 @@ fn validate_geometry(values: &[String; 4]) -> Result<()> {
         if value.bytes().any(|byte| byte.is_ascii_whitespace()) {
             return invalid("ODG geometry value contains whitespace");
         }
+    }
+    Ok(())
+}
+
+fn validate_path_data(value: &str) -> Result<()> {
+    validate_bounded_value(value, "ODG path data")?;
+    if value.chars().any(char::is_control) {
+        return invalid("ODG path data contains a control character");
     }
     Ok(())
 }
@@ -2395,6 +3182,12 @@ fn validate_media_type(media_type: &str) -> Result<()> {
 
 fn inverse_change(change: &Change) -> Change {
     match change {
+        Change::ControlReference(value) => Change::ControlReference(ControlReferenceChange {
+            page: value.page,
+            shape: value.shape,
+            before: value.after.clone(),
+            after: value.before.clone(),
+        }),
         Change::Text(value) => Change::Text(TextChange {
             page: value.page,
             shape: value.shape,
@@ -2420,6 +3213,12 @@ fn inverse_change(change: &Change) -> Change {
             after: value.before.clone(),
         }),
         Change::Style(value) => Change::Style(StyleChange {
+            page: value.page,
+            shape: value.shape,
+            before: value.after.clone(),
+            after: value.before.clone(),
+        }),
+        Change::Path(value) => Change::Path(PathChange {
             page: value.page,
             shape: value.shape,
             before: value.after.clone(),

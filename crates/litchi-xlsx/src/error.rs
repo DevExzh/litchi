@@ -183,6 +183,9 @@ pub enum Error {
     /// A patch expected different source bytes and was not applied.
     #[error("patch conflict in '{part}': target content differs from the expected state")]
     PatchConflict { part: String },
+    /// A bounded durable patch envelope was invalid or exceeded its limits.
+    #[error("durable XLSX patch error: {0}")]
+    DurablePatch(#[from] litchi_core::PatchError),
     /// Independently prepared edits could not be joined.
     #[error(transparent)]
     Join(Box<JoinError>),

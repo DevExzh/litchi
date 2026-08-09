@@ -276,7 +276,12 @@ fn parse_processed(xml: &[u8], limits: &XmlMapLimits) -> Result<ParsedXmlMapInfo
                     return Err(invalid("DTD and processing instructions are rejected"));
                 },
                 Event::Eof => return Err(invalid("unterminated opaque XML payload")),
-                _ => {},
+                Event::Empty(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::GeneralRef(_) => {},
             }
             active
                 .writer
@@ -452,7 +457,9 @@ fn handle_start(
             }
             *capture = Some(begin_capture(Owner::Binding(index), e, &binding.bindings)?);
         },
-        _ => return Err(invalid("unexpected custom XML maps element")),
+        Context::Root | Context::Map(_) => {
+            return Err(invalid("unexpected custom XML maps element"));
+        },
     }
     Ok(())
 }
@@ -660,7 +667,7 @@ fn root_conformance(
                 _ => None,
             }
         },
-        _ => None,
+        ResolveResult::Unbound | ResolveResult::Unknown(_) => None,
     }
 }
 fn core_name(ns: &ResolveResult<'_>, e: &BytesStart<'_>, local: &[u8]) -> bool {
@@ -673,7 +680,7 @@ fn namespace_matches(ns: &ResolveResult<'_>) -> bool {
             let bytes: &[u8] = v;
             bytes == NS || bytes == STRICT_NS
         },
-        _ => false,
+        ResolveResult::Unbound | ResolveResult::Unknown(_) => false,
     }
 }
 fn required_attr(e: &BytesStart<'_>, d: Decoder, n: &[u8]) -> Result<String> {
@@ -724,10 +731,10 @@ fn parse_bool_attr(
 }
 fn parse_u32_attr(e: &BytesStart<'_>, d: Decoder, n: &[u8], required: bool) -> Result<Option<u32>> {
     match optional_attr(e, d, n)? {
-        Some(v) => Ok(Some(v.parse().map_err(|_| {
+        Some(v) => Ok(Some(v.parse().map_err(|error| {
             invalid(format!(
-                "invalid unsigned integer attribute '{}'",
-                String::from_utf8_lossy(n)
+                "invalid unsigned integer attribute '{}': {error}",
+                String::from_utf8_lossy(n),
             ))
         })?)),
         None if required => Err(invalid(format!(
@@ -849,9 +856,11 @@ impl BoundedXml {
         if length > self.max_part_bytes {
             return Err(invalid("serialized custom XML maps part exceeds 32 MiB"));
         }
-        self.bytes
-            .try_reserve(value.len())
-            .map_err(|_| invalid("serialized custom XML maps output allocation failed"))?;
+        self.bytes.try_reserve(value.len()).map_err(|error| {
+            invalid(format!(
+                "serialized custom XML maps output allocation failed: {error}"
+            ))
+        })?;
         self.bytes.extend_from_slice(value);
         Ok(())
     }
@@ -1473,9 +1482,11 @@ fn apply_source_edits(
         ));
     }
     let mut result = Vec::new();
-    result
-        .try_reserve(final_len)
-        .map_err(|_| invalid("serialized custom XML maps output allocation failed"))?;
+    result.try_reserve(final_len).map_err(|error| {
+        invalid(format!(
+            "serialized custom XML maps output allocation failed: {error}"
+        ))
+    })?;
     let mut copied = 0usize;
     for edit in edits {
         if edit.range.end > source.len() {
@@ -1768,21 +1779,37 @@ fn source_local(value: &[u8]) -> Result<String> {
 }
 
 /// Parse a bounded, namespace-aware, MCE-processed `SpreadsheetML` `MapInfo` part.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn parse_xml_map_info(xml: &[u8]) -> Result<XmlMapInfo> {
     XmlMapInfo::parse(xml)
 }
 
 /// Parse with caller-selected resource ceilings.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn parse_xml_map_info_with_limits(xml: &[u8], limits: &XmlMapLimits) -> Result<XmlMapInfo> {
     XmlMapInfo::parse_with_limits(xml, limits)
 }
 
 /// Parse and report the `SpreadsheetML` namespace family observed at the root.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn parse_xml_map_info_with_conformance(xml: &[u8]) -> Result<ParsedXmlMapInfo> {
     parse_xml_map_info_with_conformance_and_limits(xml, &XmlMapLimits::DEFAULT)
 }
 
 /// Parse with caller ceilings and report the root namespace family.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn parse_xml_map_info_with_conformance_and_limits(
     xml: &[u8],
     limits: &XmlMapLimits,
@@ -1791,6 +1818,10 @@ pub fn parse_xml_map_info_with_conformance_and_limits(
 }
 
 /// Serialize `MapInfo` canonically for the selected OOXML conformance family.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn serialize_xml_map_info(
     info: &XmlMapInfo,
     conformance: XmlMapConformance,
@@ -1799,6 +1830,10 @@ pub fn serialize_xml_map_info(
 }
 
 /// Serialize using caller-selected resource ceilings.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn serialize_xml_map_info_with_limits(
     info: &XmlMapInfo,
     conformance: XmlMapConformance,
@@ -1809,6 +1844,10 @@ pub fn serialize_xml_map_info_with_limits(
 }
 
 /// Serialize a borrowed `MapInfo` projection using default resource ceilings.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn serialize_xml_map_info_ref(
     info: &XmlMapInfoRef<'_>,
     conformance: XmlMapConformance,
@@ -1817,6 +1856,10 @@ pub fn serialize_xml_map_info_ref(
 }
 
 /// Serialize a borrowed `MapInfo` projection without cloning referenced data.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn serialize_xml_map_info_ref_with_limits(
     info: &XmlMapInfoRef<'_>,
     conformance: XmlMapConformance,
@@ -1904,6 +1947,10 @@ fn conformance(strict: bool) -> XmlMapConformance {
 }
 
 /// Patch modeled fields while preserving unaffected source spelling and markup.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn patch_xml_map_info_source(
     source: &[u8],
     before: &XmlMapInfo,
@@ -1922,6 +1969,10 @@ pub fn patch_xml_map_info_source(
 }
 
 /// Patch modeled fields using caller-selected validation and output ceilings.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn patch_xml_map_info_source_with_limits(
     source: &[u8],
     before: &XmlMapInfo,
@@ -1943,6 +1994,10 @@ pub fn patch_xml_map_info_source_with_limits(
 }
 
 /// Patch source from borrowed projections using default resource ceilings.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn patch_xml_map_info_source_ref(
     source: &[u8],
     before: &XmlMapInfoRef<'_>,
@@ -1961,6 +2016,10 @@ pub fn patch_xml_map_info_source_ref(
 }
 
 /// Patch source from borrowed projections using caller-selected ceilings.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn patch_xml_map_info_source_ref_with_limits(
     source: &[u8],
     before: &XmlMapInfoRef<'_>,

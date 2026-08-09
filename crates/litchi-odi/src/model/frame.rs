@@ -396,6 +396,34 @@ impl Frame {
         self.relative_width = width;
         self.relative_height = height;
     }
+
+    pub(crate) fn set_image_map(&mut self, value: Option<ImageMap>) {
+        self.image_map = value;
+    }
+
+    pub(crate) fn set_x(&mut self, value: Option<String>) {
+        self.x = value;
+    }
+
+    pub(crate) fn set_y(&mut self, value: Option<String>) {
+        self.y = value;
+    }
+
+    pub(crate) fn set_width(&mut self, value: Option<String>) {
+        self.width = value;
+    }
+
+    pub(crate) fn set_height(&mut self, value: Option<String>) {
+        self.height = value;
+    }
+
+    pub(crate) fn set_relative_width(&mut self, value: Option<String>) {
+        self.relative_width = value;
+    }
+
+    pub(crate) fn set_relative_height(&mut self, value: Option<String>) {
+        self.relative_height = value;
+    }
 }
 
 /// Additional ODF 1.4 frame semantics scanned by the ODI owner.

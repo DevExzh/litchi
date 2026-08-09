@@ -46,6 +46,10 @@ impl Rgb {
     }
 
     /// Parse the exact six-digit hexadecimal sRGB lexical form.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn parse(value: &str) -> crate::Result<Self> {
         if value.len() != 6 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
             return Err(crate::Error::Invalid(
@@ -110,11 +114,19 @@ macro_rules! percentage_value {
 
         impl $name {
             /// Construct a checked DrawingML scalar from its canonical raw value.
+            /// # Errors
+            ///
+            /// Returns an error when input violates DrawingML constraints, exceeds a configured
+            /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
             pub fn new(value: $value) -> crate::Result<Self> {
                 Ok(Self(validation::$validate(value, $kind)?))
             }
 
             /// Parse a raw thousandth-of-a-percent or Office percent-sign value.
+            /// # Errors
+            ///
+            /// Returns an error when input violates DrawingML constraints, exceeds a configured
+            /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
             pub fn parse(value: &str) -> crate::Result<Self> {
                 Ok(Self(validation::$parse(value, $kind)?))
             }
@@ -175,6 +187,10 @@ impl Angle {
     }
 
     /// Parse an angle in 60000ths of a degree.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn parse(value: &str) -> crate::Result<Self> {
         Ok(Self(validation::parse_angle(value)?))
     }
@@ -195,11 +211,19 @@ pub struct PositiveAngle(u32);
 
 impl PositiveAngle {
     /// Construct an angle in the schema's inclusive 0–360 degree range.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn new(value: u32) -> crate::Result<Self> {
         Ok(Self(validation::positive_angle(value)?))
     }
 
     /// Parse an angle in 60000ths of a degree.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn parse(value: &str) -> crate::Result<Self> {
         Ok(Self(validation::parse_positive_angle(value)?))
     }
@@ -223,6 +247,10 @@ pub struct ScRgb {
 
 impl ScRgb {
     /// Construct a scRGB color from raw thousandths-of-a-percent channels.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn new(red: u32, green: u32, blue: u32) -> crate::Result<Self> {
         Ok(Self::from_values(
             PositiveFixedPercentage::new(red)?,
@@ -271,6 +299,10 @@ pub struct Hsl {
 
 impl Hsl {
     /// Construct an HSL color from raw schema values.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn new(hue: u32, saturation: i32, luminance: i32) -> crate::Result<Self> {
         Ok(Self::from_values(
             PositiveAngle::new(hue)?,
@@ -355,6 +387,10 @@ pub struct System {
 
 impl System {
     /// Construct a system color from an `ST_SystemColorVal` token.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn new(value: impl AsRef<str>, last: Option<Rgb>) -> crate::Result<Self> {
         let value = value.as_ref();
         if !SYSTEM_VALUES.contains(&value) {
@@ -547,6 +583,10 @@ pub struct Preset(Box<str>);
 
 impl Preset {
     /// Construct a preset color from an `ST_PresetColorVal` token.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn new(value: impl AsRef<str>) -> crate::Result<Self> {
         let value = value.as_ref();
         if !PRESET_VALUES.contains(&value) {
@@ -704,6 +744,10 @@ pub struct Transformed {
 impl Transformed {
     /// Construct a transformed color. The sequence must contain at least one
     /// transform and may not exceed [`super::MAX_TRANSFORMS`].
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn new<I>(base: Base, transforms: I) -> crate::Result<Self>
     where
         I: IntoIterator<Item = Transform>,
@@ -804,6 +848,10 @@ impl Value {
     }
 
     /// Construct a typed color with an ordered transform sequence.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn transformed<I>(base: impl Into<Base>, transforms: I) -> crate::Result<Self>
     where
         I: IntoIterator<Item = Transform>,
@@ -816,6 +864,10 @@ impl Value {
 
     /// Construct a checked opaque color fragment.
     #[inline]
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn unknown(xml: &[u8]) -> crate::Result<Self> {
         Ok(Self::Unknown(Unknown::from_xml(xml)?))
     }
@@ -974,6 +1026,10 @@ pub struct Unknown {
 
 impl Unknown {
     /// Validate and retain one complete color fragment.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn from_xml(xml: &[u8]) -> crate::Result<Self> {
         Ok(Self {
             xml: validation::validated_fragment(xml)?
@@ -995,8 +1051,10 @@ impl Unknown {
 }
 
 pub(super) fn write_hex(output: &mut String, value: Rgb) {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
     for channel in value.0 {
-        let _ = fmt::Write::write_fmt(output, format_args!("{channel:02X}"));
+        output.push(char::from(HEX[usize::from(channel >> 4)]));
+        output.push(char::from(HEX[usize::from(channel & 0x0f)]));
     }
 }
 

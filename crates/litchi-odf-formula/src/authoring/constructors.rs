@@ -7,7 +7,7 @@
 //! [`Element`] mutation API and installed through the [`crate::Formula`]
 //! facade.
 
-use crate::facade::StarMathVersion;
+use crate::facade::{OpaqueStarMath, StarMathVersion};
 use crate::model::Element;
 
 /// The `MathML` `mathvariant` attribute value family (`MathML` 2 §3.2.2).
@@ -250,6 +250,12 @@ pub fn semantics_with_starmath(
         wrapper.push_child(annotation);
     }
     wrapper
+}
+
+/// A `semantics` wrapper with validated opaque `StarMath` source.
+#[must_use]
+pub fn semantics_with_opaque_starmath(content: Element, starmath: &OpaqueStarMath) -> Element {
+    semantics_with_starmath(content, Some((starmath.version(), starmath.source())))
 }
 
 /// A `math` root element wrapping the body with the given display style.

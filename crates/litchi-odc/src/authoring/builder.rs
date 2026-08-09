@@ -117,6 +117,7 @@ fn package_content(
     crate::codec::validate(content_xml)?;
     if let Some(styles) = styles_xml {
         compact_xml::validate_with_limits(styles.as_bytes(), compact_limits)?;
+        crate::codec::validate_styles(styles, limits)?;
     }
     let mut writer = PackageWriter::new_bounded(limits.max_package_bytes());
     writer.set_mimetype(crate::package::MIMETYPE)?;

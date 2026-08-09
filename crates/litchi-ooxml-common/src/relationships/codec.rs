@@ -19,6 +19,10 @@ pub const STRICT_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/
 /// Unresolved `r:` fragments are accepted because a caller may pass an XML
 /// slice whose namespace declaration belongs to an omitted ancestor. Duplicate
 /// semantic attributes are rejected before any value is returned.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn attribute_value(
     element: &BytesStart<'_>,
     name: &[u8],
@@ -57,6 +61,10 @@ pub fn attribute_value(
 }
 
 /// Decode one relationship attribute into a checked [`Id`].
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn attribute_id(
     element: &BytesStart<'_>,
     name: &[u8],

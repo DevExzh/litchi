@@ -27,6 +27,10 @@ const MAX_NODES: usize = 128;
 /// matched by local name while all scalar values retain their strict schema
 /// domains. Unsupported attributes and children fail rather than being lost
 /// by a later edit.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn read(xml: &[u8]) -> Result<Transform> {
     if xml.len() > MAX_XML_BYTES {
         return Err(limit("DrawingML transform XML", MAX_XML_BYTES));
@@ -150,6 +154,10 @@ pub fn read(xml: &[u8]) -> Result<Transform> {
 }
 
 /// Serialize a transform with the canonical `DrawingML` `a:` prefix.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn write(transform: &Transform) -> Result<Vec<u8>> {
     validation::validate(transform)?;
 
@@ -192,6 +200,10 @@ pub fn write(transform: &Transform) -> Result<Vec<u8>> {
 }
 
 /// Serialize a transform to a caller-owned sink.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn write_to<W: Write>(writer: &mut W, transform: &Transform) -> Result<()> {
     writer.write_all(&write(transform)?)?;
     Ok(())

@@ -3,10 +3,9 @@
 use litchi_core::{HistoryLimits, Position};
 use litchi_odf_common::{
     compact_xml,
-    core::{OwnedPackage, PackageWriter, Profile},
+    core::{PackageWriter, Profile},
 };
 use litchi_odm::{Master, style::Origin, subdocument::Target, transaction::MergeError};
-use quick_xml::{Reader, Writer, events::Event};
 
 const MIME: &str = "application/vnd.oasis.opendocument.text-master";
 const CONTENT: &str = concat!(
@@ -241,27 +240,8 @@ fn checked_in_libreoffice_odm_drives_real_section_and_style_projection() {
     let original = include_bytes!(
         "../../../3rdparty/libreoffice-core/sw/qa/extras/odfexport/data/tdf121119.odm"
     );
-    let source = OwnedPackage::from_bytes(original.to_vec()).unwrap();
-    let content = source.get_file("content.xml").unwrap();
-    let compact_content = compact_fixture_xml(&content);
-    compact_xml::validate(&compact_content).unwrap();
-
-    let mut writer = PackageWriter::new();
-    writer.set_mimetype(MIME).unwrap();
-    writer.add_file("content.xml", &compact_content).unwrap();
-    writer
-        .add_file(
-            "styles.xml",
-            &compact_fixture_xml(&source.get_file("styles.xml").unwrap()),
-        )
-        .unwrap();
-    writer
-        .add_file(
-            "meta.xml",
-            &compact_fixture_xml(&source.get_file("meta.xml").unwrap()),
-        )
-        .unwrap();
-    let master = Master::from_bytes(writer.finish_to_bytes().unwrap()).unwrap();
+    let master = Master::from_bytes(original.to_vec()).unwrap();
+    assert_eq!(master.as_bytes(), original);
     assert_eq!(master.section_tree().sections().len(), 2);
     assert!(
         master
@@ -278,18 +258,24 @@ fn checked_in_libreoffice_odm_drives_real_section_and_style_projection() {
             .iter()
             .all(|reference| reference.target().is_external())
     );
-}
-
-fn compact_fixture_xml(xml: &[u8]) -> Vec<u8> {
-    let mut reader = Reader::from_reader(xml);
-    let mut writer = Writer::new(Vec::new());
-    loop {
-        let event = reader.read_event().unwrap();
-        match &event {
-            Event::Text(text) if text.as_ref().iter().all(u8::is_ascii_whitespace) => {},
-            Event::Eof => break,
-            _ => writer.write_event(event).unwrap(),
-        }
-    }
-    writer.into_inner()
+    let mut edit = master.edit();
+    edit.set_title("Edited genuine ODM")
+        .unwrap()
+        .set_link(Position::new(0), "../edited-DUMMY2.odt")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(commit.snapshot().title(), Some("Edited genuine ODM"));
+    assert_eq!(
+        commit.snapshot().subdocuments()[0].href(),
+        "../edited-DUMMY2.odt"
+    );
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap()
+            .as_bytes(),
+        original
+    );
 }

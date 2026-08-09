@@ -201,6 +201,10 @@ impl Props {
     /// and [`Self::write`] perform the host-independent checks automatically;
     /// [`Self::read_for`] and [`Self::write_for`] additionally enforce the
     /// host-specific sensitivity-label property scope.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn validate_for(&self, host: Host) -> Result<()> {
         reserved::validate(self, Some(host))
     }
@@ -209,6 +213,10 @@ impl Props {
     ///
     /// New PIDs are allocated monotonically with checked arithmetic. The old
     /// value is moved out when an exact-name property is replaced.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn insert(
         &mut self,
         name: impl Into<String>,
@@ -418,7 +426,13 @@ pub(crate) fn validate_value(value: &Value) -> Result<()> {
         Value::F64(value) if !value.is_finite() => {
             Err(invalid("F64 custom property must be finite"))
         },
-        _ => Ok(()),
+        Value::Empty
+        | Value::I32(_)
+        | Value::I64(_)
+        | Value::F32(_)
+        | Value::F64(_)
+        | Value::Bool(_)
+        | Value::Time(_) => Ok(()),
     }
 }
 
@@ -466,6 +480,12 @@ pub(crate) fn fold_name(name: &str) -> String {
 pub(crate) fn value_text_bytes(value: &Value) -> usize {
     match value {
         Value::Text(text) => text.len(),
-        _ => 0,
+        Value::Empty
+        | Value::I32(_)
+        | Value::I64(_)
+        | Value::F32(_)
+        | Value::F64(_)
+        | Value::Bool(_)
+        | Value::Time(_) => 0,
     }
 }

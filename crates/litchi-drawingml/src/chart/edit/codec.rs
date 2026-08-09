@@ -79,7 +79,7 @@ impl Document {
                 .read_event_into(&mut buffer)
                 .map_err(|error| Error::Xml(error.to_string()))?;
             let end = usize::try_from(reader.buffer_position())
-                .map_err(|_| Error::Invalid("chart XML position exceeds usize".into()))?;
+                .map_err(|_error| Error::Invalid("chart XML position exceeds usize".into()))?;
             match event {
                 Event::Start(element) => {
                     if nodes.len() >= validation::MAX_XML_NODES {
@@ -145,7 +145,12 @@ impl Document {
                     ));
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::GeneralRef(_) => {},
             }
             buffer.clear();
         }
@@ -646,7 +651,7 @@ fn set_scaling_value(xml: &[u8], axis_id: u32, name: &[u8], value: f64) -> Resul
     }
     let prefix = document.prefix(scaling);
     let local =
-        std::str::from_utf8(name).map_err(|_| Error::Invalid("invalid axis field".into()))?;
+        std::str::from_utf8(name).map_err(|_error| Error::Invalid("invalid axis field".into()))?;
     let fragment = element(&prefix, local, &format!(r#" val="{value}""#), "");
     if name == b"max"
         && let Some(min) = document.child(scaling, b"min", NamespaceKind::Chart)?
@@ -895,17 +900,17 @@ fn decode_attribute(value: &[u8]) -> Vec<u8> {
 
 fn parse_u32(value: &[u8]) -> Result<u32> {
     std::str::from_utf8(value)
-        .map_err(|_| Error::Invalid("chart numeric attribute is not UTF-8".into()))?
+        .map_err(|_error| Error::Invalid("chart numeric attribute is not UTF-8".into()))?
         .parse()
-        .map_err(|_| Error::Invalid("chart numeric attribute is invalid".into()))
+        .map_err(|_error| Error::Invalid("chart numeric attribute is invalid".into()))
 }
 
 fn parse_f64(value: &[u8]) -> Result<f64> {
     let value = std::str::from_utf8(value)
-        .map_err(|_| Error::Invalid("chart numeric attribute is not UTF-8".into()))?;
+        .map_err(|_error| Error::Invalid("chart numeric attribute is not UTF-8".into()))?;
     let value = value
         .parse::<f64>()
-        .map_err(|_| Error::Invalid("chart numeric attribute is invalid".into()))?;
+        .map_err(|_error| Error::Invalid("chart numeric attribute is invalid".into()))?;
     if value.is_finite() {
         Ok(value)
     } else {
@@ -953,7 +958,7 @@ fn replace_text(xml: &[u8], document: &Document, node: usize, value: &str) -> Re
             .map(|position| target.qname[..position].to_vec())
             .unwrap_or_default();
         let local = std::str::from_utf8(&target.local)
-            .map_err(|_| Error::Invalid("chart text element name is invalid".into()))?;
+            .map_err(|_error| Error::Invalid("chart text element name is invalid".into()))?;
         let fragment = element(&prefix, local, "", value);
         return replace_range(xml, target.start..target.end, fragment.as_bytes());
     }

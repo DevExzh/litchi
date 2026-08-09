@@ -247,13 +247,13 @@ pub(in crate::web) fn parse_task_pane(node: &Node, document: &XmlDocument) -> Re
     let visible = parse_bool(required_attr(node, "", "visibility")?)?;
     let width = required_attr(node, "", "width")?
         .parse::<f64>()
-        .map_err(|_| Error::Invalid("invalid task-pane width".into()))?;
+        .map_err(|error| Error::Invalid(format!("invalid task-pane width: {error}")))?;
     if !width.is_finite() {
         return invalid("task-pane width must be finite".into());
     }
     let row = required_attr(node, "", "row")?
         .parse::<u32>()
-        .map_err(|_| Error::Invalid("invalid task-pane row".into()))?;
+        .map_err(|error| Error::Invalid(format!("invalid task-pane row: {error}")))?;
     let locked = optional_bool_attr(node, "", "locked")?.unwrap_or(false);
     let children = element_children(node);
     if children.is_empty() {

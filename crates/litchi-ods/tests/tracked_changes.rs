@@ -1,3 +1,5 @@
+mod support;
+
 use litchi_odf_common::core::{OwnedPackage, PackageWriter, Profile};
 use litchi_ods::Spreadsheet;
 use litchi_ods::tracked_changes::{
@@ -80,37 +82,28 @@ fn content(owner: &str) -> String {
 }
 
 fn package(content_xml: &str, signed: bool) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
-    writer.set_mimetype(MIMETYPE).unwrap();
-    writer
-        .add_file("content.xml", content_xml.as_bytes())
-        .unwrap();
-    writer
-        .add_file("Thumbnails/thumbnail.png", b"inert auxiliary bytes")
-        .unwrap();
+    let compact_content = support::compact_xml_fixture(content_xml);
+    let mut entries = vec![
+        ("content.xml", compact_content.as_bytes(), "text/xml"),
+        (
+            "Thumbnails/thumbnail.png",
+            b"inert auxiliary bytes".as_slice(),
+            "image/png",
+        ),
+    ];
     if signed {
-        writer
-            .add_file(
+        entries.push((
                 "META-INF/documentsignatures.xml",
-                format!(
-                    r#"<ds:document-signatures xmlns:ds="{}"/>"#,
-                    "urn:oasis:names:tc:opendocument:xmlns:digitalsignature:1.0"
-                )
-                .as_bytes(),
-            )
-            .unwrap();
-        writer
-            .add_file(
+                br#"<ds:document-signatures xmlns:ds="urn:oasis:names:tc:opendocument:xmlns:digitalsignature:1.0"/>"#.as_slice(),
+                "text/xml",
+            ));
+        entries.push((
                 "META-INF/macrosignatures.xml",
-                format!(
-                    r#"<ds:document-signatures xmlns:ds="{}"/>"#,
-                    "urn:oasis:names:tc:opendocument:xmlns:digitalsignature:1.0"
-                )
-                .as_bytes(),
-            )
-            .unwrap();
+                br#"<ds:document-signatures xmlns:ds="urn:oasis:names:tc:opendocument:xmlns:digitalsignature:1.0"/>"#.as_slice(),
+                "text/xml",
+            ));
     }
-    writer.finish_to_bytes().unwrap()
+    support::raw_package(&entries)
 }
 
 fn assert_in_order(haystack: &str, needles: &[&str]) {
@@ -762,8 +755,12 @@ fn encrypted_content_is_refused_before_a_tracked_change_transaction_can_begin() 
     writer
         .set_encryption("tracked-change-password", Profile::compatible())
         .unwrap();
+    let compact_content = content(&independent_owner(None))
+        .lines()
+        .map(str::trim)
+        .collect::<String>();
     writer
-        .add_file("content.xml", content(&independent_owner(None)).as_bytes())
+        .add_file("content.xml", compact_content.as_bytes())
         .unwrap();
     let encrypted = writer.finish_to_bytes().unwrap();
 

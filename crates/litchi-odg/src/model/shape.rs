@@ -85,6 +85,7 @@ impl ShapeKind {
 /// One bounded, inert shape view from `content.xml`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Shape {
+    control_reference: Option<String>,
     name: Option<String>,
     layer: Option<String>,
     style_name: Option<String>,
@@ -94,6 +95,7 @@ pub struct Shape {
     y: Option<String>,
     width: Option<String>,
     height: Option<String>,
+    path_data: Option<String>,
     title: Option<String>,
     description: Option<String>,
     kind: ShapeKind,
@@ -102,9 +104,11 @@ pub struct Shape {
 }
 
 pub(crate) struct Properties {
+    pub(crate) control_reference: Option<String>,
     pub(crate) geometry: [Option<String>; 4],
     pub(crate) layer: Option<String>,
     pub(crate) name: Option<String>,
+    pub(crate) path_data: Option<String>,
     pub(crate) style_name: Option<String>,
     pub(crate) text_style_name: Option<String>,
     pub(crate) z_index: Option<u32>,
@@ -116,9 +120,11 @@ impl Shape {
     pub fn new(kind: ShapeKind) -> Self {
         Self::parsed(
             Properties {
+                control_reference: None,
                 geometry: [None, None, None, None],
                 layer: None,
                 name: None,
+                path_data: None,
                 style_name: None,
                 text_style_name: None,
                 z_index: None,
@@ -130,15 +136,18 @@ impl Shape {
 
     pub(crate) fn parsed(properties: Properties, kind: ShapeKind, frame: Option<Frame>) -> Self {
         let Properties {
+            control_reference,
             geometry,
             layer,
             name,
+            path_data,
             style_name,
             text_style_name,
             z_index,
         } = properties;
         let [x, y, width, height] = geometry;
         Self {
+            control_reference,
             name,
             layer,
             style_name,
@@ -148,6 +157,7 @@ impl Shape {
             y,
             width,
             height,
+            path_data,
             title: None,
             description: None,
             kind,
@@ -204,6 +214,20 @@ impl Shape {
         self.y = Some(y.into());
         self.width = Some(width.into());
         self.height = Some(height.into());
+        self
+    }
+
+    /// Sets lexical SVG path data on a detached path shape.
+    #[must_use]
+    pub fn with_path_data(mut self, path_data: impl Into<String>) -> Self {
+        self.path_data = Some(path_data.into());
+        self
+    }
+
+    /// Sets the inert form-control reference on a detached control shape.
+    #[must_use]
+    pub fn with_control_reference(mut self, reference: impl Into<String>) -> Self {
+        self.control_reference = Some(reference.into());
         self
     }
 
@@ -303,6 +327,18 @@ impl Shape {
     #[must_use]
     pub fn height(&self) -> Option<&str> {
         self.height.as_deref()
+    }
+
+    /// The optional lexical `svg:d` path data.
+    #[must_use]
+    pub fn path_data(&self) -> Option<&str> {
+        self.path_data.as_deref()
+    }
+
+    /// The optional inert `draw:control` form-control reference.
+    #[must_use]
+    pub fn control_reference(&self) -> Option<&str> {
+        self.control_reference.as_deref()
     }
 
     /// The direct accessibility title.

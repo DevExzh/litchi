@@ -12,6 +12,10 @@ use super::{
 impl DiagramDataModel {
     /// Validates identifiers, references, Office's single-parent rule, and
     /// configured resource limits without changing the model.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn validate(&self) -> Result<()> {
         self.serialized_xml_len(Conformance::Transitional)
             .map(|_| ())
@@ -197,7 +201,12 @@ pub(super) fn validate_transition_point(point: &Point, connection: &Connection) 
                 ..
             } if *sibling_transition == point.id
         ),
-        _ => false,
+        PointType::Node
+        | PointType::Document
+        | PointType::Assistant
+        | PointType::ParentTransition(_)
+        | PointType::SiblingTransition(_)
+        | PointType::Presentation => false,
     };
     if matches {
         Ok(())

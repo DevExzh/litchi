@@ -23,12 +23,20 @@ enum Mode {
 /// The schema requires the `a:pathLst` element but allows it to be empty;
 /// authored geometry additionally requires at least one path so the shape
 /// actually draws something.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn validate_custom_geometry(geometry: &CustomGeometry) -> Result<(), String> {
     validate_geometry(geometry, Mode::Author)
 }
 
 /// Validate decoded geometry without imposing the authoring-only requirement
 /// that a path list contain a visible path.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn validate_parsed_custom_geometry(geometry: &CustomGeometry) -> Result<(), String> {
     validate_geometry(geometry, Mode::Parsed)
 }

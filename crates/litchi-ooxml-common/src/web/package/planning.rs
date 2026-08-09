@@ -17,11 +17,19 @@ use super::{
 ///
 /// Add-in references, bindings, properties, and snapshot resources are stored
 /// as inert data. External snapshot links are never contacted.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn put(package: &mut OpcPackage, panes: Panes, conformance: Conformance) -> Result<()> {
     put_with(package, panes, conformance, &Limits::standard())
 }
 
 /// Create or replace the task-pane graph with explicit resource limits.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn put_with(
     package: &mut OpcPackage,
     task_panes: Panes,
@@ -38,11 +46,19 @@ pub fn put_with(
 /// The returned patch is opaque: physical part names and relationship IDs stay
 /// private to the graph owner. Payload allocations are shared with the patch,
 /// and [`Patch::inverse`] does not copy them.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn plan_put(package: &OpcPackage, panes: Panes, conformance: Conformance) -> Result<Patch> {
     plan_put_with(package, panes, conformance, &Limits::standard())
 }
 
 /// Plan a task-pane graph replacement with explicit resource limits.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn plan_put_with(
     package: &OpcPackage,
     task_panes: Panes,
@@ -236,11 +252,19 @@ pub fn plan_put_with(
 /// Remove the package-level task-pane relationship and graph.
 ///
 /// Parts still referenced elsewhere remain in the package.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn remove(package: &mut OpcPackage) -> Result<bool> {
     remove_with(package, &Limits::standard())
 }
 
 /// Remove the task-pane graph with explicit package graph and deletion ceilings.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn remove_with(package: &mut OpcPackage, limits: &Limits) -> Result<bool> {
     plan_remove_with(package, limits)?.apply(package)
 }
@@ -249,11 +273,19 @@ pub fn remove_with(package: &mut OpcPackage, limits: &Limits) -> Result<bool> {
 ///
 /// An absent graph produces an empty patch, so applying it is a
 /// signature-preserving no-op.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn plan_remove(package: &OpcPackage) -> Result<Patch> {
     plan_remove_with(package, &Limits::standard())
 }
 
 /// Plan task-pane graph removal with explicit graph and deletion ceilings.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn plan_remove_with(package: &OpcPackage, limits: &Limits) -> Result<Patch> {
     if !has_task_panes_relationship(package, limits)? {
         return Ok(Patch::default());

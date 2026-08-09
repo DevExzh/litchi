@@ -27,12 +27,14 @@ impl Angle {
     }
 
     /// Parse the XML Schema integer lexical form for `ST_Angle`.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn parse(value: &str) -> Result<Self> {
-        value
-            .trim()
-            .parse::<i32>()
-            .map(Self)
-            .map_err(|_| Error::Invalid(format!("invalid DrawingML transform angle '{value}'")))
+        value.trim().parse::<i32>().map(Self).map_err(|_error| {
+            Error::Invalid(format!("invalid DrawingML transform angle '{value}'"))
+        })
     }
 
     /// Return the raw 60,000ths-of-a-degree value.
@@ -85,6 +87,10 @@ impl Point {
     }
 
     /// Construct an EMU point with both `ST_Coordinate` bounds checked.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn emu(x: i64, y: i64) -> Result<Self> {
         Ok(Self::new(
             Coordinate::emu(x).map_err(|error| coordinate_error("x", error))?,
@@ -127,6 +133,10 @@ impl Size {
     }
 
     /// Construct an EMU size with both `ST_PositiveCoordinate` bounds checked.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn emu(width: i64, height: i64) -> Result<Self> {
         Ok(Self::new(
             Extent::emu(width).map_err(|error| coordinate_error("cx", error))?,

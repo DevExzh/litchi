@@ -18,6 +18,7 @@ use super::manifest::{
     ManifestKeyDerivation, ManifestStartKeyGeneration,
 };
 use super::package::OwnedPackage;
+use super::xml_splice::XmlSplicePublication;
 
 /// Builder for creating ODF packages (ZIP archives)
 ///
@@ -64,6 +65,7 @@ struct WriterEncryption {
 #[derive(Clone, Copy)]
 enum PayloadOrigin {
     AuthoredOrChanged,
+    CheckedSplice,
     ExactSource,
 }
 
@@ -391,6 +393,66 @@ impl<W: Write> PackageWriter<W> {
         media_type: &str,
     ) -> Result<()> {
         self.write_file(path, content, media_type, PayloadOrigin::ExactSource)
+    }
+
+    /// Add a provenance-bearing, individually audited XML splice publication.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no MIME type is configured, the checked part
+    /// cannot be assembled, or the archive write fails.
+    pub fn add_spliced_xml(&mut self, publication: XmlSplicePublication) -> Result<()> {
+        if !self.wrote_mimetype {
+            return Err(Error::InvalidFormat("MIME type not set".to_string()));
+        }
+        let (path, content, media_type) = publication.assemble()?;
+        self.write_file(&path, &content, &media_type, PayloadOrigin::CheckedSplice)
+    }
+
+    /// Copy every exact source member except regenerated metadata, signatures,
+    /// and the explicitly excluded replacement paths.
+    ///
+    /// Unlike [`Self::copy_auxiliary_files_from`], this preserves source-loaded
+    /// core parts such as `styles.xml` and `meta.xml` during a splice rebuild.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for unsupported source encryption or archive failures.
+    pub(crate) fn copy_source_files_from_except(
+        &mut self,
+        source: &OwnedPackage,
+        excluded_paths: &HashSet<String>,
+    ) -> Result<()> {
+        let package = source.package()?;
+        if package.manifest().has_encrypted_entries() && self.encryption.is_none() {
+            return Err(Error::InvalidFormat(
+                "Rewriting encrypted ODF entries requires writer encryption".to_string(),
+            ));
+        }
+        for (path, entry) in &package.manifest().entries {
+            if path.ends_with('/')
+                && !matches!(path.as_str(), "/" | "META-INF/")
+                && !excluded_paths.contains(path)
+            {
+                self.add_manifest_entry(path, &entry.media_type)?;
+            }
+        }
+        for path in package.files()? {
+            if path.ends_with('/')
+                || matches!(path.as_str(), "mimetype" | "META-INF/manifest.xml")
+                || (path.starts_with("META-INF/") && path.ends_with("signatures.xml"))
+                || excluded_paths.contains(&path)
+            {
+                continue;
+            }
+            let bytes = package.get_file(&path)?;
+            let media_type = package
+                .manifest()
+                .get_media_type(&path)
+                .unwrap_or_else(|| Self::guess_media_type(&path));
+            self.write_exact_source_file(&path, &bytes, media_type)?;
+        }
+        Ok(())
     }
 
     fn validate_authored_xml(path: &str, content: &[u8], media_type: &str) -> Result<()> {

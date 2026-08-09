@@ -19,17 +19,29 @@ pub use litchi_odf_common::chart::{ChartClass, ChartClassKind};
 use litchi_core::Result;
 
 /// Serialize a definition using the default ODC limits.
+///
+/// # Errors
+///
+/// Returns an error when validation or XML serialization fails.
 pub fn serialize_content(definition: &Definition) -> Result<String> {
     serialize_content_with_limits(definition, crate::Limits::default())
 }
 
 /// Serialize a definition after ODF range/formula and caller-limit checks.
+///
+/// # Errors
+///
+/// Returns an error when validation, serialization, or compactness checks fail.
 pub fn serialize_content_with_limits(
     definition: &Definition,
     limits: crate::Limits,
 ) -> Result<String> {
     crate::validation::validate_definition(definition, limits)?;
-    let content = litchi_odf_common::chart::authoring::serialize_content(definition)?;
+    let content = litchi_odf_common::chart::authoring::serialize_content(definition)?.replacen(
+        "office:version=\"1.2\"",
+        "office:version=\"1.4\"",
+        1,
+    );
     let compact_limits =
         litchi_odf_common::compact_xml::Limits::new(limits.max_content_bytes(), limits.max_depth())
             .map_err(litchi_core::Error::from)?;

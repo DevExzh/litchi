@@ -21,11 +21,19 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Discover and validate the package's explicit Custom XML graph.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn load(package: &OpcPackage) -> Result<Self> {
         Self::load_scoped(package, &[])
     }
 
     /// Alias for [`Self::load`] emphasizing source-bound parsing.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn read(package: &OpcPackage) -> Result<Self> {
         Self::load(package)
     }

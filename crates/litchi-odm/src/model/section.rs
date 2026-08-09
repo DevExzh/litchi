@@ -2,6 +2,7 @@
 
 use super::subdocument::Subdocument;
 use litchi_core::Position;
+use std::ops::Range;
 
 /// A master-document section.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -24,6 +25,8 @@ pub struct Node {
     pub(crate) parent: Option<Position>,
     pub(crate) children: Vec<Position>,
     pub(crate) reference: Option<Position>,
+    pub(crate) source_span: Range<usize>,
+    pub(crate) name_span: Range<usize>,
 }
 
 impl Node {

@@ -1,9 +1,4 @@
 //! Inert ODF client-side image-map semantics.
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Public image-map types and accessors are grouped by semantic role."
-)]
-
 /// One client-side image map attached directly to the document frame.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ImageMap {
@@ -115,6 +110,7 @@ impl Area {
     pub fn with_href(mut self, href: impl Into<String>) -> Self {
         self.href = Some(href.into());
         self.no_href = false;
+        self.link_type = Some("simple".to_owned());
         self
     }
 
@@ -123,6 +119,8 @@ impl Area {
     pub fn with_no_href(mut self) -> Self {
         self.href = None;
         self.no_href = true;
+        self.link_type = None;
+        self.show = None;
         self
     }
 

@@ -9,8 +9,12 @@ use crate::{
     map::{Area, AreaKind, AreaProperties, ImageMap},
     source::Source,
 };
-use litchi_core::{Error, FileFormat, Result};
-use litchi_odf_common::{compact_xml, media};
+use litchi_core::{Error, FileFormat, Metadata, Result};
+use litchi_odf_common::{
+    compact_xml,
+    core::{MetaXmlPatch, metadata::Metadata as OdfMetadata, patch_meta_xml},
+    media,
+};
 use quick_xml::{
     XmlVersion,
     events::{BytesStart, Event},
@@ -37,6 +41,7 @@ struct State {
     root: Root,
     frames: Vec<Frame>,
     sites: Vec<FrameSite>,
+    metadata: Option<Metadata>,
 }
 
 #[derive(Clone, Debug)]
@@ -47,6 +52,14 @@ struct FrameSite {
     image_tag: Range<usize>,
     href_attribute: Option<String>,
     binary_contents: Option<Range<usize>>,
+    map: MapEditSite,
+}
+
+#[derive(Clone, Debug, Default)]
+struct MapEditSite {
+    span: Option<Range<usize>>,
+    insert_at: Option<usize>,
+    editable: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -118,12 +131,19 @@ impl FlatImage {
         &self.0.bytes
     }
 
+    /// Returns metadata embedded in the flat document, if `office:meta` exists.
+    #[must_use]
+    pub fn metadata(&self) -> Option<&Metadata> {
+        self.0.metadata.as_ref()
+    }
+
     /// Starts a source-bound transaction without changing this snapshot.
     #[must_use]
     pub fn transaction(&self) -> FlatImageTransaction {
         FlatImageTransaction {
             source: self.clone(),
             changes: Vec::new(),
+            metadata: None,
         }
     }
 
@@ -157,6 +177,7 @@ pub(crate) fn validate_content_xml(xml: &str) -> Result<()> {
 pub struct FlatImageTransaction {
     source: FlatImage,
     changes: Vec<FrameChange>,
+    metadata: Option<(crate::MetadataFields, crate::MetadataFields)>,
 }
 
 impl FlatImageTransaction {
@@ -266,6 +287,99 @@ impl FlatImageTransaction {
         Ok(())
     }
 
+    /// Replaces, inserts, or removes the typed client-side image map.
+    ///
+    /// Unknown map children are retained by refusing an edit rather than
+    /// normalizing their source markup.
+    pub fn set_image_map(&mut self, frame: usize, value: Option<ImageMap>) -> Result<()> {
+        let site = self.site(frame)?;
+        if !site.map.editable || site.map.insert_at.is_none() {
+            return Err(invalid(
+                "flat ODI image map contains markup that cannot be edited losslessly",
+            ));
+        }
+        self.change_mut(frame)?.after.set_image_map(value);
+        self.remove_noops();
+        Ok(())
+    }
+
+    /// Replaces the lexical horizontal position.
+    pub fn set_x(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.change_mut(frame)?.after.set_x(value);
+        self.remove_noops();
+        Ok(())
+    }
+
+    /// Replaces the lexical vertical position.
+    pub fn set_y(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.change_mut(frame)?.after.set_y(value);
+        self.remove_noops();
+        Ok(())
+    }
+
+    /// Replaces the lexical width.
+    pub fn set_width(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.change_mut(frame)?.after.set_width(value);
+        self.remove_noops();
+        Ok(())
+    }
+
+    /// Replaces the lexical height.
+    pub fn set_height(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.change_mut(frame)?.after.set_height(value);
+        self.remove_noops();
+        Ok(())
+    }
+
+    /// Replaces the lexical relative width.
+    pub fn set_relative_width(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.change_mut(frame)?.after.set_relative_width(value);
+        self.remove_noops();
+        Ok(())
+    }
+
+    /// Replaces the lexical relative height.
+    pub fn set_relative_height(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.change_mut(frame)?.after.set_relative_height(value);
+        self.remove_noops();
+        Ok(())
+    }
+
+    /// Replaces the flat document title while preserving opaque metadata nodes.
+    pub fn set_title(&mut self, value: Option<String>) -> Result<()> {
+        self.metadata_mut()?.1.set_title(value);
+        self.remove_metadata_noop();
+        Ok(())
+    }
+
+    /// Replaces the flat document author.
+    pub fn set_author(&mut self, value: Option<String>) -> Result<()> {
+        self.metadata_mut()?.1.set_author(value);
+        self.remove_metadata_noop();
+        Ok(())
+    }
+
+    /// Replaces the flat document subject.
+    pub fn set_subject(&mut self, value: Option<String>) -> Result<()> {
+        self.metadata_mut()?.1.set_subject(value);
+        self.remove_metadata_noop();
+        Ok(())
+    }
+
+    /// Replaces the flat document description.
+    pub fn set_description(&mut self, value: Option<String>) -> Result<()> {
+        self.metadata_mut()?.1.set_description(value);
+        self.remove_metadata_noop();
+        Ok(())
+    }
+
+    /// Replaces the flat document keyword value.
+    pub fn set_keywords(&mut self, value: Option<String>) -> Result<()> {
+        self.metadata_mut()?.1.set_keywords(value);
+        self.remove_metadata_noop();
+        Ok(())
+    }
+
     /// Stages replacement of an existing linked URI or inline binary payload.
     ///
     /// Cross-kind source changes refuse rather than reconstructing unknown XML.
@@ -309,13 +423,14 @@ impl FlatImageTransaction {
     ///
     /// Returns an error if staged XML cannot be rewritten and read back safely.
     pub fn commit(mut self) -> Result<FlatImageCommit> {
-        if self.changes.is_empty() {
+        if self.changes.is_empty() && self.metadata.is_none() {
             return Ok(FlatImageCommit {
                 snapshot: self.source.clone(),
                 patch: FlatImagePatch {
                     source: self.source.clone(),
                     target: self.source,
                     changes: Vec::new(),
+                    metadata_change: None,
                 },
             });
         }
@@ -360,8 +475,30 @@ impl FlatImageTransaction {
                     )),
                 }
             }
+            if change.before.image_map() != change.after.image_map() {
+                let replacement = change
+                    .after
+                    .image_map()
+                    .map(crate::authoring::image_map_xml)
+                    .unwrap_or_default();
+                let span = site
+                    .map
+                    .span
+                    .clone()
+                    .or_else(|| site.map.insert_at.map(|position| position..position));
+                edits.push((
+                    span.ok_or_else(|| invalid("flat ODI image-map edit site disappeared"))?,
+                    replacement,
+                ));
+            }
         }
-        let bytes = apply_edits(self.source.as_bytes(), edits)?;
+        let mut bytes = apply_edits(self.source.as_bytes(), edits)?;
+        let metadata_change = self
+            .metadata
+            .map(|(before, after)| crate::MetadataChange::new(before, after));
+        if let Some(change) = &metadata_change {
+            bytes = patch_flat_metadata(&bytes, change.after())?;
+        }
         compact_xml::validate(&bytes)?;
         let snapshot = FlatImage::from_root_bytes(bytes, self.source.0.root)?;
         for change in &self.changes {
@@ -373,12 +510,18 @@ impl FlatImageTransaction {
                 return Err(invalid("flat ODI edit failed semantic readback"));
             }
         }
+        if let Some(change) = &metadata_change
+            && crate::MetadataFields::from(snapshot.metadata()) != *change.after()
+        {
+            return Err(invalid("flat ODI metadata edit failed semantic readback"));
+        }
         Ok(FlatImageCommit {
             snapshot: snapshot.clone(),
             patch: FlatImagePatch {
                 source: self.source,
                 target: snapshot,
                 changes: self.changes,
+                metadata_change,
             },
         })
     }
@@ -416,6 +559,31 @@ impl FlatImageTransaction {
     fn remove_noops(&mut self) {
         self.changes.retain(|change| change.before != change.after);
     }
+
+    fn metadata_mut(&mut self) -> Result<&mut (crate::MetadataFields, crate::MetadataFields)> {
+        if self.source.metadata().is_none() {
+            return Err(invalid(
+                "flat ODI metadata editing requires an existing office:meta",
+            ));
+        }
+        if self.metadata.is_none() {
+            let before = crate::MetadataFields::from(self.source.metadata());
+            self.metadata = Some((before.clone(), before));
+        }
+        self.metadata
+            .as_mut()
+            .ok_or_else(|| invalid("flat ODI metadata edit state disappeared"))
+    }
+
+    fn remove_metadata_noop(&mut self) {
+        if self
+            .metadata
+            .as_ref()
+            .is_some_and(|(before, after)| before == after)
+        {
+            self.metadata = None;
+        }
+    }
 }
 
 /// A validated publication result and its reversible patch.
@@ -437,6 +605,17 @@ impl FlatImageCommit {
         &self.patch
     }
 
+    /// Returns the exact source snapshot accepted by this commit.
+    #[must_use]
+    pub const fn source(&self) -> &FlatImage {
+        &self.patch.source
+    }
+
+    /// Builds a deterministic semantic patch under explicit limits.
+    pub fn semantic_patch(&self, policy: &crate::SecurityPolicy) -> Result<crate::SemanticPatch> {
+        crate::SemanticPatch::from_flat_commit(self, policy)
+    }
+
     /// Consumes this result and returns the published snapshot.
     #[must_use]
     pub fn into_snapshot(self) -> FlatImage {
@@ -450,9 +629,22 @@ pub struct FlatImagePatch {
     source: FlatImage,
     target: FlatImage,
     changes: Vec<FrameChange>,
+    metadata_change: Option<crate::MetadataChange>,
 }
 
 impl FlatImagePatch {
+    /// Returns the exact source snapshot.
+    #[must_use]
+    pub const fn source(&self) -> &FlatImage {
+        &self.source
+    }
+
+    /// Returns the exact target snapshot.
+    #[must_use]
+    pub const fn target(&self) -> &FlatImage {
+        &self.target
+    }
+
     /// Returns whether the patch applies to this exact source byte sequence.
     #[must_use]
     pub fn is_applicable_to(&self, source: &FlatImage) -> bool {
@@ -468,13 +660,19 @@ impl FlatImagePatch {
         if !self.is_applicable_to(source) {
             return Err(invalid("stale flat ODI patch source"));
         }
-        Ok(self.target.clone())
+        FlatImage::from_bytes(self.target.as_bytes().to_vec())
     }
 
     /// Returns selector-bound metadata changes in source order.
     #[must_use]
     pub fn changes(&self) -> &[FrameChange] {
         &self.changes
+    }
+
+    /// Returns the common metadata change, if any.
+    #[must_use]
+    pub const fn metadata_change(&self) -> Option<&crate::MetadataChange> {
+        self.metadata_change.as_ref()
     }
 
     /// Returns the patch that restores the exact source snapshot.
@@ -484,6 +682,10 @@ impl FlatImagePatch {
             source: self.target.clone(),
             target: self.source.clone(),
             changes: self.changes.iter().map(FrameChange::inverse).collect(),
+            metadata_change: self
+                .metadata_change
+                .as_ref()
+                .map(crate::MetadataChange::inverse),
         }
     }
 }
@@ -553,12 +755,16 @@ fn parse(input_bytes: Vec<u8>, root: Root) -> Result<State> {
     if images.len() > MAX_FRAMES {
         return Err(invalid("flat ODI frame count exceeds the limit"));
     }
-    let sites = scan_sites(xml)?;
+    let mut sites = scan_sites(xml)?;
     if sites.len() != images.len() {
         return Err(invalid("flat ODI image sites cannot be matched losslessly"));
     }
     let mut frames = Vec::with_capacity(images.len());
     let image_map = scan_image_map(xml)?;
+    let map_site = scan_map_edit_site(xml)?;
+    if let Some(site) = sites.first_mut() {
+        site.map = map_site;
+    }
     for (image, site) in images.into_iter().zip(&sites) {
         let source = match &image.source {
             media::Source::Inline { bytes: payload, .. } => Source::Embedded(payload.clone()),
@@ -578,11 +784,17 @@ fn parse(input_bytes: Vec<u8>, root: Root) -> Result<State> {
         frame.apply_properties(properties);
         frames.push(frame);
     }
+    let metadata = if has_office_meta(xml)? {
+        Some(Metadata::from(OdfMetadata::from_xml(xml)?))
+    } else {
+        None
+    };
     Ok(State {
         bytes: input_bytes,
         root,
         frames,
         sites,
+        metadata,
     })
 }
 
@@ -633,6 +845,64 @@ fn validate_structure(xml: &str, root: Root) -> Result<()> {
         ));
     }
     Ok(())
+}
+
+fn has_office_meta(xml: &str) -> Result<bool> {
+    let mut reader = NsReader::from_reader(xml.as_bytes());
+    let mut depth = 0usize;
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| invalid(format!("invalid ODI metadata XML: {error}")))?;
+        match event {
+            Event::Start(element) => {
+                depth = checked_depth(depth)?;
+                if depth == 2
+                    && bound_to(&namespace, OFFICE)
+                    && element.local_name().as_ref() == b"meta"
+                {
+                    return Ok(true);
+                }
+            },
+            Event::Empty(element) => {
+                if depth == 1
+                    && bound_to(&namespace, OFFICE)
+                    && element.local_name().as_ref() == b"meta"
+                {
+                    return Ok(true);
+                }
+            },
+            Event::End(_) => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("ODI metadata XML depth underflow"))?;
+            },
+            Event::DocType(_) => return Err(invalid("DOCTYPE is not allowed in ODI XML")),
+            Event::Eof => return Ok(false),
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+}
+
+fn patch_flat_metadata(bytes: &[u8], values: &crate::MetadataFields) -> Result<Vec<u8>> {
+    let source = std::str::from_utf8(bytes)
+        .map_err(|error| invalid(format!("flat ODI metadata source is not UTF-8: {error}")))?;
+    let parsed = OdfMetadata::from_xml(source)?;
+    let mut target = Metadata::from(parsed.clone());
+    target.title = values.title().map(str::to_owned);
+    target.author = values.author().map(str::to_owned);
+    target.subject = values.subject().map(str::to_owned);
+    target.description = values.description().map(str::to_owned);
+    target.keywords = values.keywords().map(str::to_owned);
+    let patch = MetaXmlPatch::preserve_all().diff_simple_fields(&parsed, &target);
+    patch_meta_xml(source, &patch)?
+        .map(String::into_bytes)
+        .ok_or_else(|| invalid("flat ODI metadata edit lost office:meta"))
 }
 
 #[derive(Default)]
@@ -830,6 +1100,7 @@ fn scan_sites(xml: &str) -> Result<Vec<FrameSite>> {
                         image_tag: start..end,
                         href_attribute: attribute_qname(&reader, &element, XLINK, b"href")?,
                         binary_contents: None,
+                        map: MapEditSite::default(),
                     });
                     image_depth = Some((depth, images.len() - 1));
                 } else if namespace == NamespaceKind::Office
@@ -853,6 +1124,7 @@ fn scan_sites(xml: &str) -> Result<Vec<FrameSite>> {
                         image_tag: start..end,
                         href_attribute: attribute_qname(&reader, &element, XLINK, b"href")?,
                         binary_contents: None,
+                        map: MapEditSite::default(),
                     });
                 }
             },
@@ -887,6 +1159,97 @@ fn scan_sites(xml: &str) -> Result<Vec<FrameSite>> {
         }
     }
     Ok(images)
+}
+
+fn scan_map_edit_site(xml: &str) -> Result<MapEditSite> {
+    let mut reader = NsReader::from_reader(xml.as_bytes());
+    let mut depth = 0usize;
+    let mut frame_depth = None;
+    let mut map = None::<(usize, usize)>;
+    let mut area_depth = None;
+    let mut text_depth = None;
+    let mut site = MapEditSite {
+        editable: true,
+        ..MapEditSite::default()
+    };
+    loop {
+        let start = usize::try_from(reader.buffer_position())
+            .map_err(|error| invalid(format!("ODI XML position exceeds usize: {error}")))?;
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| invalid(format!("invalid ODI image-map edit XML: {error}")))?;
+        let is_draw = bound_to(&namespace, DRAW);
+        let is_svg = bound_to(&namespace, SVG);
+        let end = usize::try_from(reader.buffer_position())
+            .map_err(|error| invalid(format!("ODI XML position exceeds usize: {error}")))?;
+        match event {
+            Event::Start(element) => {
+                depth = checked_depth(depth)?;
+                let local = element.local_name();
+                if is_draw && local.as_ref() == b"frame" {
+                    frame_depth = Some(depth);
+                } else if is_draw && local.as_ref() == b"image-map" {
+                    map = Some((depth, start));
+                } else if map.is_some() && is_area_local(local.as_ref()) {
+                    area_depth = Some(depth);
+                } else if area_depth.is_some_and(|area| depth == area + 1)
+                    && is_svg
+                    && matches!(local.as_ref(), b"title" | b"desc")
+                {
+                    text_depth = Some(depth);
+                } else if map.is_some() {
+                    site.editable = false;
+                }
+            },
+            Event::Empty(element) => {
+                if is_draw && element.local_name().as_ref() == b"image-map" {
+                    site.span = Some(start..end);
+                } else if map.is_some()
+                    && !(is_area_local(element.local_name().as_ref())
+                        || (area_depth.is_some_and(|area| depth == area)
+                            && is_svg
+                            && matches!(element.local_name().as_ref(), b"title" | b"desc")))
+                {
+                    site.editable = false;
+                }
+            },
+            Event::End(_) => {
+                if text_depth == Some(depth) {
+                    text_depth = None;
+                } else if area_depth == Some(depth) {
+                    area_depth = None;
+                } else if map.is_some_and(|value| value.0 == depth) {
+                    let (_, map_start) = map
+                        .take()
+                        .ok_or_else(|| invalid("ODI image-map edit state disappeared"))?;
+                    site.span = Some(map_start..end);
+                } else if frame_depth == Some(depth) {
+                    site.insert_at = Some(start);
+                    frame_depth = None;
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("ODI image-map edit depth underflow"))?;
+            },
+            Event::Text(text) if map.is_some() && text_depth.is_none() => {
+                if !text.as_ref().iter().all(u8::is_ascii_whitespace) {
+                    site.editable = false;
+                }
+            },
+            Event::CData(_) | Event::Comment(_) | Event::PI(_) if map.is_some() => {
+                site.editable = false;
+            },
+            Event::DocType(_) => return Err(invalid("DOCTYPE is not allowed in ODI XML")),
+            Event::Eof => break,
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+    Ok(site)
 }
 
 #[derive(Clone, Copy)]

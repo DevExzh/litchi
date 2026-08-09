@@ -39,6 +39,10 @@ impl Snapshot {
         self
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn push_effect(&mut self, effect: Effect) -> Result<&mut Self> {
         if self.effects.len() >= MAX_WEB_EXTENSION_ITEMS {
             return limit(
@@ -55,6 +59,10 @@ impl Snapshot {
         Ok(self)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn replace_effect(&mut self, index: usize, effect: Effect) -> Result<Option<Effect>> {
         let reparsed = Effect::from_xml(effect.xml.as_bytes())?;
         if reparsed.kind != effect.kind {
@@ -81,6 +89,10 @@ impl Snapshot {
         self.extension_list.as_ref()
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn set_ext(&mut self, extension: ExtList) -> Result<&mut Self> {
         validate_extension_list(
             Some(&extension),

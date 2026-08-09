@@ -5,10 +5,6 @@
 //! inert data: this crate never evaluates it.
 
 #![forbid(unsafe_code)]
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "formula transaction artifacts stay adjacent to their encode/decode phases"
-)]
 
 pub mod authoring;
 pub mod codec;
@@ -19,7 +15,10 @@ pub mod package;
 pub use authoring::Builder;
 pub use codec::{LimitError, LimitKind, Limits};
 pub use facade::{
-    ChangeKind, Commit, Diagnostics, Edit, Formula, History, NodePath, Patch, Revision, RootChange,
-    SemanticChange, StarMathAnnotation, StarMathVersion,
+    ChangeKind, Commit, CommitRecord, DependencyConflict, DependencyConflictKind,
+    DependencyTransfer, Diagnostics, Edit, Formula, History, MAX_COMMIT_HISTORY,
+    MAX_COMMIT_HISTORY_BYTES, MAX_SEMANTIC_OPERATIONS, MAX_STARMATH_SOURCE_BYTES, NodePath,
+    OpaqueStarMath, Patch, Revision, RootChange, SemanticChange, StarMathAnnotation,
+    StarMathVersion, ThreeWayPlan,
 };
 pub use model::{Attribute, Content, Element, Kind};

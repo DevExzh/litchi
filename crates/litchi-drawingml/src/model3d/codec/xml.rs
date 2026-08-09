@@ -19,6 +19,10 @@ use super::super::{
 };
 
 /// Read one complete `m3d:model3d` element.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn read(xml: &[u8]) -> Result<Metadata> {
     if xml.len() > super::super::MAX_XML_BYTES {
         return Err(limit("model3d XML bytes", super::super::MAX_XML_BYTES));
@@ -34,18 +38,18 @@ pub fn read(xml: &[u8]) -> Result<Metadata> {
 
     loop {
         let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("model3d XML offset exceeds usize"))?;
+            .map_err(|_error| invalid("model3d XML offset exceeds usize"))?;
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(xml_error)?;
         let namespace = resolved_namespace(namespace)?;
         let event = event.into_owned();
         let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("model3d XML offset exceeds usize"))?;
+            .map_err(|_error| invalid("model3d XML offset exceeds usize"))?;
 
         match event {
             Event::Start(element) if metadata.is_none() && root_depth == 0 => {
-                let (local, namespace) = resolved_name(&namespace, element.name())?;
+                let (local, namespace) = resolved_name(&namespace, &element.name())?;
                 require_root(&local, &namespace)?;
                 let namespaces = declarations(&element, reader.decoder())?;
                 let reference = reference_from_namespace(&element, &reader)?;
@@ -57,7 +61,7 @@ pub fn read(xml: &[u8]) -> Result<Metadata> {
                 root_depth = 1;
             },
             Event::Empty(element) if metadata.is_none() && root_depth == 0 => {
-                let (local, namespace) = resolved_name(&namespace, element.name())?;
+                let (local, namespace) = resolved_name(&namespace, &element.name())?;
                 require_root(&local, &namespace)?;
                 let namespaces = declarations(&element, reader.decoder())?;
                 let reference = reference_from_namespace(&element, &reader)?;
@@ -69,30 +73,26 @@ pub fn read(xml: &[u8]) -> Result<Metadata> {
                 root_closed = true;
             },
             Event::Start(element) if metadata.is_some() && root_depth == 1 => {
-                let (local, namespace) = resolved_name(&namespace, element.name())?;
+                let (local, namespace) = resolved_name(&namespace, &element.name())?;
                 let child_start = event_start;
                 let child_end = capture_namespace_element(&mut reader, &mut buffer)?;
                 let raw = xml
                     .get(child_start..child_end)
                     .ok_or_else(|| invalid("model3d child range is outside the input"))?;
-                push_child(
-                    metadata.as_mut().expect("root metadata exists"),
-                    local,
-                    namespace,
-                    raw.to_vec(),
-                )?;
+                let metadata = metadata
+                    .as_mut()
+                    .ok_or_else(|| invalid("model3d root metadata is missing"))?;
+                push_child(metadata, local, namespace, raw.to_vec())?;
             },
             Event::Empty(element) if metadata.is_some() && root_depth == 1 => {
-                let (local, namespace) = resolved_name(&namespace, element.name())?;
+                let (local, namespace) = resolved_name(&namespace, &element.name())?;
                 let raw = xml
                     .get(event_start..event_end)
                     .ok_or_else(|| invalid("model3d child range is outside the input"))?;
-                push_child(
-                    metadata.as_mut().expect("root metadata exists"),
-                    local,
-                    namespace,
-                    raw.to_vec(),
-                )?;
+                let metadata = metadata
+                    .as_mut()
+                    .ok_or_else(|| invalid("model3d root metadata is missing"))?;
+                push_child(metadata, local, namespace, raw.to_vec())?;
             },
             Event::End(_) if metadata.is_some() && root_depth == 1 => {
                 root_depth = 0;
@@ -108,7 +108,15 @@ pub fn read(xml: &[u8]) -> Result<Metadata> {
             },
             Event::DocType(_) => return Err(invalid("DTD is forbidden in model3d XML")),
             Event::Eof => break,
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -122,6 +130,10 @@ pub fn read(xml: &[u8]) -> Result<Metadata> {
 }
 
 /// Construct one inert child from a self-contained XML element.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn opaque(xml: &[u8]) -> Result<Inert> {
     if xml.len() > MAX_FRAGMENT_BYTES {
         return Err(limit("model3d inert fragment bytes", MAX_FRAGMENT_BYTES));
@@ -134,23 +146,23 @@ pub fn opaque(xml: &[u8]) -> Result<Inert> {
     let mut root_end = 0usize;
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("model3d fragment offset exceeds usize"))?;
+            .map_err(|_error| invalid("model3d fragment offset exceeds usize"))?;
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(xml_error)?;
         let namespace = resolved_namespace(namespace)?;
         let event = event.into_owned();
         let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("model3d fragment offset exceeds usize"))?;
+            .map_err(|_error| invalid("model3d fragment offset exceeds usize"))?;
         match event {
             Event::Start(element) if root.is_none() => {
-                let (local, namespace) = resolved_name(&namespace, element.name())?;
+                let (local, namespace) = resolved_name(&namespace, &element.name())?;
                 root = Some((local, namespace));
                 root_start = start;
                 root_end = capture_namespace_element(&mut reader, &mut buffer)?;
             },
             Event::Empty(element) if root.is_none() => {
-                let (local, namespace) = resolved_name(&namespace, element.name())?;
+                let (local, namespace) = resolved_name(&namespace, &element.name())?;
                 root = Some((local, namespace));
                 root_start = start;
                 root_end = end;
@@ -174,7 +186,14 @@ pub fn opaque(xml: &[u8]) -> Result<Inert> {
                 return Err(invalid("model3d inert fragment contains document markup"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -188,10 +207,14 @@ pub fn opaque(xml: &[u8]) -> Result<Inert> {
 }
 
 /// Serialize one model3d fragment with stable prefixes and child order.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn write(metadata: &Metadata) -> Result<Vec<u8>> {
     crate::model3d::validation::validate(metadata).map_err(validation_error)?;
     let mut output = Vec::new();
-    write_inner(&mut output, metadata)?;
+    write_inner(&mut output, metadata);
     if output.len() > super::super::MAX_XML_BYTES {
         return Err(limit("model3d output bytes", super::super::MAX_XML_BYTES));
     }
@@ -199,6 +222,10 @@ pub fn write(metadata: &Metadata) -> Result<Vec<u8>> {
 }
 
 /// Serialize one model3d fragment to a caller-owned sink.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn write_to<W: Write>(writer: &mut W, metadata: &Metadata) -> Result<()> {
     let output = write(metadata)?;
     writer.write_all(&output)?;
@@ -252,16 +279,16 @@ fn parse_raster(xml: &[u8], inherited: &[Namespace]) -> Result<Raster> {
     let mut depth = 1usize;
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("model3d raster offset exceeds usize"))?;
+            .map_err(|_error| invalid("model3d raster offset exceeds usize"))?;
         let event = reader
             .read_event_into(&mut buffer)
             .map_err(xml_error)?
             .into_owned();
         let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("model3d raster offset exceeds usize"))?;
+            .map_err(|_error| invalid("model3d raster offset exceeds usize"))?;
         match event {
             Event::Start(element) if depth == 1 => {
-                let local = local_name(element.name())?;
+                let local = local_name(&element.name())?;
                 let namespace = prefix_namespace(element.name().prefix(), &namespaces);
                 let child_end = capture_plain_element(&mut reader, &mut buffer)?;
                 let raw = xml
@@ -270,7 +297,7 @@ fn parse_raster(xml: &[u8], inherited: &[Namespace]) -> Result<Raster> {
                 push_raster_child(&mut children, local, namespace, raw.to_vec(), &namespaces)?;
             },
             Event::Empty(element) if depth == 1 => {
-                let local = local_name(element.name())?;
+                let local = local_name(&element.name())?;
                 let namespace = prefix_namespace(element.name().prefix(), &namespaces);
                 let raw = xml
                     .get(start..end)
@@ -292,7 +319,13 @@ fn parse_raster(xml: &[u8], inherited: &[Namespace]) -> Result<Raster> {
                 return Err(invalid("model3d raster contains document markup"));
             },
             Event::Eof => return Err(invalid("model3d raster is unterminated")),
-            _ => {},
+            Event::Start(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -348,16 +381,16 @@ fn parse_blip(xml: &[u8], inherited: &[Namespace]) -> Result<Blip> {
     let mut children = Vec::new();
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("model3d blip offset exceeds usize"))?;
+            .map_err(|_error| invalid("model3d blip offset exceeds usize"))?;
         let event = reader
             .read_event_into(&mut buffer)
             .map_err(xml_error)?
             .into_owned();
         let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("model3d blip offset exceeds usize"))?;
+            .map_err(|_error| invalid("model3d blip offset exceeds usize"))?;
         match event {
             Event::Start(element) => {
-                let local = local_name(element.name())?;
+                let local = local_name(&element.name())?;
                 let namespace = prefix_namespace(element.name().prefix(), &namespaces);
                 let child_end = capture_plain_element(&mut reader, &mut buffer)?;
                 let raw = xml
@@ -366,7 +399,7 @@ fn parse_blip(xml: &[u8], inherited: &[Namespace]) -> Result<Blip> {
                 children.push(Inert::from_wire(raw.to_vec(), local, namespace));
             },
             Event::Empty(element) => {
-                let local = local_name(element.name())?;
+                let local = local_name(&element.name())?;
                 let namespace = prefix_namespace(element.name().prefix(), &namespaces);
                 let raw = xml
                     .get(start..end)
@@ -381,14 +414,18 @@ fn parse_blip(xml: &[u8], inherited: &[Namespace]) -> Result<Blip> {
                 return Err(invalid("model3d blip contains document markup"));
             },
             Event::Eof => return Err(invalid("model3d blip is unterminated")),
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
     Ok(Blip::from_wire(reference, children, local_namespaces))
 }
 
-fn write_inner(output: &mut Vec<u8>, metadata: &Metadata) -> Result<()> {
+fn write_inner(output: &mut Vec<u8>, metadata: &Metadata) {
     output.extend_from_slice(b"<m3d:model3d");
     let mut has_model = false;
     let mut has_rel = false;
@@ -409,14 +446,13 @@ fn write_inner(output: &mut Vec<u8>, metadata: &Metadata) -> Result<()> {
     for child in &metadata.children {
         match child {
             Child::Opaque(value) => output.extend_from_slice(value.as_bytes()),
-            Child::Raster(value) => write_raster(output, value)?,
+            Child::Raster(value) => write_raster(output, value),
         }
     }
     output.extend_from_slice(b"</m3d:model3d>");
-    Ok(())
 }
 
-fn write_raster(output: &mut Vec<u8>, raster: &Raster) -> Result<()> {
+fn write_raster(output: &mut Vec<u8>, raster: &Raster) {
     output.extend_from_slice(b"<m3d:raster rName=\"");
     push_escaped(output, &raster.renderer_name);
     output.extend_from_slice(b"\" rVer=\"");
@@ -428,15 +464,14 @@ fn write_raster(output: &mut Vec<u8>, raster: &Raster) -> Result<()> {
     output.push(b'>');
     for child in &raster.children {
         match child {
-            RasterChild::Blip(value) => write_blip(output, value)?,
+            RasterChild::Blip(value) => write_blip(output, value),
             RasterChild::Opaque(value) => output.extend_from_slice(value.as_bytes()),
         }
     }
     output.extend_from_slice(b"</m3d:raster>");
-    Ok(())
 }
 
-fn write_blip(output: &mut Vec<u8>, blip: &Blip) -> Result<()> {
+fn write_blip(output: &mut Vec<u8>, blip: &Blip) {
     output.extend_from_slice(b"<m3d:blip");
     for declaration in &blip.namespaces {
         write_namespace(output, declaration);
@@ -451,7 +486,6 @@ fn write_blip(output: &mut Vec<u8>, blip: &Blip) -> Result<()> {
         }
         output.extend_from_slice(b"</m3d:blip>");
     }
-    Ok(())
 }
 
 fn write_reference(output: &mut Vec<u8>, reference: &Reference) {
@@ -631,13 +665,13 @@ fn next_element(
 ) -> Result<(BytesStart<'static>, bool, usize, usize)> {
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("model3d fragment offset exceeds usize"))?;
+            .map_err(|_error| invalid("model3d fragment offset exceeds usize"))?;
         let event = reader
             .read_event_into(buffer)
             .map_err(xml_error)?
             .into_owned();
         let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("model3d fragment offset exceeds usize"))?;
+            .map_err(|_error| invalid("model3d fragment offset exceeds usize"))?;
         match event {
             Event::Start(element) => {
                 buffer.clear();
@@ -654,7 +688,12 @@ fn next_element(
                 return Err(invalid("model3d fragment contains document markup"));
             },
             Event::Eof => return Err(invalid("model3d fragment has no root")),
-            _ => {},
+            Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -671,7 +710,7 @@ fn capture_namespace_element<R: std::io::BufRead>(
         let (_, event) = reader.read_resolved_event_into(buffer).map_err(xml_error)?;
         let event = event.into_owned();
         let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("model3d XML offset exceeds usize"))?;
+            .map_err(|_error| invalid("model3d XML offset exceeds usize"))?;
         match event {
             Event::Start(_) => {
                 depth = depth
@@ -701,7 +740,12 @@ fn capture_namespace_element<R: std::io::BufRead>(
             },
             Event::DocType(_) => return Err(invalid("DTD is forbidden in model3d XML")),
             Event::Eof => return Err(invalid("model3d element is unterminated")),
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -719,7 +763,7 @@ fn capture_plain_element<R: std::io::BufRead>(
             .map_err(xml_error)?
             .into_owned();
         let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("model3d XML offset exceeds usize"))?;
+            .map_err(|_error| invalid("model3d XML offset exceeds usize"))?;
         match event {
             Event::Start(_) => {
                 depth = depth
@@ -739,7 +783,13 @@ fn capture_plain_element<R: std::io::BufRead>(
             },
             Event::DocType(_) => return Err(invalid("DTD is forbidden in model3d XML")),
             Event::Eof => return Err(invalid("model3d element is unterminated")),
-            _ => {},
+            Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -755,12 +805,16 @@ fn required_attr(
         .ok_or_else(|| invalid(format!("{description} is required")))
 }
 
-fn local_name(name: QName<'_>) -> Result<String> {
+fn local_name(name: &QName<'_>) -> Result<String> {
     std::str::from_utf8(name.local_name().as_ref())
         .map(str::to_owned)
         .map_err(xml_error)
 }
 
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "quick_xml yields namespace resolution tokens by value at the event boundary"
+)]
 fn resolved_namespace(namespace: ResolveResult<'_>) -> Result<String> {
     match namespace {
         ResolveResult::Bound(namespace) => std::str::from_utf8(namespace.as_ref())
@@ -770,7 +824,7 @@ fn resolved_namespace(namespace: ResolveResult<'_>) -> Result<String> {
     }
 }
 
-fn resolved_name(namespace: &str, name: QName<'_>) -> Result<(String, String)> {
+fn resolved_name(namespace: &str, name: &QName<'_>) -> Result<(String, String)> {
     let local = local_name(name)?;
     Ok((local, namespace.to_owned()))
 }
@@ -782,6 +836,10 @@ fn require_root(local: &str, namespace: &str) -> Result<()> {
     Ok(())
 }
 
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "map_err transfers the typed validation failure into the public error"
+)]
 fn validation_error(error: crate::model3d::Error) -> Error {
     Error::Invalid(error.to_string())
 }

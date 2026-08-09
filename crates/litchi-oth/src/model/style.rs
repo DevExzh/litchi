@@ -19,6 +19,43 @@ pub struct Style {
 }
 
 impl Style {
+    /// Creates a detached named style.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the name is empty or either value contains NUL.
+    pub fn new(name: impl Into<String>, family: impl Into<String>) -> litchi_core::Result<Self> {
+        let style_name = name.into();
+        let style_family = family.into();
+        if style_name.is_empty() || style_name.contains('\0') || style_family.contains('\0') {
+            return Err(litchi_core::Error::InvalidFormat(
+                "invalid OTH detached style name or family".to_string(),
+            ));
+        }
+        Ok(Self {
+            family: Some(style_family),
+            name: style_name,
+            origin: Origin::Styles,
+            parent_name: None,
+        })
+    }
+
+    /// Sets a parent style reference.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the parent name contains NUL.
+    pub fn with_parent(mut self, parent_name: impl Into<String>) -> litchi_core::Result<Self> {
+        let converted_parent_name = parent_name.into();
+        if converted_parent_name.contains('\0') {
+            return Err(litchi_core::Error::InvalidFormat(
+                "invalid OTH parent style name".to_string(),
+            ));
+        }
+        self.parent_name = Some(converted_parent_name);
+        Ok(self)
+    }
+
     pub(crate) const fn projected(
         name: String,
         family: Option<String>,

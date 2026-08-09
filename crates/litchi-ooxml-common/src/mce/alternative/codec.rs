@@ -19,6 +19,10 @@ use crate::{xml::decode_xml_reference, xml_name};
 /// declarations must be present in the supplied fragment; a caller that has
 /// only an inherited namespace scope should first materialize that scope on
 /// the fragment root.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn read(xml: &[u8], limits: &Limits) -> Result<Alternatives, Error> {
     if xml.len() > limits.bytes {
         return Err(limit("alternate-content XML bytes"));
@@ -411,8 +415,11 @@ fn is_xml_whitespace(text: &quick_xml::events::BytesText<'_>) -> Result<bool, Er
 }
 
 fn position<R: BufRead>(reader: &NsReader<R>) -> Result<usize, Error> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("AlternateContent byte offset exceeds platform size"))
+    usize::try_from(reader.buffer_position()).map_err(|error| {
+        invalid(format!(
+            "AlternateContent byte offset exceeds platform size: {error}"
+        ))
+    })
 }
 
 fn charge(current: &mut usize, max: usize, resource: &'static str) -> Result<(), Error> {

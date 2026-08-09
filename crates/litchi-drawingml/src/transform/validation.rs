@@ -11,6 +11,10 @@ const MAX_SERIALIZED_BYTES: usize = 1 << 20;
 /// Coordinates, extents, and angles are private checked domains, so this
 /// pass focuses on the aggregate output budget and keeps the validation seam
 /// explicit for future `DrawingML` transform extensions.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn validate(transform: &Transform) -> Result<()> {
     let mut size = 7usize; // `<a:xfrm/>`
     if let Some(value) = transform.authored_rotation() {

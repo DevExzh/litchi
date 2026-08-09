@@ -31,10 +31,23 @@ impl Builder {
     ///
     /// Returns an error if content validation or package writing fails.
     pub fn build(self) -> Result<Vec<u8>> {
+        self.build_with_mimetype(crate::package::MIMETYPE)
+    }
+
+    /// Validates and packages an OTG drawing template.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if content validation or package writing fails.
+    pub fn build_template(self) -> Result<Vec<u8>> {
+        self.build_with_mimetype(crate::package::TEMPLATE_MIMETYPE)
+    }
+
+    fn build_with_mimetype(self, mimetype: &str) -> Result<Vec<u8>> {
         compact_xml::validate(self.content_xml.as_bytes())?;
         crate::codec::validate(&self.content_xml)?;
         let mut writer = PackageWriter::new();
-        writer.set_mimetype(crate::package::MIMETYPE)?;
+        writer.set_mimetype(mimetype)?;
         writer.add_file("content.xml", self.content_xml.as_bytes())?;
         writer.finish_to_bytes()
     }

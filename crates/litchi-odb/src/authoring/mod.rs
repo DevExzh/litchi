@@ -1,11 +1,22 @@
 //! Detached construction for new family packages.
 
 mod builder;
+mod composition;
+mod durable;
+mod policy;
 mod transaction;
 
 pub use builder::Builder;
+pub use composition::{
+    CompositionLimits, JoinError, JoinedEdits, Lineage, MergeChoice, MergePlan, MergePlanError,
+    PreparedEdit,
+};
+pub use durable::{DurablePatch, SealedPatch};
+pub use policy::{
+    DependencyDisposition, EditPolicy, EncryptionPolicy, ProtectionStatus, SignaturePolicy,
+};
 pub(crate) use transaction::producer_extensions;
-pub use transaction::{Change, ChangeKind, Commit, Edit, Patch, QueryChange};
+pub use transaction::{Change, ChangeAction, ChangeKind, Commit, Edit, Patch, QueryChange};
 
 /// Explicit budgeted undo/redo retention for immutable database snapshots.
 pub type History = litchi_core::patch::History<crate::Database>;

@@ -28,6 +28,10 @@ const DECIMAL_BUFFER_BYTES: usize = usize::BITS as usize;
 /// an implementation detail. Input order and duplicate offsets are preserved.
 /// Every offset must be less than `xml.len()` and identify a position where an
 /// XML comment can be inserted (normally an element-start offset).
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn active_offsets(
     xml: &[u8],
     offsets: &[u32],
@@ -89,8 +93,11 @@ pub fn active_offsets(
     let mut cursor = 0usize;
     let mut decimal = [0u8; DECIMAL_BUFFER_BYTES];
     for (offset, index) in positions {
-        let offset = usize::try_from(offset)
-            .map_err(|_| bad("active offset does not fit the platform address space"))?;
+        let offset = usize::try_from(offset).map_err(|error| {
+            bad(format!(
+                "active offset does not fit the platform address space: {error}"
+            ))
+        })?;
         marked.extend_from_slice(
             xml.get(cursor..offset)
                 .ok_or_else(|| bad("active offsets are not valid source positions"))?,
@@ -216,7 +223,7 @@ pub(crate) fn active_marker_with_hash(
 fn write_hex(mut value: u64, output: &mut [u8]) -> R<()> {
     for byte in output.iter_mut().rev() {
         let nibble = u8::try_from(value & 0x0f)
-            .map_err(|_| bad("active-offset marker nibble is invalid"))?;
+            .map_err(|error| bad(format!("active-offset marker nibble is invalid: {error}")))?;
         *byte = if nibble < 10 {
             b'0' + nibble
         } else {
@@ -248,8 +255,8 @@ fn decimal_bytes(mut value: usize, buffer: &mut [u8]) -> R<&[u8]> {
         cursor = cursor
             .checked_sub(1)
             .ok_or_else(|| bad("active-offset decimal buffer is too small"))?;
-        let digit =
-            u8::try_from(value % 10).map_err(|_| bad("active-offset decimal digit is invalid"))?;
+        let digit = u8::try_from(value % 10)
+            .map_err(|error| bad(format!("active-offset decimal digit is invalid: {error}")))?;
         let slot = buffer
             .get_mut(cursor)
             .ok_or_else(|| bad("active-offset decimal cursor is invalid"))?;
@@ -516,6 +523,10 @@ struct Frame {
     mode: Mode,
     active: bool,
 }
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn process_markup_compatibility<'a>(
     xml: &'a [u8],
     caps: &Capabilities,
@@ -563,7 +574,8 @@ pub fn process_markup_compatibility<'a>(
                         out.extend_from_slice(q.as_bytes())?;
                         out.push(b'>')?;
                     },
-                    _ => {},
+                    Mode::Emit(_) | Mode::Unwrap | Mode::Skip | Mode::Alt { .. } | Mode::Branch => {
+                    },
                 }
             },
             Ok(Event::Text(e)) => {
@@ -991,7 +1003,7 @@ fn close(st: &mut Vec<Frame>, f: Frame, empty: bool, out: &mut BoundedOutput) ->
                 out.push(b'>')?;
             },
             Mode::Alt { .. } => return Err(bad("empty AlternateContent")),
-            _ => {},
+            Mode::Emit(_) | Mode::Unwrap | Mode::Skip | Mode::Branch => {},
         }
     } else {
         reserve_exact(st, 1, "MCE element stack")?;
@@ -1065,7 +1077,8 @@ fn validate_alternate_attributes(
     Ok(())
 }
 fn expand(q: &str, ns: &Namespaces, element: bool) -> R<Name> {
-    let qualified = QualifiedName::try_from(q).map_err(|_| bad("invalid QName"))?;
+    let qualified =
+        QualifiedName::try_from(q).map_err(|error| bad(format!("invalid QName: {error}")))?;
     let p = qualified.prefix().unwrap_or_default();
     let l = qualified.local();
     let n = if p.is_empty() {
@@ -1192,16 +1205,28 @@ fn esc(o: &mut BoundedOutput, s: &str) -> R<()> {
     Ok(())
 }
 /// Applies the baseline OOXML markup-compatibility profile.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn process_ooxml(x: &[u8]) -> R<Cow<'_, [u8]>> {
     process_markup_compatibility(x, &Capabilities::default(), &Limits::default()).map(|x| x.xml)
 }
 
 /// Applies baseline preprocessing to one OPC part.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn process_part(part: &dyn litchi_opc::Part) -> R<Cow<'_, [u8]>> {
     process_ooxml(part.blob())
 }
 
 /// Applies baseline preprocessing while retaining the part's shared blob on the fast path.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn process_part_arc(part: &dyn litchi_opc::Part) -> R<Arc<Vec<u8>>> {
     Ok(match process_part(part)? {
         Cow::Borrowed(_) => part.blob_arc(),
@@ -1209,6 +1234,10 @@ pub fn process_part_arc(part: &dyn litchi_opc::Part) -> R<Arc<Vec<u8>>> {
     })
 }
 /// Applies baseline preprocessing to UTF-8 OOXML.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn process_str(x: &str) -> R<Cow<'_, str>> {
     match process_ooxml(x.as_bytes())? {
         Cow::Borrowed(_) => Ok(Cow::Borrowed(x)),

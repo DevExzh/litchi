@@ -1,5 +1,7 @@
 //! Inert style-catalog projection for master documents.
 
+use std::ops::Range;
+
 /// The package part which owns a style definition.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -17,6 +19,8 @@ pub struct Definition {
     pub(crate) family: Option<String>,
     pub(crate) parent: Option<String>,
     pub(crate) origin: Origin,
+    pub(crate) source_span: Range<usize>,
+    pub(crate) name_span: Range<usize>,
 }
 
 impl Definition {

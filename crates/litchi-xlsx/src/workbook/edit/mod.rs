@@ -36,8 +36,10 @@ use crate::web::{Binding as WebBinding, Bindings as WebBindings};
 mod codec;
 mod model;
 mod package;
+mod planning;
 mod semantic;
 mod validation;
+mod wire;
 
 use validation::{
     Added, CreatedSheet, FinalOrder, MergeIntent, MoveIntent, OrderPlan, PanesAction, Placement,
@@ -51,7 +53,9 @@ pub use model::{
     ActiveTab, Change, Commit, Conflict, ConflictSet, JoinError, JoinFailure, PackageChange, Patch,
     State,
 };
+pub use planning::{MergeChoice, MergeLimits, ThreeWayPlan};
 pub use semantic::{ColumnEdit, DefaultsEdit, Edit, NewSheet, RowEdit, TabEdit, WorksheetEdit};
+pub use wire::{DurablePatch, SealedPatch};
 
 use model::{
     GraphAction, GraphChange, PartChange, StyleGuard, defaults_after, ensure_merge_area,

@@ -23,6 +23,10 @@ const MAX_DEPTH: usize = 128;
 const FORMAT_SCHEME: &str = "<a:fmtScheme name=\"Office\"><a:fillStyleLst/><a:lnStyleLst/><a:effectStyleLst/><a:bgFillStyleLst/></a:fmtScheme>";
 
 /// Encode a complete theme part.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn encode_part(name: &str, colors: &Palette, fonts: &FontSet) -> Result<Vec<u8>> {
     validate_name("theme", name)?;
     validate_palette(colors)?;
@@ -42,6 +46,10 @@ pub fn encode_part(name: &str, colors: &Palette, fonts: &FontSet) -> Result<Vec<
 }
 
 /// Encode a theme override part.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn encode_override(value: &Override) -> Result<Vec<u8>> {
     if value.colors.is_none() && value.fonts.is_none() {
         return Err(invalid("theme override requires at least one scheme"));
@@ -68,6 +76,10 @@ pub fn encode_override(value: &Override) -> Result<Vec<u8>> {
 }
 
 /// Parse a complete theme part.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn read(xml: &[u8]) -> Result<Theme> {
     let parsed = parse(xml, "theme")?;
     let colors = parsed
@@ -84,6 +96,10 @@ pub fn read(xml: &[u8]) -> Result<Theme> {
 }
 
 /// Parse a theme override, retaining only its typed color and font schemes.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn read_override(xml: &[u8]) -> Result<Override> {
     let parsed = parse(xml, "themeOverride")?;
     Ok(Override {
@@ -93,6 +109,10 @@ pub fn read_override(xml: &[u8]) -> Result<Override> {
 }
 
 /// Replace a direct `clrScheme` or `fontScheme` child of `themeElements`.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn replace_scheme(xml: &[u8], local: &[u8], replacement: &[u8]) -> Result<Vec<u8>> {
     let range = direct_scheme_range(xml, local)?
         .ok_or_else(|| invalid("theme scheme is missing from themeElements"))?;
@@ -103,6 +123,10 @@ pub fn replace_scheme(xml: &[u8], local: &[u8], replacement: &[u8]) -> Result<Ve
     bounded(output, "patched theme XML")
 }
 
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn encode_palette_fragment(value: &Palette) -> Result<Vec<u8>> {
     validate_palette(value)?;
     let mut output = String::with_capacity(1024);
@@ -110,6 +134,10 @@ pub fn encode_palette_fragment(value: &Palette) -> Result<Vec<u8>> {
     bounded(output.into_bytes(), "color palette XML")
 }
 
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn encode_fonts_fragment(value: &FontSet) -> Result<Vec<u8>> {
     validate_fonts(value)?;
     let mut output = String::with_capacity(1024);
@@ -131,10 +159,10 @@ fn push_palette(xml: &mut String, value: &Palette, declare_namespace: bool) {
         xml.push_str("<a:");
         xml.push_str(slot.token());
         xml.push('>');
-        match value
-            .color(slot)
-            .expect("validated palettes contain all slots")
-        {
+        let Some(color) = value.color(slot) else {
+            continue;
+        };
+        match color {
             Color::Rgb(value) => {
                 xml.push_str("<a:srgbClr val=\"");
                 xml.push_str(value);
@@ -330,7 +358,11 @@ fn parse(xml: &[u8], root_name: &str) -> Result<Parsed> {
                 return Err(invalid("theme XML contains forbidden markup"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if !root_seen || !stack.is_empty() {
@@ -391,7 +423,7 @@ fn open(
             },
             _ => return Ok(()),
         };
-        let slot = current_slot.expect("checked above");
+        let slot = current_slot.ok_or_else(|| invalid("theme color slot is missing"))?;
         if palette_values.iter().any(|(existing, _)| *existing == slot) {
             return Err(invalid("theme contains a duplicate color slot"));
         }
@@ -500,12 +532,12 @@ fn direct_scheme_range(xml: &[u8], target: &[u8]) -> Result<Option<Range<usize>>
     let mut nodes = 0usize;
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("theme XML offset exceeds usize"))?;
+            .map_err(|_error| invalid("theme XML offset exceeds usize"))?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
         let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("theme XML offset exceeds usize"))?;
+            .map_err(|_error| invalid("theme XML offset exceeds usize"))?;
         nodes = nodes
             .checked_add(1)
             .ok_or_else(|| invalid("theme node count overflow"))?;
@@ -515,18 +547,13 @@ fn direct_scheme_range(xml: &[u8], target: &[u8]) -> Result<Option<Range<usize>>
         match event {
             Event::Start(element) => {
                 let local = element.local_name().as_ref().to_vec();
-                if stack.len() == 2 && local.as_slice() == target {
-                    stack.push((start, local));
-                } else {
-                    stack.push((start, local));
-                }
+                stack.push((start, local));
             },
             Event::Empty(element)
                 if stack.len() == 2 && element.local_name().as_ref() == target =>
             {
                 return Ok(Some(start..end));
             },
-            Event::Empty(_) => {},
             Event::End(element) => {
                 let Some((open, local)) = stack.pop() else {
                     return Err(invalid("theme XML nesting underflow"));
@@ -542,7 +569,12 @@ fn direct_scheme_range(xml: &[u8], target: &[u8]) -> Result<Option<Range<usize>>
                 return Err(invalid("theme XML contains forbidden markup"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if !stack.is_empty() {

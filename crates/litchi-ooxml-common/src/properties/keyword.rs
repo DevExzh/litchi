@@ -11,6 +11,10 @@ pub struct Lang(String);
 
 impl Lang {
     /// Validates and retains an `xml:lang` value without canonicalizing it.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         if value.len() > MAX_PROPERTY_TEXT {

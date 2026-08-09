@@ -16,6 +16,10 @@ impl Props {
     /// A genuinely absent relationship and part produce empty properties.
     /// Orphans, duplicate relationships, external targets, missing targets,
     /// wrong content types, and malformed XML are returned as typed errors.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn read(package: &OpcPackage) -> Result<Self> {
         let graph = inspect_graph(package)?;
         let Some(part_name) = graph.part_name else {
@@ -30,6 +34,10 @@ impl Props {
     /// The host-independent parser preserves opaque Microsoft Information
     /// Protection SDK metadata. This method additionally rejects reserved
     /// sensitivity-marking properties that belong to a different host.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn read_for(package: &OpcPackage, host: Host) -> Result<Self> {
         let properties = Self::read(package)?;
         properties.validate_for(host)?;
@@ -41,6 +49,10 @@ impl Props {
     /// Empty properties remove both the target part and its package-level
     /// relationship. Non-empty properties update the existing validated target
     /// or create the canonical `/docProps/custom.xml` part and relationship.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn write(&self, package: &mut OpcPackage) -> Result<()> {
         let graph = inspect_graph(package)?;
         if self.is_empty() {
@@ -84,6 +96,10 @@ impl Props {
     }
 
     /// Validates reserved names for `host` and writes this collection.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn write_for(&self, package: &mut OpcPackage, host: Host) -> Result<()> {
         self.validate_for(host)?;
         self.write(package)

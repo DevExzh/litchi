@@ -93,8 +93,9 @@ fn document_reads_styles_bibliography_configuration() {
 fn mutable_document_replaces_removes_and_inserts_bibliography_configuration() {
     let original = fixture_configuration();
     let replacement = replacement_configuration();
+    let compact_styles = support::compact_xml_fixture(STYLES);
     let mut mutable =
-        litchi_odt::mutable::MutableDocument::from_document(document(STYLES)).unwrap();
+        litchi_odt::mutable::MutableDocument::from_document(document(&compact_styles)).unwrap();
 
     assert_eq!(
         mutable

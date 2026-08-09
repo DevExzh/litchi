@@ -130,6 +130,10 @@ impl CustomGeometryBuilder {
 
     /// Handle a start or empty event whose parent is `parent`; returns the
     /// element context for known children and `None` for elements to skip.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn open(
         &mut self,
         parent: GeometryElement,
@@ -197,6 +201,10 @@ impl CustomGeometryBuilder {
     }
 
     /// Handle the close event of a known geometry element.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn close(&mut self, element: GeometryElement) -> Result<()> {
         match element {
             GeometryElement::XyAdjustHandle
@@ -207,11 +215,26 @@ impl CustomGeometryBuilder {
             | GeometryElement::LineTo
             | GeometryElement::QuadraticBezierTo
             | GeometryElement::CubicBezierTo => self.close_command(),
-            _ => Ok(()),
+            GeometryElement::CustomGeometry
+            | GeometryElement::AdjustValueList
+            | GeometryElement::GuideList
+            | GeometryElement::Guide
+            | GeometryElement::AdjustHandleList
+            | GeometryElement::ConnectionSiteList
+            | GeometryElement::Position
+            | GeometryElement::TextRectangle
+            | GeometryElement::PathList
+            | GeometryElement::ArcTo
+            | GeometryElement::Close
+            | GeometryElement::Point => Ok(()),
         }
     }
 
     /// Finalize the geometry when `a:custGeom` closes.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn finish(self) -> Result<CustomGeometry> {
         if !self.saw_path_list {
             return Err(invalid("custom geometry is missing its path list"));
@@ -529,7 +552,7 @@ fn optional_number(
         .map(|value| {
             value
                 .parse()
-                .map_err(|_| invalid(format!("invalid {description} '{value}'")))
+                .map_err(|_error| invalid(format!("invalid {description} '{value}'")))
         })
         .transpose()
 }

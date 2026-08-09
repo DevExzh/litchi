@@ -38,8 +38,13 @@ are supplied to encrypted documents through `OpenOptions::with_password` and
 the non-cloneable, zeroizing `Password` type. `Document::text` exposes stored
 source text. `body_text::Snapshot::paragraphs` additionally exposes stored,
 accepted, and rejected ordinary body-paragraph projections. Its focused edit
-seam accepts only same-length UTF-16 replacement inside one Unicode piece and
-returns a typed refusal for every case requiring CLX/FKP/PLCF reconstruction.
+seam supports bounded length-changing replacements across multiple ordinary
+paragraphs plus direct-bold changes in one immutable transaction. It rebuilds
+the CLX and CHPX FKPs, shifts its modeled main-story PLCFs, fully reopens the
+result, and explicitly refuses structural, tracked, mixed-format, or unmodeled
+position dependencies. Source-checked in-memory and durable semantic patches,
+disjoint composition, and bounded undo/redo history use the same operation
+model.
 Paragraph selection uses the format-neutral, zero-based `litchi_core::Position`;
 resolving it against a source body reports a typed not-found refusal.
 

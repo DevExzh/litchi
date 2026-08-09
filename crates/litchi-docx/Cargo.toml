@@ -35,6 +35,7 @@ litchi-ooxml-common = { workspace = true }
 litchi-opc = { workspace = true }
 litchi-vba = { workspace = true, optional = true }
 quick-xml = { workspace = true }
+serde_json = { workspace = true }
 smallvec = { workspace = true }
 thiserror = { workspace = true }
 unicode-normalization = { workspace = true }

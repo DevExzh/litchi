@@ -1,8 +1,4 @@
 //! Caller-selected resource ceilings for chart parsing, authoring, and history.
-#![allow(
-    clippy::missing_errors_doc,
-    reason = "all fluent limit setters share the documented checked-ceiling contract"
-)]
 
 use litchi_core::{Error, Result};
 
@@ -18,127 +14,173 @@ const HARD_MAX_ITEMS: usize = 16_777_216;
 /// Resource limits retained by snapshots and reused by edits and patches.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
-    max_package_bytes: usize,
-    max_content_bytes: usize,
-    max_depth: usize,
-    max_axes: usize,
-    max_series: usize,
-    max_data_points: usize,
-    max_resources: usize,
-    max_history: usize,
-    max_scalar_bytes: usize,
+    package_bytes: usize,
+    content_bytes: usize,
+    depth: usize,
+    axes: usize,
+    series: usize,
+    data_points: usize,
+    resources: usize,
+    history: usize,
+    scalar_bytes: usize,
 }
 
 impl Default for Limits {
     fn default() -> Self {
         Self {
-            max_package_bytes: HARD_MAX_PACKAGE_BYTES,
-            max_content_bytes: HARD_MAX_CONTENT_BYTES,
-            max_depth: 256,
-            max_axes: 16_384,
-            max_series: 65_536,
-            max_data_points: HARD_MAX_ITEMS,
-            max_resources: 100_000,
-            max_history: 4_096,
-            max_scalar_bytes: 64 * 1024,
+            package_bytes: HARD_MAX_PACKAGE_BYTES,
+            content_bytes: HARD_MAX_CONTENT_BYTES,
+            depth: 256,
+            axes: 16_384,
+            series: 65_536,
+            data_points: HARD_MAX_ITEMS,
+            resources: 100_000,
+            history: 4_096,
+            scalar_bytes: 64 * 1024,
         }
     }
 }
 
 impl Limits {
+    /// Return the default retained limits.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Set the package byte ceiling.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for zero or a value above the hard safety ceiling.
     pub fn with_package_bytes(mut self, value: usize) -> Result<Self> {
-        self.max_package_bytes = checked(value, HARD_MAX_PACKAGE_BYTES, "package bytes")?;
+        self.package_bytes = checked(value, HARD_MAX_PACKAGE_BYTES, "package bytes")?;
         Ok(self)
     }
 
+    /// Set the XML content byte ceiling.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for zero or a value above the hard safety ceiling.
     pub fn with_content_bytes(mut self, value: usize) -> Result<Self> {
-        self.max_content_bytes = checked(value, HARD_MAX_CONTENT_BYTES, "content bytes")?;
+        self.content_bytes = checked(value, HARD_MAX_CONTENT_BYTES, "content bytes")?;
         Ok(self)
     }
 
+    /// Set the XML nesting ceiling.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for zero or a value above the hard safety ceiling.
     pub fn with_depth(mut self, value: usize) -> Result<Self> {
-        self.max_depth = checked(value, HARD_MAX_DEPTH, "XML depth")?;
+        self.depth = checked(value, HARD_MAX_DEPTH, "XML depth")?;
         Ok(self)
     }
 
+    /// Set the retained axis ceiling.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for zero or a value above the hard safety ceiling.
     pub fn with_axes(mut self, value: usize) -> Result<Self> {
-        self.max_axes = checked(value, HARD_MAX_ITEMS, "axis count")?;
+        self.axes = checked(value, HARD_MAX_ITEMS, "axis count")?;
         Ok(self)
     }
 
+    /// Set the retained series ceiling.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for zero or a value above the hard safety ceiling.
     pub fn with_series(mut self, value: usize) -> Result<Self> {
-        self.max_series = checked(value, HARD_MAX_ITEMS, "series count")?;
+        self.series = checked(value, HARD_MAX_ITEMS, "series count")?;
         Ok(self)
     }
 
+    /// Set the expanded data-point ceiling.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for zero or a value above the hard safety ceiling.
     pub fn with_data_points(mut self, value: usize) -> Result<Self> {
-        self.max_data_points = checked(value, HARD_MAX_ITEMS, "data-point count")?;
+        self.data_points = checked(value, HARD_MAX_ITEMS, "data-point count")?;
         Ok(self)
     }
 
+    /// Set the auxiliary-resource count ceiling.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for zero or a value above the hard safety ceiling.
     pub fn with_resources(mut self, value: usize) -> Result<Self> {
-        self.max_resources = checked(value, HARD_MAX_ITEMS, "resource count")?;
+        self.resources = checked(value, HARD_MAX_ITEMS, "resource count")?;
         Ok(self)
     }
 
+    /// Set the undo-history entry ceiling.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for zero or a value above the hard safety ceiling.
     pub fn with_history(mut self, value: usize) -> Result<Self> {
-        self.max_history = checked(value, HARD_MAX_ITEMS, "history length")?;
+        self.history = checked(value, HARD_MAX_ITEMS, "history length")?;
         Ok(self)
     }
 
+    /// Set the scalar string byte ceiling.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for zero or a value above the hard safety ceiling.
     pub fn with_scalar_bytes(mut self, value: usize) -> Result<Self> {
-        self.max_scalar_bytes = checked(value, HARD_MAX_CONTENT_BYTES, "scalar bytes")?;
+        self.scalar_bytes = checked(value, HARD_MAX_CONTENT_BYTES, "scalar bytes")?;
         Ok(self)
     }
 
     #[must_use]
     pub const fn max_package_bytes(self) -> usize {
-        self.max_package_bytes
+        self.package_bytes
     }
 
     #[must_use]
     pub const fn max_content_bytes(self) -> usize {
-        self.max_content_bytes
+        self.content_bytes
     }
 
     #[must_use]
     pub const fn max_depth(self) -> usize {
-        self.max_depth
+        self.depth
     }
 
     #[must_use]
     pub const fn max_axes(self) -> usize {
-        self.max_axes
+        self.axes
     }
 
     #[must_use]
     pub const fn max_series(self) -> usize {
-        self.max_series
+        self.series
     }
 
     #[must_use]
     pub const fn max_data_points(self) -> usize {
-        self.max_data_points
+        self.data_points
     }
 
     #[must_use]
     pub const fn max_resources(self) -> usize {
-        self.max_resources
+        self.resources
     }
 
     #[must_use]
     pub const fn max_history(self) -> usize {
-        self.max_history
+        self.history
     }
 
     #[must_use]
     pub const fn max_scalar_bytes(self) -> usize {
-        self.max_scalar_bytes
+        self.scalar_bytes
     }
 }
 

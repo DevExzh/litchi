@@ -81,6 +81,10 @@ impl FromStr for Unit {
 
 impl Coordinate {
     /// Construct an exact decimal physical measurement.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn measure(number: &str, unit: Unit) -> Result<Self, ParseError> {
         if number.is_empty() {
             return Err(ParseError::Empty);
@@ -105,6 +109,10 @@ impl Coordinate {
 
     /// Parse either member of the `a:ST_Coordinate` union.
     #[inline]
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn parse(value: &str) -> Result<Self, ParseError> {
         if value.len() > MAX_BYTES {
             return Err(ParseError::TooLong {
@@ -138,7 +146,7 @@ impl Coordinate {
         }
         let parsed = value
             .parse::<i64>()
-            .map_err(|_| ParseError::InvalidNumber)?;
+            .map_err(|_error| ParseError::InvalidNumber)?;
         Self::emu(parsed)
     }
 }
@@ -202,6 +210,10 @@ impl fmt::Display for Extent {
 impl Extent {
     /// Parse the integer lexical space of `a:ST_PositiveCoordinate`.
     #[inline]
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn parse(value: &str) -> Result<Self, ParseError> {
         if value.len() > MAX_BYTES {
             return Err(ParseError::TooLong {
@@ -215,7 +227,7 @@ impl Extent {
         }
         let value = value
             .parse::<i64>()
-            .map_err(|_| ParseError::InvalidExtent)?;
+            .map_err(|_error| ParseError::InvalidExtent)?;
         Self::emu(value)
     }
 }

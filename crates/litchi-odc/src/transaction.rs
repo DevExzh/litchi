@@ -1,9 +1,4 @@
 //! Granular transactions over detached typed chart definitions.
-#![allow(
-    clippy::missing_errors_doc,
-    clippy::module_name_repetitions,
-    reason = "all selectors share the transaction's documented invalid-format refusal contract"
-)]
 
 use crate::{
     AxisSpec, CachedCell, CachedRow, CachedTable, DataPointSpec, Definition, Limits, PlotAreaSpec,
@@ -32,6 +27,7 @@ pub enum StyleTarget {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum DefinitionChange {
+    DefinitionUpdated,
     PlotAreaUpdated,
     AxisInserted {
         index: usize,
@@ -99,12 +95,16 @@ pub enum DefinitionChange {
 /// An immutable validated chart definition and its retained limits.
 #[derive(Clone, Debug)]
 pub struct DefinitionSnapshot {
-    definition: Arc<Definition>,
-    limits: Limits,
+    pub(crate) definition: Arc<Definition>,
+    pub(crate) limits: Limits,
 }
 
 impl DefinitionSnapshot {
     /// Validate and retain a typed definition with caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the definition violates semantic or size limits.
     pub fn new(definition: Definition, limits: Limits) -> Result<Self> {
         crate::validation::validate_definition(&definition, limits)?;
         Ok(Self {
@@ -114,6 +114,10 @@ impl DefinitionSnapshot {
     }
 
     /// Validate with default limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the definition is invalid.
     pub fn with_default_limits(definition: Definition) -> Result<Self> {
         Self::new(definition, Limits::default())
     }
@@ -163,6 +167,11 @@ impl DefinitionEdit {
         self.update_plot_area(PlotAreaSpec::default());
     }
 
+    /// Insert an axis at a zero-based position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the insertion selector is out of bounds.
     pub fn insert_axis(&mut self, index: usize, axis: AxisSpec) -> Result<()> {
         if index > self.candidate.plot_area.axes.len() {
             return selector("ODC axis insertion selector is out of bounds");
@@ -172,6 +181,11 @@ impl DefinitionEdit {
         Ok(())
     }
 
+    /// Replace an axis at a zero-based position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selector is out of bounds.
     pub fn update_axis(&mut self, index: usize, axis: AxisSpec) -> Result<()> {
         *self
             .candidate
@@ -183,6 +197,11 @@ impl DefinitionEdit {
         Ok(())
     }
 
+    /// Remove and return an axis at a zero-based position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selector is out of bounds.
     pub fn remove_axis(&mut self, index: usize) -> Result<AxisSpec> {
         if index >= self.candidate.plot_area.axes.len() {
             return selector("ODC axis selector is out of bounds");
@@ -191,6 +210,11 @@ impl DefinitionEdit {
         Ok(self.candidate.plot_area.axes.remove(index))
     }
 
+    /// Insert a series at a zero-based position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the insertion selector is out of bounds.
     pub fn insert_series(&mut self, index: usize, series: SeriesSpec) -> Result<()> {
         if index > self.candidate.plot_area.series.len() {
             return selector("ODC series insertion selector is out of bounds");
@@ -201,6 +225,11 @@ impl DefinitionEdit {
         Ok(())
     }
 
+    /// Replace a series at a zero-based position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selector is out of bounds.
     pub fn update_series(&mut self, index: usize, series: SeriesSpec) -> Result<()> {
         *self
             .candidate
@@ -212,6 +241,11 @@ impl DefinitionEdit {
         Ok(())
     }
 
+    /// Remove and return a series at a zero-based position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selector is out of bounds.
     pub fn remove_series(&mut self, index: usize) -> Result<SeriesSpec> {
         if index >= self.candidate.plot_area.series.len() {
             return selector("ODC series selector is out of bounds");
@@ -220,6 +254,11 @@ impl DefinitionEdit {
         Ok(self.candidate.plot_area.series.remove(index))
     }
 
+    /// Insert a data point into one series.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when either selector is out of bounds.
     pub fn insert_data_point(
         &mut self,
         series: usize,
@@ -236,6 +275,11 @@ impl DefinitionEdit {
         Ok(())
     }
 
+    /// Replace a data point in one series.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when either selector is out of bounds.
     pub fn update_data_point(
         &mut self,
         series: usize,
@@ -251,6 +295,11 @@ impl DefinitionEdit {
         Ok(())
     }
 
+    /// Remove and return a data point from one series.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when either selector is out of bounds.
     pub fn remove_data_point(&mut self, series: usize, index: usize) -> Result<DataPointSpec> {
         let points = self.points_mut(series)?;
         if index >= points.len() {
@@ -267,6 +316,11 @@ impl DefinitionEdit {
         self.changes.push(DefinitionChange::CachedTableUpdated);
     }
 
+    /// Insert a row into the header or body cached-table collection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the table is absent or the selector is invalid.
     pub fn insert_cached_row(&mut self, header: bool, index: usize, row: CachedRow) -> Result<()> {
         let rows = self.rows_mut(header)?;
         if index > rows.len() {
@@ -278,6 +332,11 @@ impl DefinitionEdit {
         Ok(())
     }
 
+    /// Replace a row in the header or body cached-table collection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the table is absent or the selector is invalid.
     pub fn update_cached_row(&mut self, header: bool, index: usize, row: CachedRow) -> Result<()> {
         *self
             .rows_mut(header)?
@@ -288,6 +347,11 @@ impl DefinitionEdit {
         Ok(())
     }
 
+    /// Remove a row from the header or body cached-table collection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the table is absent or the selector is invalid.
     pub fn remove_cached_row(&mut self, header: bool, index: usize) -> Result<CachedRow> {
         let rows = self.rows_mut(header)?;
         if index >= rows.len() {
@@ -299,6 +363,11 @@ impl DefinitionEdit {
         Ok(removed)
     }
 
+    /// Insert a cell into one cached row.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the table, row, or insertion selector is invalid.
     pub fn insert_cached_cell(
         &mut self,
         header: bool,
@@ -316,6 +385,11 @@ impl DefinitionEdit {
         Ok(())
     }
 
+    /// Replace a cell in one cached row.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the table, row, or cell selector is invalid.
     pub fn update_cached_cell(
         &mut self,
         header: bool,
@@ -332,6 +406,11 @@ impl DefinitionEdit {
         Ok(())
     }
 
+    /// Remove and return a cell from one cached row.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the table, row, or cell selector is invalid.
     pub fn remove_cached_cell(
         &mut self,
         header: bool,
@@ -349,6 +428,10 @@ impl DefinitionEdit {
     }
 
     /// Set or remove `chart:style-name` at a typed semantic site.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selected style-bearing element is absent.
     pub fn set_style(&mut self, target: StyleTarget, style_name: Option<String>) -> Result<()> {
         let field = match target {
             StyleTarget::Chart => &mut self.candidate.style_name,
@@ -404,6 +487,10 @@ impl DefinitionEdit {
     }
 
     /// Validate and atomically publish this detached edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the completed definition violates retained limits.
     pub fn commit(mut self) -> Result<DefinitionCommit> {
         crate::validation::validate_definition(&self.candidate, self.source.limits)?;
         if self.candidate == *self.source.definition {
@@ -453,16 +540,6 @@ impl DefinitionEdit {
     }
 }
 
-fn style_element<'a>(
-    element: &'a mut Option<crate::StyleElement>,
-    name: &str,
-) -> Result<&'a mut Option<String>> {
-    element
-        .as_mut()
-        .map(|value| &mut value.style_name)
-        .ok_or_else(|| invalid(format!("ODC {name} style target is absent")))
-}
-
 /// A committed definition snapshot and its reversible patch.
 pub struct DefinitionCommit {
     snapshot: DefinitionSnapshot,
@@ -494,9 +571,9 @@ impl DefinitionCommit {
 /// A semantic exact-source patch that supports inversion and composition.
 #[derive(Clone, Debug)]
 pub struct DefinitionPatch {
-    source: DefinitionSnapshot,
-    target: DefinitionSnapshot,
-    changes: Vec<DefinitionChange>,
+    pub(crate) source: DefinitionSnapshot,
+    pub(crate) target: DefinitionSnapshot,
+    pub(crate) changes: Vec<DefinitionChange>,
 }
 
 impl DefinitionPatch {
@@ -510,6 +587,11 @@ impl DefinitionPatch {
         self.source.limits == source.limits && *self.source.definition == *source.definition
     }
 
+    /// Apply this patch to its exact semantic source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the supplied snapshot is stale or unrelated.
     pub fn apply(&self, source: &DefinitionSnapshot) -> Result<DefinitionSnapshot> {
         if !self.is_applicable_to(source) {
             return selector("ODC definition patch source does not match");
@@ -527,6 +609,10 @@ impl DefinitionPatch {
     }
 
     /// Compose two contiguous patches into one exact-source patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the first target is not the second source.
     pub fn compose(&self, next: &Self) -> Result<Self> {
         if self.target.limits != next.source.limits
             || *self.target.definition != *next.source.definition
@@ -540,6 +626,24 @@ impl DefinitionPatch {
             target: next.target.clone(),
             changes,
         })
+    }
+
+    /// Join two patches that share the same semantic source.
+    ///
+    /// Inputs remain immutable. Independent paths merge; divergent edits to
+    /// one path are reported as deterministic conflicts.
+    #[must_use]
+    pub fn join(&self, other: &Self) -> crate::DefinitionMerge {
+        crate::merge::join(self, other)
+    }
+
+    /// Transfer this patch's semantic dependencies onto another snapshot.
+    ///
+    /// The destination remains unchanged. Dangling axis references and other
+    /// invalid combined dependencies are returned as `chart.dependencies`.
+    #[must_use]
+    pub fn transfer_to(&self, destination: &DefinitionSnapshot) -> crate::DefinitionMerge {
+        crate::merge::transfer(self, destination)
     }
 }
 
@@ -566,6 +670,10 @@ impl DefinitionHistory {
     }
 
     /// Record a contiguous committed patch and discard the redo branch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a stale patch or exhausted history limit.
     pub fn record(&mut self, patch: &DefinitionPatch) -> Result<()> {
         if !patch.is_applicable_to(&self.current) {
             return selector("ODC history patch is not contiguous");
@@ -582,6 +690,11 @@ impl DefinitionHistory {
         Ok(())
     }
 
+    /// Restore the previous definition when present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if retained history is internally non-contiguous.
     pub fn undo(&mut self) -> Result<bool> {
         let Some(patch) = self.undo.pop() else {
             return Ok(false);
@@ -592,6 +705,11 @@ impl DefinitionHistory {
         Ok(true)
     }
 
+    /// Reapply the next definition when present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if retained history is internally non-contiguous.
     pub fn redo(&mut self) -> Result<bool> {
         let Some(patch) = self.redo.pop() else {
             return Ok(false);
@@ -612,8 +730,9 @@ impl DefinitionHistory {
     }
 }
 
-fn inverse_change(change: &DefinitionChange) -> DefinitionChange {
+pub(crate) fn inverse_change(change: &DefinitionChange) -> DefinitionChange {
     match change {
+        DefinitionChange::DefinitionUpdated => DefinitionChange::DefinitionUpdated,
         DefinitionChange::AxisInserted { index } => DefinitionChange::AxisRemoved { index: *index },
         DefinitionChange::AxisRemoved { index } => DefinitionChange::AxisInserted { index: *index },
         DefinitionChange::SeriesInserted { index } => {
@@ -689,6 +808,16 @@ fn inverse_change(change: &DefinitionChange) -> DefinitionChange {
             DefinitionChange::StyleUpdated { target: *target }
         },
     }
+}
+
+fn style_element<'a>(
+    element: &'a mut Option<crate::StyleElement>,
+    name: &str,
+) -> Result<&'a mut Option<String>> {
+    element
+        .as_mut()
+        .map(|value| &mut value.style_name)
+        .ok_or_else(|| invalid(format!("ODC {name} style target is absent")))
 }
 
 fn selector<T>(message: impl Into<String>) -> Result<T> {

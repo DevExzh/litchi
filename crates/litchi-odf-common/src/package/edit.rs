@@ -1,5 +1,7 @@
 //! Bounded package reconstruction primitives shared by ODF family editors.
 
+use std::collections::HashSet;
+
 use crate::constants;
 use crate::core::{OwnedPackage, PackageWriter};
 use litchi_core::{Error, Result};
@@ -37,17 +39,42 @@ pub fn rebuild_package(
         return invalid("outer content.xml exceeds package mutation limit");
     }
 
+    let excluded_path_list = excluded_paths.as_ref();
+    let excluded_prefix_list = excluded_prefixes.as_ref();
+    let source_content = source.get_file(constants::ODF_CONTENT)?;
+    let content_is_exact_source = source_content == content.as_bytes();
+    let source_package = source.package()?;
+    let mut exact_exclusions = excluded_path_list.iter().cloned().collect::<HashSet<_>>();
+    for path in source_package.files()? {
+        if excluded_prefix_list
+            .iter()
+            .any(|prefix| path.starts_with(prefix))
+        {
+            exact_exclusions.insert(path);
+        }
+    }
+    for path in source_package.manifest().entries.keys() {
+        if excluded_prefix_list
+            .iter()
+            .any(|prefix| path.starts_with(prefix))
+        {
+            exact_exclusions.insert(path.clone());
+        }
+    }
+    if !content_is_exact_source {
+        exact_exclusions.insert(constants::ODF_CONTENT.to_string());
+    }
+    for addition in &additions {
+        exact_exclusions.insert(addition.path.clone());
+    }
+    for (path, _) in &directories {
+        exact_exclusions.insert(path.clone());
+    }
+
     let mut writer = PackageWriter::new();
     writer.set_mimetype(&source.mimetype()?)?;
-    writer.add_file(constants::ODF_CONTENT, content.as_bytes())?;
-    if source.has_file(constants::ODF_STYLES)? {
-        writer.add_file(
-            constants::ODF_STYLES,
-            &source.get_file(constants::ODF_STYLES)?,
-        )?;
-    }
-    if source.has_file(constants::ODF_META)? {
-        writer.add_file(constants::ODF_META, &source.get_file(constants::ODF_META)?)?;
+    if !content_is_exact_source {
+        writer.add_file(constants::ODF_CONTENT, content.as_bytes())?;
     }
     for (path, media_type) in directories {
         writer.add_manifest_directory(&path, &media_type)?;
@@ -63,11 +90,7 @@ pub fn rebuild_package(
         }
         writer.add_file_with_media_type(&addition.path, &addition.bytes, &addition.media_type)?;
     }
-    writer.copy_auxiliary_files_from_except(
-        source,
-        excluded_paths.as_ref(),
-        excluded_prefixes.as_ref(),
-    )?;
+    writer.copy_source_files_from_except(source, &exact_exclusions)?;
     writer.finish_to_bytes()
 }
 

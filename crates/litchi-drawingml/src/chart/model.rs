@@ -108,7 +108,11 @@ fn validate_chart_xml_fragment(xml: &[u8], expected_root: &[u8], description: &s
                 )));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -130,6 +134,10 @@ macro_rules! chart_xml_fragment {
 
         impl $name {
             /// Validate and retain one complete XML fragment.
+            /// # Errors
+            ///
+            /// Returns an error when input violates DrawingML constraints, exceeds a configured
+            /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
             pub fn from_xml(xml: Vec<u8>) -> Result<Self> {
                 validate_chart_xml_fragment(&xml, $root, $description)?;
                 Ok(Self { xml })

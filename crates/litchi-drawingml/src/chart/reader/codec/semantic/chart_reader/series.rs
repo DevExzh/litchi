@@ -1312,7 +1312,11 @@ pub(crate) fn parse_error_bar<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Res
                 "standard-error and custom error bars cannot have a scalar value".to_string(),
             ));
         },
-        _ => {},
+        ErrorBarValueType::Fixed
+        | ErrorBarValueType::Percentage
+        | ErrorBarValueType::StdDev
+        | ErrorBarValueType::StdErr
+        | ErrorBarValueType::Custom => {},
     }
     Ok(error_bar)
 }
@@ -1602,7 +1606,7 @@ pub(crate) fn parse_point_text<R: BufRead>(
 
 pub(crate) fn parse_point_value<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<f64>> {
     if let Some(text) = parse_point_text(reader)? {
-        Ok(Some(text.trim().parse::<f64>().map_err(|_| {
+        Ok(Some(text.trim().parse::<f64>().map_err(|_error| {
             Error::Invalid(format!("invalid chart numeric point '{text}'"))
         })?))
     } else {

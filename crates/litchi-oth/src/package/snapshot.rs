@@ -15,7 +15,10 @@ struct State {
     bookmarks: Vec<crate::bookmark::Bookmark>,
     forms: Vec<crate::form::Form>,
     headings: Vec<crate::heading::Heading>,
+    heading_replacement_sites: Vec<Option<crate::codec::ReplacementSite>>,
     lists: Vec<crate::list::List>,
+    list_sites: Vec<crate::codec::ReplacementSite>,
+    meta_xml: Option<String>,
     order: Vec<crate::codec::BlockOrder>,
     package: Package,
     paragraphs: Vec<crate::paragraph::Paragraph>,
@@ -61,7 +64,34 @@ impl Snapshot {
     }
 
     fn from_package(package: Package) -> Result<Self> {
+        let meta_xml = if package.package().has_file("meta.xml")? {
+            Some(
+                String::from_utf8(package.package().get_file("meta.xml")?).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid OTH meta.xml UTF-8: {error}"))
+                })?,
+            )
+        } else {
+            None
+        };
         let projection = crate::codec::project(package.content_xml())?;
+        let mut headings = Vec::new();
+        let mut heading_replacement_sites = Vec::new();
+        headings
+            .try_reserve(projection.headings.len())
+            .map_err(|source| Error::Allocation {
+                resource: "OTH heading snapshot",
+                source,
+            })?;
+        heading_replacement_sites
+            .try_reserve(projection.headings.len())
+            .map_err(|source| Error::Allocation {
+                resource: "OTH heading edit sites",
+                source,
+            })?;
+        for site in projection.headings {
+            headings.push(site.value);
+            heading_replacement_sites.push(site.replacement);
+        }
         let mut paragraphs = Vec::new();
         let mut replacement_sites = Vec::new();
         paragraphs
@@ -91,8 +121,11 @@ impl Snapshot {
         Ok(Self(Arc::new(State {
             bookmarks: projection.bookmarks,
             forms: projection.forms,
-            headings: projection.headings,
+            headings,
+            heading_replacement_sites,
             lists: projection.lists,
+            list_sites: projection.list_sites,
+            meta_xml,
             order: projection.order,
             package,
             paragraphs,
@@ -113,6 +146,10 @@ impl Snapshot {
 
     pub(crate) fn metadata(&self) -> Option<&Metadata> {
         self.0.package.metadata()
+    }
+
+    pub(crate) fn meta_xml(&self) -> Option<&str> {
+        self.0.meta_xml.as_deref()
     }
 
     pub(crate) fn as_bytes(&self) -> &[u8] {
@@ -146,6 +183,14 @@ impl Snapshot {
         &self.0.lists
     }
 
+    pub(crate) fn list_site(&self, index: usize) -> Option<&crate::codec::ReplacementSite> {
+        self.0.list_sites.get(index)
+    }
+
+    pub(crate) fn list_sites(&self) -> &[crate::codec::ReplacementSite] {
+        &self.0.list_sites
+    }
+
     pub(crate) fn resources(&self) -> &[crate::resource::Resource] {
         &self.0.resources
     }
@@ -166,11 +211,26 @@ impl Snapshot {
         self.0.replacement_sites.get(index).and_then(Option::as_ref)
     }
 
+    pub(crate) fn heading_replacement_site(
+        &self,
+        index: usize,
+    ) -> Option<&crate::codec::ReplacementSite> {
+        self.0
+            .heading_replacement_sites
+            .get(index)
+            .and_then(Option::as_ref)
+    }
+
     pub(crate) fn text_close(&self) -> usize {
         self.0.text_close
     }
 
-    pub(crate) fn rebuild_with_content(&self, content: &str) -> Result<Self> {
+    pub(crate) fn rebuild_with_parts(
+        &self,
+        content: &str,
+        meta_override: Option<&str>,
+        styles_override: Option<&str>,
+    ) -> Result<Self> {
         let files = self.files()?;
         if files.iter().any(|path| {
             matches!(
@@ -185,17 +245,27 @@ impl Snapshot {
         let mut writer = PackageWriter::new_bounded(MAX_OUTPUT_BYTES);
         writer.set_mimetype(MIMETYPE)?;
         writer.add_file("content.xml", content.as_bytes())?;
-        for path in ["meta.xml", "styles.xml"] {
-            if self.0.package.package().has_file(path)? {
-                let bytes = self.0.package.package().get_file(path)?;
-                let xml = std::str::from_utf8(&bytes).map_err(|error| {
-                    Error::InvalidFormat(format!("invalid OTH {path} UTF-8: {error}"))
-                })?;
-                let compact = crate::codec::compact_for_publication(xml)?;
+        for (path, replacement) in [("meta.xml", meta_override), ("styles.xml", styles_override)] {
+            let source_xml = match replacement {
+                Some(xml) => Some(xml.to_owned()),
+                None if self.0.package.package().has_file(path)? => {
+                    let bytes = self.0.package.package().get_file(path)?;
+                    Some(String::from_utf8(bytes).map_err(|error| {
+                        Error::InvalidFormat(format!("invalid OTH {path} UTF-8: {error}"))
+                    })?)
+                },
+                None => None,
+            };
+            if let Some(xml) = source_xml {
+                let compact = crate::codec::compact_for_publication(&xml)?;
                 writer.add_file(path, compact.as_bytes())?;
             }
         }
-        let excluded_paths = ["content.xml".to_string()];
+        let excluded_paths = [
+            "content.xml".to_string(),
+            "meta.xml".to_string(),
+            "styles.xml".to_string(),
+        ];
         writer.copy_auxiliary_files_from_except(self.0.package.package(), &excluded_paths, &[])?;
         Self::from_bytes(writer.finish_to_bounded_bytes()?)
     }

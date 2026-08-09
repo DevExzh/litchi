@@ -3,14 +3,15 @@
     reason = "test code panics on failure; unwrap keeps assertions concise"
 )]
 
-use litchi_core::{HistoryLimits, Position};
+use litchi_core::{HistoryLimits, Metadata, Position};
 use litchi_oth::{
-    Block, Builder, History, JoinFailure, Template, field,
+    Block, Builder, History, JoinFailure, Patch, SecurityPolicy, Template, field,
     heading::Heading,
     link::Link,
     list::{Item, List},
     paragraph::Paragraph,
     resource,
+    style::Style,
 };
 use std::sync::Arc;
 
@@ -443,6 +444,157 @@ fn rich_semantic_ranges_and_resources_fail_closed() {
         let xml = format!("{PREFIX}{body}{SUFFIX}");
         assert!(Builder::new().content_xml(xml).build().is_err());
     }
+}
+
+fn structural_source() -> Template {
+    Template::from_bytes(
+        Builder::new()
+            .heading(Heading::new(1, "Heading").unwrap())
+            .paragraph(Paragraph::new("outside"))
+            .list(List::new([
+                Item::new(Paragraph::new("one")),
+                Item::new(Paragraph::new("two")),
+            ]))
+            .build()
+            .unwrap(),
+    )
+    .unwrap()
+}
+
+#[test]
+fn heading_list_durable_and_merge_workflows_are_source_checked() {
+    let source = structural_source();
+    let mut left = source.edit();
+    left.set_heading_text(Position::new(0), "Changed heading")
+        .unwrap();
+    left.set_paragraph_text(Position::new(0), "changed outside")
+        .unwrap();
+    let left_commit = left.commit().unwrap();
+
+    let wire = left_commit.patch().to_bytes().unwrap();
+    assert_eq!(wire, left_commit.patch().to_bytes().unwrap());
+    let durable = Patch::from_bytes(&wire).unwrap();
+    assert_eq!(durable.heading_changes()[0].before(), "Heading");
+    assert_eq!(
+        durable.apply(&source).unwrap().as_bytes(),
+        left_commit.template().as_bytes()
+    );
+    let alternate = Template::from_bytes(Builder::new().build().unwrap()).unwrap();
+    assert!(durable.apply(&alternate).is_err());
+    let inverse_wire = durable.inverse().to_bytes().unwrap();
+    let inverse = Patch::from_bytes(&inverse_wire).unwrap();
+    assert_eq!(
+        inverse.apply(left_commit.template()).unwrap().as_bytes(),
+        source.as_bytes()
+    );
+
+    let mut right = source.edit();
+    right
+        .set_list(
+            Position::new(0),
+            List::styled("Bullets", [Item::new(Paragraph::new("replacement"))]),
+        )
+        .unwrap();
+    let right_commit = right.commit().unwrap();
+    let plan = Patch::plan_three_way(&source, left_commit.patch(), right_commit.patch()).unwrap();
+    assert!(plan.conflicts().is_empty());
+    let merged = plan.publish().unwrap();
+    assert_eq!(
+        merged.text_body().unwrap().headings()[0].text(),
+        "Changed heading"
+    );
+    assert_eq!(
+        merged.text_body().unwrap().lists()[0].style_name(),
+        Some("Bullets")
+    );
+
+    let mut remove = source.edit();
+    remove.remove_list(Position::new(0)).unwrap();
+    let removed = remove.commit().unwrap();
+    assert!(removed.template().text_body().unwrap().lists().is_empty());
+    assert_eq!(
+        removed
+            .patch()
+            .inverse()
+            .apply(removed.template())
+            .unwrap()
+            .as_bytes(),
+        source.as_bytes()
+    );
+}
+
+#[test]
+fn metadata_and_styles_are_durable_and_reversible() {
+    let source = structural_source();
+    let metadata = Metadata {
+        title: Some("Durable title".to_string()),
+        author: Some("Template author".to_string()),
+        page_count: Some(3),
+        ..Metadata::default()
+    };
+    let body_style = Style::new("Body2", "paragraph")
+        .unwrap()
+        .with_parent("Standard")
+        .unwrap();
+    let mut parts = source.edit();
+    parts.set_metadata(&metadata).unwrap();
+    parts.set_styles(&[body_style]).unwrap();
+    let parts_commit = parts.commit().unwrap();
+    assert_eq!(
+        parts_commit
+            .template()
+            .metadata()
+            .and_then(|value| value.title.as_deref()),
+        Some("Durable title")
+    );
+    assert_eq!(parts_commit.template().styles()[0].name(), "Body2");
+    assert_eq!(
+        parts_commit.template().styles()[0].parent_name(),
+        Some("Standard")
+    );
+    let parts_wire = parts_commit.patch().to_bytes().unwrap();
+    let parts_durable = Patch::from_bytes(&parts_wire).unwrap();
+    assert_eq!(
+        parts_durable.apply(&source).unwrap().as_bytes(),
+        parts_commit.template().as_bytes()
+    );
+    assert_eq!(
+        parts_durable
+            .inverse()
+            .apply(parts_commit.template())
+            .unwrap()
+            .as_bytes(),
+        source.as_bytes()
+    );
+}
+
+#[test]
+fn security_policy_is_explicit_and_default_deny() {
+    const ACTIVE: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" "#,
+        r#"xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" "#,
+        r#"xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" "#,
+        r#"xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:text>"#,
+        r#"<text:p><draw:image xlink:href="Pictures/a.png"/><draw:image xlink:href="https://example.test/a.png"/></text:p>"#,
+        r#"<office:forms><form:form form:name="f"><form:text form:name="q"/></form:form></office:forms>"#,
+        r#"</office:text></office:body></office:document-content>"#,
+    );
+    let active = Template::from_bytes(Builder::new().content_xml(ACTIVE).build().unwrap()).unwrap();
+    assert!(active.check_security(SecurityPolicy::default()).is_err());
+    let report = active
+        .check_security(SecurityPolicy {
+            allow_embedded_objects: true,
+            allow_external_resources: true,
+            allow_forms: true,
+            allow_scripts: false,
+            allow_signatures: false,
+        })
+        .unwrap();
+    assert_eq!(report.embedded_objects, 1);
+    assert_eq!(report.external_resources, 1);
+    assert_eq!(report.forms, 1);
 }
 
 #[test]

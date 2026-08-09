@@ -75,6 +75,31 @@ fn rewrite_preserves_unrelated_bytes_and_schema_order() {
 }
 
 #[test]
+fn changed_pretty_xml_is_compact_without_losing_text_whitespace() {
+    let source = format!(
+        concat!(
+            r#"<worksheet xmlns="{SML}">"#,
+            "\n  <sheetData><row r=\"1\"><c r=\"A1\" t=\"inlineStr\"><is>",
+            r#"<t xml:space="preserve"> </t>"#,
+            "</is></c></row></sheetData>\n",
+            "</worksheet>"
+        ),
+        SML = SML,
+    );
+    let mut value = PageBreaks::new();
+    value
+        .set_horizontal(Collection::horizontal([Break::new(1, 0, 1).unwrap()]).unwrap())
+        .unwrap();
+    let output = replace(source.as_bytes(), &value).unwrap();
+    assert!(!output.windows(2).any(|window| window == b">\n"));
+    assert!(
+        output
+            .windows(b"> </t>".len())
+            .any(|window| window == b"> </t>")
+    );
+}
+
+#[test]
 fn rejects_count_bounds_grid_and_unsafe_xml() {
     for body in [
         r#"<rowBreaks count="2"><brk/></rowBreaks>"#,

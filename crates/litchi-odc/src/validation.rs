@@ -1,13 +1,14 @@
 //! ODF 1.4 chart range and inert formula grammar checks.
-#![allow(
-    clippy::cognitive_complexity,
-    clippy::excessive_nesting,
-    clippy::shadow_reuse,
-    reason = "the validators mirror nested quote and delimiter grammar state"
-)]
 
 use crate::{Definition, Limits};
 use litchi_core::{Error, Result};
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum AddressKind {
+    Cell,
+    Column,
+    Row,
+}
 
 /// Validate a whitespace-separated ODF 1.4 cell-range-address list.
 ///
@@ -147,15 +148,21 @@ fn validate_range(value: &str) -> Result<()> {
             if find_unquoted(&value[index + 1..], b':')?.is_some() {
                 return invalid("ODC cell range contains more than one colon");
             }
-            validate_address(&value[..index])?;
-            validate_address(&value[index + 1..])?;
+            let start = validate_address(&value[..index])?;
+            let end = validate_address(&value[index + 1..])?;
+            if start != end {
+                return invalid("ODC range endpoints use different address kinds");
+            }
         },
-        None => validate_address(value)?,
+        None if validate_address(value)? != AddressKind::Cell => {
+            return invalid("ODC whole-row or whole-column address requires a range");
+        },
+        None => {},
     }
     Ok(())
 }
 
-fn validate_address(value: &str) -> Result<()> {
+fn validate_address(value: &str) -> Result<AddressKind> {
     if value.is_empty() {
         return invalid("ODC cell address is empty");
     }
@@ -170,15 +177,15 @@ fn validate_address(value: &str) -> Result<()> {
 }
 
 fn validate_table_name(value: &str) -> Result<()> {
-    let value = value.strip_prefix('$').unwrap_or(value);
-    if value.is_empty() {
+    let table_name = value.strip_prefix('$').unwrap_or(value);
+    if table_name.is_empty() {
         return Ok(());
     }
-    if value.starts_with('\'') {
-        if !value.ends_with('\'') || value.len() < 3 {
+    if table_name.starts_with('\'') {
+        if !table_name.ends_with('\'') || table_name.len() < 3 {
             return invalid("ODC quoted table name is incomplete");
         }
-        let inner = &value[1..value.len() - 1];
+        let inner = &table_name[1..table_name.len() - 1];
         let mut chars = inner.chars();
         while let Some(character) = chars.next() {
             if character == '\'' && chars.next() != Some('\'') {
@@ -187,7 +194,7 @@ fn validate_table_name(value: &str) -> Result<()> {
         }
         return Ok(());
     }
-    if value.chars().any(|character| {
+    if table_name.chars().any(|character| {
         character.is_whitespace()
             || matches!(character, '.' | '\'' | ':' | '[' | ']' | '#')
             || character.is_control()
@@ -197,22 +204,32 @@ fn validate_table_name(value: &str) -> Result<()> {
     Ok(())
 }
 
-fn validate_cell(value: &str) -> Result<()> {
+fn validate_cell(value: &str) -> Result<AddressKind> {
     let mut rest = value.strip_prefix('$').unwrap_or(value);
     let column_bytes = rest.bytes().take_while(u8::is_ascii_alphabetic).count();
-    if column_bytes == 0
-        || !rest[..column_bytes]
-            .bytes()
-            .all(|byte| byte.is_ascii_uppercase())
+    if column_bytes == 0 {
+        let row = rest.strip_prefix('$').unwrap_or(rest);
+        if row.is_empty() || row.starts_with('0') || !row.bytes().all(|byte| byte.is_ascii_digit())
+        {
+            return invalid("ODC row address must be a positive decimal integer");
+        }
+        return Ok(AddressKind::Row);
+    }
+    if !rest[..column_bytes]
+        .bytes()
+        .all(|byte| byte.is_ascii_uppercase())
     {
         return invalid("ODC cell column must contain uppercase ASCII letters");
     }
     rest = &rest[column_bytes..];
+    if rest.is_empty() {
+        return Ok(AddressKind::Column);
+    }
     rest = rest.strip_prefix('$').unwrap_or(rest);
     if rest.is_empty() || rest.starts_with('0') || !rest.bytes().all(|byte| byte.is_ascii_digit()) {
         return invalid("ODC cell row must be a positive decimal integer");
     }
-    Ok(())
+    Ok(AddressKind::Cell)
 }
 
 fn validate_formula_with_limit(value: &str, max_bytes: usize) -> Result<()> {
@@ -222,11 +239,11 @@ fn validate_formula_with_limit(value: &str, max_bytes: usize) -> Result<()> {
     if value.chars().any(char::is_control) {
         return invalid("ODC formula contains a control character");
     }
-    let expression = strip_formula_prefix(value)?;
-    let expression = expression
+    let prefixed_expression = strip_formula_prefix(value)?;
+    let expression = prefixed_expression
         .strip_prefix("==")
-        .or_else(|| expression.strip_prefix('='))
-        .unwrap_or(expression);
+        .or_else(|| prefixed_expression.strip_prefix('='))
+        .unwrap_or(prefixed_expression);
     if expression.trim().is_empty() {
         return invalid("ODC formula expression is empty");
     }

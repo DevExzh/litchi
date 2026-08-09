@@ -10,5 +10,11 @@ mod model;
 mod parse;
 mod transaction;
 
-pub use model::{Block, BlockKind, Blocks, Dialect, Error, ReadLimits, Snapshot};
-pub use transaction::{Commit, Diagnostics, Edit, Patch};
+pub use model::{
+    Block, BlockKind, Blocks, Dialect, Error, Inline, InlineKind, Inlines, ReadLimits, Reference,
+    ReferenceKind, References, Snapshot,
+};
+pub use transaction::{
+    Commit, Conflict, ConflictSet, Diagnostics, Edit, History, HistoryLimits, JoinError, MergePlan,
+    Patch, PatchEnvelopeLimits,
+};

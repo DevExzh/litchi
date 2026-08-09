@@ -5,8 +5,6 @@
 //! can be consumed by any format-owned shape parser into an identical
 //! [`CustomGeometry`].
 
-use std::fmt::Write as _;
-
 use litchi_core::xml::escape::escape_xml;
 
 use super::{
@@ -28,21 +26,23 @@ pub fn write_custom_geometry(xml: &mut String, geometry: &CustomGeometry) {
     if !geometry.connection_sites.is_empty() {
         xml.push_str("<a:cxnLst>");
         for site in &geometry.connection_sites {
-            let _ = write!(xml, r#"<a:cxn ang="{}">"#, value_attribute(&site.angle));
+            xml.push_str(&format!(
+                r#"<a:cxn ang="{}">"#,
+                value_attribute(&site.angle)
+            ));
             write_position(xml, &site.position);
             xml.push_str("</a:cxn>");
         }
         xml.push_str("</a:cxnLst>");
     }
     if let Some(rectangle) = &geometry.text_rectangle {
-        let _ = write!(
-            xml,
+        xml.push_str(&format!(
             r#"<a:rect l="{}" t="{}" r="{}" b="{}"/>"#,
             value_attribute(&rectangle.left),
             value_attribute(&rectangle.top),
             value_attribute(&rectangle.right),
             value_attribute(&rectangle.bottom)
-        );
+        ));
     }
     xml.push_str("<a:pathLst>");
     for path in &geometry.paths {
@@ -55,16 +55,15 @@ fn write_guide_list(xml: &mut String, tag: &str, guides: &[Guide]) {
     if guides.is_empty() {
         return;
     }
-    let _ = write!(xml, "<a:{tag}>");
+    xml.push_str(&format!("<a:{tag}>"));
     for guide in guides {
-        let _ = write!(
-            xml,
+        xml.push_str(&format!(
             r#"<a:gd name="{}" fmla="{}"/>"#,
             escape_xml(&guide.name),
             escape_xml(&guide.formula.to_string())
-        );
+        ));
     }
-    let _ = write!(xml, "</a:{tag}>");
+    xml.push_str(&format!("</a:{tag}>"));
 }
 
 fn write_adjust_handle(xml: &mut String, handle: &AdjustHandle) {
@@ -100,13 +99,13 @@ fn write_path(xml: &mut String, path: &Path) {
     let defaults = Path::default();
     xml.push_str("<a:path");
     if path.width != defaults.width {
-        let _ = write!(xml, r#" w="{}""#, path.width);
+        xml.push_str(&format!(r#" w="{}""#, path.width));
     }
     if path.height != defaults.height {
-        let _ = write!(xml, r#" h="{}""#, path.height);
+        xml.push_str(&format!(r#" h="{}""#, path.height));
     }
     if path.fill_mode != PathFillMode::Normal {
-        let _ = write!(xml, r#" fill="{}""#, path.fill_mode.as_str());
+        xml.push_str(&format!(r#" fill="{}""#, path.fill_mode.as_str()));
     }
     if path.stroked != defaults.stroked {
         xml.push_str(r#" stroke="0""#);
@@ -139,14 +138,13 @@ fn write_command(xml: &mut String, command: &PathCommand) {
             start_angle,
             swing_angle,
         } => {
-            let _ = write!(
-                xml,
+            xml.push_str(&format!(
                 r#"<a:arcTo wR="{}" hR="{}" stAng="{}" swAng="{}"/>"#,
                 value_attribute(width_radius),
                 value_attribute(height_radius),
                 value_attribute(start_angle),
                 value_attribute(swing_angle)
-            );
+            ));
         },
         PathCommand::QuadraticBezierTo { control, end } => {
             xml.push_str("<a:quadBezTo>");
@@ -170,32 +168,30 @@ fn write_command(xml: &mut String, command: &PathCommand) {
 }
 
 fn write_point(xml: &mut String, point: &Point) {
-    let _ = write!(
-        xml,
+    xml.push_str(&format!(
         r#"<a:pt x="{}" y="{}"/>"#,
         value_attribute(&point.x),
         value_attribute(&point.y)
-    );
+    ));
 }
 
 fn write_position(xml: &mut String, position: &Point) {
-    let _ = write!(
-        xml,
+    xml.push_str(&format!(
         r#"<a:pos x="{}" y="{}"/>"#,
         value_attribute(&position.x),
         value_attribute(&position.y)
-    );
+    ));
 }
 
 fn write_guide_reference(xml: &mut String, name: &str, reference: &Option<String>) {
     if let Some(reference) = reference {
-        let _ = write!(xml, r#" {name}="{}""#, escape_xml(reference));
+        xml.push_str(&format!(r#" {name}="{}""#, escape_xml(reference)));
     }
 }
 
 fn write_optional_value(xml: &mut String, name: &str, value: &Option<AdjustValue>) {
     if let Some(value) = value {
-        let _ = write!(xml, r#" {name}="{}""#, value_attribute(value));
+        xml.push_str(&format!(r#" {name}="{}""#, value_attribute(value)));
     }
 }
 

@@ -36,6 +36,8 @@ impl Revision {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ChangeKind {
     SlidesReordered,
+    SlideInserted,
+    SlideRemoved,
     MastersReordered,
     CustomTableStylesMoved,
     CustomTableStylesInserted,
@@ -48,6 +50,10 @@ pub enum ChangeKind {
 pub enum Change {
     /// Reorder slide groups while retaining each group's text and opaque atoms.
     SlidesReordered { before: Vec<u32>, after: Vec<u32> },
+    /// Insert one complete slide-list group at a semantic position.
+    SlideInserted { position: usize, group: Vec<Record> },
+    /// Remove one complete slide-list group at a semantic position.
+    SlideRemoved { position: usize, group: Vec<Record> },
     /// Reorder master reference groups.
     MastersReordered { before: Vec<u32>, after: Vec<u32> },
     /// Move an existing custom table-style atom around `EndDocumentAtom`.
@@ -79,6 +85,8 @@ impl Change {
     pub const fn kind(&self) -> ChangeKind {
         match self {
             Self::SlidesReordered { .. } => ChangeKind::SlidesReordered,
+            Self::SlideInserted { .. } => ChangeKind::SlideInserted,
+            Self::SlideRemoved { .. } => ChangeKind::SlideRemoved,
             Self::MastersReordered { .. } => ChangeKind::MastersReordered,
             Self::CustomTableStylesMoved { .. } => ChangeKind::CustomTableStylesMoved,
             Self::CustomTableStylesInserted { .. } => ChangeKind::CustomTableStylesInserted,
@@ -92,6 +100,14 @@ impl Change {
             Self::SlidesReordered { before, after } => Self::SlidesReordered {
                 before: after.clone(),
                 after: before.clone(),
+            },
+            Self::SlideInserted { position, group } => Self::SlideRemoved {
+                position: *position,
+                group: group.clone(),
+            },
+            Self::SlideRemoved { position, group } => Self::SlideInserted {
+                position: *position,
+                group: group.clone(),
             },
             Self::MastersReordered { before, after } => Self::MastersReordered {
                 before: after.clone(),
@@ -371,6 +387,82 @@ impl Transaction {
             .position(|slide| slide.slide_id() == slide_id)
             .ok_or_else(|| Error::InvalidFormat(format!("slide ID {slide_id} was not found")))?;
         self.move_slide(index, destination)
+    }
+
+    /// Returns one complete slide-list group without changing the candidate.
+    ///
+    /// The returned records begin with the selected `SlidePersistAtom` and
+    /// include every following outline-text record owned by that slide.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the position is absent or the slide list is
+    /// malformed.
+    pub fn slide_group(&self, position: usize) -> Result<Vec<Record>> {
+        let list_index = validation::list_index(&self.candidate, 0)?
+            .ok_or_else(|| Error::InvalidFormat("the presentation slide list is absent".into()))?;
+        grouped_children(&self.candidate.children[list_index])?
+            .groups
+            .get(position)
+            .cloned()
+            .ok_or_else(|| Error::InvalidFormat("slide position is out of range".into()))
+    }
+
+    /// Inserts one complete slide-list group at a zero-based position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the position is outside the insertion range, the
+    /// group does not begin with exactly one `SlidePersistAtom`, or the
+    /// resulting document violates identifier and outline-text invariants.
+    pub fn insert_slide_group(&mut self, position: usize, group: Vec<Record>) -> Result<()> {
+        validate_slide_group(&group)?;
+        let list_index = validation::list_index(&self.candidate, 0)?
+            .ok_or_else(|| Error::InvalidFormat("the presentation slide list is absent".into()))?;
+        let mut candidate = self.candidate.clone();
+        let groups = grouped_children_allow_empty(&candidate.children[list_index])?;
+        if position > groups.groups.len() {
+            return invalid("slide insertion position is out of range");
+        }
+        let mut reordered = groups.groups;
+        reordered.insert(position, group.clone());
+        let mut children = groups.prefix;
+        for owned_group in reordered {
+            children.extend(owned_group);
+        }
+        candidate.children[list_index].children = children;
+        self.publish_candidate(candidate)?;
+        self.changes.push(Change::SlideInserted { position, group });
+        Ok(())
+    }
+
+    /// Removes and returns one complete slide-list group.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the position is absent or publication would
+    /// violate the document invariants.
+    pub fn remove_slide(&mut self, position: usize) -> Result<Vec<Record>> {
+        let list_index = validation::list_index(&self.candidate, 0)?
+            .ok_or_else(|| Error::InvalidFormat("the presentation slide list is absent".into()))?;
+        let mut candidate = self.candidate.clone();
+        let groups = grouped_children(&candidate.children[list_index])?;
+        if position >= groups.groups.len() {
+            return invalid("slide position is out of range");
+        }
+        let mut reordered = groups.groups;
+        let removed = reordered.remove(position);
+        let mut children = groups.prefix;
+        for owned_group in reordered {
+            children.extend(owned_group);
+        }
+        candidate.children[list_index].children = children;
+        self.publish_candidate(candidate)?;
+        self.changes.push(Change::SlideRemoved {
+            position,
+            group: removed.clone(),
+        });
+        Ok(removed)
     }
 
     /// Reorder all slide groups using a checked permutation of current positions.
@@ -850,6 +942,33 @@ fn grouped_children(list: &Record) -> Result<Groups> {
         prefix: list.children[..starts[0]].to_vec(),
         groups,
     })
+}
+
+fn grouped_children_allow_empty(list: &Record) -> Result<Groups> {
+    let has_slide = list
+        .children
+        .iter()
+        .any(|child| child.record_type == RecordType::SlidePersistAtom);
+    if has_slide {
+        grouped_children(list)
+    } else {
+        Ok(Groups {
+            prefix: list.children.clone(),
+            groups: Vec::new(),
+        })
+    }
+}
+
+fn validate_slide_group(group: &[Record]) -> Result<()> {
+    if group.first().map(|record| record.record_type) != Some(RecordType::SlidePersistAtom)
+        || group
+            .iter()
+            .skip(1)
+            .any(|record| record.record_type == RecordType::SlidePersistAtom)
+    {
+        return invalid("slide group must begin with exactly one SlidePersistAtom");
+    }
+    Ok(())
 }
 
 fn validate_permutation(order: &[usize], expected: usize) -> Result<()> {

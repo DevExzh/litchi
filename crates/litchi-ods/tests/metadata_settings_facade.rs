@@ -1,10 +1,11 @@
+mod support;
+
 use litchi_core::Metadata;
 use litchi_odf_common::calculation::{Iteration, IterationStatus, Settings};
-use litchi_odf_common::core::{OwnedPackage, PackageWriter};
+use litchi_odf_common::core::OwnedPackage;
 use litchi_ods::{Builder, MutableSpreadsheet, Spreadsheet};
 use std::num::NonZeroUsize;
 
-const MIMETYPE: &str = "application/vnd.oasis.opendocument.spreadsheet";
 const CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <office:document-content
     xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
@@ -106,7 +107,7 @@ fn facade_round_trips_typed_metadata_and_calculation_settings() {
     let archive = OwnedPackage::from_bytes(output).unwrap();
     assert_eq!(
         archive.get_file("settings.xml").unwrap(),
-        SETTINGS.as_bytes()
+        support::compact_xml_fixture(SETTINGS).as_bytes()
     );
 
     let mut clear = MutableSpreadsheet::from_bytes(package(CONTENT, Some(META), None)).unwrap();
@@ -175,16 +176,15 @@ fn malformed_metadata_and_settings_are_rejected_at_package_boundary() {
 }
 
 fn package(content: &str, metadata: Option<&str>, settings: Option<&str>) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
-    writer.set_mimetype(MIMETYPE).unwrap();
-    writer.add_file("content.xml", content.as_bytes()).unwrap();
-    if let Some(metadata) = metadata {
-        writer.add_file("meta.xml", metadata.as_bytes()).unwrap();
+    let compact_content = support::compact_xml_fixture(content);
+    let compact_metadata = metadata.map(support::compact_xml_fixture);
+    let compact_settings = settings.map(support::compact_xml_fixture);
+    let mut entries = vec![("content.xml", compact_content.as_bytes(), "text/xml")];
+    if let Some(metadata) = compact_metadata.as_deref() {
+        entries.push(("meta.xml", metadata.as_bytes(), "text/xml"));
     }
-    if let Some(settings) = settings {
-        writer
-            .add_file("settings.xml", settings.as_bytes())
-            .unwrap();
+    if let Some(settings) = compact_settings.as_deref() {
+        entries.push(("settings.xml", settings.as_bytes(), "text/xml"));
     }
-    writer.finish_to_bytes().unwrap()
+    support::raw_package(&entries)
 }

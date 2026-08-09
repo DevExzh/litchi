@@ -5,7 +5,6 @@ use litchi_core::{
     HistoryLimits, Patch as CorePatch, PatchLimits, PatchOperation, Position, Result, Reversible,
     ReversibleOperation,
 };
-use litchi_odf_common::core::{MetaXmlPatch, metadata::Metadata as OdfMetadata, patch_meta_xml};
 use serde_json::Value;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -13,6 +12,11 @@ use std::{
 };
 
 use crate::{Master, link::Selector};
+
+pub use crate::edit_ops::{
+    ResourceChange, ResourceSpec, SectionChange, SectionSpec, SecurityPolicy, StyleChange,
+    StyleSpec,
+};
 
 const MAX_PACKAGE_BYTES: usize = 256 * 1024 * 1024;
 const MAX_WIRE_JSON_BYTES: usize = 768 * 1024 * 1024;
@@ -27,16 +31,30 @@ pub struct Edit<'source> {
     title_before: Option<String>,
     title_after: Option<String>,
     links: BTreeMap<usize, String>,
+    metadata: Option<litchi_core::Metadata>,
+    sections: Vec<SectionChange>,
+    styles: Vec<StyleChange>,
+    resources: BTreeMap<String, ResourceChange>,
+    policy: SecurityPolicy,
 }
 
 impl<'source> Edit<'source> {
     pub(crate) fn new(source: &'source Master) -> Self {
+        Self::with_policy(source, SecurityPolicy::default())
+    }
+
+    pub(crate) fn with_policy(source: &'source Master, policy: SecurityPolicy) -> Self {
         let title = source.title().map(str::to_owned);
         Self {
             source,
             title_before: title.clone(),
             title_after: title,
             links: BTreeMap::new(),
+            metadata: None,
+            sections: Vec::new(),
+            styles: Vec::new(),
+            resources: BTreeMap::new(),
+            policy,
         }
     }
 
@@ -81,20 +99,252 @@ impl<'source> Edit<'source> {
         let reference = resolve(self.source, selector.into())?;
         let href = href.into();
         crate::link::validate_href(&href)?;
+        if !self.policy.allows_external_targets() && is_external_target(&href) {
+            return Err(invalid(
+                "ODM security policy refuses an external link target",
+            ));
+        }
         self.links.insert(reference.get(), href);
         Ok(self)
     }
 
-    /// Publishes every staged title/link effect as one fully reopened package.
+    /// Stages the five mutable simple metadata fields: title, author, subject,
+    /// description, and keywords. Other fields remain source-preserved.
     ///
     /// # Errors
     ///
-    /// Returns an error for signed/encrypted input, non-compact package XML,
-    /// invalid metadata, or semantic readback which differs from the request.
+    /// Returns an error when a staged text field violates XML bounds.
+    pub fn set_metadata(&mut self, metadata: litchi_core::Metadata) -> Result<&mut Self> {
+        for (value, scope) in [
+            (metadata.title.as_deref(), "ODM metadata title"),
+            (metadata.author.as_deref(), "ODM metadata author"),
+            (metadata.subject.as_deref(), "ODM metadata subject"),
+            (metadata.description.as_deref(), "ODM metadata description"),
+            (metadata.keywords.as_deref(), "ODM metadata keywords"),
+        ] {
+            if let Some(value) = value {
+                crate::edit_ops::validate_value(value, scope, true)?;
+            }
+        }
+        self.title_after.clone_from(&metadata.title);
+        self.metadata = Some(metadata);
+        Ok(self)
+    }
+
+    /// Stages insertion of an empty root section.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a duplicate section name or missing style.
+    pub fn add_section(&mut self, section: SectionSpec) -> Result<&mut Self> {
+        if section_name_exists(self.source, &self.sections, section.name()) {
+            return Err(invalid("ODM section destination name already exists"));
+        }
+        if let Some(style_name) = section.style_name()
+            && !style_name_exists(self.source, &self.styles, style_name)
+        {
+            return Err(invalid("ODM section style does not exist"));
+        }
+        self.sections.push(SectionChange::Add(section));
+        Ok(self)
+    }
+
+    /// Renames one source section and its modeled local-section references.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a stale selector or duplicate destination name.
+    pub fn rename_section(
+        &mut self,
+        position: Position,
+        name: impl Into<String>,
+    ) -> Result<&mut Self> {
+        let name = name.into();
+        crate::edit_ops::validate_value(&name, "ODM section name", false)?;
+        let before = self
+            .source
+            .section_tree()
+            .get(position)
+            .ok_or_else(|| invalid("ODM section selector is out of bounds"))?
+            .name()
+            .to_owned();
+        if before != name && section_name_exists(self.source, &self.sections, &name) {
+            return Err(invalid("ODM section destination name already exists"));
+        }
+        ensure_section_not_staged(&self.sections, position)?;
+        self.sections.push(SectionChange::Rename {
+            position,
+            before,
+            after: name,
+        });
+        Ok(self)
+    }
+
+    /// Removes one section subtree when no modeled local reference targets it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a stale selector, overlapping intent, or incoming
+    /// local-section dependency.
+    pub fn remove_section(&mut self, position: Position) -> Result<&mut Self> {
+        let before = self
+            .source
+            .section_tree()
+            .get(position)
+            .ok_or_else(|| invalid("ODM section selector is out of bounds"))?
+            .name()
+            .to_owned();
+        ensure_section_not_staged(&self.sections, position)?;
+        self.sections
+            .push(SectionChange::Remove { position, before });
+        Ok(self)
+    }
+
+    /// Adds one minimal named style definition.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a duplicate style identity.
+    pub fn add_style(&mut self, style: StyleSpec) -> Result<&mut Self> {
+        if style_name_exists(self.source, &self.styles, style.name()) {
+            return Err(invalid("ODM style destination name already exists"));
+        }
+        self.styles.push(StyleChange::Add(style));
+        Ok(self)
+    }
+
+    /// Renames one style and every modeled style-name/parent-style-name use.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing/ambiguous source or duplicate destination.
+    pub fn rename_style(
+        &mut self,
+        origin: crate::style::Origin,
+        before: impl Into<String>,
+        after: impl Into<String>,
+    ) -> Result<&mut Self> {
+        let before = before.into();
+        let after = after.into();
+        crate::edit_ops::validate_value(&after, "ODM style name", false)?;
+        resolve_style(self.source, origin, &before)?;
+        if before != after && style_name_exists(self.source, &self.styles, &after) {
+            return Err(invalid("ODM style destination name already exists"));
+        }
+        self.styles.push(StyleChange::Rename {
+            origin,
+            before,
+            after,
+        });
+        Ok(self)
+    }
+
+    /// Removes one unreferenced style definition.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing/ambiguous style or dependency block.
+    pub fn remove_style(
+        &mut self,
+        origin: crate::style::Origin,
+        name: impl Into<String>,
+    ) -> Result<&mut Self> {
+        let name = name.into();
+        resolve_style(self.source, origin, &name)?;
+        self.styles.push(StyleChange::Remove { origin, name });
+        Ok(self)
+    }
+
+    /// Adds or replaces one inert package resource.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the explicit resource byte policy is exceeded.
+    pub fn put_resource(&mut self, resource: ResourceSpec) -> Result<&mut Self> {
+        if resource.bytes().len() > self.policy.max_resource_bytes() {
+            return Err(invalid(
+                "ODM resource exceeds the transaction security policy",
+            ));
+        }
+        self.resources
+            .insert(resource.path().to_owned(), ResourceChange::Put(resource));
+        Ok(self)
+    }
+
+    /// Removes an unreferenced inert package resource.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the path is absent. Final dependency validation
+    /// also refuses a resource still targeted by a linked section.
+    pub fn remove_resource(&mut self, path: impl Into<String>) -> Result<&mut Self> {
+        let path = path.into();
+        if !self
+            .source
+            .resources()
+            .resources()
+            .iter()
+            .any(|resource| resource.path() == path)
+        {
+            return Err(invalid("ODM resource path was not found"));
+        }
+        let resource = self
+            .source
+            .resources()
+            .resources()
+            .iter()
+            .find(|resource| resource.path() == path)
+            .ok_or_else(|| invalid("ODM resource path was not found"))?;
+        let previous = ResourceSpec::new(
+            path.clone(),
+            resource.media_type().unwrap_or("application/octet-stream"),
+            self.source.resource_bytes(&path)?,
+        )?;
+        self.resources
+            .insert(path, ResourceChange::Remove(previous));
+        Ok(self)
+    }
+
+    /// Copies one inert resource from another immutable master snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an absent source path or policy violation.
+    pub fn transfer_resource(
+        &mut self,
+        source: &Master,
+        source_path: &str,
+        destination_path: impl Into<String>,
+    ) -> Result<&mut Self> {
+        let resource = source
+            .resources()
+            .resources()
+            .iter()
+            .find(|resource| resource.path() == source_path)
+            .ok_or_else(|| invalid("ODM transfer source resource was not found"))?;
+        let spec = ResourceSpec::new(
+            destination_path,
+            resource.media_type().unwrap_or("application/octet-stream"),
+            source.resource_bytes(source_path)?,
+        )?;
+        self.put_resource(spec)
+    }
+
+    /// Publishes every staged effect as one fully reopened package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for signed/encrypted input, invalid staged data, or
+    /// semantic readback which differs from the request.
     pub fn commit(self) -> Result<Commit> {
         let title_changed = self.title_before != self.title_after;
+        let explicit_metadata = self.metadata.is_some();
         let link_changes = collect_link_changes(self.source, &self.links)?;
-        if !title_changed && link_changes.is_empty() {
+        let extended_changed = self.metadata.is_some()
+            || !self.sections.is_empty()
+            || !self.styles.is_empty()
+            || !self.resources.is_empty();
+        if !title_changed && link_changes.is_empty() && !extended_changed {
             return Ok(Commit::new(
                 self.source,
                 self.source.clone(),
@@ -102,20 +352,61 @@ impl<'source> Edit<'source> {
             ));
         }
 
-        let meta_xml = if title_changed {
-            Some(stage_title(self.source, self.title_after.as_deref())?)
+        let requested_metadata = if let Some(metadata) = self.metadata {
+            Some(metadata)
+        } else if title_changed {
+            let mut metadata = self.source.metadata().cloned().unwrap_or_default();
+            metadata.title.clone_from(&self.title_after);
+            Some(metadata)
         } else {
             None
         };
-        let mut content_xml = self.source.content_xml().to_owned();
-        for change in link_changes.iter().rev() {
-            let span = self
-                .source
-                .href_span(change.reference.get())
-                .ok_or_else(|| invalid("ODM linked-section source span is missing"))?;
-            content_xml = crate::link::replace_attribute_value(&content_xml, span, &change.after)?;
+        let meta_xml = requested_metadata
+            .as_ref()
+            .map(|metadata| crate::edit_ops::stage_metadata(self.source, metadata))
+            .transpose()?;
+        let staged_links = link_changes
+            .iter()
+            .map(|change| (change.reference, change.after.clone()))
+            .collect::<Vec<_>>();
+        let parts =
+            crate::edit_ops::mutate_xml(self.source, &staged_links, &self.sections, &self.styles)?;
+        let mut removed_resources = Vec::new();
+        let mut resource_writes = Vec::new();
+        removed_resources
+            .try_reserve(self.resources.len())
+            .map_err(|source| Error::Allocation {
+                resource: "ODM removed resources",
+                source,
+            })?;
+        resource_writes
+            .try_reserve(self.resources.len())
+            .map_err(|source| Error::Allocation {
+                resource: "ODM resource writes",
+                source,
+            })?;
+        for change in self.resources.values() {
+            match change {
+                ResourceChange::Put(resource) => {
+                    resource_writes.push(crate::package::ResourceWrite {
+                        path: resource.path().to_owned(),
+                        media_type: resource.media_type().to_owned(),
+                        bytes: resource.bytes().to_vec(),
+                    });
+                },
+                ResourceChange::Remove(resource) => {
+                    removed_resources.push(resource.path().to_owned());
+                },
+            }
         }
-        let snapshot = self.source.with_parts(&content_xml, meta_xml.as_deref())?;
+        ensure_removed_resources_are_unreferenced(&parts.content, &removed_resources)?;
+        let snapshot = self.source.with_transaction_parts(
+            &parts.content,
+            parts.styles.as_deref(),
+            meta_xml.as_deref(),
+            &removed_resources,
+            &resource_writes,
+        )?;
         if snapshot.title() != self.title_after.as_deref() {
             return Err(invalid(
                 "ODM transaction title readback differs from the request",
@@ -132,6 +423,17 @@ impl<'source> Edit<'source> {
                 ));
             }
         }
+        if let Some(requested) = &requested_metadata {
+            let actual = snapshot
+                .metadata()
+                .ok_or_else(|| invalid("ODM transaction metadata disappeared during readback"))?;
+            if !simple_metadata_equal(actual, requested) {
+                return Err(invalid(
+                    "ODM transaction metadata readback differs from the request",
+                ));
+            }
+        }
+        verify_extended_readback(&snapshot, &self.sections, &self.styles, &self.resources)?;
         let title = title_changed.then_some(TitleChange {
             before: self.title_before,
             after: self.title_after,
@@ -142,6 +444,17 @@ impl<'source> Edit<'source> {
             ChangeSet {
                 title,
                 links: link_changes,
+                metadata: if explicit_metadata {
+                    requested_metadata.map(|after| MetadataChange {
+                        before: self.source.metadata().cloned().unwrap_or_default(),
+                        after,
+                    })
+                } else {
+                    None
+                },
+                sections: self.sections,
+                styles: self.styles,
+                resources: self.resources.into_values().collect(),
             },
         ))
     }
@@ -197,10 +510,14 @@ impl LinkChange {
 }
 
 /// Ordered semantic effects retained by a unified patch.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default)]
 pub struct ChangeSet {
     title: Option<TitleChange>,
     links: Vec<LinkChange>,
+    metadata: Option<MetadataChange>,
+    sections: Vec<SectionChange>,
+    styles: Vec<StyleChange>,
+    resources: Vec<ResourceChange>,
 }
 
 impl ChangeSet {
@@ -216,10 +533,60 @@ impl ChangeSet {
         &self.links
     }
 
+    /// Returns the simple metadata effect, when present.
+    #[must_use]
+    pub const fn metadata(&self) -> Option<&MetadataChange> {
+        self.metadata.as_ref()
+    }
+
+    /// Returns section-tree effects in staging order.
+    #[must_use]
+    pub fn sections(&self) -> &[SectionChange] {
+        &self.sections
+    }
+
+    /// Returns style-catalog effects in staging order.
+    #[must_use]
+    pub fn styles(&self) -> &[StyleChange] {
+        &self.styles
+    }
+
+    /// Returns resource effects in path order.
+    #[must_use]
+    pub fn resources(&self) -> &[ResourceChange] {
+        &self.resources
+    }
+
     /// Returns whether this set contains no semantic effect.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.title.is_none() && self.links.is_empty()
+        self.title.is_none()
+            && self.links.is_empty()
+            && self.metadata.is_none()
+            && self.sections.is_empty()
+            && self.styles.is_empty()
+            && self.resources.is_empty()
+    }
+}
+
+/// Before/after common metadata retained by a transaction.
+#[derive(Clone, Debug)]
+pub struct MetadataChange {
+    before: litchi_core::Metadata,
+    after: litchi_core::Metadata,
+}
+
+impl MetadataChange {
+    /// Returns the source metadata projection.
+    #[must_use]
+    pub const fn before(&self) -> &litchi_core::Metadata {
+        &self.before
+    }
+
+    /// Returns the published metadata projection.
+    #[must_use]
+    pub const fn after(&self) -> &litchi_core::Metadata {
+        &self.after
     }
 }
 
@@ -334,6 +701,28 @@ impl Patch {
             .map_err(MergeError::Invalid)
     }
 
+    /// Builds a non-mutating same-base three-way plan.
+    ///
+    /// The exact common source is the base and the two patches are branches.
+    /// Planning never publishes package bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the branches do not share an exact base or
+    /// conflict discovery cannot allocate within process limits.
+    pub fn plan_three_way(&self, other: &Self) -> std::result::Result<MergePlan, MergeError> {
+        if self.before.as_slice() != other.before.as_slice() {
+            return Err(MergeError::DifferentSource);
+        }
+        let conflicts =
+            find_conflicts(&self.changes, &other.changes).map_err(MergeError::Invalid)?;
+        Ok(MergePlan {
+            left: self.clone(),
+            right: other.clone(),
+            conflicts: ConflictSet::new(conflicts),
+        })
+    }
+
     /// Converts this patch to bounded canonical deterministic JSON.
     ///
     /// # Errors
@@ -345,6 +734,39 @@ impl Patch {
     }
 }
 
+/// Non-mutating three-way plan over one exact source and two branches.
+pub struct MergePlan {
+    left: Patch,
+    right: Patch,
+    conflicts: ConflictSet<Conflict>,
+}
+
+impl MergePlan {
+    /// Returns deterministic overlap details without publishing a candidate.
+    #[must_use]
+    pub const fn conflicts(&self) -> &ConflictSet<Conflict> {
+        &self.conflicts
+    }
+
+    /// Returns whether automatic commit is currently possible.
+    #[must_use]
+    pub fn can_commit(&self) -> bool {
+        self.conflicts.is_empty()
+    }
+
+    /// Publishes the already-planned disjoint effects with full reopen.
+    ///
+    /// # Errors
+    ///
+    /// Returns the retained conflicts or a candidate validation failure.
+    pub fn commit(self) -> std::result::Result<Patch, MergeError> {
+        if !self.conflicts.is_empty() {
+            return Err(MergeError::Conflicts(self.conflicts));
+        }
+        self.left.merge(&self.right)
+    }
+}
+
 /// One semantic write target which prevented an automatic merge.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -353,6 +775,14 @@ pub enum Conflict {
     Title,
     /// Both patches write one link to different targets.
     Link(Position),
+    /// Both patches write simple metadata differently.
+    Metadata,
+    /// Both patches structurally write one source section.
+    Section(Position),
+    /// Both patches write one style identity.
+    Style(String),
+    /// Both patches write one package resource path.
+    Resource(String),
 }
 
 /// A unified-patch merge failure.
@@ -569,6 +999,181 @@ fn resolve(source: &Master, selector: Selector<'_>) -> Result<Position> {
     }
 }
 
+fn is_external_target(href: &str) -> bool {
+    href.is_empty()
+        || href.starts_with('/')
+        || href.starts_with('\\')
+        || href.contains('\\')
+        || href.contains(':')
+        || href
+            .split('/')
+            .any(|segment| segment.is_empty() || matches!(segment, "." | ".."))
+}
+
+fn section_name_exists(source: &Master, staged: &[SectionChange], name: &str) -> bool {
+    source
+        .section_tree()
+        .sections()
+        .iter()
+        .any(|section| section.name() == name)
+        || staged.iter().any(|change| match change {
+            SectionChange::Add(section) => section.name() == name,
+            SectionChange::Rename { after, .. } => after == name,
+            SectionChange::Remove { .. } => false,
+        })
+}
+
+fn ensure_section_not_staged(staged: &[SectionChange], position: Position) -> Result<()> {
+    if staged.iter().any(|change| match change {
+        SectionChange::Rename {
+            position: selected, ..
+        }
+        | SectionChange::Remove {
+            position: selected, ..
+        } => *selected == position,
+        SectionChange::Add(_) => false,
+    }) {
+        return Err(invalid(
+            "ODM section already has a staged structural intent",
+        ));
+    }
+    Ok(())
+}
+
+fn style_name_exists(source: &Master, staged: &[StyleChange], name: &str) -> bool {
+    source.styles().iter().any(|style| style.name() == name)
+        || staged.iter().any(|change| match change {
+            StyleChange::Add(style) => style.name() == name,
+            StyleChange::Rename { after, .. } => after == name,
+            StyleChange::Remove { .. } => false,
+        })
+}
+
+fn resolve_style(source: &Master, origin: crate::style::Origin, name: &str) -> Result<()> {
+    let count = source
+        .styles()
+        .iter()
+        .filter(|style| style.origin() == origin && style.name() == name)
+        .count();
+    match count {
+        1 => Ok(()),
+        0 => Err(invalid("ODM style selector was not found")),
+        _ => Err(invalid("ODM style selector is ambiguous")),
+    }
+}
+
+fn ensure_removed_resources_are_unreferenced(content: &str, removed: &[String]) -> Result<()> {
+    if removed.is_empty() {
+        return Ok(());
+    }
+    let semantics = crate::codec::parse(content)?;
+    if semantics
+        .references()
+        .iter()
+        .any(|reference| removed.iter().any(|path| path == reference.href()))
+    {
+        return Err(invalid(
+            "ODM resource removal is blocked by a linked-section dependency",
+        ));
+    }
+    Ok(())
+}
+
+fn simple_metadata_equal(left: &litchi_core::Metadata, right: &litchi_core::Metadata) -> bool {
+    left.title == right.title
+        && left.author == right.author
+        && left.subject == right.subject
+        && left.description == right.description
+        && left.keywords == right.keywords
+}
+
+fn verify_extended_readback(
+    snapshot: &Master,
+    sections: &[SectionChange],
+    styles: &[StyleChange],
+    resources: &BTreeMap<String, ResourceChange>,
+) -> Result<()> {
+    for change in sections {
+        match change {
+            SectionChange::Add(section) => {
+                if !snapshot
+                    .section_tree()
+                    .sections()
+                    .iter()
+                    .any(|node| node.name() == section.name())
+                {
+                    return Err(invalid("ODM added section failed semantic readback"));
+                }
+            },
+            SectionChange::Rename { before, after, .. } => {
+                let names = snapshot.section_tree().sections();
+                if names.iter().any(|node| node.name() == before)
+                    || !names.iter().any(|node| node.name() == after)
+                {
+                    return Err(invalid("ODM renamed section failed semantic readback"));
+                }
+            },
+            SectionChange::Remove { before, .. } => {
+                if snapshot
+                    .section_tree()
+                    .sections()
+                    .iter()
+                    .any(|node| node.name() == before)
+                {
+                    return Err(invalid("ODM removed section failed semantic readback"));
+                }
+            },
+        }
+    }
+    for change in styles {
+        match change {
+            StyleChange::Add(style) => {
+                if !snapshot.styles().iter().any(|definition| {
+                    definition.origin() == style.origin() && definition.name() == style.name()
+                }) {
+                    return Err(invalid("ODM added style failed semantic readback"));
+                }
+            },
+            StyleChange::Rename {
+                origin,
+                before,
+                after,
+            } => {
+                if snapshot
+                    .styles()
+                    .iter()
+                    .any(|definition| definition.origin() == *origin && definition.name() == before)
+                    || !snapshot.styles().iter().any(|definition| {
+                        definition.origin() == *origin && definition.name() == after
+                    })
+                {
+                    return Err(invalid("ODM renamed style failed semantic readback"));
+                }
+            },
+            StyleChange::Remove { origin, name } => {
+                if snapshot
+                    .styles()
+                    .iter()
+                    .any(|definition| definition.origin() == *origin && definition.name() == name)
+                {
+                    return Err(invalid("ODM removed style failed semantic readback"));
+                }
+            },
+        }
+    }
+    for (path, change) in resources {
+        let present = snapshot
+            .resources()
+            .resources()
+            .iter()
+            .any(|resource| resource.path() == path);
+        if matches!(change, ResourceChange::Put(_)) != present {
+            return Err(invalid("ODM resource operation failed semantic readback"));
+        }
+    }
+    Ok(())
+}
+
 fn collect_link_changes(
     source: &Master,
     staged: &BTreeMap<usize, String>,
@@ -597,18 +1202,6 @@ fn collect_link_changes(
     Ok(changes)
 }
 
-fn stage_title(source: &Master, after: Option<&str>) -> Result<String> {
-    let source_xml = source
-        .meta_xml()?
-        .ok_or_else(|| invalid("ODM title editing requires an existing UTF-8 meta.xml part"))?;
-    let metadata = OdfMetadata::from_xml(&source_xml)?;
-    let mut changed = litchi_core::Metadata::from(metadata.clone());
-    changed.title = after.map(str::to_owned);
-    let patch = MetaXmlPatch::preserve_all().diff_simple_fields(&metadata, &changed);
-    patch_meta_xml(&source_xml, &patch)?
-        .ok_or_else(|| invalid("ODM title editing requires an office:meta container"))
-}
-
 fn inverse_changes(changes: &ChangeSet) -> ChangeSet {
     ChangeSet {
         title: changes.title.as_ref().map(|change| TitleChange {
@@ -622,6 +1215,50 @@ fn inverse_changes(changes: &ChangeSet) -> ChangeSet {
                 reference: change.reference,
                 before: change.after.clone(),
                 after: change.before.clone(),
+            })
+            .collect(),
+        metadata: changes.metadata.as_ref().map(|change| MetadataChange {
+            before: change.after.clone(),
+            after: change.before.clone(),
+        }),
+        sections: changes
+            .sections
+            .iter()
+            .filter_map(|change| match change {
+                SectionChange::Rename {
+                    position,
+                    before,
+                    after,
+                } => Some(SectionChange::Rename {
+                    position: *position,
+                    before: after.clone(),
+                    after: before.clone(),
+                }),
+                SectionChange::Add(_) | SectionChange::Remove { .. } => None,
+            })
+            .collect(),
+        styles: changes
+            .styles
+            .iter()
+            .filter_map(|change| match change {
+                StyleChange::Rename {
+                    origin,
+                    before,
+                    after,
+                } => Some(StyleChange::Rename {
+                    origin: *origin,
+                    before: after.clone(),
+                    after: before.clone(),
+                }),
+                StyleChange::Add(_) | StyleChange::Remove { .. } => None,
+            })
+            .collect(),
+        resources: changes
+            .resources
+            .iter()
+            .map(|change| match change {
+                ResourceChange::Put(resource) => ResourceChange::Remove(resource.clone()),
+                ResourceChange::Remove(resource) => ResourceChange::Put(resource.clone()),
             })
             .collect(),
     }
@@ -658,10 +1295,73 @@ fn find_conflicts(left: &ChangeSet, right: &ChangeSet) -> Result<Vec<Conflict>> 
             conflicts.push(Conflict::Link(change.reference));
         }
     }
+    if let (Some(left), Some(right)) = (&left.metadata, &right.metadata)
+        && !simple_metadata_equal(&left.after, &right.after)
+    {
+        conflicts.push(Conflict::Metadata);
+    }
+    for left_change in &left.sections {
+        for right_change in &right.sections {
+            if let (Some(left_position), Some(right_position)) = (
+                section_change_position(left_change),
+                section_change_position(right_change),
+            ) && left_position == right_position
+                && left_change != right_change
+            {
+                conflicts.push(Conflict::Section(left_position));
+            }
+        }
+    }
+    for left_change in &left.styles {
+        for right_change in &right.styles {
+            if style_change_key(left_change) == style_change_key(right_change)
+                && left_change != right_change
+            {
+                conflicts.push(Conflict::Style(style_change_key(left_change).to_owned()));
+            }
+        }
+    }
+    for left_change in &left.resources {
+        for right_change in &right.resources {
+            if resource_change_path(left_change) == resource_change_path(right_change)
+                && left_change != right_change
+            {
+                conflicts.push(Conflict::Resource(
+                    resource_change_path(left_change).to_owned(),
+                ));
+            }
+        }
+    }
     Ok(conflicts)
 }
 
+fn section_change_position(change: &SectionChange) -> Option<Position> {
+    match change {
+        SectionChange::Rename { position, .. } | SectionChange::Remove { position, .. } => {
+            Some(*position)
+        },
+        SectionChange::Add(_) => None,
+    }
+}
+
+fn style_change_key(change: &StyleChange) -> &str {
+    match change {
+        StyleChange::Add(spec) => spec.name(),
+        StyleChange::Rename { before, .. } => before,
+        StyleChange::Remove { name, .. } => name,
+    }
+}
+
+fn resource_change_path(change: &ResourceChange) -> &str {
+    match change {
+        ResourceChange::Put(spec) | ResourceChange::Remove(spec) => spec.path(),
+    }
+}
+
 fn stage_changes(edit: &mut Edit<'_>, changes: &ChangeSet) -> Result<()> {
+    if let Some(metadata) = &changes.metadata {
+        edit.set_metadata(metadata.after.clone())?;
+    }
     if let Some(title) = &changes.title {
         if let Some(after) = &title.after {
             edit.set_title(after.clone())?;
@@ -671,6 +1371,48 @@ fn stage_changes(edit: &mut Edit<'_>, changes: &ChangeSet) -> Result<()> {
     }
     for link in &changes.links {
         edit.set_link(link.reference, link.after.clone())?;
+    }
+    for section in &changes.sections {
+        match section {
+            SectionChange::Add(spec) => {
+                edit.add_section(spec.clone())?;
+            },
+            SectionChange::Rename {
+                position, after, ..
+            } => {
+                edit.rename_section(*position, after.clone())?;
+            },
+            SectionChange::Remove { position, .. } => {
+                edit.remove_section(*position)?;
+            },
+        }
+    }
+    for style in &changes.styles {
+        match style {
+            StyleChange::Add(spec) => {
+                edit.add_style(spec.clone())?;
+            },
+            StyleChange::Rename {
+                origin,
+                before,
+                after,
+            } => {
+                edit.rename_style(*origin, before.clone(), after.clone())?;
+            },
+            StyleChange::Remove { origin, name } => {
+                edit.remove_style(*origin, name.clone())?;
+            },
+        }
+    }
+    for resource in &changes.resources {
+        match resource {
+            ResourceChange::Put(spec) => {
+                edit.put_resource(spec.clone())?;
+            },
+            ResourceChange::Remove(spec) => {
+                edit.remove_resource(spec.path().to_owned())?;
+            },
+        }
     }
     Ok(())
 }

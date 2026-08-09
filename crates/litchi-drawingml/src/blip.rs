@@ -7,6 +7,10 @@ use quick_xml::{Reader, events::BytesStart, events::Event};
 use crate::{Error, Result};
 
 /// Write an embedded-image reference, escaping the relationship ID.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn write_embed(xml: &mut String, relationship_id: &str, include_xmlns_r: bool) -> fmt::Result {
     let relationship_id = quick_xml::escape::escape(relationship_id);
     if include_xmlns_r {
@@ -20,6 +24,10 @@ pub fn write_embed(xml: &mut String, relationship_id: &str, include_xmlns_r: boo
 }
 
 /// Write an `rIdN` embedded-image reference without allocating the ID.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn write_embed_id(
     xml: &mut String,
     relationship_number: u32,
@@ -36,6 +44,10 @@ pub fn write_embed_id(
 }
 
 /// Read an embedded relationship ID from a `blip` start element.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn read_embed(element: &BytesStart<'_>) -> Result<Option<String>> {
     for attribute in element.attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
@@ -51,6 +63,10 @@ pub fn read_embed(element: &BytesStart<'_>) -> Result<Option<String>> {
 }
 
 /// Find the first embedded-image relationship ID in `DrawingML` XML.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn find_first_embed(xml: &[u8]) -> Result<Option<String>> {
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(true);

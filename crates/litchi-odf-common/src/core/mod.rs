@@ -66,6 +66,8 @@ pub mod package;
 pub mod writer;
 /// ODF XML utilities
 pub mod xml;
+/// Provenance-bearing publication of source-preserving XML splices.
+pub mod xml_splice;
 
 // Re-export main types for convenience
 // Manifest is internal to the package system
@@ -87,3 +89,7 @@ pub use metadata::{MetaXmlPatch, patch_meta_xml};
 pub use package::OwnedPackage;
 pub use writer::{PackageWriter, Structure};
 pub use xml::{Content, Meta, Styles};
+pub use xml_splice::{
+    AuthoredXmlFragment, XmlSourcePart, XmlSourceRange, XmlSplicePublication,
+    rebuild_package_with_xml_splices,
+};

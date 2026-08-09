@@ -372,6 +372,14 @@ pub struct AxisChange {
 }
 
 impl AxisChange {
+    pub(crate) fn new(index: usize, before: Option<String>, after: Option<String>) -> Self {
+        Self {
+            index,
+            before,
+            after,
+        }
+    }
+
     pub(crate) fn new_inverse(change: &Self) -> Self {
         Self {
             index: change.index,

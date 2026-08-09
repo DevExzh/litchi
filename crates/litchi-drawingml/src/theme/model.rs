@@ -175,10 +175,18 @@ pub enum Color {
 }
 
 impl Color {
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn rgb(value: &str) -> Result<Self> {
         Ok(Self::Rgb(hex(value)?))
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn system(kind: System, last: Option<&str>) -> Result<Self> {
         Ok(Self::System {
             kind,
@@ -367,10 +375,8 @@ pub(crate) fn validate_palette(value: &Palette) -> Result<()> {
     }
     for (_, color) in value.values() {
         match color {
-            Color::Rgb(value) => {
-                let _ = hex(value)?;
-            },
-            Color::System {
+            Color::Rgb(value)
+            | Color::System {
                 last: Some(value), ..
             } => {
                 let _ = hex(value)?;

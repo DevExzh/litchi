@@ -41,16 +41,28 @@ pub struct DiagramDefinition {
 
 impl DiagramDefinition {
     /// Parse a diagram layout part (`dgm:layoutDef`).
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn parse_layout(xml: &str) -> Result<Self> {
         Self::parse(xml, "layoutDef")
     }
 
     /// Parse a diagram quick-style part (`dgm:styleDef`).
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn parse_quick_style(xml: &str) -> Result<Self> {
         Self::parse(xml, "styleDef")
     }
 
     /// Parse a diagram colors part (`dgm:colorsDef`).
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn parse_colors(xml: &str) -> Result<Self> {
         Self::parse(xml, "colorsDef")
     }
@@ -98,7 +110,11 @@ impl DiagramDefinition {
                 Event::DocType(_) => return Err(invalid("DTDs are rejected")),
                 Event::CData(_) => return Err(invalid("CDATA is rejected")),
                 Event::Eof => break,
-                _ => {},
+                Event::Text(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::GeneralRef(_) => {},
             }
             buffer.clear();
         }

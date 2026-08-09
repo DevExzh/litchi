@@ -9,6 +9,10 @@ use crate::chart::model::Chart;
 use std::io::Write;
 
 /// Write a chart to canonical `DrawingML` chart XML.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn write<W: Write>(writer: &mut W, chart: &Chart) -> std::io::Result<()> {
     write_with_rels(writer, chart, None, None)
 }
@@ -18,6 +22,10 @@ pub fn write<W: Write>(writer: &mut W, chart: &Chart) -> std::io::Result<()> {
 /// The chart model owns relationship metadata, while DOCX, PPTX, XLSX, and
 /// XLSB package writers remain responsible for allocating and validating OPC
 /// relationships. This entry point only serializes the resulting wire form.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn write_with_rels<W: Write>(
     writer: &mut W,
     chart: &Chart,

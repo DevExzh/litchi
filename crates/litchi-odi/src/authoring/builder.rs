@@ -194,6 +194,12 @@ fn frame_content(frame: &Frame) -> String {
     xml
 }
 
+pub(crate) fn image_map_xml(image_map: &ImageMap) -> String {
+    let mut xml = String::new();
+    push_image_map(&mut xml, image_map);
+    xml
+}
+
 fn push_image_map(xml: &mut String, image_map: &ImageMap) {
     xml.push_str("<draw:image-map>");
     for area in image_map.areas() {

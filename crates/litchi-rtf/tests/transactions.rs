@@ -6,7 +6,10 @@
 
 use litchi_rtf::{
     Alignment, Document,
-    edit::{Error, History, HistoryLimits, Limits, TextSpan},
+    edit::{
+        Composition, CompositionError, CompositionLimits, Error, History, HistoryLimits, Limits,
+        MergePlan, MergeResolution, TextSpan,
+    },
 };
 
 fn durable_limits(max_operations: usize) -> litchi_core::patch::PatchLimits {
@@ -318,15 +321,131 @@ fn no_op_patch_is_empty_durable_and_history_is_budgeted() {
             .same_snapshot(&source)
     );
 
-    let mut changed = source.edit();
-    changed.replace_body_text("Changed").unwrap();
-    let changed = changed.commit().unwrap();
     let mut history = History::new(source.clone(), HistoryLimits::new(2, 1024));
-    history
-        .record(changed.snapshot().clone(), changed.patch().history_weight())
-        .unwrap();
+    let mut changed = history.current().edit();
+    changed.replace_body_text("Changed").unwrap();
+    history.commit(changed).unwrap();
     assert!(history.undo());
     assert!(history.current().same_snapshot(&source));
     assert!(history.redo());
     assert_eq!(history.current().text(), "Changed");
+}
+
+#[test]
+fn bold_property_and_paragraph_structure_have_durable_semantics() {
+    let probe = Document::parse(r"{\rtf1\ansi \ql \b Alpha\b0 \par \ql Beta}").unwrap();
+    assert!(probe.body().runs().next().unwrap().format().bold());
+    let source = Document::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
+    let mut formatting = source.edit();
+    formatting
+        .set_text_bold(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap();
+    let formatted = formatting.commit().unwrap();
+    let runs = formatted.snapshot().body().runs().collect::<Vec<_>>();
+    assert_eq!(runs[0].text(), "Alpha");
+    assert!(runs[0].format().bold());
+    assert!(!runs[1].format().bold());
+
+    let durable = formatted.patch().to_durable(durable_limits(1)).unwrap();
+    let applied = source.apply_durable(&durable).unwrap();
+    assert!(applied.body().runs().next().unwrap().format().bold());
+    let restored = applied.apply_durable(&durable.inverse()).unwrap();
+    assert!(!restored.body().runs().next().unwrap().format().bold());
+
+    let mut structure = source.edit();
+    structure.insert_paragraph_after(0, "Inserted").unwrap();
+    let inserted = structure.commit().unwrap();
+    assert_eq!(inserted.snapshot().text(), "Alpha\nInserted\nBeta");
+    let structural_patch = inserted.patch().to_durable(durable_limits(1)).unwrap();
+    let structurally_applied = source.apply_durable(&structural_patch).unwrap();
+    assert_eq!(structurally_applied.text(), "Alpha\nInserted\nBeta");
+    assert_eq!(
+        structurally_applied
+            .apply_durable(&structural_patch.inverse())
+            .unwrap()
+            .text(),
+        source.text()
+    );
+}
+
+#[test]
+fn core_subedits_compose_and_report_typed_conflicts() {
+    let source = Document::parse(r"{\rtf1\ansi Alpha Beta}").unwrap();
+    let limits = CompositionLimits::new(4, 8, 16, 8);
+
+    let mut text_edit = source.edit();
+    text_edit
+        .replace_text(TextSpan::new(0, 5).unwrap(), "A")
+        .unwrap();
+    let prepared_text = text_edit.into_sub_edit("text", limits).unwrap();
+    let mut alignment_edit = source.edit();
+    alignment_edit
+        .set_paragraph_alignment(0, Alignment::Center)
+        .unwrap();
+    let prepared_alignment = alignment_edit.into_sub_edit("alignment", limits).unwrap();
+    let mut joined = Composition::new(&source, limits);
+    joined
+        .join(prepared_text)
+        .unwrap()
+        .join(prepared_alignment)
+        .unwrap();
+    let committed = joined.commit().unwrap();
+    assert_eq!(committed.snapshot().text(), "A Beta");
+    assert_eq!(
+        committed
+            .snapshot()
+            .body()
+            .paragraphs()
+            .next()
+            .unwrap()
+            .format()
+            .alignment(),
+        Alignment::Center
+    );
+
+    let mut left = source.edit();
+    left.replace_text(TextSpan::new(0, 5).unwrap(), "Left")
+        .unwrap();
+    let mut right = source.edit();
+    right
+        .replace_text(TextSpan::new(6, 10).unwrap(), "Right")
+        .unwrap();
+    let mut conflicts = Composition::new(&source, limits);
+    conflicts
+        .join(left.into_sub_edit("left", limits).unwrap())
+        .unwrap();
+    let error = conflicts
+        .join(right.into_sub_edit("right", limits).unwrap())
+        .unwrap_err();
+    assert!(matches!(error, CompositionError::Conflicts(set) if !set.is_empty()));
+}
+
+#[test]
+fn three_way_merge_is_non_mutating_until_resolved_and_committed() {
+    let source = Document::parse(r"{\rtf1\ansi Alpha Beta}").unwrap();
+    let limits = CompositionLimits::new(4, 8, 16, 8);
+    let mut left_edit = source.edit();
+    left_edit
+        .replace_text(TextSpan::new(0, 5).unwrap(), "Left")
+        .unwrap();
+    let mut right_edit = source.edit();
+    right_edit
+        .replace_text(TextSpan::new(6, 10).unwrap(), "Right")
+        .unwrap();
+    let mut left = Composition::new(&source, limits);
+    left.join(left_edit.into_sub_edit("left", limits).unwrap())
+        .unwrap();
+    let mut right = Composition::new(&source, limits);
+    right
+        .join(right_edit.into_sub_edit("right", limits).unwrap())
+        .unwrap();
+
+    let plan = MergePlan::new(left, right).unwrap();
+    assert_eq!(source.text(), "Alpha Beta");
+    assert!(!plan.conflicts().is_empty());
+    let mut unresolved = *plan.finish().unwrap_err();
+    unresolved.resolve(MergeResolution::Left);
+    let merged = unresolved.finish().unwrap().commit().unwrap();
+    assert_eq!(merged.snapshot().text(), "Left Beta");
+    assert_eq!(source.text(), "Alpha Beta");
 }

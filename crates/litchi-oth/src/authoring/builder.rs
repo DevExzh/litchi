@@ -231,3 +231,88 @@ fn push_style(output: &mut String, optional_style_name: Option<&str>) {
         output.push('"');
     }
 }
+
+pub(crate) fn render_styles(styles: &[crate::style::Style]) -> Result<String> {
+    let mut output = String::from(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?><office:document-styles xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:style=\"urn:oasis:names:tc:opendocument:xmlns:style:1.0\"><office:styles>",
+    );
+    for style in styles {
+        output.push_str("<style:style style:name=\"");
+        output.push_str(&quick_xml::escape::escape(style.name()));
+        output.push('"');
+        if let Some(family) = style.family() {
+            output.push_str(" style:family=\"");
+            output.push_str(&quick_xml::escape::escape(family));
+            output.push('"');
+        }
+        if let Some(parent) = style.parent_name() {
+            output.push_str(" style:parent-style-name=\"");
+            output.push_str(&quick_xml::escape::escape(parent));
+            output.push('"');
+        }
+        output.push_str("/>");
+    }
+    output.push_str("</office:styles></office:document-styles>");
+    compact_xml::validate(output.as_bytes())?;
+    Ok(output)
+}
+
+pub(crate) fn render_metadata(metadata: &litchi_core::Metadata) -> Result<String> {
+    let mut output = String::from(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?><office:document-meta xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:meta=\"urn:oasis:names:tc:opendocument:xmlns:meta:1.0\"><office:meta>",
+    );
+    for (tag, optional_text) in [
+        ("dc:title", metadata.title.as_deref()),
+        ("dc:subject", metadata.subject.as_deref()),
+        ("dc:creator", metadata.author.as_deref()),
+        ("dc:description", metadata.description.as_deref()),
+        ("dc:identifier", metadata.identifier.as_deref()),
+        ("dc:language", metadata.language.as_deref()),
+        ("meta:keyword", metadata.keywords.as_deref()),
+        ("meta:generator", metadata.application.as_deref()),
+        ("meta:category", metadata.category.as_deref()),
+    ] {
+        if let Some(text) = optional_text {
+            output.push('<');
+            output.push_str(tag);
+            output.push('>');
+            output.push_str(&quick_xml::escape::escape(text));
+            output.push_str("</");
+            output.push_str(tag);
+            output.push('>');
+        }
+    }
+    if let Some(created) = metadata.created {
+        output.push_str("<meta:creation-date>");
+        output.push_str(&created.to_rfc3339());
+        output.push_str("</meta:creation-date>");
+    }
+    if let Some(modified) = metadata.modified {
+        output.push_str("<dc:date>");
+        output.push_str(&modified.to_rfc3339());
+        output.push_str("</dc:date>");
+    }
+    if metadata.page_count.is_some()
+        || metadata.word_count.is_some()
+        || metadata.character_count.is_some()
+    {
+        output.push_str("<meta:document-statistic");
+        for (name, optional_count) in [
+            ("page-count", metadata.page_count),
+            ("word-count", metadata.word_count),
+            ("character-count", metadata.character_count),
+        ] {
+            if let Some(count) = optional_count {
+                output.push_str(" meta:");
+                output.push_str(name);
+                output.push_str("=\"");
+                output.push_str(&count.to_string());
+                output.push('"');
+            }
+        }
+        output.push_str("/>");
+    }
+    output.push_str("</office:meta></office:document-meta>");
+    compact_xml::validate(output.as_bytes())?;
+    Ok(output)
+}

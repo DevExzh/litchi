@@ -19,7 +19,12 @@ mod facade;
 mod model;
 mod package;
 
-pub use authoring::{Change, ChangeKind, Commit, Edit, History, HistoryLimits, Patch, QueryChange};
+pub use authoring::{
+    Change, ChangeAction, ChangeKind, Commit, CompositionLimits, DependencyDisposition,
+    DurablePatch, Edit, EditPolicy, EncryptionPolicy, History, HistoryLimits, JoinError,
+    JoinedEdits, Lineage, MergeChoice, MergePlan, MergePlanError, Patch, PreparedEdit,
+    ProtectionStatus, QueryChange, SealedPatch, SignaturePolicy,
+};
 pub use facade::{Builder, Database};
 pub use model::connection::Connection;
 pub use model::query::Query;

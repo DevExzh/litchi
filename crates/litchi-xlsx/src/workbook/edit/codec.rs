@@ -262,6 +262,7 @@ pub(super) fn create_sheets(
             rows,
             columns,
             merges,
+            page_breaks,
         } = actions;
         let change_start = changes.len();
         if let Some(after) = &web
@@ -382,6 +383,16 @@ pub(super) fn create_sheets(
         if let Some(bindings) = &web {
             content = raw::web::replace(&content, bindings)?;
         }
+        if let Some(page_breaks) = &page_breaks
+            && page_breaks != &crate::page_breaks::PageBreaks::new()
+        {
+            changes.push(Change::PageBreaks {
+                sheet: name.as_str().into(),
+                before: crate::page_breaks::PageBreaks::new(),
+                after: page_breaks.clone(),
+            });
+            content = crate::page_breaks::replace(&content, page_breaks)?;
+        }
         if active == Some(index) {
             content = raw::sheet_view_edit::rewrite(
                 &content,
@@ -440,6 +451,18 @@ pub(super) fn create_sheets(
                         return Err(invalid(format!(
                             "new worksheet column verification failed at {sheet}!column {}",
                             column.get()
+                        )));
+                    }
+                },
+                Change::PageBreaks {
+                    sheet,
+                    after: expected,
+                    ..
+                } => {
+                    let actual = crate::page_breaks::parse(&content)?;
+                    if &actual != expected {
+                        return Err(invalid(format!(
+                            "new worksheet page-break verification failed at {sheet}"
                         )));
                     }
                 },

@@ -22,6 +22,10 @@ use crate::{Error, Result};
 use quick_xml::events::Event;
 use std::io::{BufRead, Read};
 
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn read<R: BufRead>(reader: R) -> Result<Chart> {
     let limits = litchi_ooxml_common::mce::Limits::default();
     let mut input = Vec::new();
@@ -343,7 +347,6 @@ pub fn read<R: BufRead>(reader: R) -> Result<Chart> {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
                     b"chart" => saw_chart = true,
-                    b"chartSpace" => {},
                     b"title" => {
                         if chart.title.is_some() {
                             return Err(Error::Invalid("chart contains duplicate titles".into()));

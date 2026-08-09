@@ -1,17 +1,74 @@
-//! Narrow source-preserving editing for ordinary main-story DOC paragraphs.
+//! Bounded, source-preserving edits for ordinary main-story DOC paragraphs.
 //!
-//! A Word binary file has independent piece-table, FKP, PLCF, and CFB layers.
-//! This API intentionally edits only a paragraph wholly contained in one
-//! Unicode piece and only when replacement text has the same UTF-16 length.
-//! Consequently no piece descriptor, FKP page, PLCF, FIB length, or table
-//! stream changes. Everything outside the replaced `WordDocument` bytes is
-//! retained by the package editor. Other edits are rejected with a typed
-//! refusal instead of approximating a DOC rewrite.
+//! Length-changing replacements append Unicode text, rebuild the CLX and CHPX
+//! FKPs, shift modeled main-story PLCFs, and update the FIB story length. The
+//! transaction refuses structural text, tracked ranges, non-uniform character
+//! formatting, interior position boundaries, and unmodeled dependencies before
+//! publication. Text and direct-bold changes share one immutable
+//! multi-operation transaction.
 
 use crate::package::Error as PackageError;
 use crate::tracked_revision::{Limits, RevisionEditor, RevisionKind};
 use litchi_core::Position;
+use litchi_core::patch::{
+    BlobBundle, BlobId, CompositionError, JoinedSubEdits, PatchError, PatchLimits, PatchOperation,
+    Reversible, ReversibleOperation, SubEdit,
+};
+pub use litchi_core::patch::{CompositionLimits, HistoryLimits, SubEditJoinFailure};
+use std::collections::BTreeMap;
+use std::io::Cursor;
 use std::sync::Arc;
+
+/// Bounded undo/redo history over immutable DOC snapshots.
+pub type History = litchi_core::patch::History<Snapshot>;
+
+/// Finite limits for one body transaction.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TransactionLimits {
+    operations: usize,
+    replacement_units: usize,
+    total_units: usize,
+}
+
+impl TransactionLimits {
+    /// Creates explicit per-transaction bounds.
+    #[must_use]
+    pub const fn new(
+        max_operations: usize,
+        max_replacement_units: usize,
+        max_total_replacement_units: usize,
+    ) -> Self {
+        Self {
+            operations: max_operations,
+            replacement_units: max_replacement_units,
+            total_units: max_total_replacement_units,
+        }
+    }
+
+    /// Maximum staged semantic operations.
+    #[must_use]
+    pub const fn max_operations(self) -> usize {
+        self.operations
+    }
+
+    /// Maximum UTF-16 units in one replacement.
+    #[must_use]
+    pub const fn max_replacement_units(self) -> usize {
+        self.replacement_units
+    }
+
+    /// Maximum aggregate UTF-16 replacement units.
+    #[must_use]
+    pub const fn max_total_replacement_units(self) -> usize {
+        self.total_units
+    }
+}
+
+impl Default for TransactionLimits {
+    fn default() -> Self {
+        Self::new(256, 1024 * 1024, 4 * 1024 * 1024)
+    }
+}
 
 /// Main-story text visibility used for a review projection.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -55,7 +112,8 @@ impl Paragraph {
 pub enum Refusal {
     /// The selected [`Position`] does not exist in the source body.
     ParagraphNotFound,
-    /// A replacement changes UTF-16 length and would require a CLX/PLCF rewrite.
+    /// Retained for source compatibility; length changes are now modeled by
+    /// the bounded CLX/FKP transaction.
     LengthChange { expected: usize, actual: usize },
     /// The paragraph crosses pieces, which can have distinct encodings and PRMs.
     CrossesPieceBoundary,
@@ -69,6 +127,17 @@ pub enum Refusal {
     ReplacementContainsStructuralContent,
     /// The source's review ranges overlap in a way this projection cannot prove.
     AmbiguousReviewRanges,
+    /// An empty paragraph has no text run from which formatting can be copied.
+    EmptyParagraph,
+    /// Character formatting or another CP-bound dependency is not uniform or
+    /// cannot be shifted without changing its meaning.
+    FormattingDependency,
+    /// A known CP-indexed table has coupled records outside the resize model.
+    PositionDependency { fib_index: usize },
+    /// The configured operation count was exhausted.
+    OperationLimit { observed: usize, limit: usize },
+    /// One or all replacement payloads exceed the configured UTF-16 bound.
+    ReplacementLimit { observed: usize, limit: usize },
 }
 
 impl std::fmt::Display for Refusal {
@@ -97,6 +166,24 @@ impl std::fmt::Display for Refusal {
             Self::AmbiguousReviewRanges => {
                 formatter.write_str("tracked revision ranges overlap ambiguously")
             },
+            Self::EmptyParagraph => {
+                formatter.write_str("empty body paragraph has no editable text formatting run")
+            },
+            Self::FormattingDependency => formatter.write_str(
+                "body paragraph has character formatting or CP-bound dependencies that cannot be resized losslessly",
+            ),
+            Self::PositionDependency { fib_index } => write!(
+                formatter,
+                "body length change depends on unmodeled CP-indexed FIB table {fib_index}"
+            ),
+            Self::OperationLimit { observed, limit } => write!(
+                formatter,
+                "body transaction requested {observed} operations; limit is {limit}"
+            ),
+            Self::ReplacementLimit { observed, limit } => write!(
+                formatter,
+                "body transaction requested {observed} UTF-16 replacement units; limit is {limit}"
+            ),
         }
     }
 }
@@ -111,6 +198,10 @@ pub enum Error {
     Refused(Refusal),
     /// A patch was presented with any snapshot other than its exact source.
     Conflict,
+    /// A shared bounded composition rejected staged work.
+    Composition(CompositionError),
+    /// A durable semantic patch is malformed or exceeds its explicit limits.
+    Durable(PatchError),
 }
 
 impl std::fmt::Display for Error {
@@ -119,17 +210,41 @@ impl std::fmt::Display for Error {
             Self::Invalid(error) => error.fmt(formatter),
             Self::Refused(refusal) => refusal.fmt(formatter),
             Self::Conflict => formatter.write_str("body-text patch source conflict"),
+            Self::Composition(error) => error.fmt(formatter),
+            Self::Durable(error) => error.fmt(formatter),
         }
     }
 }
 
-impl std::error::Error for Error {}
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Invalid(error) => Some(error),
+            Self::Composition(error) => Some(error),
+            Self::Durable(error) => Some(error),
+            Self::Refused(_) | Self::Conflict => None,
+        }
+    }
+}
+
+impl From<CompositionError> for Error {
+    fn from(error: CompositionError) -> Self {
+        Self::Composition(error)
+    }
+}
+
+impl From<PatchError> for Error {
+    fn from(error: PatchError) -> Self {
+        Self::Durable(error)
+    }
+}
 
 /// Immutable, exact-source snapshot for the body-text transaction seam.
 #[derive(Clone)]
 pub struct Snapshot {
     source: Arc<[u8]>,
     limits: Limits,
+    transaction_limits: TransactionLimits,
 }
 
 impl Snapshot {
@@ -140,11 +255,29 @@ impl Snapshot {
     /// Returns [`Error::Invalid`] when the CFB, Word 97+ FIB, selected table
     /// stream, piece table, or FKP basis cannot support safe editing.
     pub fn open(input: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
+        Self::open_bounded(input, limits, TransactionLimits::default())
+    }
+
+    /// Opens an owned DOC source with explicit package and transaction bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] when the complete package or its safe edit
+    /// basis cannot be reopened.
+    pub fn open_bounded(
+        input: impl Into<Vec<u8>>,
+        limits: Limits,
+        transaction_limits: TransactionLimits,
+    ) -> Result<Self> {
         let bytes = input.into();
         RevisionEditor::open(bytes.clone(), limits).map_err(Error::Invalid)?;
+        let mut package =
+            crate::Package::from_reader(Cursor::new(bytes.clone())).map_err(Error::Invalid)?;
+        package.document().map_err(Error::Invalid)?;
         Ok(Self {
             source: Arc::from(bytes.into_boxed_slice()),
             limits,
+            transaction_limits,
         })
     }
 
@@ -184,6 +317,12 @@ impl Snapshot {
         fingerprint(&self.source)
     }
 
+    /// Configured finite semantic-operation and text-payload bounds.
+    #[must_use]
+    pub const fn transaction_limits(&self) -> TransactionLimits {
+        self.transaction_limits
+    }
+
     /// Lists ordinary source-body paragraphs under the requested review projection.
     ///
     /// # Errors
@@ -195,7 +334,7 @@ impl Snapshot {
         projected_paragraphs(&editor, projection)
     }
 
-    /// Starts a staged same-shape body-paragraph transaction.
+    /// Starts a staged bounded body text-and-formatting transaction.
     ///
     /// # Errors
     ///
@@ -213,6 +352,151 @@ impl Snapshot {
         self.edit()
     }
 
+    /// Starts a bounded disjoint composition for this exact artifact.
+    #[must_use]
+    pub fn compose(&self, limits: CompositionLimits) -> Composition {
+        Composition {
+            source: self.clone(),
+            joined: JoinedSubEdits::new(self.lineage(), limits),
+        }
+    }
+
+    /// Starts explicit bounded undo/redo history at this immutable snapshot.
+    #[must_use]
+    pub fn history(&self, limits: HistoryLimits) -> History {
+        History::new(self.clone(), limits)
+    }
+
+    /// Prepares one independently composable paragraph replacement against
+    /// this exact immutable artifact.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same typed validation refusal as [`Edit::replace_paragraph`]
+    /// or a common composition-bound error.
+    pub fn prepare_replace(
+        &self,
+        limits: CompositionLimits,
+        identifier: impl Into<String>,
+        position: Position,
+        replacement: impl Into<String>,
+    ) -> Result<PreparedEdit> {
+        let replacement = replacement.into();
+        let mut validation = self.edit()?;
+        validation.replace_paragraph(position, &replacement)?;
+        PreparedEdit::new(
+            self.lineage(),
+            limits,
+            identifier,
+            PreparedOperation::Text {
+                position,
+                replacement,
+            },
+        )
+    }
+
+    /// Prepares one independently composable direct-bold change.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same typed validation refusal as
+    /// [`Edit::set_paragraph_bold`] or a common composition-bound error.
+    pub fn prepare_bold(
+        &self,
+        limits: CompositionLimits,
+        identifier: impl Into<String>,
+        position: Position,
+        enabled: bool,
+    ) -> Result<PreparedEdit> {
+        let mut validation = self.edit()?;
+        validation.set_paragraph_bold(position, enabled)?;
+        PreparedEdit::new(
+            self.lineage(),
+            limits,
+            identifier,
+            PreparedOperation::Bold { position, enabled },
+        )
+    }
+
+    /// Applies supported durable body-text operations to this exact artifact.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a foreign vocabulary, malformed selector,
+    /// artifact or semantic precondition conflict, bound violation, or typed
+    /// body-edit refusal.
+    pub fn apply_durable<Mode>(&self, patch: &litchi_core::patch::Patch<Mode>) -> Result<Self> {
+        if patch.format() != "litchi-doc-body" || !patch.blobs().is_empty() {
+            return Err(invalid_durable_patch("unsupported format or blob bundle"));
+        }
+        if patch.operations().is_empty() {
+            return Ok(self.clone());
+        }
+        let expected_artifact = BlobId::of(self.bytes()).as_hex();
+        let mut edit = self.edit()?;
+        for operation in patch.operations() {
+            if operation.preconditions.len() != 2 {
+                return Err(invalid_durable_patch(
+                    "body operation must have exactly two preconditions",
+                ));
+            }
+            let artifact = operation
+                .preconditions
+                .get("artifact_sha256")
+                .and_then(serde_json::Value::as_str)
+                .ok_or_else(|| invalid_durable_patch("missing artifact hash precondition"))?;
+            if artifact != expected_artifact {
+                return Err(Error::Conflict);
+            }
+            let position = parse_durable_target(&operation.target)?;
+            match operation.op.as_str() {
+                "body-text.set" => {
+                    let expected = operation
+                        .preconditions
+                        .get("text")
+                        .and_then(serde_json::Value::as_str)
+                        .ok_or_else(|| invalid_durable_patch("missing text precondition"))?;
+                    let paragraphs = source_paragraphs(&edit.editor)?;
+                    let paragraph = paragraphs
+                        .get(position.get())
+                        .ok_or(Error::Refused(Refusal::ParagraphNotFound))?;
+                    if paragraph.text != expected {
+                        return Err(Error::Conflict);
+                    }
+                    let replacement = operation
+                        .value
+                        .as_str()
+                        .ok_or_else(|| invalid_durable_patch("body text value is not a string"))?;
+                    edit.replace_paragraph(position, replacement)?;
+                },
+                "body-bold.set" => {
+                    let expected = parse_optional_bool(
+                        operation
+                            .preconditions
+                            .get("bold")
+                            .ok_or_else(|| invalid_durable_patch("missing bold precondition"))?,
+                    )?;
+                    let paragraphs = source_paragraphs(&edit.editor)?;
+                    let paragraph = paragraphs
+                        .get(position.get())
+                        .ok_or(Error::Refused(Refusal::ParagraphNotFound))?;
+                    let actual = edit
+                        .editor
+                        .uniform_bold_override(paragraph.start_cp, paragraph.end_cp)
+                        .map_err(Error::Invalid)?
+                        .ok_or(Error::Refused(Refusal::FormattingDependency))?;
+                    if actual != expected {
+                        return Err(Error::Conflict);
+                    }
+                    let value = parse_optional_bool(&operation.value)?;
+                    edit.set_paragraph_bold_override(position, value)?;
+                },
+                _ => return Err(invalid_durable_patch("unsupported operation vocabulary")),
+            }
+        }
+        edit.commit().map(|commit| commit.snapshot)
+    }
+
     /// Exact source bytes. A snapshot has no implicit serialization step.
     #[must_use]
     pub fn finish(&self) -> Vec<u8> {
@@ -221,6 +505,10 @@ impl Snapshot {
 
     fn editor(&self) -> Result<RevisionEditor> {
         RevisionEditor::open(self.source.as_ref().to_vec(), self.limits).map_err(Error::Invalid)
+    }
+
+    fn lineage(&self) -> Lineage {
+        Lineage(Arc::clone(&self.source))
     }
 }
 
@@ -231,6 +519,7 @@ impl std::fmt::Debug for Snapshot {
             .field("bytes", &self.source.len())
             .field("fingerprint", &self.fingerprint())
             .field("limits", &self.limits)
+            .field("transaction_limits", &self.transaction_limits)
             .finish()
     }
 }
@@ -247,12 +536,19 @@ impl Eq for Snapshot {}
 pub struct Edit {
     source: Snapshot,
     editor: RevisionEditor,
+    changes: Vec<Change>,
+    replacement_units: usize,
 }
 
 impl Edit {
     fn new(source: Snapshot) -> Result<Self> {
         let editor = source.editor()?;
-        Ok(Self { source, editor })
+        Ok(Self {
+            source,
+            editor,
+            changes: Vec::new(),
+            replacement_units: 0,
+        })
     }
 
     /// Immutable source snapshot that authorizes this transaction.
@@ -263,9 +559,9 @@ impl Edit {
 
     /// Replaces text in one ordinary source-body paragraph.
     ///
-    /// The replacement must have the same UTF-16 length and be confined to a
-    /// single Unicode piece. A successful edit does not alter the CLX, FKP,
-    /// PLCF, FIB, or table stream.
+    /// The replacement can change UTF-16 length. Publication appends a Unicode
+    /// piece, rebuilds CHPX FKPs and the CLX, shifts modeled main-story PLCFs,
+    /// and updates the FIB story length.
     ///
     /// `position` is a format-neutral [`Position`]; its membership in this
     /// source body is checked here and an absent paragraph is reported as
@@ -274,7 +570,8 @@ impl Edit {
     /// # Errors
     ///
     /// Returns a typed [`Refusal`] for every operation outside the proven
-    /// same-shape closure and [`Error::Invalid`] for a failed package update.
+    /// bounded dependency closure and [`Error::Invalid`] for a failed package
+    /// update.
     pub fn replace_paragraph(&mut self, position: Position, replacement: &str) -> Result<()> {
         let paragraphs = source_paragraphs(&self.editor)?;
         let paragraph = paragraphs
@@ -288,27 +585,52 @@ impl Edit {
                 Refusal::ReplacementContainsStructuralContent,
             ));
         }
-        let expected = paragraph.text.encode_utf16().count();
         let actual = replacement.encode_utf16().count();
-        if actual != expected {
-            return Err(Error::Refused(Refusal::LengthChange { expected, actual }));
-        }
-        if !self
-            .editor
-            .is_unicode_piece_range(paragraph.start_cp, paragraph.end_cp)
-        {
-            return Err(Error::Refused(piece_refusal(
-                &self.editor,
-                paragraph.start_cp,
-                paragraph.end_cp,
-            )));
+        self.ensure_replacement_capacity(actual)?;
+        if paragraph.start_cp == paragraph.end_cp {
+            return Err(Error::Refused(Refusal::EmptyParagraph));
         }
         if text_revision_intersects(&self.editor, paragraph.start_cp, paragraph.end_cp)? {
             return Err(Error::Refused(Refusal::TrackedText));
         }
+        if paragraph.text == replacement {
+            return Ok(());
+        }
+        if actual != paragraph.text.encode_utf16().count()
+            && let Some(&fib_index) = self.editor.unmodeled_length_dependencies().first()
+        {
+            return Err(Error::Refused(Refusal::PositionDependency { fib_index }));
+        }
+        self.ensure_operation_capacity()?;
+        if !self
+            .editor
+            .has_uniform_character_format(paragraph.start_cp, paragraph.end_cp)
+            .map_err(Error::Invalid)?
+        {
+            return Err(Error::Refused(Refusal::FormattingDependency));
+        }
+        let before = paragraph.text.clone();
         self.editor
-            .replace_unicode_text_same_length(paragraph.start_cp, paragraph.end_cp, replacement)
-            .map_err(Error::Invalid)
+            .replace_plain_text(paragraph.start_cp, paragraph.end_cp, replacement)
+            .map_err(Error::Invalid)?;
+        self.replacement_units = self.replacement_units.saturating_add(actual);
+        self.changes.push(Change::Text {
+            position,
+            before,
+            after: replacement.to_string(),
+        });
+        Ok(())
+    }
+
+    /// Sets a direct bold override for one ordinary body paragraph in the
+    /// same transaction as text replacements.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal when the paragraph is absent, empty,
+    /// structural, tracked, or has non-uniform direct bold semantics.
+    pub fn set_paragraph_bold(&mut self, position: Position, enabled: bool) -> Result<()> {
+        self.set_paragraph_bold_override(position, Some(enabled))
     }
 
     /// Discards staged changes and returns the original immutable snapshot.
@@ -328,10 +650,77 @@ impl Edit {
         let snapshot = if bytes == self.source.bytes() {
             self.source.clone()
         } else {
-            Snapshot::open(bytes, self.source.limits)?
+            Snapshot::open_bounded(bytes, self.source.limits, self.source.transaction_limits)?
         };
-        let patch = Patch::new(self.source, snapshot.clone());
+        let patch = Patch::new(self.source, snapshot.clone(), self.changes);
         Ok(Commit { snapshot, patch })
+    }
+
+    fn ensure_operation_capacity(&self) -> Result<()> {
+        let observed = self.changes.len().saturating_add(1);
+        let limit = self.source.transaction_limits.operations;
+        if observed > limit {
+            Err(Error::Refused(Refusal::OperationLimit { observed, limit }))
+        } else {
+            Ok(())
+        }
+    }
+
+    fn ensure_replacement_capacity(&self, units: usize) -> Result<()> {
+        let per_value = self.source.transaction_limits.replacement_units;
+        if units > per_value {
+            return Err(Error::Refused(Refusal::ReplacementLimit {
+                observed: units,
+                limit: per_value,
+            }));
+        }
+        let total = self.replacement_units.saturating_add(units);
+        let total_limit = self.source.transaction_limits.total_units;
+        if total > total_limit {
+            return Err(Error::Refused(Refusal::ReplacementLimit {
+                observed: total,
+                limit: total_limit,
+            }));
+        }
+        Ok(())
+    }
+
+    fn set_paragraph_bold_override(
+        &mut self,
+        position: Position,
+        value: Option<bool>,
+    ) -> Result<()> {
+        let paragraphs = source_paragraphs(&self.editor)?;
+        let paragraph = paragraphs
+            .get(position.get())
+            .ok_or(Error::Refused(Refusal::ParagraphNotFound))?;
+        if paragraph.start_cp == paragraph.end_cp {
+            return Err(Error::Refused(Refusal::EmptyParagraph));
+        }
+        if has_structural_content(&paragraph.text) {
+            return Err(Error::Refused(Refusal::StructuralContent));
+        }
+        if text_revision_intersects(&self.editor, paragraph.start_cp, paragraph.end_cp)? {
+            return Err(Error::Refused(Refusal::TrackedText));
+        }
+        let before = self
+            .editor
+            .uniform_bold_override(paragraph.start_cp, paragraph.end_cp)
+            .map_err(Error::Invalid)?
+            .ok_or(Error::Refused(Refusal::FormattingDependency))?;
+        if before == value {
+            return Ok(());
+        }
+        self.ensure_operation_capacity()?;
+        self.editor
+            .set_character_bold_override(paragraph.start_cp, paragraph.end_cp, value)
+            .map_err(Error::Invalid)?;
+        self.changes.push(Change::Bold {
+            position,
+            before,
+            after: value,
+        });
+        Ok(())
     }
 }
 
@@ -375,16 +764,24 @@ pub struct Patch {
     after: Snapshot,
     before_fingerprint: u64,
     after_fingerprint: u64,
+    changes: Vec<Change>,
 }
 
 impl Patch {
-    fn new(before: Snapshot, after: Snapshot) -> Self {
+    fn new(before: Snapshot, after: Snapshot, changes: Vec<Change>) -> Self {
         Self {
             before_fingerprint: before.fingerprint(),
             after_fingerprint: after.fingerprint(),
             before,
             after,
+            changes,
         }
+    }
+
+    /// Semantic text and formatting changes in application order.
+    #[must_use]
+    pub fn changes(&self) -> impl ExactSizeIterator<Item = ChangeRef<'_>> {
+        self.changes.iter().map(Change::as_ref)
     }
 
     /// Exact source snapshot required for application.
@@ -443,8 +840,380 @@ impl Patch {
             after: self.before.clone(),
             before_fingerprint: self.after_fingerprint,
             after_fingerprint: self.before_fingerprint,
+            changes: self.changes.iter().rev().map(Change::inverse).collect(),
         }
     }
+
+    /// Converts this exact-source patch to the shared bounded deterministic
+    /// semantic envelope.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PatchError`] when the requested wire limits cannot represent
+    /// every semantic operation and inverse.
+    pub fn to_durable(
+        &self,
+        limits: PatchLimits,
+    ) -> std::result::Result<litchi_core::patch::Patch<Reversible>, PatchError> {
+        let before_artifact = BlobId::of(self.before.bytes()).as_hex();
+        let after_artifact = BlobId::of(self.after.bytes()).as_hex();
+        let operations = self
+            .changes
+            .iter()
+            .map(|change| {
+                let forward = durable_operation(limits, change, &before_artifact)?;
+                let inverse = durable_operation(limits, &change.inverse(), &after_artifact)?;
+                Ok(ReversibleOperation::new(forward, inverse))
+            })
+            .collect::<std::result::Result<Vec<_>, PatchError>>()?;
+        litchi_core::patch::Patch::<Reversible>::new(
+            limits,
+            "litchi-doc-body",
+            operations,
+            BlobBundle::new(limits.blobs()),
+            BlobBundle::new(limits.blobs()),
+        )
+    }
+}
+
+/// Borrowed semantic change carried by an in-memory patch.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ChangeRef<'a> {
+    /// One ordinary paragraph text replacement.
+    Text {
+        position: Position,
+        before: &'a str,
+        after: &'a str,
+    },
+    /// One direct bold-override mutation.
+    Bold {
+        position: Position,
+        before: Option<bool>,
+        after: Option<bool>,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Change {
+    Text {
+        position: Position,
+        before: String,
+        after: String,
+    },
+    Bold {
+        position: Position,
+        before: Option<bool>,
+        after: Option<bool>,
+    },
+}
+
+impl Change {
+    fn as_ref(&self) -> ChangeRef<'_> {
+        match self {
+            Self::Text {
+                position,
+                before,
+                after,
+            } => ChangeRef::Text {
+                position: *position,
+                before,
+                after,
+            },
+            Self::Bold {
+                position,
+                before,
+                after,
+            } => ChangeRef::Bold {
+                position: *position,
+                before: *before,
+                after: *after,
+            },
+        }
+    }
+
+    fn inverse(&self) -> Self {
+        match self {
+            Self::Text {
+                position,
+                before,
+                after,
+            } => Self::Text {
+                position: *position,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::Bold {
+                position,
+                before,
+                after,
+            } => Self::Bold {
+                position: *position,
+                before: *after,
+                after: *before,
+            },
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct Lineage(Arc<[u8]>);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum PreparedOperation {
+    Text {
+        position: Position,
+        replacement: String,
+    },
+    Bold {
+        position: Position,
+        enabled: bool,
+    },
+}
+
+impl PreparedOperation {
+    fn position(&self) -> Position {
+        match self {
+            Self::Text { position, .. } | Self::Bold { position, .. } => *position,
+        }
+    }
+
+    fn effect(&self) -> String {
+        let facet = match self {
+            Self::Text { .. } => "text",
+            Self::Bold { .. } => "bold",
+        };
+        format!("body/paragraph:{}/{facet}", self.position().get())
+    }
+}
+
+/// One independently prepared body-text or formatting edit.
+pub struct PreparedEdit {
+    inner: SubEdit<Lineage, PreparedOperation>,
+}
+
+impl PreparedEdit {
+    fn new(
+        lineage: Lineage,
+        limits: CompositionLimits,
+        identifier: impl Into<String>,
+        operation: PreparedOperation,
+    ) -> Result<Self> {
+        let writes = [operation.effect()];
+        let inner = SubEdit::new(
+            lineage,
+            limits,
+            identifier,
+            std::iter::empty(),
+            writes,
+            operation,
+        )?;
+        Ok(Self { inner })
+    }
+
+    /// Stable caller-selected composition identifier.
+    #[must_use]
+    pub fn identifier(&self) -> &str {
+        self.inner.id()
+    }
+
+    /// Target paragraph position in the immutable source collection.
+    #[must_use]
+    pub fn position(&self) -> Position {
+        self.inner.payload().position()
+    }
+}
+
+impl std::fmt::Debug for PreparedEdit {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("PreparedEdit")
+            .field("identifier", &self.identifier())
+            .field("position", &self.position())
+            .finish_non_exhaustive()
+    }
+}
+
+/// Recoverable failure to join one independently prepared edit.
+pub struct JoinError {
+    failure: SubEditJoinFailure,
+    rejected: PreparedEdit,
+}
+
+impl JoinError {
+    /// Structured common composition refusal.
+    #[must_use]
+    pub const fn failure(&self) -> &SubEditJoinFailure {
+        &self.failure
+    }
+
+    /// Recovers the rejected prepared edit.
+    #[must_use]
+    pub fn into_rejected(self) -> PreparedEdit {
+        self.rejected
+    }
+}
+
+impl std::fmt::Debug for JoinError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("JoinError")
+            .field("failure", &self.failure)
+            .field("rejected", &self.rejected)
+            .finish()
+    }
+}
+
+/// Bounded deterministic composition of provably disjoint body edits.
+pub struct Composition {
+    source: Snapshot,
+    joined: JoinedSubEdits<Lineage, PreparedOperation>,
+}
+
+impl Composition {
+    /// Joins one edit when its exact artifact lineage and semantic facet are
+    /// disjoint from every accepted edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns a structured common composition refusal while retaining the
+    /// rejected work.
+    #[expect(
+        clippy::result_large_err,
+        reason = "composition refusals intentionally return the rejected prepared edit to the caller"
+    )]
+    pub fn join(&mut self, incoming: PreparedEdit) -> std::result::Result<&mut Self, JoinError> {
+        if let Err(error) = self.joined.join(incoming.inner) {
+            let (failure, rejected) = error.into_parts();
+            return Err(JoinError {
+                failure,
+                rejected: PreparedEdit { inner: rejected },
+            });
+        }
+        Ok(self)
+    }
+
+    /// Number of accepted independently prepared edits.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.joined.len()
+    }
+
+    /// Whether no edits have been accepted.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.joined.is_empty()
+    }
+
+    /// Commits all accepted edits atomically in stable identifier order.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same staging, publication, and full-reopen errors as an
+    /// ordinary multi-operation [`Edit`].
+    pub fn commit(self) -> Result<Commit> {
+        let mut edit = self.source.edit()?;
+        for prepared in self.joined.into_sub_edits() {
+            match prepared.into_payload() {
+                PreparedOperation::Text {
+                    position,
+                    replacement,
+                } => edit.replace_paragraph(position, &replacement)?,
+                PreparedOperation::Bold { position, enabled } => {
+                    edit.set_paragraph_bold(position, enabled)?;
+                },
+            }
+        }
+        edit.commit()
+    }
+}
+
+impl std::fmt::Debug for Composition {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Composition")
+            .field("edits", &self.joined.len())
+            .finish_non_exhaustive()
+    }
+}
+
+fn durable_operation(
+    limits: PatchLimits,
+    change: &Change,
+    artifact: &str,
+) -> std::result::Result<PatchOperation, PatchError> {
+    let mut preconditions = BTreeMap::new();
+    preconditions.insert(
+        "artifact_sha256".to_string(),
+        serde_json::Value::String(artifact.to_string()),
+    );
+    let (op, position, value) = match change {
+        Change::Text {
+            position,
+            before,
+            after,
+        } => {
+            preconditions.insert(
+                "text".to_string(),
+                serde_json::Value::String(before.clone()),
+            );
+            (
+                "body-text.set",
+                *position,
+                serde_json::Value::String(after.clone()),
+            )
+        },
+        Change::Bold {
+            position,
+            before,
+            after,
+        } => {
+            preconditions.insert("bold".to_string(), optional_bool_value(*before));
+            ("body-bold.set", *position, optional_bool_value(*after))
+        },
+    };
+    PatchOperation::new(
+        limits,
+        op,
+        format!("body/paragraph:{}", position.get()),
+        preconditions,
+        value,
+    )
+}
+
+fn optional_bool_value(value: Option<bool>) -> serde_json::Value {
+    value.map_or(serde_json::Value::Null, serde_json::Value::Bool)
+}
+
+fn parse_optional_bool(value: &serde_json::Value) -> Result<Option<bool>> {
+    match value {
+        serde_json::Value::Null => Ok(None),
+        serde_json::Value::Bool(value) => Ok(Some(*value)),
+        _ => Err(invalid_durable_patch(
+            "bold value must be a Boolean or null",
+        )),
+    }
+}
+
+fn parse_durable_target(target: &str) -> Result<Position> {
+    let position = target
+        .strip_prefix("body/paragraph:")
+        .filter(|value| {
+            !value.is_empty()
+                && value.bytes().all(|byte| byte.is_ascii_digit())
+                && (*value == "0" || !value.starts_with('0'))
+        })
+        .ok_or_else(|| invalid_durable_patch("invalid body paragraph target"))?;
+    position
+        .parse::<usize>()
+        .map(Position::new)
+        .map_err(|_error| invalid_durable_patch("body paragraph position exceeds this platform"))
+}
+
+fn invalid_durable_patch(message: &str) -> Error {
+    Error::Invalid(PackageError::InvalidFormat(format!(
+        "invalid DOC body durable patch: {message}"
+    )))
 }
 
 type Result<T> = std::result::Result<T, Error>;
@@ -580,14 +1349,6 @@ fn text_revision_intersects(editor: &RevisionEditor, start: u32, end: u32) -> Re
         }))
 }
 
-fn piece_refusal(editor: &RevisionEditor, start: u32, end: u32) -> Refusal {
-    if editor.piece_count_for_range(start, end) > 1 {
-        Refusal::CrossesPieceBoundary
-    } else {
-        Refusal::CompressedPiece
-    }
-}
-
 fn has_structural_content(text: &str) -> bool {
     text.chars().any(|character| {
         matches!(character, '\r' | '\u{7}' | '\u{13}'..='\u{15}' | '\u{fffc}')
@@ -606,10 +1367,14 @@ fn fingerprint(bytes: &[u8]) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{Error, Projection, Refusal, Snapshot};
+    use super::{Error, Projection, Refusal, Snapshot, TransactionLimits};
     use crate::tracked_revision::Limits;
     use crate::writer::{CharacterFormatting, ParagraphFormatting, TextRevision, Writer};
     use litchi_core::Position;
+    use litchi_core::patch::{
+        BlobLimits, CompositionLimits, HistoryLimits, Patch, PatchLimits, Reversible,
+        SubEditJoinFailure,
+    };
     use std::io::Cursor;
 
     fn doc(paragraphs: &[&str]) -> Vec<u8> {
@@ -627,6 +1392,17 @@ mod tests {
             .write_to(&mut output)
             .expect("fixture DOC must serialize");
         output.into_inner()
+    }
+
+    fn patch_limits() -> PatchLimits {
+        PatchLimits::new(
+            BlobLimits::new(0, 0, 0),
+            128 * 1024,
+            32,
+            8,
+            16 * 1024,
+            64 * 1024,
+        )
     }
 
     #[test]
@@ -674,13 +1450,11 @@ mod tests {
     }
 
     #[test]
-    fn length_and_structural_changes_are_refused_before_publication() {
+    fn length_changes_publish_while_structural_changes_are_refused() {
         let source = Snapshot::parse(&doc(&["alpha"])).expect("snapshot");
         let mut edit = source.edit().expect("edit");
-        assert!(matches!(
-            edit.replace_paragraph(Position::new(0), "longer"),
-            Err(Error::Refused(Refusal::LengthChange { .. }))
-        ));
+        edit.replace_paragraph(Position::new(0), "a much longer paragraph")
+            .expect("length-changing edit");
         assert!(matches!(
             edit.replace_paragraph(Position::new(0), "a\rpha"),
             Err(Error::Refused(
@@ -691,9 +1465,13 @@ mod tests {
             edit.replace_paragraph(Position::new(1), "alpha"),
             Err(Error::Refused(Refusal::ParagraphNotFound))
         ));
-        let commit = edit.commit().expect("no-op commit");
-        assert!(!commit.changed());
-        assert_eq!(commit.snapshot().bytes(), source.bytes());
+        let commit = edit.commit().expect("changed commit");
+        assert!(commit.changed());
+        let paragraphs = commit
+            .snapshot()
+            .paragraphs(Projection::All)
+            .expect("changed paragraphs");
+        assert_eq!(paragraphs[0].text(), "a much longer paragraph");
     }
 
     #[test]
@@ -726,5 +1504,152 @@ mod tests {
             snapshot.paragraphs(Projection::Rejected).expect("rejected")[0].text(),
             "kept old new"
         );
+    }
+
+    #[test]
+    fn multi_paragraph_text_and_bold_commit_reopens_and_inverts() {
+        let source = Snapshot::parse(&doc(&["alpha", "bravo", "charlie"])).expect("snapshot");
+        let mut edit = source.edit().expect("edit");
+        edit.replace_paragraph(Position::new(0), "alpha expanded")
+            .expect("grow first paragraph");
+        edit.replace_paragraph(Position::new(2), "c")
+            .expect("shrink third paragraph");
+        edit.set_paragraph_bold(Position::new(0), true)
+            .expect("bold first paragraph");
+        let commit = edit.commit().expect("commit and full reopen");
+        let texts = commit
+            .snapshot()
+            .paragraphs(Projection::All)
+            .expect("readback")
+            .into_iter()
+            .map(|paragraph| paragraph.text().to_string())
+            .collect::<Vec<_>>();
+        assert_eq!(texts, ["alpha expanded", "bravo", "c"]);
+
+        let mut package = crate::Package::from_reader(Cursor::new(commit.snapshot().finish()))
+            .expect("CFB reopens");
+        let document = package.document().expect("DOC reopens");
+        let paragraphs = document.paragraphs().expect("paragraphs read back");
+        assert_eq!(paragraphs[0].runs().expect("runs")[0].bold(), Some(true));
+
+        let restored = commit
+            .patch()
+            .inverse()
+            .apply(commit.snapshot())
+            .expect("inverse applies");
+        assert_eq!(restored.bytes(), source.bytes());
+    }
+
+    #[test]
+    fn durable_patch_composition_and_history_are_bounded() {
+        let source = Snapshot::parse(&doc(&["alpha", "bravo"])).expect("snapshot");
+        let composition_limits = CompositionLimits::new(4, 2, 8, 8);
+        let text = source
+            .prepare_replace(
+                composition_limits,
+                "replace-alpha",
+                Position::new(0),
+                "alpha grows",
+            )
+            .expect("prepare text");
+        let bold = source
+            .prepare_bold(composition_limits, "bold-alpha", Position::new(0), true)
+            .expect("prepare bold");
+        let conflict = source
+            .prepare_replace(
+                composition_limits,
+                "replace-alpha-again",
+                Position::new(0),
+                "other",
+            )
+            .expect("prepare conflicting text");
+        let mut composition = source.compose(composition_limits);
+        composition.join(text).expect("text joins");
+        composition.join(bold).expect("disjoint bold joins");
+        let failure = composition
+            .join(conflict)
+            .expect_err("same facet conflicts");
+        assert!(matches!(failure.failure(), SubEditJoinFailure::Overlap(_)));
+
+        let commit = composition.commit().expect("composition commits");
+        let durable = commit
+            .patch()
+            .to_durable(patch_limits())
+            .expect("durable patch");
+        let wire = durable.to_deterministic_json().expect("canonical JSON");
+        let decoded = Patch::<Reversible>::from_deterministic_json(&wire, patch_limits())
+            .expect("durable decode");
+        assert_eq!(
+            decoded.to_deterministic_json().expect("durable re-encode"),
+            wire
+        );
+        assert_eq!(
+            source.apply_durable(&decoded).expect("durable apply"),
+            *commit.snapshot()
+        );
+        let semantic_inverse = commit
+            .snapshot()
+            .apply_durable(&decoded.inverse())
+            .expect("durable inverse");
+        assert_eq!(
+            semantic_inverse
+                .paragraphs(Projection::All)
+                .expect("inverse paragraphs")
+                .iter()
+                .map(|paragraph| paragraph.text())
+                .collect::<Vec<_>>(),
+            ["alpha", "bravo"]
+        );
+        let mut inverse_package =
+            crate::Package::from_reader(Cursor::new(semantic_inverse.finish()))
+                .expect("durable inverse CFB reopens");
+        let inverse_document = inverse_package
+            .document()
+            .expect("durable inverse DOC reopens");
+        assert_eq!(
+            inverse_document.paragraphs().expect("inverse paragraphs")[0]
+                .runs()
+                .expect("inverse runs")[0]
+                .bold(),
+            None
+        );
+
+        let mut history = source.history(HistoryLimits::new(1, wire.len() as u64));
+        history
+            .record(commit.snapshot().clone(), wire.len() as u64)
+            .expect("record history");
+        assert!(history.undo());
+        assert_eq!(history.current(), &source);
+        assert!(history.redo());
+        assert_eq!(history.current(), commit.snapshot());
+
+        let mut too_small = source.history(HistoryLimits::new(1, wire.len() as u64 - 1));
+        assert!(
+            too_small
+                .record(commit.snapshot().clone(), wire.len() as u64)
+                .is_err()
+        );
+        assert_eq!(too_small.current(), &source);
+    }
+
+    #[test]
+    fn transaction_limits_fail_before_mutation() {
+        let source = Snapshot::open_bounded(
+            doc(&["alpha", "bravo"]),
+            Limits::default(),
+            TransactionLimits::new(1, 5, 5),
+        )
+        .expect("bounded source");
+        let mut edit = source.edit().expect("edit");
+        assert!(matches!(
+            edit.replace_paragraph(Position::new(0), "too long"),
+            Err(Error::Refused(Refusal::ReplacementLimit { .. }))
+        ));
+        edit.replace_paragraph(Position::new(0), "short")
+            .expect("within bounds");
+        assert!(matches!(
+            edit.set_paragraph_bold(Position::new(1), true),
+            Err(Error::Refused(Refusal::OperationLimit { .. }))
+        ));
     }
 }

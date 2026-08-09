@@ -44,6 +44,7 @@ for DrawingML, charts, diagrams, ink, math, and 3D extensions, [MS-OWEXML] for w
 | Open, create, and save | ✅ | ✅ | ✅ | Path, bytes, reader, in-memory OPC, and deterministic package workflows with bounded XML and part validation |
 | OPC parts, relationships, and content types | ✅ | ✅ | ✅ | Strict/transitional relationship and content-type handling, graph validation, transactional edits, and relationship-aware cleanup |
 | Slides, IDs, ordering, duplication, and visibility | ✅ | ✅ | ✅ | Enumerate, add, insert, duplicate, move, remove, resolve stable slide identities, and expose hidden state |
+| Opened-presentation atomic composition | ✅ | ✅ | ✅ | `opened::{Snapshot, Transaction, Commit, Patch}` composes checked slide ordering, existing shape text, and existing notes text in one exact-source commit; durable bounded patches support disjoint joins, conflicts, inverse operations, and bounded undo history while preserving untouched OPC parts, relationships, and unknown XML |
 | Presentation size, root properties, and view settings | 🟡 | ✅ | ✅ | Typed slide/notes dimensions, size type, presentation and view settings, PowerPoint 2010 browse-mode state, and bounded extension serialization; settings do not render or drive a host UI |
 | Sections | ✅ | ✅ | ✅ | Typed section IDs and names, resolved slide-index membership, and graph-safe ordered CRUD |
 | Custom slide shows | ✅ | ✅ | ✅ | Typed named subsets and graph-safe ordered CRUD; `presentation_properties::metadata::custom_show::{Snapshot, Transaction, Commit, Patch}` adds source-checked XML inverse edits |

@@ -1,8 +1,10 @@
 //! Primary API for presentation consumers.
 
-/// Source-checked slide, shape, media, and RDF package transactions.
+/// Unified source-checked presentation package transactions and history.
 pub mod edit {
-    pub use crate::authoring::edit::{Commit, Patch, Selector, Snapshot, Transaction};
+    pub use crate::authoring::edit::{
+        Commit, Domain, History, MergePlan, Patch, Selector, Snapshot, Transaction,
+    };
 }
 
 /// Bounded, inert embedded-object discovery.

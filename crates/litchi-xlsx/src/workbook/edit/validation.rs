@@ -26,6 +26,7 @@ pub(super) struct SheetActions {
     pub(super) rows: BTreeMap<RowIndex, RowAction>,
     pub(super) columns: BTreeMap<ColumnIndex, ColumnAction>,
     pub(super) merges: Vec<MergeIntent>,
+    pub(super) page_breaks: Option<crate::page_breaks::PageBreaks>,
 }
 
 impl SheetActions {
@@ -38,6 +39,7 @@ impl SheetActions {
             .saturating_add(self.rows.len())
             .saturating_add(self.columns.len())
             .saturating_add(self.merges.len())
+            .saturating_add(usize::from(self.page_breaks.is_some()))
     }
 
     pub(super) fn is_empty(&self) -> bool {
@@ -49,6 +51,7 @@ impl SheetActions {
             && self.rows.is_empty()
             && self.columns.is_empty()
             && self.merges.is_empty()
+            && self.page_breaks.is_none()
     }
 }
 

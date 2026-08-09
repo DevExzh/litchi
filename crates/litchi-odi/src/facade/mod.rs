@@ -115,6 +115,12 @@ impl Image {
         self.package.resource_bytes(index)
     }
 
+    /// Reads one safely named auxiliary package member without activating it.
+    pub fn member_bytes(&self, path: &str) -> Result<Option<Vec<u8>>> {
+        validate_resource_path(path)?;
+        self.package.resource_file(path)
+    }
+
     /// Starts a source-bound package image transaction.
     ///
     /// This supports the same lossless existing-name and existing-source edits
@@ -237,6 +243,45 @@ impl Edit<'_> {
         self.transaction.set_relative_size(frame, width, height)
     }
 
+    /// Replaces, inserts, or removes the document frame's typed image map.
+    pub fn set_image_map(
+        &mut self,
+        frame: usize,
+        value: Option<crate::map::ImageMap>,
+    ) -> Result<()> {
+        self.transaction.set_image_map(frame, value)
+    }
+
+    /// Replaces the lexical horizontal position.
+    pub fn set_x(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.transaction.set_x(frame, value)
+    }
+
+    /// Replaces the lexical vertical position.
+    pub fn set_y(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.transaction.set_y(frame, value)
+    }
+
+    /// Replaces the lexical width.
+    pub fn set_width(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.transaction.set_width(frame, value)
+    }
+
+    /// Replaces the lexical height.
+    pub fn set_height(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.transaction.set_height(frame, value)
+    }
+
+    /// Replaces the lexical relative width.
+    pub fn set_relative_width(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.transaction.set_relative_width(frame, value)
+    }
+
+    /// Replaces the lexical relative height.
+    pub fn set_relative_height(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.transaction.set_relative_height(frame, value)
+    }
+
     /// Stages the document title while preserving every unedited metadata node.
     pub fn set_title(&mut self, value: Option<String>) -> Result<()> {
         self.metadata_mut()?.after.title = value;
@@ -298,6 +343,19 @@ impl Edit<'_> {
         self.stage_resource(resource, None, None)
     }
 
+    /// Adds or replaces an auxiliary package member by safe path.
+    pub fn put_member(&mut self, path: String, media_type: String, bytes: Vec<u8>) -> Result<()> {
+        validate_resource_path(&path)?;
+        validate_media_type(&media_type)?;
+        self.stage_member(path, Some(media_type), Some(bytes))
+    }
+
+    /// Removes an auxiliary package member by safe path.
+    pub fn remove_member(&mut self, path: String) -> Result<()> {
+        validate_resource_path(&path)?;
+        self.stage_member(path, None, None)
+    }
+
     /// Atomically validates, rebuilds, and publishes the package edit.
     ///
     /// # Errors
@@ -309,7 +367,7 @@ impl Edit<'_> {
         let changes = content.patch().changes().to_vec();
         let inverse_changes = content.patch().inverse().changes().to_vec();
         let mut resource_edits = self.resource_changes;
-        resource_edits.sort_unstable_by_key(|change| change.resource);
+        resource_edits.sort_unstable_by(|left, right| left.path.cmp(&right.path));
         let resource_changes = resource_edits
             .iter()
             .map(ResourceEdit::change)
@@ -353,7 +411,7 @@ impl Edit<'_> {
             let actual = snapshot.frames().get(change.frame()).ok_or_else(|| {
                 Error::InvalidFormat("ODI edited frame disappeared during readback".to_string())
             })?;
-            if actual.name() != change.after_name() || actual.source() != change.after_source() {
+            if actual != change.after() {
                 return Err(Error::InvalidFormat(
                     "ODI package edit failed semantic readback".to_string(),
                 ));
@@ -369,10 +427,11 @@ impl Edit<'_> {
             }
             if let Some(after_media_type) = change.after_media_type.as_deref()
                 && snapshot
-                    .resources()
+                    .resource_graph()
+                    .nodes()
                     .iter()
-                    .find(|resource| resource.path() == change.path)
-                    .and_then(crate::resource::Resource::media_type)
+                    .find(|node| node.path() == change.path)
+                    .and_then(crate::resource::Node::media_type)
                     != Some(after_media_type)
             {
                 return Err(Error::InvalidFormat(
@@ -416,24 +475,70 @@ impl Edit<'_> {
         if let Some(change) = self
             .resource_changes
             .iter_mut()
-            .find(|change| change.resource == resource)
+            .find(|change| change.resource == Some(resource))
+        {
+            change.after_media_type = after_media_type;
+            change.after_bytes = after_bytes;
+        } else {
+            self.resource_changes.push(ResourceEdit {
+                resource: Some(resource),
+                path: selected.path().to_string(),
+                before_media_type: before_media_type.clone(),
+                after_media_type,
+                before_size: before_bytes.as_ref().map(Vec::len),
+                before_bytes,
+                after_bytes,
+            });
+        }
+        self.resource_changes.retain(|change| {
+            change.resource != Some(resource)
+                || change.before_media_type != change.after_media_type
+                || change.before_bytes.as_deref() != change.after_bytes.as_deref()
+        });
+        Ok(())
+    }
+
+    fn stage_member(
+        &mut self,
+        path: String,
+        after_media_type: Option<String>,
+        after_bytes: Option<Vec<u8>>,
+    ) -> Result<()> {
+        let before_bytes = self.source.package.resource_file(&path)?;
+        let before_media_type = self
+            .source
+            .resource_graph()
+            .nodes()
+            .iter()
+            .find(|node| node.path() == path)
+            .and_then(crate::resource::Node::media_type)
+            .map(str::to_owned);
+        let resource = self
+            .source
+            .resources()
+            .iter()
+            .position(|candidate| candidate.path() == path);
+        if let Some(change) = self
+            .resource_changes
+            .iter_mut()
+            .find(|change| change.path == path)
         {
             change.after_media_type = after_media_type;
             change.after_bytes = after_bytes;
         } else {
             self.resource_changes.push(ResourceEdit {
                 resource,
-                path: selected.path().to_string(),
-                before_media_type: before_media_type.clone(),
+                path,
+                before_media_type,
                 after_media_type,
                 before_size: before_bytes.as_ref().map(Vec::len),
+                before_bytes,
                 after_bytes,
             });
         }
         self.resource_changes.retain(|change| {
-            change.resource != resource
-                || change.before_media_type != change.after_media_type
-                || before_bytes.as_deref() != change.after_bytes.as_deref()
+            change.before_media_type != change.after_media_type
+                || change.before_bytes.as_deref() != change.after_bytes.as_deref()
         });
         Ok(())
     }
@@ -473,11 +578,12 @@ struct MetadataEdit {
 }
 
 struct ResourceEdit {
-    resource: usize,
+    resource: Option<usize>,
     path: String,
     before_media_type: Option<String>,
     after_media_type: Option<String>,
     before_size: Option<usize>,
+    before_bytes: Option<Vec<u8>>,
     after_bytes: Option<Vec<u8>>,
 }
 
@@ -521,6 +627,17 @@ impl Commit {
         &self.patch
     }
 
+    /// Returns the exact source snapshot accepted by this commit.
+    #[must_use]
+    pub const fn source(&self) -> &Image {
+        &self.patch.source
+    }
+
+    /// Builds a deterministic semantic patch under explicit limits.
+    pub fn semantic_patch(&self, policy: &crate::SecurityPolicy) -> Result<crate::SemanticPatch> {
+        crate::SemanticPatch::from_package_commit(self, policy)
+    }
+
     /// Consumes this commit into its published snapshot.
     #[must_use]
     pub fn into_image(self) -> Image {
@@ -542,6 +659,18 @@ pub struct Patch {
 }
 
 impl Patch {
+    /// Returns the exact source snapshot.
+    #[must_use]
+    pub const fn source(&self) -> &Image {
+        &self.source
+    }
+
+    /// Returns the exact target snapshot.
+    #[must_use]
+    pub const fn target(&self) -> &Image {
+        &self.target
+    }
+
     /// Returns whether the patch applies to this exact source byte sequence.
     #[must_use]
     pub fn is_applicable_to(&self, source: &Image) -> bool {
@@ -559,7 +688,7 @@ impl Patch {
                 "ODI package patch source does not match its expected snapshot".to_string(),
             ));
         }
-        Ok(self.target.clone())
+        Image::from_bytes(self.target.as_bytes().to_vec())
     }
 
     /// Returns the semantic changes in source order.
@@ -632,6 +761,26 @@ impl MetadataFields {
     pub fn keywords(&self) -> Option<&str> {
         self.keywords.as_deref()
     }
+
+    pub(crate) fn set_title(&mut self, value: Option<String>) {
+        self.title = value;
+    }
+
+    pub(crate) fn set_author(&mut self, value: Option<String>) {
+        self.author = value;
+    }
+
+    pub(crate) fn set_subject(&mut self, value: Option<String>) {
+        self.subject = value;
+    }
+
+    pub(crate) fn set_description(&mut self, value: Option<String>) {
+        self.description = value;
+    }
+
+    pub(crate) fn set_keywords(&mut self, value: Option<String>) {
+        self.keywords = value;
+    }
 }
 
 impl From<Option<&Metadata>> for MetadataFields {
@@ -654,6 +803,9 @@ pub struct MetadataChange {
 }
 
 impl MetadataChange {
+    pub(crate) fn new(before: MetadataFields, after: MetadataFields) -> Self {
+        Self { before, after }
+    }
     /// Returns source metadata.
     #[must_use]
     pub const fn before(&self) -> &MetadataFields {
@@ -665,7 +817,7 @@ impl MetadataChange {
         &self.after
     }
 
-    fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
@@ -693,7 +845,7 @@ fn patch_metadata(source: &Image, values: &MetadataFields) -> Result<String> {
 /// One reversible package-local image-resource change.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ResourceChange {
-    resource: usize,
+    resource: Option<usize>,
     path: String,
     before_media_type: Option<String>,
     after_media_type: Option<String>,
@@ -704,7 +856,7 @@ pub struct ResourceChange {
 impl ResourceChange {
     /// Returns the source resource selector.
     #[must_use]
-    pub fn resource(&self) -> usize {
+    pub const fn resource(&self) -> Option<usize> {
         self.resource
     }
 
@@ -761,6 +913,35 @@ fn validate_media_type(media_type: &str) -> Result<()> {
     {
         return Err(Error::InvalidFormat(
             "ODI resource media type is invalid".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_resource_path(path: &str) -> Result<()> {
+    let reserved = matches!(
+        path,
+        "mimetype"
+            | "content.xml"
+            | "styles.xml"
+            | "meta.xml"
+            | "settings.xml"
+            | "META-INF/manifest.xml"
+    );
+    if path.is_empty()
+        || path.len() > 4_096
+        || path.starts_with('/')
+        || path.contains('\\')
+        || path
+            .split('/')
+            .any(|part| part.is_empty() || matches!(part, "." | ".."))
+        || path
+            .strip_prefix("META-INF/")
+            .is_some_and(|name| name.contains("signatures"))
+        || reserved
+    {
+        return Err(Error::InvalidFormat(
+            "ODI auxiliary resource path is unsafe or reserved".to_string(),
         ));
     }
     Ok(())

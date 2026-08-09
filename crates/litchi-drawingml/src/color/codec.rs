@@ -56,6 +56,10 @@ impl<'a> From<&'a Base> for BaseRef<'a> {
 }
 
 /// Read one `DrawingML` color-choice fragment.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn read(xml: &[u8]) -> Result<Value> {
     let validated = validation::validated_fragment(xml)?;
     let mut reader = Reader::from_reader(validated);
@@ -74,7 +78,15 @@ pub fn read(xml: &[u8]) -> Result<Value> {
                 return Ok(parse_empty_choice(&mut reader, &element)?
                     .unwrap_or_else(|| Value::Unknown(Unknown::from_validated(validated))));
             },
-            _ => return Ok(Value::Unknown(Unknown::from_validated(validated))),
+            Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_)
+            | Event::Eof => return Ok(Value::Unknown(Unknown::from_validated(validated))),
         }
     }
 }
@@ -82,6 +94,10 @@ pub fn read(xml: &[u8]) -> Result<Value> {
 /// Write one `DrawingML` color-choice fragment using the conventional `a`
 /// prefix. The result is a fragment and intentionally has no namespace
 /// declaration so the host can retain its own namespace spelling.
+/// # Errors
+///
+/// Returns an error when input violates DrawingML constraints, exceeds a configured
+/// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn write(value: &Value) -> Result<Vec<u8>> {
     let mut output = String::new();
     match value {
@@ -143,7 +159,14 @@ fn read_choice(reader: &mut Reader<&[u8]>, element: &BytesStart<'_>) -> Result<O
                     "DrawingML color choice ended before its root element".into(),
                 ));
             },
-            _ => return Ok(None),
+            Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => return Ok(None),
         }
     }
 
@@ -250,7 +273,17 @@ fn parse_started_transform(
             Event::End(end) if end.name().as_ref() == name.as_slice() => {
                 return Ok(Some(transform));
             },
-            _ => return Ok(None),
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_)
+            | Event::Eof => return Ok(None),
         }
     }
 }
@@ -455,38 +488,38 @@ fn base_name(base: &Base) -> &'static str {
 
 fn write_transform(output: &mut String, transform: Transform) {
     match transform {
-        Transform::Alpha(value) => write_value(output, "alpha", value.value()),
-        Transform::AlphaMod(value) => write_value(output, "alphaMod", value.value()),
-        Transform::AlphaOff(value) => write_value(output, "alphaOff", value.value()),
-        Transform::Blue(value) => write_value(output, "blue", value.value()),
-        Transform::BlueMod(value) => write_value(output, "blueMod", value.value()),
-        Transform::BlueOff(value) => write_value(output, "blueOff", value.value()),
+        Transform::Alpha(value) => write_value(output, "alpha", &value.value()),
+        Transform::AlphaMod(value) => write_value(output, "alphaMod", &value.value()),
+        Transform::AlphaOff(value) => write_value(output, "alphaOff", &value.value()),
+        Transform::Blue(value) => write_value(output, "blue", &value.value()),
+        Transform::BlueMod(value) => write_value(output, "blueMod", &value.value()),
+        Transform::BlueOff(value) => write_value(output, "blueOff", &value.value()),
         Transform::Complement => write_empty(output, "comp"),
         Transform::Gamma => write_empty(output, "gamma"),
         Transform::Gray => write_empty(output, "gray"),
-        Transform::Green(value) => write_value(output, "green", value.value()),
-        Transform::GreenMod(value) => write_value(output, "greenMod", value.value()),
-        Transform::GreenOff(value) => write_value(output, "greenOff", value.value()),
-        Transform::Hue(value) => write_value(output, "hue", value.value()),
-        Transform::HueMod(value) => write_value(output, "hueMod", value.value()),
-        Transform::HueOff(value) => write_value(output, "hueOff", value.value()),
+        Transform::Green(value) => write_value(output, "green", &value.value()),
+        Transform::GreenMod(value) => write_value(output, "greenMod", &value.value()),
+        Transform::GreenOff(value) => write_value(output, "greenOff", &value.value()),
+        Transform::Hue(value) => write_value(output, "hue", &value.value()),
+        Transform::HueMod(value) => write_value(output, "hueMod", &value.value()),
+        Transform::HueOff(value) => write_value(output, "hueOff", &value.value()),
         Transform::Inverse => write_empty(output, "inv"),
         Transform::InverseGamma => write_empty(output, "invGamma"),
-        Transform::Lum(value) => write_value(output, "lum", value.value()),
-        Transform::LumMod(value) => write_value(output, "lumMod", value.value()),
-        Transform::LumOff(value) => write_value(output, "lumOff", value.value()),
-        Transform::Red(value) => write_value(output, "red", value.value()),
-        Transform::RedMod(value) => write_value(output, "redMod", value.value()),
-        Transform::RedOff(value) => write_value(output, "redOff", value.value()),
-        Transform::Sat(value) => write_value(output, "sat", value.value()),
-        Transform::SatMod(value) => write_value(output, "satMod", value.value()),
-        Transform::SatOff(value) => write_value(output, "satOff", value.value()),
-        Transform::Shade(value) => write_value(output, "shade", value.value()),
-        Transform::Tint(value) => write_value(output, "tint", value.value()),
+        Transform::Lum(value) => write_value(output, "lum", &value.value()),
+        Transform::LumMod(value) => write_value(output, "lumMod", &value.value()),
+        Transform::LumOff(value) => write_value(output, "lumOff", &value.value()),
+        Transform::Red(value) => write_value(output, "red", &value.value()),
+        Transform::RedMod(value) => write_value(output, "redMod", &value.value()),
+        Transform::RedOff(value) => write_value(output, "redOff", &value.value()),
+        Transform::Sat(value) => write_value(output, "sat", &value.value()),
+        Transform::SatMod(value) => write_value(output, "satMod", &value.value()),
+        Transform::SatOff(value) => write_value(output, "satOff", &value.value()),
+        Transform::Shade(value) => write_value(output, "shade", &value.value()),
+        Transform::Tint(value) => write_value(output, "tint", &value.value()),
     }
 }
 
-fn write_value(output: &mut String, name: &str, value: impl ToString) {
+fn write_value(output: &mut String, name: &str, value: &impl ToString) {
     output.push_str("<a:");
     output.push_str(name);
     output.push_str(" val=\"");
@@ -508,11 +541,24 @@ fn tail_is_empty(reader: &mut Reader<&[u8]>) -> Result<bool> {
         {
             Event::Text(text) if text.decode().map_err(xml_error)?.trim().is_empty() => {},
             Event::Eof => return Ok(true),
-            _ => return Ok(false),
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => return Ok(false),
         }
     }
 }
 
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "quick_xml map_err callbacks deliver this small encoding error by value"
+)]
 fn xml_error(error: quick_xml::encoding::EncodingError) -> Error {
     Error::Xml(error.to_string())
 }

@@ -238,6 +238,68 @@ impl Edit {
         Ok(Some(self))
     }
 
+    /// Copy direct row and column page breaks between two worksheets.
+    ///
+    /// Both selectors are resolved against the exact source snapshot. The
+    /// copied value is staged as owned semantic state, so publication never
+    /// aliases worksheet XML or relationship identifiers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when either selector targets a non-worksheet, source
+    /// page breaks are invalid, or the transaction contains a removal plan.
+    pub fn copy_page_breaks<'source, 'target>(
+        &mut self,
+        source: impl Into<Selector<'source>>,
+        target: impl Into<Selector<'target>>,
+    ) -> Result<Option<&mut Self>> {
+        guard::no_removal(self, "page-break copy")?;
+        let Some((source, target)) = Snapshot::new(&self.base).worksheet_pair(source, target)?
+        else {
+            return Ok(None);
+        };
+        let value = self.pending_page_breaks(&source)?;
+        self.sheets
+            .entry(target.position())
+            .or_default()
+            .page_breaks = Some(value);
+        Ok(Some(self))
+    }
+
+    /// Move direct row and column page breaks between two worksheets.
+    ///
+    /// The source is cleared and the target receives an owned copy in one
+    /// atomic workbook transaction. Moving a worksheet to itself is a no-op.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error under the same dependency and validation conditions as
+    /// [`Self::copy_page_breaks`].
+    pub fn move_page_breaks<'source, 'target>(
+        &mut self,
+        source: impl Into<Selector<'source>>,
+        target: impl Into<Selector<'target>>,
+    ) -> Result<Option<&mut Self>> {
+        guard::no_removal(self, "page-break move")?;
+        let Some((source, target)) = Snapshot::new(&self.base).worksheet_pair(source, target)?
+        else {
+            return Ok(None);
+        };
+        if source.position() == target.position() {
+            return Ok(Some(self));
+        }
+        let value = self.pending_page_breaks(&source)?;
+        self.sheets
+            .entry(target.position())
+            .or_default()
+            .page_breaks = Some(value);
+        self.sheets
+            .entry(source.position())
+            .or_default()
+            .page_breaks = Some(crate::page_breaks::PageBreaks::new());
+        Ok(Some(self))
+    }
+
     /// Remove a worksheet selected by its developer-facing name or checked
     /// zero-based source position.
     ///
@@ -286,6 +348,7 @@ impl Edit {
                 .saturating_add(added.actions.rows.len())
                 .saturating_add(added.actions.columns.len())
                 .saturating_add(added.actions.merges.len())
+                .saturating_add(usize::from(added.actions.page_breaks.is_some()))
         })
     }
 
@@ -392,6 +455,9 @@ impl Edit {
                         }
                     }
                     accepted.merges.extend(actions.merges);
+                    if accepted.page_breaks.is_none() {
+                        accepted.page_breaks = actions.page_breaks;
+                    }
                 },
             }
         }
@@ -404,9 +470,14 @@ impl Edit {
     pub fn commit(self) -> Result<Commit> {
         codec::ensure_unsigned(&self.base)?;
         if self.is_empty() {
+            let source = self.base.clone();
             return Ok(Commit {
                 workbook: self.base,
-                patch: Patch::default(),
+                patch: Patch {
+                    source: Some(source.clone()),
+                    target: Some(source),
+                    ..Patch::default()
+                },
             });
         }
         if !self.removed.is_empty() {
@@ -790,6 +861,7 @@ impl Edit {
                 rows,
                 columns,
                 merges,
+                page_breaks,
             } = requested;
             if defaults.is_none()
                 && web.is_none()
@@ -797,6 +869,7 @@ impl Edit {
                 && rows.is_empty()
                 && columns.is_empty()
                 && merges.is_empty()
+                && page_breaks.is_none()
             {
                 continue;
             }
@@ -811,6 +884,22 @@ impl Edit {
             };
             let store = sheet.store()?;
             let change_start = changes.len();
+            let effective_page_breaks = match page_breaks {
+                Some(after) => {
+                    let before = sheet.page_breaks()?;
+                    if before == after {
+                        None
+                    } else {
+                        changes.push(Change::PageBreaks {
+                            sheet: data.name.clone().into_boxed_str(),
+                            before,
+                            after: after.clone(),
+                        });
+                        Some(after)
+                    }
+                },
+                None => None,
+            };
             let effective_web = match web {
                 Some(after) => {
                     let before = sheet.web_bindings()?.clone();
@@ -918,6 +1007,7 @@ impl Edit {
                 && effective_rows.is_empty()
                 && effective_columns.is_empty()
                 && merge_projection.plan.is_empty()
+                && effective_page_breaks.is_none()
             {
                 continue;
             }
@@ -961,6 +1051,10 @@ impl Edit {
             if let Some(bindings) = &effective_web {
                 let input = after.as_deref().unwrap_or(&before);
                 after = Some(raw::web::replace(input, bindings)?);
+            }
+            if let Some(page_breaks) = &effective_page_breaks {
+                let input = after.as_deref().unwrap_or(&before);
+                after = Some(crate::page_breaks::replace(input, page_breaks)?);
             }
             let after =
                 after.ok_or_else(|| invalid("effective worksheet edit produced no bytes"))?;
@@ -1040,6 +1134,18 @@ impl Edit {
                             return Err(invalid(format!(
                                 "worksheet column edit verification failed at {sheet}!column {}",
                                 column.get()
+                            )));
+                        }
+                    },
+                    Change::PageBreaks {
+                        sheet,
+                        after: expected,
+                        ..
+                    } => {
+                        let actual = crate::page_breaks::parse(&after)?;
+                        if &actual != expected {
+                            return Err(invalid(format!(
+                                "worksheet page-break verification failed at {sheet}"
                             )));
                         }
                     },
@@ -1663,9 +1769,14 @@ impl Edit {
             && graph.is_empty()
             && web_patch.is_none()
         {
+            let source = base.clone();
             return Ok(Commit {
                 workbook: base,
-                patch: Patch::default(),
+                patch: Patch {
+                    source: Some(source.clone()),
+                    target: Some(source),
+                    ..Patch::default()
+                },
             });
         }
         let mut package = base.inner.package.clone();
@@ -1690,7 +1801,7 @@ impl Edit {
             codec::validate_web_integrity(&workbook)?;
         }
         Ok(Commit {
-            workbook,
+            workbook: workbook.clone(),
             patch: Patch {
                 changes: changes.into_boxed_slice(),
                 package_changes: package_changes.into_boxed_slice(),
@@ -1698,6 +1809,8 @@ impl Edit {
                 graph: graph.into_boxed_slice(),
                 web: web_patch,
                 style_guard,
+                source: Some(base),
+                target: Some(workbook),
             },
         })
     }
@@ -1797,6 +1910,17 @@ impl Edit {
             .get_mut(&position)
             .and_then(|actions| actions.web.as_mut())
             .ok_or_else(|| invalid("web-binding edit initialization failed"))
+    }
+
+    fn pending_page_breaks(&self, sheet: &Worksheet) -> Result<crate::page_breaks::PageBreaks> {
+        if let Some(value) = self
+            .sheets
+            .get(&sheet.position())
+            .and_then(|actions| actions.page_breaks.as_ref())
+        {
+            return Ok(value.clone());
+        }
+        sheet.page_breaks()
     }
 
     pub(super) fn set_visibility(&mut self, position: usize, action: TabAction) {
@@ -1918,6 +2042,12 @@ impl Edit {
             }
             if left.web.is_some() && right.web.is_some() {
                 conflicts.push(Conflict::Web {
+                    sheet: sheet.into(),
+                    position: *position,
+                });
+            }
+            if left.page_breaks.is_some() && right.page_breaks.is_some() {
+                conflicts.push(Conflict::PageBreaks {
                     sheet: sheet.into(),
                     position: *position,
                 });

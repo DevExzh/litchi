@@ -61,6 +61,10 @@ impl Panes {
     ///
     /// Image payloads remain shared through `Arc`; a failed edit leaves the
     /// original pane untouched. Returns `false` when the selector is absent.
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn edit<'key>(
         &mut self,
         selector: impl Into<Selector<'key>>,
@@ -108,6 +112,10 @@ impl Panes {
         Some(self.panes.remove(index))
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn push(&mut self, mut pane: Pane) -> Result<&mut Self> {
         if self.panes.len() >= MAX_WEB_EXTENSION_ITEMS {
             return limit(

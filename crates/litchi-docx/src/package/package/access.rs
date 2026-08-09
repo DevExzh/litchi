@@ -1,7 +1,9 @@
 //! Package graph access, signatures, and transactional low-level edits.
 
+#[cfg(feature = "sign")]
+use super::super::model::PackURI;
 use super::super::model::{
-    CustomProps, CustomPropsHost, Error, OpcPackage, PackURI, Package, Result, Slot, embedded,
+    CustomProps, CustomPropsHost, Error, OpcPackage, Package, Result, Slot, embedded,
     validate_document_main_content_type,
 };
 

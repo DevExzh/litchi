@@ -1,7 +1,8 @@
 //! Workbook-level publication for lossless cell-value edits.
 
-use super::{Commit, Limits, Snapshot};
+use super::{Commit, Limits, Snapshot, Value};
 use crate::package::error::{Error, Result};
+use litchi_core::sheet::traits::WorkbookTrait;
 use litchi_opc::{OpcPackage, PackURI, Part};
 
 const WORKSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.worksheet";
@@ -54,9 +55,59 @@ pub fn apply(package: &mut OpcPackage, worksheet: &PackURI, commit: &Commit) -> 
     let mut candidate = package.clone();
     candidate.get_part_mut(worksheet)?.set_blob(updated.clone());
     candidate.unsign();
-    crate::Workbook::from_opc_package(candidate.clone())?;
+    let parsed = crate::Workbook::from_opc_package(candidate.clone())?;
+    let worksheet_index = (0..parsed.worksheet_count())
+        .find_map(|index| {
+            parsed
+                .worksheet_uri(index)
+                .ok()
+                .filter(|candidate_uri| candidate_uri == worksheet)
+                .map(|_| index)
+        })
+        .ok_or_else(|| {
+            Error::WorksheetNotFound(format!("candidate worksheet part {}", worksheet.as_str()))
+        })?;
+    let _ = parsed.worksheet(worksheet_index)?;
+    validate_dependencies(commit.snapshot(), &parsed)?;
     *package = candidate;
-    super::worksheet::read(&updated)
+    Ok(commit.snapshot().clone())
+}
+
+fn validate_dependencies(snapshot: &Snapshot, workbook: &crate::Workbook) -> Result<()> {
+    for cell in snapshot.cells() {
+        let reference = cell.reference();
+        let style = usize::try_from(cell.style().get()).map_err(|_| {
+            Error::InvalidCellReference(format!(
+                "cell ({}, {}) style index does not fit this platform",
+                reference.row(),
+                reference.column()
+            ))
+        })?;
+        if workbook.styles().get_cell_format(style).is_none() {
+            return Err(Error::InvalidCellReference(format!(
+                "cell ({}, {}) references missing style index {style}",
+                reference.row(),
+                reference.column()
+            )));
+        }
+        if let Value::SharedStringIndex(index) = cell.value() {
+            let index = usize::try_from(*index).map_err(|_| {
+                Error::InvalidCellReference(format!(
+                    "cell ({}, {}) shared-string index does not fit this platform",
+                    reference.row(),
+                    reference.column()
+                ))
+            })?;
+            if workbook.shared_strings().get(index).is_none() {
+                return Err(Error::InvalidCellReference(format!(
+                    "cell ({}, {}) references missing shared-string index {index}",
+                    reference.row(),
+                    reference.column()
+                )));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn require_worksheet(part: &dyn Part) -> Result<()> {

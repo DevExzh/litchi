@@ -353,7 +353,7 @@ fn take_operands<const COUNT: usize>(
     operands: Vec<AdjustValue>,
 ) -> Result<[AdjustValue; COUNT]> {
     <[AdjustValue; COUNT]>::try_from(operands)
-        .map_err(|_| invalid_formula(text, "it has the wrong operand count"))
+        .map_err(|_error| invalid_formula(text, "it has the wrong operand count"))
 }
 
 fn invalid_formula(text: &str, reason: &str) -> Error {

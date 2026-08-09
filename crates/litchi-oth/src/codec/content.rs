@@ -59,6 +59,11 @@ pub(crate) struct ParagraphSite {
     pub(crate) value: crate::paragraph::Paragraph,
 }
 
+pub(crate) struct HeadingSite {
+    pub(crate) replacement: Option<ReplacementSite>,
+    pub(crate) value: crate::heading::Heading,
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct ReplacementSite {
     pub(crate) prefix: String,
@@ -69,8 +74,9 @@ pub(crate) struct ReplacementSite {
 pub(crate) struct Projection {
     pub(crate) bookmarks: Vec<crate::bookmark::Bookmark>,
     pub(crate) forms: Vec<crate::form::Form>,
-    pub(crate) headings: Vec<crate::heading::Heading>,
+    pub(crate) headings: Vec<HeadingSite>,
     pub(crate) lists: Vec<crate::list::List>,
+    pub(crate) list_sites: Vec<ReplacementSite>,
     pub(crate) order: Vec<BlockOrder>,
     pub(crate) paragraphs: Vec<ParagraphSite>,
     pub(crate) resources: Vec<crate::resource::Resource>,
@@ -108,6 +114,7 @@ struct ActiveSpan {
 struct PendingList {
     items: Vec<PendingListItem>,
     level: usize,
+    source_start: usize,
     style_name: Option<String>,
 }
 
@@ -318,6 +325,7 @@ pub(crate) fn project(xml: &str) -> Result<Projection> {
     let mut headings = Vec::new();
     let mut list_stack = Vec::<PendingList>::new();
     let mut lists = Vec::new();
+    let mut list_sites = Vec::new();
     let mut order = Vec::new();
     let mut paragraphs = Vec::new();
     let mut resources = Vec::new();
@@ -331,7 +339,7 @@ pub(crate) fn project(xml: &str) -> Result<Projection> {
                 let current = element(&reader, start.name());
                 inventory_resource(&reader, &start, current, &mut resources)?;
                 start_form(&reader, &start, current, &mut form_stack)?;
-                start_list(&reader, &start, current, &mut list_stack)?;
+                start_list(&reader, &start, current, event_start, &mut list_stack)?;
                 reserve(&mut stack, "OTH XML projection stack")?;
                 stack.push(current);
                 if matches!(current, Element::Paragraph | Element::Heading) {
@@ -355,21 +363,23 @@ pub(crate) fn project(xml: &str) -> Result<Projection> {
             },
             Event::Empty(start) => {
                 let current = element(&reader, start.name());
+                let event_end = source_offset(reader.buffer_position())?;
                 inventory_resource(&reader, &start, current, &mut resources)?;
                 empty_form(&reader, &start, current, &mut form_stack, &mut forms)?;
                 empty_list(
                     &reader,
                     &start,
                     current,
+                    event_start..event_end,
                     &mut list_stack,
                     &paragraphs,
                     &mut lists,
+                    &mut list_sites,
                 )?;
                 if matches!(current, Element::Paragraph | Element::Heading) {
                     if active.is_some() {
                         return invalid("OTH text blocks cannot contain text blocks");
                     }
-                    let event_end = source_offset(reader.buffer_position())?;
                     let block = ActiveBlock::new(&reader, &start, current, event_end)?;
                     let replacement = empty_replacement(xml, event_start..event_end, &start)?;
                     publish_block(
@@ -440,7 +450,15 @@ pub(crate) fn project(xml: &str) -> Result<Projection> {
                 if current == Element::Text {
                     text_close = Some(event_start);
                 }
-                end_list(current, &mut list_stack, &paragraphs, &mut lists)?;
+                let event_end = source_offset(reader.buffer_position())?;
+                end_list(
+                    current,
+                    event_end,
+                    &mut list_stack,
+                    &paragraphs,
+                    &mut lists,
+                    &mut list_sites,
+                )?;
                 end_form(current, &mut form_stack, &mut forms)?;
             },
             Event::Eof => {
@@ -452,6 +470,7 @@ pub(crate) fn project(xml: &str) -> Result<Projection> {
                     forms,
                     headings,
                     lists,
+                    list_sites,
                     order,
                     paragraphs,
                     resources,
@@ -1094,7 +1113,7 @@ fn publish_block(
     block: ActiveBlock,
     replacement: Option<ReplacementSite>,
     paragraphs: &mut Vec<ParagraphSite>,
-    headings: &mut Vec<crate::heading::Heading>,
+    headings: &mut Vec<HeadingSite>,
     order: &mut Vec<BlockOrder>,
     list_stack: &mut [PendingList],
 ) -> Result<()> {
@@ -1129,14 +1148,17 @@ fn publish_block(
             reserve(headings, "OTH heading projection")?;
             reserve(order, "OTH block order")?;
             let index = headings.len();
-            headings.push(crate::heading::Heading::projected(
-                block.level,
-                block.links,
-                block.runs,
-                block.fields,
-                block.style_name,
-                block.text,
-            ));
+            headings.push(HeadingSite {
+                replacement,
+                value: crate::heading::Heading::projected(
+                    block.level,
+                    block.links,
+                    block.runs,
+                    block.fields,
+                    block.style_name,
+                    block.text,
+                ),
+            });
             order.push(BlockOrder::Heading(index));
         },
         Element::Body
@@ -1247,6 +1269,7 @@ fn start_list(
     reader: &NsReader<&[u8]>,
     start: &BytesStart<'_>,
     current: Element,
+    source_start: usize,
     stack: &mut Vec<PendingList>,
 ) -> Result<()> {
     match current {
@@ -1256,6 +1279,7 @@ fn start_list(
             stack.push(PendingList {
                 items: Vec::new(),
                 level,
+                source_start,
                 style_name: optional_attribute(reader, start, TEXT_NAMESPACE, b"style-name")?,
             });
         },
@@ -1302,25 +1326,29 @@ fn empty_list(
     reader: &NsReader<&[u8]>,
     start: &BytesStart<'_>,
     current: Element,
+    source_range: Range<usize>,
     stack: &mut Vec<PendingList>,
     paragraphs: &[ParagraphSite],
     lists: &mut Vec<crate::list::List>,
+    sites: &mut Vec<ReplacementSite>,
 ) -> Result<()> {
-    start_list(reader, start, current, stack)?;
+    start_list(reader, start, current, source_range.start, stack)?;
     if current == Element::List {
-        publish_list(stack, paragraphs, lists)?;
+        publish_list(stack, paragraphs, lists, source_range.end, sites)?;
     }
     Ok(())
 }
 
 fn end_list(
     current: Element,
+    source_end: usize,
     stack: &mut Vec<PendingList>,
     paragraphs: &[ParagraphSite],
     lists: &mut Vec<crate::list::List>,
+    sites: &mut Vec<ReplacementSite>,
 ) -> Result<()> {
     if current == Element::List {
-        publish_list(stack, paragraphs, lists)?;
+        publish_list(stack, paragraphs, lists, source_end, sites)?;
     }
     Ok(())
 }
@@ -1329,6 +1357,8 @@ fn publish_list(
     stack: &mut Vec<PendingList>,
     paragraphs: &[ParagraphSite],
     lists: &mut Vec<crate::list::List>,
+    source_end: usize,
+    sites: &mut Vec<ReplacementSite>,
 ) -> Result<()> {
     let list = stack
         .pop()
@@ -1369,6 +1399,12 @@ fn publish_list(
         ));
     }
     reserve(lists, "OTH list projection")?;
+    reserve(sites, "OTH list edit sites")?;
+    sites.push(ReplacementSite {
+        prefix: String::new(),
+        range: list.source_start..source_end,
+        suffix: String::new(),
+    });
     lists.push(crate::list::List::projected(
         items,
         list.level,
@@ -1587,7 +1623,7 @@ mod tests {
             projected.order,
             [BlockOrder::Heading(0), BlockOrder::Paragraph(0)]
         );
-        assert_eq!(projected.headings[0].level(), 2);
+        assert_eq!(projected.headings[0].value.level(), 2);
         assert_eq!(projected.paragraphs[0].value.text(), "plain  link\t\nend");
         assert_eq!(projected.paragraphs[0].value.style_name(), Some("Body"));
         assert_eq!(

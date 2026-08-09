@@ -3,4 +3,4 @@
 mod builder;
 
 pub use builder::Builder;
-pub(crate) use builder::render_fragment;
+pub(crate) use builder::{render_fragment, render_metadata, render_styles};

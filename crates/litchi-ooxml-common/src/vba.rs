@@ -100,6 +100,10 @@ impl Host {
 }
 
 /// Parse one validated package part as inert MS-OVBA source.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn read_project_part(
     package: &OpcPackage,
     part_name: &PackURI,
@@ -110,6 +114,10 @@ pub fn read_project_part(
 }
 
 /// Replace or attach the one VBA graph allowed for an OOXML main part.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn store_project_graph(
     package: &mut OpcPackage,
     source_part: &PackURI,
@@ -205,6 +213,10 @@ fn store_project_graph_in_place(
 }
 
 /// Remove the complete VBA graph and restore the corresponding non-macro main type.
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn remove_project_graph(
     package: &mut OpcPackage,
     source_part: &PackURI,
@@ -370,6 +382,10 @@ fn ensure_replacement_targets_available(
     Ok(())
 }
 
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn ensure_no_inbound_reference(package: &OpcPackage, target: &PackURI) -> Result<()> {
     let package_relationship = package.rels().iter().any(|relationship| {
         !relationship.is_external() && relationship.target_partname().ok().as_ref() == Some(target)
@@ -389,6 +405,10 @@ pub fn ensure_no_inbound_reference(package: &OpcPackage, target: &PackURI) -> Re
     Ok(())
 }
 
+/// # Errors
+///
+/// Returns an error when input violates OOXML constraints, exceeds a configured
+/// bound, or an underlying XML or package operation fails.
 pub fn ensure_exclusive_inbound_reference(
     package: &OpcPackage,
     target: &PackURI,

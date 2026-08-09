@@ -47,6 +47,29 @@ impl Spreadsheet {
         })
     }
 
+    /// Capture the exact package as the unified immutable transaction owner.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when package bounds or complete facade readback fail.
+    pub fn document_snapshot(&self) -> Result<crate::document::Snapshot> {
+        crate::document::Snapshot::from_bytes(self.package.package().as_bytes().to_vec())
+    }
+
+    /// Apply one durable exact-source unified package patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for stale lineage, security refusal, package bounds, or candidate
+    /// readback failure. This facade changes only after the target fully reopens.
+    pub fn apply_document_patch(&mut self, patch: &crate::document::Patch) -> Result<()> {
+        let commit = patch.apply(&self.document_snapshot()?)?;
+        if commit.changed() {
+            *self = Self::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+        }
+        Ok(())
+    }
+
     #[must_use]
     pub fn content_xml(&self) -> &str {
         self.package.content_xml()

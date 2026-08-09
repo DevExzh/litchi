@@ -21,6 +21,10 @@ impl DiagramDataModel {
     /// `mc:AlternateContent` wrappers resolve to their fallback content.
     /// Unmodeled formatting and extension content is validated as XML structure
     /// but is not retained; see the publication warning on [`Self::to_xml`].
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn parse(xml: &str) -> Result<Self> {
         if xml.len() > MAX_DATA_MODEL_XML {
             return Err(limit("data-model XML bytes"));
@@ -343,7 +347,7 @@ impl DiagramDataModel {
                 Event::DocType(_) => return Err(invalid("DTDs are rejected")),
                 Event::CData(_) => return Err(invalid("CDATA is rejected")),
                 Event::Eof => break,
-                _ => {},
+                Event::Comment(_) | Event::Decl(_) | Event::PI(_) => {},
             }
             buffer.clear();
         }
@@ -370,6 +374,10 @@ impl DiagramDataModel {
     /// whole-diagram formatting, and extension lists are outside this model and
     /// will not be emitted. Use this method for fresh authoring or only after
     /// deliberately accepting that canonicalization.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn to_xml(&self, conformance: Conformance) -> Result<String> {
         let capacity = self.serialized_xml_len(conformance)?;
         let mut xml = String::new();
@@ -384,6 +392,10 @@ impl DiagramDataModel {
     /// This has the same non-lossless publication contract as [`Self::to_xml`].
     /// Validation and allocation complete before the destination is changed, so
     /// an error leaves its previous contents intact.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn write_xml(&self, xml: &mut String, conformance: Conformance) -> Result<()> {
         let additional = self.serialized_xml_len(conformance)?;
         xml.try_reserve_exact(additional).map_err(reserve_error)?;
@@ -493,6 +505,10 @@ fn write_connection(xml: &mut impl fmt::Write, connection: &Connection) -> Resul
     xml.write_str("/>").map_err(write_error)
 }
 
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "the copyable optional attribute mirrors the schema writer call shape"
+)]
 fn write_optional_attribute(
     xml: &mut impl fmt::Write,
     name: &str,
@@ -510,6 +526,10 @@ fn write_error(error: fmt::Error) -> Error {
     Error::Xml(format!("failed to write diagram XML: {error}"))
 }
 
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "String::try_reserve map_err supplies the owned allocation error"
+)]
 fn reserve_error(error: std::collections::TryReserveError) -> Error {
     invalid(format!("cannot reserve diagram XML output: {error}"))
 }
@@ -712,13 +732,13 @@ fn push_connection(model: &mut DiagramDataModel, element: &BytesStart<'_>) -> Re
 fn parse_order(value: &str) -> Result<u32> {
     xml_token(value)
         .parse()
-        .map_err(|_| invalid("invalid diagram connection order"))
+        .map_err(|_error| invalid("invalid diagram connection order"))
 }
 
 fn parse_id(value: &str, description: &str) -> Result<Id> {
     value
         .parse()
-        .map_err(|_| invalid(format!("invalid {description} `{value}`")))
+        .map_err(|_error| invalid(format!("invalid {description} `{value}`")))
 }
 
 fn xml_token(value: &str) -> &str {

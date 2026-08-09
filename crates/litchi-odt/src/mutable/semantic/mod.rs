@@ -9,7 +9,9 @@
 //! # fn main() -> litchi_core::Result<()> {
 //! let mut document = MutableDocument::new();
 //! document.content_mut().add_paragraph("body")?;
-//! document.content_mut().append_line_break(0)?;
+//! document
+//!     .content_mut()
+//!     .append_line_break_at(litchi_core::Position::new(0))?;
 //! document.styles_mut().add_master_page("Standard", "pm1")?;
 //! # Ok(())
 //! # }

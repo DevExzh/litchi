@@ -52,6 +52,10 @@ pub struct ExtList {
 }
 
 impl ExtList {
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn from_xml(xml: &[u8]) -> Result<Self> {
         if xml.len() > MAX_WEB_EXTENSION_XML_BYTES {
             return invalid(format!(
@@ -209,6 +213,10 @@ pub struct Effect {
 }
 
 impl Effect {
+    /// # Errors
+    ///
+    /// Returns an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn from_xml(xml: &[u8]) -> Result<Self> {
         if xml.len() > MAX_WEB_EXTENSION_XML_BYTES {
             return invalid(format!(

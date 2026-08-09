@@ -28,8 +28,9 @@ animations, and embedded payloads are inert unless a row says otherwise.
 The public ODP path includes package opening, slide parsing, slide/text and
 shape authoring, package-contained image/media access, page-layout models,
 presentation settings, declarations, page metadata, custom shows, metadata,
-RDF graph editing, password opening, and source-checked slide/shape/RDF and
-chart transactions. Attached mutable presentation roots are private implementation
+RDF graph editing, password opening, and a unified source-checked transaction
+for slides, shapes, media, charts, layouts, masters, annotations, and RDF.
+Attached mutable presentation roots are private implementation
 details and cannot be obtained through the public API.
 
 The Microsoft `[MS-PPTX]` Front Matter and ToC describe extensions to OOXML
@@ -49,12 +50,12 @@ the existence of a PPTX feature is never treated as ODP support.
 | Common styles and data styles | 🟡 | 🟡 | 🟡 | Direct presentation/drawing properties and bounded shared style values are supported; there is no complete public style-graph resolver/editor for every ODF style family |
 | Images and package media | ✅ | ✅ | ✅ | Package-contained and linked image/media references are typed; package bytes are read without fetching external URLs, and builder media embedding creates package resources |
 | Embedded objects and OLE-like payloads | 🟡 | ✅ | 🟡 | `embedded_objects()` provides a bounded inert inventory for regular objects, OLE payloads, applets, plugins, and floating frames, including storage/link classification and applet/plugin parameters. Payloads are never opened, fetched, activated, executed, or rendered |
-| Embedded charts | 🟡 | ✅ | 🟡 | Bounded chart parts and frame/storage context are typed; `chart_snapshot()` provides source-checked add/remove/replace commits, typed readback, and reversible exact-source patches. There is no complete chart-data CRUD or recalculation engine |
-| Annotations/comments | ✅ | ✅ | ✅ | `annotation::{Anchor, Info, Position}` inventories shared rich ODF annotations at validated pages or uniquely named shapes; `Presentation` provides atomic add/replace/remove while untouched XML and no-op bytes remain preserved |
+| Embedded charts | 🟡 | ✅ | 🟡 | Bounded chart parts and frame/storage context are typed; `chart_snapshot()` and the unified `edit::Transaction` provide source-checked add/remove/replace commits, typed readback, and reversible exact-source patches. There is no complete chart-data CRUD or recalculation engine |
+| Annotations/comments | ✅ | ✅ | ✅ | `annotation::{Anchor, Info, Position}` inventories shared rich ODF annotations at validated pages or uniquely named shapes; `Presentation` and the unified transaction provide atomic add/replace/remove while untouched XML and no-op bytes remain preserved |
 | Hyperlinks and external references | ✅ | ✅ | ✅ | Shape links, XLink targets, show/actuate values, page jumps, and action metadata are typed and serialized; targets are never opened or followed |
 | Forms and controls | ❌ | ❌ | ❌ | No public ODP form/control model or authoring surface is exposed; a control-shaped XML payload is not treated as typed form support |
 | Scripts, events, and macros | 🟡 | 🟡 | 🟡 | Event/action and script-binding metadata can be represented as inert values; no script, macro, or event execution occurs |
-| RDF metadata graphs | ✅ | ✅ | ✅ | Graph and triple inventory plus ordered add/replace/remove/move operations are exposed on `Presentation`; the same CRUD can be committed atomically with slide, shape, and media edits through `edit::Transaction` |
+| RDF metadata graphs | ✅ | ✅ | ✅ | Graph and triple inventory plus ordered add/replace/remove/move operations are exposed on `Presentation`; the same CRUD can be committed atomically with slide, shape, media, chart, design, and annotation edits through `edit::Transaction` |
 | ODF encryption authoring | ❌ | ✅ | ❌ | Password opening is supported, but the public ODP builder has no encrypt/password-change operation; common encryption code alone is not end-to-end write support |
 | ODF digital signatures | ❌ | ❌ | ❌ | Shared XMLDSig models do not become ODP sign/verify/add/clear APIs in the current public crate |
 | Unknown package-part preservation | 🟡 | ✅ | 🟡 | The owned package can retain unrelated resources around supported edits; preservation is not semantic understanding or guaranteed lossless mutation of every extension |
@@ -73,9 +74,9 @@ the existence of a PPTX feature is never treated as ODP support.
 | Audio and video plugins | ✅ | ✅ | ✅ | `draw:plugin` references include MIME type, XLink show/actuate, IDs, and parameters; package-contained media is embeddable/readable, but playback is never attempted |
 | Tables | 🟡 | 🟡 | 🟡 | Table-shaped frames or opaque table XML can be retained within the bounded drawing model; there is no public typed cell/row/table editor |
 | Charts and chart data ranges | 🟡 | ✅ | 🟡 | Chart frames and shared range/series views are bounded and chart parts can be added, removed, or atomically replaced. Fine-grained series/data editing, recalculation, and rendering remain unavailable |
-| Presentation page layouts | ✅ | ✅ | ✅ | Named presentation page layouts and typed placeholder roles/geometry are parsed, validated, added, replaced, and serialized through public builder/package APIs |
+| Presentation page layouts | ✅ | ✅ | ✅ | Named presentation page layouts and typed placeholder roles/geometry are parsed, validated, added, replaced, reordered, removed, and serialized through public builder/package and unified transaction APIs |
 | Slide page metadata and layout references | ✅ | ✅ | ✅ | Page names, IDs, page-layout/master references, and related declaration bindings are inspected and authored through the public page metadata model |
-| Master pages | ✅ | ✅ | ✅ | Typed master-page metadata, shared ODF regions/children, lossless XML fragments, package CRUD, ordering, and slide master/layout assignment are exposed through the layered `master` facade |
+| Master pages | ✅ | ✅ | ✅ | Typed master-page metadata, shared ODF regions/children, lossless XML fragments, package CRUD, ordering, and slide master/layout assignment are exposed through the layered `master` facade and unified transaction |
 | Handout master | ✅ | ✅ | ✅ | `handout_master::Master` provides typed XML, shared drawing children, package set/replace/clear, and bounded one-hop presentation-layout resolution |
 | Headers, footers, and date-time declarations | ✅ | ✅ | ✅ | Typed declaration collections cover header/footer/date-time values and page bindings; field expansion and host clock identity remain inert |
 | Backgrounds and named drawing resources | 🟡 | 🟡 | 🟡 | Direct background/drawing properties and source-level named fill-image, gradient, hatch, marker, opacity, and stroke-dash values are bounded; no complete public resolver or renderer is provided |

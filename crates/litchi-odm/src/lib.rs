@@ -9,6 +9,7 @@
 
 mod authoring;
 mod codec;
+mod edit_ops;
 mod facade;
 pub mod link;
 mod model;

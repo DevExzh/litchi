@@ -1,8 +1,10 @@
 //! Top-level content projection and structural element operations.
 
+#![deny(clippy::expect_used, clippy::unwrap_used)]
+
 use super::model::{DocumentElement, MutableDocument};
 use crate::elements::table::Table;
-use crate::elements::text::{Heading, Hyperlink, List, Paragraph};
+use crate::elements::text::{Heading, Hyperlink, List, Paragraph, Span};
 use litchi_core::{Error, Result};
 
 impl MutableDocument {
@@ -106,6 +108,7 @@ impl MutableDocument {
     }
 
     /// Insert a plain paragraph at a top-level structural position.
+    #[deprecated(note = "use insert_paragraph_at with a checked semantic Position")]
     pub fn insert_paragraph(&mut self, index: usize, text: &str) -> Result<()> {
         let mut paragraph = Paragraph::new();
         paragraph.set_text(text);
@@ -122,8 +125,27 @@ impl MutableDocument {
         Ok(())
     }
 
+    /// Insert a plain paragraph at a checked semantic paragraph position.
+    pub fn insert_paragraph_at(
+        &mut self,
+        position: litchi_core::Position,
+        text: &str,
+    ) -> Result<()> {
+        self.insert_semantic_paragraph(position.get(), text)
+    }
+
     /// Remove one top-level paragraph and return its typed value.
+    #[deprecated(note = "use remove_paragraph_at with a checked semantic Position")]
     pub fn remove_paragraph(&mut self, index: usize) -> Result<Paragraph> {
+        self.remove_semantic_paragraph(index)
+    }
+
+    /// Remove one paragraph selected by a checked semantic position.
+    pub fn remove_paragraph_at(&mut self, position: litchi_core::Position) -> Result<Paragraph> {
+        self.remove_semantic_paragraph(position.get())
+    }
+
+    pub(crate) fn remove_semantic_paragraph(&mut self, index: usize) -> Result<Paragraph> {
         let element_index = nth_element_index(
             &self.elements,
             index,
@@ -139,7 +161,21 @@ impl MutableDocument {
     }
 
     /// Replace one top-level paragraph's plain text.
+    #[deprecated(note = "use replace_paragraph_at with a checked semantic Position")]
     pub fn update_paragraph(&mut self, index: usize, text: &str) -> Result<()> {
+        self.replace_semantic_paragraph(index, text)
+    }
+
+    /// Replace one paragraph's content with plain text at a checked position.
+    pub fn replace_paragraph_at(
+        &mut self,
+        position: litchi_core::Position,
+        text: &str,
+    ) -> Result<()> {
+        self.replace_semantic_paragraph(position.get(), text)
+    }
+
+    pub(crate) fn replace_semantic_paragraph(&mut self, index: usize, text: &str) -> Result<()> {
         let element_index = nth_element_index(
             &self.elements,
             index,
@@ -153,6 +189,84 @@ impl MutableDocument {
                 paragraph.set_text(text);
                 Ok(())
             },
+            _ => unreachable!("paragraph index resolved to a non-paragraph"),
+        }
+    }
+
+    pub(crate) fn insert_semantic_paragraph(&mut self, index: usize, text: &str) -> Result<()> {
+        let paragraph_count = self.paragraphs().len();
+        if index > paragraph_count {
+            return Err(Error::InvalidFormat(format!(
+                "Paragraph position {index} out of bounds (found {paragraph_count} paragraphs)"
+            )));
+        }
+        let element_index = if index == paragraph_count {
+            self.elements
+                .iter()
+                .rposition(|element| matches!(element, DocumentElement::Paragraph(_)))
+                .map_or(self.elements.len(), |position| position + 1)
+        } else {
+            nth_element_index(
+                &self.elements,
+                index,
+                "Paragraph",
+                "paragraphs",
+                |element| matches!(element, DocumentElement::Paragraph(_)),
+            )?
+        };
+        let mut paragraph = Paragraph::new();
+        paragraph.set_text(text);
+        self.invalidate_content_xml();
+        self.elements
+            .insert(element_index, DocumentElement::Paragraph(paragraph));
+        Ok(())
+    }
+
+    pub(crate) fn append_semantic_run(
+        &mut self,
+        paragraph: usize,
+        text: &str,
+        style_name: Option<&str>,
+    ) -> Result<()> {
+        let element_index = nth_element_index(
+            &self.elements,
+            paragraph,
+            "Paragraph",
+            "paragraphs",
+            |element| matches!(element, DocumentElement::Paragraph(_)),
+        )?;
+        let mut span = Span::new();
+        span.set_text(text);
+        if let Some(style_name) = style_name {
+            span.set_style_name(style_name);
+        }
+        self.invalidate_content_xml();
+        match &mut self.elements[element_index] {
+            DocumentElement::Paragraph(paragraph) => {
+                paragraph.add_span(span);
+                Ok(())
+            },
+            _ => unreachable!("paragraph index resolved to a non-paragraph"),
+        }
+    }
+
+    pub(crate) fn append_semantic_hyperlink(
+        &mut self,
+        paragraph: usize,
+        href: &str,
+        text: &str,
+    ) -> Result<()> {
+        let element_index = nth_element_index(
+            &self.elements,
+            paragraph,
+            "Paragraph",
+            "paragraphs",
+            |element| matches!(element, DocumentElement::Paragraph(_)),
+        )?;
+        let hyperlink = Hyperlink::with_href(href, text)?;
+        self.invalidate_content_xml();
+        match &mut self.elements[element_index] {
+            DocumentElement::Paragraph(paragraph) => paragraph.add_hyperlink(hyperlink),
             _ => unreachable!("paragraph index resolved to a non-paragraph"),
         }
     }

@@ -142,7 +142,13 @@ fn validate_guid(name: &str, value: &Value) -> Result<()> {
 fn text_value<'a>(name: &str, value: &'a Value) -> Result<&'a str> {
     match value {
         Value::Text(text) => Ok(text),
-        _ => Err(invalid(format!(
+        Value::Empty
+        | Value::I32(_)
+        | Value::I64(_)
+        | Value::F32(_)
+        | Value::F64(_)
+        | Value::Bool(_)
+        | Value::Time(_) => Err(invalid(format!(
             "reserved custom property '{name}' must use a text value"
         ))),
     }
@@ -150,9 +156,7 @@ fn text_value<'a>(name: &str, value: &'a Value) -> Result<&'a str> {
 
 fn validate_font(name: &str, value: &str) -> Result<()> {
     let mut fields = value.splitn(3, ',');
-    let color = fields
-        .next()
-        .expect("splitn always returns the first field");
+    let color = fields.next().unwrap_or_default();
     let points = fields.next();
     let face = fields.next();
     let valid_color = color.len() == 7

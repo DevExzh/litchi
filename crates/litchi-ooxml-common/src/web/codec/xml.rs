@@ -17,14 +17,14 @@ pub(in crate::web) fn effective_namespaces(
     let mut namespaces = Vec::new();
     namespaces
         .try_reserve(scope.binding_count)
-        .map_err(|_| Error::Limit {
+        .map_err(|_error| Error::Limit {
             resource: "retained web extension namespace entries",
             max: scope.binding_count,
             actual: scope.binding_count,
         })?;
     let mut seen = HashSet::new();
     seen.try_reserve(scope.binding_count)
-        .map_err(|_| Error::Limit {
+        .map_err(|_error| Error::Limit {
             resource: "retained web extension namespace entries",
             max: scope.binding_count,
             actual: scope.binding_count,
@@ -256,7 +256,7 @@ impl XmlDocument {
             actual: usize::MAX,
         })?;
         let mut out = String::new();
-        out.try_reserve(capacity).map_err(|_| Error::Limit {
+        out.try_reserve(capacity).map_err(|_error| Error::Limit {
             resource: "retained web extension fragment bytes",
             max: capacity,
             actual: capacity,
@@ -326,9 +326,11 @@ pub(in crate::web) fn parse_xml_owned(xml: Vec<u8>, limits: &Limits) -> Result<X
     let mut declaration_seen = false;
     let mut content_seen = false;
     loop {
-        let event_start = reader.buffer_position() as usize;
+        let event_start = usize::try_from(reader.buffer_position())
+            .map_err(|error| Error::Invalid(format!("XML event offset is too large: {error}")))?;
         let event = reader.read_event_into(&mut buffer)?;
-        let event_end = reader.buffer_position() as usize;
+        let event_end = usize::try_from(reader.buffer_position())
+            .map_err(|error| Error::Invalid(format!("XML event offset is too large: {error}")))?;
         let declaration_or_eof = matches!(&event, Event::Decl(_) | Event::Eof);
         match event {
             Event::Decl(declaration) => {
@@ -397,7 +399,7 @@ pub(in crate::web) fn parse_xml_owned(xml: Vec<u8>, limits: &Limits) -> Result<X
                 }
                 attach_node(&mut state.root, &mut state.stack, frame.node)?;
             },
-            _ => {},
+            Event::Text(_) | Event::CData(_) | Event::Comment(_) | Event::PI(_) => {},
         }
         if !declaration_or_eof {
             content_seen = true;
