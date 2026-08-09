@@ -1,11 +1,11 @@
 //! XML generation for the builder's ODF document parts.
 
 use super::model::{AnnotationInsertion, Builder, DocumentElement};
-use litchi_core::xml::escape_xml;
+use litchi_core::{Error, Result, xml::escape_xml};
 
 impl Builder {
     /// Generate the content.xml body
-    pub(super) fn generate_content_body(&self) -> String {
+    pub(super) fn generate_content_body(&self) -> Result<String> {
         let mut estimated = 256usize;
         estimated += self.elements.len() * 96;
         estimated += self
@@ -14,8 +14,7 @@ impl Builder {
             .map(|e| match e {
                 DocumentElement::Paragraph(p) => p.text().map_or(0, |t| t.len()),
                 DocumentElement::Heading(h) => h.text().map_or(0, |t| t.len()),
-                DocumentElement::Table(_) => 256,
-                DocumentElement::List(_) => 256,
+                DocumentElement::Table(_) | DocumentElement::List(_) => 256,
                 DocumentElement::Section(xml) => xml.len(),
             })
             .sum::<usize>();
@@ -23,11 +22,7 @@ impl Builder {
         let mut body = String::with_capacity(estimated);
 
         if let Some(sequence) = &self.page_sequence {
-            body.push_str(
-                &sequence
-                    .to_xml_fragment()
-                    .expect("validated builder page sequence"),
-            );
+            body.push_str(&sequence.to_xml_fragment()?);
         }
 
         if !self.property_forms.is_empty()
@@ -45,84 +40,40 @@ impl Builder {
         {
             body.push_str("<office:forms>");
             for form in &self.property_forms {
-                body.push_str(
-                    &form
-                        .to_xml_fragment()
-                        .expect("validated builder property form"),
-                );
+                body.push_str(&form.to_xml_fragment()?);
             }
             for form in &self.control_forms {
-                body.push_str(
-                    &form
-                        .to_xml_fragment()
-                        .expect("validated builder control form"),
-                );
+                body.push_str(&form.to_xml_fragment()?);
             }
             for form in &self.interactive_forms {
-                body.push_str(
-                    &form
-                        .to_xml_fragment()
-                        .expect("validated builder interactive form"),
-                );
+                body.push_str(&form.to_xml_fragment()?);
             }
             for form in &self.selection_forms {
-                body.push_str(
-                    &form
-                        .to_xml_fragment()
-                        .expect("validated builder selection form"),
-                );
+                body.push_str(&form.to_xml_fragment()?);
             }
             for form in &self.visual_forms {
-                body.push_str(
-                    &form
-                        .to_xml_fragment()
-                        .expect("validated builder visual form"),
-                );
+                body.push_str(&form.to_xml_fragment()?);
             }
             for form in &self.generic_forms {
-                body.push_str(
-                    &form
-                        .to_xml_fragment()
-                        .expect("validated builder generic form"),
-                );
+                body.push_str(&form.to_xml_fragment()?);
             }
             for form in &self.password_file_forms {
-                body.push_str(
-                    &form
-                        .to_xml_fragment()
-                        .expect("validated builder password/file form"),
-                );
+                body.push_str(&form.to_xml_fragment()?);
             }
             for form in &self.image_frame_forms {
-                body.push_str(
-                    &form
-                        .to_xml_fragment()
-                        .expect("validated builder image-frame form"),
-                );
+                body.push_str(&form.to_xml_fragment()?);
             }
             for form in &self.value_range_forms {
-                body.push_str(
-                    &form
-                        .to_xml_fragment()
-                        .expect("validated builder value-range form"),
-                );
+                body.push_str(&form.to_xml_fragment()?);
             }
             for form in &self.typed_value_forms {
-                body.push_str(
-                    &form
-                        .to_xml_fragment()
-                        .expect("validated builder typed-value form"),
-                );
+                body.push_str(&form.to_xml_fragment()?);
             }
             for form in &self.grid_forms {
-                body.push_str(&form.to_xml_fragment().expect("validated builder grid form"));
+                body.push_str(&form.to_xml_fragment()?);
             }
             for form in &self.connection_resource_forms {
-                body.push_str(
-                    &form
-                        .to_xml_fragment()
-                        .expect("validated builder connection-resource form"),
-                );
+                body.push_str(&form.to_xml_fragment()?);
             }
             body.push_str("</office:forms>");
         }
@@ -159,10 +110,9 @@ impl Builder {
             let suffix = "</office:text>";
             let mut wrapped = format!("{prefix}{body}{suffix}");
             for (paragraph_index, mark) in &self.text_index_marks {
-                wrapped = crate::insert_text_index_mark_xml(&wrapped, *paragraph_index, mark)
-                    .expect("validated builder index mark");
+                wrapped = crate::insert_text_index_mark_xml(&wrapped, *paragraph_index, mark)?;
             }
-            body = wrapped[prefix.len()..wrapped.len() - suffix.len()].to_string();
+            body = unwrap_text_body(&wrapped, prefix, suffix)?;
         }
 
         if !self.reference_marks.is_empty() {
@@ -170,10 +120,9 @@ impl Builder {
             let suffix = "</office:text>";
             let mut wrapped = format!("{prefix}{body}{suffix}");
             for (paragraph_index, mark) in &self.reference_marks {
-                wrapped = crate::insert_reference_mark_xml(&wrapped, *paragraph_index, mark)
-                    .expect("validated builder reference mark");
+                wrapped = crate::insert_reference_mark_xml(&wrapped, *paragraph_index, mark)?;
             }
-            body = wrapped[prefix.len()..wrapped.len() - suffix.len()].to_string();
+            body = unwrap_text_body(&wrapped, prefix, suffix)?;
         }
 
         if !self.bookmark_targets.is_empty() {
@@ -181,10 +130,9 @@ impl Builder {
             let suffix = "</office:text>";
             let mut wrapped = format!("{prefix}{body}{suffix}");
             for (paragraph_index, target) in &self.bookmark_targets {
-                wrapped = crate::insert_bookmark_xml(&wrapped, *paragraph_index, target)
-                    .expect("validated builder bookmark target");
+                wrapped = crate::insert_bookmark_xml(&wrapped, *paragraph_index, target)?;
             }
-            body = wrapped[prefix.len()..wrapped.len() - suffix.len()].to_string();
+            body = unwrap_text_body(&wrapped, prefix, suffix)?;
         }
 
         if !self.ruby_annotations.is_empty() {
@@ -196,8 +144,7 @@ impl Builder {
                     AnnotationInsertion::Append {
                         paragraph_index,
                         annotation,
-                    } => crate::insert_ruby_annotation_xml(&wrapped, *paragraph_index, annotation)
-                        .expect("validated builder ruby annotation"),
+                    } => crate::insert_ruby_annotation_xml(&wrapped, *paragraph_index, annotation)?,
                     AnnotationInsertion::Wrap {
                         paragraph_index,
                         range,
@@ -207,11 +154,10 @@ impl Builder {
                         *paragraph_index,
                         range.clone(),
                         annotation,
-                    )
-                    .expect("validated builder ruby annotation range"),
+                    )?,
                 };
             }
-            body = wrapped[prefix.len()..wrapped.len() - suffix.len()].to_string();
+            body = unwrap_text_body(&wrapped, prefix, suffix)?;
         }
 
         if !self.notes.is_empty() {
@@ -219,57 +165,74 @@ impl Builder {
             let suffix = "</office:text>";
             let mut wrapped = format!("{prefix}{body}{suffix}");
             for (paragraph_index, note) in &self.notes {
-                wrapped = crate::insert_note_xml(&wrapped, *paragraph_index, note)
-                    .expect("validated builder note");
+                wrapped = crate::insert_note_xml(&wrapped, *paragraph_index, note)?;
             }
-            body = wrapped[prefix.len()..wrapped.len() - suffix.len()].to_string();
+            body = unwrap_text_body(&wrapped, prefix, suffix)?;
         }
 
-        body
+        Ok(body)
     }
 
     /// Generate the complete content.xml
-    pub(super) fn generate_content_xml(&self) -> String {
-        let body = self.generate_content_body();
+    pub(super) fn generate_content_xml(&self) -> Result<String> {
+        let body = self.generate_content_body()?;
 
-        format!(
+        Ok(format!(
             r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" xmlns:dr3d="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0" xmlns:math="http://www.w3.org/1998/Math/MathML" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:ooo="http://openoffice.org/2004/office" xmlns:ooow="http://openoffice.org/2004/writer" xmlns:oooc="http://openoffice.org/2004/calc" xmlns:dom="http://www.w3.org/2001/xml-events" xmlns:xforms="http://www.w3.org/2002/xforms" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" office:version="1.3"><office:scripts/><office:font-face-decls/><office:automatic-styles/><office:body><office:text>{body}</office:text></office:body></office:document-content>"#
-        )
+        ))
     }
 
     /// Generate meta.xml with metadata
     pub(super) fn generate_meta_xml(&self) -> String {
-        let now = chrono::Utc::now().to_rfc3339();
-
-        let mut meta = format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" office:version="1.3"><office:meta><meta:generator>Litchi/0.0.1</meta:generator><meta:creation-date>{now}</meta:creation-date><dc:date>{now}</dc:date>"#
-        );
+        let mut meta = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" office:version="1.3"><office:meta><meta:generator>Litchi/0.0.1</meta:generator>"#.to_string();
 
         // Add optional metadata fields
         if let Some(ref title) = self.metadata.title {
-            meta.push_str(&format!("<dc:title>{}</dc:title>", escape_xml(title)));
+            push_metadata_element(&mut meta, "dc:title", title);
         }
 
         if let Some(ref author) = self.metadata.author {
-            meta.push_str(&format!("<dc:creator>{}</dc:creator>", escape_xml(author)));
+            push_metadata_element(&mut meta, "dc:creator", author);
         }
 
         if let Some(ref subject) = self.metadata.subject {
-            meta.push_str(&format!("<dc:subject>{}</dc:subject>", escape_xml(subject)));
+            push_metadata_element(&mut meta, "dc:subject", subject);
         }
 
         if let Some(ref description) = self.metadata.description {
-            meta.push_str(&format!(
-                "<dc:description>{}</dc:description>",
-                escape_xml(description)
-            ));
+            push_metadata_element(&mut meta, "dc:description", description);
         }
 
         if let Some(ref keywords) = self.metadata.keywords {
-            meta.push_str(&format!(
-                "<meta:keyword>{}</meta:keyword>",
-                escape_xml(keywords)
-            ));
+            push_metadata_element(&mut meta, "meta:keyword", keywords);
+        }
+
+        if let Some(ref identifier) = self.metadata.identifier {
+            push_metadata_element(&mut meta, "dc:identifier", identifier);
+        }
+
+        if let Some(ref language) = self.metadata.language {
+            push_metadata_element(&mut meta, "dc:language", language);
+        }
+
+        if let Some(created) = &self.metadata.created {
+            meta.push_str("<meta:creation-date>");
+            meta.push_str(&created.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true));
+            meta.push_str("</meta:creation-date>");
+        } else if let Some(created) = &self.metadata.created_local {
+            meta.push_str("<meta:creation-date>");
+            meta.push_str(&created.format("%Y-%m-%dT%H:%M:%S%.f").to_string());
+            meta.push_str("</meta:creation-date>");
+        }
+
+        if let Some(modified) = &self.metadata.modified {
+            meta.push_str("<dc:date>");
+            meta.push_str(&modified.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true));
+            meta.push_str("</dc:date>");
+        } else if let Some(modified) = &self.metadata.modified_local {
+            meta.push_str("<dc:date>");
+            meta.push_str(&modified.format("%Y-%m-%dT%H:%M:%S%.f").to_string());
+            meta.push_str("</dc:date>");
         }
 
         meta.push_str("</office:meta>");
@@ -590,4 +553,22 @@ impl Builder {
         }
         xml
     }
+}
+
+fn push_metadata_element(output: &mut String, name: &str, value: &str) {
+    output.push('<');
+    output.push_str(name);
+    output.push('>');
+    output.push_str(&escape_xml(value));
+    output.push_str("</");
+    output.push_str(name);
+    output.push('>');
+}
+
+fn unwrap_text_body(wrapped: &str, prefix: &str, suffix: &str) -> Result<String> {
+    wrapped
+        .strip_prefix(prefix)
+        .and_then(|value| value.strip_suffix(suffix))
+        .map(str::to_owned)
+        .ok_or_else(|| Error::InvalidFormat("generated ODT text wrapper is malformed".to_string()))
 }

@@ -118,8 +118,8 @@ pub use document::{Block, Document, Element, ImageWatermarkPart, OpaqueBlock};
 pub use math::{OfficeMath, OfficeMathParagraph};
 pub use package::Package;
 pub use paragraph::{
-    Collapsed, Paragraph, Run, RunBreak, RunBreakClear, RunBreakType, RunProperties, RunUnderline,
-    RunUnderlineColor,
+    Collapsed, Inline, InlineHyperlink, OpaqueInline, OpaqueRunContent, Paragraph, Run, RunBreak,
+    RunBreakClear, RunBreakType, RunContent, RunProperties, RunUnderline, RunUnderlineColor,
 };
 pub use run_effects::{Effect, Effects, OpaqueExtension};
 pub use section::{Emu, Margins, PageSize, Section, Sections};

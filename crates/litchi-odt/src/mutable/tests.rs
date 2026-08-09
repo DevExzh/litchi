@@ -33,6 +33,43 @@ fn source_document() -> Document {
     Document::from_bytes(builder.build().unwrap()).unwrap()
 }
 
+#[test]
+fn mutable_metadata_is_deterministic_and_preserves_source_timestamps() {
+    let mut fresh = MutableDocument::new();
+    fresh.metadata_mut().created = Some("2026-08-10T01:02:03Z".parse().unwrap());
+    fresh.metadata_mut().modified = Some("2026-08-10T04:05:06Z".parse().unwrap());
+    let fresh_package = OwnedPackage::from_bytes(fresh.to_bytes().unwrap()).unwrap();
+    let fresh_meta = String::from_utf8(fresh_package.get_file("meta.xml").unwrap()).unwrap();
+    assert!(fresh_meta.contains("<meta:creation-date>2026-08-10T01:02:03Z</meta:creation-date>"));
+    assert!(fresh_meta.contains("<dc:date>2026-08-10T04:05:06Z</dc:date>"));
+    litchi_odf_common::compact_xml::validate(fresh_meta.as_bytes()).unwrap();
+
+    const SOURCE_META: &str = r#"<?xml version="1.0"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"><office:meta><meta:generator>Producer/1</meta:generator><dc:date>2024-01-02T03:04:05Z</dc:date></office:meta></office:document-meta>"#;
+    let mut writer = PackageWriter::new();
+    writer
+        .set_mimetype("application/vnd.oasis.opendocument.text")
+        .unwrap();
+    writer
+        .add_file("content.xml", MINIMAL_CONTENT.as_bytes())
+        .unwrap();
+    writer.add_file("meta.xml", SOURCE_META.as_bytes()).unwrap();
+    let source = Document::from_bytes(writer.finish_to_bytes().unwrap()).unwrap();
+    let mut edited = MutableDocument::from_document(source).unwrap();
+    edited.add_paragraph("Changed").unwrap();
+    let output = OwnedPackage::from_bytes(edited.to_bytes().unwrap()).unwrap();
+    assert_eq!(output.get_file("meta.xml").unwrap(), SOURCE_META.as_bytes());
+}
+
+#[test]
+fn mutable_default_metadata_has_no_ambient_timestamp() {
+    let document = MutableDocument::new();
+    let package = OwnedPackage::from_bytes(document.to_bytes().unwrap()).unwrap();
+    let meta = String::from_utf8(package.get_file("meta.xml").unwrap()).unwrap();
+    assert!(!meta.contains("<meta:creation-date>"));
+    assert!(!meta.contains("<dc:date>"));
+    litchi_odf_common::compact_xml::validate(meta.as_bytes()).unwrap();
+}
+
 fn rich_note_body() -> crate::NoteBodyContent {
     const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
     crate::NoteBodyContent::new(vec![crate::MetaFieldNode::Element(

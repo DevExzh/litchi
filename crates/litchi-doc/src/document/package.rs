@@ -11,6 +11,7 @@ use crate::parts::bookmarks::BookmarksTable;
 use crate::parts::captions::CaptionTables;
 use crate::parts::chp_bin_table::ChpBinTable;
 use crate::parts::comments::CommentsTable;
+use crate::parts::document_properties::DocumentProperties;
 use crate::parts::embedded_fonts::DocumentEmbeddedFonts;
 use crate::parts::envelope::Envelope;
 use crate::parts::fib::{FileInformationBlock, WORD_97_NFIB};
@@ -168,6 +169,7 @@ impl Document {
         let footnotes_table = FootnotesTable::parse(&fib, &table_stream).ok();
         let endnotes_table = EndnotesTable::parse(&fib, &table_stream).ok();
         let comments_table = CommentsTable::parse(&fib, &table_stream)?;
+        let document_properties = DocumentProperties::parse(&fib, &table_stream);
         let bookmarks_table = BookmarksTable::parse(&fib, &table_stream)?;
         let smart_tags = DocumentSmartTags::parse(&fib, &table_stream)?;
         let rsids = DocumentRsids::parse(&fib, &table_stream)?;
@@ -282,6 +284,7 @@ impl Document {
             footnotes_table,
             endnotes_table,
             comments_table,
+            document_properties,
             bookmarks_table,
             smart_tags,
             rsids,

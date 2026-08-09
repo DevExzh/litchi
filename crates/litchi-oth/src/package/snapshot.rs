@@ -1,11 +1,8 @@
 //! Immutable web-template package ownership and bounded content replacement.
 
 use litchi_core::{Error, Metadata, Result};
-use litchi_odf_common::{
-    compact_xml,
-    core::{PackageWriter, family::Package},
-};
-use std::{ops::Range, path::Path, sync::Arc};
+use litchi_odf_common::core::{PackageWriter, family::Package};
+use std::{path::Path, sync::Arc};
 
 pub(crate) const MIMETYPE: &str = "application/vnd.oasis.opendocument.text-web";
 // The common package shell requires a cheap marker before this family applies
@@ -15,9 +12,11 @@ const PRELIMINARY_XML_MARKER: &str = "<";
 const MAX_OUTPUT_BYTES: usize = 256 * 1024 * 1024;
 
 struct State {
+    headings: Vec<crate::heading::Heading>,
+    order: Vec<crate::codec::BlockOrder>,
     package: Package,
     paragraphs: Vec<crate::paragraph::Paragraph>,
-    replacement_sites: Vec<Option<Range<usize>>>,
+    replacement_sites: Vec<Option<crate::codec::ReplacementSite>>,
 }
 
 /// An immutable, validated package snapshot.
@@ -43,27 +42,38 @@ impl Snapshot {
         )?)
     }
 
+    pub(crate) fn from_shared_bytes(bytes: Arc<Vec<u8>>) -> Result<Self> {
+        Self::from_package(Package::from_shared_bytes(
+            bytes,
+            MIMETYPE,
+            PRELIMINARY_XML_MARKER,
+            "OTH",
+        )?)
+    }
+
     fn from_package(package: Package) -> Result<Self> {
-        let sites = crate::codec::paragraphs_with_sites(package.content_xml())?;
+        let projection = crate::codec::project(package.content_xml())?;
         let mut paragraphs = Vec::new();
         let mut replacement_sites = Vec::new();
         paragraphs
-            .try_reserve(sites.len())
+            .try_reserve(projection.paragraphs.len())
             .map_err(|source| Error::Allocation {
                 resource: "OTH paragraph snapshot",
                 source,
             })?;
         replacement_sites
-            .try_reserve(sites.len())
+            .try_reserve(projection.paragraphs.len())
             .map_err(|source| Error::Allocation {
                 resource: "OTH paragraph edit sites",
                 source,
             })?;
-        for site in sites {
+        for site in projection.paragraphs {
             paragraphs.push(site.value);
             replacement_sites.push(site.replacement);
         }
         Ok(Self(Arc::new(State {
+            headings: projection.headings,
+            order: projection.order,
             package,
             paragraphs,
             replacement_sites,
@@ -101,12 +111,19 @@ impl Snapshot {
         &self.0.paragraphs
     }
 
-    pub(crate) fn replacement_site(&self, index: usize) -> Option<&Range<usize>> {
+    pub(crate) fn headings(&self) -> &[crate::heading::Heading] {
+        &self.0.headings
+    }
+
+    pub(crate) fn order(&self) -> &[crate::codec::BlockOrder] {
+        &self.0.order
+    }
+
+    pub(crate) fn replacement_site(&self, index: usize) -> Option<&crate::codec::ReplacementSite> {
         self.0.replacement_sites.get(index).and_then(Option::as_ref)
     }
 
     pub(crate) fn rebuild_with_content(&self, content: &str) -> Result<Self> {
-        ensure_compact_rewrite_source(self)?;
         let files = self.files()?;
         if files.iter().any(|path| {
             matches!(
@@ -121,22 +138,13 @@ impl Snapshot {
         let mut writer = PackageWriter::new_bounded(MAX_OUTPUT_BYTES);
         writer.set_mimetype(MIMETYPE)?;
         writer.add_file("content.xml", content.as_bytes())?;
-        for path in ["styles.xml", "meta.xml", "settings.xml"] {
+        for path in ["meta.xml", "styles.xml"] {
             if self.0.package.package().has_file(path)? {
                 writer.add_file(path, &self.0.package.package().get_file(path)?)?;
             }
         }
-        writer.copy_auxiliary_files_from(self.0.package.package())?;
+        let excluded_paths = ["content.xml".to_string()];
+        writer.copy_auxiliary_files_from_except(self.0.package.package(), &excluded_paths, &[])?;
         Self::from_bytes(writer.finish_to_bounded_bytes()?)
     }
-}
-
-fn ensure_compact_rewrite_source(source: &Snapshot) -> Result<()> {
-    let archive = source.0.package.package();
-    for path in source.files()? {
-        if path.ends_with(".xml") && path != "META-INF/manifest.xml" {
-            compact_xml::validate(&archive.get_file(&path)?).map_err(Error::from)?;
-        }
-    }
-    Ok(())
 }

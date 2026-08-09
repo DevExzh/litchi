@@ -8,13 +8,15 @@
 mod codec;
 mod model;
 mod package;
+mod snapshot;
 mod transaction;
 
 #[cfg(test)]
 mod tests;
 
 pub use model::{Chart, Limits, Page, Part, Selector, Storage};
-pub use transaction::{Commit, Editor, Inventory, Transaction};
+pub use snapshot::{Commit, Diagnostics, Edit, Patch, Snapshot};
+pub use transaction::{Commit as InventoryCommit, Editor, Inventory, Transaction};
 
 pub use litchi_odf_common::chart::authoring::Definition;
 pub use litchi_odf_common::chart::{Axis, DataPoint, Element, Grid, Legend, PlotArea, Series};

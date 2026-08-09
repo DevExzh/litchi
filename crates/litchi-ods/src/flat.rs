@@ -279,10 +279,10 @@ impl Transaction {
         if self.staged[index].is_none() {
             self.staged[index] = Some(clone_sheet_fallible(&self.base.sheets()[index])?);
         }
-        self.staged[index]
+        let staged_sheet = self.staged[index]
             .as_mut()
-            .expect("staged sheet was initialized")
-            .set_cell(row, column, cell)?;
+            .ok_or_else(|| invalid("flat ODS staged sheet initialization failed"))?;
+        staged_sheet.set_cell(row, column, cell)?;
         Ok(Some(()))
     }
 

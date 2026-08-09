@@ -127,7 +127,7 @@ automatic-fonts = [
 images = ["dep:litchi-imgconv", "dep:litchi-odraw"]
 eval = ["dep:litchi-eval"]
 web-functions = ["eval", "litchi-eval/web_functions"]
-markdown = ["dep:litchi-markdown", "dep:memchr", "dep:rayon"]
+markdown = ["dep:base64", "dep:litchi-markdown", "dep:memchr", "dep:rayon"]
 yaml = ["dep:serde-saphyr"]
 
 # Format and convenience aggregates
@@ -161,6 +161,7 @@ all = [
 ]
 
 [dependencies]
+base64 = { workspace = true, optional = true } # Self-contained Markdown image data URIs
 chrono = { version = "0", features = ["serde"], optional = true } # RTF metadata timestamps
 fast-float2 = { version = "0.2", optional = true } # Text-sheet numeric parsing
 litchi-cfb = { workspace = true, optional = true } # Compound File Binary substrate

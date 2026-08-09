@@ -19,6 +19,7 @@ use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::sync::Arc;
+use xml_minifier::audit;
 
 const OFFICE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
@@ -139,12 +140,14 @@ pub(crate) fn inventory(source: &OwnedPackage, limits: Limits) -> Result<Vec<Cha
 }
 
 impl Part {
-    /// Parse an existing standalone chart content part.
+    /// Parse an authored compact standalone chart content part.
     ///
     /// # Errors
     /// Returns an error when the chart data is malformed or a configured limit is exceeded.
-    pub fn from_xml(xml: impl Into<String>) -> Result<Self> {
-        Self::from_xml_with_limit(xml.into(), Limits::default().max_part_bytes())
+    pub fn from_xml(source_xml: impl Into<String>) -> Result<Self> {
+        let xml = source_xml.into();
+        verify_authored_xml(&xml, Limits::default().max_part_bytes())?;
+        Self::from_xml_with_limit(xml, Limits::default().max_part_bytes())
     }
 
     /// Serialize a checked common ODF chart definition into an ODP part.
@@ -159,8 +162,10 @@ impl Part {
     ///
     /// # Errors
     /// Returns an error when the chart data is malformed or a configured limit is exceeded.
-    pub fn from_inline_xml(xml: impl Into<String>) -> Result<Self> {
-        Self::from_inline_with_limit(xml.into(), Limits::default().max_part_bytes())
+    pub fn from_inline_xml(source_xml: impl Into<String>) -> Result<Self> {
+        let xml = source_xml.into();
+        verify_authored_xml(&xml, Limits::default().max_part_bytes())?;
+        Self::from_inline_with_limit(xml, Limits::default().max_part_bytes())
     }
 
     pub(crate) fn from_xml_with_limit(xml: String, max_bytes: usize) -> Result<Self> {
@@ -188,6 +193,30 @@ impl Part {
         let content = rename_document_root(&xml, "document", "document-content", None)?;
         Self::from_xml_with_limit(content, max_bytes)
     }
+}
+
+fn verify_authored_xml(xml: &str, max_bytes: usize) -> Result<()> {
+    if xml.contains("> <") {
+        return Err(Error::Unsupported(
+            "authored ODP chart XML contains inter-element spacing".to_string(),
+        ));
+    }
+    let limits = audit::Limits::new(
+        max_bytes, MAX_DEPTH, 1_000_000, 250_000, max_bytes, max_bytes,
+    )
+    .map_err(|source| invalid_error(format!("invalid ODP chart XML audit limits: {source}")))?;
+    let _report = audit::verify(xml.as_bytes(), limits).map_err(|source| match source {
+        audit::Error::NotCompact(_) => {
+            Error::Unsupported(format!("authored ODP chart XML is not compact: {source}"))
+        },
+        audit::Error::Limit { .. }
+        | audit::Error::Encoding { .. }
+        | audit::Error::Malformed { .. }
+        | audit::Error::Doctype { .. }
+        | audit::Error::Allocation
+        | _ => Error::InvalidFormat(format!("authored ODP chart XML failed audit: {source}")),
+    })?;
+    Ok(())
 }
 
 pub(crate) fn content_xml(source: &OwnedPackage) -> Result<String> {

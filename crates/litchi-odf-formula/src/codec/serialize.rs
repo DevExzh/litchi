@@ -14,45 +14,57 @@
 //! reference literally.
 
 use crate::model::{Content, Element, MATHML_NAMESPACE};
-use std::collections::HashMap;
 
 /// Generated prefixes for foreign namespaces, in first-use document order.
 #[derive(Default)]
 struct NamespaceMap {
-    prefixes: HashMap<String, String>,
+    prefixes: Vec<(String, String)>,
+}
+
+enum Write<'element> {
+    Element(&'element Element, bool),
+    Text(&'element str),
+    End(String),
 }
 
 impl NamespaceMap {
-    fn collect(&mut self, element: &Element) {
-        if let Some(uri) = element.namespace_uri() {
-            self.register(uri);
-        }
-        for attribute in element.attributes() {
-            if let Some(uri) = attribute.namespace_uri() {
+    fn collect(&mut self, root: &Element) {
+        let mut pending = vec![root];
+        while let Some(element) = pending.pop() {
+            if let Some(uri) = element.namespace_uri() {
                 self.register(uri);
             }
-        }
-        for content in element.content() {
-            if let Content::Element(child) = content {
-                self.collect(child);
+            for attribute in element.attributes() {
+                if let Some(uri) = attribute.namespace_uri() {
+                    self.register(uri);
+                }
+            }
+            for content in element.content().iter().rev() {
+                if let Content::Element(child) = content {
+                    pending.push(child);
+                }
             }
         }
     }
 
     fn register(&mut self, uri: &str) {
-        if uri == MATHML_NAMESPACE || self.prefixes.contains_key(uri) {
+        if uri == MATHML_NAMESPACE || self.prefixes.iter().any(|(known, _)| known == uri) {
             return;
         }
         let prefix = format!("ns{}", self.prefixes.len() + 1);
-        self.prefixes.insert(uri.to_string(), prefix);
+        self.prefixes.push((uri.to_string(), prefix));
     }
 
     fn qualify<'a>(&'a self, namespace_uri: Option<&'a str>, local_name: &'a str) -> String {
         match namespace_uri {
-            Some(uri) if uri != MATHML_NAMESPACE => match self.prefixes.get(uri) {
-                Some(prefix) => format!("{prefix}:{local_name}"),
-                None => local_name.to_string(),
-            },
+            Some(uri) if uri != MATHML_NAMESPACE => self
+                .prefixes
+                .iter()
+                .find(|(known, _)| known == uri)
+                .map_or_else(
+                    || local_name.to_string(),
+                    |(_, prefix)| format!("{prefix}:{local_name}"),
+                ),
             _ => local_name.to_string(),
         }
     }
@@ -68,14 +80,45 @@ pub(crate) fn write_mathml(root: &Element) -> String {
     let mut namespaces = NamespaceMap::default();
     namespaces.collect(root);
     let mut output = String::new();
-    write_element(root, true, &namespaces, &mut output);
+    let mut pending = vec![Write::Element(root, true)];
+    while let Some(write) = pending.pop() {
+        match write {
+            Write::Element(element, is_root) => {
+                let name = namespaces.qualify(element.namespace_uri(), element.local_name());
+                write_start(element, is_root, &name, &namespaces, &mut output);
+                if element.content().is_empty() {
+                    output.push_str("/>");
+                    continue;
+                }
+                output.push('>');
+                pending.push(Write::End(name));
+                for content in element.content().iter().rev() {
+                    pending.push(match content {
+                        Content::Text(text) => Write::Text(text),
+                        Content::Element(child) => Write::Element(child, false),
+                    });
+                }
+            },
+            Write::Text(value) => escape_text(value, &mut output),
+            Write::End(name) => {
+                output.push_str("</");
+                output.push_str(&name);
+                output.push('>');
+            },
+        }
+    }
     output
 }
 
-fn write_element(element: &Element, root: bool, namespaces: &NamespaceMap, output: &mut String) {
-    let name = namespaces.qualify(element.namespace_uri(), element.local_name());
+fn write_start(
+    element: &Element,
+    root: bool,
+    name: &str,
+    namespaces: &NamespaceMap,
+    output: &mut String,
+) {
     output.push('<');
-    output.push_str(&name);
+    output.push_str(name);
     if root {
         if element.namespace_uri() == Some(MATHML_NAMESPACE) {
             output.push_str(" xmlns=\"");
@@ -98,20 +141,6 @@ fn write_element(element: &Element, root: bool, namespaces: &NamespaceMap, outpu
         escape_attribute(attribute.value(), output);
         output.push('"');
     }
-    if element.content().is_empty() {
-        output.push_str("/>");
-        return;
-    }
-    output.push('>');
-    for content in element.content() {
-        match content {
-            Content::Text(text) => escape_text(text, output),
-            Content::Element(child) => write_element(child, false, namespaces, output),
-        }
-    }
-    output.push_str("</");
-    output.push_str(&name);
-    output.push('>');
 }
 
 fn escape_text(text: &str, output: &mut String) {

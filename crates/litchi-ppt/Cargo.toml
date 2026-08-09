@@ -38,6 +38,7 @@ litchi-vba         = { workspace = true, optional = true }
 once_cell          = { workspace = true }
 quick-xml          = { workspace = true }
 rand               = { workspace = true, optional = true }
+serde_json         = { workspace = true }
 url                = { workspace = true }
 zerocopy           = { workspace = true }
 zerocopy-derive    = { workspace = true }

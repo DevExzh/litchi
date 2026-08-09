@@ -45,8 +45,8 @@ assert_eq!(
 - Stylesheet, font table, and color table handling
 - Compressed RTF (`MS-OXRTFCP`) encode/decode
 - Immutable, cheap-to-share `Document` snapshots for ordinary reads
-- Source-checked `Document::edit()` transactions for one lossless root-body
-  text replacement, with atomic commits and reversible patches
+- Source-checked `Document::edit()` transactions for one lossless root-body or
+  checked paragraph-text replacement, with atomic commits and reversible patches
 - Lazy borrowed `text::Story`, paragraph, inline, and run traversal
 - Sparse-safe `font::Catalog` and checked `color::Palette` resource views
 - Semantic run font/color resolution without numeric table references

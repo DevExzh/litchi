@@ -1,8 +1,10 @@
-//! Semantic WordprocessingML paragraph and run values.
+//! Semantic `WordprocessingML` paragraph and run values.
 
 use crate::UnderlineStyle;
 use crate::color::Theme;
 use crate::font::OpenType;
+use crate::hyperlink::Hyperlink;
+use crate::image::InlineImage;
 use crate::run_effects::Effects;
 use litchi_core::{VerticalPosition, XmlSlice};
 use std::sync::Arc;
@@ -59,6 +61,172 @@ pub struct Paragraph {
     pub(super) xml_data: XmlData,
 }
 
+/// An ordered direct child of a `WordprocessingML` paragraph.
+///
+/// Runs are exposed through their typed semantic value. Every other paragraph
+/// child is retained as an inert exact-XML fallback until a focused semantic
+/// owner can represent it without loss. This keeps hyperlinks, fields,
+/// revisions, content controls, bookmarks, Office Math, and future extension
+/// elements visible in document order instead of silently dropping them.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub enum Inline {
+    /// A typed `WordprocessingML` run.
+    Run(Box<Run>),
+    /// A relationship-resolved hyperlink and its ordered run children.
+    Hyperlink(Box<InlineHyperlink>),
+    /// A supported or future paragraph child retained byte-for-byte.
+    Unknown(Box<OpaqueInline>),
+}
+
+/// A relationship-resolved direct `<w:hyperlink>` paragraph child.
+///
+/// The public value deliberately contains the resolved [`Hyperlink`] rather
+/// than its package-local relationship identifier. Its direct runs retain
+/// their formatting and expose ordered content through [`Run::contents`].
+#[derive(Debug, Clone)]
+pub struct InlineHyperlink {
+    link: Hyperlink,
+    runs: Vec<Run>,
+    target_frame: Option<String>,
+    document_location: Option<String>,
+    has_unmodeled_content: bool,
+}
+
+impl InlineHyperlink {
+    pub(crate) fn new(
+        link: Hyperlink,
+        runs: Vec<Run>,
+        target_frame: Option<String>,
+        document_location: Option<String>,
+        has_unmodeled_content: bool,
+    ) -> Self {
+        Self {
+            link,
+            runs,
+            target_frame,
+            document_location,
+            has_unmodeled_content,
+        }
+    }
+
+    /// Borrow the resolved hyperlink value.
+    #[must_use]
+    pub const fn link(&self) -> &Hyperlink {
+        &self.link
+    }
+
+    /// Borrow the hyperlink's direct runs in source order.
+    #[must_use]
+    pub fn runs(&self) -> &[Run] {
+        &self.runs
+    }
+
+    /// Return the optional target frame (`w:tgtFrame`).
+    #[must_use]
+    pub fn target_frame(&self) -> Option<&str> {
+        self.target_frame.as_deref()
+    }
+
+    /// Return the optional document location (`w:docLocation`).
+    #[must_use]
+    pub fn document_location(&self) -> Option<&str> {
+        self.document_location.as_deref()
+    }
+
+    /// Whether the hyperlink also contains direct children other than runs.
+    ///
+    /// Consumers that require a complete semantic projection should refuse
+    /// the hyperlink when this returns `true`; the paragraph's lossless
+    /// [`Inline::Unknown`] projection remains available through
+    /// [`Paragraph::inlines`] for exact preservation.
+    #[must_use]
+    pub const fn has_unmodeled_content(&self) -> bool {
+        self.has_unmodeled_content
+    }
+}
+
+/// A paragraph child whose semantics are not modeled by [`Inline`].
+///
+/// The payload is inert. Reading it does not resolve relationships, evaluate
+/// fields, apply revisions, activate controls, or execute embedded content.
+#[derive(Debug, Clone)]
+pub struct OpaqueInline {
+    source: Arc<Vec<u8>>,
+    start: u32,
+    length: u32,
+    word_hyperlink: bool,
+}
+
+impl OpaqueInline {
+    pub(crate) const fn from_arc_range(
+        source: Arc<Vec<u8>>,
+        start: u32,
+        length: u32,
+        word_hyperlink: bool,
+    ) -> Self {
+        Self {
+            source,
+            start,
+            length,
+            word_hyperlink,
+        }
+    }
+
+    pub(crate) const fn is_word_hyperlink(&self) -> bool {
+        self.word_hyperlink
+    }
+
+    /// Borrow the retained paragraph child exactly as it appeared in the
+    /// active paragraph XML.
+    #[must_use]
+    pub fn xml_bytes(&self) -> &[u8] {
+        let Ok(start) = usize::try_from(self.start) else {
+            return &[];
+        };
+        let Ok(length) = usize::try_from(self.length) else {
+            return &[];
+        };
+        let Some(end) = start.checked_add(length) else {
+            return &[];
+        };
+        self.source.get(start..end).unwrap_or_default()
+    }
+}
+
+/// A direct run child whose semantics are not modeled by [`RunContent`].
+#[derive(Debug, Clone)]
+pub struct OpaqueRunContent {
+    source: Arc<Vec<u8>>,
+    start: u32,
+    length: u32,
+}
+
+impl OpaqueRunContent {
+    pub(crate) const fn from_arc_range(source: Arc<Vec<u8>>, start: u32, length: u32) -> Self {
+        Self {
+            source,
+            start,
+            length,
+        }
+    }
+
+    /// Borrow the retained run child exactly as it appeared in source XML.
+    #[must_use]
+    pub fn xml_bytes(&self) -> &[u8] {
+        let Ok(start) = usize::try_from(self.start) else {
+            return &[];
+        };
+        let Ok(length) = usize::try_from(self.length) else {
+            return &[];
+        };
+        let Some(end) = start.checked_add(length) else {
+            return &[];
+        };
+        self.source.get(start..end).unwrap_or_default()
+    }
+}
+
 impl Paragraph {
     /// Create a new Paragraph from XML bytes (owned).
     ///
@@ -66,6 +234,7 @@ impl Paragraph {
     ///
     /// * `xml_bytes` - The XML content of the `<w:p>` element
     #[inline]
+    #[must_use]
     pub fn new(xml_bytes: Vec<u8>) -> Self {
         Self {
             xml_data: XmlData::Owned(xml_bytes.into_boxed_slice()),
@@ -77,6 +246,7 @@ impl Paragraph {
     /// This is used for arena-based parsing where all element XMLs are stored
     /// in a single contiguous buffer.
     #[inline]
+    #[must_use]
     pub fn from_slice(slice: XmlSlice) -> Self {
         Self {
             xml_data: XmlData::Shared(slice),
@@ -87,6 +257,7 @@ impl Paragraph {
     ///
     /// This is a convenience method for arena-based parsing.
     #[inline]
+    #[must_use]
     pub fn from_arc_range(arena: Arc<Vec<u8>>, start: u32, len: u32) -> Self {
         Self::from_slice(XmlSlice::new(arena, start, len))
     }
@@ -100,7 +271,7 @@ impl Paragraph {
 
 /// The `w:lineRule` interpretation for a paragraph's `w:line` value.
 ///
-/// These tokens are defined by the WordprocessingML `ST_LineSpacingRule`
+/// These tokens are defined by the `WordprocessingML` `ST_LineSpacingRule`
 /// simple type. `None` on [`ParagraphSpacing::line_rule`] means that the
 /// source omitted the optional attribute; consumers use their normal default.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -114,7 +285,8 @@ pub enum LineSpacingRule {
 }
 
 impl LineSpacingRule {
-    /// Parse the exact WordprocessingML token for `w:lineRule`.
+    /// Parse the exact `WordprocessingML` token for `w:lineRule`.
+    #[must_use]
     pub fn from_xml(value: &str) -> Option<Self> {
         match value {
             "auto" => Some(Self::Auto),
@@ -124,7 +296,8 @@ impl LineSpacingRule {
         }
     }
 
-    /// Return the exact WordprocessingML token for `w:lineRule`.
+    /// Return the exact `WordprocessingML` token for `w:lineRule`.
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Auto => "auto",
@@ -184,7 +357,7 @@ pub struct RunProperties {
     pub open_type: OpenType,
 }
 
-/// A direct color applied to a WordprocessingML underline.
+/// A direct color applied to a `WordprocessingML` underline.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RunUnderlineColor {
     /// Automatic color selected by the consumer.
@@ -223,6 +396,14 @@ impl RunXmlData {
             RunXmlData::Shared(slice) => slice.as_bytes(),
         }
     }
+
+    #[inline]
+    pub(super) fn get_or_create_arc(&self) -> (Arc<Vec<u8>>, u32) {
+        match self {
+            RunXmlData::Owned(bytes) => (Arc::new(bytes.clone()), 0),
+            RunXmlData::Shared(slice) => (slice.arc(), slice.start()),
+        }
+    }
 }
 
 /// A run within a paragraph.
@@ -249,7 +430,37 @@ pub struct Run {
     pub(super) xml_data: RunXmlData,
 }
 
-/// The semantic type of an explicit WordprocessingML run break.
+/// An ordered direct child of a `WordprocessingML` run.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub enum RunContent {
+    /// Text from one `<w:t>` element.
+    Text(String),
+    /// A tab character (`<w:tab>`).
+    Tab,
+    /// An explicit line, page, or column break.
+    Break(RunBreak),
+    /// A carriage return (`<w:cr>`).
+    CarriageReturn,
+    /// A non-breaking hyphen (`<w:noBreakHyphen>`).
+    NoBreakHyphen,
+    /// A discretionary soft hyphen (`<w:softHyphen>`).
+    SoftHyphen,
+    /// A relationship-backed inline image.
+    Image(Box<InlineImage>),
+    /// A footnote reference by non-negative Word note identifier.
+    FootnoteReference(u32),
+    /// An endnote reference by non-negative Word note identifier.
+    EndnoteReference(u32),
+    /// The automatic footnote number marker inside a footnote definition.
+    FootnoteMark,
+    /// The automatic endnote number marker inside an endnote definition.
+    EndnoteMark,
+    /// A supported or future run child retained byte-for-byte.
+    Unknown(Box<OpaqueRunContent>),
+}
+
+/// The semantic type of an explicit `WordprocessingML` run break.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum RunBreakType {
     /// A normal line break within the current text flow.
@@ -286,6 +497,7 @@ pub struct RunBreak {
 
 impl Run {
     /// Create a new Run from XML bytes (owned).
+    #[must_use]
     pub fn new(xml_bytes: Vec<u8>) -> Self {
         Self {
             xml_data: RunXmlData::Owned(xml_bytes),
@@ -294,6 +506,7 @@ impl Run {
 
     /// Create a Run from a shared XML slice (zero-copy).
     #[inline]
+    #[must_use]
     pub fn from_slice(slice: XmlSlice) -> Self {
         Self {
             xml_data: RunXmlData::Shared(slice),

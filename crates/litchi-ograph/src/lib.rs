@@ -14,6 +14,16 @@
 //! object IDs, directory entries, and embedding metadata.
 
 #![forbid(unsafe_code)]
+#![allow(
+    clippy::missing_errors_doc,
+    reason = "all fallible public APIs use the crate's typed Error taxonomy documented at the variant level"
+)]
+#![allow(
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    reason = "record codecs deliberately reuse specification field names in short, non-overlapping scopes"
+)]
 
 pub mod chart;
 mod error;

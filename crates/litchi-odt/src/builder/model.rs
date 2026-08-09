@@ -1136,7 +1136,7 @@ impl Builder {
         annotation: &crate::ruby_family::Annotation,
     ) -> Result<&mut Self> {
         annotation.validate()?;
-        let body = self.generate_content_body();
+        let body = self.generate_content_body()?;
         let xml = format!(
             r#"<office:text xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">{body}</office:text>"#
         );
@@ -1161,7 +1161,7 @@ impl Builder {
         annotation: &crate::ruby_family::Annotation,
     ) -> Result<&mut Self> {
         annotation.validate()?;
-        let body = self.generate_content_body();
+        let body = self.generate_content_body()?;
         let xml = format!(
             r#"<office:text xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">{body}</office:text>"#
         );
@@ -1183,7 +1183,7 @@ impl Builder {
     /// link, script, macro, event listener, or embedded payload is evaluated.
     pub fn add_note(&mut self, paragraph_index: usize, note: &crate::Note) -> Result<&mut Self> {
         note.validate()?;
-        let body = self.generate_content_body();
+        let body = self.generate_content_body()?;
         let xml = format!(
             r#"<office:text xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">{body}</office:text>"#
         );

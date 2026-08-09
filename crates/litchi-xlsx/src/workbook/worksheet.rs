@@ -156,6 +156,11 @@ pub(crate) fn page_margins(sheet: &Worksheet) -> Result<Option<crate::page_margi
     crate::page_margins::parse_page_margins(xml(sheet)?)
 }
 
+/// Parse worksheet row and column page breaks.
+pub(crate) fn page_breaks(sheet: &Worksheet) -> Result<crate::page_breaks::PageBreaks> {
+    crate::page_breaks::parse(xml(sheet)?)
+}
+
 /// Parse worksheet page setup.
 pub(crate) fn page_setup(sheet: &Worksheet) -> Result<Option<crate::page_setup::Setup>> {
     crate::page_setup::parse_worksheet_page_setup(xml(sheet)?)

@@ -28,7 +28,7 @@ animations, and embedded payloads are inert unless a row says otherwise.
 The public ODP path includes package opening, slide parsing, slide/text and
 shape authoring, package-contained image/media access, page-layout models,
 presentation settings, declarations, page metadata, custom shows, metadata,
-RDF graph editing, password opening, and source-checked slide/shape
+RDF graph editing, password opening, and source-checked slide/shape and chart
 transactions. Attached mutable presentation roots are private implementation
 details and cannot be obtained through the public API.
 
@@ -48,8 +48,8 @@ the existence of a PPTX feature is never treated as ODP support.
 | ODF metadata and statistics | ✅ | ✅ | ✅ | `Presentation::metadata` and `Builder::set_metadata` use the shared typed metadata model, including Dublin Core, user-defined values, template/reload/link metadata, and statistics |
 | Common styles and data styles | 🟡 | 🟡 | 🟡 | Direct presentation/drawing properties and bounded shared style values are supported; there is no complete public style-graph resolver/editor for every ODF style family |
 | Images and package media | ✅ | ✅ | ✅ | Package-contained and linked image/media references are typed; package bytes are read without fetching external URLs, and builder media embedding creates package resources |
-| Embedded objects and OLE-like payloads | 🟡 | 🟡 | 🟡 | Frames/object references can remain as bounded opaque content/resources; payloads are not opened, activated, executed, or rendered as native documents |
-| Embedded charts | 🟡 | 🟡 | 🟡 | Shared ODF chart views can inspect chart XML vocabulary, but ODP exposes no complete typed chart-part model or chart data/editor; chart frames are bounded/opaque |
+| Embedded objects and OLE-like payloads | 🟡 | ✅ | 🟡 | `embedded_objects()` provides a bounded inert inventory for regular objects, OLE payloads, applets, plugins, and floating frames, including storage/link classification and applet/plugin parameters. Payloads are never opened, fetched, activated, executed, or rendered |
+| Embedded charts | 🟡 | ✅ | 🟡 | Bounded chart parts and frame/storage context are typed; `chart_snapshot()` provides source-checked add/remove/replace commits, typed readback, and reversible exact-source patches. There is no complete chart-data CRUD or recalculation engine |
 | Annotations/comments | ✅ | ✅ | ✅ | `annotation::{Anchor, Info, Position}` inventories shared rich ODF annotations at validated pages or uniquely named shapes; `Presentation` provides atomic add/replace/remove while untouched XML and no-op bytes remain preserved |
 | Hyperlinks and external references | ✅ | ✅ | ✅ | Shape links, XLink targets, show/actuate values, page jumps, and action metadata are typed and serialized; targets are never opened or followed |
 | Forms and controls | ❌ | ❌ | ❌ | No public ODP form/control model or authoring surface is exposed; a control-shaped XML payload is not treated as typed form support |
@@ -72,7 +72,7 @@ the existence of a PPTX feature is never treated as ODP support.
 | Images in slide frames | ✅ | ✅ | ✅ | Embedded or linked image references and package resources are parsed; builder insertion embeds supported payloads and preserves inert external links |
 | Audio and video plugins | ✅ | ✅ | ✅ | `draw:plugin` references include MIME type, XLink show/actuate, IDs, and parameters; package-contained media is embeddable/readable, but playback is never attempted |
 | Tables | 🟡 | 🟡 | 🟡 | Table-shaped frames or opaque table XML can be retained within the bounded drawing model; there is no public typed cell/row/table editor |
-| Charts and chart data ranges | 🟡 | 🟡 | 🟡 | Chart frames and shared chart range/series views are bounded metadata; no public ODP chart authoring, recalculation, or rendering engine is available |
+| Charts and chart data ranges | 🟡 | ✅ | 🟡 | Chart frames and shared range/series views are bounded and chart parts can be added, removed, or atomically replaced. Fine-grained series/data editing, recalculation, and rendering remain unavailable |
 | Presentation page layouts | ✅ | ✅ | ✅ | Named presentation page layouts and typed placeholder roles/geometry are parsed, validated, added, replaced, and serialized through public builder/package APIs |
 | Slide page metadata and layout references | ✅ | ✅ | ✅ | Page names, IDs, page-layout/master references, and related declaration bindings are inspected and authored through the public page metadata model |
 | Master pages | ✅ | ✅ | ✅ | Typed master-page metadata, shared ODF regions/children, lossless XML fragments, package CRUD, ordering, and slide master/layout assignment are exposed through the layered `master` facade |

@@ -415,13 +415,17 @@ fn validate_new_graph(catalog: &Catalog) -> Result<()> {
             "BrtUsr GUID does not identify a revision header",
         ));
     }
-    if !headers.headers.is_empty()
-        && (headers.info.guid != headers.headers.last().map(|header| header.guid).unwrap()
-            || !header_guids.contains(&headers.info.root_guid))
-    {
-        return Err(super::invalid(
-            "BrtInfo GUIDs do not identify revision headers",
-        ));
+    if !headers.headers.is_empty() {
+        let last_guid = headers
+            .headers
+            .last()
+            .map(|header| header.guid)
+            .ok_or_else(|| super::invalid("shared-workbook revision headers are missing"))?;
+        if headers.info.guid != last_guid || !header_guids.contains(&headers.info.root_guid) {
+            return Err(super::invalid(
+                "BrtInfo GUIDs do not identify revision headers",
+            ));
+        }
     }
     Ok(())
 }

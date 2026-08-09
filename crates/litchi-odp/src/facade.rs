@@ -5,6 +5,11 @@ pub mod edit {
     pub use crate::authoring::edit::{Commit, Patch, Selector, Snapshot, Transaction};
 }
 
+/// Bounded, inert embedded-object discovery.
+pub mod embedded {
+    pub use litchi_odf_common::embedded::{Kind, Object, Parameter, Root, Source};
+}
+
 /// Source-bound flat-presentation reads and checked edits.
 pub mod flat {
     #[allow(

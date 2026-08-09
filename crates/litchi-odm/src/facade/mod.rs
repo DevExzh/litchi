@@ -6,6 +6,7 @@ use std::path::Path;
 pub use crate::authoring::Builder;
 
 /// Immutable document snapshot.
+#[derive(Clone)]
 pub struct Master {
     package: crate::package::Snapshot,
 }
@@ -31,6 +32,16 @@ impl Master {
         self.package
             .with_meta_xml(meta_xml)
             .map(Self::from_snapshot)
+    }
+
+    pub(crate) fn with_content_xml(&self, content_xml: &str) -> Result<Self> {
+        self.package
+            .with_content_xml(content_xml)
+            .map(Self::from_snapshot)
+    }
+
+    pub(crate) fn href_span(&self, reference: usize) -> Option<&std::ops::Range<usize>> {
+        self.package.href_span(reference)
     }
 
     /// Opens a master-document package from a file path.
@@ -91,6 +102,32 @@ impl Master {
     ///
     /// Returns an error when this package does not match the patch's source.
     pub fn apply_title_patch(&self, patch: &crate::title::Patch) -> Result<Self> {
+        patch.apply(self)
+    }
+
+    /// Starts a source-checked transaction for one linked section target.
+    ///
+    /// The selector is the checked zero-based position returned by
+    /// [`Self::subdocuments`]. It is resolved immediately against this
+    /// immutable snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selector is out of bounds or the exact source
+    /// attribute cannot be addressed losslessly.
+    pub fn edit_link<'source, 'selector>(
+        &'source self,
+        selector: impl Into<crate::link::Selector<'selector>>,
+    ) -> Result<crate::link::Edit<'source>> {
+        crate::link::Edit::new(self, selector.into())
+    }
+
+    /// Applies a linked-section patch only when this is its exact source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when this package does not match the patch's source.
+    pub fn apply_link_patch(&self, patch: &crate::link::Patch) -> Result<Self> {
         patch.apply(self)
     }
 

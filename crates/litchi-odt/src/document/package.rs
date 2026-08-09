@@ -335,21 +335,25 @@ impl Document {
 
     #[deprecated(
         since = "0.0.1",
-        note = "use Document::edit().remove_rdf_triple() and commit"
+        note = "use Document::edit().remove_rdf_triple_at() and commit"
     )]
     pub fn remove_rdf_triple(&mut self, path: &str, index: usize) -> Result<()> {
         let mut edit = self.edit()?;
-        edit.remove_rdf_triple(path, index)?;
+        edit.remove_rdf_triple_at(path, crate::transaction::Position::new(index))?;
         self.publish_transaction(edit.commit()?)
     }
 
     #[deprecated(
         since = "0.0.1",
-        note = "use Document::edit().move_rdf_triple() and commit"
+        note = "use Document::edit().move_rdf_triple_to() and commit"
     )]
     pub fn move_rdf_triple(&mut self, path: &str, from: usize, to: usize) -> Result<()> {
         let mut edit = self.edit()?;
-        edit.move_rdf_triple(path, from, to)?;
+        edit.move_rdf_triple_to(
+            path,
+            crate::transaction::Position::new(from),
+            crate::transaction::Position::new(to),
+        )?;
         self.publish_transaction(edit.commit()?)
     }
 
@@ -470,21 +474,24 @@ impl Document {
 
     #[deprecated(
         since = "0.0.1",
-        note = "use Document::edit().remove_form_control() and commit"
+        note = "use Document::edit().remove_form_control_at() and commit"
     )]
     pub fn remove_form_control(&mut self, index: usize) -> Result<()> {
         let mut edit = self.edit()?;
-        edit.remove_form_control(index)?;
+        edit.remove_form_control_at(crate::transaction::Position::new(index))?;
         self.publish_transaction(edit.commit()?)
     }
 
     #[deprecated(
         since = "0.0.1",
-        note = "use Document::edit().move_form_control() and commit"
+        note = "use Document::edit().move_form_control_to() and commit"
     )]
     pub fn move_form_control(&mut self, from: usize, to: usize) -> Result<()> {
         let mut edit = self.edit()?;
-        edit.move_form_control(from, to)?;
+        edit.move_form_control_to(
+            crate::transaction::Position::new(from),
+            crate::transaction::Position::new(to),
+        )?;
         self.publish_transaction(edit.commit()?)
     }
 

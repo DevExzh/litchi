@@ -499,6 +499,8 @@ pub(crate) enum ControlWord<'a> {
     WriteReservationHash(Option<i32>),
     FromText(Option<i32>),
     FromHtml(Option<i32>),
+    HtmlRtf(bool),
+    HtmlTag(i32),
     DocumentType(Option<i32>),
     MakeBackup(Option<i32>),
     DefaultSaveFormat(Option<i32>),
@@ -712,6 +714,7 @@ pub(crate) enum ControlWord<'a> {
     CharacterShading(Option<i32>),
     CharacterForegroundPattern(Option<i32>),
     CharacterBackgroundPattern(Option<i32>),
+    CharacterShadingPattern(crate::ShadingPattern, Option<i32>),
     Plain,
 
     // Paragraph formatting
@@ -884,6 +887,7 @@ pub(crate) enum ControlWord<'a> {
     Shading(Option<i32>),
     ForegroundPattern(Option<i32>),
     BackgroundPattern(Option<i32>),
+    ParagraphShadingPattern(crate::ShadingPattern, Option<i32>),
 
     // Tab stops
     TabLeft(Option<i32>),
@@ -1210,6 +1214,10 @@ pub(crate) enum ControlWord<'a> {
     EnSpace,
     QuarterEmSpace,
     Bullet,
+    LeftSingleQuote,
+    RightSingleQuote,
+    LeftDoubleQuote,
+    RightDoubleQuote,
     LeftToRightMark,
     RightToLeftMark,
     ZeroWidthJoiner,

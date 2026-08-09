@@ -27,9 +27,17 @@ mod tests {
     fn upgrades_dop_and_sets_factoid_preservation_only_when_requested() {
         let basic = DocumentProperties::parse_bytes(&generate_dop(false, 0, false)).unwrap();
         assert_eq!(basic.embeds_factoids(), None);
+        assert!(matches!(
+            basic.versioned().unwrap(),
+            crate::VersionedDocumentProperties::Word97(_)
+        ));
 
         let factoids = DocumentProperties::parse_bytes(&generate_dop(false, 0, true)).unwrap();
         assert_eq!(factoids.version(), crate::DocumentPropertyVersion::Word2002);
         assert_eq!(factoids.embeds_factoids(), Some(true));
+        assert!(matches!(
+            factoids.versioned().unwrap(),
+            crate::VersionedDocumentProperties::Word2002(_)
+        ));
     }
 }

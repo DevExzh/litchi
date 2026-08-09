@@ -50,6 +50,27 @@ fn writer_round_trips_deterministically() {
 }
 
 #[test]
+fn spec_cell_spacing_controls_parse_and_write_canonically() {
+    let document = RtfDocument::parse(
+        r"{\rtf1\trowd\clspl11\clspfl3\clspr12\clspfr3\clspt13\clspft3\clspb14\clspfb3\cellx1200\intbl Cell\cell\row}",
+    )
+    .unwrap();
+    let spacing = document.tables()[0].rows()[0].cells()[0].spacing();
+    assert_eq!(spacing.left.value, Some(11));
+    assert_eq!(spacing.right.value, Some(12));
+    assert_eq!(spacing.top.value, Some(13));
+    assert_eq!(spacing.bottom.value, Some(14));
+
+    let mut output = Vec::new();
+    RtfWriter::new(&mut output)
+        .write_document(&document)
+        .unwrap();
+    let output = String::from_utf8(output).unwrap();
+    assert!(output.contains(r"\clspl11\clspfl3\clspr12\clspfr3\clspt13\clspft3\clspb14\clspfb3"));
+    assert!(!output.contains(r"\clspd"));
+}
+
+#[test]
 fn parses_real_libreoffice_row_and_cell_distances() {
     let row_source = std::fs::read_to_string(
         std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

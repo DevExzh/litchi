@@ -147,6 +147,11 @@ impl ToMarkdown for Document {
 
         // Extract all document elements (paragraphs and tables) in document order
         let elements = self.elements()?;
+        #[cfg(feature = "docx")]
+        let docx_bundle = self
+            .markdown_docx_document()?
+            .map(|document| super::docx::Bundle::build(&elements, &document))
+            .transpose()?;
         let mut resolved_lists = self.markdown_list_items()?;
         let mut heading_levels = self.markdown_heading_levels()?;
         if resolved_lists.is_empty() {
@@ -182,30 +187,37 @@ impl ToMarkdown for Document {
             // With Arc-based Send + Sync types, we can now safely parallelize
             let element_strings: Result<Vec<String>> = elements
                 .par_iter()
+                .enumerate()
                 .zip(resolved_lists.par_iter())
                 .zip(heading_levels.par_iter())
-                .map(|((element, resolved_list), heading_level)| {
-                    let mut writer = MarkdownWriter::new(*options);
-                    match element {
-                        DocumentElement::Paragraph(para) => {
-                            writer.write_paragraph_with_list(
-                                para,
-                                resolved_list.as_ref(),
-                                *heading_level,
-                            )?;
-                        },
-                        #[cfg(any(
-                            feature = "doc",
-                            feature = "docx",
-                            feature = "rtf",
-                            feature = "odt"
-                        ))]
-                        DocumentElement::Table(table) => {
-                            writer.write_table(table)?;
-                        },
-                    }
-                    Ok(writer.finish())
-                })
+                .map(
+                    |(((_element_index, element), resolved_list), heading_level)| {
+                        let mut writer = MarkdownWriter::new(*options);
+                        match element {
+                            DocumentElement::Paragraph(para) => {
+                                writer.write_paragraph_with_projection(
+                                    para,
+                                    resolved_list.as_ref(),
+                                    *heading_level,
+                                    #[cfg(feature = "docx")]
+                                    docx_bundle.as_ref().and_then(|bundle| {
+                                        bundle.paragraphs[_element_index].as_ref()
+                                    }),
+                                )?;
+                            },
+                            #[cfg(any(
+                                feature = "doc",
+                                feature = "docx",
+                                feature = "rtf",
+                                feature = "odt"
+                            ))]
+                            DocumentElement::Table(table) => {
+                                writer.write_table(table)?;
+                            },
+                        }
+                        Ok(writer.finish())
+                    },
+                )
                 .collect();
             let element_strings = element_strings?;
 
@@ -227,17 +239,22 @@ impl ToMarkdown for Document {
             let estimated_size = elements.len() * 150; // Rough average
             writer.reserve(estimated_size);
 
-            for ((element, resolved_list), heading_level) in elements
+            for (_element_index, ((element, resolved_list), heading_level)) in elements
                 .into_iter()
                 .zip(resolved_lists.iter())
                 .zip(heading_levels.iter())
+                .enumerate()
             {
                 match element {
                     DocumentElement::Paragraph(para) => {
-                        writer.write_paragraph_with_list(
+                        writer.write_paragraph_with_projection(
                             &para,
                             resolved_list.as_ref(),
                             *heading_level,
+                            #[cfg(feature = "docx")]
+                            docx_bundle
+                                .as_ref()
+                                .and_then(|bundle| bundle.paragraphs[_element_index].as_ref()),
                         )?;
                     },
                     #[cfg(any(
@@ -260,6 +277,10 @@ impl ToMarkdown for Document {
             String::with_capacity(metadata_md.len().saturating_add(content_md.len()));
         markdown.push_str(&metadata_md);
         markdown.push_str(&content_md);
+        #[cfg(feature = "docx")]
+        if let Some(bundle) = docx_bundle {
+            markdown.push_str(&bundle.render_note_definitions(options)?);
+        }
         Ok(markdown)
     }
 }

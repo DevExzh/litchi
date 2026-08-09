@@ -1,3 +1,5 @@
+#[cfg(feature = "docx")]
+use super::docx::{ParagraphProjection, RunProjection};
 #[cfg(feature = "yaml")]
 use crate::MetadataYaml;
 #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
@@ -64,6 +66,7 @@ enum ParagraphBlock {
 }
 
 impl ListItemInfo {
+    #[cfg(any(feature = "doc", feature = "docx"))]
     pub(crate) fn bullet(level: usize) -> Self {
         Self {
             list_type: ListType::Unordered,
@@ -651,12 +654,60 @@ impl MarkdownWriter {
         resolved_list: Option<&ListItemInfo>,
         explicit_heading_level: Option<u8>,
     ) -> Result<()> {
+        self.write_paragraph_with_projection(
+            para,
+            resolved_list,
+            explicit_heading_level,
+            #[cfg(feature = "docx")]
+            None,
+        )
+    }
+
+    #[cfg(any(
+        feature = "doc",
+        feature = "docx",
+        feature = "odt",
+        feature = "rtf",
+        feature = "pages"
+    ))]
+    #[allow(
+        irrefutable_let_patterns,
+        reason = "the facade enum collapses to DOCX in a docx-only feature build"
+    )]
+    pub(crate) fn write_paragraph_with_projection(
+        &mut self,
+        para: &Paragraph,
+        resolved_list: Option<&ListItemInfo>,
+        explicit_heading_level: Option<u8>,
+        #[cfg(feature = "docx")] projection: Option<&ParagraphProjection>,
+    ) -> Result<()> {
+        #[cfg(feature = "docx")]
+        if projection.is_none()
+            && let Paragraph::Docx(paragraph) = para
+            && super::docx::requires_package_context(paragraph)?
+        {
+            return Err(Error::Unsupported(
+                "Markdown export of this DOCX paragraph requires its package context".to_owned(),
+            ));
+        }
+        #[cfg(feature = "docx")]
+        if projection.is_none() {
+            self.reject_inline_images(para)?;
+        }
+        #[cfg(not(feature = "docx"))]
         self.reject_inline_images(para)?;
         if resolved_list.is_none() {
             self.reject_unresolved_list(para)?;
         }
         let block = self.paragraph_block(para)?;
         if block == ParagraphBlock::Code {
+            #[cfg(feature = "docx")]
+            if projection.is_some_and(ParagraphProjection::has_non_text_content) {
+                return Err(Error::Unsupported(
+                    "Markdown export cannot combine DOCX inline semantics with a code-block paragraph style"
+                        .to_owned(),
+                ));
+            }
             if resolved_list.is_some() {
                 return Err(Error::Unsupported(
                     "Markdown export cannot combine a semantic list item with a code-block paragraph style"
@@ -675,6 +726,14 @@ impl MarkdownWriter {
             self.buffer.push(' ');
         }
 
+        #[cfg(feature = "odt")]
+        if let Paragraph::Odt(paragraph) = para
+            && self.write_whole_odt_hyperlink(paragraph)?
+        {
+            self.buffer.push_str("\n\n");
+            return Ok(());
+        }
+
         // First check for paragraph-level formulas (display math)
         #[cfg(feature = "docx")]
         {
@@ -684,6 +743,12 @@ impl MarkdownWriter {
                     .paragraph_level_formulas()
                     .map_err(crate::map_ooxml_error)?;
                 if !display_formulas.is_empty() {
+                    if projection.is_some_and(ParagraphProjection::has_non_text_content) {
+                        return Err(Error::Unsupported(
+                            "Markdown export cannot combine DOCX inline semantics with a display formula paragraph"
+                                .to_owned(),
+                        ));
+                    }
                     // This paragraph contains display formulas
                     // Process runs and formulas together in order
                     self.write_paragraph_with_display_formulas(para, display_formulas)?;
@@ -691,6 +756,24 @@ impl MarkdownWriter {
                     return Ok(());
                 }
             }
+        }
+
+        #[cfg(feature = "docx")]
+        if let Some(projection) = projection {
+            let runs = para.runs()?;
+            let text = self.extract_text_from_runs(&runs)?;
+            let list_info = resolved_list.cloned().or_else(|| {
+                Self::permits_text_list_fallback(para)
+                    .then(|| self.detect_list_item(&text))
+                    .flatten()
+            });
+            if let Some(list_info) = list_info {
+                self.write_list_prefix(&list_info)?;
+            }
+            self.write_docx_projected_runs(&runs, projection)?;
+            self.close_formatting();
+            self.buffer.push_str("\n\n");
+            return Ok(());
         }
 
         // PERFORMANCE OPTIMIZATION:
@@ -766,6 +849,138 @@ impl MarkdownWriter {
 
         // Add paragraph break
         self.buffer.push_str("\n\n");
+        Ok(())
+    }
+
+    #[cfg(feature = "odt")]
+    fn write_whole_odt_hyperlink(
+        &mut self,
+        paragraph: &litchi_odt::elements::text::Paragraph,
+    ) -> Result<bool> {
+        let links = paragraph.hyperlinks().map_err(|error| {
+            Error::ParseError(format!(
+                "Failed to inspect ODT paragraph hyperlinks: {error}"
+            ))
+        })?;
+        if links.is_empty() {
+            return Ok(false);
+        }
+        if links.len() != 1 {
+            return Err(Error::Unsupported(
+                "Markdown export cannot prove placement for multiple ODT hyperlinks in one paragraph"
+                    .to_owned(),
+            ));
+        }
+        let link = &links[0];
+        link.validate().map_err(|error| {
+            Error::InvalidFormat(format!("Invalid ODT hyperlink for Markdown: {error}"))
+        })?;
+        let paragraph_text = paragraph.text().map_err(|error| {
+            Error::ParseError(format!("Failed to read ODT hyperlink paragraph: {error}"))
+        })?;
+        let link_text = link.text().map_err(|error| {
+            Error::ParseError(format!("Failed to read ODT hyperlink text: {error}"))
+        })?;
+        if paragraph_text != link_text {
+            return Err(Error::Unsupported(
+                "Markdown export cannot prove mixed ODT hyperlink placement".to_owned(),
+            ));
+        }
+        if link.target_frame_name().is_some()
+            || link.name().is_some()
+            || matches!(link.show(), Some(litchi_odt::elements::text::LinkShow::New))
+        {
+            return Err(Error::Unsupported(
+                "Markdown export cannot preserve ODT hyperlink window or identity metadata"
+                    .to_owned(),
+            ));
+        }
+        let destination = link
+            .href()
+            .ok_or_else(|| Error::InvalidFormat("ODT hyperlink has no target".to_owned()))?;
+        self.close_formatting();
+        self.buffer.push('[');
+        self.write_literal(&link_text);
+        self.buffer.push_str("](<");
+        self.buffer.push_str(&escape::link_destination(destination));
+        self.buffer.push('>');
+        if let Some(title) = link.title() {
+            self.buffer.push_str(" \"");
+            self.buffer.push_str(&escape::link_title(title));
+            self.buffer.push('"');
+        }
+        self.buffer.push(')');
+        Ok(true)
+    }
+
+    #[cfg(feature = "docx")]
+    fn write_docx_projected_runs(
+        &mut self,
+        runs: &[Run],
+        projection: &ParagraphProjection,
+    ) -> Result<()> {
+        if runs.len() != projection.runs.len() {
+            return Err(Error::InvalidFormat(
+                "DOCX Markdown run projection is not aligned with paragraph runs".to_owned(),
+            ));
+        }
+        let mut link_index = 0usize;
+        for (run_index, (run, projected)) in runs.iter().zip(&projection.runs).enumerate() {
+            if let Some(link) = projection.links.get(link_index)
+                && link.start_run == run_index
+            {
+                self.close_formatting();
+                self.buffer.push('[');
+            }
+
+            match projected {
+                RunProjection::Ordinary if self.options.include_styles => self.write_run(run)?,
+                RunProjection::Ordinary => self.write_literal(&run.text()?),
+                RunProjection::Images(images) => {
+                    self.close_formatting();
+                    for image in images {
+                        self.buffer.push_str("![");
+                        self.write_literal(&image.alt);
+                        self.buffer.push_str("](<");
+                        self.buffer.push_str(&image.data_uri);
+                        self.buffer.push('>');
+                        if let Some(title) = &image.title {
+                            self.buffer.push_str(" \"");
+                            self.buffer.push_str(&escape::link_title(title));
+                            self.buffer.push('"');
+                        }
+                        self.buffer.push(')');
+                    }
+                },
+                RunProjection::Note(key) => {
+                    self.close_formatting();
+                    self.buffer.push_str("[^");
+                    self.buffer.push_str(&key.label());
+                    self.buffer.push(']');
+                },
+            }
+
+            if let Some(link) = projection.links.get(link_index)
+                && link.end_run == run_index.saturating_add(1)
+            {
+                self.close_formatting();
+                self.buffer.push_str("](<");
+                self.buffer.push_str(&link.destination);
+                self.buffer.push('>');
+                if let Some(title) = &link.title {
+                    self.buffer.push_str(" \"");
+                    self.buffer.push_str(&escape::link_title(title));
+                    self.buffer.push('"');
+                }
+                self.buffer.push(')');
+                link_index = link_index.saturating_add(1);
+            }
+        }
+        if link_index != projection.links.len() {
+            return Err(Error::InvalidFormat(
+                "DOCX Markdown hyperlink projection is not aligned with paragraph runs".to_owned(),
+            ));
+        }
         Ok(())
     }
 
@@ -1816,6 +2031,7 @@ impl MarkdownWriter {
     /// # Arguments
     /// * `formula` - The formula content (LaTeX)
     /// * `inline` - Whether this is an inline formula (true) or display formula (false)
+    #[cfg(any(feature = "formula", feature = "doc"))]
     fn format_formula(&self, formula: &str, inline: bool) -> String {
         if inline {
             match self.options.formula_style {
@@ -2038,5 +2254,47 @@ mod tests {
         let mut output = String::new();
         MarkdownWriter::escape_markdown_to_buffer(&mut output, "&copy;\r\nnext");
         assert_eq!(output, "\\&copy; next");
+    }
+}
+
+#[cfg(all(test, feature = "odt"))]
+mod odt_tests {
+    use crate::document::Paragraph;
+    use litchi_markdown::ToMarkdown;
+    use litchi_odt::elements::text::{Hyperlink, LinkShow};
+
+    #[test]
+    fn whole_paragraph_hyperlink_has_compact_golden_markdown() -> litchi_core::Result<()> {
+        let mut link = Hyperlink::with_href("https://example.test/a b", "ODT [link]")?;
+        link.set_title("tip \"one\"");
+        let mut paragraph = litchi_odt::elements::text::Paragraph::new();
+        paragraph.add_hyperlink(link)?;
+
+        assert_eq!(
+            Paragraph::Odt(paragraph).to_markdown()?,
+            "[ODT \\[link\\]](<https://example.test/a%20b> \"tip \\\"one\\\"\")"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn mixed_or_window_targeted_hyperlinks_are_refused() -> litchi_core::Result<()> {
+        let mut mixed = litchi_odt::elements::text::Paragraph::new();
+        mixed.set_text("prefix ");
+        mixed.add_hyperlink(Hyperlink::with_href("https://example.test", "link")?)?;
+        assert!(matches!(
+            Paragraph::Odt(mixed).to_markdown(),
+            Err(litchi_core::Error::Unsupported(_))
+        ));
+
+        let mut windowed = Hyperlink::with_href("https://example.test", "link")?;
+        windowed.set_show(Some(LinkShow::New));
+        let mut paragraph = litchi_odt::elements::text::Paragraph::new();
+        paragraph.add_hyperlink(windowed)?;
+        assert!(matches!(
+            Paragraph::Odt(paragraph).to_markdown(),
+            Err(litchi_core::Error::Unsupported(_))
+        ));
+        Ok(())
     }
 }

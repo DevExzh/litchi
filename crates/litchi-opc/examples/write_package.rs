@@ -23,11 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut pkg = OpcPackage::new();
 
     let partname = PackURI::new("/custom/data.xml").map_err(|e| format!("invalid PackURI: {e}"))?;
-    let xml = br#"<?xml version="1.0" encoding="UTF-8"?>
-<root xmlns="urn:litchi-opc:example">
-  <hello>world</hello>
-  <pi value="3.14159"/>
-</root>"#
+    let xml = br#"<?xml version="1.0" encoding="UTF-8"?><root xmlns="urn:litchi-opc:example"><hello>world</hello><pi value="3.14159"/></root>"#
         .to_vec();
     let content_type = "application/vnd.litchi-opc.example+xml".to_string();
 

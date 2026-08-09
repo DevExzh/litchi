@@ -1,4 +1,4 @@
-//! Bounded, byte-preserving flat OpenDocument Chart snapshots and axis edits.
+//! Bounded, byte-preserving flat `OpenDocument` Chart snapshots and axis edits.
 
 use litchi_core::{Error, FileFormat, Result};
 use litchi_odf_common::chart::{self, Element, PlotArea};
@@ -22,6 +22,7 @@ struct State {
     bytes: Vec<u8>,
     chart: Element,
     axes: Vec<AxisRecord>,
+    root_kind: RootKind,
 }
 
 #[derive(Clone, Debug)]
@@ -35,12 +36,25 @@ struct AxisRecord {
 
 /// An immutable, byte-exact flat ODC snapshot.
 #[derive(Clone, Debug)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "the public name distinguishes a flat chart from a packaged chart"
+)]
 pub struct FlatChart(Arc<State>);
 
 impl FlatChart {
     /// Opens a flat ODC document from owned UTF-8 XML bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the input is not a bounded, structurally valid
+    /// flat ODC document.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        parse(bytes).map(|state| Self(Arc::new(state)))
+        parse(bytes, RootKind::Flat).map(|state| Self(Arc::new(state)))
+    }
+
+    pub(crate) fn from_content_xml(bytes: Vec<u8>) -> Result<Self> {
+        parse(bytes, RootKind::Content).map(|state| Self(Arc::new(state)))
     }
 
     /// Returns the retained semantic chart tree.
@@ -79,6 +93,7 @@ impl FlatChart {
     }
 
     /// Consumes the snapshot and returns its exact XML bytes.
+    #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
         Arc::try_unwrap(self.0).map_or_else(|state| state.bytes.clone(), |state| state.bytes)
     }
@@ -117,6 +132,10 @@ impl AxisUpdate {
 }
 
 /// A staged, source-bound flat chart transaction.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "the public name associates this transaction with FlatChart"
+)]
 pub struct FlatChartEdit {
     source: FlatChart,
     changes: Vec<AxisChange>,
@@ -124,6 +143,11 @@ pub struct FlatChartEdit {
 
 impl FlatChartEdit {
     /// Stages an axis update by plot-area axis index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selector is out of bounds or the requested
+    /// name exceeds the bounded value limit.
     pub fn update_axis(&mut self, index: usize, update: AxisUpdate) -> Result<()> {
         let Some(after) = update.name else {
             return Ok(());
@@ -157,6 +181,11 @@ impl FlatChartEdit {
     }
 
     /// Validates and atomically publishes all staged changes in memory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a change cannot be applied losslessly or the
+    /// candidate fails structural validation and typed readback.
     pub fn commit(self) -> Result<FlatChartCommit> {
         let FlatChartEdit { source, changes } = self;
         let mut replacements = Vec::with_capacity(changes.len());
@@ -187,15 +216,12 @@ impl FlatChartEdit {
                     });
                 },
                 (None, None, None) => {},
-                (None, Some(_), None) => {
-                    return Err(invalid_error("flat ODC axis attribute span is incomplete"));
-                },
-                (Some(_), None, Some(_)) => {
+                (None, Some(_), None) | (Some(_), None, Some(_)) => {
                     return Err(invalid_error("flat ODC axis attribute span is incomplete"));
                 },
             }
         }
-        replacements.sort_unstable_by(|left, right| right.range.start.cmp(&left.range.start));
+        replacements.sort_unstable_by_key(|replacement| std::cmp::Reverse(replacement.range.start));
         let mut bytes = source.as_bytes().to_vec();
         let mut previous = bytes.len();
         for replacement in replacements {
@@ -208,7 +234,7 @@ impl FlatChartEdit {
             bytes.splice(replacement.range.clone(), replacement.value);
             previous = replacement.range.start;
         }
-        let snapshot = FlatChart::from_bytes(bytes)?;
+        let snapshot = FlatChart(Arc::new(parse(bytes, source.0.root_kind)?));
         for change in &changes {
             if snapshot.axis_name(change.index)? != change.after.as_deref() {
                 return Err(invalid_error("flat ODC edit failed typed readback"));
@@ -226,6 +252,10 @@ impl FlatChartEdit {
 }
 
 /// A committed flat chart snapshot and its reversible semantic patch.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "the public name associates this commit with FlatChart"
+)]
 pub struct FlatChartCommit {
     snapshot: FlatChart,
     patch: FlatChartPatch,
@@ -245,6 +275,7 @@ impl FlatChartCommit {
     }
 
     /// Consumes the commit and returns its snapshot.
+    #[must_use]
     pub fn into_snapshot(self) -> FlatChart {
         self.snapshot
     }
@@ -252,6 +283,10 @@ impl FlatChartCommit {
 
 /// A source-checked, reversible collection of axis changes.
 #[derive(Clone, Debug)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "the public name associates this patch with FlatChart"
+)]
 pub struct FlatChartPatch {
     source: FlatChart,
     target: FlatChart,
@@ -300,6 +335,11 @@ impl FlatChartPatch {
     }
 
     /// Applies the patch only to its exact immutable source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `source` is not the exact snapshot from which
+    /// this patch was committed.
     pub fn apply(&self, source: &FlatChart) -> Result<FlatChartCommit> {
         if !self.is_applicable_to(source) {
             return Err(invalid_error("flat ODC patch source does not match"));
@@ -320,6 +360,14 @@ pub struct AxisChange {
 }
 
 impl AxisChange {
+    pub(crate) fn new_inverse(change: &Self) -> Self {
+        Self {
+            index: change.index,
+            before: change.after.clone(),
+            after: change.before.clone(),
+        }
+    }
+
     #[must_use]
     pub fn index(&self) -> usize {
         self.index
@@ -341,14 +389,30 @@ struct Replacement {
     value: Vec<u8>,
 }
 
-fn parse(bytes: Vec<u8>) -> Result<State> {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RootKind {
+    Flat,
+    Content,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum NamespaceKind {
+    Office,
+    Chart,
+    Other,
+}
+
+fn parse(bytes: Vec<u8>, root_kind: RootKind) -> Result<State> {
     if bytes.len() > MAX_BYTES {
         return Err(invalid_error("flat ODC exceeds the 64 MiB input limit"));
     }
-    if litchi_odf_common::detect::flat(&bytes) != Some(FileFormat::Odc) {
+    if root_kind == RootKind::Flat
+        && litchi_odf_common::detect::flat(&bytes) != Some(FileFormat::Odc)
+    {
         return Err(invalid_error("input is not a flat ODC document"));
     }
-    let xml = std::str::from_utf8(&bytes).map_err(|_| invalid_error("flat ODC is not UTF-8"))?;
+    let xml =
+        std::str::from_utf8(&bytes).map_err(|_utf8_error| invalid_error("ODC XML is not UTF-8"))?;
     let mut reader = NsReader::from_reader(xml.as_bytes());
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
@@ -368,22 +432,28 @@ fn parse(bytes: Vec<u8>) -> Result<State> {
     let mut axes = Vec::new();
 
     loop {
-        let event_start = reader.buffer_position() as usize;
-        let (namespace, event) = reader
+        let event_start = usize::try_from(reader.buffer_position())
+            .map_err(|_overflow| invalid_error("ODC XML event offset exceeds this platform"))?;
+        let (resolved_namespace, event) = reader
             .read_resolved_event()
-            .map_err(|error| invalid_error(format!("invalid flat ODC XML: {error}")))?;
-        let namespace = classify(&namespace);
-        let event_end = reader.buffer_position() as usize;
+            .map_err(|error| invalid_error(format!("invalid ODC XML: {error}")))?;
+        let namespace = classify(&resolved_namespace);
+        let event_end = usize::try_from(reader.buffer_position())
+            .map_err(|_overflow| invalid_error("ODC XML event offset exceeds this platform"))?;
         match event {
             Event::Start(element) => {
                 let event_depth = checked_depth(depth)?;
                 let local = element.local_name();
                 if event_depth == 1 {
-                    if root_seen
-                        || namespace != NamespaceKind::Office
-                        || local.as_ref() != b"document"
+                    let expected = match root_kind {
+                        RootKind::Flat => b"document".as_slice(),
+                        RootKind::Content => b"document-content".as_slice(),
+                    };
+                    if root_seen || namespace != NamespaceKind::Office || local.as_ref() != expected
                     {
-                        return Err(invalid_error("flat ODC requires one office:document root"));
+                        return Err(invalid_error(
+                            "ODC requires one expected office document root",
+                        ));
                     }
                     root_seen = true;
                     root_start_name = Some(event_name_span(
@@ -485,7 +555,7 @@ fn parse(bytes: Vec<u8>) -> Result<State> {
                 }
                 depth -= 1;
             },
-            Event::DocType(_) => return Err(invalid_error("DOCTYPE is not allowed in flat ODC")),
+            Event::DocType(_) => return Err(invalid_error("DOCTYPE is not allowed in ODC")),
             Event::GeneralRef(reference)
                 if !matches!(
                     reference.as_ref(),
@@ -495,7 +565,12 @@ fn parse(bytes: Vec<u8>) -> Result<State> {
                 return Err(invalid_error("flat ODC contains an unsupported entity"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if depth != 0
@@ -512,22 +587,34 @@ fn parse(bytes: Vec<u8>) -> Result<State> {
         return Err(invalid_error("flat ODC structure is incomplete"));
     }
 
-    let mut normalized = bytes.clone();
-    let start = root_start_name.ok_or_else(|| invalid_error("flat ODC root start is missing"))?;
-    let end = root_end_name.ok_or_else(|| invalid_error("flat ODC root end is missing"))?;
-    let replacement = root_content_name(&bytes[start.clone()])?;
-    for span in [end, start] {
-        normalized.splice(span, replacement.iter().copied());
-    }
-    let normalized = std::str::from_utf8(&normalized)
-        .map_err(|_| invalid_error("normalized flat ODC is not UTF-8"))?;
-    let chart = chart::read(normalized)?;
+    let normalized_bytes = if root_kind == RootKind::Flat {
+        let mut candidate = bytes.clone();
+        let start =
+            root_start_name.ok_or_else(|| invalid_error("flat ODC root start is missing"))?;
+        let end = root_end_name.ok_or_else(|| invalid_error("flat ODC root end is missing"))?;
+        let replacement = root_content_name(&bytes[start.clone()])?;
+        for span in [end, start] {
+            candidate.splice(span, replacement.iter().copied());
+        }
+        candidate
+    } else {
+        bytes.clone()
+    };
+    let normalized_xml = std::str::from_utf8(&normalized_bytes)
+        .map_err(|_utf8_error| invalid_error("normalized ODC is not UTF-8"))?;
+    let chart = chart::read(normalized_xml)?;
+    let _ = chart.chart_class()?;
     if let Some(plot_area) = chart.plot_area() {
         for axis in plot_area.axes() {
             let _ = axis.dimension()?;
         }
     }
-    Ok(State { bytes, chart, axes })
+    Ok(State {
+        bytes,
+        chart,
+        axes,
+        root_kind,
+    })
 }
 
 fn push_axis(
@@ -542,8 +629,8 @@ fn push_axis(
     }
     let mut name = None;
     let mut key = None;
-    for attribute in element.attributes().with_checks(true) {
-        let attribute = attribute
+    for attribute_result in element.attributes().with_checks(true) {
+        let attribute = attribute_result
             .map_err(|error| invalid_error(format!("invalid flat ODC attribute: {error}")))?;
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
         if resolved(&namespace, CHART) && local.as_ref() == b"name" {
@@ -568,8 +655,8 @@ fn push_axis(
         .next()
         .filter(|_| element.name().as_ref().contains(&b':'))
         .map(|value| String::from_utf8_lossy(value).into_owned());
-    let (name_value, name_attribute) = if let Some(key) = key {
-        let (value, attribute) = attribute_spans(&bytes[tag.clone()], &key)?;
+    let (name_value, name_attribute) = if let Some(attribute_key) = key {
+        let (value, attribute) = attribute_spans(&bytes[tag.clone()], &attribute_key)?;
         (
             Some(tag.start + value.start..tag.start + value.end),
             Some(tag.start + attribute.start..tag.start + attribute.end),
@@ -662,40 +749,35 @@ fn event_name_span(bytes: &[u8], event: Range<usize>, name: &[u8]) -> Result<Ran
 }
 
 fn root_content_name(name: &[u8]) -> Result<Vec<u8>> {
-    let name =
-        std::str::from_utf8(name).map_err(|_| invalid_error("flat ODC root name is invalid"))?;
-    let prefix = name
+    let qualified_name = std::str::from_utf8(name)
+        .map_err(|_utf8_error| invalid_error("flat ODC root name is invalid"))?;
+    let prefix = qualified_name
         .strip_suffix("document")
         .ok_or_else(|| invalid_error("flat ODC root name is invalid"))?;
     Ok(format!("{prefix}document-content").into_bytes())
 }
 
 fn checked_depth(depth: usize) -> Result<usize> {
-    let depth = depth
+    let next_depth = depth
         .checked_add(1)
         .ok_or_else(|| invalid_error("flat ODC XML depth overflow"))?;
-    if depth > MAX_DEPTH {
+    if next_depth > MAX_DEPTH {
         return Err(invalid_error("flat ODC XML depth exceeds 256"));
     }
-    Ok(depth)
+    Ok(next_depth)
 }
 
 fn resolved(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
-    matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri.as_ref() == expected)
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum NamespaceKind {
-    Office,
-    Chart,
-    Other,
+    matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == expected)
 }
 
 fn classify(namespace: &ResolveResult<'_>) -> NamespaceKind {
     match namespace {
-        ResolveResult::Bound(Namespace(uri)) if uri.as_ref() == OFFICE => NamespaceKind::Office,
-        ResolveResult::Bound(Namespace(uri)) if uri.as_ref() == CHART => NamespaceKind::Chart,
-        _ => NamespaceKind::Other,
+        ResolveResult::Bound(Namespace(uri)) if *uri == OFFICE => NamespaceKind::Office,
+        ResolveResult::Bound(Namespace(uri)) if *uri == CHART => NamespaceKind::Chart,
+        ResolveResult::Unbound | ResolveResult::Bound(_) | ResolveResult::Unknown(_) => {
+            NamespaceKind::Other
+        },
     }
 }
 

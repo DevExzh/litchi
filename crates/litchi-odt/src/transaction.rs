@@ -8,14 +8,23 @@
 //! preservation contracts are migrated to this transaction surface.
 
 use crate::{Document, mutable::MutableDocument};
-use litchi_core::{Error, Result};
-use std::sync::Arc;
+use litchi_core::{
+    BlobBundle, BlobId, BlobLimits, Error, ForwardOnly, Patch as CorePatch, PatchLimits,
+    PatchOperation, Result, Reversible, ReversibleOperation,
+};
+use serde_json::Value;
+use std::{collections::BTreeMap, sync::Arc};
 
 /// Shared zero-based semantic collection position.
 pub use litchi_core::Position;
 
 const MAX_PACKAGE_BYTES: usize = 64 * 1024 * 1024;
 const MAX_OPERATIONS: usize = 1_024;
+const MAX_WIRE_JSON_BYTES: usize = 192 * 1024 * 1024;
+const DURABLE_FORMAT: &str = "litchi.odt";
+const DURABLE_OPERATION: &str = "document.replace";
+const DURABLE_TARGET: &str = "/";
+const SOURCE_PRECONDITION: &str = "source_sha256";
 
 /// Immutable, validated ODT package snapshot.
 #[derive(Clone)]
@@ -180,6 +189,7 @@ impl Edit {
     }
 
     /// Stages removal of one RDF assertion.
+    #[deprecated(note = "use remove_rdf_triple_at with a checked Position")]
     pub fn remove_rdf_triple(&mut self, path: &str, index: usize) -> Result<&mut Self> {
         self.push(Operation::RemoveRdfTriple {
             path: path.to_owned(),
@@ -193,10 +203,14 @@ impl Edit {
     ///
     /// Returns an error if the transaction operation limit has been reached.
     pub fn remove_rdf_triple_at(&mut self, path: &str, position: Position) -> Result<&mut Self> {
-        self.remove_rdf_triple(path, position.get())
+        self.push(Operation::RemoveRdfTriple {
+            path: path.to_owned(),
+            index: position.get(),
+        })
     }
 
     /// Stages an RDF assertion move; equal selectors are an exact no-op.
+    #[deprecated(note = "use move_rdf_triple_to with checked Positions")]
     pub fn move_rdf_triple(&mut self, path: &str, from: usize, to: usize) -> Result<&mut Self> {
         if from == to {
             return Ok(self);
@@ -219,7 +233,14 @@ impl Edit {
         from: Position,
         to: Position,
     ) -> Result<&mut Self> {
-        self.move_rdf_triple(path, from.get(), to.get())
+        if from == to {
+            return Ok(self);
+        }
+        self.push(Operation::MoveRdfTriple {
+            path: path.to_owned(),
+            from: from.get(),
+            to: to.get(),
+        })
     }
 
     /// Stages insertion of a top-level inert form into a form group.
@@ -271,6 +292,7 @@ impl Edit {
     }
 
     /// Stages removal of an inert form control.
+    #[deprecated(note = "use remove_form_control_at with a checked Position")]
     pub fn remove_form_control(&mut self, index: usize) -> Result<&mut Self> {
         self.push(Operation::RemoveFormControl { index })
     }
@@ -281,10 +303,13 @@ impl Edit {
     ///
     /// Returns an error if the transaction operation limit has been reached.
     pub fn remove_form_control_at(&mut self, position: Position) -> Result<&mut Self> {
-        self.remove_form_control(position.get())
+        self.push(Operation::RemoveFormControl {
+            index: position.get(),
+        })
     }
 
     /// Stages a form-control move; equal selectors are an exact no-op.
+    #[deprecated(note = "use move_form_control_to with checked Positions")]
     pub fn move_form_control(&mut self, from: usize, to: usize) -> Result<&mut Self> {
         if from == to {
             return Ok(self);
@@ -298,7 +323,13 @@ impl Edit {
     ///
     /// Returns an error if the transaction operation limit has been reached.
     pub fn move_form_control_to(&mut self, from: Position, to: Position) -> Result<&mut Self> {
-        self.move_form_control(from.get(), to.get())
+        if from == to {
+            return Ok(self);
+        }
+        self.push(Operation::MoveFormControl {
+            from: from.get(),
+            to: to.get(),
+        })
     }
 
     /// Stages replacement of a form selected in semantic document order.
@@ -314,6 +345,7 @@ impl Edit {
     }
 
     /// Stages removal of a form selected in semantic document order.
+    #[deprecated(note = "use remove_form_at with a checked Position")]
     pub fn remove_form(&mut self, index: usize) -> Result<&mut Self> {
         self.push(Operation::RemoveForm { index })
     }
@@ -324,10 +356,13 @@ impl Edit {
     ///
     /// Returns an error if the transaction operation limit has been reached.
     pub fn remove_form_at(&mut self, position: Position) -> Result<&mut Self> {
-        self.remove_form(position.get())
+        self.push(Operation::RemoveForm {
+            index: position.get(),
+        })
     }
 
     /// Stages a form move; equal selectors are an exact no-op.
+    #[deprecated(note = "use move_form_to with checked Positions")]
     pub fn move_form(&mut self, from: usize, to: usize) -> Result<&mut Self> {
         if from == to {
             return Ok(self);
@@ -341,7 +376,13 @@ impl Edit {
     ///
     /// Returns an error if the transaction operation limit has been reached.
     pub fn move_form_to(&mut self, from: Position, to: Position) -> Result<&mut Self> {
-        self.move_form(from.get(), to.get())
+        if from == to {
+            return Ok(self);
+        }
+        self.push(Operation::MoveForm {
+            from: from.get(),
+            to: to.get(),
+        })
     }
 
     /// Stages creation of a packaged or inline embedded chart. Formula and
@@ -377,6 +418,7 @@ impl Edit {
     }
 
     /// Stages removal of an embedded chart selected in document order.
+    #[deprecated(note = "use remove_embedded_chart_at with a checked Position")]
     pub fn remove_embedded_chart(&mut self, index: usize) -> Result<&mut Self> {
         self.push(Operation::RemoveEmbeddedChart { index })
     }
@@ -387,7 +429,9 @@ impl Edit {
     ///
     /// Returns an error if the transaction operation limit has been reached.
     pub fn remove_embedded_chart_at(&mut self, position: Position) -> Result<&mut Self> {
-        self.remove_embedded_chart(position.get())
+        self.push(Operation::RemoveEmbeddedChart {
+            index: position.get(),
+        })
     }
 
     /// Stages creation of an inert embedded object or image.
@@ -425,6 +469,7 @@ impl Edit {
     }
 
     /// Stages removal of an embedded object selected in document order.
+    #[deprecated(note = "use remove_embedded_object_at with a checked Position")]
     pub fn remove_embedded_object(&mut self, index: usize) -> Result<&mut Self> {
         self.push(Operation::RemoveEmbeddedObject { index })
     }
@@ -435,10 +480,13 @@ impl Edit {
     ///
     /// Returns an error if the transaction operation limit has been reached.
     pub fn remove_embedded_object_at(&mut self, position: Position) -> Result<&mut Self> {
-        self.remove_embedded_object(position.get())
+        self.push(Operation::RemoveEmbeddedObject {
+            index: position.get(),
+        })
     }
 
     /// Stages removal of an embedded image selected in document order.
+    #[deprecated(note = "use remove_embedded_image_at with a checked Position")]
     pub fn remove_embedded_image(&mut self, index: usize) -> Result<&mut Self> {
         self.push(Operation::RemoveEmbeddedImage { index })
     }
@@ -449,10 +497,13 @@ impl Edit {
     ///
     /// Returns an error if the transaction operation limit has been reached.
     pub fn remove_embedded_image_at(&mut self, position: Position) -> Result<&mut Self> {
-        self.remove_embedded_image(position.get())
+        self.push(Operation::RemoveEmbeddedImage {
+            index: position.get(),
+        })
     }
 
     /// Stages an embedded-object move; equal selectors are an exact no-op.
+    #[deprecated(note = "use move_embedded_object_to with checked Positions")]
     pub fn move_embedded_object(&mut self, from: usize, to: usize) -> Result<&mut Self> {
         if from == to {
             return Ok(self);
@@ -466,10 +517,17 @@ impl Edit {
     ///
     /// Returns an error if the transaction operation limit has been reached.
     pub fn move_embedded_object_to(&mut self, from: Position, to: Position) -> Result<&mut Self> {
-        self.move_embedded_object(from.get(), to.get())
+        if from == to {
+            return Ok(self);
+        }
+        self.push(Operation::MoveEmbeddedObject {
+            from: from.get(),
+            to: to.get(),
+        })
     }
 
     /// Stages an embedded-image move; equal selectors are an exact no-op.
+    #[deprecated(note = "use move_embedded_image_to with checked Positions")]
     pub fn move_embedded_image(&mut self, from: usize, to: usize) -> Result<&mut Self> {
         if from == to {
             return Ok(self);
@@ -483,7 +541,13 @@ impl Edit {
     ///
     /// Returns an error if the transaction operation limit has been reached.
     pub fn move_embedded_image_to(&mut self, from: Position, to: Position) -> Result<&mut Self> {
-        self.move_embedded_image(from.get(), to.get())
+        if from == to {
+            return Ok(self);
+        }
+        self.push(Operation::MoveEmbeddedImage {
+            from: from.get(),
+            to: to.get(),
+        })
     }
 
     /// Stages validated opaque script bytes. They are never interpreted,
@@ -1004,6 +1068,288 @@ impl Patch {
             after: self.before.clone(),
         }
     }
+
+    /// Converts this exact in-memory patch into a bounded durable patch.
+    ///
+    /// The durable form uses deterministic JSON and content-addressed package
+    /// blobs. The complete source artifact is retained only while the patch is
+    /// reversible; [`DurablePatch::seal`] permanently discards it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either package exceeds the durable patch bounds or
+    /// the format-neutral wire envelope cannot be constructed.
+    pub fn durable(&self) -> Result<DurablePatch> {
+        DurablePatch::from_snapshots(&self.before, &self.after)
+    }
+}
+
+/// Bounded deterministic-JSON patch for cross-process ODT exchange.
+#[derive(Clone)]
+pub struct DurablePatch {
+    inner: CorePatch<Reversible>,
+}
+
+impl DurablePatch {
+    fn from_snapshots(before: &Snapshot, after: &Snapshot) -> Result<Self> {
+        // Durable application cannot retain credentials. Validate both exact
+        // artifacts through the credential-free public ingress before
+        // publishing an exchangeable patch.
+        Snapshot::from_bytes(copy_bytes(before.as_bytes())?)?;
+        Snapshot::from_bytes(copy_bytes(after.as_bytes())?)?;
+        let limits = durable_patch_limits();
+        let blob_limits = limits.blobs();
+        let mut forward_blobs = BlobBundle::new(blob_limits);
+        let after_id = forward_blobs
+            .insert(after.as_bytes())
+            .map_err(durable_wire_error)?;
+        let mut reverse_blobs = BlobBundle::new(blob_limits);
+        let before_id = reverse_blobs
+            .insert(before.as_bytes())
+            .map_err(durable_wire_error)?;
+        let forward = durable_operation(limits, &before_id, &after_id)?;
+        let inverse = durable_operation(limits, &after_id, &before_id)?;
+        let inner = CorePatch::<Reversible>::new(
+            limits,
+            DURABLE_FORMAT,
+            [ReversibleOperation::new(forward, inverse)],
+            forward_blobs,
+            reverse_blobs,
+        )
+        .map_err(durable_wire_error)?;
+        Ok(Self { inner })
+    }
+
+    /// Parses a canonical durable ODT patch under the crate's finite bounds.
+    ///
+    /// Both retained package artifacts are validated as ODT snapshots before
+    /// the patch is published.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for non-canonical JSON, exceeded limits, invalid blob
+    /// integrity, a foreign operation vocabulary, or an invalid ODT artifact.
+    pub fn from_deterministic_json(bytes: &[u8]) -> Result<Self> {
+        let inner = CorePatch::<Reversible>::from_deterministic_json(bytes, durable_patch_limits())
+            .map_err(durable_wire_error)?;
+        validate_reversible_patch(&inner)?;
+        Ok(Self { inner })
+    }
+
+    /// Serializes this patch as canonical deterministic JSON.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bounded JSON output cannot be produced.
+    pub fn to_deterministic_json(&self) -> Result<Vec<u8>> {
+        self.inner
+            .to_deterministic_json()
+            .map_err(durable_wire_error)
+    }
+
+    /// Applies this patch only to its exact source package bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `source` is not byte-identical to the retained
+    /// source artifact or the target package no longer validates as ODT.
+    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+        let inverse = self.inner.inverse();
+        let expected_source = durable_direction(&inverse)?.target_bytes;
+        if source.as_bytes() != expected_source {
+            return Err(durable_source_mismatch());
+        }
+        snapshot_from_durable_target(&self.inner)
+    }
+
+    /// Returns the durable patch that restores the exact source package.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            inner: self.inner.inverse(),
+        }
+    }
+
+    /// Permanently drops the reverse operation and source package bytes.
+    #[must_use]
+    pub fn seal(self) -> SealedPatch {
+        SealedPatch {
+            inner: self.inner.seal(),
+        }
+    }
+}
+
+/// Forward-only durable ODT patch with no retained inverse package.
+#[derive(Clone)]
+pub struct SealedPatch {
+    inner: CorePatch<ForwardOnly>,
+}
+
+impl SealedPatch {
+    /// Parses a canonical forward-only ODT patch under finite bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for non-canonical JSON, exceeded limits, invalid blob
+    /// integrity, a foreign operation vocabulary, or an invalid target ODT.
+    pub fn from_deterministic_json(bytes: &[u8]) -> Result<Self> {
+        let inner =
+            CorePatch::<ForwardOnly>::from_deterministic_json(bytes, durable_patch_limits())
+                .map_err(durable_wire_error)?;
+        validate_sealed_patch(&inner)?;
+        Ok(Self { inner })
+    }
+
+    /// Serializes this forward-only patch as canonical deterministic JSON.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bounded JSON output cannot be produced.
+    pub fn to_deterministic_json(&self) -> Result<Vec<u8>> {
+        self.inner
+            .to_deterministic_json()
+            .map_err(durable_wire_error)
+    }
+
+    /// Applies the sealed patch after checking the source SHA-256 precondition.
+    ///
+    /// Exact source bytes are intentionally unavailable after sealing; the
+    /// cryptographic precondition is the remaining conflict authorization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the source digest differs or the target package no
+    /// longer validates as ODT.
+    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+        let direction = durable_direction(&self.inner)?;
+        if BlobId::of(source.as_bytes()).as_hex() != direction.source_id {
+            return Err(durable_source_mismatch());
+        }
+        Snapshot::from_bytes(copy_bytes(direction.target_bytes)?)
+    }
+}
+
+struct DurableDirection<'a> {
+    source_id: &'a str,
+    target_id: &'a str,
+    target_bytes: &'a [u8],
+}
+
+fn durable_patch_limits() -> PatchLimits {
+    PatchLimits::new(
+        BlobLimits::new(1, MAX_PACKAGE_BYTES, MAX_PACKAGE_BYTES),
+        MAX_WIRE_JSON_BYTES,
+        1,
+        4,
+        4_096,
+        16_384,
+    )
+}
+
+fn durable_operation(
+    limits: PatchLimits,
+    source: &BlobId,
+    target: &BlobId,
+) -> Result<PatchOperation> {
+    let mut preconditions = BTreeMap::new();
+    preconditions.insert(
+        SOURCE_PRECONDITION.to_string(),
+        Value::String(source.as_hex()),
+    );
+    PatchOperation::new(
+        limits,
+        DURABLE_OPERATION,
+        DURABLE_TARGET,
+        preconditions,
+        Value::String(target.as_hex()),
+    )
+    .map_err(durable_wire_error)
+}
+
+fn durable_direction<Mode>(patch: &CorePatch<Mode>) -> Result<DurableDirection<'_>> {
+    if patch.format() != DURABLE_FORMAT || patch.operations().len() != 1 {
+        return Err(invalid_durable_patch());
+    }
+    let operation = &patch.operations()[0];
+    if operation.op != DURABLE_OPERATION
+        || operation.target != DURABLE_TARGET
+        || operation.preconditions.len() != 1
+    {
+        return Err(invalid_durable_patch());
+    }
+    let source_id = operation
+        .preconditions
+        .get(SOURCE_PRECONDITION)
+        .and_then(Value::as_str)
+        .ok_or_else(invalid_durable_patch)?;
+    let target_id = operation.value.as_str().ok_or_else(invalid_durable_patch)?;
+    if !is_canonical_digest(source_id) || !is_canonical_digest(target_id) {
+        return Err(invalid_durable_patch());
+    }
+    if patch.blobs().len() != 1 {
+        return Err(invalid_durable_patch());
+    }
+    let blob_id = patch
+        .blobs()
+        .ids()
+        .next()
+        .ok_or_else(invalid_durable_patch)?;
+    if blob_id.as_hex() != target_id {
+        return Err(invalid_durable_patch());
+    }
+    let target_bytes = patch
+        .blobs()
+        .get(blob_id)
+        .ok_or_else(invalid_durable_patch)?;
+    Ok(DurableDirection {
+        source_id,
+        target_id,
+        target_bytes,
+    })
+}
+
+fn validate_reversible_patch(patch: &CorePatch<Reversible>) -> Result<()> {
+    let forward = durable_direction(patch)?;
+    let inverse_patch = patch.inverse();
+    let reverse = durable_direction(&inverse_patch)?;
+    if forward.source_id != reverse.target_id || forward.target_id != reverse.source_id {
+        return Err(invalid_durable_patch());
+    }
+    Snapshot::from_bytes(copy_bytes(forward.target_bytes)?)?;
+    Snapshot::from_bytes(copy_bytes(reverse.target_bytes)?)?;
+    Ok(())
+}
+
+fn validate_sealed_patch(patch: &CorePatch<ForwardOnly>) -> Result<()> {
+    let direction = durable_direction(patch)?;
+    Snapshot::from_bytes(copy_bytes(direction.target_bytes)?)?;
+    Ok(())
+}
+
+fn snapshot_from_durable_target<Mode>(patch: &CorePatch<Mode>) -> Result<Snapshot> {
+    let direction = durable_direction(patch)?;
+    Snapshot::from_bytes(copy_bytes(direction.target_bytes)?)
+}
+
+fn is_canonical_digest(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn durable_wire_error(source: litchi_core::PatchError) -> Error {
+    let message = format!("invalid ODT durable patch: {source}");
+    drop(source);
+    Error::InvalidFormat(message)
+}
+
+fn invalid_durable_patch() -> Error {
+    Error::InvalidFormat("invalid ODT durable patch vocabulary".to_string())
+}
+
+fn durable_source_mismatch() -> Error {
+    Error::InvalidFormat("ODT durable patch source does not match".to_string())
 }
 
 fn copy_bytes(source: &[u8]) -> Result<Vec<u8>> {
@@ -1011,9 +1357,9 @@ fn copy_bytes(source: &[u8]) -> Result<Vec<u8>> {
     let mut bytes = Vec::new();
     bytes
         .try_reserve_exact(source.len())
-        .map_err(|source| Error::Allocation {
+        .map_err(|allocation_error| Error::Allocation {
             resource: "ODT transaction package",
-            source,
+            source: allocation_error,
         })?;
     bytes.extend_from_slice(source);
     Ok(bytes)

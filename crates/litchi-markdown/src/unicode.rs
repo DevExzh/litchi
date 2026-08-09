@@ -241,7 +241,7 @@ pub fn to_subscript(c: char) -> Option<char> {
 #[inline]
 pub fn convert_to_superscript(text: &str) -> String {
     // Pre-allocate with same capacity as input (superscript chars are same byte size or larger)
-    let mut result = String::with_capacity(text.len() * 2);
+    let mut result = String::with_capacity(text.len().saturating_mul(2));
 
     for c in text.chars() {
         result.push(to_superscript(c).unwrap_or(c));
@@ -277,7 +277,7 @@ pub fn convert_to_superscript(text: &str) -> String {
 #[inline]
 pub fn convert_to_subscript(text: &str) -> String {
     // Pre-allocate with same capacity as input (subscript chars are same byte size or larger)
-    let mut result = String::with_capacity(text.len() * 2);
+    let mut result = String::with_capacity(text.len().saturating_mul(2));
 
     for c in text.chars() {
         result.push(to_subscript(c).unwrap_or(c));

@@ -279,6 +279,44 @@ impl Package {
         patch.apply(&mut self.0)
     }
 
+    /// Read one worksheet's source-bound row and column page breaks.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selector or package is invalid, the selected
+    /// sheet is not a worksheet, or its page-break XML is invalid.
+    pub fn page_breaks<'a>(
+        &self,
+        selector: impl Into<crate::Selector<'a>>,
+    ) -> Result<crate::page_breaks::Snapshot> {
+        crate::page_breaks::Snapshot::load(&self.0, selector)
+    }
+
+    /// Start a source-bound page-break transaction for one worksheet.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when mutation is prohibited or loading the selected
+    /// worksheet fails.
+    pub fn edit_page_breaks<'package, 'selector>(
+        &'package mut self,
+        selector: impl Into<crate::Selector<'selector>>,
+    ) -> Result<crate::page_breaks::Transaction<'package>> {
+        self.ensure_mutation_allowed("edit_page_breaks")?;
+        crate::page_breaks::Transaction::new(&mut self.0, selector)
+    }
+
+    /// Atomically apply an exact source-bound worksheet page-break patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when mutation is prohibited, the patch source is
+    /// stale, or publication/readback fails.
+    pub fn apply_page_breaks_patch(&mut self, patch: &crate::page_breaks::Patch) -> Result<()> {
+        self.ensure_mutation_allowed("apply_page_breaks_patch")?;
+        patch.apply(&mut self.0)
+    }
+
     /// Read the inert typed package-level custom document properties.
     ///
     /// An absent custom-properties relationship and part produce the shared

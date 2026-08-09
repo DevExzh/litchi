@@ -13,5 +13,6 @@ pub mod model;
 pub mod package;
 
 pub use authoring::Builder;
-pub use facade::Formula;
+pub use codec::{LimitError, LimitKind, Limits};
+pub use facade::{Commit, Diagnostics, Edit, Formula, Patch, RootChange};
 pub use model::{Attribute, Content, Element, Kind};

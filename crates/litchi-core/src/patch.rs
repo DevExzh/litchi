@@ -7,7 +7,7 @@
 //! that can be exchanged across processes without exposing private file IDs.
 
 use std::{
-    collections::{BTreeMap, VecDeque},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     fmt,
     marker::PhantomData,
     sync::Arc,
@@ -33,6 +33,47 @@ pub struct Reversible;
 /// Typestate marker for a redacted, forward-only patch.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ForwardOnly;
+
+/// A content-free SHA-256 fingerprint intended only for diagnostics.
+///
+/// A fingerprint does not authorize patch application and does not replace a
+/// format owner's exact immutable source-lineage check.
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct DiagnosticFingerprint([u8; 32]);
+
+impl DiagnosticFingerprint {
+    /// Fingerprints an exact byte sequence.
+    #[must_use]
+    pub fn of(bytes: &[u8]) -> Self {
+        Self(Sha256::digest(bytes).into())
+    }
+
+    /// Returns the lowercase hexadecimal SHA-256 fingerprint.
+    #[must_use]
+    pub fn as_hex(&self) -> String {
+        let mut text = String::with_capacity(64);
+        for byte in self.0 {
+            use std::fmt::Write as _;
+            let _result = write!(text, "{byte:02x}");
+        }
+        text
+    }
+}
+
+impl fmt::Debug for DiagnosticFingerprint {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_tuple("DiagnosticFingerprint")
+            .field(&self.as_hex())
+            .finish()
+    }
+}
+
+impl fmt::Display for DiagnosticFingerprint {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.as_hex())
+    }
+}
 
 /// A SHA-256 content address for one attached patch blob.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -508,6 +549,17 @@ impl Patch<Reversible> {
         let wire: ReversibleWire = parse_canonical(bytes, limits)?;
         wire.into_patch(limits)
     }
+
+    /// Fingerprints the complete canonical reversible wire envelope.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same bounded serialization error as
+    /// [`Self::to_deterministic_json`].
+    pub fn fingerprint(&self) -> Result<DiagnosticFingerprint, PatchError> {
+        self.to_deterministic_json()
+            .map(|wire| DiagnosticFingerprint::of(&wire))
+    }
 }
 
 impl Patch<ForwardOnly> {
@@ -563,6 +615,17 @@ impl Patch<ForwardOnly> {
     pub fn from_deterministic_json(bytes: &[u8], limits: PatchLimits) -> Result<Self, PatchError> {
         let wire: ForwardWire = parse_canonical(bytes, limits)?;
         wire.into_patch(limits)
+    }
+
+    /// Fingerprints the complete canonical forward-only wire envelope.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same bounded serialization error as
+    /// [`Self::to_deterministic_json`].
+    pub fn fingerprint(&self) -> Result<DiagnosticFingerprint, PatchError> {
+        self.to_deterministic_json()
+            .map(|wire| DiagnosticFingerprint::of(&wire))
     }
 }
 
@@ -904,6 +967,586 @@ pub enum JsonLimitKind {
     PayloadBytes,
 }
 
+/// Explicit finite bounds for generic sub-edit composition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CompositionLimits {
+    sub_edits: usize,
+    effects_per_sub_edit: usize,
+    total_effects: usize,
+    conflicts: usize,
+}
+
+impl CompositionLimits {
+    /// Creates finite bounds for one joined edit or merge plan.
+    #[must_use]
+    pub const fn new(
+        max_sub_edits: usize,
+        max_effects_per_sub_edit: usize,
+        max_total_effects: usize,
+        max_conflicts: usize,
+    ) -> Self {
+        Self {
+            sub_edits: max_sub_edits,
+            effects_per_sub_edit: max_effects_per_sub_edit,
+            total_effects: max_total_effects,
+            conflicts: max_conflicts,
+        }
+    }
+
+    /// Maximum sub-edits retained by one composition.
+    #[must_use]
+    pub const fn max_sub_edits(self) -> usize {
+        self.sub_edits
+    }
+
+    /// Maximum declared effects accepted from one sub-edit.
+    #[must_use]
+    pub const fn max_effects_per_sub_edit(self) -> usize {
+        self.effects_per_sub_edit
+    }
+
+    /// Maximum canonical effects retained by one composition.
+    #[must_use]
+    pub const fn max_total_effects(self) -> usize {
+        self.total_effects
+    }
+
+    /// Maximum detailed conflicts returned by one operation.
+    #[must_use]
+    pub const fn max_conflicts(self) -> usize {
+        self.conflicts
+    }
+}
+
+/// One finite sub-edit composition bound.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum CompositionLimitKind {
+    /// Number of sub-edits.
+    SubEdits,
+    /// Effects declared by one sub-edit before deduplication.
+    EffectsPerSubEdit,
+    /// Aggregate canonical effects.
+    TotalEffects,
+    /// Detailed conflict entries.
+    Conflicts,
+}
+
+/// Failure while constructing or planning bounded sub-edits.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
+pub enum CompositionError {
+    /// A stable sub-edit identifier was empty, contained a control code, or
+    /// exceeded the fixed durable operation-name bound.
+    #[error("invalid sub-edit identifier")]
+    InvalidId,
+    /// An exact semantic effect key was empty, contained a control code, or
+    /// exceeded the fixed durable target bound.
+    #[error("invalid semantic effect key")]
+    InvalidEffect,
+    /// One finite composition bound was exceeded.
+    #[error("{kind:?} composition limit exceeded: observed {observed}, limit {limit}")]
+    Limit {
+        /// Bound that failed.
+        kind: CompositionLimitKind,
+        /// Requested or observed amount.
+        observed: usize,
+        /// Configured maximum.
+        limit: usize,
+    },
+}
+
+/// Whether a sub-edit observes or changes one exact semantic effect key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[non_exhaustive]
+pub enum EffectAccess {
+    /// The staged operation depends on current semantic state.
+    Read,
+    /// The staged operation changes semantic state.
+    Write,
+}
+
+/// Canonical exact-key read and write effects for one sub-edit.
+///
+/// Keys are deliberately opaque to common code. Format owners map ranges,
+/// structural dependencies, and effect facets that can interfere to an equal
+/// key; this layer never guesses hierarchy from string prefixes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EffectSet {
+    reads: BTreeSet<String>,
+    writes: BTreeSet<String>,
+}
+
+impl EffectSet {
+    /// Exact keys read but not written by this sub-edit.
+    #[must_use]
+    pub fn reads(&self) -> impl ExactSizeIterator<Item = &str> {
+        self.reads.iter().map(String::as_str)
+    }
+
+    /// Exact keys written by this sub-edit.
+    #[must_use]
+    pub fn writes(&self) -> impl ExactSizeIterator<Item = &str> {
+        self.writes.iter().map(String::as_str)
+    }
+
+    /// Number of canonical read and write effects.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.reads.len().saturating_add(self.writes.len())
+    }
+
+    /// Whether no effect is declared.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.reads.is_empty() && self.writes.is_empty()
+    }
+}
+
+/// One exact-key read/write overlap between two sub-edits.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct EffectConflict {
+    effect: String,
+    left_id: String,
+    right_id: String,
+    left_access: EffectAccess,
+    right_access: EffectAccess,
+}
+
+impl EffectConflict {
+    /// Exact format-owned semantic key that overlaps.
+    #[must_use]
+    pub fn effect(&self) -> &str {
+        &self.effect
+    }
+
+    /// Stable left sub-edit identifier.
+    #[must_use]
+    pub fn left_id(&self) -> &str {
+        &self.left_id
+    }
+
+    /// Stable right sub-edit identifier.
+    #[must_use]
+    pub fn right_id(&self) -> &str {
+        &self.right_id
+    }
+
+    /// Left access participating in the overlap.
+    #[must_use]
+    pub const fn left_access(&self) -> EffectAccess {
+        self.left_access
+    }
+
+    /// Right access participating in the overlap.
+    #[must_use]
+    pub const fn right_access(&self) -> EffectAccess {
+        self.right_access
+    }
+}
+
+/// One reason two sub-edits cannot be combined automatically.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[non_exhaustive]
+pub enum SubEditConflict {
+    /// Both branches used the same stable sub-edit identifier.
+    DuplicateId(String),
+    /// At least one side writes an exact semantic key used by the other.
+    Effect(EffectConflict),
+}
+
+/// Independently prepared staged work against one exact immutable base.
+///
+/// `L` is a format-owned exact source-lineage token, not a diagnostic hash.
+/// `T` is the format-owned staged operation payload.
+pub struct SubEdit<L, T> {
+    lineage: L,
+    limits: CompositionLimits,
+    id: String,
+    effects: EffectSet,
+    payload: T,
+}
+
+impl<L, T> SubEdit<L, T> {
+    /// Creates one bounded sub-edit and canonicalizes its effects.
+    ///
+    /// A key declared as both read and written is retained only as a write,
+    /// while all input occurrences are charged before deduplication.
+    ///
+    /// # Errors
+    ///
+    /// Returns a text or per-sub-edit effect-bound error.
+    pub fn new(
+        lineage: L,
+        limits: CompositionLimits,
+        identifier: impl Into<String>,
+        reads: impl IntoIterator<Item = String>,
+        writes: impl IntoIterator<Item = String>,
+        payload: T,
+    ) -> Result<Self, CompositionError> {
+        let id = identifier.into();
+        if !valid_composition_text(&id, MAX_OPERATION_NAME_BYTES) {
+            return Err(CompositionError::InvalidId);
+        }
+        let effects = collect_effect_set(reads, writes, limits)?;
+        Ok(Self {
+            lineage,
+            limits,
+            id,
+            effects,
+            payload,
+        })
+    }
+
+    /// Exact format-owned source-lineage token.
+    #[must_use]
+    pub const fn lineage(&self) -> &L {
+        &self.lineage
+    }
+
+    /// Stable composition identifier.
+    #[must_use]
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    /// Canonical read and write effects.
+    #[must_use]
+    pub const fn effects(&self) -> &EffectSet {
+        &self.effects
+    }
+
+    /// Borrow the format-owned staged payload.
+    #[must_use]
+    pub const fn payload(&self) -> &T {
+        &self.payload
+    }
+
+    /// Consumes the wrapper and returns the staged payload.
+    #[must_use]
+    pub fn into_payload(self) -> T {
+        self.payload
+    }
+}
+
+impl<L, T> fmt::Debug for SubEdit<L, T> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("SubEdit")
+            .field("id", &self.id)
+            .field("effects", &self.effects)
+            .finish_non_exhaustive()
+    }
+}
+
+/// A bounded deterministic collection of provably disjoint sub-edits.
+pub struct JoinedSubEdits<L, T> {
+    lineage: L,
+    limits: CompositionLimits,
+    total_effects: usize,
+    edits: BTreeMap<String, SubEdit<L, T>>,
+}
+
+impl<L, T> JoinedSubEdits<L, T> {
+    /// Starts an empty composition for one exact source lineage.
+    #[must_use]
+    pub fn new(lineage: L, limits: CompositionLimits) -> Self {
+        Self {
+            lineage,
+            limits,
+            total_effects: 0,
+            edits: BTreeMap::new(),
+        }
+    }
+
+    /// Exact format-owned source-lineage token.
+    #[must_use]
+    pub const fn lineage(&self) -> &L {
+        &self.lineage
+    }
+
+    /// Accepted sub-edits in stable identifier order.
+    #[must_use]
+    pub fn sub_edits(&self) -> impl ExactSizeIterator<Item = &SubEdit<L, T>> {
+        self.edits.values()
+    }
+
+    /// Number of accepted sub-edits.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.edits.len()
+    }
+
+    /// Whether no sub-edit has been accepted.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.edits.is_empty()
+    }
+
+    /// Aggregate number of canonical effects.
+    #[must_use]
+    pub const fn total_effects(&self) -> usize {
+        self.total_effects
+    }
+
+    /// Consumes the composition into stable identifier order.
+    #[must_use]
+    pub fn into_sub_edits(self) -> impl ExactSizeIterator<Item = SubEdit<L, T>> {
+        self.edits.into_values()
+    }
+
+    fn insert_disjoint(&mut self, edit: SubEdit<L, T>) {
+        self.total_effects = self.total_effects.saturating_add(edit.effects.len());
+        self.edits.insert(edit.id.clone(), edit);
+    }
+}
+
+impl<L: Eq, T> JoinedSubEdits<L, T> {
+    /// Joins one sub-edit only when its exact effects are provably disjoint.
+    ///
+    /// On failure `self` remains unchanged and the error returns `incoming`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a lineage, limits, identifier, overlap, or finite-bound error.
+    pub fn join(&mut self, incoming: SubEdit<L, T>) -> Result<&mut Self, SubEditJoinError<L, T>> {
+        if let Some(failure) = join_failure(self, &incoming) {
+            return Err(SubEditJoinError {
+                failure,
+                rejected: Box::new(incoming),
+            });
+        }
+        self.insert_disjoint(incoming);
+        Ok(self)
+    }
+}
+
+impl<L, T> fmt::Debug for JoinedSubEdits<L, T> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("JoinedSubEdits")
+            .field("limits", &self.limits)
+            .field("total_effects", &self.total_effects)
+            .field("ids", &self.edits.keys().collect::<Vec<_>>())
+            .finish_non_exhaustive()
+    }
+}
+
+/// Why an independently prepared sub-edit could not be joined.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SubEditJoinFailure {
+    /// Exact source lineage differs.
+    DifferentLineage,
+    /// The incoming sub-edit uses different finite bounds.
+    DifferentLimits,
+    /// The stable identifier already exists.
+    DuplicateId,
+    /// One or more exact effects overlap.
+    Overlap(ConflictSet<SubEditConflict>),
+    /// Accepting or fully reporting the edit would exceed a bound.
+    Limit(CompositionError),
+}
+
+/// Recoverable join failure retaining the rejected sub-edit.
+pub struct SubEditJoinError<L, T> {
+    failure: SubEditJoinFailure,
+    rejected: Box<SubEdit<L, T>>,
+}
+
+impl<L, T> SubEditJoinError<L, T> {
+    /// Structured refusal reason.
+    #[must_use]
+    pub const fn failure(&self) -> &SubEditJoinFailure {
+        &self.failure
+    }
+
+    /// Borrow the rejected sub-edit.
+    #[must_use]
+    pub const fn rejected(&self) -> &SubEdit<L, T> {
+        &self.rejected
+    }
+
+    /// Recover the rejected sub-edit.
+    #[must_use]
+    pub fn into_rejected(self) -> SubEdit<L, T> {
+        *self.rejected
+    }
+
+    /// Recover both the reason and rejected sub-edit.
+    #[must_use]
+    pub fn into_parts(self) -> (SubEditJoinFailure, SubEdit<L, T>) {
+        (self.failure, *self.rejected)
+    }
+}
+
+impl<L, T> fmt::Debug for SubEditJoinError<L, T> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("SubEditJoinError")
+            .field("failure", &self.failure)
+            .field("rejected_id", &self.rejected.id)
+            .finish()
+    }
+}
+
+/// Explicit resolution of the conflicting portion of a three-way merge.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum MergeChoice {
+    /// Keep conflicting sub-edits from the left branch.
+    Left,
+    /// Keep conflicting sub-edits from the right branch.
+    Right,
+    /// Drop conflicting sub-edits from both branches.
+    Neither,
+}
+
+/// A non-applying three-way plan for two branches from one exact base.
+///
+/// Disjoint sub-edits from both branches are retained automatically. All
+/// overlapping sub-edits form one conservative conflict group and require an
+/// explicit choice before [`Self::finish`] yields staged work. A format owner
+/// still validates and commits that work atomically against its exact base.
+pub struct ThreeWayMergePlan<L, T> {
+    automatic: JoinedSubEdits<L, T>,
+    left_conflicts: JoinedSubEdits<L, T>,
+    right_conflicts: JoinedSubEdits<L, T>,
+    conflicts: ConflictSet<SubEditConflict>,
+    resolution: Option<MergeChoice>,
+}
+
+impl<L: Clone + Eq, T> ThreeWayMergePlan<L, T> {
+    /// Plans a bounded merge without applying either branch.
+    ///
+    /// # Errors
+    ///
+    /// Returns both branches intact when lineage or limits differ, combined
+    /// work exceeds a bound, or all conflicts cannot be reported within the
+    /// configured conflict limit.
+    pub fn new(
+        left: JoinedSubEdits<L, T>,
+        right: JoinedSubEdits<L, T>,
+    ) -> Result<Self, ThreeWayMergeError<L, T>> {
+        build_three_way_plan(left, right)
+    }
+}
+
+impl<L, T> ThreeWayMergePlan<L, T> {
+    /// Automatically accepted disjoint work from both branches.
+    #[must_use]
+    pub const fn automatic(&self) -> &JoinedSubEdits<L, T> {
+        &self.automatic
+    }
+
+    /// Conflicting left-branch work in stable identifier order.
+    #[must_use]
+    pub const fn left_conflicts(&self) -> &JoinedSubEdits<L, T> {
+        &self.left_conflicts
+    }
+
+    /// Conflicting right-branch work in stable identifier order.
+    #[must_use]
+    pub const fn right_conflicts(&self) -> &JoinedSubEdits<L, T> {
+        &self.right_conflicts
+    }
+
+    /// Deterministically ordered overlap details.
+    #[must_use]
+    pub const fn conflicts(&self) -> &ConflictSet<SubEditConflict> {
+        &self.conflicts
+    }
+
+    /// Current explicit resolution, if conflicts exist and were resolved.
+    #[must_use]
+    pub const fn resolution(&self) -> Option<MergeChoice> {
+        self.resolution
+    }
+
+    /// Resolves the complete conservative conflict group.
+    pub fn resolve(&mut self, choice: MergeChoice) -> &mut Self {
+        self.resolution = Some(choice);
+        self
+    }
+
+    /// Produces complete staged work only after every conflict is resolved.
+    ///
+    /// # Errors
+    ///
+    /// Returns this plan unchanged while conflicts remain unresolved.
+    pub fn finish(mut self) -> Result<JoinedSubEdits<L, T>, Box<Self>> {
+        if !self.conflicts.is_empty() && self.resolution.is_none() {
+            return Err(Box::new(self));
+        }
+        let selected = match self.resolution {
+            Some(MergeChoice::Left) => self.left_conflicts.edits,
+            Some(MergeChoice::Right) => self.right_conflicts.edits,
+            Some(MergeChoice::Neither) | None => BTreeMap::new(),
+        };
+        for edit in selected.into_values() {
+            self.automatic.insert_disjoint(edit);
+        }
+        Ok(self.automatic)
+    }
+}
+
+impl<L, T> fmt::Debug for ThreeWayMergePlan<L, T> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ThreeWayMergePlan")
+            .field("automatic", &self.automatic)
+            .field("left_conflicts", &self.left_conflicts)
+            .field("right_conflicts", &self.right_conflicts)
+            .field("conflicts", &self.conflicts)
+            .field("resolution", &self.resolution)
+            .finish()
+    }
+}
+
+/// Why a three-way plan could not be constructed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ThreeWayMergeFailure {
+    /// Exact format-owned base lineage differs.
+    DifferentLineage,
+    /// Branches use different finite bounds.
+    DifferentLimits,
+    /// Planning every possible resolution would exceed a finite bound.
+    Limit(CompositionError),
+}
+
+/// Recoverable three-way planning failure retaining both branches.
+pub struct ThreeWayMergeError<L, T> {
+    failure: ThreeWayMergeFailure,
+    left: Box<JoinedSubEdits<L, T>>,
+    right: Box<JoinedSubEdits<L, T>>,
+}
+
+impl<L, T> ThreeWayMergeError<L, T> {
+    /// Structured planning refusal reason.
+    #[must_use]
+    pub const fn failure(&self) -> &ThreeWayMergeFailure {
+        &self.failure
+    }
+
+    /// Recovers both unchanged branches.
+    #[must_use]
+    pub fn into_branches(self) -> (JoinedSubEdits<L, T>, JoinedSubEdits<L, T>) {
+        (*self.left, *self.right)
+    }
+}
+
+impl<L, T> fmt::Debug for ThreeWayMergeError<L, T> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ThreeWayMergeError")
+            .field("failure", &self.failure)
+            .field("left", &self.left)
+            .field("right", &self.right)
+            .finish()
+    }
+}
+
 struct BoundedJsonOutput {
     bytes: Vec<u8>,
     maximum: usize,
@@ -1030,6 +1673,319 @@ struct WireReversibleOperation {
 struct WireBlob {
     bytes: String,
     sha256: String,
+}
+
+type BranchConflictDetails = (Vec<SubEditConflict>, BTreeSet<String>, BTreeSet<String>);
+
+fn valid_composition_text(text: &str, maximum: usize) -> bool {
+    !text.is_empty() && text.len() <= maximum && !text.chars().any(char::is_control)
+}
+
+fn collect_effect_set(
+    reads: impl IntoIterator<Item = String>,
+    writes: impl IntoIterator<Item = String>,
+    limits: CompositionLimits,
+) -> Result<EffectSet, CompositionError> {
+    let mut observed = 0_usize;
+    let mut read_set = BTreeSet::new();
+    for effect in reads {
+        observed = observed.saturating_add(1);
+        validate_effect_input(&effect, observed, limits)?;
+        read_set.insert(effect);
+    }
+    let mut write_set = BTreeSet::new();
+    for effect in writes {
+        observed = observed.saturating_add(1);
+        validate_effect_input(&effect, observed, limits)?;
+        write_set.insert(effect);
+    }
+    read_set.retain(|effect| !write_set.contains(effect));
+    Ok(EffectSet {
+        reads: read_set,
+        writes: write_set,
+    })
+}
+
+fn validate_effect_input(
+    effect: &str,
+    observed: usize,
+    limits: CompositionLimits,
+) -> Result<(), CompositionError> {
+    if observed > limits.effects_per_sub_edit {
+        return Err(CompositionError::Limit {
+            kind: CompositionLimitKind::EffectsPerSubEdit,
+            observed,
+            limit: limits.effects_per_sub_edit,
+        });
+    }
+    if !valid_composition_text(effect, MAX_TARGET_BYTES) {
+        return Err(CompositionError::InvalidEffect);
+    }
+    Ok(())
+}
+
+fn join_failure<L: Eq, T>(
+    accepted: &JoinedSubEdits<L, T>,
+    incoming: &SubEdit<L, T>,
+) -> Option<SubEditJoinFailure> {
+    if accepted.lineage != incoming.lineage {
+        return Some(SubEditJoinFailure::DifferentLineage);
+    }
+    if accepted.limits != incoming.limits {
+        return Some(SubEditJoinFailure::DifferentLimits);
+    }
+    if accepted.edits.contains_key(&incoming.id) {
+        return Some(SubEditJoinFailure::DuplicateId);
+    }
+    if let Err(error) = ensure_composition_capacity(
+        accepted.edits.len(),
+        accepted.total_effects,
+        1,
+        incoming.effects.len(),
+        accepted.limits,
+    ) {
+        return Some(SubEditJoinFailure::Limit(error));
+    }
+    let mut conflicts = Vec::new();
+    for edit in accepted.edits.values() {
+        let remaining = accepted.limits.conflicts.saturating_sub(conflicts.len());
+        match effect_conflicts(edit, incoming, remaining) {
+            Ok(found) => conflicts.extend(found.into_iter().map(SubEditConflict::Effect)),
+            Err(error) => return Some(SubEditJoinFailure::Limit(error)),
+        }
+    }
+    if conflicts.is_empty() {
+        None
+    } else {
+        conflicts.sort_unstable();
+        Some(SubEditJoinFailure::Overlap(ConflictSet::new(conflicts)))
+    }
+}
+
+fn build_three_way_plan<L: Clone + Eq, T>(
+    left: JoinedSubEdits<L, T>,
+    right: JoinedSubEdits<L, T>,
+) -> Result<ThreeWayMergePlan<L, T>, ThreeWayMergeError<L, T>> {
+    if left.lineage != right.lineage {
+        return Err(three_way_error(
+            ThreeWayMergeFailure::DifferentLineage,
+            left,
+            right,
+        ));
+    }
+    if left.limits != right.limits {
+        return Err(three_way_error(
+            ThreeWayMergeFailure::DifferentLimits,
+            left,
+            right,
+        ));
+    }
+    if let Err(error) = ensure_composition_capacity(
+        left.edits.len(),
+        left.total_effects,
+        right.edits.len(),
+        right.total_effects,
+        left.limits,
+    ) {
+        return Err(three_way_error(
+            ThreeWayMergeFailure::Limit(error),
+            left,
+            right,
+        ));
+    }
+    let (details, left_ids, right_ids) = match branch_conflicts(&left, &right) {
+        Ok(result) => result,
+        Err(error) => {
+            return Err(three_way_error(
+                ThreeWayMergeFailure::Limit(error),
+                left,
+                right,
+            ));
+        },
+    };
+
+    let JoinedSubEdits {
+        lineage,
+        limits,
+        edits: left_edits,
+        ..
+    } = left;
+    let JoinedSubEdits {
+        edits: right_edits, ..
+    } = right;
+    let mut automatic = JoinedSubEdits::new(lineage.clone(), limits);
+    let mut left_conflicts = JoinedSubEdits::new(lineage.clone(), limits);
+    let mut right_conflicts = JoinedSubEdits::new(lineage, limits);
+    partition_branch(left_edits, &left_ids, &mut automatic, &mut left_conflicts);
+    partition_branch(
+        right_edits,
+        &right_ids,
+        &mut automatic,
+        &mut right_conflicts,
+    );
+    Ok(ThreeWayMergePlan {
+        automatic,
+        left_conflicts,
+        right_conflicts,
+        conflicts: ConflictSet::new(details),
+        resolution: None,
+    })
+}
+
+fn ensure_composition_capacity(
+    left_edits: usize,
+    left_effects: usize,
+    right_edits: usize,
+    right_effects: usize,
+    limits: CompositionLimits,
+) -> Result<(), CompositionError> {
+    let edits = left_edits.saturating_add(right_edits);
+    if edits > limits.sub_edits {
+        return Err(CompositionError::Limit {
+            kind: CompositionLimitKind::SubEdits,
+            observed: edits,
+            limit: limits.sub_edits,
+        });
+    }
+    let effects = left_effects.saturating_add(right_effects);
+    if effects > limits.total_effects {
+        return Err(CompositionError::Limit {
+            kind: CompositionLimitKind::TotalEffects,
+            observed: effects,
+            limit: limits.total_effects,
+        });
+    }
+    Ok(())
+}
+
+fn effect_conflicts<L, T>(
+    left: &SubEdit<L, T>,
+    right: &SubEdit<L, T>,
+    maximum: usize,
+) -> Result<Vec<EffectConflict>, CompositionError> {
+    let mut conflicts = Vec::new();
+    append_effect_conflicts(
+        &mut conflicts,
+        left,
+        right,
+        left.effects.writes.intersection(&right.effects.writes),
+        (EffectAccess::Write, EffectAccess::Write),
+        maximum,
+    )?;
+    append_effect_conflicts(
+        &mut conflicts,
+        left,
+        right,
+        left.effects.writes.intersection(&right.effects.reads),
+        (EffectAccess::Write, EffectAccess::Read),
+        maximum,
+    )?;
+    append_effect_conflicts(
+        &mut conflicts,
+        left,
+        right,
+        left.effects.reads.intersection(&right.effects.writes),
+        (EffectAccess::Read, EffectAccess::Write),
+        maximum,
+    )?;
+    conflicts.sort_unstable();
+    Ok(conflicts)
+}
+
+fn append_effect_conflicts<'a, L, T>(
+    conflicts: &mut Vec<EffectConflict>,
+    left: &SubEdit<L, T>,
+    right: &SubEdit<L, T>,
+    effects: impl Iterator<Item = &'a String>,
+    access: (EffectAccess, EffectAccess),
+    maximum: usize,
+) -> Result<(), CompositionError> {
+    for effect in effects {
+        if conflicts.len() >= maximum {
+            return Err(CompositionError::Limit {
+                kind: CompositionLimitKind::Conflicts,
+                observed: conflicts.len().saturating_add(1),
+                limit: maximum,
+            });
+        }
+        conflicts.push(EffectConflict {
+            effect: effect.clone(),
+            left_id: left.id.clone(),
+            right_id: right.id.clone(),
+            left_access: access.0,
+            right_access: access.1,
+        });
+    }
+    Ok(())
+}
+
+fn branch_conflicts<L, T>(
+    left: &JoinedSubEdits<L, T>,
+    right: &JoinedSubEdits<L, T>,
+) -> Result<BranchConflictDetails, CompositionError> {
+    let mut details = Vec::new();
+    let mut left_ids = BTreeSet::new();
+    let mut right_ids = BTreeSet::new();
+    for left_edit in left.edits.values() {
+        for right_edit in right.edits.values() {
+            let mut pair = Vec::new();
+            if left_edit.id == right_edit.id {
+                pair.push(SubEditConflict::DuplicateId(left_edit.id.clone()));
+            }
+            let remaining = left
+                .limits
+                .conflicts
+                .saturating_sub(details.len().saturating_add(pair.len()));
+            pair.extend(
+                effect_conflicts(left_edit, right_edit, remaining)?
+                    .into_iter()
+                    .map(SubEditConflict::Effect),
+            );
+            if pair.is_empty() {
+                continue;
+            }
+            let observed = details.len().saturating_add(pair.len());
+            if observed > left.limits.conflicts {
+                return Err(CompositionError::Limit {
+                    kind: CompositionLimitKind::Conflicts,
+                    observed,
+                    limit: left.limits.conflicts,
+                });
+            }
+            left_ids.insert(left_edit.id.clone());
+            right_ids.insert(right_edit.id.clone());
+            details.extend(pair);
+        }
+    }
+    details.sort_unstable();
+    Ok((details, left_ids, right_ids))
+}
+
+fn partition_branch<L, T>(
+    edits: BTreeMap<String, SubEdit<L, T>>,
+    conflicting_ids: &BTreeSet<String>,
+    automatic: &mut JoinedSubEdits<L, T>,
+    conflicts: &mut JoinedSubEdits<L, T>,
+) {
+    for (id, edit) in edits {
+        if conflicting_ids.contains(&id) {
+            conflicts.insert_disjoint(edit);
+        } else {
+            automatic.insert_disjoint(edit);
+        }
+    }
+}
+
+fn three_way_error<L, T>(
+    failure: ThreeWayMergeFailure,
+    left: JoinedSubEdits<L, T>,
+    right: JoinedSubEdits<L, T>,
+) -> ThreeWayMergeError<L, T> {
+    ThreeWayMergeError {
+        failure,
+        left: Box::new(left),
+        right: Box::new(right),
+    }
 }
 
 fn wire_blobs(bundle: &BlobBundle) -> Vec<WireBlob> {
@@ -1965,5 +2921,234 @@ mod tests {
         );
         assert_eq!(conflicts.len(), 2);
         assert!(!conflicts.is_empty());
+    }
+
+    fn composition_limits() -> CompositionLimits {
+        CompositionLimits::new(8, 8, 24, 8)
+    }
+
+    fn sub_edit(lineage: u64, id: &str, reads: &[&str], writes: &[&str]) -> SubEdit<u64, String> {
+        SubEdit::new(
+            lineage,
+            composition_limits(),
+            id,
+            reads.iter().map(|value| (*value).to_owned()),
+            writes.iter().map(|value| (*value).to_owned()),
+            format!("payload:{id}"),
+        )
+        .expect("valid sub-edit")
+    }
+
+    #[test]
+    fn patch_fingerprint_is_deterministic_and_content_sensitive() {
+        let first = Patch::<ForwardOnly>::new(
+            patch_limits(),
+            "org.litchi.odf",
+            [operation("shape.text.set", "page:0/shape:1", json!("one"))],
+            BlobBundle::new(limits()),
+        )
+        .expect("valid first patch");
+        let equivalent = Patch::<ForwardOnly>::from_deterministic_json(
+            &first.to_deterministic_json().expect("serialize first"),
+            patch_limits(),
+        )
+        .expect("parse equivalent");
+        let changed = Patch::<ForwardOnly>::new(
+            patch_limits(),
+            "org.litchi.odf",
+            [operation("shape.text.set", "page:0/shape:1", json!("two"))],
+            BlobBundle::new(limits()),
+        )
+        .expect("valid changed patch");
+
+        assert_eq!(
+            first.fingerprint().expect("fingerprint first"),
+            equivalent.fingerprint().expect("fingerprint equivalent")
+        );
+        assert_ne!(
+            first.fingerprint().expect("fingerprint first"),
+            changed.fingerprint().expect("fingerprint changed")
+        );
+        assert_eq!(
+            first.fingerprint().expect("fingerprint first").as_hex(),
+            String::from("47226755188d6f3a473b211c6d193cbccb51c07ada2dbdccd488611c719a5108")
+        );
+    }
+
+    #[test]
+    fn sub_edit_effects_are_canonical_and_bounded() {
+        let edit = SubEdit::new(
+            7_u64,
+            composition_limits(),
+            "canonical",
+            ["shared".to_owned(), "read".to_owned()],
+            ["shared".to_owned(), "write".to_owned()],
+            (),
+        )
+        .expect("valid effects");
+        assert_eq!(edit.effects().reads().collect::<Vec<_>>(), ["read"]);
+        assert_eq!(
+            edit.effects().writes().collect::<Vec<_>>(),
+            ["shared", "write"]
+        );
+        assert!(matches!(
+            SubEdit::new(
+                7_u64,
+                CompositionLimits::new(1, 1, 1, 1),
+                "too-many",
+                ["one".to_owned(), "two".to_owned()],
+                [],
+                (),
+            ),
+            Err(CompositionError::Limit {
+                kind: CompositionLimitKind::EffectsPerSubEdit,
+                observed: 2,
+                limit: 1,
+            })
+        ));
+        assert!(matches!(
+            SubEdit::new(
+                7_u64,
+                composition_limits(),
+                "invalid",
+                ["bad\nkey".to_owned()],
+                [],
+                (),
+            ),
+            Err(CompositionError::InvalidEffect)
+        ));
+    }
+
+    #[test]
+    fn joined_sub_edits_accept_only_disjoint_effects_in_id_order() {
+        let mut joined = JoinedSubEdits::new(11_u64, composition_limits());
+        joined
+            .join(sub_edit(11, "z-last", &["sheet:0/A1:value"], &[]))
+            .expect("read-only edit joins")
+            .join(sub_edit(11, "a-first", &[], &["sheet:0/B1:value"]))
+            .expect("disjoint write joins");
+        assert_eq!(
+            joined.sub_edits().map(SubEdit::id).collect::<Vec<_>>(),
+            ["a-first", "z-last"]
+        );
+        assert_eq!(joined.total_effects(), 2);
+    }
+
+    #[test]
+    fn join_reports_read_write_conflict_and_returns_rejected_work() {
+        let mut joined = JoinedSubEdits::new(13_u64, composition_limits());
+        joined
+            .join(sub_edit(13, "reader", &["sheet:0/A1:value"], &[]))
+            .expect("first edit joins");
+        let error = joined
+            .join(sub_edit(13, "writer", &[], &["sheet:0/A1:value"]))
+            .expect_err("read/write overlap must fail");
+        assert_eq!(joined.len(), 1);
+        assert_eq!(error.rejected().id(), "writer");
+        let SubEditJoinFailure::Overlap(conflicts) = error.failure() else {
+            panic!("expected structured overlap");
+        };
+        let SubEditConflict::Effect(conflict) = &conflicts.conflicts()[0] else {
+            panic!("expected effect conflict");
+        };
+        assert_eq!(conflict.effect(), "sheet:0/A1:value");
+        assert_eq!(conflict.left_access(), EffectAccess::Read);
+        assert_eq!(conflict.right_access(), EffectAccess::Write);
+    }
+
+    #[test]
+    fn join_refuses_to_truncate_conflict_details() {
+        let strict = CompositionLimits::new(4, 4, 8, 1);
+        let mut joined = JoinedSubEdits::new(17_u64, strict);
+        joined
+            .join(
+                SubEdit::new(
+                    17_u64,
+                    strict,
+                    "left",
+                    [],
+                    ["a".to_owned(), "b".to_owned()],
+                    (),
+                )
+                .expect("left edit"),
+            )
+            .expect("first edit joins");
+        let error = joined
+            .join(
+                SubEdit::new(
+                    17_u64,
+                    strict,
+                    "right",
+                    ["a".to_owned(), "b".to_owned()],
+                    [],
+                    (),
+                )
+                .expect("right edit"),
+            )
+            .expect_err("conflict report cannot be truncated");
+        assert!(matches!(
+            error.failure(),
+            SubEditJoinFailure::Limit(CompositionError::Limit {
+                kind: CompositionLimitKind::Conflicts,
+                observed: 2,
+                limit: 1,
+            })
+        ));
+        assert_eq!(joined.len(), 1);
+    }
+
+    #[test]
+    fn three_way_plan_preserves_disjoint_work_and_requires_resolution() {
+        let mut unresolved_left = JoinedSubEdits::new(19_u64, composition_limits());
+        unresolved_left
+            .join(sub_edit(19, "left-auto", &[], &["sheet:0/A1:value"]))
+            .expect("left automatic")
+            .join(sub_edit(19, "left-conflict", &[], &["sheet:0/C1:value"]))
+            .expect("left conflict");
+        let mut unresolved_right = JoinedSubEdits::new(19_u64, composition_limits());
+        unresolved_right
+            .join(sub_edit(19, "right-auto", &[], &["sheet:0/B1:value"]))
+            .expect("right automatic")
+            .join(sub_edit(19, "right-conflict", &["sheet:0/C1:value"], &[]))
+            .expect("right conflict");
+
+        let unresolved_plan = ThreeWayMergePlan::new(unresolved_left, unresolved_right)
+            .expect("plan unresolved merge");
+        assert_eq!(unresolved_plan.automatic().len(), 2);
+        assert_eq!(unresolved_plan.left_conflicts().len(), 1);
+        assert_eq!(unresolved_plan.right_conflicts().len(), 1);
+        assert!(unresolved_plan.finish().is_err());
+
+        let mut resolved_left = JoinedSubEdits::new(19_u64, composition_limits());
+        resolved_left
+            .join(sub_edit(19, "left-auto", &[], &["sheet:0/A1:value"]))
+            .expect("left automatic")
+            .join(sub_edit(19, "left-conflict", &[], &["sheet:0/C1:value"]))
+            .expect("left conflict");
+        let mut resolved_right = JoinedSubEdits::new(19_u64, composition_limits());
+        resolved_right
+            .join(sub_edit(19, "right-auto", &[], &["sheet:0/B1:value"]))
+            .expect("right automatic")
+            .join(sub_edit(19, "right-conflict", &["sheet:0/C1:value"], &[]))
+            .expect("right conflict");
+        let mut resolved_plan =
+            ThreeWayMergePlan::new(resolved_left, resolved_right).expect("plan resolved merge");
+        resolved_plan.resolve(MergeChoice::Left);
+        let merged = resolved_plan.finish().expect("resolved plan finishes");
+        assert_eq!(
+            merged.sub_edits().map(SubEdit::id).collect::<Vec<_>>(),
+            ["left-auto", "left-conflict", "right-auto"]
+        );
+    }
+
+    #[test]
+    fn three_way_lineage_failure_returns_both_branches() {
+        let left = JoinedSubEdits::<u64, ()>::new(23, composition_limits());
+        let right = JoinedSubEdits::<u64, ()>::new(24, composition_limits());
+        let error = ThreeWayMergePlan::new(left, right).expect_err("lineage mismatch");
+        assert_eq!(error.failure(), &ThreeWayMergeFailure::DifferentLineage);
+        let (recovered_left, recovered_right) = error.into_branches();
+        assert_eq!(recovered_left.lineage(), &23);
+        assert_eq!(recovered_right.lineage(), &24);
     }
 }

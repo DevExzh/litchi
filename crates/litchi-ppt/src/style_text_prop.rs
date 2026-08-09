@@ -241,6 +241,59 @@ impl StyleTextPropAtom {
         data.extend_from_slice(&payload);
         data
     }
+
+    /// Rewrites only the two coverage counts of a style atom that has one
+    /// paragraph run and one character run.
+    ///
+    /// The raw record remains authoritative: exception bytes, reserved bits,
+    /// and header spelling are copied exactly. `None` means that distributing
+    /// a changed length across several formatting runs would require a
+    /// semantic choice by the caller.
+    pub(crate) fn resize_single_run_record(
+        record_bytes: &[u8],
+        old_text_length: usize,
+        new_text_length: usize,
+    ) -> Result<Option<Vec<u8>>> {
+        let (record, consumed) = Record::parse_strict(record_bytes, 0)?;
+        if consumed != record_bytes.len() {
+            return Err(corrupted("StyleTextPropAtom has trailing record bytes"));
+        }
+        let parsed = Self::parse_record(&record, old_text_length)?;
+        let ([paragraph], [character]) = (
+            parsed.paragraph_runs.as_slice(),
+            parsed.character_runs.as_slice(),
+        ) else {
+            return Ok(None);
+        };
+        let old_coverage = u32::try_from(old_text_length)
+            .ok()
+            .and_then(|length| length.checked_add(1))
+            .ok_or_else(|| corrupted("StyleTextPropAtom old text length exceeds u32"))?;
+        if paragraph.count != old_coverage || character.count != old_coverage {
+            return Err(corrupted(
+                "StyleTextPropAtom single runs do not cover the old text",
+            ));
+        }
+        let new_coverage = u32::try_from(new_text_length)
+            .ok()
+            .and_then(|length| length.checked_add(1))
+            .ok_or_else(|| corrupted("StyleTextPropAtom new text length exceeds u32"))?;
+        let character_count_offset = 8usize
+            .checked_add(paragraph.to_payload().len())
+            .ok_or_else(|| corrupted("StyleTextPropAtom run offset overflows"))?;
+        let character_count_end = character_count_offset
+            .checked_add(4)
+            .ok_or_else(|| corrupted("StyleTextPropAtom run offset overflows"))?;
+        if character_count_end > record_bytes.len() {
+            return Err(corrupted("StyleTextPropAtom character run is truncated"));
+        }
+
+        let mut rewritten = record_bytes.to_vec();
+        rewritten[8..12].copy_from_slice(&new_coverage.to_le_bytes());
+        rewritten[character_count_offset..character_count_end]
+            .copy_from_slice(&new_coverage.to_le_bytes());
+        Ok(Some(rewritten))
+    }
 }
 
 fn corrupted(message: impl Into<String>) -> Error {
@@ -327,6 +380,15 @@ mod tests {
         data
     }
 
+    fn raw_style_record(payload: &[u8]) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&0u16.to_le_bytes());
+        bytes.extend_from_slice(&STYLE_TEXT_PROP_TYPE.to_le_bytes());
+        bytes.extend_from_slice(&u32::try_from(payload.len()).unwrap().to_le_bytes());
+        bytes.extend_from_slice(payload);
+        bytes
+    }
+
     #[test]
     fn parses_runs_and_round_trips() {
         let payload = sample_payload();
@@ -360,6 +422,37 @@ mod tests {
         assert_eq!(
             StyleTextPropAtom::parse(&serialized[8..], 9).unwrap(),
             parsed
+        );
+    }
+
+    #[test]
+    fn single_run_resize_changes_only_the_two_coverage_counts() {
+        let mut payload = Vec::new();
+        payload.extend_from_slice(&4u32.to_le_bytes());
+        payload.extend_from_slice(&0u16.to_le_bytes());
+        payload.extend_from_slice(&0u32.to_le_bytes());
+        payload.extend_from_slice(&4u32.to_le_bytes());
+        payload.extend_from_slice(&0u32.to_le_bytes());
+        let source = raw_style_record(&payload);
+        let resized = StyleTextPropAtom::resize_single_run_record(&source, 3, 9)
+            .unwrap()
+            .unwrap();
+        let mut expected = source;
+        expected[8..12].copy_from_slice(&10u32.to_le_bytes());
+        expected[18..22].copy_from_slice(&10u32.to_le_bytes());
+        assert_eq!(resized, expected);
+    }
+
+    #[test]
+    fn multi_run_style_resize_requires_a_semantic_dependency_choice() {
+        assert!(
+            StyleTextPropAtom::resize_single_run_record(
+                &raw_style_record(&sample_payload()),
+                9,
+                12,
+            )
+            .unwrap()
+            .is_none()
         );
     }
 

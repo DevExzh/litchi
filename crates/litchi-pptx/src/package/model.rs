@@ -153,6 +153,66 @@ impl Package {
         })
     }
 
+    /// Capture one slide's inert `[MS-PPTX]` change-tracking identifiers.
+    ///
+    /// The snapshot includes the slide creation ID and each shape modification
+    /// ID in semantic scene order. It never interprets the identifiers as
+    /// history, clocks, authorship, or executable collaboration state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing, ambiguous, or out-of-range slide,
+    /// malformed extension XML or exceeded bounds. Duplicate producer values
+    /// remain readable for checked-position repair but cannot be committed.
+    pub fn change_tracking<'a>(
+        &self,
+        slide: impl Into<crate::slide::Key<'a>>,
+    ) -> Result<crate::change_tracking::Snapshot> {
+        self.ensure_graph_current("change_tracking")?;
+        let owner = self.resolve_slide(slide.into())?;
+        crate::change_tracking::load(&self.opc, &owner)
+    }
+
+    /// Publish a committed change-tracking edit atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selected slide no longer exactly matches the
+    /// commit source or package mutation policy refuses publication.
+    pub fn apply_change_tracking_commit(
+        &mut self,
+        commit: crate::change_tracking::Commit,
+    ) -> Result<crate::change_tracking::Snapshot> {
+        self.ensure_graph_current("apply_change_tracking_commit")?;
+        self.ensure_plain_mutation("apply_change_tracking_commit")?;
+        let changed = commit.is_changed();
+        let snapshot = crate::change_tracking::apply_commit(&mut self.opc, commit)?;
+        if changed {
+            self.mutable_pres = None;
+        }
+        Ok(snapshot)
+    }
+
+    /// Apply an exact-source reversible change-tracking patch atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the patch is stale, malformed, or rejected by
+    /// package mutation policy.
+    pub fn apply_change_tracking_patch(
+        &mut self,
+        patch: &crate::change_tracking::Patch,
+    ) -> Result<crate::change_tracking::Snapshot> {
+        self.ensure_graph_current("apply_change_tracking_patch")?;
+        self.ensure_plain_mutation("apply_change_tracking_patch")?;
+        let changed = patch.is_changed();
+        let snapshot = crate::change_tracking::apply_patch(&mut self.opc, patch)?;
+        if changed {
+            self.mutable_pres = None;
+        }
+        Ok(snapshot)
+    }
+
     /// Load the complete inert speaker-notes graph, when present.
     ///
     /// Physical part names remain diagnostic details of the returned graph;

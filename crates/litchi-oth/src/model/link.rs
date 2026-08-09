@@ -8,6 +8,10 @@ pub struct Link {
 }
 
 impl Link {
+    /// Creates an inert hyperlink value.
+    ///
+    /// Constructing a link never resolves, fetches, or activates its target.
+    #[must_use]
     pub fn new(href: impl Into<String>, label: impl Into<String>) -> Self {
         Self {
             href: href.into(),

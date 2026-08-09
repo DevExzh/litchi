@@ -24,6 +24,9 @@ pub mod worksheet;
 /// Cell value parsing and representation
 mod cell;
 
+/// Source-checked edits of existing BIFF8 `Number` cell values.
+pub mod cell_values;
+
 /// BIFF8 worksheet data-validation records.
 mod data_validation;
 

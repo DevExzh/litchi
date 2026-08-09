@@ -579,9 +579,6 @@ pub fn write_database_ranges(output: &mut String, ranges: &[Range]) -> Result<()
 ///
 /// Returns an error when the value cannot be serialized.
 ///
-/// # Panics
-///
-/// Panics if the internally generated wrapper element is missing; this is an internal invariant that always holds.
 pub fn write_database_range_fragment(range: &Range) -> Result<String> {
     range.validate()?;
     let mut output = String::with_capacity(512);
@@ -590,10 +587,12 @@ pub fn write_database_range_fragment(range: &Range) -> Result<String> {
     );
     write_database_range(&mut output, range);
     output.push_str("</table:database-ranges>");
-    let start = output.find('>').expect("generated container") + 1;
+    let start = output.find('>').ok_or_else(|| {
+        Error::InvalidFormat("database-range wrapper start is missing".to_string())
+    })? + 1;
     let end = output
         .rfind("</table:database-ranges>")
-        .expect("generated container end");
+        .ok_or_else(|| Error::InvalidFormat("database-range wrapper end is missing".to_string()))?;
     Ok(output[start..end].to_string())
 }
 

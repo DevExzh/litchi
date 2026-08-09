@@ -6,8 +6,9 @@ use std::path::Path;
 pub use crate::authoring::Builder;
 
 /// Immutable document snapshot.
+#[derive(Clone)]
 pub struct Database {
-    package: crate::package::Snapshot,
+    pub(crate) package: crate::package::Snapshot,
 }
 
 impl Database {
@@ -83,6 +84,15 @@ impl Database {
     /// exceeds `limits`.
     pub fn catalog_with(&self, limits: crate::Limits) -> Result<crate::Catalog<'_>> {
         crate::Catalog::parse(self.content_xml(), limits)
+    }
+
+    /// Starts a source-bound stored-query transaction.
+    ///
+    /// Query commands remain inert text throughout the transaction and are
+    /// never parsed, connected, refreshed, or executed.
+    #[must_use]
+    pub const fn edit(&self) -> crate::Edit<'_> {
+        crate::Edit::new(self)
     }
 
     /// Consumes the snapshot and returns the raw package bytes.

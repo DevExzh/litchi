@@ -2005,6 +2005,7 @@ impl<'a> Parser<'a> {
             ControlWord::ListOverrideIndex(_) => "list-override",
             ControlWord::ListLevelIndex(_) => "list-level",
             ControlWord::Shading(_) => "shading",
+            ControlWord::ParagraphShadingPattern(..) => "shading-pattern",
             ControlWord::ForegroundPattern(_) => "shading-foreground",
             ControlWord::BackgroundPattern(_) => "shading-background",
             _ => return None,
@@ -3093,11 +3094,9 @@ impl<'a> Parser<'a> {
             ControlWord::CharacterShading(value) => {
                 state.character_border_active = false;
                 let amount = Self::required_character_value(*value, "chshdng", 10_000)?;
-                state
-                    .formatting
-                    .character_shading
-                    .get_or_insert_default()
-                    .amount = amount;
+                let shading = state.formatting.character_shading.get_or_insert_default();
+                shading.amount = Some(amount);
+                shading.pattern = None;
                 return Ok(true);
             },
             ControlWord::CharacterForegroundPattern(value) => {
@@ -3107,7 +3106,7 @@ impl<'a> Parser<'a> {
                     .formatting
                     .character_shading
                     .get_or_insert_default()
-                    .foreground_color = color;
+                    .foreground_color = Some(color);
                 return Ok(true);
             },
             ControlWord::CharacterBackgroundPattern(value) => {
@@ -3117,7 +3116,15 @@ impl<'a> Parser<'a> {
                     .formatting
                     .character_shading
                     .get_or_insert_default()
-                    .background_color = color;
+                    .background_color = Some(color);
+                return Ok(true);
+            },
+            ControlWord::CharacterShadingPattern(pattern, parameter) => {
+                state.character_border_active = false;
+                require_parameterless(*parameter, "character shading pattern")?;
+                let shading = state.formatting.character_shading.get_or_insert_default();
+                shading.pattern = Some(*pattern);
+                shading.amount = None;
                 return Ok(true);
             },
             _ => {},
@@ -3321,6 +3328,7 @@ impl<'a> Parser<'a> {
                     .set_amount(Some(Self::required_character_value(
                         *value, "shading", 10_000,
                     )?))?;
+                state.paragraph.shading.pattern = None;
             },
             ControlWord::ForegroundPattern(value) => {
                 state
@@ -3341,6 +3349,11 @@ impl<'a> Parser<'a> {
                         "cbpat",
                         u16::MAX,
                     )?));
+            },
+            ControlWord::ParagraphShadingPattern(pattern, parameter) => {
+                require_parameterless(*parameter, "paragraph shading pattern")?;
+                state.paragraph.shading.pattern = Some(*pattern);
+                state.paragraph.shading.amount = None;
             },
             _ => return Ok(false),
         }

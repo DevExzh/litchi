@@ -74,6 +74,41 @@ fn runs_accept_fragments_with_an_inherited_namespace_binding() {
 }
 
 #[test]
+fn inlines_preserve_every_direct_paragraph_child_in_order() {
+    let xml = br#"<wp:p xmlns:wp="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns:x="urn:future"><wp:pPr><wp:keepNext/></wp:pPr><wp:r><wp:t>typed</wp:t></wp:r><wp:hyperlink wp:anchor="target"><wp:r><wp:t>link</wp:t></wp:r></wp:hyperlink><m:oMath><m:r><m:t>x</m:t></m:r></m:oMath><x:future x:value="1"/></wp:p>"#;
+    let paragraph = Paragraph::new(xml.to_vec());
+    let inlines = paragraph.inlines().unwrap();
+
+    assert_eq!(inlines.len(), 4);
+    assert!(matches!(&inlines[0], Inline::Run(run) if run.text().unwrap() == "typed"));
+    assert!(
+        matches!(&inlines[1], Inline::Unknown(value) if value.xml_bytes() == br#"<wp:hyperlink wp:anchor="target"><wp:r><wp:t>link</wp:t></wp:r></wp:hyperlink>"#)
+    );
+    assert!(
+        matches!(&inlines[2], Inline::Unknown(value) if value.xml_bytes() == br#"<m:oMath><m:r><m:t>x</m:t></m:r></m:oMath>"#)
+    );
+    assert!(
+        matches!(&inlines[3], Inline::Unknown(value) if value.xml_bytes() == br#"<x:future x:value="1"/>"#)
+    );
+}
+
+#[test]
+fn inlines_accept_strict_and_inherited_word_prefixes() {
+    let strict = Paragraph::new(
+        br#"<s:p xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"><s:r/><s:fldSimple s:instr="DATE"/></s:p>"#
+            .to_vec(),
+    );
+    let strict_inlines = strict.inlines().unwrap();
+    assert!(matches!(strict_inlines[0], Inline::Run(_)));
+    assert!(matches!(strict_inlines[1], Inline::Unknown(_)));
+
+    let inherited = Paragraph::new(br#"<wp:p><wp:r/><wp:future/></wp:p>"#.to_vec());
+    let inherited_inlines = inherited.inlines().unwrap();
+    assert!(matches!(inherited_inlines[0], Inline::Run(_)));
+    assert!(matches!(inherited_inlines[1], Inline::Unknown(_)));
+}
+
+#[test]
 fn reads_nested_smart_tags_and_their_typed_metadata() {
     let xml = br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
             xmlns:false="urn:not-wordprocessingml">
@@ -537,4 +572,68 @@ fn edits_spacing_in_inherited_namespace_fragments_without_copying_runs() {
     paragraph.set_spacing(None).unwrap();
     assert_eq!(paragraph.spacing().unwrap(), None);
     assert_eq!(paragraph.text().unwrap(), "body");
+}
+
+#[test]
+fn run_contents_preserve_source_order_and_unknown_xml() {
+    let run = Run::new(
+        br#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:b/></w:rPr><w:t>A</w:t><w:tab/><w:br w:type="page"/><w:cr/><w:noBreakHyphen/><w:softHyphen/><w:drawing><wp:inline><wp:extent cx="100" cy="200"/><wp:docPr name="logo" descr="alt"/><pic:blipFill><a:blip r:embed="rId7"/></pic:blipFill></wp:inline></w:drawing><w:footnoteReference w:id="12"/><w:endnoteReference w:id="34"/><w:footnoteRef/><w:endnoteRef/><w:continuationSeparator/></w:r>"#
+            .to_vec(),
+    );
+
+    let contents = run.contents().unwrap();
+    assert_eq!(contents.len(), 12);
+    assert!(matches!(&contents[0], RunContent::Text(text) if text == "A"));
+    assert!(matches!(contents[1], RunContent::Tab));
+    assert!(matches!(
+        contents[2],
+        RunContent::Break(RunBreak {
+            break_type: RunBreakType::Page,
+            clear: RunBreakClear::None
+        })
+    ));
+    assert!(matches!(contents[3], RunContent::CarriageReturn));
+    assert!(matches!(contents[4], RunContent::NoBreakHyphen));
+    assert!(matches!(contents[5], RunContent::SoftHyphen));
+    assert!(matches!(&contents[6], RunContent::Image(image) if image.r_embed() == "rId7"));
+    assert!(matches!(contents[7], RunContent::FootnoteReference(12)));
+    assert!(matches!(contents[8], RunContent::EndnoteReference(34)));
+    assert!(matches!(contents[9], RunContent::FootnoteMark));
+    assert!(matches!(contents[10], RunContent::EndnoteMark));
+    assert!(matches!(
+        &contents[11],
+        RunContent::Unknown(unknown)
+            if unknown.xml_bytes() == br#"<w:continuationSeparator/>"#
+    ));
+}
+
+#[test]
+fn relationship_projection_groups_hyperlink_runs_without_exposing_rids() {
+    let paragraph = Paragraph::new(
+        br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:t>before</w:t></w:r><w:hyperlink w:anchor="section" w:tooltip="jump" w:tgtFrame="_self" w:docLocation="part"><w:r><w:t>one</w:t></w:r><w:r><w:tab/><w:t>two</w:t></w:r></w:hyperlink><w:bookmarkStart w:id="1" w:name="section"/></w:p>"#
+            .to_vec(),
+    );
+    let relationships = litchi_opc::rel::Relationships::new("/word/document.xml".to_owned());
+
+    let raw = paragraph.inlines().unwrap();
+    assert!(matches!(raw[1], Inline::Unknown(_)));
+    let resolved = paragraph
+        .inlines_with_relationships(&relationships)
+        .unwrap();
+    assert_eq!(resolved.len(), 3);
+    let Inline::Hyperlink(hyperlink) = &resolved[1] else {
+        panic!("expected typed hyperlink");
+    };
+    assert_eq!(hyperlink.link().anchor(), Some("section"));
+    assert_eq!(hyperlink.link().tooltip(), Some("jump"));
+    assert_eq!(hyperlink.target_frame(), Some("_self"));
+    assert_eq!(hyperlink.document_location(), Some("part"));
+    assert!(!hyperlink.has_unmodeled_content());
+    assert_eq!(hyperlink.runs().len(), 2);
+    assert_eq!(hyperlink.runs()[0].text().unwrap(), "one");
+    assert!(matches!(
+        hyperlink.runs()[1].contents().unwrap().as_slice(),
+        [RunContent::Tab, RunContent::Text(text)] if text == "two"
+    ));
+    assert!(matches!(resolved[2], Inline::Unknown(_)));
 }

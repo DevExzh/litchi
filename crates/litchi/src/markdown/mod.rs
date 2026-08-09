@@ -117,6 +117,8 @@ mod writer;
     feature = "pages"
 ))]
 mod document;
+#[cfg(feature = "docx")]
+mod docx;
 #[cfg(feature = "doc")]
 pub(crate) use document::resolve_doc_lists;
 #[cfg(feature = "docx")]

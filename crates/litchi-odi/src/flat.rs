@@ -1,4 +1,8 @@
-//! Byte-preserving flat OpenDocument Image snapshots and bounded frame edits.
+//! Byte-preserving flat `OpenDocument` Image snapshots and bounded frame edits.
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "The file keeps public snapshot/transaction types before their private XML machinery."
+)]
 
 use crate::{frame::Frame, source::Source};
 use litchi_core::{Error, FileFormat, Result};
@@ -40,6 +44,11 @@ pub struct FlatImage(Arc<State>);
 
 impl FlatImage {
     /// Opens a flat ODI document and inventories its inert image frames.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for the wrong family, malformed XML, unsupported image
+    /// sources, or exceeded input limits.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         if bytes.len() > MAX_BYTES {
             return Err(invalid("flat ODI exceeds the input size limit"));
@@ -69,6 +78,12 @@ impl FlatImage {
         &self.0.frames
     }
 
+    /// Returns the document's single normative image frame.
+    #[must_use]
+    pub fn frame(&self) -> Option<&Frame> {
+        self.0.frames.first()
+    }
+
     /// Returns the original flat XML bytes exactly.
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
@@ -85,8 +100,28 @@ impl FlatImage {
     }
 
     /// Consumes the snapshot and returns its exact flat XML bytes.
+    #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
         Arc::try_unwrap(self.0).map_or_else(|state| state.bytes.clone(), |state| state.bytes)
+    }
+}
+
+pub(crate) fn validate_content_xml(xml: &str) -> Result<()> {
+    if xml.len() > MAX_BYTES {
+        return Err(invalid("ODI content.xml exceeds the input size limit"));
+    }
+    validate_structure(xml, Root::Content)?;
+    let images = media::scan_content(xml)?;
+    if images.len() != 1 {
+        return Err(invalid("ODI content.xml must contain exactly one image"));
+    }
+    match &images[0].source {
+        media::Source::Inline { .. }
+        | media::Source::Linked { .. }
+        | media::Source::PackagePart { .. }
+        | media::Source::MissingPackagePart { .. } => Ok(()),
+        media::Source::Missing => Err(invalid("ODI draw:image has no image source")),
+        _ => Err(invalid("ODI draw:image source is not supported")),
     }
 }
 
@@ -97,7 +132,29 @@ pub struct FlatImageTransaction {
 }
 
 impl FlatImageTransaction {
+    /// Stages a replacement for the document frame's optional name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the frame has no losslessly editable owner.
+    pub fn set_name(&mut self, name: Option<String>) -> Result<()> {
+        self.set_frame_name(0, name)
+    }
+
+    /// Stages a replacement for the document's linked or inline image source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if changing source representation would be lossy.
+    pub fn set_image_source(&mut self, source: Source) -> Result<()> {
+        self.set_source(0, source)
+    }
+
     /// Stages a replacement for a frame's optional `draw:name` attribute.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid selector or uneditable owner.
     pub fn set_frame_name(&mut self, frame: usize, name: Option<String>) -> Result<()> {
         let (before_name, before_source) = {
             let current = self.frame(frame)?;
@@ -132,6 +189,10 @@ impl FlatImageTransaction {
     /// Stages replacement of an existing linked URI or inline binary payload.
     ///
     /// Cross-kind source changes refuse rather than reconstructing unknown XML.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid selector or lossy representation change.
     pub fn set_source(&mut self, frame: usize, source: Source) -> Result<()> {
         let (before_name, before_source) = {
             let current = self.frame(frame)?;
@@ -177,7 +238,11 @@ impl FlatImageTransaction {
     }
 
     /// Atomically validates and publishes an immutable edited snapshot.
-    pub fn commit(self) -> Result<FlatImageCommit> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if staged XML cannot be rewritten and read back safely.
+    pub fn commit(mut self) -> Result<FlatImageCommit> {
         if self.changes.is_empty() {
             return Ok(FlatImageCommit {
                 snapshot: self.source.clone(),
@@ -188,6 +253,7 @@ impl FlatImageTransaction {
                 },
             });
         }
+        self.changes.sort_unstable_by_key(|change| change.frame);
         let mut edits = Vec::with_capacity(self.changes.len() * 2);
         for change in &self.changes {
             let site = self.site(change.frame)?;
@@ -316,6 +382,10 @@ impl FlatImagePatch {
     }
 
     /// Applies the patch only to its exact immutable source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the supplied source is not byte-identical.
     pub fn apply(&self, source: &FlatImage) -> Result<FlatImage> {
         if !self.is_applicable_to(source) {
             return Err(invalid("stale flat ODI patch source"));
@@ -389,8 +459,9 @@ enum Root {
     Content,
 }
 
-fn parse(bytes: Vec<u8>, root: Root) -> Result<State> {
-    let xml = std::str::from_utf8(&bytes).map_err(|_| invalid("ODI XML is not UTF-8"))?;
+fn parse(input_bytes: Vec<u8>, root: Root) -> Result<State> {
+    let xml = std::str::from_utf8(&input_bytes)
+        .map_err(|error| invalid(format!("ODI XML is not UTF-8: {error}")))?;
     validate_structure(xml, root)?;
     let images = media::scan_flat(xml)?;
     if images.len() > MAX_FRAMES {
@@ -402,11 +473,11 @@ fn parse(bytes: Vec<u8>, root: Root) -> Result<State> {
     }
     let mut frames = Vec::with_capacity(images.len());
     for image in images {
-        let source = match image.source {
-            media::Source::Inline { bytes, .. } => Source::Embedded(bytes),
+        let source = match &image.source {
+            media::Source::Inline { bytes: payload, .. } => Source::Embedded(payload.clone()),
             media::Source::Linked { href }
             | media::Source::PackagePart { href, .. }
-            | media::Source::MissingPackagePart { href, .. } => Source::Linked(href),
+            | media::Source::MissingPackagePart { href, .. } => Source::Linked(href.clone()),
             media::Source::Missing => {
                 return Err(invalid(
                     "flat ODI draw:image has no losslessly modeled source",
@@ -414,14 +485,10 @@ fn parse(bytes: Vec<u8>, root: Root) -> Result<State> {
             },
             _ => return Err(invalid("flat ODI image source is not supported")),
         };
-        let mut frame = Frame::new(source);
-        if let Some(name) = image.frame.and_then(|frame| frame.name) {
-            frame = frame.with_name(name);
-        }
-        frames.push(frame);
+        frames.push(Frame::from_scanned(source, &image));
     }
     Ok(State {
-        bytes,
+        bytes: input_bytes,
         root,
         frames,
         sites,
@@ -429,101 +496,147 @@ fn parse(bytes: Vec<u8>, root: Root) -> Result<State> {
 }
 
 fn validate_structure(xml: &str, root: Root) -> Result<()> {
+    // ODF 1.4 Part 3, sections 2.2.8 and 3.9: an image body owns one
+    // `draw:frame`, and that frame owns one `draw:image`.
     let mut reader = NsReader::from_reader(xml.as_bytes());
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut body_seen = false;
-    let mut image_seen = false;
-    let mut body_depth = None;
+    let mut structure = Structure::default();
     loop {
-        let (namespace, event) = reader
+        let (resolved_namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| invalid(format!("invalid ODI XML: {error}")))?;
-        let namespace = classify(&namespace);
+        let namespace = classify(&resolved_namespace);
         match event {
             Event::Start(element) => {
                 depth = checked_depth(depth)?;
-                observe(
-                    namespace,
-                    &element,
-                    depth,
-                    false,
-                    root,
-                    &mut root_seen,
-                    &mut body_seen,
-                    &mut image_seen,
-                    &mut body_depth,
-                )?;
+                structure.observe(namespace, &element, depth, false, root)?;
             },
             Event::Empty(element) => {
-                observe(
-                    namespace,
-                    &element,
-                    checked_depth(depth)?,
-                    true,
-                    root,
-                    &mut root_seen,
-                    &mut body_seen,
-                    &mut image_seen,
-                    &mut body_depth,
-                )?;
+                structure.observe(namespace, &element, checked_depth(depth)?, true, root)?;
             },
             Event::End(_) => {
-                if body_depth == Some(depth) {
-                    body_depth = None;
-                }
+                structure.close(depth);
                 depth = depth
                     .checked_sub(1)
                     .ok_or_else(|| invalid("ODI XML depth underflow"))?;
             },
             Event::DocType(_) => return Err(invalid("DOCTYPE is not allowed in ODI XML")),
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
         }
     }
-    if depth != 0 || !root_seen || !body_seen || !image_seen {
+    if depth != 0
+        || !structure.root_seen
+        || !structure.body_seen
+        || !structure.image_seen
+        || !structure.frame_seen
+        || structure.image_count != 1
+    {
         return Err(invalid(
-            "ODI requires office:document/office:body/office:image",
+            "ODI requires office:body/office:image with one draw:frame containing one draw:image",
         ));
     }
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
-fn observe(
-    namespace: NamespaceKind,
-    element: &BytesStart<'_>,
-    depth: usize,
-    empty: bool,
-    root: Root,
-    root_seen: &mut bool,
-    body_seen: &mut bool,
-    image_seen: &mut bool,
-    body_depth: &mut Option<usize>,
-) -> Result<()> {
-    let local = element.local_name();
-    if depth == 1 {
-        let expected = match root {
-            Root::Flat => b"document".as_slice(),
-            Root::Content => b"document-content".as_slice(),
-        };
-        if *root_seen || namespace != NamespaceKind::Office || local.as_ref() != expected || empty {
-            return Err(invalid("ODI requires one non-empty office document root"));
+#[derive(Default)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "Each Boolean records a distinct one-time ODF grammar occurrence."
+)]
+struct Structure {
+    root_seen: bool,
+    body_seen: bool,
+    image_seen: bool,
+    frame_seen: bool,
+    image_count: usize,
+    body_depth: Option<usize>,
+    image_depth: Option<usize>,
+    frame_depth: Option<usize>,
+}
+
+impl Structure {
+    fn observe(
+        &mut self,
+        namespace: NamespaceKind,
+        element: &BytesStart<'_>,
+        depth: usize,
+        empty: bool,
+        root: Root,
+    ) -> Result<()> {
+        let local = element.local_name();
+        if depth == 1 {
+            let expected = match root {
+                Root::Flat => b"document".as_slice(),
+                Root::Content => b"document-content".as_slice(),
+            };
+            if self.root_seen
+                || namespace != NamespaceKind::Office
+                || local.as_ref() != expected
+                || empty
+            {
+                return Err(invalid("ODI requires one non-empty office document root"));
+            }
+            self.root_seen = true;
+        } else if namespace == NamespaceKind::Office && local.as_ref() == b"body" {
+            if self.body_seen || depth != 2 || empty {
+                return Err(invalid("ODI requires one non-empty office:body"));
+            }
+            self.body_seen = true;
+            self.body_depth = Some(depth);
+        } else if namespace == NamespaceKind::Office && local.as_ref() == b"image" {
+            if self.image_seen || self.body_depth != Some(depth - 1) || empty {
+                return Err(invalid("office:image is misplaced, duplicated, or empty"));
+            }
+            self.image_seen = true;
+            self.image_depth = Some(depth);
+        } else if local.as_ref() == b"frame" {
+            if namespace != NamespaceKind::Draw
+                || self.frame_seen
+                || self.image_depth != Some(depth - 1)
+                || empty
+            {
+                return Err(invalid(
+                    "ODI requires one non-empty draw:frame directly inside office:image",
+                ));
+            }
+            self.frame_seen = true;
+            self.frame_depth = Some(depth);
+        } else if local.as_ref() == b"image" {
+            if namespace != NamespaceKind::Draw || self.frame_depth != Some(depth - 1) {
+                return Err(invalid(
+                    "ODI requires draw:image directly inside its document frame",
+                ));
+            }
+            self.image_count = self
+                .image_count
+                .checked_add(1)
+                .ok_or_else(|| invalid("ODI draw:image count overflow"))?;
+            if self.image_count > 1 {
+                return Err(invalid(
+                    "ODI document frame contains multiple draw:image elements",
+                ));
+            }
         }
-        *root_seen = true;
-    } else if namespace == NamespaceKind::Office && local.as_ref() == b"body" {
-        if *body_seen || depth != 2 || empty {
-            return Err(invalid("ODI requires one non-empty office:body"));
-        }
-        *body_seen = true;
-        *body_depth = Some(depth);
-    } else if namespace == NamespaceKind::Office && local.as_ref() == b"image" {
-        if *image_seen || *body_depth != Some(depth - 1) {
-            return Err(invalid("office:image is misplaced or duplicated"));
-        }
-        *image_seen = true;
+        Ok(())
     }
-    Ok(())
+
+    fn close(&mut self, depth: usize) {
+        if self.frame_depth == Some(depth) {
+            self.frame_depth = None;
+        }
+        if self.image_depth == Some(depth) {
+            self.image_depth = None;
+        }
+        if self.body_depth == Some(depth) {
+            self.body_depth = None;
+        }
+    }
 }
 
 fn scan_sites(xml: &str) -> Result<Vec<FrameSite>> {
@@ -534,12 +647,14 @@ fn scan_sites(xml: &str) -> Result<Vec<FrameSite>> {
     let mut image_depth = None;
     let mut binary = None;
     loop {
-        let start = reader.buffer_position() as usize;
-        let (namespace, event) = reader
+        let start = usize::try_from(reader.buffer_position())
+            .map_err(|error| invalid(format!("ODI XML position exceeds usize: {error}")))?;
+        let (resolved_namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| invalid(format!("invalid ODI XML: {error}")))?;
-        let namespace = classify(&namespace);
-        let end = reader.buffer_position() as usize;
+        let namespace = classify(&resolved_namespace);
+        let end = usize::try_from(reader.buffer_position())
+            .map_err(|error| invalid(format!("ODI XML position exceeds usize: {error}")))?;
         match event {
             Event::Start(element) => {
                 depth = checked_depth(depth)?;
@@ -562,10 +677,11 @@ fn scan_sites(xml: &str) -> Result<Vec<FrameSite>> {
                         binary_contents: None,
                     });
                     image_depth = Some((depth, images.len() - 1));
-                } else if namespace == NamespaceKind::Office && local.as_ref() == b"binary-data" {
-                    if let Some((_, image)) = image_depth {
-                        binary = Some((depth, image, end));
-                    }
+                } else if namespace == NamespaceKind::Office
+                    && local.as_ref() == b"binary-data"
+                    && let Some((_, image)) = image_depth
+                {
+                    binary = Some((depth, image, end));
                 }
             },
             Event::Empty(element) => {
@@ -584,14 +700,14 @@ fn scan_sites(xml: &str) -> Result<Vec<FrameSite>> {
                 }
             },
             Event::End(_) => {
-                if let Some((binary_depth, image, contents_start)) = binary {
-                    if binary_depth == depth {
-                        images
-                            .get_mut(image)
-                            .ok_or_else(|| invalid("ODI binary image site is out of bounds"))?
-                            .binary_contents = Some(contents_start..start);
-                        binary = None;
-                    }
+                if let Some((binary_depth, image, contents_start)) = binary
+                    && binary_depth == depth
+                {
+                    images
+                        .get_mut(image)
+                        .ok_or_else(|| invalid("ODI binary image site is out of bounds"))?
+                        .binary_contents = Some(contents_start..start);
+                    binary = None;
                 }
                 if image_depth.is_some_and(|(image, _)| image == depth) {
                     image_depth = None;
@@ -605,7 +721,12 @@ fn scan_sites(xml: &str) -> Result<Vec<FrameSite>> {
             },
             Event::DocType(_) => return Err(invalid("DOCTYPE is not allowed in ODI XML")),
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     Ok(images)
@@ -627,7 +748,7 @@ fn attribute_qname(
             return std::str::from_utf8(attribute.key.as_ref())
                 .map(str::to_owned)
                 .map(Some)
-                .map_err(|_| invalid("ODI attribute name is not UTF-8"));
+                .map_err(|error| invalid(format!("ODI attribute name is not UTF-8: {error}")));
         }
     }
     Ok(None)
@@ -638,19 +759,19 @@ fn rewrite_attribute(
     span: &Range<usize>,
     existing: Option<&str>,
     fallback: &str,
-    value: Option<&str>,
+    new_value: Option<&str>,
 ) -> Result<String> {
     let tag = std::str::from_utf8(
         bytes
             .get(span.clone())
             .ok_or_else(|| invalid("ODI attribute tag span is invalid"))?,
     )
-    .map_err(|_| invalid("ODI attribute tag is not UTF-8"))?;
-    let escaped = value.map(|value| quick_xml::escape::escape(value).into_owned());
+    .map_err(|error| invalid(format!("ODI attribute tag is not UTF-8: {error}")))?;
+    let escaped = new_value.map(|candidate| quick_xml::escape::escape(candidate).into_owned());
     match (existing, escaped) {
-        (Some(name), Some(value)) => replace_attribute(tag, name, &value),
+        (Some(name), Some(replacement)) => replace_attribute(tag, name, &replacement),
         (Some(name), None) => remove_attribute(tag, name),
-        (None, Some(value)) => insert_attribute(tag, fallback, &value),
+        (None, Some(replacement)) => insert_attribute(tag, fallback, &replacement),
         (None, None) => Ok(tag.to_owned()),
     }
 }
@@ -751,7 +872,7 @@ fn find_attribute(tag: &str, wanted: &str) -> Result<Option<(Range<usize>, Range
 }
 
 fn apply_edits(source: &[u8], mut edits: Vec<(Range<usize>, String)>) -> Result<Vec<u8>> {
-    edits.sort_unstable_by(|left, right| right.0.start.cmp(&left.0.start));
+    edits.sort_unstable_by_key(|edit| std::cmp::Reverse(edit.0.start));
     let mut output = source.to_vec();
     let mut prior = source.len();
     for (span, replacement) in edits {
@@ -791,13 +912,13 @@ fn base64(bytes: &[u8]) -> String {
 }
 
 fn checked_depth(depth: usize) -> Result<usize> {
-    let depth = depth
+    let next_depth = depth
         .checked_add(1)
         .ok_or_else(|| invalid("ODI XML depth overflow"))?;
-    if depth > MAX_DEPTH {
+    if next_depth > MAX_DEPTH {
         return Err(invalid("ODI XML depth exceeds the limit"));
     }
-    Ok(depth)
+    Ok(next_depth)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -811,7 +932,9 @@ fn classify(namespace: &ResolveResult<'_>) -> NamespaceKind {
     match namespace {
         ResolveResult::Bound(Namespace(uri)) if *uri == OFFICE => NamespaceKind::Office,
         ResolveResult::Bound(Namespace(uri)) if *uri == DRAW => NamespaceKind::Draw,
-        _ => NamespaceKind::Other,
+        ResolveResult::Bound(_) | ResolveResult::Unbound | ResolveResult::Unknown(_) => {
+            NamespaceKind::Other
+        },
     }
 }
 

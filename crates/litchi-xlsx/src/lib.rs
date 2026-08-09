@@ -35,6 +35,7 @@ pub mod ole_objects;
 mod outline;
 pub mod outline_properties;
 pub mod package;
+pub mod page_breaks;
 pub mod page_margins;
 pub mod page_setup;
 pub mod phonetic_properties;
@@ -208,8 +209,9 @@ pub use threaded_comments::{
 };
 pub use workbook::{
     ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DateSystem, DefaultsEdit, Edit,
-    Flavor, JoinError, JoinFailure, NewSheet, PackageChange, Patch, RowEdit, Selector, State,
-    TabEdit, Visibility, Workbook, Worksheet, WorksheetEdit, WorksheetKind,
+    Flavor, History, HistoryLimits, JoinError, JoinFailure, NewSheet, PackageChange, Patch,
+    RowEdit, Selector, State, TabEdit, Visibility, Workbook, Worksheet, WorksheetEdit,
+    WorksheetKind,
 };
 pub use workbook_metadata::{
     FutureMetadata, MetadataBehavior, MetadataBlock, MetadataRecord, MetadataType,

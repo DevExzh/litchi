@@ -179,7 +179,12 @@ pub(crate) fn split_cell_range_addresses(value: &str) -> Result<Vec<String>> {
         if character == '\'' {
             current.push(character);
             if quoted && chars.peek() == Some(&'\'') {
-                current.push(chars.next().expect("peeked quote is present"));
+                if chars.next().is_none() {
+                    return Err(Error::InvalidFormat(
+                        "quoted cell-range address ended unexpectedly".to_string(),
+                    ));
+                }
+                current.push('\'');
             } else {
                 quoted = !quoted;
             }
@@ -427,7 +432,9 @@ fn structure_bounds(entry: &Structure, total: usize, depth: usize) -> Result<(us
             let first = group.children.first().ok_or_else(|| {
                 Error::InvalidFormat("table groups must contain at least one item".to_string())
             })?;
-            let last = group.children.last().expect("group has a first child");
+            let last = group.children.last().ok_or_else(|| {
+                Error::InvalidFormat("table groups must contain at least one item".to_string())
+            })?;
             let (start, _) = structure_bounds(first, total, depth + 1)?;
             let (_, end) = structure_bounds(last, total, depth + 1)?;
             Ok((start, end))

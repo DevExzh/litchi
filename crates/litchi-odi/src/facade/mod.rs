@@ -72,7 +72,33 @@ impl Image {
         self.package.frames()
     }
 
-    /// Starts a source-bound package frame-metadata transaction.
+    /// Returns the package's single normative image frame.
+    #[must_use]
+    pub fn frame(&self) -> Option<&crate::frame::Frame> {
+        self.package.frames().first()
+    }
+
+    /// Returns package-local image resources referenced by `content.xml`.
+    ///
+    /// External links and inline `office:binary-data` are not package
+    /// resources. Missing safe package references remain visible with
+    /// [`crate::resource::Resource::is_present`] set to `false`.
+    #[must_use]
+    pub fn resources(&self) -> &[crate::resource::Resource] {
+        self.package.resources()
+    }
+
+    /// Reads one inventoried package-local image resource.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `index` is out of bounds or the archive member
+    /// cannot be read. A referenced but absent member returns `Ok(None)`.
+    pub fn resource_bytes(&self, index: usize) -> Result<Option<Vec<u8>>> {
+        self.package.resource_bytes(index)
+    }
+
+    /// Starts a source-bound package image transaction.
     ///
     /// This supports the same lossless existing-name and existing-source edits
     /// as [`crate::FlatImage`], while rebuilding a validated ODI package and
@@ -82,6 +108,7 @@ impl Image {
         Edit {
             source: self,
             transaction: self.package.content_snapshot().transaction(),
+            resource_changes: Vec::new(),
         }
     }
 
@@ -92,13 +119,32 @@ impl Image {
     }
 }
 
-/// A source-bound package frame-metadata transaction.
+/// A source-bound package image and resource transaction.
 pub struct Edit<'a> {
     source: &'a Image,
     transaction: crate::FlatImageTransaction,
+    resource_changes: Vec<ResourceEdit>,
 }
 
 impl Edit<'_> {
+    /// Stages a replacement for the document frame's optional name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the lossless frame site is unavailable.
+    pub fn set_name(&mut self, name: Option<String>) -> Result<()> {
+        self.transaction.set_name(name)
+    }
+
+    /// Stages a replacement for the document's linked or inline source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when changing source representation would be lossy.
+    pub fn set_image_source(&mut self, source: crate::source::Source) -> Result<()> {
+        self.transaction.set_image_source(source)
+    }
+
     /// Stages a replacement for one frame's optional `draw:name`.
     ///
     /// # Errors
@@ -120,6 +166,32 @@ impl Edit<'_> {
         self.transaction.set_source(frame, source)
     }
 
+    /// Adds or replaces one referenced package-local image resource.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid resource selector, media type, or
+    /// resource that is not package-local.
+    pub fn set_resource(
+        &mut self,
+        resource: usize,
+        media_type: String,
+        bytes: Vec<u8>,
+    ) -> Result<()> {
+        validate_media_type(&media_type)?;
+        self.stage_resource(resource, Some(media_type), Some(bytes))
+    }
+
+    /// Removes one existing package-local image member while preserving its
+    /// inert reference as a typed missing resource.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid selector.
+    pub fn remove_resource(&mut self, resource: usize) -> Result<()> {
+        self.stage_resource(resource, None, None)
+    }
+
     /// Atomically validates, rebuilds, and publishes the package edit.
     ///
     /// # Errors
@@ -130,14 +202,32 @@ impl Edit<'_> {
         let content = self.transaction.commit()?;
         let changes = content.patch().changes().to_vec();
         let inverse_changes = content.patch().inverse().changes().to_vec();
-        let snapshot = if changes.is_empty() {
+        let mut resource_edits = self.resource_changes;
+        resource_edits.sort_unstable_by_key(|change| change.resource);
+        let resource_changes = resource_edits
+            .iter()
+            .map(ResourceEdit::change)
+            .collect::<Vec<_>>();
+        let inverse_resource_changes = resource_changes
+            .iter()
+            .map(ResourceChange::inverse)
+            .collect::<Vec<_>>();
+        let snapshot = if changes.is_empty() && resource_edits.is_empty() {
             self.source.clone()
         } else {
-            let xml = std::str::from_utf8(content.snapshot().as_bytes()).map_err(|_| {
-                Error::InvalidFormat("ODI edited content.xml is not UTF-8".to_string())
+            let xml = std::str::from_utf8(content.snapshot().as_bytes()).map_err(|error| {
+                Error::InvalidFormat(format!("ODI edited content.xml is not UTF-8: {error}"))
             })?;
+            let replacements = resource_edits
+                .iter()
+                .map(|change| crate::package::ResourceReplacement {
+                    path: &change.path,
+                    media_type: change.after_media_type.as_deref().unwrap_or_default(),
+                    bytes: change.after_bytes.as_deref(),
+                })
+                .collect::<Vec<_>>();
             Image {
-                package: self.source.package.rebuild_with_content(xml)?,
+                package: self.source.package.rebuild(xml, &replacements)?,
             }
         };
         for change in &changes {
@@ -150,6 +240,27 @@ impl Edit<'_> {
                 ));
             }
         }
+        for change in &resource_edits {
+            if snapshot.package.resource_file(&change.path)?.as_deref()
+                != change.after_bytes.as_deref()
+            {
+                return Err(Error::InvalidFormat(
+                    "ODI package resource edit failed byte readback".to_string(),
+                ));
+            }
+            if let Some(after_media_type) = change.after_media_type.as_deref()
+                && snapshot
+                    .resources()
+                    .iter()
+                    .find(|resource| resource.path() == change.path)
+                    .and_then(crate::resource::Resource::media_type)
+                    != Some(after_media_type)
+            {
+                return Err(Error::InvalidFormat(
+                    "ODI package resource edit failed media-type readback".to_string(),
+                ));
+            }
+        }
         Ok(Commit {
             snapshot: snapshot.clone(),
             patch: Patch {
@@ -157,8 +268,68 @@ impl Edit<'_> {
                 target: snapshot,
                 changes,
                 inverse_changes,
+                resource_changes,
+                inverse_resource_changes,
             },
         })
+    }
+
+    fn stage_resource(
+        &mut self,
+        resource: usize,
+        after_media_type: Option<String>,
+        after_bytes: Option<Vec<u8>>,
+    ) -> Result<()> {
+        let selected = self.source.resources().get(resource).ok_or_else(|| {
+            Error::InvalidFormat("ODI resource selector is out of bounds".to_string())
+        })?;
+        let before_bytes = self.source.resource_bytes(resource)?;
+        let before_media_type = selected.media_type().map(str::to_owned);
+        if let Some(change) = self
+            .resource_changes
+            .iter_mut()
+            .find(|change| change.resource == resource)
+        {
+            change.after_media_type = after_media_type;
+            change.after_bytes = after_bytes;
+        } else {
+            self.resource_changes.push(ResourceEdit {
+                resource,
+                path: selected.path().to_string(),
+                before_media_type: before_media_type.clone(),
+                after_media_type,
+                before_size: before_bytes.as_ref().map(Vec::len),
+                after_bytes,
+            });
+        }
+        self.resource_changes.retain(|change| {
+            change.resource != resource
+                || change.before_media_type != change.after_media_type
+                || before_bytes.as_deref() != change.after_bytes.as_deref()
+        });
+        Ok(())
+    }
+}
+
+struct ResourceEdit {
+    resource: usize,
+    path: String,
+    before_media_type: Option<String>,
+    after_media_type: Option<String>,
+    before_size: Option<usize>,
+    after_bytes: Option<Vec<u8>>,
+}
+
+impl ResourceEdit {
+    fn change(&self) -> ResourceChange {
+        ResourceChange {
+            resource: self.resource,
+            path: self.path.clone(),
+            before_media_type: self.before_media_type.clone(),
+            after_media_type: self.after_media_type.clone(),
+            before_size: self.before_size,
+            after_size: self.after_bytes.as_ref().map(Vec::len),
+        }
     }
 }
 
@@ -172,7 +343,7 @@ impl Commit {
     /// Returns whether the package bytes changed.
     #[must_use]
     pub fn changed(&self) -> bool {
-        !self.patch.changes.is_empty()
+        !self.patch.changes.is_empty() || !self.patch.resource_changes.is_empty()
     }
 
     /// Returns the committed image snapshot.
@@ -194,13 +365,15 @@ impl Commit {
     }
 }
 
-/// A source-checked reversible ODI package frame-metadata patch.
+/// A source-checked reversible ODI package image/resource patch.
 #[derive(Clone)]
 pub struct Patch {
     source: Image,
     target: Image,
     changes: Vec<crate::FrameChange>,
     inverse_changes: Vec<crate::FrameChange>,
+    resource_changes: Vec<ResourceChange>,
+    inverse_resource_changes: Vec<ResourceChange>,
 }
 
 impl Patch {
@@ -230,6 +403,12 @@ impl Patch {
         &self.changes
     }
 
+    /// Returns package-resource changes in source order.
+    #[must_use]
+    pub fn resource_changes(&self) -> &[ResourceChange] {
+        &self.resource_changes
+    }
+
     /// Returns the patch that restores the exact source package.
     #[must_use]
     pub fn inverse(&self) -> Self {
@@ -238,8 +417,86 @@ impl Patch {
             target: self.source.clone(),
             changes: self.inverse_changes.clone(),
             inverse_changes: self.changes.clone(),
+            resource_changes: self.inverse_resource_changes.clone(),
+            inverse_resource_changes: self.resource_changes.clone(),
         }
     }
+}
+
+/// One reversible package-local image-resource change.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ResourceChange {
+    resource: usize,
+    path: String,
+    before_media_type: Option<String>,
+    after_media_type: Option<String>,
+    before_size: Option<usize>,
+    after_size: Option<usize>,
+}
+
+impl ResourceChange {
+    /// Returns the source resource selector.
+    #[must_use]
+    pub fn resource(&self) -> usize {
+        self.resource
+    }
+
+    /// Returns the safe package path.
+    #[must_use]
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    /// Returns the source manifest media type.
+    #[must_use]
+    pub fn before_media_type(&self) -> Option<&str> {
+        self.before_media_type.as_deref()
+    }
+
+    /// Returns the target manifest media type.
+    #[must_use]
+    pub fn after_media_type(&self) -> Option<&str> {
+        self.after_media_type.as_deref()
+    }
+
+    /// Returns the source member size, or `None` when it was missing.
+    #[must_use]
+    pub fn before_size(&self) -> Option<usize> {
+        self.before_size
+    }
+
+    /// Returns the target member size, or `None` when it is removed.
+    #[must_use]
+    pub fn after_size(&self) -> Option<usize> {
+        self.after_size
+    }
+
+    fn inverse(&self) -> Self {
+        Self {
+            resource: self.resource,
+            path: self.path.clone(),
+            before_media_type: self.after_media_type.clone(),
+            after_media_type: self.before_media_type.clone(),
+            before_size: self.after_size,
+            after_size: self.before_size,
+        }
+    }
+}
+
+fn validate_media_type(media_type: &str) -> Result<()> {
+    if media_type.is_empty()
+        || media_type.len() > 1_024
+        || !media_type.is_ascii()
+        || media_type
+            .bytes()
+            .any(|byte| byte.is_ascii_whitespace() || byte.is_ascii_control())
+        || !media_type.contains('/')
+    {
+        return Err(Error::InvalidFormat(
+            "ODI resource media type is invalid".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 #[cfg(test)]

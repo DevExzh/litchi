@@ -30,6 +30,15 @@ impl<'a> Parser<'a> {
             self.preserve_unknown_control(token)?;
             return Ok(());
         }
+        if matches!(control, ControlWord::HtmlRtf(_)) {
+            if !text_buffer.is_empty() {
+                self.flush_text_buffer(text_buffer)?;
+            }
+            let token = self.pos;
+            self.pos += 1;
+            self.preserve_unknown_control(token)?;
+            return Ok(());
+        }
         match control {
             ControlWord::Par | ControlWord::Line => {
                 let structural_table_boundary =
@@ -196,6 +205,10 @@ impl<'a> Parser<'a> {
             | ControlWord::EnSpace
             | ControlWord::QuarterEmSpace
             | ControlWord::Bullet
+            | ControlWord::LeftSingleQuote
+            | ControlWord::RightSingleQuote
+            | ControlWord::LeftDoubleQuote
+            | ControlWord::RightDoubleQuote
             | ControlWord::LeftToRightMark
             | ControlWord::RightToLeftMark
             | ControlWord::ZeroWidthJoiner

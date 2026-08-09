@@ -227,8 +227,8 @@ fn encode_replacement(
 
     let mut encoder = Encoder::with_limits(limits.biff)?;
     cache::encode_cache(&mut encoder, &replacement)?;
-    let encoded = encoder.finish();
-    let mut records = Records::new(&encoded);
+    let record_bytes = encoder.finish();
+    let mut records = Records::new(&record_bytes);
     let record = records.next().ok_or(Error::UnsupportedMutation {
         operation: "cache-value-patch",
         reason: "replacement did not produce one cache record",

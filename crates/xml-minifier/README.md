@@ -89,8 +89,10 @@ The macros never infer an XML schema content model. They reject text consisting
 only of XML whitespace when it contains CR, LF, or tab outside inherited
 `xml:space="preserve"`; they never silently delete it. Pure-space nodes and all
 text containing semantic characters are preserved byte-for-byte, including any
-CR, LF, or tab within that semantic text. Keep producer-template sources compact
-and use `audit::verify` to enforce the same structural whitespace contract.
+CR, LF, or tab within that semantic text. Pure whitespace before or after the
+document element is always rejected because it cannot be element content. Keep
+producer-template sources compact and use `audit::verify` to enforce the same
+structural whitespace contract.
 
 ### CDATA Sections
 
@@ -153,9 +155,10 @@ assert_eq!(report.max_depth(), 1);
 # Ok::<(), audit::Error>(())
 ```
 
-The verifier rejects structural CR/LF/tab indentation, whitespace before a tag
-close, and nonminimal attribute separators. Character data, CDATA, and plain
-space-only nodes are never normalized. An inherited `xml:space="preserve"`
-keeps line-oriented whitespace exact. `audit::package` verifies borrowed named
-parts under aggregate part and byte budgets without rewriting opaque input.
-DTD and DOCTYPE declarations are rejected without resolving entities.
+The verifier rejects structural CR/LF/tab indentation, whitespace outside the
+document element, whitespace before a tag close, and nonminimal attribute
+separators. Character data, CDATA, and plain space-only nodes inside elements
+are never normalized. An inherited `xml:space="preserve"` keeps line-oriented
+whitespace exact. `audit::package` verifies borrowed named parts under aggregate
+part and byte budgets without rewriting opaque input. DTD and DOCTYPE
+declarations are rejected without resolving entities.

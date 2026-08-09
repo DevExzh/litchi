@@ -8,8 +8,12 @@ use litchi_odc::{
     chart::{Dimension, Kind, Position},
 };
 
+fn assert_send_sync<T: Send + Sync>() {}
+
 #[test]
 fn focused_modules_are_the_canonical_semantic_api() {
+    assert_send_sync::<Chart>();
+    assert_send_sync::<litchi_odc::FlatChart>();
     assert_eq!(Dimension::Z, Dimension::Z);
     assert_eq!(Position::BottomEnd, Position::BottomEnd);
 

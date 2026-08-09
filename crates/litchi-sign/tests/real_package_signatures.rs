@@ -1,3 +1,14 @@
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    clippy::case_sensitive_file_extension_comparisons,
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::struct_field_names,
+    clippy::unwrap_used,
+    clippy::wildcard_enum_match_arm,
+    reason = "the fixture resolver mirrors exact OPC names and XML attributes; test setup failures panic by design"
+)]
+
 use litchi_sign::xml::{self, Profile, Resolver, Transform};
 use litchi_sign::{Coverage, Error, Limits, Policy, Status};
 use quick_xml::{Reader, XmlVersion, events::Event};

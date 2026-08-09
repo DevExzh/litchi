@@ -34,7 +34,7 @@ fn parses_libreoffice_character_border_and_shading_fixtures() {
         style
             .formatting
             .character_shading
-            .is_some_and(|shading| shading.background_color == 8)
+            .is_some_and(|shading| shading.background_color == Some(8))
     }));
 }
 
@@ -74,7 +74,10 @@ fn inherits_resets_writes_and_keeps_ignored_destinations_inert() {
     assert_eq!(outer_border.style, CharacterBorderStyle::Single);
     assert_eq!(outer_border.width, 10);
     assert!(outer_border.shadow && outer_border.frame);
-    assert_eq!(outer.formatting.character_shading.unwrap().amount, 2500);
+    assert_eq!(
+        outer.formatting.character_shading.unwrap().amount,
+        Some(2500)
+    );
     assert_eq!(
         inner.formatting.character_border.unwrap().style,
         CharacterBorderStyle::Double

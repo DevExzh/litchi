@@ -155,6 +155,14 @@ impl<'source> Transaction<'source> {
         } else {
             Cow::Borrowed(self.source.as_bytes())
         };
+        if changed {
+            super::snapshot::validate_compact_package(bytes.as_ref())?;
+            let reopened =
+                super::snapshot::Snapshot::from_bytes_with(bytes.as_ref().to_vec(), self.limits)?;
+            if !super::snapshot::charts_semantically_equal(reopened.charts(), &self.draft) {
+                return invalid("ODP chart transaction failed typed readback");
+            }
+        }
         Ok(Commit {
             bytes,
             charts: self.draft,

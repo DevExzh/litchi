@@ -130,6 +130,7 @@ pub use parts::document_properties::{
     CompatibilityOptions60, DocumentProperties, DocumentPropertiesBase, DocumentPropertyVersion,
     DocumentStatistics, DocumentTimestamp, EndnotePlacement, FootnotePlacement,
     NoteNumberingRestart, ProtectionSettings, SavedView, SavedViewKind, SavedZoomKind,
+    Versioned as VersionedDocumentProperties,
 };
 pub use parts::document_properties_97::{
     AutoSummaryState, AutoSummaryView, CompatibilityOptions80, CustomKinsokuLanguage,
@@ -147,6 +148,11 @@ pub use parts::document_properties_2002::{
 pub use parts::document_properties_2003::{
     DocumentProtectionMode, DocumentStateToolbars, Dop2003, ReadingModePageLock,
 };
+pub use parts::document_properties_2007::{
+    Dop2007, DopMth, MathBreakPlacement, MathJustification, MathSubtractionBreak, StyleSortMethod,
+};
+pub use parts::document_properties_2010::{DocumentId, Dop2010};
+pub use parts::document_properties_2013::Dop2013;
 pub use parts::embedded_fonts::{DocumentEmbeddedFonts, EmbeddedFont};
 pub use parts::envelope::{
     Attachment, Commit as EnvelopeCommit, Editor as EnvelopeEditor, Envelope,

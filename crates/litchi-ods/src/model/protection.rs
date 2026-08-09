@@ -143,7 +143,11 @@ pub(crate) fn parse_protection(xml: &str) -> Result<(Protection, Vec<Sheet>)> {
                     && is_protection_extension_namespace(&namespace) =>
             {
                 let options = parse_sheet_options(&reader, &element)?;
-                let sheet = current_sheet.as_mut().expect("checked sheet");
+                let sheet = current_sheet.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "table-protection element is outside a worksheet".to_string(),
+                    )
+                })?;
                 if !sheet.options.is_empty() {
                     return Err(Error::InvalidFormat(
                         "duplicate sheet table-protection element".to_string(),
@@ -156,7 +160,9 @@ pub(crate) fn parse_protection(xml: &str) -> Result<(Protection, Vec<Sheet>)> {
                     && element.local_name().as_ref() == b"table"
                     && current_sheet_depth == Some(element_depth) =>
             {
-                sheets.push(current_sheet.take().expect("checked sheet"));
+                sheets.push(current_sheet.take().ok_or_else(|| {
+                    Error::InvalidFormat("worksheet close has no open worksheet".to_string())
+                })?);
                 current_sheet_depth = None;
             },
             Event::End(element)

@@ -25,14 +25,14 @@ impl Zoom {
         {
             return None;
         }
-        let numerator = numerator as u32;
-        let denominator = denominator as u32;
-        if numerator * 10 < denominator || numerator > denominator * 4 {
+        let wide_numerator = numerator as u32;
+        let wide_denominator = denominator as u32;
+        if wide_numerator * 10 < wide_denominator || wide_numerator > wide_denominator * 4 {
             return None;
         }
         Some(Self {
-            numerator: numerator as u16,
-            denominator: denominator as u16,
+            numerator,
+            denominator,
         })
     }
 

@@ -44,11 +44,21 @@ impl Builder {
     /// Returns an error when the serialized `MathML` fails validation or the
     /// package cannot be created.
     pub fn build(self) -> Result<crate::Formula> {
+        self.build_with_limits(crate::Limits::default())
+    }
+
+    /// Build and validate the package under caller-selected finite limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the serialized `MathML` exceeds a limit, fails
+    /// validation, or the package cannot be created.
+    pub fn build_with_limits(self, limits: crate::Limits) -> Result<crate::Formula> {
         let xml = self.root.to_xml();
         if self.template {
-            crate::Formula::create_template(xml)
+            crate::Formula::create_template_with_limits(xml, limits)
         } else {
-            crate::Formula::create(xml)
+            crate::Formula::create_with_limits(xml, limits)
         }
     }
 }

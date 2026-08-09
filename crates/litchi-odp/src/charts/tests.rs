@@ -117,7 +117,86 @@ fn limits_reject_oversized_parts_before_staging() -> Result<()> {
     let limits = super::Limits::new(1, CHART.len(), CHART.len())?;
     let inventory = presentation.charts_with(limits)?;
     let mut transaction = inventory.transaction();
-    let error = transaction.replace("Chart A", Part::from_xml(format!("{CHART} "))?);
+    let error = transaction.replace(
+        "Chart A",
+        Part::from_xml(CHART.replace("kept", "too-long"))?,
+    );
     assert!(error.is_err());
     Ok(())
+}
+
+#[test]
+fn owned_snapshot_commit_and_patch_rehydrate_the_presentation() -> Result<()> {
+    let source_bytes = package(false)?;
+    let presentation = open_presentation(source_bytes.clone())?;
+    let source = presentation.chart_snapshot()?;
+    let mut edit = source.edit();
+    edit.replace(
+        "Chart A",
+        Part::from_xml(CHART.replace("kept", "snapshot-kept"))?,
+    )?;
+    let commit = edit.commit()?;
+
+    assert!(commit.changed());
+    assert_eq!(commit.diagnostics().charts_before(), 1);
+    assert_eq!(commit.diagnostics().charts_after(), 1);
+    assert!(commit.diagnostics().changed());
+    assert_eq!(source.bytes(), source_bytes.as_slice());
+    assert!(
+        commit
+            .snapshot()
+            .get("Chart A")?
+            .is_some_and(|chart| chart.part().xml().contains("snapshot-kept"))
+    );
+    let reopened = commit.snapshot().to_presentation()?;
+    assert!(
+        reopened
+            .chart("Chart A")?
+            .is_some_and(|chart| chart.part().xml().contains("snapshot-kept"))
+    );
+
+    let applied = commit.patch().apply(&source)?;
+    assert_eq!(applied.snapshot().bytes(), commit.snapshot().bytes());
+    let restored = commit.patch().inverse().apply(applied.snapshot())?;
+    assert_eq!(restored.snapshot().bytes(), source.bytes());
+    assert!(commit.patch().is_applicable_to(restored.snapshot()));
+    assert!(commit.patch().apply(restored.snapshot()).is_ok());
+    let stale = open_presentation(package(true)?)?.chart_snapshot()?;
+    assert!(commit.patch().apply(&stale).is_err());
+    Ok(())
+}
+
+#[test]
+fn owned_snapshot_add_remove_and_noop_have_verified_readback() -> Result<()> {
+    let presentation = open_presentation(package(false)?)?;
+    let source = presentation.chart_snapshot()?;
+    let noop = source.edit().commit()?;
+    assert!(!noop.changed());
+    assert!(noop.patch().is_noop());
+    assert_eq!(noop.snapshot().bytes(), source.bytes());
+
+    let mut edit = source.edit();
+    edit.remove("Chart A")?;
+    edit.add(
+        "Slide 1",
+        "Chart B",
+        Storage::InlineXml,
+        Part::from_xml(CHART)?,
+    )?;
+    let commit = edit.commit()?;
+    let chart = commit
+        .snapshot()
+        .get("Chart B")?
+        .ok_or_else(|| litchi_core::Error::InvalidFormat("added chart disappeared".to_string()))?;
+    assert_eq!(chart.storage(), Storage::InlineXml);
+    assert!(commit.snapshot().get("Chart A")?.is_none());
+    Ok(())
+}
+
+#[test]
+fn authored_chart_parts_must_be_compact_xml() {
+    let formatted = CHART.replace("><", ">\n  <");
+    assert!(Part::from_xml(formatted).is_err());
+    let spaced = CHART.replacen("><", "> <", 1);
+    assert!(Part::from_xml(spaced).is_err());
 }

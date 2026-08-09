@@ -35,13 +35,22 @@ impl Target {
 pub struct Reference {
     section: String,
     target: Target,
+    source_section: Option<String>,
+    filter_name: Option<String>,
 }
 
 impl Reference {
-    pub(crate) fn new(section: String, href: String) -> Self {
+    pub(crate) fn new(
+        section: String,
+        href: String,
+        source_section: Option<String>,
+        filter_name: Option<String>,
+    ) -> Self {
         Self {
             section,
             target: classify_target(href),
+            source_section,
+            filter_name,
         }
     }
 
@@ -61,6 +70,18 @@ impl Reference {
     #[must_use]
     pub fn href(&self) -> &str {
         self.target.href()
+    }
+
+    /// Returns the named section selected within the linked document.
+    #[must_use]
+    pub fn source_section(&self) -> Option<&str> {
+        self.source_section.as_deref()
+    }
+
+    /// Returns the producer filter name attached to the linked section.
+    #[must_use]
+    pub fn filter_name(&self) -> Option<&str> {
+        self.filter_name.as_deref()
     }
 }
 
@@ -109,7 +130,7 @@ mod tests {
     #[test]
     fn classifies_only_safe_relative_paths_as_package_targets() {
         assert!(matches!(
-            Reference::new("A".to_string(), "Chapters/a.odt".to_string()).target(),
+            Reference::new("A".to_string(), "Chapters/a.odt".to_string(), None, None).target(),
             Target::Package(_)
         ));
         for href in [
@@ -119,7 +140,7 @@ mod tests {
             "file:a.odt",
         ] {
             assert!(matches!(
-                Reference::new("A".to_string(), href.to_string()).target(),
+                Reference::new("A".to_string(), href.to_string(), None, None).target(),
                 Target::External(_)
             ));
         }

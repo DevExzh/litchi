@@ -45,8 +45,12 @@ pub use detection::FileFormat;
 pub use error::{Error, Result};
 pub use metadata::Metadata;
 pub use patch::{
-    BlobBundle, BlobId, BlobLimits, ConflictSet, ForwardOnly, History, HistoryLimits,
-    JsonLimitKind, Patch, PatchError, PatchLimits, PatchOperation, Reversible, ReversibleOperation,
+    BlobBundle, BlobId, BlobLimits, CompositionError, CompositionLimitKind, CompositionLimits,
+    ConflictSet, DiagnosticFingerprint, EffectAccess, EffectConflict, EffectSet, ForwardOnly,
+    History, HistoryLimits, JoinedSubEdits, JsonLimitKind, MergeChoice, Patch, PatchError,
+    PatchLimits, PatchOperation, Reversible, ReversibleOperation, SubEdit, SubEditConflict,
+    SubEditJoinError, SubEditJoinFailure, ThreeWayMergeError, ThreeWayMergeFailure,
+    ThreeWayMergePlan,
 };
 pub use selector::{Position, Selector};
 pub use shapes::{PlaceholderType, ShapeType};

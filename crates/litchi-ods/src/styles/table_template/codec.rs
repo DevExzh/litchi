@@ -374,7 +374,11 @@ impl TemplateRegions {
             "even-columns" => &mut self.even_columns,
             "odd-columns" => &mut self.odd_columns,
             "background" => &mut self.background,
-            _ => unreachable!("checked region name"),
+            _ => {
+                return Err(Error::InvalidFormat(format!(
+                    "unknown table-template region '{local}'"
+                )));
+            },
         };
         if slot.replace(style).is_some() {
             return Err(Error::InvalidFormat(format!(

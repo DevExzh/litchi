@@ -4,7 +4,9 @@ use litchi_core::{Metadata, Result};
 use std::path::Path;
 
 pub use crate::authoring::Builder;
-pub use crate::package::{Commit, NameChange, Patch, Snapshot, TextChange, Transaction};
+pub use crate::package::{
+    Commit, LayerChange, NameChange, Patch, Snapshot, TextChange, Transaction,
+};
 
 /// Immutable source-owning drawing facade.
 pub struct Drawing {
@@ -13,11 +15,19 @@ pub struct Drawing {
 
 impl Drawing {
     /// Opens a drawing package from a file path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package cannot be read or is not a structurally valid ODG.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         Snapshot::open(path).map(|package| Self { package })
     }
 
     /// Opens a drawing package from in-memory bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package is not a structurally valid ODG.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         Snapshot::from_bytes(bytes).map(|package| Self { package })
     }
@@ -46,7 +56,19 @@ impl Drawing {
         self.package.pages()
     }
 
-    /// Returns declared drawing layers in source order.
+    /// Selects one page by exact name or checked position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an exact-name selector is ambiguous.
+    pub fn page<'selector>(
+        &self,
+        selector: impl Into<crate::page::Selector<'selector>>,
+    ) -> Result<Option<&crate::page::Page>> {
+        self.package.page(selector)
+    }
+
+    /// Returns global `styles.xml` drawing layers in source order.
     #[must_use]
     pub fn layers(&self) -> &[crate::layer::Layer] {
         self.package.layers()
@@ -59,6 +81,10 @@ impl Drawing {
     }
 
     /// Lists safe package member names.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when package member validation fails.
     pub fn files(&self) -> Result<Vec<String>> {
         self.package.files()
     }

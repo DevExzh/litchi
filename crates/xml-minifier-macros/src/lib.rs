@@ -536,6 +536,7 @@ fn minify_xml(xml: &str) -> Result<String, Box<dyn std::error::Error>> {
     // Stack to track element names for collapsing empty tags
     let mut tag_stack: Vec<BytesStart<'static>> = Vec::new();
     let mut preserve_space = Vec::new();
+    let mut roots = 0_usize;
 
     loop {
         match reader.read_event_into(&mut buf)? {
@@ -544,6 +545,13 @@ fn minify_xml(xml: &str) -> Result<String, Box<dyn std::error::Error>> {
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::InvalidData,
                         "unclosed XML element",
+                    )
+                    .into());
+                }
+                if roots != 1 {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "XML must contain exactly one document element",
                     )
                     .into());
                 }
@@ -577,6 +585,16 @@ fn minify_xml(xml: &str) -> Result<String, Box<dyn std::error::Error>> {
 
             // Handle start tags - buffer them to check if they can be collapsed
             Event::Start(e) => {
+                if preserve_space.is_empty() {
+                    roots += 1;
+                    if roots > 1 {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "XML must contain exactly one document element",
+                        )
+                        .into());
+                    }
+                }
                 let inherited = preserve_space.last().is_some_and(|value| *value);
                 let mut current = inherited;
                 for attribute_result in e.attributes() {
@@ -589,7 +607,13 @@ fn minify_xml(xml: &str) -> Result<String, Box<dyn std::error::Error>> {
                         current = match value.as_ref() {
                             "preserve" => true,
                             "default" => false,
-                            _ => inherited,
+                            _ => {
+                                return Err(std::io::Error::new(
+                                    std::io::ErrorKind::InvalidData,
+                                    "xml:space must be 'default' or 'preserve'",
+                                )
+                                .into());
+                            },
                         };
                     }
                 }
@@ -601,6 +625,16 @@ fn minify_xml(xml: &str) -> Result<String, Box<dyn std::error::Error>> {
 
             // Handle empty tags - flush buffered tags first, then write
             Event::Empty(e) => {
+                if preserve_space.is_empty() {
+                    roots += 1;
+                    if roots > 1 {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "XML must contain exactly one document element",
+                        )
+                        .into());
+                    }
+                }
                 // Flush all buffered start tags since we have an empty element
                 let tags_to_flush = std::mem::take(&mut tag_stack);
                 for start_tag in tags_to_flush {
@@ -676,6 +710,20 @@ fn minify_xml(xml: &str) -> Result<String, Box<dyn std::error::Error>> {
             // must already be compact: formatting-only CR/LF/tab text is
             // rejected, never deleted. Accepted text remains byte-exact.
             Event::Text(e) => {
+                if preserve_space.is_empty() && is_xml_whitespace(e.as_ref()) {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "whitespace outside the XML document element is not compact",
+                    )
+                    .into());
+                }
+                if preserve_space.is_empty() {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "character data outside the XML document element",
+                    )
+                    .into());
+                }
                 if !preserve_space.last().is_some_and(|value| *value)
                     && is_formatting_only_text(e.as_ref())
                 {
@@ -691,6 +739,13 @@ fn minify_xml(xml: &str) -> Result<String, Box<dyn std::error::Error>> {
 
             // Preserve CDATA sections as-is (they may contain formatting-sensitive content)
             Event::CData(e) => {
+                if preserve_space.is_empty() {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "CDATA outside the XML document element",
+                    )
+                    .into());
+                }
                 flush_tags(&mut output, &mut tag_stack)?;
 
                 output.extend_from_slice(b"<![CDATA[");
@@ -699,6 +754,13 @@ fn minify_xml(xml: &str) -> Result<String, Box<dyn std::error::Error>> {
             },
 
             Event::GeneralRef(e) => {
+                if preserve_space.is_empty() {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "entity reference outside the XML document element",
+                    )
+                    .into());
+                }
                 flush_tags(&mut output, &mut tag_stack)?;
                 output.push(b'&');
                 output.extend_from_slice(e.as_ref());
@@ -791,10 +853,14 @@ const fn is_xml_space(byte: u8) -> bool {
 }
 
 fn is_formatting_only_text(text: &[u8]) -> bool {
-    text.iter().copied().all(is_xml_space)
+    is_xml_whitespace(text)
         && text
             .iter()
             .any(|byte| matches!(byte, b'\t' | b'\n' | b'\r'))
+}
+
+fn is_xml_whitespace(text: &[u8]) -> bool {
+    !text.is_empty() && text.iter().copied().all(is_xml_space)
 }
 
 /// Check if a byte slice contains only whitespace characters
@@ -1094,6 +1160,38 @@ mod tests {
     }
 
     #[test]
+    fn test_reject_whitespace_outside_document_element() {
+        for input in [
+            " <root/>",
+            "<root/> ",
+            "<?xml version=\"1.0\"?> <root/>",
+            "<root/><!--comment--> ",
+        ] {
+            let error = rejected(input);
+            assert!(error.contains("not compact"), "{input:?}: {error}");
+        }
+    }
+
+    #[test]
+    fn test_reject_invalid_document_boundaries() {
+        for input in [
+            "",
+            "<!--comment-->",
+            "<root/><second/>",
+            "<![CDATA[ ]]><root/>",
+            "<root/><![CDATA[ ]]>",
+            "text<root/>",
+            "<root/>&amp;",
+        ] {
+            let error = rejected(input);
+            assert!(
+                error.contains("document element") || error.contains("outside"),
+                "{input:?}: {error}"
+            );
+        }
+    }
+
+    #[test]
     fn test_reject_newline_only_mixed_content() {
         let input = "<p><b>a</b>\n\t<i>b</i></p>";
         let error = rejected(input);
@@ -1119,6 +1217,15 @@ mod tests {
         let input = "<a xml:space=\"preserve\"><b xml:space=\"default\">\n</b></a>";
         let error = rejected(input);
         assert!(error.contains("formatting-only XML text"), "{error}");
+    }
+
+    #[test]
+    fn test_xml_space_uses_normalized_values_and_rejects_invalid_values() {
+        let input = "<a xml:space=\"pre&#115;erve\">\n</a>";
+        assert_eq!(transformed(input), input);
+
+        let error = rejected("<a xml:space=\"keep\">text</a>");
+        assert!(error.contains("xml:space must be"), "{error}");
     }
 
     #[test]

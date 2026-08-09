@@ -26,8 +26,8 @@ fn exercise(bytes: Vec<u8>) -> Option<litchi_core::Error> {
                     }
                 }
                 for series in plot.series() {
-                    let _ = series.values_range();
-                    let _ = series.attached_axis();
+                    std::hint::black_box(series.values_range());
+                    std::hint::black_box(series.attached_axis());
                 }
             }
             None

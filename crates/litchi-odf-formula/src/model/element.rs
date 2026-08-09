@@ -107,6 +107,29 @@ pub struct Element {
 }
 
 impl Element {
+    pub(crate) fn fixed_mathml(local_name: &'static str) -> Self {
+        Self::from_parts(
+            Some(MATHML_NAMESPACE.to_string()),
+            local_name.to_string(),
+            Vec::new(),
+            Vec::new(),
+        )
+    }
+
+    pub(crate) fn set_fixed_attribute(&mut self, local_name: &'static str, value: &str) {
+        if let Some(existing) = self.attributes.iter_mut().find(|attribute| {
+            attribute.namespace_uri().is_none() && attribute.local_name == local_name
+        }) {
+            *existing = Attribute::from_parts(None, local_name.to_string(), value.to_string());
+        } else {
+            self.attributes.push(Attribute::from_parts(
+                None,
+                local_name.to_string(),
+                value.to_string(),
+            ));
+        }
+    }
+
     pub(crate) fn from_parts(
         namespace_uri: Option<String>,
         local_name: String,

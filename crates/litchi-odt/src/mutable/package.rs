@@ -253,8 +253,8 @@ impl MutableDocument {
     }
 
     /// Patch the retained source meta.xml so metadata the edit did not change
-    /// survives the save, while fields set through the mutable API, the
-    /// generator, and the modification date are updated in place.
+    /// survives the save, while fields set through the mutable API are updated
+    /// in place. Existing timestamps and generator metadata remain untouched.
     fn patched_source_meta_xml(&self) -> Result<Option<String>> {
         let Some(package) = &self.source_package else {
             return Ok(None);
@@ -266,21 +266,19 @@ impl MutableDocument {
             return Ok(None);
         };
         let source_metadata = crate::Metadata::from_xml(&source)?;
-        let patch = MetaXmlPatch::preserve_all()
-            .with_generator_and_modification_date("Litchi/0.0.1", chrono::Utc::now().to_rfc3339())
-            .diff_simple_fields(&source_metadata, &self.metadata);
+        let patch =
+            MetaXmlPatch::preserve_all().diff_simple_fields(&source_metadata, &self.metadata);
         patch_meta_xml(&source, &patch)
     }
 
     /// Generate meta.xml from the mutable metadata model alone.
     fn generate_meta_xml_from_scratch(&self) -> String {
-        let now = chrono::Utc::now().to_rfc3339();
         let mut estimated = 64usize;
-        estimated += self.metadata.title.as_ref().map_or(0, |s| s.len());
-        estimated += self.metadata.author.as_ref().map_or(0, |s| s.len());
-        estimated += self.metadata.subject.as_ref().map_or(0, |s| s.len());
-        estimated += self.metadata.description.as_ref().map_or(0, |s| s.len());
-        estimated += self.metadata.keywords.as_ref().map_or(0, |s| s.len());
+        estimated += self.metadata.title.as_ref().map_or(0, String::len);
+        estimated += self.metadata.author.as_ref().map_or(0, String::len);
+        estimated += self.metadata.subject.as_ref().map_or(0, String::len);
+        estimated += self.metadata.description.as_ref().map_or(0, String::len);
+        estimated += self.metadata.keywords.as_ref().map_or(0, String::len);
         let mut meta_fields = String::with_capacity(estimated);
 
         // Add optional metadata fields
@@ -324,9 +322,52 @@ impl MutableDocument {
             ));
         }
 
+        if let Some(ref identifier) = self.metadata.identifier {
+            let escaped_identifier = escape_xml(identifier);
+            meta_fields.push_str(&xml_minifier::minified_xml_format!(
+                r#"<dc:identifier>{}</dc:identifier>"#,
+                escaped_identifier
+            ));
+        }
+
+        if let Some(ref language) = self.metadata.language {
+            let escaped_language = escape_xml(language);
+            meta_fields.push_str(&xml_minifier::minified_xml_format!(
+                r#"<dc:language>{}</dc:language>"#,
+                escaped_language
+            ));
+        }
+
+        if let Some(created) = &self.metadata.created {
+            let value = created.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true);
+            meta_fields.push_str(&xml_minifier::minified_xml_format!(
+                r#"<meta:creation-date>{}</meta:creation-date>"#,
+                value
+            ));
+        } else if let Some(created) = &self.metadata.created_local {
+            let value = created.format("%Y-%m-%dT%H:%M:%S%.f").to_string();
+            meta_fields.push_str(&xml_minifier::minified_xml_format!(
+                r#"<meta:creation-date>{}</meta:creation-date>"#,
+                value
+            ));
+        }
+
+        if let Some(modified) = &self.metadata.modified {
+            let value = modified.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true);
+            meta_fields.push_str(&xml_minifier::minified_xml_format!(
+                r#"<dc:date>{}</dc:date>"#,
+                value
+            ));
+        } else if let Some(modified) = &self.metadata.modified_local {
+            let value = modified.format("%Y-%m-%dT%H:%M:%S%.f").to_string();
+            meta_fields.push_str(&xml_minifier::minified_xml_format!(
+                r#"<dc:date>{}</dc:date>"#,
+                value
+            ));
+        }
+
         xml_minifier::minified_xml_format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" office:version="1.3"><office:meta><meta:generator>Litchi/0.0.1</meta:generator><dc:date>{}</dc:date>{}</office:meta></office:document-meta>"#,
-            now,
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" office:version="1.3"><office:meta><meta:generator>Litchi/0.0.1</meta:generator>{}</office:meta></office:document-meta>"#,
             meta_fields
         )
     }

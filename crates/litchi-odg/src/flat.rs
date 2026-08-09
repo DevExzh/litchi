@@ -1,4 +1,4 @@
-//! Lossless flat OpenDocument Drawing snapshots and bounded text edits.
+//! Lossless flat `OpenDocument` Drawing snapshots and bounded text edits.
 
 use litchi_core::{Error, FileFormat, Result};
 use quick_xml::{
@@ -18,6 +18,14 @@ const MAX_PAGES: usize = 16_384;
 const MAX_SHAPES: usize = 1_000_000;
 const MAX_TEXT_BYTES: usize = 16 * 1024 * 1024;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum NamespaceKind {
+    Office,
+    Draw,
+    Text,
+    Other,
+}
+
 #[derive(Clone, Debug)]
 struct State {
     bytes: Vec<u8>,
@@ -30,6 +38,10 @@ pub struct FlatDrawing(Arc<State>);
 
 impl FlatDrawing {
     /// Opens a flat ODG document from owned bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the bytes are not a bounded, structurally valid FODG document.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         parse(bytes).map(|state| Self(Arc::new(state)))
     }
@@ -56,6 +68,7 @@ impl FlatDrawing {
     }
 
     /// Consumes the snapshot and returns its exact flat XML bytes.
+    #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
         Arc::try_unwrap(self.0).map_or_else(|state| state.bytes.clone(), |state| state.bytes)
     }
@@ -115,28 +128,32 @@ impl FlatDrawingEdit {
     ///
     /// Shapes with empty, split, or mixed-content text are refused rather than
     /// being serialized through a lossy generic XML writer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid selector, unsupported source span, or limit violation.
     pub fn set_shape_text(
         &mut self,
         page: usize,
         shape: usize,
         text: impl Into<String>,
     ) -> Result<()> {
-        let text = text.into();
-        if text.len() > MAX_TEXT_BYTES {
+        let replacement = text.into();
+        if replacement.len() > MAX_TEXT_BYTES {
             return Err(invalid("replacement shape text exceeds the flat ODG limit"));
         }
         let selected = self
             .source
             .pages()
             .get(page)
-            .and_then(|page| page.shapes().get(shape))
+            .and_then(|page_value| page_value.shapes().get(shape))
             .ok_or_else(|| invalid("flat ODG shape selector is out of bounds"))?;
         if selected.text_spans.len() != 1 {
             return Err(invalid(
                 "flat ODG shape text is not one losslessly replaceable XML span",
             ));
         }
-        if selected.text == text {
+        if selected.text == replacement {
             self.changes
                 .retain(|change| change.page != page || change.shape != shape);
             return Ok(());
@@ -145,7 +162,7 @@ impl FlatDrawingEdit {
             page,
             shape,
             before: selected.text.clone(),
-            after: text,
+            after: replacement,
         };
         if let Some(existing) = self
             .changes
@@ -160,6 +177,10 @@ impl FlatDrawingEdit {
     }
 
     /// Validates and atomically publishes a new immutable snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when staged spans overlap, output parsing fails, or readback differs.
     pub fn commit(self) -> Result<FlatDrawingCommit> {
         let FlatDrawingEdit { source, changes } = self;
         let mut replacements = Vec::with_capacity(changes.len());
@@ -170,7 +191,7 @@ impl FlatDrawingEdit {
                 quick_xml::escape::escape(&change.after).into_owned(),
             ));
         }
-        replacements.sort_unstable_by(|left, right| right.0.start.cmp(&left.0.start));
+        replacements.sort_unstable_by_key(|replacement| std::cmp::Reverse(replacement.0.start));
         let mut bytes = source.as_bytes().to_vec();
         let mut previous_start = bytes.len();
         for (span, replacement) in replacements {
@@ -218,6 +239,7 @@ impl FlatDrawingCommit {
     }
 
     /// Consumes the commit and returns the published snapshot.
+    #[must_use]
     pub fn into_snapshot(self) -> FlatDrawing {
         self.snapshot
     }
@@ -239,6 +261,10 @@ impl FlatDrawingPatch {
     }
 
     /// Applies this patch only to its exact immutable source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `source` is not the exact source artifact.
     pub fn apply(&self, source: &FlatDrawing) -> Result<FlatDrawing> {
         if !self.is_applicable_to(source) {
             return Err(invalid("flat ODG patch source does not match"));
@@ -310,7 +336,7 @@ fn parse(bytes: Vec<u8>) -> Result<State> {
     if litchi_odf_common::detect::flat(&bytes) != Some(FileFormat::Odg) {
         return Err(invalid("input is not a flat ODG document"));
     }
-    let xml = std::str::from_utf8(&bytes).map_err(|_| invalid("flat ODG is not UTF-8"))?;
+    let xml = std::str::from_utf8(&bytes).map_err(|_error| invalid("flat ODG is not UTF-8"))?;
     let mut reader = NsReader::from_reader(xml.as_bytes());
     let mut depth = 0usize;
     let mut root_seen = false;
@@ -326,12 +352,12 @@ fn parse(bytes: Vec<u8>) -> Result<State> {
     let mut text_bytes = 0usize;
 
     loop {
-        let event_start = reader.buffer_position() as usize;
-        let (namespace, event) = reader
+        let event_start = position(&reader)?;
+        let (resolved_namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| invalid(format!("invalid flat ODG XML: {error}")))?;
-        let namespace = classify(&namespace);
-        let event_end = reader.buffer_position() as usize;
+        let namespace = classify(&resolved_namespace);
+        let event_end = position(&reader)?;
         match event {
             Event::Start(element) => {
                 depth = checked_depth(depth)?;
@@ -452,7 +478,12 @@ fn parse(bytes: Vec<u8>) -> Result<State> {
             },
             Event::DocType(_) => return Err(invalid("DOCTYPE is not allowed in flat ODG")),
             Event::Eof => break,
-            _ => {},
+            Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_)
+            | Event::PI(_)
+            | Event::Text(_) => {},
         }
     }
     if depth != 0 || !root_seen || !body_seen || !drawing_seen || page_open.is_some() {
@@ -461,7 +492,10 @@ fn parse(bytes: Vec<u8>) -> Result<State> {
     Ok(State { bytes, pages })
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "scanner state is kept explicit and allocation-free"
+)]
 fn observe_start(
     reader: &NsReader<&[u8]>,
     namespace: NamespaceKind,
@@ -535,6 +569,8 @@ fn observe_start(
         if !empty {
             active_shapes.push((depth, page, shape));
         }
+    } else if namespace == NamespaceKind::Draw && is_shape(local.as_ref()) {
+        return Err(invalid("flat ODG drawing shape is outside draw:page"));
     } else if !active_shapes.is_empty()
         && namespace == NamespaceKind::Text
         && local.as_ref() == b"p"
@@ -551,12 +587,12 @@ fn attribute(
     namespace: &[u8],
     local: &[u8],
 ) -> Result<Option<String>> {
-    for attribute in element.attributes() {
-        let attribute =
-            attribute.map_err(|error| invalid(format!("invalid flat ODG attribute: {error}")))?;
-        let (resolved, name) = reader.resolver().resolve_attribute(attribute.key);
+    for raw_attribute in element.attributes() {
+        let parsed_attribute = raw_attribute
+            .map_err(|error| invalid(format!("invalid flat ODG attribute: {error}")))?;
+        let (resolved, name) = reader.resolver().resolve_attribute(parsed_attribute.key);
         if resolved_bound(&resolved, namespace) && name.as_ref() == local {
-            return attribute
+            return parsed_attribute
                 .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
                 .map(|value| Some(value.into_owned()))
                 .map_err(|error| invalid(format!("invalid flat ODG attribute value: {error}")));
@@ -579,6 +615,7 @@ fn is_shape(local: &[u8]) -> bool {
             | b"line"
             | b"measure"
             | b"path"
+            | b"page-thumbnail"
             | b"polygon"
             | b"polyline"
             | b"rect"
@@ -610,25 +647,22 @@ fn resolve_reference(reference: &quick_xml::events::BytesRef<'_>) -> Result<Stri
 }
 
 fn checked_depth(depth: usize) -> Result<usize> {
-    let depth = depth
+    let next_depth = depth
         .checked_add(1)
         .ok_or_else(|| invalid("flat ODG XML depth overflow"))?;
-    if depth > MAX_DEPTH {
+    if next_depth > MAX_DEPTH {
         return Err(invalid("flat ODG XML depth exceeds the limit"));
     }
-    Ok(depth)
+    Ok(next_depth)
+}
+
+fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
+    usize::try_from(reader.buffer_position())
+        .map_err(|_error| invalid("flat ODG XML position exceeds platform limits"))
 }
 
 fn resolved_bound(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
     matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == expected)
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum NamespaceKind {
-    Office,
-    Draw,
-    Text,
-    Other,
 }
 
 fn classify(namespace: &ResolveResult<'_>) -> NamespaceKind {
@@ -636,7 +670,9 @@ fn classify(namespace: &ResolveResult<'_>) -> NamespaceKind {
         ResolveResult::Bound(Namespace(uri)) if *uri == OFFICE => NamespaceKind::Office,
         ResolveResult::Bound(Namespace(uri)) if *uri == DRAW => NamespaceKind::Draw,
         ResolveResult::Bound(Namespace(uri)) if *uri == TEXT => NamespaceKind::Text,
-        _ => NamespaceKind::Other,
+        ResolveResult::Bound(_) | ResolveResult::Unbound | ResolveResult::Unknown(_) => {
+            NamespaceKind::Other
+        },
     }
 }
 

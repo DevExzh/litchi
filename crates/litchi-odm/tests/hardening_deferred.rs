@@ -69,7 +69,7 @@ fn odm_malformed_and_misplaced_inputs_return_typed_errors() {
     for case in cases {
         assert!(matches!(
             Master::from_bytes(case),
-            Err(Error::InvalidFormat(_))
+            Err(Error::InvalidFormat(_) | Error::XmlCompactness { .. })
         ));
     }
 }

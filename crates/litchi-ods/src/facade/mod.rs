@@ -216,6 +216,28 @@ impl Spreadsheet {
         &self.sheets
     }
 
+    /// Capture worksheets as an immutable, exact-package snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the retained package or worksheet graph is invalid.
+    pub fn worksheet_snapshot(&self) -> Result<crate::worksheet::Snapshot> {
+        crate::worksheet::Snapshot::from_bytes(self.package.package().as_bytes().to_vec())
+    }
+
+    /// Apply an exact-source reversible worksheet patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a stale patch or invalid candidate package.
+    pub fn apply_worksheet_patch(&mut self, patch: &crate::worksheet::Patch) -> Result<()> {
+        let commit = patch.apply(&self.worksheet_snapshot()?)?;
+        if commit.changed() {
+            *self = Self::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+        }
+        Ok(())
+    }
+
     /// Discover embedded charts in content-level drawing order.
     pub fn charts(&self) -> Result<crate::charts::Inventory<'_>> {
         self.charts_with(crate::charts::Limits::default())
@@ -312,6 +334,29 @@ impl Spreadsheet {
     /// Return all global and sheet-local named definitions in document order.
     pub fn definitions(&self) -> &[Definition] {
         &self.definitions
+    }
+
+    /// Capture named definitions as an immutable, exact-package snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the retained package cannot be reparsed.
+    pub fn definitions_snapshot(&self) -> Result<crate::definitions::Snapshot> {
+        crate::definitions::Snapshot::from_bytes(self.package.package().as_bytes().to_vec())
+    }
+
+    /// Apply an exact-source reversible named-definition patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a stale patch or invalid candidate package. This facade changes only
+    /// after the complete target has been reparsed.
+    pub fn apply_definitions_patch(&mut self, patch: &crate::definitions::Patch) -> Result<()> {
+        let commit = patch.apply(&self.definitions_snapshot()?)?;
+        if commit.changed() {
+            *self = Self::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+        }
+        Ok(())
     }
 
     /// Return named ranges in their document order.
@@ -426,71 +471,132 @@ impl Spreadsheet {
     }
 
     /// Read all inert RDF metadata graphs in package order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the manifest or a declared graph is invalid.
     pub fn rdf_graphs(&self) -> Result<Vec<Graph>> {
         litchi_odf_common::rdf::graphs(self.package.package())
     }
 
+    /// Capture RDF graphs as an immutable, exact-package snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package, manifest, or a declared graph is invalid.
+    pub fn rdf_snapshot(&self) -> Result<crate::metadata_graphs::Snapshot> {
+        crate::metadata_graphs::Snapshot::from_bytes(self.package.package().as_bytes().to_vec())
+    }
+
+    /// Apply an exact-source reversible RDF graph patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a stale patch or invalid candidate package.
+    pub fn apply_rdf_patch(&mut self, patch: &crate::metadata_graphs::Patch) -> Result<()> {
+        let commit = patch.apply(&self.rdf_snapshot()?)?;
+        self.publish_rdf_commit(commit)
+    }
+
     /// Add a graph and atomically replace this snapshot with the rebuilt package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the path, triples, compact XML, or rebuilt package is invalid.
     pub fn add_rdf_graph(
         &mut self,
         preferred_path: Option<&str>,
         triples: &[Triple],
     ) -> Result<String> {
-        let (bytes, path) =
-            litchi_odf_common::rdf::add_graph(self.package.package(), preferred_path, triples)?;
-        self.package = crate::package::Package::from_bytes(bytes)?;
+        let snapshot = self.rdf_snapshot()?;
+        let mut edit = snapshot.edit();
+        let path = edit.add_graph(preferred_path, triples)?;
+        self.publish_rdf_commit(edit.commit())?;
         Ok(path)
     }
 
     /// Replace one complete RDF graph and atomically publish the result.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the graph, triples, compact XML, or rebuilt package is invalid.
     pub fn replace_rdf_graph(&mut self, path: &str, triples: &[Triple]) -> Result<()> {
-        let bytes = litchi_odf_common::rdf::replace_graph(self.package.package(), path, triples)?;
-        self.package = crate::package::Package::from_bytes(bytes)?;
-        Ok(())
+        let snapshot = self.rdf_snapshot()?;
+        let mut edit = snapshot.edit();
+        edit.replace_graph(path, triples)?;
+        self.publish_rdf_commit(edit.commit())
     }
 
     /// Remove one RDF graph after validating that no remaining graph references it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the graph is missing, referenced, or package rebuilding fails.
     pub fn remove_rdf_graph(&mut self, path: &str) -> Result<()> {
-        let bytes = litchi_odf_common::rdf::remove_graph(self.package.package(), path)?;
-        self.package = crate::package::Package::from_bytes(bytes)?;
-        Ok(())
+        let snapshot = self.rdf_snapshot()?;
+        let mut edit = snapshot.edit();
+        edit.remove_graph(path)?;
+        self.publish_rdf_commit(edit.commit())
     }
 
     /// Append one triple to an existing graph and return its committed index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the graph, triple, compact XML, or rebuilt package is invalid.
     pub fn add_rdf_triple(&mut self, path: &str, triple: &Triple) -> Result<usize> {
-        let index = self
-            .rdf_graphs()?
-            .into_iter()
-            .find(|graph| graph.path == path)
-            .ok_or_else(|| {
-                litchi_core::Error::InvalidFormat(format!("RDF graph '{path}' was not found"))
-            })?
-            .triples
-            .len();
-        let bytes = litchi_odf_common::rdf::add_triple(self.package.package(), path, triple)?.0;
-        self.package = crate::package::Package::from_bytes(bytes)?;
-        Ok(index)
+        let snapshot = self.rdf_snapshot()?;
+        let mut edit = snapshot.edit();
+        let position = edit.add_triple(path, triple)?;
+        self.publish_rdf_commit(edit.commit())?;
+        Ok(position.get())
     }
 
     /// Replace one triple while preserving its description subject.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the graph, position, triple, or rebuilt package is invalid.
     pub fn replace_rdf_triple(&mut self, path: &str, index: usize, triple: &Triple) -> Result<()> {
-        let bytes =
-            litchi_odf_common::rdf::replace_triple(self.package.package(), path, index, triple)?;
-        self.package = crate::package::Package::from_bytes(bytes)?;
-        Ok(())
+        let snapshot = self.rdf_snapshot()?;
+        let mut edit = snapshot.edit();
+        edit.replace_triple(path, litchi_core::Position::new(index), triple)?;
+        self.publish_rdf_commit(edit.commit())
     }
 
     /// Remove one triple from a graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the graph, position, compact XML, or rebuilt package is invalid.
     pub fn remove_rdf_triple(&mut self, path: &str, index: usize) -> Result<()> {
-        let bytes = litchi_odf_common::rdf::remove_triple(self.package.package(), path, index)?;
-        self.package = crate::package::Package::from_bytes(bytes)?;
-        Ok(())
+        let snapshot = self.rdf_snapshot()?;
+        let mut edit = snapshot.edit();
+        edit.remove_triple(path, litchi_core::Position::new(index))?;
+        self.publish_rdf_commit(edit.commit())
     }
 
     /// Move one triple within its RDF description.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when either position, the graph, or rebuilt package is invalid.
     pub fn move_rdf_triple(&mut self, path: &str, from: usize, to: usize) -> Result<()> {
-        let bytes = litchi_odf_common::rdf::move_triple(self.package.package(), path, from, to)?;
-        self.package = crate::package::Package::from_bytes(bytes)?;
+        let snapshot = self.rdf_snapshot()?;
+        let mut edit = snapshot.edit();
+        edit.move_triple(
+            path,
+            litchi_core::Position::new(from),
+            litchi_core::Position::new(to),
+        )?;
+        self.publish_rdf_commit(edit.commit())
+    }
+
+    fn publish_rdf_commit(&mut self, commit: crate::metadata_graphs::Commit) -> Result<()> {
+        if commit.changed() {
+            let snapshot = commit.into_snapshot();
+            *self = Self::from_bytes(snapshot.as_bytes().to_vec())?;
+        }
         Ok(())
     }
 }

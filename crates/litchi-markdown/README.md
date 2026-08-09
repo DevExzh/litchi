@@ -17,11 +17,8 @@ litchi-markdown = "0.0.1"
 use litchi_markdown::{MarkdownOptions, TableStyle, ToMarkdown};
 
 fn render<T: ToMarkdown>(value: &T) -> String {
-    let opts = MarkdownOptions {
-        table_style: TableStyle::Pipe,
-        ..MarkdownOptions::default()
-    };
-    value.to_markdown(&opts)
+    let opts = MarkdownOptions::new().with_table_style(TableStyle::Markdown);
+    value.to_markdown_with_options(&opts).expect("Markdown conversion failed")
 }
 ```
 

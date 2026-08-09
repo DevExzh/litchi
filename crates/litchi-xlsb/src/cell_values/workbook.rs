@@ -1,24 +1,38 @@
-//! Workbook-level publication for lossless numeric-cell edits.
+//! Workbook-level publication for lossless cell-value edits.
 
-use super::{Commit, Snapshot};
+use super::{Commit, Limits, Snapshot};
 use crate::package::error::{Error, Result};
 use litchi_opc::{OpcPackage, PackURI, Part};
 
 const WORKSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.worksheet";
 
-/// Read editable numeric values from one binary worksheet part.
+/// Read editable cell values from one binary worksheet part with safe limits.
 ///
 /// # Errors
 ///
 /// Returns an error when the part is missing, not a worksheet, or has an
 /// invalid BIFF12 record stream.
 pub fn read(package: &OpcPackage, worksheet: &PackURI) -> Result<Snapshot> {
-    let part = package.get_part(worksheet)?;
-    require_worksheet(part)?;
-    super::worksheet::read(part.blob())
+    read_with_limits(package, worksheet, Limits::DEFAULT)
 }
 
-/// Apply one source-checked numeric-cell commit atomically to an OPC package.
+/// Read editable cell values with an explicit finite policy.
+///
+/// # Errors
+///
+/// Returns an error when the part is missing, not a worksheet, exceeds a
+/// selected limit, or has an invalid BIFF12 record stream.
+pub fn read_with_limits(
+    package: &OpcPackage,
+    worksheet: &PackURI,
+    limits: Limits,
+) -> Result<Snapshot> {
+    let part = package.get_part(worksheet)?;
+    require_worksheet(part)?;
+    super::worksheet::read_with_limits(part.blob(), limits)
+}
+
+/// Apply one source-checked cell-value commit atomically to an OPC package.
 ///
 /// Only the selected worksheet part is changed. The complete XLSB workbook is
 /// reparsed before publication, so invalid candidates never escape this

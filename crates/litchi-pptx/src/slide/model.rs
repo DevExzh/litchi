@@ -123,6 +123,16 @@ impl<'a> Slide<'a> {
         package::slide_shape_classification(self.package, &self.part, shape)
     }
 
+    /// Capture this slide's inert `[MS-PPTX]` change-tracking identifiers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the bounded extension XML is malformed. Duplicate
+    /// producer values remain readable for checked-position repair.
+    pub fn change_tracking(&self) -> Result<crate::change_tracking::Snapshot> {
+        crate::change_tracking::load(self.package, self.part.part().partname())
+    }
+
     /// Read the optional typed `p15:designElem` value attached to one shape.
     ///
     /// # Errors

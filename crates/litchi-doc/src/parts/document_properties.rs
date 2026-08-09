@@ -1,12 +1,21 @@
 //! Typed legacy Word Document Properties (`Dop`) metadata.
 
 use super::super::package::{Error as PackageError, Result};
+use super::document_properties_97::{Dop95, Dop97, DopExtensionError, DrawingGrid};
+use super::document_properties_2000::Dop2000;
+use super::document_properties_2002::Dop2002;
+use super::document_properties_2003::Dop2003;
+use super::document_properties_2007::Dop2007;
+use super::document_properties_2010::Dop2010;
+use super::document_properties_2013::Dop2013;
 use super::fib::FileInformationBlock;
 
 const FIB_INDEX: usize = 31;
 const BASE_SIZE: usize = 84;
 const WORD97_SIZE: usize = 500;
 const WORD2002_SIZE: usize = 594;
+const WORD97_GRID_OFFSET: usize = 0x190;
+const WORD97_GRID_SIZE: usize = 10;
 const DOCINFO5_OFFSET: usize = 0x19A;
 const FACTOID_FLAGS_OFFSET: usize = 0x224;
 const INCLUDE_HEADER_MASK: u16 = 0x1000;
@@ -647,6 +656,25 @@ pub struct DocumentProperties {
     extension: Vec<u8>,
 }
 
+/// The specification-defined typed payload for an exact DOP generation.
+///
+/// Parsing this view is explicit so callers can preserve and inspect real-world
+/// documents whose later extension contains a producer defect without making
+/// the rest of the document inaccessible.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Versioned {
+    Base,
+    Word95(Dop95),
+    Word97(Box<Dop97>),
+    Word2000(Dop2000),
+    Word2002(Dop2002),
+    Word2003(Dop2003),
+    Word2007(Dop2007),
+    Word2010(Dop2010),
+    Word2013(Dop2013),
+}
+
 impl DocumentProperties {
     pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Option<Self>> {
         let Some((offset, length)) = fib.get_table_pointer(FIB_INDEX) else {
@@ -687,6 +715,31 @@ impl DocumentProperties {
     }
     pub fn extension_bytes(&self) -> &[u8] {
         &self.extension
+    }
+
+    /// Parses the complete version-specific DOP extension into its typed form.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DopExtensionError`] when a fixed field, reserved bit, or
+    /// version-specific value violates the selected DOP grammar.
+    pub fn versioned(&self) -> std::result::Result<Versioned, DopExtensionError> {
+        let data = self
+            .to_bytes()
+            .map_err(|error| DopExtensionError::new(error.to_string()))?;
+        match self.version {
+            DocumentPropertyVersion::Base => Ok(Versioned::Base),
+            DocumentPropertyVersion::Word95 => Dop95::parse(&data).map(Versioned::Word95),
+            DocumentPropertyVersion::Word97 => {
+                Dop97::parse(&data).map(Box::new).map(Versioned::Word97)
+            },
+            DocumentPropertyVersion::Word2000 => Dop2000::parse(&data).map(Versioned::Word2000),
+            DocumentPropertyVersion::Word2002 => Dop2002::parse(&data).map(Versioned::Word2002),
+            DocumentPropertyVersion::Word2003 => Dop2003::parse(&data).map(Versioned::Word2003),
+            DocumentPropertyVersion::Word2007 => Dop2007::parse(&data).map(Versioned::Word2007),
+            DocumentPropertyVersion::Word2010 => Dop2010::parse(&data).map(Versioned::Word2010),
+            DocumentPropertyVersion::Word2013 => Dop2013::parse(&data).map(Versioned::Word2013),
+        }
     }
     pub fn includes_headers(&self) -> Option<bool> {
         self.absolute_u16(DOCINFO5_OFFSET)
@@ -731,6 +784,8 @@ impl DocumentProperties {
         base.set_facing_pages(facing_pages);
         let mut data = vec![0u8; WORD97_SIZE];
         data[..BASE_SIZE].copy_from_slice(base.as_bytes());
+        data[WORD97_GRID_OFFSET..WORD97_GRID_OFFSET + WORD97_GRID_SIZE]
+            .copy_from_slice(&DrawingGrid::default().encode());
         let mut docinfo5 = 0u16;
         if include_headers {
             docinfo5 |= INCLUDE_HEADER_MASK;
@@ -879,5 +934,26 @@ mod tests {
         data[82..84].copy_from_slice(&(1u16 | (9 << 3)).to_le_bytes());
         assert!(DocumentProperties::parse_bytes(&data).is_err());
         assert!(DocumentProperties::parse_bytes(&vec![0; 499]).is_err());
+    }
+
+    #[test]
+    fn dispatches_word_2013_to_the_complete_typed_extension() {
+        let mut data = vec![0u8; DocumentPropertyVersion::Word2013.byte_len()];
+        // Required Dop97 typography defaults used by the versioned prefix.
+        data[0x190..0x19a].copy_from_slice(&[0xa5, 0x06, 0xc0, 0x07, 0xb4, 0, 0xb4, 0, 1, 0x81]);
+        // DopMth defaults: centered-as-group, wrapped-left, display defaults.
+        data[640..644].copy_from_slice(&(1u32 << 4 | 1 << 11 | 1 << 12).to_le_bytes());
+        data[654..658].copy_from_slice(&120i32.to_le_bytes());
+        data[658..662].copy_from_slice(&120i32.to_le_bytes());
+        data[674..678].copy_from_slice(&1u32.to_le_bytes());
+        data[690..694].copy_from_slice(&1u32.to_le_bytes());
+
+        let properties = DocumentProperties::parse_bytes(&data).unwrap();
+        match properties.versioned().unwrap() {
+            Versioned::Word2013(value) => {
+                assert!(value.chart_tracking_reference_based);
+            },
+            other => panic!("expected Word2013 properties, got {other:?}"),
+        }
     }
 }

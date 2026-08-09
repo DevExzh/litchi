@@ -387,7 +387,7 @@ impl DrawingGrid {
         })
     }
 
-    fn encode(self) -> [u8; GRID_SIZE] {
+    pub(crate) fn encode(self) -> [u8; GRID_SIZE] {
         let mut data = [0u8; GRID_SIZE];
         put_u16(&mut data, 0, self.horizontal_origin);
         put_u16(&mut data, 2, self.vertical_origin);

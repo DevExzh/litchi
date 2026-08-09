@@ -31,6 +31,7 @@ impl Flavor {
 }
 
 /// An owned, family-validated Formula ZIP package.
+#[derive(Clone)]
 pub struct Package {
     owned: OwnedPackage,
     flavor: Flavor,

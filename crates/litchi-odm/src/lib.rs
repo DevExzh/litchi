@@ -4,6 +4,7 @@
 mod authoring;
 mod codec;
 mod facade;
+pub mod link;
 mod model;
 mod package;
 pub mod title;

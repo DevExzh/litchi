@@ -2,8 +2,10 @@
 
 mod content;
 mod editing;
+mod inlines;
 mod paragraph_properties;
 mod run;
+mod run_contents;
 mod run_properties;
 mod runs;
 mod text;

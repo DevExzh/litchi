@@ -73,6 +73,55 @@ fn numbering_patch_publishes_through_the_package_graph() {
 }
 
 #[test]
+fn document_patch_publishes_atomically_and_reopens() {
+    let source_xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>before</w:t></w:r></w:p><w:sectPr/></w:body></w:document>"#;
+    let document_uri = PackURI::new("/word/document.xml").unwrap();
+    let mut package = Package::new().unwrap();
+    package
+        .edit_opc(|opc| {
+            opc.get_part_mut(&document_uri)?
+                .set_blob(source_xml.to_vec());
+            Ok(())
+        })
+        .unwrap();
+
+    let source = package.document_snapshot().unwrap();
+    let mut edit = source.edit();
+    edit.replace_paragraph_text(litchi_core::Position::new(0), "after and longer")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let published = package.apply_document_patch(commit.patch()).unwrap();
+    assert_eq!(
+        published
+            .paragraph(litchi_core::Position::new(0))
+            .unwrap()
+            .text()
+            .unwrap(),
+        "after and longer"
+    );
+
+    let before_stale = package.opc.main_document_part().unwrap().blob().to_vec();
+    assert!(package.apply_document_patch(commit.patch()).is_err());
+    assert_eq!(
+        package.opc.main_document_part().unwrap().blob(),
+        before_stale
+    );
+
+    let mut output = Cursor::new(Vec::new());
+    package.to_plain_stream(&mut output).unwrap();
+    let reopened = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    assert_eq!(
+        reopened.document().unwrap().text().unwrap(),
+        "after and longer"
+    );
+
+    package
+        .apply_document_patch(&commit.patch().inverse())
+        .unwrap();
+    assert_eq!(package.opc.main_document_part().unwrap().blob(), source_xml);
+}
+
+#[test]
 fn failed_stream_keeps_document_and_properties_retryable() {
     let mut package = Package::new().unwrap();
     package

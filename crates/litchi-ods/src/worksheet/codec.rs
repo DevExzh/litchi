@@ -9,7 +9,7 @@ use quick_xml::{
     name::{Namespace, ResolveResult},
     reader::NsReader,
 };
-use std::{fmt::Write as _, num::NonZeroUsize};
+use std::num::NonZeroUsize;
 
 pub(crate) const OFFICE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 pub(crate) const TABLE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
@@ -192,9 +192,14 @@ impl Attributes {
             Merge::Covered
         } else if self.rows_spanned != 1 || self.columns_spanned != 1 {
             Merge::Span {
-                rows: NonZeroUsize::new(self.rows_spanned).expect("positive row span was checked"),
-                columns: NonZeroUsize::new(self.columns_spanned)
-                    .expect("positive column span was checked"),
+                rows: NonZeroUsize::new(self.rows_spanned).ok_or_else(|| {
+                    Error::InvalidFormat("table:number-rows-spanned must be positive".to_string())
+                })?,
+                columns: NonZeroUsize::new(self.columns_spanned).ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "table:number-columns-spanned must be positive".to_string(),
+                    )
+                })?,
             }
         } else {
             Merge::None
@@ -292,8 +297,13 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
                             cells: Vec::new(),
                             style_name: attributes.style_name,
                             default_cell_style_name: attributes.default_cell_style_name,
-                            repeat: NonZeroUsize::new(attributes.rows_repeated)
-                                .expect("positive row repetition was checked"),
+                            repeat: NonZeroUsize::new(attributes.rows_repeated).ok_or_else(
+                                || {
+                                    Error::InvalidFormat(
+                                        "table:number-rows-repeated must be positive".to_string(),
+                                    )
+                                },
+                            )?,
                         });
                     },
                     Kind::Cell => {
@@ -313,8 +323,10 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
                         });
                     },
                 }
-                if kind == Kind::Text && current_cell.is_some() {
-                    current_cell.as_mut().expect("cell is present").text_depth += 1;
+                if kind == Kind::Text
+                    && let Some(cell) = current_cell.as_mut()
+                {
+                    cell.text_depth += 1;
                 }
                 stack.push(kind);
             },
@@ -357,8 +369,13 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
                             cells: Vec::new(),
                             style_name: attributes.style_name,
                             default_cell_style_name: attributes.default_cell_style_name,
-                            repeat: NonZeroUsize::new(attributes.rows_repeated)
-                                .expect("positive row repetition was checked"),
+                            repeat: NonZeroUsize::new(attributes.rows_repeated).ok_or_else(
+                                || {
+                                    Error::InvalidFormat(
+                                        "table:number-rows-repeated must be positive".to_string(),
+                                    )
+                                },
+                            )?,
                         });
                     },
                     Kind::Cell => {
@@ -413,12 +430,10 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
                 if kind == Kind::DdeCache {
                     dde_cache_depth = None;
                 }
-                if kind == Kind::Text && current_cell.is_some() {
-                    current_cell.as_mut().expect("cell is present").text_depth = current_cell
-                        .as_ref()
-                        .expect("cell is present")
-                        .text_depth
-                        .saturating_sub(1);
+                if kind == Kind::Text
+                    && let Some(cell) = current_cell.as_mut()
+                {
+                    cell.text_depth = cell.text_depth.saturating_sub(1);
                 }
                 match kind {
                     Kind::Cell => {
@@ -914,7 +929,7 @@ fn write_row_inner(output: &mut String, row: &Row, bind_namespaces: bool) -> Res
     }
     if row.repeat() > 1 {
         output.push_str(" table:number-rows-repeated=\"");
-        write!(output, "{}", row.repeat()).expect("writing a number to String cannot fail");
+        output.push_str(&row.repeat().to_string());
         output.push('"');
     }
     if let Some(style_name) = &row.style_name {
@@ -949,14 +964,14 @@ fn write_cell(output: &mut String, cell: &Cell) -> Result<()> {
     });
     if cell.repeat() > 1 {
         output.push_str(" table:number-columns-repeated=\"");
-        write!(output, "{}", cell.repeat()).expect("writing a number to String cannot fail");
+        output.push_str(&cell.repeat().to_string());
         output.push('"');
     }
     if let Merge::Span { rows, columns } = cell.merge {
         output.push_str(" table:number-rows-spanned=\"");
-        write!(output, "{}", rows.get()).expect("writing a number to String cannot fail");
+        output.push_str(&rows.get().to_string());
         output.push_str("\" table:number-columns-spanned=\"");
-        write!(output, "{}", columns.get()).expect("writing a number to String cannot fail");
+        output.push_str(&columns.get().to_string());
         output.push('"');
     }
     if let Some(formula) = &cell.formula {
@@ -996,19 +1011,19 @@ fn write_value_attributes(output: &mut String, value: &CellValue) {
         CellValue::Text(_) => output.push_str(" office:value-type=\"string\""),
         CellValue::Number(value) => {
             output.push_str(" office:value-type=\"float\" office:value=\"");
-            write!(output, "{value}").expect("writing a number to String cannot fail");
+            output.push_str(&value.to_string());
             output.push('"');
         },
         CellValue::Currency { value, currency } => {
             output.push_str(" office:value-type=\"currency\" office:value=\"");
-            write!(output, "{value}").expect("writing a number to String cannot fail");
+            output.push_str(&value.to_string());
             output.push_str("\" office:currency=\"");
             output.push_str(&escape_xml(currency));
             output.push('"');
         },
         CellValue::Percentage(value) => {
             output.push_str(" office:value-type=\"percentage\" office:value=\"");
-            write!(output, "{value}").expect("writing a number to String cannot fail");
+            output.push_str(&value.to_string());
             output.push('"');
         },
         CellValue::Boolean(value) => {

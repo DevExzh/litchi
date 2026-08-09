@@ -1,4 +1,4 @@
-//! XMLDSig storage for legacy DOC, PPT, and XLS compound files.
+//! `XMLDSig` storage for legacy DOC, PPT, and XLS compound files.
 //!
 //! Rewriting preserves the sector size, root CLSID, every storage path, every
 //! storage CLSID exposed by `litchi-cfb`, stream order, and stream bytes.
@@ -7,6 +7,11 @@
 //! changed file therefore cannot preserve non-zero values in those fields.
 //! Clean `Editor::finish` returns the caller's original `Vec` allocation and
 //! does not render the compound file.
+
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "container types and helpers are arranged in CFB verification and transaction flow"
+)]
 
 use crate::xml::{self, Profile, Ref};
 use crate::{Coverage, Error, Limits, Policy, Result, Signer, Status, Trust};
@@ -35,40 +40,48 @@ pub struct Report {
 }
 
 impl Report {
+    #[must_use]
     pub fn stream(&self) -> &str {
         &self.stream
     }
 
+    #[must_use]
     pub fn details(&self) -> &crate::Report {
         &self.signature
     }
 
+    #[must_use]
     pub fn integrity(&self) -> Status {
         self.signature.integrity()
     }
 
+    #[must_use]
     pub fn signature(&self) -> Status {
         self.signature.signature()
     }
 
+    #[must_use]
     pub fn coverage(&self) -> Coverage {
         self.signature.coverage()
     }
 
+    #[must_use]
     pub fn trust(&self) -> Trust {
         self.signature.trust()
     }
 
+    #[must_use]
     pub fn uses_sha1(&self) -> bool {
         self.signature.uses_sha1()
     }
 
+    #[must_use]
     pub fn time(&self) -> Option<&str> {
         self.signature.time()
     }
 }
 
-/// Discover and verify every XMLDSig stream without evaluating PKI trust.
+/// Discover and verify every `XMLDSig` stream without evaluating PKI trust.
 pub fn verify<R: Read + Seek>(
     ole: &mut OleFile<R>,
     format: Format,
@@ -106,7 +119,7 @@ fn signature_entries<R: Read + Seek>(
     let mut names = Vec::new();
     names
         .try_reserve(entries.len())
-        .map_err(|_| Error::Limit("signature entry allocation failed".into()))?;
+        .map_err(|error| Error::Limit(format!("signature entry allocation failed: {error}")))?;
     for entry in entries {
         if entry.entry_type != 2
             || entry.name.is_empty()
@@ -118,10 +131,9 @@ fn signature_entries<R: Read + Seek>(
                 entry.name
             )));
         }
-        let number = entry
-            .name
-            .parse::<u64>()
-            .map_err(|_| Error::Container("signature stream number overflow".into()))?;
+        let number = entry.name.parse::<u64>().map_err(|error| {
+            Error::Container(format!("signature stream number overflow: {error}"))
+        })?;
         if !numeric.insert(number) {
             return Err(Error::Container(
                 "duplicate numeric signature stream name".into(),
@@ -133,7 +145,7 @@ fn signature_entries<R: Read + Seek>(
     let mut output = Vec::new();
     output
         .try_reserve(names.len())
-        .map_err(|_| Error::Limit("signature stream allocation failed".into()))?;
+        .map_err(|error| Error::Limit(format!("signature stream allocation failed: {error}")))?;
     for (number, name) in names {
         let bytes = ole.open_stream(&[XML_SIGNATURE_STORAGE, &name])?;
         if bytes.len() > limits.max_signature_bytes() {
@@ -144,24 +156,6 @@ fn signature_entries<R: Read + Seek>(
         output.push((number, name, bytes));
     }
     Ok(output)
-}
-
-fn verify_entries(
-    snapshot: &Snapshot,
-    signatures: &[(u64, &str, &[u8])],
-    policy: &Policy,
-) -> Result<Vec<Report>> {
-    let references = snapshot.references()?;
-    signatures
-        .iter()
-        .map(|(_, stream, bytes)| {
-            let signature = xml::verify(Profile::Binary, bytes, &references[..], policy)?;
-            Ok(Report {
-                stream: (*stream).to_string(),
-                signature,
-            })
-        })
-        .collect()
 }
 
 #[derive(Debug)]
@@ -184,6 +178,24 @@ struct Snapshot {
     storages: Vec<Storage>,
     streams: Vec<Stream>,
     changed: bool,
+}
+
+fn verify_entries(
+    snapshot: &Snapshot,
+    signatures: &[(u64, &str, &[u8])],
+    policy: &Policy,
+) -> Result<Vec<Report>> {
+    let references = snapshot.references()?;
+    signatures
+        .iter()
+        .map(|(_, stream, bytes)| {
+            let signature = xml::verify(Profile::Binary, bytes, &references[..], policy)?;
+            Ok(Report {
+                stream: (*stream).to_string(),
+                signature,
+            })
+        })
+        .collect()
 }
 
 impl Snapshot {
@@ -260,7 +272,7 @@ impl Snapshot {
                 Format::Ppt if leaf.eq_ignore_ascii_case("Current User") => {
                     Ref::borrowed_uri(uri, &[])?
                 },
-                _ => Ref::borrowed_uri(uri, &stream.data)?,
+                Format::Doc | Format::Ppt | Format::Xls => Ref::borrowed_uri(uri, &stream.data)?,
             };
             output.push(reference);
         }
@@ -357,7 +369,9 @@ impl Snapshot {
         if existing.len() >= limits.max_signatures() {
             return Err(Error::Limit("too many binary Office signatures".into()));
         }
-        (1_u64..)
+        let maximum = u64::try_from(limits.max_signatures())
+            .map_err(|error| Error::Limit(format!("signature count exceeds u64: {error}")))?;
+        (1_u64..=maximum)
             .find(|candidate| !existing.contains(candidate))
             .map(|candidate| candidate.to_string())
             .ok_or_else(|| Error::Limit("no decimal signature stream name is available".into()))
@@ -397,6 +411,7 @@ impl fmt::Debug for Editor {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Editor")
+            .field("limits", &self.limits)
             .field("format", &self.format)
             .field("bytes", &self.original.len())
             .field("materialized", &self.snapshot.is_some())
@@ -501,7 +516,7 @@ impl Editor {
         Ok(self)
     }
 
-    /// Remove both XMLDSig and unsupported legacy CryptoAPI signature storage.
+    /// Remove both `XMLDSig` and unsupported legacy `CryptoAPI` signature storage.
     pub fn clear(&mut self) -> Result<&mut Self> {
         self.materialize()?;
         self.snapshot_mut()?.clear();
@@ -567,9 +582,9 @@ impl Editor {
             {
                 return Err(Error::Container("invalid decimal signature stream".into()));
             }
-            let number = name
-                .parse::<u64>()
-                .map_err(|_| Error::Container("signature stream number overflow".into()))?;
+            let number = name.parse::<u64>().map_err(|error| {
+                Error::Container(format!("signature stream number overflow: {error}"))
+            })?;
             if !numeric.insert(number) {
                 return Err(Error::Container(
                     "duplicate numeric signature stream name".into(),
@@ -643,7 +658,7 @@ fn contains_biff_record(data: &[u8], wanted: u16) -> bool {
     let mut offset = 0_usize;
     while let Some(header) = data.get(offset..offset.saturating_add(4)) {
         let record = u16::from_le_bytes([header[0], header[1]]);
-        let length = u16::from_le_bytes([header[2], header[3]]) as usize;
+        let length = usize::from(u16::from_le_bytes([header[2], header[3]]));
         let Some(next) = offset
             .checked_add(4)
             .and_then(|value| value.checked_add(length))
@@ -673,7 +688,7 @@ fn filter_xls_write_access(data: &[u8]) -> Result<Vec<u8>> {
             return Err(Error::Container("truncated BIFF record header".into()));
         };
         let record = u16::from_le_bytes([header[0], header[1]]);
-        let length = u16::from_le_bytes([header[2], header[3]]) as usize;
+        let length = usize::from(u16::from_le_bytes([header[2], header[3]]));
         let Some(end) = offset
             .checked_add(4)
             .and_then(|value| value.checked_add(length))
@@ -704,8 +719,8 @@ fn encode_path(path: &[String], storage: bool) -> String {
             } else {
                 const HEX: &[u8; 16] = b"0123456789ABCDEF";
                 output.push('%');
-                output.push(HEX[(byte >> 4) as usize] as char);
-                output.push(HEX[(byte & 15) as usize] as char);
+                output.push(char::from(HEX[usize::from(byte >> 4)]));
+                output.push(char::from(HEX[usize::from(byte & 15)]));
             }
         }
     }
@@ -739,9 +754,9 @@ fn collect_entries<R: Read + Seek>(
                 if seen > limits.max_cfb_entries() {
                     return Err(Error::Limit("CFB directory entries exceed policy".into()));
                 }
-                pending
-                    .try_reserve(children.len())
-                    .map_err(|_| Error::Limit("CFB traversal allocation failed".into()))?;
+                pending.try_reserve(children.len()).map_err(|error| {
+                    Error::Limit(format!("CFB traversal allocation failed: {error}"))
+                })?;
                 let parent: Rc<[String]> = parent.into();
                 for child in children.into_iter().rev() {
                     pending.push(Task::Entry(Rc::clone(&parent), child));
@@ -753,8 +768,9 @@ fn collect_entries<R: Read + Seek>(
                     .checked_add(1)
                     .ok_or_else(|| Error::Limit("CFB path depth overflow".into()))?;
                 let mut path = Vec::new();
-                path.try_reserve(capacity)
-                    .map_err(|_| Error::Limit("CFB path allocation failed".into()))?;
+                path.try_reserve(capacity).map_err(|error| {
+                    Error::Limit(format!("CFB path allocation failed: {error}"))
+                })?;
                 path.extend(parent.iter().cloned());
                 path.push(entry.name.clone());
                 if path.len() > limits.max_cfb_depth() {
@@ -762,9 +778,9 @@ fn collect_entries<R: Read + Seek>(
                 }
                 match entry.entry_type {
                     1 => {
-                        storages
-                            .try_reserve(1)
-                            .map_err(|_| Error::Limit("CFB storage allocation failed".into()))?;
+                        storages.try_reserve(1).map_err(|error| {
+                            Error::Limit(format!("CFB storage allocation failed: {error}"))
+                        })?;
                         storages.push(Storage {
                             path: path.clone(),
                             clsid: parse_clsid(&entry.clsid)?,
@@ -772,9 +788,9 @@ fn collect_entries<R: Read + Seek>(
                         pending.push(Task::Directory(path));
                     },
                     2 => {
-                        streams
-                            .try_reserve(1)
-                            .map_err(|_| Error::Limit("CFB stream allocation failed".into()))?;
+                        streams.try_reserve(1).map_err(|error| {
+                            Error::Limit(format!("CFB stream allocation failed: {error}"))
+                        })?;
                         streams.push(path);
                     },
                     kind => {
@@ -800,7 +816,7 @@ fn parse_clsid(value: &str) -> Result<[u8; 16]> {
     let mut canonical = [0_u8; 16];
     for (index, slot) in canonical.iter_mut().enumerate() {
         *slot = u8::from_str_radix(&compact[index * 2..index * 2 + 2], 16)
-            .map_err(|_| Error::Container("invalid storage CLSID".into()))?;
+            .map_err(|error| Error::Container(format!("invalid storage CLSID: {error}")))?;
     }
     canonical[0..4].reverse();
     canonical[4..6].reverse();
@@ -990,5 +1006,34 @@ mod tests {
             .find(|entry| entry.name == "Nested")
             .unwrap();
         assert_eq!(parse_clsid(&nested.clsid).unwrap(), storage_clsid);
+    }
+
+    #[test]
+    fn signature_name_search_is_bounded_and_fills_the_first_gap() {
+        let limits = Limits::standard().signatures(3).unwrap();
+        let mut snapshot = Snapshot {
+            format: Format::Doc,
+            sector_size: 512,
+            root_clsid: [0; 16],
+            storages: Vec::new(),
+            streams: vec![
+                Stream {
+                    path: vec![XML_SIGNATURE_STORAGE.into(), "1".into()],
+                    data: Vec::new(),
+                },
+                Stream {
+                    path: vec![XML_SIGNATURE_STORAGE.into(), "3".into()],
+                    data: Vec::new(),
+                },
+            ],
+            changed: false,
+        };
+
+        assert_eq!(snapshot.next_name(&limits).unwrap(), "2");
+        snapshot.streams.push(Stream {
+            path: vec![XML_SIGNATURE_STORAGE.into(), "2".into()],
+            data: Vec::new(),
+        });
+        assert!(matches!(snapshot.next_name(&limits), Err(Error::Limit(_))));
     }
 }

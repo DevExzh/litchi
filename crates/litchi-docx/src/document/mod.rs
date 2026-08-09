@@ -9,5 +9,10 @@ mod model;
 mod package;
 #[cfg(test)]
 mod tests;
+mod transaction;
 
 pub use model::{Block, Document, Element, ImageWatermarkPart, OpaqueBlock};
+pub use transaction::{
+    Commit, Diagnostics, Edit, Operation, Patch, Refusal, Snapshot, TransactionError,
+    TransactionResult,
+};

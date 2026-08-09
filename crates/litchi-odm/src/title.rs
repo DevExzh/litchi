@@ -62,7 +62,7 @@ impl<'source> Edit<'source> {
     /// candidate package cannot be validated, or title readback differs.
     pub fn commit(self) -> Result<Commit> {
         if self.before == self.after {
-            let snapshot = Master::from_shared_bytes(self.source.shared_bytes())?;
+            let snapshot = self.source.clone();
             return Ok(Commit::new(self.source, snapshot));
         }
         let source_meta_xml = self
@@ -132,6 +132,12 @@ pub struct Patch {
 }
 
 impl Patch {
+    /// Returns whether this patch applies to the exact source artifact.
+    #[must_use]
+    pub fn is_applicable_to(&self, source: &Master) -> bool {
+        source.as_bytes() == self.before.as_slice()
+    }
+
     /// Applies this patch only to the exact package bytes from which it was made.
     ///
     /// # Errors
@@ -139,7 +145,7 @@ impl Patch {
     /// Returns an error when `source` is not byte-for-byte identical to the
     /// source snapshot accepted by this patch.
     pub fn apply(&self, source: &Master) -> Result<Master> {
-        if source.as_bytes() != self.before.as_slice() {
+        if !self.is_applicable_to(source) {
             return Err(invalid(
                 "ODM title patch source does not match its expected snapshot",
             ));

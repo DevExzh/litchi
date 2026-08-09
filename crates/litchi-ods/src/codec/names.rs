@@ -65,9 +65,10 @@ pub(crate) fn replace(xml: &str, definitions: &[Definition]) -> Result<String> {
             .insert(container.scope.clone(), container.start)
             .is_none()
         {
-            groups
-                .get(&container.scope)
-                .map_or_else(String::new, |values| container_xml(values))
+            match groups.get(&container.scope) {
+                Some(values) => container_xml(values)?,
+                None => String::new(),
+            }
         } else {
             String::new()
         };
@@ -82,7 +83,7 @@ pub(crate) fn replace(xml: &str, definitions: &[Definition]) -> Result<String> {
         if first_container.contains_key(scope) {
             continue;
         }
-        let container = container_xml(values);
+        let container = container_xml(values)?;
         let host = match scope {
             Scope::Global => scan.spreadsheet.as_ref(),
             Scope::Sheet(name) => scan
@@ -162,15 +163,15 @@ fn groups<'a>(definitions: &'a [Definition]) -> HashMap<Scope, Vec<&'a Definitio
     groups
 }
 
-fn container_xml(definitions: &[&Definition]) -> String {
+fn container_xml(definitions: &[&Definition]) -> Result<String> {
     let mut output = String::with_capacity(64 + definitions.len() * 96);
     write_definitions(&mut output, definitions.iter().copied());
     let declaration = " xmlns:table=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\"";
     let insertion = output
         .find('>')
-        .expect("named-definition writer always emits a container");
+        .ok_or_else(|| invalid_error("named-definition writer emitted no container"))?;
     output.insert_str(insertion, declaration);
-    output
+    Ok(output)
 }
 
 fn expand_empty_host(xml: &str, host: &Host, child: &str) -> Result<String> {

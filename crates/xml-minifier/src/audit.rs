@@ -1,8 +1,9 @@
 //! Bounded verification of the repository's compact XML output contract.
 //!
-//! Character data and CDATA are never normalized. Plain spaces remain content;
-//! only whitespace-only nodes containing CR, LF, or tab are classified as
-//! structural formatting outside an inherited `xml:space="preserve"` scope.
+//! Character data and CDATA are never normalized. Plain spaces inside the
+//! document element remain content; whitespace outside the document element,
+//! and whitespace-only nodes containing CR, LF, or tab outside an inherited
+//! `xml:space="preserve"` scope, are classified as structural formatting.
 
 #![allow(
     clippy::arbitrary_source_item_ordering,
@@ -11,6 +12,8 @@
 
 use core::fmt;
 use quick_xml::Reader;
+use quick_xml::XmlVersion;
+use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 
 /// Finite resource budgets for one XML document.
@@ -358,7 +361,7 @@ pub enum Resource {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum Kind {
-    /// Whitespace-only character data outside `xml:space="preserve"`.
+    /// Provably structural whitespace outside `xml:space="preserve"`.
     FormattingWhitespace,
     /// Attribute boundaries do not use exactly one ASCII space.
     AttributeSeparation,
@@ -583,8 +586,14 @@ pub fn verify(input: &[u8], limits: Limits) -> Result<Report, Error> {
         match event {
             Event::Start(tag) => {
                 check_start(raw, false, start)?;
-                let space =
-                    inspect_attributes(&tag, state.current_space(), &mut state, limits, start)?;
+                let space = inspect_attributes(
+                    &tag,
+                    reader.decoder(),
+                    state.current_space(),
+                    &mut state,
+                    limits,
+                    start,
+                )?;
                 enter_element(&mut state, limits, start)?;
                 state
                     .spaces
@@ -594,7 +603,14 @@ pub fn verify(input: &[u8], limits: Limits) -> Result<Report, Error> {
             },
             Event::Empty(tag) => {
                 check_start(raw, true, start)?;
-                inspect_attributes(&tag, state.current_space(), &mut state, limits, start)?;
+                inspect_attributes(
+                    &tag,
+                    reader.decoder(),
+                    state.current_space(),
+                    &mut state,
+                    limits,
+                    start,
+                )?;
                 enter_empty(&mut state, limits, start)?;
             },
             Event::End(_) => {
@@ -608,7 +624,9 @@ pub fn verify(input: &[u8], limits: Limits) -> Result<Report, Error> {
                 let bytes = text.as_ref();
                 check_character_context(state.depth, bytes, start)?;
                 charge_text(&mut state, limits, bytes.len(), start)?;
-                if is_structural_whitespace(bytes) && state.current_space() != Space::Preserve {
+                if (state.depth == 0 && is_xml_whitespace(bytes))
+                    || (is_structural_whitespace(bytes) && state.current_space() != Space::Preserve)
+                {
                     return Err(Error::NotCompact(Violation {
                         kind: Kind::FormattingWhitespace,
                         offset: start,
@@ -616,7 +634,12 @@ pub fn verify(input: &[u8], limits: Limits) -> Result<Report, Error> {
                 }
             },
             Event::CData(data) => {
-                check_character_context(state.depth, data.as_ref(), start)?;
+                if state.depth == 0 {
+                    return Err(Error::malformed(
+                        start,
+                        "CDATA outside the document element",
+                    ));
+                }
                 charge_text(&mut state, limits, data.as_ref().len(), start)?;
             },
             Event::GeneralRef(reference) => {
@@ -701,6 +724,7 @@ fn enter_empty(state: &mut State, limits: Limits, offset: usize) -> Result<(), E
 
 fn inspect_attributes(
     tag: &BytesStart<'_>,
+    decoder: Decoder,
     inherited: Space,
     state: &mut State,
     limits: Limits,
@@ -718,9 +742,12 @@ fn inspect_attributes(
             offset,
         )?;
         if attribute.key.as_ref() == b"xml:space" {
-            space = match attribute.value.as_ref() {
-                b"default" => Space::Default,
-                b"preserve" => Space::Preserve,
+            let value = attribute
+                .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+                .map_err(|error| Error::malformed(offset, error.to_string()))?;
+            space = match value.as_ref() {
+                "default" => Space::Default,
+                "preserve" => Space::Preserve,
                 _ => {
                     return Err(Error::malformed(
                         offset,

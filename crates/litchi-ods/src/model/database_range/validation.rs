@@ -24,15 +24,10 @@ impl Range {
             true,
         )?;
         data_pilot::parse_data_pilot_range(&self.target_range_address)?;
-        if self
-            .refresh_delay
-            .as_deref()
-            .is_some_and(|value| !is_xsd_duration(value))
+        if let Some(delay) = self.refresh_delay.as_deref()
+            && !is_xsd_duration(delay)
         {
-            return Err(invalid(
-                "table:refresh-delay",
-                self.refresh_delay.as_deref().expect("delay checked above"),
-            ));
+            return Err(invalid("table:refresh-delay", delay));
         }
         if let Some(filter) = &self.filter {
             validate_filter(filter)?;

@@ -288,7 +288,7 @@ fn test_generate_content_body() {
     builder.add_paragraph("Paragraph 1").unwrap();
     builder.add_heading("Heading", 1).unwrap();
 
-    let body = builder.generate_content_body();
+    let body = builder.generate_content_body().unwrap();
     assert!(body.contains("Paragraph 1"));
     assert!(body.contains("Heading"));
 }
@@ -298,7 +298,7 @@ fn test_generate_content_xml() {
     let mut builder = Builder::new();
     builder.add_paragraph("Test").unwrap();
 
-    let xml = builder.generate_content_xml();
+    let xml = builder.generate_content_xml().unwrap();
     assert!(xml.starts_with(r#"<?xml version="1.0" encoding="UTF-8"?"#));
     assert!(xml.contains("office:document-content"));
     assert!(xml.contains("office:text"));
@@ -313,8 +313,16 @@ fn test_generate_meta_xml() {
     builder.metadata.subject = Some("My Subject".to_string());
     builder.metadata.description = Some("My Description".to_string());
     builder.metadata.keywords = Some("my, keywords".to_string());
+    builder.metadata.identifier = Some("urn:litchi:document".to_string());
+    builder.metadata.language = Some("en-US".to_string());
+    builder.metadata.created = Some("2026-08-10T01:02:03Z".parse().unwrap());
+    builder.metadata.modified_local = Some(
+        chrono::NaiveDateTime::parse_from_str("2026-08-10T04:05:06", "%Y-%m-%dT%H:%M:%S").unwrap(),
+    );
 
     let meta_xml = builder.generate_meta_xml();
+    assert_eq!(meta_xml, builder.generate_meta_xml());
+    litchi_odf_common::compact_xml::validate(meta_xml.as_bytes()).unwrap();
     assert!(meta_xml.contains("office:document-meta"));
     assert!(meta_xml.contains("Litchi/"));
     assert!(meta_xml.contains("My Title"));
@@ -322,6 +330,20 @@ fn test_generate_meta_xml() {
     assert!(meta_xml.contains("My Subject"));
     assert!(meta_xml.contains("My Description"));
     assert!(meta_xml.contains("my, keywords"));
+    assert_eq!(meta_xml.matches("<dc:title>").count(), 1);
+    assert!(meta_xml.contains("<dc:identifier>urn:litchi:document</dc:identifier>"));
+    assert!(meta_xml.contains("<dc:language>en-US</dc:language>"));
+    assert!(meta_xml.contains("<meta:creation-date>2026-08-10T01:02:03Z</meta:creation-date>"));
+    assert!(meta_xml.contains("<dc:date>2026-08-10T04:05:06</dc:date>"));
+}
+
+#[test]
+fn default_metadata_xml_has_no_ambient_timestamp() {
+    let builder = Builder::new();
+    let meta_xml = builder.generate_meta_xml();
+    assert!(!meta_xml.contains("<meta:creation-date>"));
+    assert!(!meta_xml.contains("<dc:date>"));
+    litchi_odf_common::compact_xml::validate(meta_xml.as_bytes()).unwrap();
 }
 
 #[test]

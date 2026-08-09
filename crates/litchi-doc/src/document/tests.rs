@@ -31,7 +31,8 @@ mod owned_mtef_tests {
 
 use crate::package::{Error as PackageError, Package};
 use crate::parts::fib::WORD_97_NFIB;
-use crate::{Image, ImageError};
+use crate::{Image, ImageError, Writer};
+use std::io::Cursor;
 use std::path::Path;
 
 #[test]
@@ -66,6 +67,31 @@ fn test_extract_png_image_from_doc() {
         found_signature,
         "expected PNG signature in document streams"
     );
+}
+
+#[test]
+fn opened_document_exposes_versioned_document_properties() {
+    let mut writer = Writer::new();
+    writer.add_paragraph("Body").unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    let document = package.document().expect("load document");
+    let properties = document
+        .document_properties()
+        .expect("valid DopBase")
+        .expect("document carries a Dop");
+
+    assert_eq!(
+        properties.to_bytes().unwrap().len(),
+        properties.version().byte_len()
+    );
+    assert!(matches!(
+        properties
+            .versioned()
+            .expect("valid versioned Dop extension"),
+        crate::VersionedDocumentProperties::Word97(_)
+    ));
 }
 
 #[test]

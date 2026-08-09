@@ -5,6 +5,7 @@ use crate::parts::bookmarks::BookmarksTable;
 use crate::parts::captions::CaptionTables;
 use crate::parts::chp_bin_table::ChpBinTable;
 use crate::parts::comments::CommentsTable;
+use crate::parts::document_properties::DocumentProperties;
 use crate::parts::embedded_fonts::DocumentEmbeddedFonts;
 use crate::parts::envelope::Envelope;
 use crate::parts::fib::FileInformationBlock;
@@ -86,6 +87,8 @@ pub struct Document {
     pub(in crate::document) endnotes_table: Option<EndnotesTable>,
     /// Comments table
     pub(in crate::document) comments_table: CommentsTable,
+    /// Deferred strict parsing of the versioned document-property record.
+    pub(in crate::document) document_properties: Result<Option<DocumentProperties>>,
     /// Standard bookmark tables
     pub(in crate::document) bookmarks_table: BookmarksTable,
     /// Legacy Word smart-tag bookmarks, property bags, and recognizer ranges.

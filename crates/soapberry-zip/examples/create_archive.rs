@@ -13,15 +13,7 @@ use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 use std::fs;
 
 const MIMETYPE_VALUE: &[u8] = b"application/vnd.oasis.opendocument.text";
-const CONTENT_XML: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?>
-<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0">
-    <office:body>
-        <office:text>
-            <text:p xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">Hello, soapberry-zip!</text:p>
-        </office:text>
-    </office:body>
-</office:document-content>
-"#;
+const CONTENT_XML: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body><office:text><text:p xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">Hello, soapberry-zip!</text:p></office:text></office:body></office:document-content>"#;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Build the archive in memory.

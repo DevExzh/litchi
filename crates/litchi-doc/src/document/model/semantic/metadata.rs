@@ -1,6 +1,25 @@
 use super::prelude::*;
 
 impl Document {
+    /// Versioned document and compatibility settings (`Dop`, MS-DOC 2.7.1).
+    ///
+    /// The base record is validated when this accessor is used. Call
+    /// [`DocumentProperties::versioned`] to validate and inspect the exact
+    /// Word-version extension, including Word 2007+ equation settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PackageError::Corrupted`] when the stored DOP range has a
+    /// non-standard size or an invalid common `DopBase` field.
+    pub fn document_properties(&self) -> Result<Option<&DocumentProperties>> {
+        self.document_properties
+            .as_ref()
+            .map(Option::as_ref)
+            .map_err(|error| {
+                PackageError::Corrupted(format!("invalid document properties: {error}"))
+            })
+    }
+
     // ──────────────────────────────────────────────────────────────────
     // Bookmarks
     // ──────────────────────────────────────────────────────────────────

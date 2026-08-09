@@ -171,6 +171,25 @@ impl Presentation {
             .map(Option::<&crate::charts::Chart>::cloned)
     }
 
+    /// Create an immutable, exact-source embedded-chart snapshot.
+    ///
+    /// # Errors
+    /// Returns an error when the package or chart inventory is malformed or exceeds its limits.
+    pub fn chart_snapshot(&self) -> Result<crate::charts::Snapshot> {
+        self.chart_snapshot_with(crate::charts::Limits::default())
+    }
+
+    /// Create an immutable embedded-chart snapshot under an explicit resource budget.
+    ///
+    /// # Errors
+    /// Returns an error when the package or chart inventory is malformed or exceeds its limits.
+    pub fn chart_snapshot_with(
+        &self,
+        limits: crate::charts::Limits,
+    ) -> Result<crate::charts::Snapshot> {
+        crate::charts::Snapshot::from_shared_bytes(self.package.shared_bytes(), limits)
+    }
+
     /// Borrow the optional validated `styles.xml` snapshot without reparsing it.
     #[must_use]
     pub fn styles_xml(&self) -> Option<&str> {
@@ -417,6 +436,24 @@ impl Presentation {
             return Ok(None);
         }
         package.get_file(path).map(Some)
+    }
+
+    /// Discover inert embedded objects in content and styles document order.
+    ///
+    /// This includes regular objects, OLE payloads, applets, plugins, and
+    /// floating frames. Linked targets are classified but never fetched;
+    /// applets and plugins are never loaded or executed.
+    ///
+    /// # Errors
+    /// Returns an error when XML, package paths, inline payloads, or the bounded inventory is
+    /// malformed or exceeds its configured safety ceilings.
+    pub fn embedded_objects(&self) -> Result<Vec<crate::embedded::Object>> {
+        let package = self.package.package().package()?;
+        litchi_odf_common::embedded::scan_package(
+            self.package.content_xml(),
+            self.package.styles_xml(),
+            &package,
+        )
     }
 
     /// Extract all text content from the presentation.

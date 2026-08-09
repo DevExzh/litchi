@@ -78,3 +78,39 @@ fn body_text_splice_preserves_modeled_header_bytes_exactly() {
     assert_eq!(&output[prefix.len()..], br"Changed\par body}");
     assert_eq!(commit.snapshot().text(), "Changed\nbody");
 }
+
+#[test]
+fn paragraph_text_edit_is_checked_local_and_reversible() {
+    let source = Document::parse(r"{\rtf1\ansi First\par Second\par Third}").unwrap();
+    let mut edit = source.edit();
+    edit.replace_paragraph_text(1, "Changed").unwrap();
+    let commit = edit.commit().unwrap();
+
+    assert_eq!(source.text(), "First\nSecond\nThird");
+    assert_eq!(commit.snapshot().text(), "First\nChanged\nThird");
+    assert_eq!(commit.diagnostics().operation_count(), 1);
+    assert!(commit.diagnostics().changed());
+    assert!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap()
+            .same_snapshot(&source)
+    );
+}
+
+#[test]
+fn paragraph_text_edit_rejects_out_of_range_before_staging() {
+    let source = Document::parse(r"{\rtf1 Only}").unwrap();
+    let mut edit = source.edit();
+    assert!(matches!(
+        edit.replace_paragraph_text(1, "never"),
+        Err(Error::ParagraphOutOfRange {
+            position: 1,
+            count: 1
+        })
+    ));
+    edit.replace_paragraph_text(0, "Changed").unwrap();
+    assert_eq!(edit.commit().unwrap().snapshot().text(), "Changed");
+}

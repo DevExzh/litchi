@@ -283,7 +283,7 @@ impl Chart {
                     });
                 }
             },
-            _ => {},
+            Owner::Group(_) => {},
         }
         for binding in value.ai.ordered() {
             if !matches!(

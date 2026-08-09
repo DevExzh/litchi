@@ -41,6 +41,77 @@ pub fn text(input: &str) -> Cow<'_, str> {
     Cow::Owned(output)
 }
 
+/// Encode a URI for use in an angle-bracket Markdown link destination.
+///
+/// `CommonMark` permits balanced parentheses in this form, but whitespace,
+/// control characters, angle brackets, and backslashes would terminate or
+/// alter the destination. Those bytes are percent-encoded. Existing URI
+/// punctuation and UTF-8 text are otherwise retained.
+#[must_use]
+pub fn link_destination(input: &str) -> Cow<'_, str> {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+
+    let special_index = input.as_bytes().iter().position(|byte| {
+        byte.is_ascii_control()
+            || byte.is_ascii_whitespace()
+            || matches!(*byte, b'<' | b'>' | b'\\')
+    });
+    let Some(first_special) = special_index else {
+        return Cow::Borrowed(input);
+    };
+
+    let mut output = String::with_capacity(input.len().saturating_add(8));
+    output.push_str(&input[..first_special]);
+    let mut literal_start = first_special;
+    for (index, &byte) in input.as_bytes().iter().enumerate().skip(first_special) {
+        if byte.is_ascii_control()
+            || byte.is_ascii_whitespace()
+            || matches!(byte, b'<' | b'>' | b'\\')
+        {
+            output.push_str(&input[literal_start..index]);
+            output.push('%');
+            output.push(char::from(HEX[usize::from(byte >> 4)]));
+            output.push(char::from(HEX[usize::from(byte & 0x0f)]));
+            literal_start = index.saturating_add(1);
+        }
+    }
+    output.push_str(&input[literal_start..]);
+    Cow::Owned(output)
+}
+
+/// Escape a Markdown link title placed between double quotes.
+///
+/// Line endings are normalized to spaces because a title cannot span a
+/// source line. Quotes and backslashes are escaped with a backslash.
+#[must_use]
+pub fn link_title(input: &str) -> Cow<'_, str> {
+    if !input
+        .bytes()
+        .any(|byte| matches!(byte, b'"' | b'\\' | b'\r' | b'\n'))
+    {
+        return Cow::Borrowed(input);
+    }
+    let mut output = String::with_capacity(input.len().saturating_add(4));
+    let mut characters = input.chars().peekable();
+    while let Some(character) = characters.next() {
+        match character {
+            '"' | '\\' => {
+                output.push('\\');
+                output.push(character);
+            },
+            '\r' => {
+                if characters.peek() == Some(&'\n') {
+                    characters.next();
+                }
+                output.push(' ');
+            },
+            '\n' => output.push(' '),
+            other => output.push(other),
+        }
+    }
+    Cow::Owned(output)
+}
+
 fn needs_backslash(input: &str, line_start: usize, index: usize, character: char) -> bool {
     if matches!(
         character,
@@ -85,7 +156,7 @@ fn is_ordered_list_delimiter(input: &str, line_start: usize, index: usize) -> bo
 
 #[cfg(test)]
 mod tests {
-    use super::text;
+    use super::{link_destination, link_title, text};
     use std::borrow::Cow;
 
     #[test]
@@ -141,5 +212,26 @@ mod tests {
     #[test]
     fn escapes_ampersands_that_could_become_character_references() {
         assert_eq!(text("AT&T &copy; &#169;"), "AT\\&T \\&copy; \\&\\#169;");
+    }
+
+    #[test]
+    fn link_contexts_preserve_uri_punctuation_and_block_delimiter_injection() {
+        assert_eq!(
+            link_destination("https://example.test/a (b)<c>\\d\n"),
+            "https://example.test/a%20(b)%3Cc%3E%5Cd%0A"
+        );
+        assert_eq!(
+            link_title("say \"hi\"\\now\r\nnext"),
+            "say \\\"hi\\\"\\\\now next"
+        );
+    }
+
+    #[test]
+    fn link_contexts_borrow_safe_input() {
+        assert!(matches!(
+            link_destination("https://例.example/a_(b)?x=1&y=2"),
+            Cow::Borrowed(_)
+        ));
+        assert!(matches!(link_title("safe title"), Cow::Borrowed(_)));
     }
 }

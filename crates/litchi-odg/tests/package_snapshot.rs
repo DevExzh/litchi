@@ -9,6 +9,9 @@ use litchi_odg::Drawing;
 const CONTENT: &str =
     include_str!("../../../test-data/odf/odg/drawing-style-resources-content.xml");
 const STYLES: &str = include_str!("../../../test-data/odf/odg/drawing-style-resources-styles.xml");
+const LIBREOFFICE_ODG: &[u8] = include_bytes!(
+    "../../../3rdparty/libreoffice-core/xmlsecurity/doc/OpenDocumentSignatures-Workflow.odg"
+);
 
 #[test]
 fn real_drawing_resource_xml_remains_exact_and_opaque() {
@@ -36,5 +39,27 @@ fn real_drawing_resource_xml_remains_exact_and_opaque() {
         "draw:stroke-dash",
     ] {
         assert!(raw.contains(element), "fixture lost {element}");
+    }
+}
+
+#[test]
+fn real_libreoffice_odg_opens_with_exact_bytes_and_declared_layers() {
+    let drawing = Drawing::from_bytes(LIBREOFFICE_ODG.to_vec()).unwrap();
+    assert_eq!(drawing.as_bytes(), LIBREOFFICE_ODG);
+    assert!(!drawing.pages().is_empty());
+    assert!(drawing.pages().iter().any(|page| !page.shapes().is_empty()));
+    for expected in [
+        "layout",
+        "background",
+        "backgroundobjects",
+        "controls",
+        "measurelines",
+    ] {
+        assert!(
+            drawing
+                .layers()
+                .iter()
+                .any(|layer| layer.name() == expected)
+        );
     }
 }

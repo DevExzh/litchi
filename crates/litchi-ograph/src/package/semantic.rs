@@ -6,6 +6,10 @@ use super::{codec, validation};
 
 /// Validated root-stream topology of a standalone `OGraph` compound file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(
+    clippy::struct_field_names,
+    reason = "the suffix distinguishes declared byte sizes from decoded stream values"
+)]
 pub struct Topology {
     pub(super) workbook_bytes: u64,
     pub(super) comp_obj_bytes: Option<u64>,

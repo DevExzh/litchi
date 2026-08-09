@@ -1,4 +1,9 @@
-//! Bounded XMLDSig processing with caller-resolved reference bytes.
+//! Bounded `XMLDSig` processing with caller-resolved reference bytes.
+
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "XML model types and helpers are arranged in authoring, verification, and parser flow"
+)]
 
 use crate::{
     Cert, Coverage, Error, Limits, Policy, Reference, Report, Result, Signer, Status, Weak,
@@ -62,6 +67,7 @@ pub enum Canon {
 }
 
 impl Canon {
+    #[must_use]
     pub fn uri(self) -> &'static str {
         match self {
             Self::Inclusive => C14N,
@@ -100,6 +106,7 @@ pub enum Hash {
 }
 
 impl Hash {
+    #[must_use]
     pub fn uri(self) -> &'static str {
         match self {
             Self::Sha1 => SHA1,
@@ -129,7 +136,7 @@ impl Hash {
     }
 }
 
-/// XMLDSig signature method.
+/// `XMLDSig` signature method.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Method {
     RsaSha1,
@@ -140,6 +147,7 @@ pub enum Method {
 }
 
 impl Method {
+    #[must_use]
     pub fn uri(self) -> &'static str {
         match self {
             Self::RsaSha1 => RSA_SHA1,
@@ -166,7 +174,7 @@ impl Method {
     }
 }
 
-/// Office XMLDSig object profile.
+/// Office `XMLDSig` object profile.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Profile {
     /// OPC-like package signatures with one signed package object.
@@ -222,35 +230,26 @@ impl<'a> Ref<'a> {
         })
     }
 
+    #[must_use]
     pub fn transform(mut self, value: Transform) -> Self {
         self.transforms.push(value);
         self
     }
 
+    #[must_use]
     pub fn uri(&self) -> &str {
         &self.uri
     }
 
+    #[must_use]
     pub fn data(&self) -> &[u8] {
         &self.data
     }
 
+    #[must_use]
     pub fn transforms(&self) -> &[Transform] {
         &self.transforms
     }
-}
-
-fn validate_uri(uri: &str) -> Result<()> {
-    if uri.is_empty() || uri.starts_with('#') || uri.chars().any(is_forbidden_xml_char) {
-        return Err(Error::Container(format!(
-            "invalid external signature reference URI {uri:?}"
-        )));
-    }
-    Ok(())
-}
-
-fn is_forbidden_xml_char(value: char) -> bool {
-    matches!(value, '\u{0}'..='\u{8}' | '\u{B}' | '\u{C}' | '\u{E}'..='\u{1F}')
 }
 
 /// Resolve the exact external reference set required by a container.
@@ -259,17 +258,13 @@ fn is_forbidden_xml_char(value: char) -> bool {
 /// `expected`, `has`, and `get` jointly define exact Manifest coverage.
 pub trait Resolver {
     fn expected(&self) -> usize;
-    fn has(&self, uri: &str) -> bool;
     fn get<'a>(&'a self, uri: &str, transforms: &[Transform]) -> Result<(Cow<'a, [u8]>, Coverage)>;
+    fn has(&self, uri: &str) -> bool;
 }
 
 impl Resolver for [Ref<'_>] {
     fn expected(&self) -> usize {
         self.len()
-    }
-
-    fn has(&self, uri: &str) -> bool {
-        self.iter().any(|reference| reference.uri() == uri)
     }
 
     fn get<'a>(&'a self, uri: &str, transforms: &[Transform]) -> Result<(Cow<'a, [u8]>, Coverage)> {
@@ -288,6 +283,10 @@ impl Resolver for [Ref<'_>] {
             )));
         }
         Ok((Cow::Borrowed(reference.data()), Coverage::Complete))
+    }
+
+    fn has(&self, uri: &str) -> bool {
+        self.iter().any(|reference| reference.uri() == uri)
     }
 }
 
@@ -322,7 +321,7 @@ impl ByteBuf {
         }
         self.value
             .try_reserve(value.len())
-            .map_err(|_| Error::Limit("canonical XML allocation failed".into()))?;
+            .map_err(|error| Error::Limit(format!("canonical XML allocation failed: {error}")))?;
         self.value.extend_from_slice(value);
         Ok(())
     }
@@ -355,7 +354,7 @@ impl XmlBuf {
         }
         self.value
             .try_reserve(value.len())
-            .map_err(|_| Error::Limit("authored XML allocation failed".into()))?;
+            .map_err(|error| Error::Limit(format!("authored XML allocation failed: {error}")))?;
         self.value.push_str(value);
         Ok(())
     }
@@ -405,7 +404,20 @@ impl XmlBuf {
     }
 }
 
-/// Author an Office-profile XMLDSig document.
+fn validate_uri(uri: &str) -> Result<()> {
+    if uri.is_empty() || uri.starts_with('#') || uri.chars().any(is_forbidden_xml_char) {
+        return Err(Error::Container(format!(
+            "invalid external signature reference URI {uri:?}"
+        )));
+    }
+    Ok(())
+}
+
+fn is_forbidden_xml_char(value: char) -> bool {
+    matches!(value, '\u{0}'..='\u{8}' | '\u{B}' | '\u{C}' | '\u{E}'..='\u{1F}')
+}
+
+/// Author an Office-profile `XMLDSig` document.
 pub fn author(
     profile: Profile,
     signer: &Signer,
@@ -427,7 +439,7 @@ pub fn author(
     let mut ordered = Vec::new();
     ordered
         .try_reserve(references.len())
-        .map_err(|_| Error::Limit("reference ordering allocation failed".into()))?;
+        .map_err(|error| Error::Limit(format!("reference ordering allocation failed: {error}")))?;
     ordered.extend(references.iter());
     ordered.sort_by(|left, right| left.uri().cmp(right.uri()));
     for pair in ordered.windows(2) {
@@ -650,7 +662,7 @@ fn build_key_info(
     let mut result = String::new();
     result
         .try_reserve(capacity)
-        .map_err(|_| Error::Limit("KeyInfo allocation failed".into()))?;
+        .map_err(|error| Error::Limit(format!("KeyInfo allocation failed: {error}")))?;
     result.push_str("<KeyInfo>");
     result.push_str(&key_value);
     result.push_str("<X509Data>");
@@ -673,7 +685,7 @@ pub fn canonicalize(xml: &[u8], canon: Canon, limits: &Limits) -> Result<Vec<u8>
     document.canonicalize(document.root, canon, limits)
 }
 
-/// Verify one Office-profile XMLDSig document against an exact reference set.
+/// Verify one Office-profile `XMLDSig` document against an exact reference set.
 pub fn verify(
     profile: Profile,
     xml: &[u8],
@@ -1222,14 +1234,6 @@ fn decode64(value: &str, max: usize, description: &str) -> Result<Vec<u8>> {
     }
 }
 
-fn status(value: bool) -> Status {
-    if value {
-        Status::Valid
-    } else {
-        Status::Invalid
-    }
-}
-
 #[derive(Debug)]
 struct Name {
     qualified: String,
@@ -1353,7 +1357,10 @@ impl Document {
         })
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "the parser threads all bounded document-construction state through one event handler"
+    )]
     fn start(
         start: &BytesStart<'_>,
         decoder: quick_xml::encoding::Decoder,
@@ -1472,7 +1479,7 @@ impl Document {
             .iter()
             .filter_map(|child| match child {
                 Child::Element(child) if self.is(*child, namespace, local) => Some(*child),
-                _ => None,
+                Child::Element(_) | Child::Text(_) | Child::Comment(_) => None,
             })
             .collect()
     }
@@ -1672,7 +1679,9 @@ impl Document {
         let mut attributes = Vec::new();
         attributes
             .try_reserve(element.attributes.len())
-            .map_err(|_| Error::Limit("canonical attribute allocation failed".into()))?;
+            .map_err(|error| {
+                Error::Limit(format!("canonical attribute allocation failed: {error}"))
+            })?;
         attributes.extend(element.attributes.iter());
         attributes.sort_by(|left, right| {
             (&left.name.namespace, &left.name.local)
@@ -1689,7 +1698,7 @@ impl Document {
         for child in &element.children {
             match child {
                 Child::Element(child) => {
-                    self.canonicalize_element(*child, &rendered, canon, output)?
+                    self.canonicalize_element(*child, &rendered, canon, output)?;
                 },
                 Child::Text(text) => escape_text_bytes(output, text)?,
                 Child::Comment(comment) if canon.comments() => {
@@ -1704,6 +1713,14 @@ impl Document {
         output.push(element.name.qualified.as_bytes())?;
         output.byte(b'>')?;
         Ok(())
+    }
+}
+
+fn status(value: bool) -> Status {
+    if value {
+        Status::Valid
+    } else {
+        Status::Invalid
     }
 }
 
@@ -1827,10 +1844,10 @@ mod tests {
         let signed_info = document
             .required_child(document.root, DS, "SignedInfo")
             .unwrap();
-        let signed = document
+        let canonical_signed_info = document
             .canonicalize(signed_info, Canon::Inclusive, &limits)
             .unwrap();
-        let value = BASE64.encode(signer.sign(&signed));
+        let value = BASE64.encode(signer.sign(&canonical_signed_info));
         let value_start = xml.find("<SignatureValue>").unwrap() + "<SignatureValue>".len();
         let value_end = xml.find("</SignatureValue>").unwrap();
         xml.replace_range(value_start..value_end, &value);

@@ -1,9 +1,10 @@
 //! Bounded immutable RTF body-text transactions.
 //!
-//! This seam deliberately covers one ordinary body-text replacement. It does
-//! not expose the retained mutable parser tree, and it refuses changed sources
-//! containing opaque syntax or body structure whose positions would need a
-//! richer editor to update safely.
+//! This seam deliberately covers one ordinary body-text operation: replacement
+//! of either the complete story or one checked paragraph. It does not expose
+//! the retained mutable parser tree, and it refuses changed sources containing
+//! opaque syntax or body structure whose positions would need a richer editor
+//! to update safely.
 
 use crate::{Document, RtfError, RtfWriter};
 use bumpalo::Bump;
@@ -23,6 +24,8 @@ pub enum Error {
     OperationAlreadyStaged,
     /// Replacement text exceeds the source snapshot's retained resource profile.
     InputTooLarge { observed: usize, limit: usize },
+    /// A checked paragraph position does not exist in the source body story.
+    ParagraphOutOfRange { position: usize, count: usize },
     /// Candidate parsing or validation failed.
     Rtf(RtfError),
     /// Candidate transport construction failed before publication.
@@ -44,6 +47,10 @@ impl fmt::Display for Error {
                 formatter,
                 "replacement body text exceeds the source limit: observed {observed}, limit {limit}"
             ),
+            Self::ParagraphOutOfRange { position, count } => write!(
+                formatter,
+                "RTF body paragraph position {position} is outside 0..{count}"
+            ),
             Self::Rtf(error) => error.fmt(formatter),
             Self::Write(error) => write!(formatter, "RTF candidate construction failed: {error}"),
             Self::PatchConflict => {
@@ -64,14 +71,19 @@ impl From<RtfError> for Error {
 /// Detached, one-operation edit of an immutable snapshot.
 pub struct Edit {
     source: Snapshot,
-    replacement: Option<String>,
+    operation: Option<Operation>,
+}
+
+enum Operation {
+    Body(String),
+    Paragraph { position: usize, text: String },
 }
 
 impl Edit {
     pub(crate) fn new(source: Snapshot) -> Self {
         Self {
             source,
-            replacement: None,
+            operation: None,
         }
     }
 
@@ -87,10 +99,43 @@ impl Edit {
         &mut self,
         replacement: impl Into<String>,
     ) -> Result<&mut Self, Error> {
-        if self.replacement.is_some() {
+        if self.operation.is_some() {
             return Err(Error::OperationAlreadyStaged);
         }
         let text = replacement.into();
+        self.validate_input_size(&text)?;
+        self.operation = Some(Operation::Body(text));
+        Ok(self)
+    }
+
+    /// Stages replacement of one checked zero-based ordinary body paragraph.
+    ///
+    /// Newlines in the replacement create additional RTF paragraph breaks.
+    /// Selection is resolved against the immutable source snapshot before any
+    /// candidate bytes are constructed.
+    ///
+    /// # Errors
+    /// Returns an error if another operation is staged, `position` is outside
+    /// the source paragraph list, or the replacement exceeds retained limits.
+    pub fn replace_paragraph_text(
+        &mut self,
+        position: usize,
+        replacement: impl Into<String>,
+    ) -> Result<&mut Self, Error> {
+        if self.operation.is_some() {
+            return Err(Error::OperationAlreadyStaged);
+        }
+        let count = self.source.paragraph_count();
+        if position >= count {
+            return Err(Error::ParagraphOutOfRange { position, count });
+        }
+        let text = replacement.into();
+        self.validate_input_size(&text)?;
+        self.operation = Some(Operation::Paragraph { position, text });
+        Ok(self)
+    }
+
+    fn validate_input_size(&self, text: &str) -> Result<(), Error> {
         let limit = self.source.limits().max_source_bytes();
         if text.len() > limit {
             return Err(Error::InputTooLarge {
@@ -98,8 +143,7 @@ impl Edit {
                 limit,
             });
         }
-        self.replacement = Some(text);
-        Ok(self)
+        Ok(())
     }
 
     /// Validates and publishes the candidate atomically.
@@ -108,8 +152,14 @@ impl Edit {
     /// Returns an error when the source is outside this seam's supported
     /// closure or candidate validation fails.
     pub fn commit(self) -> Result<Commit, Error> {
-        let Some(replacement) = self.replacement else {
+        let Some(operation) = self.operation else {
             return Ok(Commit::new(self.source.clone(), self.source, false, 0));
+        };
+        let replacement = match operation {
+            Operation::Body(text) => text,
+            Operation::Paragraph { position, text } => {
+                replace_paragraph(&self.source, position, &text)?
+            },
         };
         if replacement == self.source.text() {
             return Ok(Commit::new(self.source.clone(), self.source, false, 1));
@@ -140,6 +190,62 @@ impl Edit {
         }
         Ok(Commit::new(self.source, snapshot, true, 1))
     }
+}
+
+fn replace_paragraph(
+    source: &Snapshot,
+    position: usize,
+    replacement: &str,
+) -> Result<String, Error> {
+    let mut start = 0usize;
+    let mut range = None;
+    for (paragraph_position, paragraph) in source.body().paragraphs().enumerate() {
+        let end = start
+            .checked_add(paragraph.len())
+            .ok_or(Error::InputTooLarge {
+                observed: usize::MAX,
+                limit: source.limits().max_source_bytes(),
+            })?;
+        if paragraph_position == position {
+            range = Some(start..end);
+            break;
+        }
+        start = end.checked_add(1).ok_or(Error::InputTooLarge {
+            observed: usize::MAX,
+            limit: source.limits().max_source_bytes(),
+        })?;
+    }
+    let count = source.paragraph_count();
+    let range = range.ok_or(Error::ParagraphOutOfRange { position, count })?;
+    let body = source.text();
+    let prefix = body.get(..range.start).ok_or(Error::UnsupportedSource(
+        "paragraph boundary is not a UTF-8 text boundary",
+    ))?;
+    let suffix = body.get(range.end..).ok_or(Error::UnsupportedSource(
+        "paragraph boundary is not a UTF-8 text boundary",
+    ))?;
+    let capacity = prefix
+        .len()
+        .checked_add(replacement.len())
+        .and_then(|length| length.checked_add(suffix.len()))
+        .ok_or(Error::InputTooLarge {
+            observed: usize::MAX,
+            limit: source.limits().max_source_bytes(),
+        })?;
+    if capacity > source.limits().max_source_bytes() {
+        return Err(Error::InputTooLarge {
+            observed: capacity,
+            limit: source.limits().max_source_bytes(),
+        });
+    }
+    let mut output = String::new();
+    output
+        .try_reserve_exact(capacity)
+        .map_err(|_err| Error::Write("could not reserve replacement body text".to_string()))?;
+    output.push_str(prefix);
+    output.push_str(replacement);
+    output.push_str(suffix);
+    Ok(output)
 }
 
 fn ordinary_body_source_span(

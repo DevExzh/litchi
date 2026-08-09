@@ -21,6 +21,10 @@ pub use edit::{
     ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DefaultsEdit, Edit, JoinError,
     JoinFailure, NewSheet, PackageChange, Patch, RowEdit, State, TabEdit, WorksheetEdit,
 };
+/// Finite step and retained-weight bounds for [`History`].
+pub use litchi_core::patch::HistoryLimits;
+pub(crate) use model::Inner;
 pub use model::{DateSystem, Flavor, Selector, Visibility, Workbook, Worksheet, WorksheetKind};
 
-pub(crate) use model::Inner;
+/// Explicit budgeted undo/redo retention for immutable workbook snapshots.
+pub type History = litchi_core::patch::History<Workbook>;

@@ -201,15 +201,12 @@ fn changed_transactions_refuse_signed_and_encrypted_envelopes() {
     let encrypted_bytes = encrypted_writer.finish_to_bytes().unwrap();
     let encrypted = Document::from_bytes_with_password(encrypted_bytes, "secret").unwrap();
     let encrypted_snapshot = encrypted.snapshot().unwrap();
+    let encrypted_noop = encrypted_snapshot.edit().commit().unwrap();
     assert_eq!(
-        encrypted_snapshot
-            .edit()
-            .commit()
-            .unwrap()
-            .snapshot()
-            .as_bytes(),
+        encrypted_noop.snapshot().as_bytes(),
         encrypted_snapshot.as_bytes()
     );
+    assert!(encrypted_noop.patch().durable().is_err());
     let mut encrypted_edit = encrypted.edit().unwrap();
     encrypted_edit
         .append_line_break(ParagraphSelector::at(0))
@@ -317,5 +314,90 @@ fn residual_semantic_families_share_one_reversible_transaction() {
             .unwrap()
             .as_bytes(),
         source.original_bytes()
+    );
+}
+
+#[test]
+fn durable_patch_round_trips_deterministically_and_remains_exactly_reversible() {
+    let source = source();
+    let snapshot = source.snapshot().unwrap();
+    let mut edit = snapshot.edit();
+    edit.append_line_break(ParagraphSelector::position(Position::new(0)))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+
+    let durable = commit.patch().durable().unwrap();
+    let first_json = durable.to_deterministic_json().unwrap();
+    let second_json = durable.to_deterministic_json().unwrap();
+    assert_eq!(first_json, second_json);
+
+    let decoded =
+        litchi_odt::transaction::DurablePatch::from_deterministic_json(&first_json).unwrap();
+    let applied = decoded.apply(&snapshot).unwrap();
+    assert_eq!(applied.as_bytes(), commit.snapshot().as_bytes());
+    assert_all_package_xml_is_compact(applied.as_bytes());
+    let restored = decoded.inverse().apply(&applied).unwrap();
+    assert_eq!(restored.as_bytes(), snapshot.as_bytes());
+    assert!(decoded.apply(&applied).is_err());
+}
+
+#[test]
+fn sealed_durable_patch_discards_reverse_artifact_and_checks_source_digest() {
+    let source = source();
+    let snapshot = source.snapshot().unwrap();
+    let mut edit = snapshot.edit();
+    edit.append_line_break(ParagraphSelector::position(Position::new(0)))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let reversible_json = commit
+        .patch()
+        .durable()
+        .unwrap()
+        .to_deterministic_json()
+        .unwrap();
+    let sealed_json = commit
+        .patch()
+        .durable()
+        .unwrap()
+        .seal()
+        .to_deterministic_json()
+        .unwrap();
+    assert!(sealed_json.len() < reversible_json.len());
+
+    let sealed =
+        litchi_odt::transaction::SealedPatch::from_deterministic_json(&sealed_json).unwrap();
+    assert_eq!(
+        sealed.apply(&snapshot).unwrap().as_bytes(),
+        commit.snapshot().as_bytes()
+    );
+    assert!(sealed.apply(commit.snapshot()).is_err());
+}
+
+#[test]
+fn durable_patch_parser_rejects_noncanonical_json() {
+    let source = source();
+    let snapshot = source.snapshot().unwrap();
+    let json = snapshot
+        .edit()
+        .commit()
+        .unwrap()
+        .patch()
+        .durable()
+        .unwrap()
+        .to_deterministic_json()
+        .unwrap();
+    let mut noncanonical = Vec::with_capacity(json.len() + 1);
+    noncanonical.push(b' ');
+    noncanonical.extend_from_slice(&json);
+    assert!(litchi_odt::transaction::DurablePatch::from_deterministic_json(&noncanonical).is_err());
+
+    let mut foreign_format = json;
+    let format = foreign_format
+        .windows(b"litchi.odt".len())
+        .position(|window| window == b"litchi.odt")
+        .unwrap();
+    foreign_format[format + b"litchi.odt".len() - 1] = b'x';
+    assert!(
+        litchi_odt::transaction::DurablePatch::from_deterministic_json(&foreign_format).is_err()
     );
 }

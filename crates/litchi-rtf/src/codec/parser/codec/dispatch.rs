@@ -144,6 +144,11 @@ impl Parser<'_> {
                         "RTF kinsoku destinations must be starred".to_string(),
                     ));
                 },
+                Token::Control(ControlWord::HtmlTag(_)) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF htmltag destination must be starred".to_string(),
+                    ));
+                },
                 Token::Control(ControlWord::MathZoneInline) => {
                     self.parse_math_zone_destination(false)?;
                     self.states.pop();

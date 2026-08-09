@@ -27,11 +27,11 @@ pub(super) fn ensure_value(cache: &Cache, value: &CacheValue) -> Result<()> {
         (Cache::Excel { value: current, .. }, CacheValue::Excel(replacement)) => {
             match (current, replacement) {
                 (XlValue::Number(_), XlValue::Number(value)) => ensure_xnum(*value),
-                (XlValue::Text(_), XlValue::Text(_)) | (XlValue::Blank, XlValue::Blank) => Ok(()),
-                (XlValue::Bool(_), XlValue::Bool(_))
-                | (XlValue::Bool(_), XlValue::Error(_))
-                | (XlValue::Error(_), XlValue::Bool(_))
-                | (XlValue::Error(_), XlValue::Error(_)) => Ok(()),
+                (XlValue::Text(_), XlValue::Text(_))
+                | (XlValue::Blank, XlValue::Blank)
+                | (XlValue::Bool(_) | XlValue::Error(_), XlValue::Bool(_) | XlValue::Error(_)) => {
+                    Ok(())
+                },
                 _ => same_wire_class(),
             }
         },

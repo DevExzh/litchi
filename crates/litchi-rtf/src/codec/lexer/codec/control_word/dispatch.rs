@@ -689,6 +689,10 @@ pub(in crate::codec::lexer::codec) fn match_control_word(
         "writereservhash" => ControlWord::WriteReservationHash(param),
         "fromtext" => ControlWord::FromText(param),
         "fromhtml" => ControlWord::FromHtml(param),
+        "htmlrtf" => ControlWord::HtmlRtf(param_bool),
+        "htmltag" => ControlWord::HtmlTag(param.ok_or_else(|| {
+            RtfError::MalformedDocument("RTF htmltag requires a numeric parameter".to_string())
+        })?),
         "doctype" => ControlWord::DocumentType(param),
         "makebackup" => ControlWord::MakeBackup(param),
         "defformat" => ControlWord::DefaultSaveFormat(param),
@@ -916,6 +920,38 @@ pub(in crate::codec::lexer::codec) fn match_control_word(
         "chshdng" => ControlWord::CharacterShading(param),
         "chcfpat" => ControlWord::CharacterForegroundPattern(param),
         "chcbpat" => ControlWord::CharacterBackgroundPattern(param),
+        "chbghoriz" => {
+            ControlWord::CharacterShadingPattern(crate::ShadingPattern::Horizontal, param)
+        },
+        "chbgvert" => ControlWord::CharacterShadingPattern(crate::ShadingPattern::Vertical, param),
+        "chbgfdiag" => {
+            ControlWord::CharacterShadingPattern(crate::ShadingPattern::ForwardDiagonal, param)
+        },
+        "chbgbdiag" => {
+            ControlWord::CharacterShadingPattern(crate::ShadingPattern::BackwardDiagonal, param)
+        },
+        "chbgcross" => ControlWord::CharacterShadingPattern(crate::ShadingPattern::Cross, param),
+        "chbgdcross" => {
+            ControlWord::CharacterShadingPattern(crate::ShadingPattern::DiagonalCross, param)
+        },
+        "chbgdkhoriz" => {
+            ControlWord::CharacterShadingPattern(crate::ShadingPattern::DarkHorizontal, param)
+        },
+        "chbgdkvert" => {
+            ControlWord::CharacterShadingPattern(crate::ShadingPattern::DarkVertical, param)
+        },
+        "chbgdkfdiag" => {
+            ControlWord::CharacterShadingPattern(crate::ShadingPattern::DarkForwardDiagonal, param)
+        },
+        "chbgdkbdiag" => {
+            ControlWord::CharacterShadingPattern(crate::ShadingPattern::DarkBackwardDiagonal, param)
+        },
+        "chbgdkcross" => {
+            ControlWord::CharacterShadingPattern(crate::ShadingPattern::DarkCross, param)
+        },
+        "chbgdkdcross" => {
+            ControlWord::CharacterShadingPattern(crate::ShadingPattern::DarkDiagonalCross, param)
+        },
         "plain" => ControlWord::Plain,
         "loch" => ControlWord::LowAnsiCharacter(param),
         "hich" => ControlWord::HighAnsiCharacter(param),
@@ -1231,7 +1267,7 @@ pub(in crate::codec::lexer::codec) fn match_control_word(
             },
             param,
         ),
-        "clspdl" => ControlWord::TableDistanceValue(
+        "clspl" | "clspdl" => ControlWord::TableDistanceValue(
             crate::TableDistanceTarget {
                 scope: crate::TableDistanceScope::Cell,
                 kind: crate::TableDistanceKind::Spacing,
@@ -1239,7 +1275,7 @@ pub(in crate::codec::lexer::codec) fn match_control_word(
             },
             param,
         ),
-        "clspdr" => ControlWord::TableDistanceValue(
+        "clspr" | "clspdr" => ControlWord::TableDistanceValue(
             crate::TableDistanceTarget {
                 scope: crate::TableDistanceScope::Cell,
                 kind: crate::TableDistanceKind::Spacing,
@@ -1247,7 +1283,7 @@ pub(in crate::codec::lexer::codec) fn match_control_word(
             },
             param,
         ),
-        "clspdt" => ControlWord::TableDistanceValue(
+        "clspt" | "clspdt" => ControlWord::TableDistanceValue(
             crate::TableDistanceTarget {
                 scope: crate::TableDistanceScope::Cell,
                 kind: crate::TableDistanceKind::Spacing,
@@ -1255,7 +1291,7 @@ pub(in crate::codec::lexer::codec) fn match_control_word(
             },
             param,
         ),
-        "clspdb" => ControlWord::TableDistanceValue(
+        "clspb" | "clspdb" => ControlWord::TableDistanceValue(
             crate::TableDistanceTarget {
                 scope: crate::TableDistanceScope::Cell,
                 kind: crate::TableDistanceKind::Spacing,
@@ -1263,7 +1299,7 @@ pub(in crate::codec::lexer::codec) fn match_control_word(
             },
             param,
         ),
-        "clspdfl" => ControlWord::TableDistanceUnit(
+        "clspfl" | "clspdfl" => ControlWord::TableDistanceUnit(
             crate::TableDistanceTarget {
                 scope: crate::TableDistanceScope::Cell,
                 kind: crate::TableDistanceKind::Spacing,
@@ -1271,7 +1307,7 @@ pub(in crate::codec::lexer::codec) fn match_control_word(
             },
             param,
         ),
-        "clspdfr" => ControlWord::TableDistanceUnit(
+        "clspfr" | "clspdfr" => ControlWord::TableDistanceUnit(
             crate::TableDistanceTarget {
                 scope: crate::TableDistanceScope::Cell,
                 kind: crate::TableDistanceKind::Spacing,
@@ -1279,7 +1315,7 @@ pub(in crate::codec::lexer::codec) fn match_control_word(
             },
             param,
         ),
-        "clspdft" => ControlWord::TableDistanceUnit(
+        "clspft" | "clspdft" => ControlWord::TableDistanceUnit(
             crate::TableDistanceTarget {
                 scope: crate::TableDistanceScope::Cell,
                 kind: crate::TableDistanceKind::Spacing,
@@ -1287,7 +1323,7 @@ pub(in crate::codec::lexer::codec) fn match_control_word(
             },
             param,
         ),
-        "clspdfb" => ControlWord::TableDistanceUnit(
+        "clspfb" | "clspdfb" => ControlWord::TableDistanceUnit(
             crate::TableDistanceTarget {
                 scope: crate::TableDistanceScope::Cell,
                 kind: crate::TableDistanceKind::Spacing,
@@ -1762,6 +1798,36 @@ pub(in crate::codec::lexer::codec) fn match_control_word(
         "shading" => ControlWord::Shading(param),
         "cfpat" => ControlWord::ForegroundPattern(param),
         "cbpat" => ControlWord::BackgroundPattern(param),
+        "bghoriz" => ControlWord::ParagraphShadingPattern(crate::ShadingPattern::Horizontal, param),
+        "bgvert" => ControlWord::ParagraphShadingPattern(crate::ShadingPattern::Vertical, param),
+        "bgfdiag" => {
+            ControlWord::ParagraphShadingPattern(crate::ShadingPattern::ForwardDiagonal, param)
+        },
+        "bgbdiag" => {
+            ControlWord::ParagraphShadingPattern(crate::ShadingPattern::BackwardDiagonal, param)
+        },
+        "bgcross" => ControlWord::ParagraphShadingPattern(crate::ShadingPattern::Cross, param),
+        "bgdcross" => {
+            ControlWord::ParagraphShadingPattern(crate::ShadingPattern::DiagonalCross, param)
+        },
+        "bgdkhoriz" => {
+            ControlWord::ParagraphShadingPattern(crate::ShadingPattern::DarkHorizontal, param)
+        },
+        "bgdkvert" => {
+            ControlWord::ParagraphShadingPattern(crate::ShadingPattern::DarkVertical, param)
+        },
+        "bgdkfdiag" => {
+            ControlWord::ParagraphShadingPattern(crate::ShadingPattern::DarkForwardDiagonal, param)
+        },
+        "bgdkbdiag" => {
+            ControlWord::ParagraphShadingPattern(crate::ShadingPattern::DarkBackwardDiagonal, param)
+        },
+        "bgdkcross" => {
+            ControlWord::ParagraphShadingPattern(crate::ShadingPattern::DarkCross, param)
+        },
+        "bgdkdcross" => {
+            ControlWord::ParagraphShadingPattern(crate::ShadingPattern::DarkDiagonalCross, param)
+        },
 
         // Tab stops
         "tql" => ControlWord::TabLeft(param),
@@ -2387,6 +2453,10 @@ pub(in crate::codec::lexer::codec) fn match_control_word(
         "enspace" => ControlWord::EnSpace,
         "qmspace" => ControlWord::QuarterEmSpace,
         "bullet" => ControlWord::Bullet,
+        "lquote" => ControlWord::LeftSingleQuote,
+        "rquote" => ControlWord::RightSingleQuote,
+        "ldblquote" => ControlWord::LeftDoubleQuote,
+        "rdblquote" => ControlWord::RightDoubleQuote,
         "ltrmark" => ControlWord::LeftToRightMark,
         "rtlmark" => ControlWord::RightToLeftMark,
         "zwj" => ControlWord::ZeroWidthJoiner,

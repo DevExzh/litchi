@@ -36,6 +36,15 @@ pub(super) struct WorkbookLayout {
     pub(super) stream_end: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StreamState {
+    GlobalsBof,
+    Globals,
+    ChartBof,
+    Chart,
+    Done,
+}
+
 impl WorkbookLayout {
     pub(super) fn check(self, len: usize) -> Result<()> {
         if self.stream_end != len
@@ -100,15 +109,6 @@ fn validate_entry(entry: &DirectoryEntry, limits: Limits) -> Result<()> {
         });
     }
     check_limit_u64("stream bytes", entry.size, limits.max_stream_bytes)
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum StreamState {
-    GlobalsBof,
-    Globals,
-    ChartBof,
-    Chart,
-    Done,
 }
 
 pub(super) fn validate_workbook(bytes: &[u8], limits: Limits) -> Result<WorkbookLayout> {

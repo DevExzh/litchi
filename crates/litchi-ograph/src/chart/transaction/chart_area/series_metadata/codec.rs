@@ -16,6 +16,12 @@ pub(super) struct Scan {
     pub(super) entries: Vec<Entry>,
 }
 
+struct Physical {
+    payload_start: usize,
+    payload_end: usize,
+    payload: [u8; PAYLOAD_BYTES],
+}
+
 pub(super) fn scan(chart: &Chart) -> Result<Scan> {
     let source = match &chart.origin {
         Origin::Parsed(stream) => stream.as_bytes(),
@@ -178,12 +184,6 @@ pub(super) fn patch(chart: &mut Chart, expected_source: u64, changes: &[Change])
         change.after().apply(&mut chart.series[change.index()]);
     }
     Ok(fingerprint(bytes))
-}
-
-struct Physical {
-    payload_start: usize,
-    payload_end: usize,
-    payload: [u8; PAYLOAD_BYTES],
 }
 
 fn decode(record: RecordRef<'_>) -> Result<Metadata> {

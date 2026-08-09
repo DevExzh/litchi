@@ -1,4 +1,4 @@
-//! OpenDocument Spreadsheet (`.ods`) support.
+//! `OpenDocument` Spreadsheet (`.ods`) support.
 //!
 //! The crate is organized by responsibility: immutable spreadsheet vocabulary
 //! in [`model`], XML codecs in [`codec`], package access in [`package`],
@@ -9,12 +9,14 @@ pub mod authoring;
 pub mod charts;
 pub mod codec;
 pub mod data_pilot;
+pub mod definitions;
 pub mod drawing;
 pub mod embedded;
 pub mod facade;
 pub mod flat;
 pub mod media;
 pub mod metadata;
+pub mod metadata_graphs;
 pub mod model;
 pub mod package;
 pub mod protection;

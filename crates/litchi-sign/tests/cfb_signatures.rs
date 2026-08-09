@@ -1,3 +1,10 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "integration-test fixture phases intentionally reuse editor roles and panic on failed setup"
+)]
+
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_sign::cfb::{self, Editor, Format};
 use litchi_sign::{Error, Limits, Policy, Signer, Status, Trust};

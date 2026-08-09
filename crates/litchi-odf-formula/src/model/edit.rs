@@ -150,23 +150,31 @@ impl Element {
                 matches!(content, Content::Element(_)).then_some(position)
             })
             .nth(index)?;
-        match self.content_mut().remove(position) {
-            Content::Element(element) => Some(element),
-            Content::Text(_) => unreachable!("position selects an element"),
-        }
+        let Content::Element(element) = self.content_mut().remove(position) else {
+            return None;
+        };
+        Some(element)
     }
 
     /// Replace the child element at `index`, returning the old element.
     ///
-    /// # Panics
-    ///
-    /// Panics only on an internal invariant violation: reinsertion at the
-    /// just-vacated index cannot fail.
     pub fn replace_child(&mut self, index: usize, child: Element) -> Option<Element> {
-        let removed = self.remove_child(index)?;
-        self.insert_child(index, child)
-            .unwrap_or_else(|_| unreachable!("removal vacated the index"));
-        Some(removed)
+        let position = self
+            .content()
+            .iter()
+            .enumerate()
+            .filter_map(|(position, content)| {
+                matches!(content, Content::Element(_)).then_some(position)
+            })
+            .nth(index)?;
+        let previous = std::mem::replace(
+            self.content_mut().get_mut(position)?,
+            Content::Element(child),
+        );
+        match previous {
+            Content::Element(element) => Some(element),
+            Content::Text(_) => None,
+        }
     }
 
     /// Remove all content (elements and text) from the element.

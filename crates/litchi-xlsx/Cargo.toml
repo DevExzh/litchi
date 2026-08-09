@@ -22,6 +22,7 @@ base64 = { workspace = true }
 bitflags = { workspace = true }
 caseless = { workspace = true }
 chrono = { workspace = true }
+itoa = { workspace = true }
 litchi-core = { workspace = true }
 litchi-crypto = { workspace = true, optional = true }
 litchi-drawingml = { workspace = true }

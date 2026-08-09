@@ -66,7 +66,8 @@ impl Format {
     /// Encodes the fixed-size payload without allocating.
     #[must_use]
     pub fn payload(self) -> [u8; LEN] {
-        (self.explode.get() as u16).to_le_bytes()
+        let encoded = self.explode.get().to_le_bytes();
+        [encoded[0], encoded[1]]
     }
 
     /// Appends the complete record to a bounded encoder.

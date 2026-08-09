@@ -98,8 +98,10 @@ mod tests {
     #[test]
     fn framing_bounds_and_malformed_payloads_are_typed() {
         let input = [0x33, 0x10, 0, 0, 0x34, 0x10, 0, 0];
-        let mut limits = Limits::default();
-        limits.max_records = 1;
+        let limits = Limits {
+            max_records: 1,
+            ..Limits::default()
+        };
         let mut records = Records::with_limits(&input, limits).expect("limits");
         assert!(records.next().expect("first record").is_ok());
         assert!(matches!(

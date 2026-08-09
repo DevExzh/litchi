@@ -116,13 +116,18 @@ impl CharacterBorder {
     }
 }
 
-/// Exact character shading from `chshdng`, `chcfpat`, and `chcbpat`.
+/// Exact character shading from the `chshdng`/`chbg*`, `chcfpat`, and
+/// `chcbpat` families.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct CharacterShading {
-    /// Shading in hundredths of a percent, from 0 through 10000.
-    pub amount: u16,
-    pub foreground_color: ColorRef,
-    pub background_color: ColorRef,
+    /// Exact `\chshdngN` value in hundredths of a percent.
+    pub amount: Option<u16>,
+    /// Exact explicit `\chbg*` pattern.
+    pub pattern: Option<ShadingPattern>,
+    /// Exact `\chcfpatN` foreground color reference.
+    pub foreground_color: Option<ColorRef>,
+    /// Exact `\chcbpatN` background color reference.
+    pub background_color: Option<ColorRef>,
 }
 
 impl CharacterShading {
@@ -130,7 +135,7 @@ impl CharacterShading {
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::RtfResult<()> {
-        if self.amount > 10_000 {
+        if self.amount.is_some_and(|amount| amount > 10_000) {
             return Err(crate::RtfError::MalformedDocument(
                 "RTF character shading must be in 0..=10000".to_string(),
             ));

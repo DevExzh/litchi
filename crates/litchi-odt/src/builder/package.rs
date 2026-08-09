@@ -35,7 +35,7 @@ impl Builder {
         writer.set_mimetype(mimetype)?;
 
         // Add content.xml
-        let content_xml = self.generate_content_xml();
+        let content_xml = self.generate_content_xml()?;
         writer.add_file("content.xml", content_xml.as_bytes())?;
 
         // Add styles.xml with list styles

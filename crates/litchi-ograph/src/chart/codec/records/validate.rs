@@ -93,7 +93,13 @@ pub(super) fn validate(chart: &Chart, limits: Limits, require_topology: bool) ->
             Family::Radar { flags, .. } | Family::Surface { flags } if flags & !3 != 0 => {
                 return invalid_model("group", "radar or surface reserved flags are nonzero");
             },
-            _ => {},
+            Family::Line { .. }
+            | Family::Bar { .. }
+            | Family::Area { .. }
+            | Family::Pie { .. }
+            | Family::Scatter { .. }
+            | Family::Radar { .. }
+            | Family::Surface { .. } => {},
         }
         let mut prior = None;
         for line in &group.lines {
@@ -149,7 +155,7 @@ pub(super) fn validate(chart: &Chart, limits: Limits, require_topology: bool) ->
                     );
                 }
             },
-            _ => {},
+            Owner::Group(_) => {},
         }
         for (binding, role) in series.ai.ordered().into_iter().zip(Role::ALL) {
             if binding.link().role() != role {
@@ -218,7 +224,7 @@ pub(super) fn validate(chart: &Chart, limits: Limits, require_topology: bool) ->
                 value: Value::Text(text),
                 ..
             } => check_string(Some(text), "cached text")?,
-            _ => {},
+            Cache::Excel { .. } | Cache::Graph { .. } => {},
         }
     }
     for format in &chart.formats {

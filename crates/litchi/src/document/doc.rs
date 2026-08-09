@@ -227,20 +227,6 @@ impl Document {
                 {
                     return Err(unsupported("unmodeled DOCX body blocks"));
                 }
-                if !document
-                    .hyperlinks()
-                    .map_err(crate::map_ooxml_error)?
-                    .is_empty()
-                {
-                    return Err(unsupported("DOCX hyperlinks"));
-                }
-                if !document
-                    .footnotes()
-                    .map_err(crate::map_ooxml_error)?
-                    .is_empty()
-                {
-                    return Err(unsupported("DOCX footnotes"));
-                }
             },
             #[cfg(feature = "rtf")]
             DocumentImpl::Rtf(document) => {
@@ -289,10 +275,30 @@ impl Document {
         Ok(())
     }
 
+    /// Borrow the package-aware DOCX view used by the Markdown adapter for
+    /// relationship resolution and note definitions.
+    #[cfg(all(feature = "markdown", feature = "docx"))]
+    #[allow(
+        unreachable_patterns,
+        reason = "DOCX is the only facade variant in a docx-only feature build"
+    )]
+    pub(crate) fn markdown_docx_document(&self) -> Result<Option<crate::docx::Document<'_>>> {
+        match &self.inner {
+            DocumentImpl::Docx(package, _) => {
+                package.document().map(Some).map_err(crate::map_ooxml_error)
+            },
+            _ => Ok(None),
+        }
+    }
+
     /// Preserve ODT outline levels while the ODT semantic model is still
     /// available. The unified paragraph facade intentionally stores only
     /// paragraph content, so this sidecar is aligned with `elements()`.
     #[cfg(feature = "markdown")]
+    #[allow(
+        unreachable_patterns,
+        reason = "match arms are feature-gated; some are unreachable depending on the enabled features"
+    )]
     pub(crate) fn markdown_heading_levels(&self) -> Result<Vec<Option<u8>>> {
         match &self.inner {
             #[cfg(feature = "pages")]

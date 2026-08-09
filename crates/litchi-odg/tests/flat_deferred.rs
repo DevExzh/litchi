@@ -100,12 +100,12 @@ fn flat_wrong_family_and_malformed_or_misplaced_structures_are_typed_errors() {
 fn flat_truncation_and_mutation_sweeps_never_panic() {
     let bytes = HARDENING_SEED.as_bytes();
     for end in 0..bytes.len() {
-        let _ = FlatDrawing::from_bytes(bytes[..end].to_vec());
+        drop(FlatDrawing::from_bytes(bytes[..end].to_vec()));
     }
     for position in 0..bytes.len() {
         let mut mutated = bytes.to_vec();
         mutated[position] ^= 1;
-        let _ = FlatDrawing::from_bytes(mutated);
+        drop(FlatDrawing::from_bytes(mutated));
     }
     assert!(FlatDrawing::from_bytes(bytes.to_vec()).is_ok());
     let mut invalid_utf8 = bytes.to_vec();

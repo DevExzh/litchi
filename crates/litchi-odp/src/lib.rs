@@ -19,7 +19,7 @@ pub mod package;
 pub use facade::settings as show;
 pub use facade::slide::{Shape, Slide};
 pub use facade::{Builder, FlatPresentation, MasterPage, Presentation};
-pub use facade::{edit, image, layout, master, page, slide};
+pub use facade::{edit, embedded, image, layout, master, page, slide};
 
 // Keep implementation modules ergonomic internally without flattening their
 // semantic vocabulary into the public crate root.

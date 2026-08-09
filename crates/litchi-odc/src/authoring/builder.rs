@@ -42,17 +42,8 @@ impl Builder {
     /// or if the package cannot be written.
     pub fn build(self) -> Result<Vec<u8>> {
         let content_xml = serialize_content(&self.definition)?;
-        package_content(content_xml)
+        package_content(&content_xml)
     }
-}
-
-fn package_content(content_xml: String) -> Result<Vec<u8>> {
-    compact_xml::validate(content_xml.as_bytes())?;
-    crate::codec::validate(&content_xml)?;
-    let mut writer = PackageWriter::new();
-    writer.set_mimetype(crate::package::MIMETYPE)?;
-    writer.add_file("content.xml", content_xml.as_bytes())?;
-    writer.finish_to_bytes()
 }
 
 impl Default for Builder {
@@ -61,7 +52,20 @@ impl Default for Builder {
     }
 }
 
+fn package_content(content_xml: &str) -> Result<Vec<u8>> {
+    compact_xml::validate(content_xml.as_bytes())?;
+    crate::codec::validate(content_xml)?;
+    let mut writer = PackageWriter::new();
+    writer.set_mimetype(crate::package::MIMETYPE)?;
+    writer.add_file("content.xml", content_xml.as_bytes())?;
+    writer.finish_to_bytes()
+}
+
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    reason = "test code panics on unexpected errors to keep assertions concise"
+)]
 mod tests {
     use super::{ChartClass, Definition, package_content, serialize_content};
     use litchi_core::{Error, xml::CompactnessKind};
@@ -71,7 +75,7 @@ mod tests {
         let content = serialize_content(&Definition::new(ChartClass::line())).unwrap();
         let noncompact = content.replacen("><", ">\n<", 1);
         assert!(matches!(
-            package_content(noncompact).unwrap_err(),
+            package_content(&noncompact).unwrap_err(),
             Error::XmlCompactness {
                 kind: CompactnessKind::FormattingWhitespace,
                 ..

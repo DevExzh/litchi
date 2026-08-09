@@ -1,12 +1,14 @@
 //! Source-checked, lossless edits of text already owned by a PPT shape.
 //!
-//! This deliberately supports only a replacement that leaves the selected
-//! `TextCharsAtom` or `TextBytesAtom` byte length unchanged.  `[MS-PPT]`
-//! associates character and paragraph formatting, text-range interactions,
-//! and special-information runs with UTF-16 positions.  Changing that length
-//! without rewriting every such dependent record would be lossy, so it is a
-//! typed refusal rather than a best-effort edit.
+//! Length-changing replacement is supported when the selected
+//! `TextCharsAtom` or `TextBytesAtom` has either no style record or a single
+//! paragraph-formatting run and a single character-formatting run. The two
+//! style coverage counts are then updated with the text atom and every owning
+//! container length. `[MS-PPT]` associates other formatting, interaction,
+//! bookmark, metacharacter, and special-information records with UTF-16
+//! positions; their presence remains a typed dependency-closure refusal.
 
+use std::collections::BTreeMap;
 use std::fmt;
 use std::io::Cursor;
 use std::sync::Arc;
@@ -205,6 +207,96 @@ impl Snapshot {
             replacement: None,
         })
     }
+
+    /// Applies one shared durable `litchi-ppt` shape-text operation.
+    ///
+    /// Application checks the format namespace, bounded semantic selector,
+    /// exact artifact SHA-256, and expected source text before staging the
+    /// ordinary source-checked transaction. A durable no-op patch returns this
+    /// snapshot unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the patch vocabulary is unsupported, a
+    /// precondition conflicts, or the requested text edit is refused.
+    pub fn apply_durable<Mode>(&self, patch: &litchi_core::patch::Patch<Mode>) -> Result<Self> {
+        if patch.format() != "litchi-ppt" || !patch.blobs().is_empty() {
+            return Err(invalid_durable_patch("unsupported format or blob bundle"));
+        }
+        let operations = patch.operations();
+        if operations.is_empty() {
+            return Ok(self.clone());
+        }
+        let [operation] = operations else {
+            return Err(invalid_durable_patch(
+                "shape-text patch must contain exactly one operation",
+            ));
+        };
+        if operation.op != "shape-text.set" || operation.preconditions.len() != 2 {
+            return Err(invalid_durable_patch(
+                "unsupported shape-text operation vocabulary",
+            ));
+        }
+        let target = parse_durable_target(&operation.target)?;
+        let expected_hash = operation
+            .preconditions
+            .get("artifact_sha256")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| invalid_durable_patch("missing artifact hash precondition"))?;
+        let actual_hash = litchi_core::patch::BlobId::of(self.bytes()).as_hex();
+        if expected_hash != actual_hash {
+            return Err(PackageError::InvalidFormat(
+                "PPT durable shape-text patch source artifact does not match".into(),
+            )
+            .into());
+        }
+        let expected_text = operation
+            .preconditions
+            .get("text")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| invalid_durable_patch("missing text precondition"))?;
+        let replacement = operation
+            .value
+            .as_str()
+            .ok_or_else(|| invalid_durable_patch("shape-text value must be a string"))?;
+        let mut transaction = self.edit_text(target)?;
+        if transaction.text() != expected_text {
+            return Err(PackageError::InvalidFormat(
+                "PPT durable shape-text patch text precondition does not match".into(),
+            )
+            .into());
+        }
+        transaction.set_text(replacement)?;
+        Ok(transaction.commit()?.snapshot)
+    }
+}
+
+fn parse_durable_target(value: &str) -> Result<Target> {
+    let (slide_text, shape_text) = value
+        .strip_prefix("slide:")
+        .and_then(|suffix| suffix.split_once("/shape:"))
+        .ok_or_else(|| invalid_durable_patch("invalid shape-text target"))?;
+    if slide_text.is_empty()
+        || shape_text.is_empty()
+        || !slide_text.bytes().all(|byte| byte.is_ascii_digit())
+        || !shape_text.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return Err(invalid_durable_patch("invalid shape-text target"));
+    }
+    let slide_position = slide_text
+        .parse::<usize>()
+        .map_err(|_error| invalid_durable_patch("slide position exceeds this platform"))?;
+    let shape_position = shape_text
+        .parse::<usize>()
+        .map_err(|_error| invalid_durable_patch("shape position exceeds this platform"))?;
+    Ok(Target::new(
+        Position::new(slide_position),
+        Position::new(shape_position),
+    ))
+}
+
+fn invalid_durable_patch(message: &str) -> Error {
+    PackageError::InvalidFormat(format!("invalid PPT durable patch: {message}")).into()
 }
 
 /// One isolated text replacement staged against an immutable package.
@@ -233,10 +325,14 @@ impl Transaction {
     ///
     /// # Errors
     ///
-    /// Returns a typed refusal when the replacement is not length-preserving.
+    /// Returns a typed refusal when the replacement has an incompatible
+    /// encoding or when its changed length has unmodeled dependent ranges.
     pub fn set_text(&mut self, value: impl Into<String>) -> Result<()> {
         let candidate = value.into();
-        encode_replacement(&candidate, self.resolved.kind, self.resolved.payload.len())?;
+        let encoded = encode_replacement(&candidate, self.resolved.kind)?;
+        if encoded.len() != self.resolved.payload.len() && !self.resolved.can_resize {
+            return Err(Error::Refused(Refusal::DependencyClosure));
+        }
         self.replacement = Some(candidate);
         Ok(())
     }
@@ -253,18 +349,17 @@ impl Transaction {
             .replacement
             .unwrap_or_else(|| self.resolved.text.clone());
         if replacement == self.resolved.text {
-            let patch = Patch::new(self.source.clone(), self.source.clone());
+            let patch = Patch::new(self.source.clone(), self.source.clone(), None);
             return Ok(Commit {
                 snapshot: self.source,
                 patch,
             });
         }
 
-        let encoded = encode_replacement(
-            &replacement,
-            self.resolved.kind,
-            self.resolved.payload.len(),
-        )?;
+        let encoded = encode_replacement(&replacement, self.resolved.kind)?;
+        if encoded.len() != self.resolved.payload.len() && !self.resolved.can_resize {
+            return Err(Error::Refused(Refusal::DependencyClosure));
+        }
         let target_slide = rewrite_slide(
             &self.resolved.slide_record,
             self.resolved.native_shape_id,
@@ -292,7 +387,12 @@ impl Transaction {
             )
             .into());
         }
-        let patch = Patch::new(self.source, snapshot.clone());
+        let change = Change {
+            target: self.resolved.target,
+            before_text: self.resolved.text,
+            after_text: replacement,
+        };
+        let patch = Patch::new(self.source, snapshot.clone(), Some(change));
         Ok(Commit { snapshot, patch })
     }
 
@@ -335,11 +435,16 @@ impl Commit {
 pub struct Patch {
     before: Snapshot,
     after: Snapshot,
+    change: Option<Change>,
 }
 
 impl Patch {
-    fn new(before: Snapshot, after: Snapshot) -> Self {
-        Self { before, after }
+    fn new(before: Snapshot, after: Snapshot, change: Option<Change>) -> Self {
+        Self {
+            before,
+            after,
+            change,
+        }
     }
 
     /// Exact source bytes required for forward application.
@@ -378,8 +483,109 @@ impl Patch {
     /// Returns the exact-source-checked inverse patch.
     #[must_use]
     pub fn inverse(&self) -> Self {
-        Self::new(self.after.clone(), self.before.clone())
+        Self::new(
+            self.after.clone(),
+            self.before.clone(),
+            self.change.as_ref().map(Change::inverse),
+        )
     }
+
+    /// Converts this patch to the shared versioned deterministic-JSON patch
+    /// vocabulary.
+    ///
+    /// The durable operation uses semantic slide/shape positions and retains
+    /// both the expected text and exact artifact SHA-256 as preconditions. It
+    /// contains no native shape or persist identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when caller-selected wire limits cannot represent the
+    /// operation or its authored text.
+    pub fn to_durable(
+        &self,
+        limits: litchi_core::patch::PatchLimits,
+    ) -> std::result::Result<
+        litchi_core::patch::Patch<litchi_core::patch::Reversible>,
+        litchi_core::patch::PatchError,
+    > {
+        use litchi_core::patch::{BlobBundle, ReversibleOperation};
+
+        let operations = self
+            .change
+            .as_ref()
+            .map(|change| {
+                let forward = durable_operation(
+                    limits,
+                    change.target,
+                    self.before.bytes(),
+                    &change.before_text,
+                    &change.after_text,
+                )?;
+                let inverse = durable_operation(
+                    limits,
+                    change.target,
+                    self.after.bytes(),
+                    &change.after_text,
+                    &change.before_text,
+                )?;
+                Ok(ReversibleOperation::new(forward, inverse))
+            })
+            .transpose()?
+            .into_iter();
+        litchi_core::patch::Patch::<litchi_core::patch::Reversible>::new(
+            limits,
+            "litchi-ppt",
+            operations,
+            BlobBundle::new(limits.blobs()),
+            BlobBundle::new(limits.blobs()),
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Change {
+    target: Target,
+    before_text: String,
+    after_text: String,
+}
+
+impl Change {
+    fn inverse(&self) -> Self {
+        Self {
+            target: self.target,
+            before_text: self.after_text.clone(),
+            after_text: self.before_text.clone(),
+        }
+    }
+}
+
+fn durable_operation(
+    limits: litchi_core::patch::PatchLimits,
+    target: Target,
+    source: &[u8],
+    before_text: &str,
+    after_text: &str,
+) -> std::result::Result<litchi_core::patch::PatchOperation, litchi_core::patch::PatchError> {
+    let mut preconditions = BTreeMap::new();
+    preconditions.insert(
+        "artifact_sha256".to_string(),
+        serde_json::Value::String(litchi_core::patch::BlobId::of(source).as_hex()),
+    );
+    preconditions.insert(
+        "text".to_string(),
+        serde_json::Value::String(before_text.to_string()),
+    );
+    litchi_core::patch::PatchOperation::new(
+        limits,
+        "shape-text.set",
+        format!(
+            "slide:{}/shape:{}",
+            target.slide().get(),
+            target.shape().get()
+        ),
+        preconditions,
+        serde_json::Value::String(after_text.to_string()),
+    )
 }
 
 #[derive(Debug, Clone)]
@@ -391,6 +597,7 @@ struct Resolved {
     kind: TextKind,
     payload: Vec<u8>,
     text: String,
+    can_resize: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -428,6 +635,7 @@ fn resolve(bytes: &[u8], target: Target) -> Result<Resolved> {
         kind: text.kind,
         payload: text.payload,
         text: text.text,
+        can_resize: text.can_resize,
     })
 }
 
@@ -448,6 +656,7 @@ struct TextAtom {
     kind: TextKind,
     payload: Vec<u8>,
     text: String,
+    can_resize: bool,
 }
 
 fn inspect_slide(slide: &[u8], shape_id: u32) -> Result<TextAtom> {
@@ -510,9 +719,18 @@ fn inspect_drawing(drawing: &[u8], shape_id: u32) -> Result<TextAtom> {
 
 fn inspect_textbox(textbox: &[u8]) -> Result<TextAtom> {
     let mut atom = None;
+    let mut child_types = Vec::new();
+    let mut style_record = None;
     for child_result in children(textbox)? {
         let child = child_result?;
-        let atom_kind = match record_type(child)? {
+        let child_type = record_type(child)?;
+        child_types.push(child_type);
+        if child_type == RecordType::StyleTextPropAtom as u16
+            && style_record.replace(child).is_some()
+        {
+            return Err(Error::Refused(Refusal::DependencyClosure));
+        }
+        let atom_kind = match child_type {
             value if value == RecordType::TextBytesAtom as u16 => Some(TextKind::Bytes),
             value if value == RecordType::TextCharsAtom as u16 => Some(TextKind::Chars),
             _ => None,
@@ -530,9 +748,50 @@ fn inspect_textbox(textbox: &[u8]) -> Result<TextAtom> {
             kind,
             payload,
             text,
+            can_resize: false,
         });
     }
-    atom.ok_or(Error::Refused(Refusal::NoTextAtom))
+    let mut text_atom = atom.ok_or(Error::Refused(Refusal::NoTextAtom))?;
+    text_atom.can_resize = resize_dependency_closure_is_modeled(
+        &child_types,
+        style_record,
+        text_units(text_atom.kind, text_atom.payload.len())?,
+    )?;
+    Ok(text_atom)
+}
+
+fn resize_dependency_closure_is_modeled(
+    child_types: &[u16],
+    style_record: Option<&[u8]>,
+    old_text_units: usize,
+) -> Result<bool> {
+    let text_header = RecordType::TextHeaderAtom as u16;
+    let text_bytes = RecordType::TextBytesAtom as u16;
+    let text_chars = RecordType::TextCharsAtom as u16;
+    let style = RecordType::StyleTextPropAtom as u16;
+    let supported_shape = matches!(
+        child_types,
+        [header, text]
+            if *header == text_header && (*text == text_bytes || *text == text_chars)
+    ) || matches!(
+        child_types,
+        [header, text, style_type]
+            if *header == text_header
+                && (*text == text_bytes || *text == text_chars)
+                && *style_type == style
+    );
+    if !supported_shape {
+        return Ok(false);
+    }
+    let Some(style_bytes) = style_record else {
+        return Ok(true);
+    };
+    Ok(crate::StyleTextPropAtom::resize_single_run_record(
+        style_bytes,
+        old_text_units,
+        old_text_units,
+    )?
+    .is_some())
 }
 
 fn rewrite_slide(
@@ -692,6 +951,8 @@ fn rewrite_shape_container(
 fn rewrite_textbox(textbox: &[u8], kind: TextKind, before: &[u8], after: &[u8]) -> Result<Vec<u8>> {
     let mut count = 0usize;
     let mut data = Vec::with_capacity(drawing_payload(textbox)?.len());
+    let old_text_units = text_units(kind, before.len())?;
+    let new_text_units = text_units(kind, after.len())?;
     for child_result in children(textbox)? {
         let child = child_result?;
         let record_type = record_type(child)?;
@@ -707,8 +968,17 @@ fn rewrite_textbox(textbox: &[u8], kind: TextKind, before: &[u8], after: &[u8]) 
                 )
                 .into());
             }
-            let mut rewritten = child.to_vec();
-            rewritten[PPT_HEADER_LEN..].copy_from_slice(after);
+            let rewritten = rebuild(child, after)?;
+            data.extend_from_slice(&rewritten);
+        } else if record_type == RecordType::StyleTextPropAtom as u16
+            && old_text_units != new_text_units
+        {
+            let rewritten = crate::StyleTextPropAtom::resize_single_run_record(
+                child,
+                old_text_units,
+                new_text_units,
+            )?
+            .ok_or(Error::Refused(Refusal::DependencyClosure))?;
             data.extend_from_slice(&rewritten);
         } else {
             data.extend_from_slice(child);
@@ -772,7 +1042,10 @@ fn shape_id_of(record: &[u8]) -> PackageResult<Option<u32>> {
     Ok(None)
 }
 
-fn encode_replacement(value: &str, kind: TextKind, length: usize) -> Result<Vec<u8>> {
+fn encode_replacement(value: &str, kind: TextKind) -> Result<Vec<u8>> {
+    if value.contains('\0') {
+        return Err(Error::Refused(Refusal::IncompatibleEncoding));
+    }
     let bytes = match kind {
         TextKind::Bytes => value
             .chars()
@@ -783,10 +1056,15 @@ fn encode_replacement(value: &str, kind: TextKind, length: usize) -> Result<Vec<
             .collect::<Result<Vec<_>>>()?,
         TextKind::Chars => value.encode_utf16().flat_map(u16::to_le_bytes).collect(),
     };
-    if bytes.len() != length {
-        return Err(Error::Refused(Refusal::DependencyClosure));
-    }
     Ok(bytes)
+}
+
+fn text_units(kind: TextKind, byte_length: usize) -> Result<usize> {
+    match kind {
+        TextKind::Bytes => Ok(byte_length),
+        TextKind::Chars if byte_length.is_multiple_of(2) => Ok(byte_length / 2),
+        TextKind::Chars => Err(Error::Refused(Refusal::IncompatibleEncoding)),
+    }
 }
 
 fn decode_utf16(bytes: &[u8]) -> Result<String> {
@@ -870,13 +1148,12 @@ impl<'a> Iterator for ChildRecords<'a> {
 }
 
 fn rebuild(record: &[u8], data: &[u8]) -> PackageResult<Vec<u8>> {
-    if data.len() != drawing_payload(record)?.len() {
-        return Err(PackageError::Corrupted(
-            "text edit unexpectedly changed record framing".into(),
-        ));
-    }
+    let _ = drawing_payload(record)?;
+    let data_length = u32::try_from(data.len())
+        .map_err(|_err| PackageError::ResourceLimit("PPT text-edit record exceeds u32".into()))?;
     let mut output = Vec::with_capacity(record.len());
-    output.extend_from_slice(&record[..PPT_HEADER_LEN]);
+    output.extend_from_slice(&record[..4]);
+    output.extend_from_slice(&data_length.to_le_bytes());
     output.extend_from_slice(data);
     Ok(output)
 }
@@ -904,6 +1181,17 @@ mod tests {
 
     fn target() -> Target {
         Target::new(Position::new(0), Position::new(0))
+    }
+
+    fn durable_limits() -> litchi_core::patch::PatchLimits {
+        litchi_core::patch::PatchLimits::new(
+            litchi_core::patch::BlobLimits::new(0, 0, 0),
+            1024 * 1024,
+            1,
+            8,
+            256 * 1024,
+            512 * 1024,
+        )
     }
 
     #[test]
@@ -942,17 +1230,57 @@ mod tests {
     }
 
     #[test]
-    fn length_changing_edit_is_a_typed_refusal_and_keeps_source() {
+    fn length_changing_plain_text_edit_round_trips_and_reverses() {
         let source = Snapshot::from_bytes(fixture("abc")).unwrap();
         let target = target();
+        let source_slide = super::resolve(source.bytes(), target).unwrap();
         let mut edit = source.edit_text(target).unwrap();
-        assert!(matches!(
-            edit.set_text("long"),
-            Err(Error::Refused(Refusal::DependencyClosure))
-        ));
+        edit.set_text("a longer plain text box").unwrap();
         let commit = edit.commit().unwrap();
-        assert_eq!(commit.snapshot().bytes(), source.bytes());
-        assert!(commit.patch().is_empty());
+        let committed_slide = super::resolve(commit.snapshot().bytes(), target).unwrap();
+        assert_eq!(committed_slide.text, "a longer plain text box");
+        assert!(committed_slide.slide_record.len() > source_slide.slide_record.len());
+        let undone = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+        assert_eq!(undone.bytes(), source.bytes());
+    }
+
+    #[test]
+    fn length_changing_utf16_text_updates_record_and_style_coverage() {
+        let source = Snapshot::from_bytes(fixture("初稿")).unwrap();
+        let target = target();
+        let mut edit = source.edit_text(target).unwrap();
+        edit.set_text("修订后的演示文稿\u{1f34a}").unwrap();
+        let commit = edit.commit().unwrap();
+        assert_eq!(
+            super::resolve(commit.snapshot().bytes(), target)
+                .unwrap()
+                .text,
+            "修订后的演示文稿\u{1f34a}"
+        );
+    }
+
+    #[test]
+    fn null_text_and_unmodeled_ranges_are_typed_refusals() {
+        let source = Snapshot::from_bytes(fixture("abc")).unwrap();
+        let mut edit = source.edit_text(target()).unwrap();
+        assert!(matches!(
+            edit.set_text("a\0c"),
+            Err(Error::Refused(Refusal::IncompatibleEncoding))
+        ));
+
+        assert!(
+            !super::resize_dependency_closure_is_modeled(
+                &[
+                    crate::RecordType::TextHeaderAtom as u16,
+                    crate::RecordType::TextBytesAtom as u16,
+                    crate::RecordType::StyleTextPropAtom as u16,
+                    crate::RecordType::TextInteractiveInfoAtom as u16,
+                ],
+                None,
+                3,
+            )
+            .unwrap()
+        );
     }
 
     #[test]
@@ -964,6 +1292,41 @@ mod tests {
         let patch = edit.commit().unwrap().patch().clone();
         let other = Snapshot::from_bytes(fixture("def")).unwrap();
         assert!(patch.apply(&other).is_err());
+    }
+
+    #[test]
+    fn durable_patch_round_trips_as_deterministic_json_and_applies() {
+        let source = Snapshot::from_bytes(fixture("abc")).unwrap();
+        let mut edit = source.edit_text(target()).unwrap();
+        edit.set_text("a durable replacement").unwrap();
+        let commit = edit.commit().unwrap();
+        let durable = commit.patch().to_durable(durable_limits()).unwrap();
+        let json = durable.to_deterministic_json().unwrap();
+        let decoded =
+            litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+                &json,
+                durable_limits(),
+            )
+            .unwrap();
+
+        let applied = source.apply_durable(&decoded).unwrap();
+        assert_eq!(applied.bytes(), commit.snapshot().bytes());
+        assert_eq!(
+            super::resolve(applied.bytes(), target()).unwrap().text,
+            "a durable replacement"
+        );
+
+        let restored = applied.apply_durable(&decoded.inverse()).unwrap();
+        assert_eq!(
+            super::resolve(restored.bytes(), target()).unwrap().text,
+            "abc"
+        );
+        assert!(
+            Snapshot::from_bytes(fixture("other"))
+                .unwrap()
+                .apply_durable(&decoded)
+                .is_err()
+        );
     }
 
     #[test]

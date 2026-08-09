@@ -1,3 +1,8 @@
+#![allow(
+    clippy::expect_used,
+    reason = "integration-test fixture construction and assertions panic by design"
+)]
+
 use litchi_biff::{Encoder, Error as BiffError, Kind, Limits as BiffLimits, Resource};
 use litchi_ograph::chart::{self, Kind as ChartKind};
 use litchi_ograph::{Error, Limits};

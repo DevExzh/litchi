@@ -5,13 +5,6 @@
 //! `PowerPoint`, use document type `0x0020`. [`Refs`] recognizes both without
 //! depending on either host format.
 
-use std::iter::FusedIterator;
-
-use litchi_biff::{Kind as RecordKind, RecordRef, Records};
-
-use crate::limits::as_u64;
-use crate::{Error, Limits, Result};
-
 pub mod axis;
 pub mod cache;
 mod codec;
@@ -20,6 +13,13 @@ pub mod group;
 pub mod layout;
 mod model;
 pub mod transaction;
+
+use std::iter::FusedIterator;
+
+use litchi_biff::{Kind as RecordKind, RecordRef, Records};
+
+use crate::limits::as_u64;
+use crate::{Error, Limits, Result};
 
 pub use model::{
     Ai, Binding, Cache, CellRef, Chart, Context, Count, DataKind, Edit, Family, Group, GroupId,
@@ -374,9 +374,9 @@ impl<'a> Refs<'a> {
         }
     }
 
-    fn fail(&mut self, error: Error) -> Option<Result<Ref<'a>>> {
+    fn fail(&mut self, error: Error) -> Result<Ref<'a>> {
         self.done = true;
-        Some(Err(error))
+        Err(error)
     }
 }
 
@@ -391,7 +391,7 @@ impl<'a> Iterator for Refs<'a> {
         loop {
             let record = match self.records.next() {
                 Some(Ok(record)) => record,
-                Some(Err(error)) => return self.fail(error.into()),
+                Some(Err(error)) => return Some(self.fail(error.into())),
                 None => {
                     self.done = true;
                     return self
@@ -404,49 +404,46 @@ impl<'a> Iterator for Refs<'a> {
                 active.records = match active.records.checked_add(1) {
                     Some(records) => records,
                     None => {
-                        return self.fail(Error::SizeOverflow {
+                        return Some(self.fail(Error::SizeOverflow {
                             resource: "chart record count",
-                        });
+                        }));
                     },
                 };
                 if active.records > self.limits.max_chart_records {
-                    return self.fail(Error::LimitExceeded {
+                    return Some(self.fail(Error::LimitExceeded {
                         resource: "chart record count",
                         observed: as_u64(active.records),
                         maximum: as_u64(self.limits.max_chart_records),
-                    });
+                    }));
                 }
                 self.active = Some(active);
 
                 if record.kind() == BOF {
-                    return self.fail(Error::InvalidChart {
+                    return Some(self.fail(Error::InvalidChart {
                         offset: record.offset(),
                         reason: "nested BOF in chart substream",
-                    });
+                    }));
                 }
                 if record.kind() != EOF {
                     continue;
                 }
                 if !record.payload().is_empty() {
-                    return self.fail(Error::InvalidChart {
+                    return Some(self.fail(Error::InvalidChart {
                         offset: record.offset(),
                         reason: "chart EOF has a non-empty payload",
-                    });
+                    }));
                 }
 
-                let end = match record.offset().checked_add(record.encoded().len()) {
-                    Some(end) => end,
-                    None => {
-                        return self.fail(Error::SizeOverflow {
-                            resource: "chart substream",
-                        });
-                    },
+                let Some(end) = record.offset().checked_add(record.encoded().len()) else {
+                    return Some(self.fail(Error::SizeOverflow {
+                        resource: "chart substream",
+                    }));
                 };
                 let Some(bytes) = self.bytes.get(active.start..end) else {
-                    return self.fail(Error::InvalidChart {
+                    return Some(self.fail(Error::InvalidChart {
                         offset: active.start,
                         reason: "chart range exceeds Workbook bytes",
-                    });
+                    }));
                 };
                 self.active = None;
                 return Some(Ok(Ref::from_validated(
@@ -463,22 +460,19 @@ impl<'a> Iterator for Refs<'a> {
             let kind = match parse_bof(record) {
                 Ok(Some(kind)) => kind,
                 Ok(None) => continue,
-                Err(error) => return self.fail(error),
+                Err(error) => return Some(self.fail(error)),
             };
-            let next = match self.charts.checked_add(1) {
-                Some(next) => next,
-                None => {
-                    return self.fail(Error::SizeOverflow {
-                        resource: "chart count",
-                    });
-                },
+            let Some(next) = self.charts.checked_add(1) else {
+                return Some(self.fail(Error::SizeOverflow {
+                    resource: "chart count",
+                }));
             };
             if next > self.limits.max_charts {
-                return self.fail(Error::LimitExceeded {
+                return Some(self.fail(Error::LimitExceeded {
                     resource: "chart count",
                     observed: as_u64(next),
                     maximum: as_u64(self.limits.max_charts),
-                });
+                }));
             }
             self.charts = next;
             self.active = Some(Active {
@@ -512,7 +506,7 @@ fn parse_bof(record: RecordRef<'_>) -> Result<Option<Kind>> {
     let kind = match (version, doc_type) {
         (GRAPH_VERSION, GRAPH_DOC_TYPE) => Kind::Graph,
         (EXCEL_VERSION, EXCEL_DOC_TYPE) => Kind::Excel,
-        (_, GRAPH_DOC_TYPE) | (_, EXCEL_DOC_TYPE) => {
+        (_, GRAPH_DOC_TYPE | EXCEL_DOC_TYPE) => {
             return chart_error(record.offset(), "chart BOF has an unsupported BIFF version");
         },
         _ => return Ok(None),

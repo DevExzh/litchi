@@ -29,6 +29,36 @@ fn preserves_plain_space_nodes_and_mixed_boundaries() {
 }
 
 #[test]
+fn rejects_all_whitespace_outside_the_document_element() {
+    for xml in [
+        b" <root/>".as_slice(),
+        b"<root/> ".as_slice(),
+        b"<?xml version=\"1.0\"?> <root/>".as_slice(),
+        b"<root/><!--comment--> ".as_slice(),
+    ] {
+        let error = audit::verify(xml, limits_for(xml)).unwrap_err();
+        assert!(matches!(
+            error,
+            audit::Error::NotCompact(violation)
+                if violation.kind() == Kind::FormattingWhitespace
+        ));
+    }
+}
+
+#[test]
+fn rejects_cdata_outside_the_document_element() {
+    for xml in [
+        b"<![CDATA[ ]]><root/>".as_slice(),
+        b"<root/><![CDATA[ ]]>".as_slice(),
+    ] {
+        assert!(matches!(
+            audit::verify(xml, limits_for(xml)),
+            Err(audit::Error::Malformed { .. })
+        ));
+    }
+}
+
+#[test]
 fn inherited_xml_space_preserves_whitespace_and_default_resets_it() {
     let preserved = b"<a xml:space=\"preserve\">\n<b> </b></a>";
     let _preserved_report = audit::verify(preserved, limits_for(preserved)).unwrap();
@@ -42,6 +72,15 @@ fn inherited_xml_space_preserves_whitespace_and_default_resets_it() {
 
     let nested = b"<a xml:space=\"preserve\">\n<b><c>\t</c></b></a>";
     let _nested_report = audit::verify(nested, limits_for(nested)).unwrap();
+
+    let normalized = b"<a xml:space=\"pre&#115;erve\">\n</a>";
+    let _normalized_report = audit::verify(normalized, limits_for(normalized)).unwrap();
+
+    let invalid = b"<a xml:space=\"keep\">text</a>";
+    assert!(matches!(
+        audit::verify(invalid, limits_for(invalid)),
+        Err(audit::Error::Malformed { .. })
+    ));
 }
 
 #[test]

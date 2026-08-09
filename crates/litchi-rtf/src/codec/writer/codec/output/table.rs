@@ -176,7 +176,7 @@ impl<W: Write> RtfWriter<W> {
             self.write_table_cell_borders(cell.borders())?;
             self.write_table_shading("cl", cell.shading())?;
             self.write_table_distances("clpad", "clpadf", cell.padding())?;
-            self.write_table_distances("clspd", "clspdf", cell.spacing())?;
+            self.write_table_distances("clsp", "clspf", cell.spacing())?;
             let cell_index = i32::try_from(i + 1).map_err(|_err| {
                 io::Error::new(
                     io::ErrorKind::InvalidInput,
@@ -435,7 +435,7 @@ impl<W: Write> RtfWriter<W> {
                 self.write_table_cell_borders(cell.borders())?;
                 self.write_table_shading("cl", cell.shading())?;
                 self.write_table_distances("clpad", "clpadf", cell.padding())?;
-                self.write_table_distances("clspd", "clspdf", cell.spacing())?;
+                self.write_table_distances("clsp", "clspf", cell.spacing())?;
                 let cell_index = i32::try_from(index + 1).map_err(|_err| {
                     io::Error::new(
                         io::ErrorKind::InvalidInput,

@@ -128,6 +128,44 @@ impl MutableSpreadsheet {
         self.spreadsheet.sheets()
     }
 
+    /// Capture the exact-source worksheet transaction owner.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the retained package or worksheet graph is invalid.
+    pub fn worksheet_snapshot(&self) -> Result<crate::worksheet::Snapshot> {
+        self.spreadsheet.worksheet_snapshot()
+    }
+
+    /// Apply an exact-source reversible worksheet patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a stale patch or invalid candidate package.
+    pub fn apply_worksheet_patch(&mut self, patch: &crate::worksheet::Patch) -> Result<()> {
+        self.spreadsheet.apply_worksheet_patch(patch)
+    }
+
+    /// Clone-stage worksheet structure and cell CRUD as one package edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the closure, validation, compactness check, rebuild, or readback
+    /// fails.
+    pub fn edit_worksheets<F>(&mut self, edit: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::worksheet::Edit) -> Result<()>,
+    {
+        let snapshot = self.worksheet_snapshot()?;
+        let mut transaction = snapshot.edit();
+        edit(&mut transaction)?;
+        let commit = transaction.commit()?;
+        if commit.changed() {
+            self.spreadsheet = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+        }
+        Ok(())
+    }
+
     /// Discover embedded charts in the current immutable package snapshot.
     pub fn charts(&self) -> Result<crate::charts::Inventory<'_>> {
         self.spreadsheet.charts()
@@ -315,6 +353,46 @@ impl MutableSpreadsheet {
         self.spreadsheet.definitions()
     }
 
+    /// Capture the exact-source named-definition transaction owner.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the retained package cannot be reparsed.
+    pub fn definitions_snapshot(&self) -> Result<crate::definitions::Snapshot> {
+        self.spreadsheet.definitions_snapshot()
+    }
+
+    /// Apply an exact-source reversible named-definition patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a stale patch or invalid candidate package.
+    pub fn apply_definitions_patch(&mut self, patch: &crate::definitions::Patch) -> Result<()> {
+        self.spreadsheet.apply_definitions_patch(patch)
+    }
+
+    /// Clone-stage ordered definition CRUD and publish it as one package edit.
+    ///
+    /// An unchanged edit retains the original package bytes. A changed edit must produce compact
+    /// `content.xml`, pass a full package reopen, and match the staged typed catalog.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the closure, validation, compactness check, rebuild, or readback fails.
+    pub fn edit_definitions<F>(&mut self, edit: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::definitions::Edit) -> Result<()>,
+    {
+        let snapshot = self.definitions_snapshot()?;
+        let mut transaction = snapshot.edit();
+        edit(&mut transaction)?;
+        let commit = transaction.commit()?;
+        if commit.changed() {
+            self.spreadsheet = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+        }
+        Ok(())
+    }
+
     /// Append a validated named range atomically.
     pub fn add_range(&mut self, range: Range) -> Result<()> {
         self.spreadsheet.add_range(range)
@@ -345,14 +423,63 @@ impl MutableSpreadsheet {
         self.spreadsheet.expression(name, scope)
     }
 
+    /// Add a validated RDF metadata graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the path, triples, compact XML, or rebuilt package is invalid.
     pub fn add_rdf_graph(&mut self, path: Option<&str>, triples: &[Triple]) -> Result<String> {
         self.spreadsheet.add_rdf_graph(path, triples)
     }
 
+    /// Capture RDF metadata as an immutable, exact-package snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package, manifest, or a declared graph is invalid.
+    pub fn rdf_snapshot(&self) -> Result<crate::metadata_graphs::Snapshot> {
+        self.spreadsheet.rdf_snapshot()
+    }
+
+    /// Apply an exact-source reversible RDF graph patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a stale patch or invalid candidate package.
+    pub fn apply_rdf_patch(&mut self, patch: &crate::metadata_graphs::Patch) -> Result<()> {
+        self.spreadsheet.apply_rdf_patch(patch)
+    }
+
+    /// Clone-stage RDF graph and triple CRUD and publish it as one package edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the closure or a staged package rebuild fails.
+    pub fn edit_rdf<F>(&mut self, edit: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::metadata_graphs::Edit) -> Result<()>,
+    {
+        let snapshot = self.rdf_snapshot()?;
+        let mut transaction = snapshot.edit();
+        edit(&mut transaction)?;
+        self.spreadsheet
+            .apply_rdf_patch(transaction.commit().patch())
+    }
+
+    /// Replace one complete RDF metadata graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the graph, triples, compact XML, or rebuilt package is invalid.
     pub fn replace_rdf_graph(&mut self, path: &str, triples: &[Triple]) -> Result<()> {
         self.spreadsheet.replace_rdf_graph(path, triples)
     }
 
+    /// Remove one unreferenced RDF metadata graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the graph is missing, referenced, or package rebuilding fails.
     pub fn remove_rdf_graph(&mut self, path: &str) -> Result<()> {
         self.spreadsheet.remove_rdf_graph(path)
     }

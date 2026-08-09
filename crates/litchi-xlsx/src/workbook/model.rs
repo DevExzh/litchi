@@ -833,6 +833,16 @@ impl Worksheet {
         worksheet::page_margins(self)
     }
 
+    /// Parse the direct horizontal and vertical worksheet page breaks.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the worksheet XML or page-break values are
+    /// malformed, unsafe, or out of bounds.
+    pub fn page_breaks(&self) -> Result<crate::page_breaks::PageBreaks> {
+        worksheet::page_breaks(self)
+    }
+
     /// Parse worksheet page setup.
     pub fn page_setup(&self) -> Result<Option<crate::page_setup::Setup>> {
         worksheet::page_setup(self)

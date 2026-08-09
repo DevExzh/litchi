@@ -3,9 +3,27 @@
 //! The crate deliberately separates mathematical integrity from PKI trust.
 //! Parsing and verification never fetch certificates, execute document content,
 //! or consult an async runtime. Container crates resolve signed bytes; this
-//! crate owns bounded XMLDSig processing and cryptographic key handling.
+//! crate owns bounded `XMLDSig` processing and cryptographic key handling.
 
 #![forbid(unsafe_code)]
+#![allow(
+    clippy::missing_errors_doc,
+    reason = "all fallible public APIs use the crate's typed Error taxonomy documented at the variant level"
+)]
+#![allow(
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    reason = "signature codecs reuse XML and container field names in short, non-overlapping scopes"
+)]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        reason = "unit-test fixture construction and assertions panic by design"
+    )
+)]
 
 pub mod cfb;
 pub mod xml;
@@ -77,6 +95,7 @@ pub struct Limits {
 
 impl Limits {
     /// Conservative defaults suitable for untrusted Office documents.
+    #[must_use]
     pub fn standard() -> Self {
         Self {
             signature_bytes: 8 * 1024 * 1024,
@@ -185,30 +204,37 @@ impl Limits {
         Ok(self)
     }
 
+    #[must_use]
     pub fn max_signature_bytes(&self) -> usize {
         self.signature_bytes
     }
 
+    #[must_use]
     pub fn max_references(&self) -> usize {
         self.references
     }
 
+    #[must_use]
     pub fn max_cfb_bytes(&self) -> usize {
         self.cfb_bytes
     }
 
+    #[must_use]
     pub fn max_cfb_entries(&self) -> usize {
         self.cfb_entries
     }
 
+    #[must_use]
     pub fn max_cfb_depth(&self) -> usize {
         self.cfb_depth
     }
 
+    #[must_use]
     pub fn max_cfb_streams(&self) -> usize {
         self.cfb_streams
     }
 
+    #[must_use]
     pub fn max_signatures(&self) -> usize {
         self.signatures
     }
@@ -225,14 +251,17 @@ impl Limits {
         self.attributes
     }
 
+    #[must_use]
     pub fn max_certificate_bytes(&self) -> usize {
         self.certificate_bytes
     }
 
+    #[must_use]
     pub fn max_certificates(&self) -> usize {
         self.certificates
     }
 
+    #[must_use]
     pub fn max_total_certificate_bytes(&self) -> usize {
         self.total_certificate_bytes
     }
@@ -245,14 +274,6 @@ impl Limits {
 impl Default for Limits {
     fn default() -> Self {
         Self::standard()
-    }
-}
-
-fn positive(value: usize, description: &str) -> Result<usize> {
-    if value == 0 {
-        Err(Error::Limit(format!("{description} must be non-zero")))
-    } else {
-        Ok(value)
     }
 }
 
@@ -272,6 +293,7 @@ pub struct Policy {
 }
 
 impl Policy {
+    #[must_use]
     pub fn compatible() -> Self {
         Self {
             weak: Weak::Allow,
@@ -280,6 +302,7 @@ impl Policy {
         }
     }
 
+    #[must_use]
     pub fn strict() -> Self {
         Self {
             weak: Weak::Reject,
@@ -288,15 +311,18 @@ impl Policy {
         }
     }
 
+    #[must_use]
     pub fn with_limits(mut self, limits: Limits) -> Self {
         self.limits = limits;
         self
     }
 
+    #[must_use]
     pub fn limits(&self) -> &Limits {
         &self.limits
     }
 
+    #[must_use]
     pub fn weak(&self) -> Weak {
         self.weak
     }
@@ -304,6 +330,7 @@ impl Policy {
     /// Whether a cryptographically valid signed subset is reportable rather
     /// than rejected. Compatibility mode permits this because real Office
     /// producers omit some package parts and relationship IDs.
+    #[must_use]
     pub fn allows_partial_coverage(&self) -> bool {
         self.partial
     }
@@ -352,6 +379,7 @@ pub struct Cert {
 }
 
 impl Cert {
+    #[must_use]
     pub fn der(&self) -> &[u8] {
         &self.der
     }
@@ -366,14 +394,17 @@ pub struct Reference {
 }
 
 impl Reference {
+    #[must_use]
     pub fn uri(&self) -> &str {
         &self.uri
     }
 
+    #[must_use]
     pub fn status(&self) -> Status {
         self.status
     }
 
+    #[must_use]
     pub fn coverage(&self) -> Coverage {
         self.coverage
     }
@@ -393,34 +424,42 @@ pub struct Report {
 }
 
 impl Report {
+    #[must_use]
     pub fn integrity(&self) -> Status {
         self.integrity
     }
 
+    #[must_use]
     pub fn signature(&self) -> Status {
         self.signature
     }
 
+    #[must_use]
     pub fn trust(&self) -> Trust {
         self.trust
     }
 
+    #[must_use]
     pub fn coverage(&self) -> Coverage {
         self.coverage
     }
 
+    #[must_use]
     pub fn references(&self) -> &[Reference] {
         &self.references
     }
 
+    #[must_use]
     pub fn certificates(&self) -> &[Cert] {
         &self.certificates
     }
 
+    #[must_use]
     pub fn uses_sha1(&self) -> bool {
         self.uses_sha1
     }
 
+    #[must_use]
     pub fn time(&self) -> Option<&str> {
         self.time.as_deref()
     }
@@ -517,6 +556,7 @@ impl Signer {
     }
 
     /// Consume a P-256 private key.
+    #[must_use]
     pub fn p256(key: EcSigningKey) -> Self {
         Self {
             key: Key::P256(key),
@@ -527,6 +567,10 @@ impl Signer {
     }
 
     /// Parse a zeroizing PKCS#8 RSA buffer once and retain the parsed key.
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "consuming the sensitive buffer guarantees it is zeroized when parsing finishes"
+    )]
     pub fn rsa_pkcs8(der: Zeroizing<Vec<u8>>) -> Result<Self> {
         let key =
             RsaPrivateKey::from_pkcs8_der(&der).map_err(|error| Error::Key(error.to_string()))?;
@@ -534,6 +578,10 @@ impl Signer {
     }
 
     /// Parse a zeroizing PKCS#8 P-256 buffer once and retain the parsed key.
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "consuming the sensitive buffer guarantees it is zeroized when parsing finishes"
+    )]
     pub fn p256_pkcs8(der: Zeroizing<Vec<u8>>) -> Result<Self> {
         let key =
             EcSigningKey::from_pkcs8_der(&der).map_err(|error| Error::Key(error.to_string()))?;
@@ -588,11 +636,13 @@ impl Signer {
         Ok(self)
     }
 
+    #[must_use]
     pub fn canon(mut self, value: xml::Canon) -> Self {
         self.canon = value;
         self
     }
 
+    #[must_use]
     pub fn method(&self) -> xml::Method {
         match self.key {
             Key::Rsa { .. } => xml::Method::RsaSha256,
@@ -600,14 +650,17 @@ impl Signer {
         }
     }
 
+    #[must_use]
     pub fn certificates(&self) -> &[Vec<u8>] {
         &self.certificates
     }
 
+    #[must_use]
     pub fn signing_time(&self) -> Option<&str> {
         self.time.as_deref()
     }
 
+    #[must_use]
     pub fn canonicalization(&self) -> xml::Canon {
         self.canon
     }
@@ -666,6 +719,14 @@ impl Signer {
             Key::Rsa { .. } => None,
             Key::P256(key) => Some(key.verifying_key()),
         }
+    }
+}
+
+fn positive(value: usize, description: &str) -> Result<usize> {
+    if value == 0 {
+        Err(Error::Limit(format!("{description} must be non-zero")))
+    } else {
+        Ok(value)
     }
 }
 

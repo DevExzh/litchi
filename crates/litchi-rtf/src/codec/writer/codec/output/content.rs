@@ -15,6 +15,45 @@ use super::super::{
     TabAlignment, TabLeader, TabStop, TextDirection, UnderlineStyle, Write, io,
 };
 
+fn explicit_shading_pattern_word(
+    pattern: ShadingPattern,
+    character: bool,
+) -> io::Result<&'static str> {
+    let word = match (character, pattern) {
+        (false, ShadingPattern::Horizontal) => "bghoriz",
+        (false, ShadingPattern::Vertical) => "bgvert",
+        (false, ShadingPattern::ForwardDiagonal) => "bgfdiag",
+        (false, ShadingPattern::BackwardDiagonal) => "bgbdiag",
+        (false, ShadingPattern::Cross) => "bgcross",
+        (false, ShadingPattern::DiagonalCross) => "bgdcross",
+        (false, ShadingPattern::DarkHorizontal) => "bgdkhoriz",
+        (false, ShadingPattern::DarkVertical) => "bgdkvert",
+        (false, ShadingPattern::DarkForwardDiagonal) => "bgdkfdiag",
+        (false, ShadingPattern::DarkBackwardDiagonal) => "bgdkbdiag",
+        (false, ShadingPattern::DarkCross) => "bgdkcross",
+        (false, ShadingPattern::DarkDiagonalCross) => "bgdkdcross",
+        (true, ShadingPattern::Horizontal) => "chbghoriz",
+        (true, ShadingPattern::Vertical) => "chbgvert",
+        (true, ShadingPattern::ForwardDiagonal) => "chbgfdiag",
+        (true, ShadingPattern::BackwardDiagonal) => "chbgbdiag",
+        (true, ShadingPattern::Cross) => "chbgcross",
+        (true, ShadingPattern::DiagonalCross) => "chbgdcross",
+        (true, ShadingPattern::DarkHorizontal) => "chbgdkhoriz",
+        (true, ShadingPattern::DarkVertical) => "chbgdkvert",
+        (true, ShadingPattern::DarkForwardDiagonal) => "chbgdkfdiag",
+        (true, ShadingPattern::DarkBackwardDiagonal) => "chbgdkbdiag",
+        (true, ShadingPattern::DarkCross) => "chbgdkcross",
+        (true, ShadingPattern::DarkDiagonalCross) => "chbgdkdcross",
+        _ => {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "numeric RTF shading pattern cannot use an explicit pattern control",
+            ));
+        },
+    };
+    Ok(word)
+}
+
 impl<W: Write> RtfWriter<W> {
     /// Write one inert generated list-marker destination.
     ///
@@ -482,9 +521,17 @@ impl<W: Write> RtfWriter<W> {
             shading
                 .validate()
                 .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
-            self.write_control_word("chshdng", Some(i32::from(shading.amount)))?;
-            self.write_control_word("chcfpat", Some(i32::from(shading.foreground_color)))?;
-            self.write_control_word("chcbpat", Some(i32::from(shading.background_color)))?;
+            if let Some(amount) = shading.amount {
+                self.write_control_word("chshdng", Some(i32::from(amount)))?;
+            } else if let Some(pattern) = shading.pattern {
+                self.write_control_word(explicit_shading_pattern_word(pattern, true)?, None)?;
+            }
+            if let Some(color) = shading.foreground_color {
+                self.write_control_word("chcfpat", Some(i32::from(color)))?;
+            }
+            if let Some(color) = shading.background_color {
+                self.write_control_word("chcbpat", Some(i32::from(color)))?;
+            }
         }
 
         // Bold
@@ -1174,16 +1221,13 @@ impl<W: Write> RtfWriter<W> {
             (None, Some(ShadingPattern::Percent87)) => Some(8750),
             (None, Some(ShadingPattern::Percent90)) => Some(9000),
             (None, Some(ShadingPattern::Percent95)) => Some(9500),
-            (None, Some(_)) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "explicit paragraph shading patterns are not representable by the numeric shading family",
-                ));
-            },
+            (None, Some(_)) => None,
         };
 
         if let Some(pattern_value) = pattern_value {
             self.write_control_word("shading", Some(pattern_value))?;
+        } else if let Some(pattern) = shading.pattern {
+            self.write_control_word(explicit_shading_pattern_word(pattern, false)?, None)?;
         }
 
         // Foreground color

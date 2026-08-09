@@ -219,9 +219,18 @@ impl Location {
                     let full_end = event_end;
                     match open.kind {
                         ElementKind::Sheet => {
-                            let index = open.sheet_index.expect("sheet index");
-                            sheets[index].start.full = open.info.start.start..full_end;
-                            sheets[index].end_start = Some(event_start);
+                            let index = open.sheet_index.ok_or_else(|| {
+                                Error::InvalidFormat(
+                                    "ODS protection sheet index is missing".to_string(),
+                                )
+                            })?;
+                            let sheet = sheets.get_mut(index).ok_or_else(|| {
+                                Error::InvalidFormat(
+                                    "ODS protection sheet index is out of bounds".to_string(),
+                                )
+                            })?;
+                            sheet.start.full = open.info.start.start..full_end;
+                            sheet.end_start = Some(event_start);
                         },
                         ElementKind::Protection => {
                             if let Some(index) = open.sheet_index {

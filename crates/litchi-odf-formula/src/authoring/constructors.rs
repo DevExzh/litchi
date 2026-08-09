@@ -79,11 +79,11 @@ impl Display {
     }
 }
 
-fn element(local_name: &str) -> Element {
-    Element::new(local_name).unwrap_or_else(|_| unreachable!("builder element names are valid"))
+fn element(local_name: &'static str) -> Element {
+    Element::fixed_mathml(local_name)
 }
 
-fn token(local_name: &str, text: &str) -> Element {
+fn token(local_name: &'static str, text: &str) -> Element {
     let mut element = element(local_name);
     element.push_text(text);
     element
@@ -96,17 +96,10 @@ pub fn identifier(text: &str) -> Element {
 }
 
 /// An `mi` identifier token with an explicit `mathvariant`.
-///
-/// # Panics
-///
-/// Panics only on an internal invariant violation: the fixed attribute name
-/// is statically valid.
 #[must_use]
 pub fn identifier_with_variant(text: &str, variant: Variant) -> Element {
     let mut element = identifier(text);
-    element
-        .set_attribute(None, "mathvariant", variant.as_str())
-        .unwrap_or_else(|_| unreachable!("fixed attribute name is valid"));
+    element.set_fixed_attribute("mathvariant", variant.as_str());
     element
 }
 
@@ -129,20 +122,11 @@ pub fn literal_text(text: &str) -> Element {
 }
 
 /// An `ms` string literal token with the given quote characters.
-///
-/// # Panics
-///
-/// Panics only on an internal invariant violation: the fixed attribute names
-/// are statically valid.
 #[must_use]
 pub fn string_literal(text: &str, left_quote: &str, right_quote: &str) -> Element {
     let mut element = token("ms", text);
-    element
-        .set_attribute(None, "lquote", left_quote)
-        .unwrap_or_else(|_| unreachable!("fixed attribute name is valid"));
-    element
-        .set_attribute(None, "rquote", right_quote)
-        .unwrap_or_else(|_| unreachable!("fixed attribute name is valid"));
+    element.set_fixed_attribute("lquote", left_quote);
+    element.set_fixed_attribute("rquote", right_quote);
     element
 }
 
@@ -210,7 +194,7 @@ pub fn under_over(base: Element, underscript: Element, overscript: Element) -> E
     row_schemata("munderover", [base, underscript, overscript])
 }
 
-fn row_schemata<const N: usize>(local_name: &str, children: [Element; N]) -> Element {
+fn row_schemata<const N: usize>(local_name: &'static str, children: [Element; N]) -> Element {
     let mut element = element(local_name);
     for child in children {
         element.push_child(child);
@@ -219,26 +203,15 @@ fn row_schemata<const N: usize>(local_name: &str, children: [Element; N]) -> Ele
 }
 
 /// An `mfenced` with explicit open/close characters and separators.
-///
-/// # Panics
-///
-/// Panics only on an internal invariant violation: the fixed attribute names
-/// are statically valid.
 #[must_use]
 pub fn fenced(children: Vec<Element>, open: &str, close: &str, separators: &str) -> Element {
     let mut element = element("mfenced");
     for child in children {
         element.push_child(child);
     }
-    element
-        .set_attribute(None, "open", open)
-        .unwrap_or_else(|_| unreachable!("fixed attribute name is valid"));
-    element
-        .set_attribute(None, "close", close)
-        .unwrap_or_else(|_| unreachable!("fixed attribute name is valid"));
-    element
-        .set_attribute(None, "separators", separators)
-        .unwrap_or_else(|_| unreachable!("fixed attribute name is valid"));
+    element.set_fixed_attribute("open", open);
+    element.set_fixed_attribute("close", close);
+    element.set_fixed_attribute("separators", separators);
     element
 }
 
@@ -260,20 +233,13 @@ pub fn table(rows: Vec<Vec<Element>>) -> Element {
 
 /// A `semantics` wrapper pairing presentation content with an optional
 /// `StarMath` annotation (the `math:annotation` encoding `OpenOffice` writes).
-///
-/// # Panics
-///
-/// Panics only on an internal invariant violation: the fixed attribute name
-/// is statically valid.
 #[must_use]
 pub fn semantics(content: Element, starmath_source: Option<&str>) -> Element {
     let mut wrapper = element("semantics");
     wrapper.push_child(content);
     if let Some(source) = starmath_source {
         let mut annotation = element("annotation");
-        annotation
-            .set_attribute(None, "encoding", "StarMath 5.0")
-            .unwrap_or_else(|_| unreachable!("fixed attribute name is valid"));
+        annotation.set_fixed_attribute("encoding", "StarMath 5.0");
         annotation.push_text(source);
         wrapper.push_child(annotation);
     }
@@ -281,17 +247,10 @@ pub fn semantics(content: Element, starmath_source: Option<&str>) -> Element {
 }
 
 /// A `math` root element wrapping the body with the given display style.
-///
-/// # Panics
-///
-/// Panics only on an internal invariant violation: the fixed attribute name
-/// is statically valid.
 #[must_use]
 pub fn document_root(body: Element, display: Display) -> Element {
     let mut element = element("math");
-    element
-        .set_attribute(None, "display", display.as_str())
-        .unwrap_or_else(|_| unreachable!("fixed attribute name is valid"));
+    element.set_fixed_attribute("display", display.as_str());
     element.push_child(body);
     element
 }

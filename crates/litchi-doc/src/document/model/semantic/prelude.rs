@@ -11,6 +11,7 @@ pub(super) use crate::paragraph::{Paragraph, Run};
 pub(super) use crate::parts::associated_strings::DocumentAssociatedStrings;
 pub(super) use crate::parts::auto_summary::DocumentAutoSummary;
 pub(super) use crate::parts::captions::CaptionTables;
+pub(super) use crate::parts::document_properties::DocumentProperties;
 pub(super) use crate::parts::embedded_fonts::DocumentEmbeddedFonts;
 pub(super) use crate::parts::fib::FileInformationBlock;
 pub(super) use crate::parts::fields::{

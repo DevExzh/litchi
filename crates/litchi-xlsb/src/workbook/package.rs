@@ -31,23 +31,65 @@ const CHART_SHEET_RELATIONSHIP_TYPES: &[&str] = &[
 ];
 
 impl Workbook {
-    /// Read the source-bound, editable `BrtCellReal` values on one worksheet.
+    /// Read source-bound, editable stored values on one worksheet.
     ///
-    /// This is deliberately limited to existing finite IEEE-754 value fields;
-    /// it does not create cells or alter formulas, strings, RK values, or
-    /// styles.
+    /// This inventories ordinary scalar cells and formula cached results. It
+    /// neither creates cells nor changes formula tokens or storage families.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid worksheet selector or malformed stream.
     pub fn cell_values(&self, worksheet_index: usize) -> Result<cell_values::Snapshot> {
-        let uri = self.worksheet_uri(worksheet_index)?;
-        cell_values::workbook::read(&self.package, &uri)
+        self.cell_values_with_limits(worksheet_index, cell_values::Limits::DEFAULT)
     }
 
-    /// Start a detached, source-checked edit of existing `BrtCellReal` values.
+    /// Read source-bound cell values using an explicit finite policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid worksheet selector, malformed stream,
+    /// or exceeded cell-value resource limit.
+    pub fn cell_values_with_limits(
+        &self,
+        worksheet_index: usize,
+        limits: cell_values::Limits,
+    ) -> Result<cell_values::Snapshot> {
+        let uri = self.worksheet_uri(worksheet_index)?;
+        cell_values::workbook::read_with_limits(&self.package, &uri, limits)
+    }
+
+    /// Start a detached, source-checked edit of existing stored cell values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid worksheet selector or malformed stream.
     pub fn edit_cell_values(&self, worksheet_index: usize) -> Result<cell_values::Edit> {
         Ok(self.cell_values(worksheet_index)?.edit())
     }
 
-    /// Apply an exact-source numeric-cell commit and refresh this workbook's
+    /// Start a detached cell-value edit using an explicit finite policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid worksheet selector, malformed stream,
+    /// or exceeded cell-value resource limit.
+    pub fn edit_cell_values_with_limits(
+        &self,
+        worksheet_index: usize,
+        limits: cell_values::Limits,
+    ) -> Result<cell_values::Edit> {
+        Ok(self
+            .cell_values_with_limits(worksheet_index, limits)?
+            .edit())
+    }
+
+    /// Apply an exact-source cell-value commit and refresh this workbook's
     /// typed sheet cache only after whole-workbook readback succeeds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid worksheet selector, stale commit,
+    /// invalid contextual index, or failed whole-workbook readback.
     pub fn apply_cell_values(
         &mut self,
         worksheet_index: usize,
@@ -60,9 +102,50 @@ impl Workbook {
         Ok(snapshot)
     }
 
-    /// Read editable numeric values from a worksheet selected by exact name.
+    /// Read editable cell values from a worksheet selected by exact name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid worksheet name or malformed stream.
     pub fn cell_values_by_name(&self, worksheet_name: &str) -> Result<cell_values::Snapshot> {
         self.cell_values(self.worksheet_index(worksheet_name)?)
+    }
+
+    /// Read editable cell values by exact name using an explicit finite policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid worksheet name, malformed stream, or
+    /// exceeded cell-value resource limit.
+    pub fn cell_values_by_name_with_limits(
+        &self,
+        worksheet_name: &str,
+        limits: cell_values::Limits,
+    ) -> Result<cell_values::Snapshot> {
+        self.cell_values_with_limits(self.worksheet_index(worksheet_name)?, limits)
+    }
+
+    /// Start a detached cell-value edit on a worksheet selected by exact name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid worksheet name or malformed stream.
+    pub fn edit_cell_values_by_name(&self, worksheet_name: &str) -> Result<cell_values::Edit> {
+        Ok(self.cell_values_by_name(worksheet_name)?.edit())
+    }
+
+    /// Apply an exact-source cell-value commit to a worksheet selected by name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid worksheet name, stale commit, invalid
+    /// contextual style/shared-string index, or failed whole-workbook readback.
+    pub fn apply_cell_values_by_name(
+        &mut self,
+        worksheet_name: &str,
+        commit: &cell_values::Commit,
+    ) -> Result<cell_values::Snapshot> {
+        self.apply_cell_values(self.worksheet_index(worksheet_name)?, commit)
     }
 
     /// Read the optional sparkline groups selected by zero-based worksheet

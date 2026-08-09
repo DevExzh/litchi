@@ -16,6 +16,7 @@
 pub mod actions;
 pub mod animations;
 pub mod backgrounds;
+pub mod change_tracking;
 pub mod chart;
 pub mod comments;
 pub mod custom;
