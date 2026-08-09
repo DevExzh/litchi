@@ -459,6 +459,21 @@ impl Relationships {
         self.rels.remove(r_id)
     }
 
+    /// Change the target reference of an existing relationship without
+    /// changing its identifier, type, or target mode.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `r_id` does not identify a relationship in this
+    /// collection.
+    pub fn retarget(&mut self, r_id: &str, target_ref: String) -> Result<()> {
+        let relationship = self.rels.get_mut(r_id).ok_or_else(|| {
+            OpcError::RelationshipNotFound(format!("relationship '{r_id}' was not found"))
+        })?;
+        relationship.target_ref = target_ref;
+        Ok(())
+    }
+
     pub(crate) fn retain(&mut self, mut keep: impl FnMut(&Relationship) -> bool) {
         self.rels.retain(|_, relationship| keep(relationship));
     }

@@ -408,7 +408,13 @@ impl PackageTransaction {
         let kind = MutationKind::Checksum(binding);
         let reserved = self.preflight_mutation(story, occurrence, kind)?;
         self.transactions[story].set_binding_checksum(occurrence, binding, value)?;
-        self.finish_mutation(story, occurrence, kind, reserved);
+        self.finish_mutation(
+            story,
+            occurrence,
+            kind,
+            reserved,
+            transaction_has_mutation(&self.transactions[story], occurrence, kind),
+        );
         Ok(self)
     }
 
@@ -548,7 +554,13 @@ impl PackageTransaction {
             let kind = MutationKind::Checksum(binding);
             let reserved = self.preflight_mutation(story, occurrence, kind)?;
             self.transactions[story].set_binding_checksum(occurrence, binding, Some(checksum))?;
-            self.finish_mutation(story, occurrence, kind, reserved);
+            self.finish_mutation(
+                story,
+                occurrence,
+                kind,
+                reserved,
+                transaction_has_mutation(&self.transactions[story], occurrence, kind),
+            );
         }
         Ok(self)
     }
@@ -584,9 +596,16 @@ impl PackageTransaction {
         value: Option<super::FormattingAllowed>,
     ) -> Result<&mut Self> {
         let story = self.base.story_index(part)?;
-        let reserved = self.preflight_mutation(story, occurrence, MutationKind::Formatting)?;
+        let kind = MutationKind::Formatting;
+        let reserved = self.preflight_mutation(story, occurrence, kind)?;
         self.transactions[story].set_formatting_allowed(occurrence, value)?;
-        self.finish_mutation(story, occurrence, MutationKind::Formatting, reserved);
+        self.finish_mutation(
+            story,
+            occurrence,
+            kind,
+            reserved,
+            transaction_has_mutation(&self.transactions[story], occurrence, kind),
+        );
         Ok(self)
     }
 
@@ -616,7 +635,7 @@ impl PackageTransaction {
         after.extend(commits.iter().map(|commit| commit.snapshot().clone()));
         let changed = commits.iter().any(Commit::changed);
         let after_signatures = if changed {
-            unsigned_signature_token()?
+            unsigned_signature_token(self.base.limits.max_signature_bytes)?
         } else {
             self.base.signatures.clone()
         };
@@ -647,6 +666,7 @@ impl PackageTransaction {
         self.mutations
             .try_reserve(1)
             .map_err(alloc("content-control mutation index"))?;
+        self.transactions[story].try_reserve_edits(1)?;
         Ok(true)
     }
 
@@ -656,11 +676,39 @@ impl PackageTransaction {
         occurrence: usize,
         kind: MutationKind,
         reserved: bool,
+        queued: bool,
     ) {
-        if reserved {
+        if reserved && queued {
             self.mutations.insert((story, occurrence, kind));
+        } else if !queued {
+            self.mutations.remove(&(story, occurrence, kind));
         }
     }
+}
+
+fn transaction_has_mutation(
+    transaction: &Transaction,
+    occurrence: usize,
+    kind: MutationKind,
+) -> bool {
+    transaction.edits().any(|edit| match (kind, edit) {
+        (
+            MutationKind::Checksum(binding),
+            super::Edit::SetBindingChecksum {
+                occurrence: candidate,
+                binding: candidate_binding,
+                ..
+            },
+        ) => *candidate == occurrence && *candidate_binding == binding,
+        (
+            MutationKind::Formatting,
+            super::Edit::SetFormattingAllowed {
+                occurrence: candidate,
+                ..
+            },
+        ) => *candidate == occurrence,
+        _ => false,
+    })
 }
 
 /// Prepared package publication.
@@ -757,7 +805,11 @@ impl PackagePatch {
         let result_signatures = if self.is_noop() {
             self.before.signatures.clone()
         } else {
-            self.after_signatures.clone()
+            // Changed package publication is only valid after explicit
+            // unsigning. Construct the expected empty graph in the exact
+            // format produced by `signature_token`, rather than relying on
+            // a separately maintained byte representation.
+            unsigned_signature_token(self.before.limits.max_signature_bytes)?
         };
         Ok(Self {
             before: target,
@@ -1501,11 +1553,16 @@ fn contains_ascii_case_insensitive(value: &str, needle: &str) -> bool {
         .any(|candidate| candidate.eq_ignore_ascii_case(needle.as_bytes()))
 }
 
-fn unsigned_signature_token() -> Result<Arc<[u8]>> {
+fn unsigned_signature_token(limit: usize) -> Result<Arc<[u8]>> {
     let capacity = SIGNATURE_TOKEN_MAGIC
         .len()
         .checked_add(16)
         .ok_or_else(|| invalid("unsigned signature token size overflow"))?;
+    if capacity > limit {
+        return Err(invalid(
+            "signature graph exceeds configured stale-check limit",
+        ));
+    }
     let mut token = Vec::new();
     token
         .try_reserve_exact(capacity)
@@ -1803,6 +1860,12 @@ mod tests {
             .unwrap();
         let commit = transaction.commit().unwrap();
         let inverse = commit.patch().inverse().unwrap();
+        assert_eq!(
+            inverse.before.signatures.as_ref(),
+            unsigned_signature_token(PackageLimits::default().max_signature_bytes)
+                .unwrap()
+                .as_ref()
+        );
         package.apply_content_controls(&commit).unwrap();
         package.apply_content_control_patch(&inverse).unwrap();
         assert_eq!(
@@ -1822,6 +1885,57 @@ mod tests {
 
         assert!(package.apply_content_control_patch(&inverse).is_err());
         assert!(!inverse.is_applied());
+    }
+
+    #[test]
+    fn direct_setter_failures_leave_only_previously_queued_child_edits() {
+        let mut package = Package::new().unwrap();
+        let main = replace_main(
+            &mut package,
+            format!(
+                r#"<w:document xmlns:w="{W}"><w:body><w:sdt><w:sdtPr><w:dataBinding w:xpath="/one" w:storeItemID="{ITEM}"/></w:sdtPr><w:sdtContent/></w:sdt><w:sdt><w:sdtPr><w:dataBinding w:xpath="/two" w:storeItemID="{ITEM}"/></w:sdtPr><w:sdtContent/></w:sdt></w:body></w:document>"#,
+            )
+            .into_bytes(),
+        );
+        let snapshot = package
+            .content_control_snapshot_with_limits(PackageLimits {
+                max_mutations: 1,
+                ..PackageLimits::default()
+            })
+            .unwrap();
+        let mut transaction = snapshot.edit().unwrap();
+        let checksum = Checksum::from_word_value(0x1234_5678);
+
+        transaction
+            .set_binding_checksum(&main, 0, 0, Some(checksum.clone()))
+            .unwrap();
+        assert!(
+            transaction
+                .set_binding_checksum(&main, 1, 0, Some(checksum.clone()))
+                .is_err()
+        );
+        assert_eq!(transaction.transactions[0].edits().count(), 1);
+        assert_eq!(transaction.mutations.len(), 1);
+
+        // Coalescing back to the exact source releases the package quota.
+        transaction.set_binding_checksum(&main, 0, 0, None).unwrap();
+        assert_eq!(transaction.transactions[0].edits().count(), 0);
+        assert!(transaction.mutations.is_empty());
+        transaction
+            .set_binding_checksum(&main, 1, 0, Some(checksum))
+            .unwrap();
+        assert_eq!(transaction.transactions[0].edits().count(), 1);
+        assert_eq!(transaction.mutations.len(), 1);
+    }
+
+    #[test]
+    fn canonical_unsigned_signature_token_matches_empty_signature_inventory() {
+        let package = Package::new().unwrap();
+        let limit = PackageLimits::default().max_signature_bytes;
+        assert_eq!(
+            signature_token(package.opc_package(), limit).unwrap(),
+            unsigned_signature_token(limit).unwrap()
+        );
     }
 
     #[test]

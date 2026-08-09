@@ -39,6 +39,7 @@ pub use transaction::{Commit, Edit, Transaction};
 const WORD_2010_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/word/2010/wordml";
 const WORD_2012_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/word/2012/wordml";
 const MCE_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
+const MAX_SDT_ID: u32 = i32::MAX as u32;
 
 /// Semantic kind of a Word content control.
 ///
@@ -1009,11 +1010,13 @@ fn parse_direct_property(
     if is_wordprocessing_namespace(namespace) {
         match name.as_ref() {
             b"id" => {
-                set_once(
-                    &mut control.id,
-                    required_u32(element, b"val", decoder, resolver, "content-control ID")?,
-                    "content-control ID",
-                )?;
+                let id = required_u32(element, b"val", decoder, resolver, "content-control ID")?;
+                if id > MAX_SDT_ID {
+                    return Err(Error::InvalidFormat(
+                        "content-control ID exceeds the Int32Value maximum".to_string(),
+                    ));
+                }
+                set_once(&mut control.id, id, "content-control ID")?;
             },
             b"tag" => {
                 let value = required_word_attribute(element, b"val", decoder, resolver, "tag")?;

@@ -1,4 +1,4 @@
-use litchi_docx::content_control::{Inventory, Kind, Limits};
+use litchi_docx::content_control::{Inventory, Kind, Limits, Snapshot};
 
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
@@ -52,4 +52,33 @@ fn inactive_branch_still_counts_toward_raw_mce_security_limits() {
     limits.max_metadata_bytes = 0;
 
     assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_err());
+}
+
+#[test]
+fn process_content_wrapped_properties_keep_their_exact_active_source_span() {
+    let xml = format!(
+        r#"<w:document xmlns:w="{W}" xmlns:mc="{MC}" xmlns:x="urn:unsupported" mc:Ignorable="x" mc:ProcessContent="x:wrap"><w:body><x:wrap><w:sdtPr><w:id w:val="2147483647"/></w:sdtPr></x:wrap></w:body></w:document>"#
+    );
+
+    let inventory = Inventory::parse(xml.as_bytes()).unwrap();
+    assert_eq!(inventory.occurrences().len(), 1);
+    assert_eq!(inventory.occurrences()[0].id(), Some(i32::MAX as u32));
+
+    let snapshot = Snapshot::from_xml(xml.into_bytes()).unwrap();
+    assert_eq!(snapshot.occurrences().len(), 1);
+    let span = snapshot.occurrences()[0].properties();
+    assert_eq!(
+        &snapshot.source()[span.start()..span.end()],
+        br#"<w:sdtPr><w:id w:val="2147483647"/></w:sdtPr>"#
+    );
+}
+
+#[test]
+fn parsed_content_control_ids_reject_values_above_int32() {
+    let xml = format!(
+        r#"<w:document xmlns:w="{W}"><w:body><w:sdtPr><w:id w:val="2147483648"/></w:sdtPr></w:body></w:document>"#
+    );
+
+    assert!(Inventory::parse(xml.as_bytes()).is_err());
+    assert!(Snapshot::from_xml(xml.into_bytes()).is_err());
 }

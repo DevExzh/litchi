@@ -89,3 +89,35 @@ fn catalog_enforces_its_finite_limits() {
             .is_err()
     );
 }
+
+#[test]
+fn catalog_rejects_semantic_nodes_outside_their_canonical_collections() {
+    let database = Database::from_bytes(
+        litchi_odb::Builder::new()
+            .content_xml(
+                r#"<?xml version="1.0" encoding="UTF-8"?><o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:database:1.0"><o:body><o:database><d:data-source/><d:query d:name="wrong" d:command="SELECT 1"/></o:database></o:body></o:document-content>"#,
+            )
+            .build()
+            .unwrap(),
+    )
+    .unwrap();
+    assert!(database.catalog().is_err());
+}
+
+#[test]
+fn catalog_rejects_columns_beyond_the_configured_budget_before_insertion() {
+    let database = Database::from_bytes(
+        litchi_odb::Builder::new()
+            .content_xml(
+                r#"<?xml version="1.0" encoding="UTF-8"?><o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:database:1.0"><o:body><o:database><d:data-source/><d:table-representations><d:table-representation d:name="ledger"><d:columns><d:column d:name="amount"/></d:columns></d:table-representation></d:table-representations></o:database></o:body></o:document-content>"#,
+            )
+            .build()
+            .unwrap(),
+    )
+    .unwrap();
+    assert!(
+        database
+            .catalog_with(Limits::default().with_max_columns(0))
+            .is_err()
+    );
+}

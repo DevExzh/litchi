@@ -1,5 +1,7 @@
 //! Inert ODB table presentation and schema declarations.
 
+use litchi_core::{Error, Result};
+
 /// The ODF declaration from which a table was read.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TableKind {
@@ -44,8 +46,15 @@ impl Table {
         }
     }
 
-    pub(crate) fn push_column(&mut self, column: Column) {
+    pub(crate) fn try_push_column(&mut self, column: Column) -> Result<()> {
+        self.columns
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "ODB table columns",
+                source,
+            })?;
         self.columns.push(column);
+        Ok(())
     }
 
     /// Returns the producer-visible table name.

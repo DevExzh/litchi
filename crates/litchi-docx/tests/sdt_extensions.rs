@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use litchi_docx::content_control::{
-    Checksum, ChecksumStatus, FormattingAllowed, Inventory, Limits, PackageChecksumStatus,
-    PackageLimits, Snapshot,
+    Checksum, ChecksumStatus, ChecksumValue, FormattingAllowed, Inventory, Limits,
+    PackageChecksumStatus, PackageLimits, Snapshot,
 };
 use litchi_docx::custom_xml::NewStore;
 use litchi_docx::package::{StoryDialect, StoryKind, StoryLimits};
@@ -200,11 +200,24 @@ fn checksum_equality_is_semantic_while_source_lexical_provenance_is_retained() {
     let parsed = Checksum::parse("OOMLvQ==").unwrap();
     assert_eq!(authored.original_lexical(), None);
     assert_eq!(parsed.original_lexical(), Some("OOMLvQ=="));
+    assert_eq!(authored.lexical(), "OOMLvQ==");
+    assert_eq!(parsed.lexical(), "OOMLvQ==");
     assert_eq!(authored, parsed);
 
     let mut values = HashSet::new();
-    values.insert(authored);
-    values.insert(parsed);
+    values.insert(authored.clone());
+    values.insert(parsed.clone());
+    assert_eq!(values.len(), 1);
+
+    let authored_value = ChecksumValue::Valid(authored);
+    let parsed_value = ChecksumValue::Valid(parsed);
+    assert_eq!(authored_value.lexical(), "OOMLvQ==");
+    assert_eq!(parsed_value.lexical(), "OOMLvQ==");
+    assert_eq!(authored_value, parsed_value);
+
+    let mut values = HashSet::new();
+    values.insert(authored_value);
+    values.insert(parsed_value);
     assert_eq!(values.len(), 1);
 }
 

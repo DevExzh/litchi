@@ -280,3 +280,25 @@ impl ToMarkdown for Table {
         Ok(writer.finish().trim_end().to_string())
     }
 }
+
+#[cfg(all(test, feature = "doc"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn real_doc_inline_images_are_refused_in_plain_output() -> Result<()> {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/ole/doc/testPictures.doc");
+        let document = Document::open(path)?;
+        for options in [
+            MarkdownOptions::new(),
+            MarkdownOptions::new().with_styles(false),
+        ] {
+            assert!(matches!(
+                document.to_markdown_with_options(&options),
+                Err(Error::Unsupported(_))
+            ));
+        }
+        Ok(())
+    }
+}

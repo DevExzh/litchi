@@ -178,6 +178,19 @@ impl Document {
                 if !document.footnotes().map_err(Error::from)?.is_empty() {
                     return Err(unsupported("DOC footnotes"));
                 }
+                for element in document.elements().map_err(Error::from)? {
+                    let litchi_doc::Element::Paragraph(paragraph) = element else {
+                        continue;
+                    };
+                    if paragraph
+                        .runs()
+                        .map_err(Error::from)?
+                        .iter()
+                        .any(litchi_doc::Run::has_image)
+                    {
+                        return Err(unsupported("DOC inline images"));
+                    }
+                }
             },
             #[cfg(feature = "docx")]
             DocumentImpl::Docx(package, _) => {

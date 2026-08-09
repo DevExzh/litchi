@@ -39,7 +39,7 @@ pub use model::tracked_changes;
 pub use model::{dde, scenario};
 pub use settings::{Iteration, IterationStatus, NullDate, Settings};
 pub use source_features::{
-    Drawing, DrawingKind, Hyperlink as SourceHyperlink, Sheet as SourceSheet,
-    Snapshot as SourceFeatures,
+    Drawing, DrawingKind, Hyperlink as SourceHyperlink, Limits as SourceFeatureLimits,
+    Sheet as SourceSheet, Snapshot as SourceFeatures,
 };
 pub use worksheet::{Cell, CellValue, CellView, Merge, Row, Sheet};

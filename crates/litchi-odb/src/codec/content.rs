@@ -13,6 +13,15 @@ const MAX_CONTENT_BYTES: usize = 256 * 1024 * 1024;
 const MAX_DEPTH: usize = 512;
 const MAX_EVENTS: usize = 1_000_000;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Element {
+    Document,
+    Body,
+    Database,
+    DataSource,
+    Other,
+}
+
 /// Validate a UTF-8 content part before authoring it into a package.
 pub(crate) fn validate(xml: &str) -> Result<()> {
     if xml.len() > MAX_CONTENT_BYTES {
@@ -87,7 +96,12 @@ pub(crate) fn validate(xml: &str) -> Result<()> {
                 return Err(invalid("DOCTYPE is not permitted in ODB content.xml"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -104,15 +118,6 @@ pub(crate) fn validate(xml: &str) -> Result<()> {
         ));
     }
     Ok(())
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Element {
-    Document,
-    Body,
-    Database,
-    DataSource,
-    Other,
 }
 
 fn classify(

@@ -11,6 +11,44 @@ impl Document {
         take(self)
     }
 
+    pub(crate) fn transaction_package(&self) -> &OwnedPackage {
+        &self.package
+    }
+
+    pub(crate) fn transaction_content_xml(&self) -> &str {
+        self.content.xml_content()
+    }
+
+    pub(crate) fn transaction_styles_xml(&self) -> Option<&str> {
+        self.styles.as_ref().map(Styles::xml_content)
+    }
+
+    pub(crate) fn replace_transaction_bytes(&mut self, bytes: Vec<u8>) -> Result<()> {
+        *self = Self::from_bytes(bytes)?;
+        Ok(())
+    }
+
+    pub(super) fn publish_transaction(&mut self, commit: crate::transaction::Commit) -> Result<()> {
+        *self = commit.into_snapshot().document()?;
+        Ok(())
+    }
+
+    pub(super) fn publish_transaction_path(
+        &mut self,
+        commit: crate::transaction::Commit,
+    ) -> Result<String> {
+        let path = match commit.results().last() {
+            Some(crate::transaction::OperationResult::Path(path)) => path.clone(),
+            _ => {
+                return Err(Error::InvalidFormat(
+                    "ODT transaction did not return an allocated path".to_string(),
+                ));
+            },
+        };
+        self.publish_transaction(commit)?;
+        Ok(path)
+    }
+
     /// Open an ODT document from a file path.
     ///
     /// This method reads the entire file into memory and parses it. For large files,
@@ -141,6 +179,19 @@ impl Document {
         original_bytes(self)
     }
 
+    /// Captures this document as an immutable, source-bound transaction snapshot.
+    pub fn snapshot(&self) -> Result<crate::transaction::Snapshot> {
+        crate::transaction::Snapshot::from_document(self)
+    }
+
+    /// Starts a detached packaged-document transaction.
+    ///
+    /// This is the preferred mutation boundary for RDF graphs, form trees,
+    /// embedded charts and resources, and lossless inline text operations.
+    pub fn edit(&self) -> Result<crate::transaction::Edit> {
+        Ok(self.snapshot()?.edit())
+    }
+
     /// Create an ODT document from raw bytes (ZIP archive data).
     ///
     /// This is used for single-pass parsing where the ZIP archive has already
@@ -210,17 +261,20 @@ impl Document {
     ///
     /// Only `settings.xml` is changed; all other package parts remain under
     /// the package writer's lossless auxiliary-copy policy.
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Document::edit().set_protection() and commit"
+    )]
     pub fn set_protection(&mut self, policy: &crate::protection::Policy) -> Result<()> {
-        let before = self.protection()?;
-        if &before == policy {
-            return Ok(());
-        }
-        let mimetype = self.package.mimetype()?;
-        let bytes = crate::protection::rewrite_owned_package(&self.package, &mimetype, policy)?;
-        *self = Self::from_bytes(bytes)?;
-        Ok(())
+        let mut edit = self.edit()?;
+        edit.set_protection(policy)?;
+        self.publish_transaction(edit.commit()?)
     }
 
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Document::edit().add_rdf_graph() and commit"
+    )]
     pub fn add_rdf_graph(
         &mut self,
         preferred_path: Option<&str>,
@@ -231,54 +285,75 @@ impl Document {
         Ok(path)
     }
 
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Document::edit().replace_rdf_graph() and commit"
+    )]
     pub fn replace_rdf_graph(&mut self, path: &str, triples: &[crate::rdf::Triple]) -> Result<()> {
         let bytes = crate::rdf::replace_graph(&self.package, path, triples)?;
         *self = Self::from_bytes(bytes)?;
         Ok(())
     }
 
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Document::edit().remove_rdf_graph() and commit"
+    )]
     pub fn remove_rdf_graph(&mut self, path: &str) -> Result<()> {
         let bytes = crate::rdf::remove_graph(&self.package, path)?;
         *self = Self::from_bytes(bytes)?;
         Ok(())
     }
 
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Document::edit().add_rdf_triple() and Commit::results()"
+    )]
     pub fn add_rdf_triple(&mut self, path: &str, triple: &crate::rdf::Triple) -> Result<usize> {
-        let index = self
-            .rdf_graphs()?
-            .into_iter()
-            .find(|graph| graph.path == path)
-            .ok_or_else(|| Error::InvalidFormat(format!("RDF graph '{path}' was not found")))?
-            .triples
-            .len();
-        let (bytes, _) = crate::rdf::add_triple(&self.package, path, triple)?;
-        *self = Self::from_bytes(bytes)?;
+        let mut edit = self.edit()?;
+        edit.add_rdf_triple(path, triple)?;
+        let commit = edit.commit()?;
+        let index = transaction_index(&commit)?;
+        self.publish_transaction(commit)?;
         Ok(index)
     }
 
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Document::edit().replace_rdf_triple() and commit"
+    )]
     pub fn replace_rdf_triple(
         &mut self,
         path: &str,
         index: usize,
         triple: &crate::rdf::Triple,
     ) -> Result<()> {
-        let bytes = crate::rdf::replace_triple(&self.package, path, index, triple)?;
-        *self = Self::from_bytes(bytes)?;
-        Ok(())
+        let mut edit = self.edit()?;
+        edit.replace_rdf_triple(path, index, triple)?;
+        self.publish_transaction(edit.commit()?)
     }
 
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Document::edit().remove_rdf_triple() and commit"
+    )]
     pub fn remove_rdf_triple(&mut self, path: &str, index: usize) -> Result<()> {
-        let bytes = crate::rdf::remove_triple(&self.package, path, index)?;
-        *self = Self::from_bytes(bytes)?;
-        Ok(())
+        let mut edit = self.edit()?;
+        edit.remove_rdf_triple(path, index)?;
+        self.publish_transaction(edit.commit()?)
     }
 
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Document::edit().move_rdf_triple() and commit"
+    )]
     pub fn move_rdf_triple(&mut self, path: &str, from: usize, to: usize) -> Result<()> {
-        let bytes = crate::rdf::move_triple(&self.package, path, from, to)?;
-        *self = Self::from_bytes(bytes)?;
-        Ok(())
+        let mut edit = self.edit()?;
+        edit.move_rdf_triple(path, from, to)?;
+        self.publish_transaction(edit.commit()?)
     }
 
+    #[deprecated(since = "0.0.1", note = "use Document::edit().add_form() and commit")]
     pub fn add_form(
         &mut self,
         group_index: usize,
@@ -297,24 +372,27 @@ impl Document {
         Ok(index)
     }
 
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Document::edit().add_nested_form() and Commit::results()"
+    )]
     pub fn add_nested_form(
         &mut self,
         parent_form: usize,
         form: &crate::package::forms::AuthoredForm,
     ) -> Result<usize> {
-        let (bytes, index) = crate::package::forms::add_form(
-            &self.package,
-            self.content.xml_content(),
-            self.styles.as_ref().map(Styles::xml_content),
-            crate::package::forms::FormHost::Text,
-            0,
-            Some(parent_form),
-            form,
-        )?;
-        *self = Self::from_bytes(bytes)?;
+        let mut edit = self.edit()?;
+        edit.add_nested_form(parent_form, form)?;
+        let commit = edit.commit()?;
+        let index = transaction_index(&commit)?;
+        self.publish_transaction(commit)?;
         Ok(index)
     }
 
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Document::edit().replace_form() and commit"
+    )]
     pub fn replace_form(
         &mut self,
         index: usize,
@@ -331,6 +409,10 @@ impl Document {
         Ok(())
     }
 
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Document::edit().remove_form() and commit"
+    )]
     pub fn remove_form(&mut self, index: usize) -> Result<()> {
         let bytes = crate::package::forms::remove_form(
             &self.package,
@@ -342,6 +424,7 @@ impl Document {
         Ok(())
     }
 
+    #[deprecated(since = "0.0.1", note = "use Document::edit().move_form() and commit")]
     pub fn move_form(&mut self, from: usize, to: usize) -> Result<()> {
         let bytes = crate::package::forms::move_form(
             &self.package,
@@ -354,62 +437,66 @@ impl Document {
         Ok(())
     }
 
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Document::edit().add_form_control() and Commit::results()"
+    )]
     pub fn add_form_control(
         &mut self,
         form_index: usize,
         control: &crate::package::forms::AuthoredFormControl,
     ) -> Result<usize> {
-        let (bytes, index) = crate::package::forms::add_control(
-            &self.package,
-            self.content.xml_content(),
-            self.styles.as_ref().map(Styles::xml_content),
-            form_index,
-            control,
-        )?;
-        *self = Self::from_bytes(bytes)?;
+        let mut edit = self.edit()?;
+        edit.add_form_control(form_index, control)?;
+        let commit = edit.commit()?;
+        let index = transaction_index(&commit)?;
+        self.publish_transaction(commit)?;
         Ok(index)
     }
 
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Document::edit().replace_form_control() and commit"
+    )]
     pub fn replace_form_control(
         &mut self,
         index: usize,
         control: &crate::package::forms::AuthoredFormControl,
     ) -> Result<()> {
-        let bytes = crate::package::forms::replace_control(
-            &self.package,
-            self.content.xml_content(),
-            self.styles.as_ref().map(Styles::xml_content),
-            index,
-            control,
-        )?;
-        *self = Self::from_bytes(bytes)?;
-        Ok(())
+        let mut edit = self.edit()?;
+        edit.replace_form_control(index, control)?;
+        self.publish_transaction(edit.commit()?)
     }
 
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Document::edit().remove_form_control() and commit"
+    )]
     pub fn remove_form_control(&mut self, index: usize) -> Result<()> {
-        let bytes = crate::package::forms::remove_control(
-            &self.package,
-            self.content.xml_content(),
-            self.styles.as_ref().map(Styles::xml_content),
-            index,
-        )?;
-        *self = Self::from_bytes(bytes)?;
-        Ok(())
+        let mut edit = self.edit()?;
+        edit.remove_form_control(index)?;
+        self.publish_transaction(edit.commit()?)
     }
 
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Document::edit().move_form_control() and commit"
+    )]
     pub fn move_form_control(&mut self, from: usize, to: usize) -> Result<()> {
-        let bytes = crate::package::forms::move_control(
-            &self.package,
-            self.content.xml_content(),
-            self.styles.as_ref().map(Styles::xml_content),
-            from,
-            to,
-        )?;
-        *self = Self::from_bytes(bytes)?;
-        Ok(())
+        let mut edit = self.edit()?;
+        edit.move_form_control(from, to)?;
+        self.publish_transaction(edit.commit()?)
     }
 
     /// Append a packaged chart object to the text body.
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Document::edit().add_embedded_chart() and commit"
+    )]
+    #[allow(
+        deprecated,
+        reason = "compatibility wrapper delegates to explicit storage"
+    )]
     pub fn add_embedded_chart(&mut self, definition: &crate::odc::Definition) -> Result<usize> {
         self.add_embedded_chart_with_storage(
             definition,
@@ -418,23 +505,27 @@ impl Document {
     }
 
     /// Append a chart object using an explicit storage form.
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Document::edit().add_embedded_chart_with_storage() and Commit::results()"
+    )]
     pub fn add_embedded_chart_with_storage(
         &mut self,
         definition: &crate::odc::Definition,
         storage: crate::EmbeddedChartStorage,
     ) -> Result<usize> {
-        let (bytes, index) = crate::package::charts::add_embedded_chart(
-            &self.package,
-            self.content.xml_content(),
-            self.styles.as_ref().map(Styles::xml_content),
-            crate::package::charts::EmbeddedChartHost::Text,
-            storage,
-            definition,
-        )?;
-        *self = Self::from_bytes(bytes)?;
+        let mut edit = self.edit()?;
+        edit.add_embedded_chart_with_storage(definition, storage)?;
+        let commit = edit.commit()?;
+        let index = transaction_index(&commit)?;
+        self.publish_transaction(commit)?;
         Ok(index)
     }
 
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Document::edit().replace_embedded_chart() and commit"
+    )]
     pub fn replace_embedded_chart(
         &mut self,
         index: usize,
@@ -451,6 +542,10 @@ impl Document {
         Ok(())
     }
 
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Document::edit().remove_embedded_chart() and commit"
+    )]
     pub fn remove_embedded_chart(&mut self, index: usize) -> Result<()> {
         let bytes = crate::package::charts::remove_embedded_chart(
             &self.package,
@@ -463,6 +558,10 @@ impl Document {
     }
 
     /// Append an inert embedded object or image to the text body.
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Document::edit().add_embedded_resource() and commit"
+    )]
     pub fn add_embedded_resource(&mut self, resource: &crate::EmbeddedResource) -> Result<usize> {
         let (bytes, index) = crate::package::embedded::add(
             &self.package,
@@ -475,6 +574,10 @@ impl Document {
         Ok(index)
     }
 
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Document::edit().replace_embedded_object() and commit"
+    )]
     pub fn replace_embedded_object(
         &mut self,
         index: usize,
@@ -492,6 +595,10 @@ impl Document {
         Ok(())
     }
 
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Document::edit().replace_embedded_image() and commit"
+    )]
     pub fn replace_embedded_image(
         &mut self,
         index: usize,
@@ -509,6 +616,10 @@ impl Document {
         Ok(())
     }
 
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Document::edit().remove_embedded_object() and commit"
+    )]
     pub fn remove_embedded_object(&mut self, index: usize) -> Result<()> {
         let bytes = crate::package::embedded::remove(
             &self.package,
@@ -521,6 +632,10 @@ impl Document {
         Ok(())
     }
 
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Document::edit().remove_embedded_image() and commit"
+    )]
     pub fn remove_embedded_image(&mut self, index: usize) -> Result<()> {
         let bytes = crate::package::embedded::remove(
             &self.package,
@@ -533,6 +648,10 @@ impl Document {
         Ok(())
     }
 
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Document::edit().move_embedded_object() and commit"
+    )]
     pub fn move_embedded_object(&mut self, from: usize, to: usize) -> Result<()> {
         let bytes = crate::package::embedded::reorder(
             &self.package,
@@ -546,6 +665,10 @@ impl Document {
         Ok(())
     }
 
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Document::edit().move_embedded_image() and commit"
+    )]
     pub fn move_embedded_image(&mut self, from: usize, to: usize) -> Result<()> {
         let bytes = crate::package::embedded::reorder(
             &self.package,
@@ -627,4 +750,13 @@ pub(super) fn to_bytes(document: &Document) -> Result<Vec<u8>> {
 
 pub(super) fn get_file(document: &Document, path: &str) -> Result<Vec<u8>> {
     document.package.get_file(path)
+}
+
+fn transaction_index(commit: &crate::transaction::Commit) -> Result<usize> {
+    match commit.results().last() {
+        Some(crate::transaction::OperationResult::Index(index)) => Ok(*index),
+        _ => Err(Error::InvalidFormat(
+            "ODT transaction did not return an allocated index".to_string(),
+        )),
+    }
 }

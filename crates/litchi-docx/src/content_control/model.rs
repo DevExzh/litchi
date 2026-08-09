@@ -153,6 +153,9 @@ impl FormattingAllowed {
 }
 
 /// A valid Word 2020 custom-XML checksum.
+///
+/// Equality and hashing use the decoded four bytes. Parsed source lexical text is
+/// retained only as provenance, so it does not affect semantic identity.
 #[derive(Debug, Clone)]
 pub struct Checksum {
     bytes: [u8; 4],
@@ -202,6 +205,10 @@ impl Checksum {
     }
 
     /// Compute the checksum over exact, uncompressed and unencrypted part bytes.
+    ///
+    /// This follows the observed Word interoperability profile: CRC-32 with a
+    /// zero seed, represented as a little-endian integer before Base64 encoding.
+    /// The profile is not fully determined by the OOXML schema vocabulary alone.
     pub fn compute(data: &[u8], limits: &Limits) -> Result<Self> {
         limits.validate()?;
         if data.len() > limits.max_crc_bytes {
@@ -212,7 +219,10 @@ impl Checksum {
         Ok(Self::from_word_value(litchi_core::mso_crc32::compute(data)))
     }
 
-    /// Construct from the Word-compatible little-endian integer convention.
+    /// Construct from the Word interoperability profile's little-endian integer.
+    ///
+    /// This convention is an observed Word profile, not an interpretation fixed
+    /// solely by the OOXML schema vocabulary.
     #[must_use]
     pub const fn from_word_value(value: u32) -> Self {
         Self::from_bytes(value.to_le_bytes())
@@ -224,7 +234,7 @@ impl Checksum {
         &self.bytes
     }
 
-    /// Return the Word-compatible little-endian integer convention.
+    /// Return the Word interoperability profile's little-endian integer.
     #[must_use]
     pub const fn word_value(&self) -> u32 {
         u32::from_le_bytes(self.bytes)
@@ -234,6 +244,17 @@ impl Checksum {
     #[must_use]
     pub fn original_lexical(&self) -> Option<&str> {
         self.lexical.as_deref()
+    }
+
+    /// Return preserved source lexical text, or canonical authoring text.
+    ///
+    /// Parsed values borrow their exact source lexical form. Values constructed
+    /// in memory have no source provenance and therefore return an owned,
+    /// canonical Base64 representation instead.
+    #[must_use]
+    pub fn lexical(&self) -> Cow<'_, str> {
+        self.original_lexical()
+            .map_or_else(|| Cow::Owned(self.to_base64()), Cow::Borrowed)
     }
 
     /// Encode the canonical eight-character Base64 form.
@@ -257,13 +278,7 @@ impl Checksum {
 }
 
 fn encode(bytes: [u8; 4]) -> String {
-    let mut encoded = [0u8; 8];
-    let written = BASE64
-        .encode_slice(bytes, &mut encoded)
-        .expect("an eight-byte buffer always holds four Base64 bytes");
-    debug_assert_eq!(written, encoded.len());
-    // Base64 output is always ASCII.
-    String::from_utf8_lossy(&encoded).into_owned()
+    BASE64.encode(bytes)
 }
 
 fn invalid_checksum() -> Error {
@@ -296,13 +311,16 @@ impl ChecksumValue {
         }
     }
 
-    /// Return the exact source lexical form.
+    /// Return preserved source lexical text, or canonical authoring text.
+    ///
+    /// A valid parsed checksum borrows its original source lexical form. A valid
+    /// authored checksum has no source provenance, so this returns its owned,
+    /// canonical Base64 representation. Malformed values always borrow their
+    /// exact source text.
     #[must_use]
     pub fn lexical(&self) -> Cow<'_, str> {
         match self {
-            Self::Valid(value) => value
-                .original_lexical()
-                .map_or_else(|| Cow::Owned(value.to_base64()), Cow::Borrowed),
+            Self::Valid(value) => value.lexical(),
             Self::Malformed(value) => Cow::Borrowed(value),
         }
     }

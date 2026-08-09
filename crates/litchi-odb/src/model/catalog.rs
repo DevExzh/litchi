@@ -16,6 +16,10 @@ const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1
 const DATABASE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:database:1.0";
 
 /// Finite limits for semantic ODB catalog discovery.
+#[allow(
+    clippy::struct_field_names,
+    reason = "each field names its stable public max-setting builder counterpart"
+)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
     max_xml_bytes: usize,
@@ -183,8 +187,15 @@ enum Element {
     Body,
     Database,
     DataSource,
+    Queries,
+    QueryCollection,
     TableRepresentation,
+    TableRepresentations,
     TableDefinition,
+    TableDefinitions,
+    SchemaDefinition,
+    Columns,
+    ColumnDefinitions,
     Column,
     ColumnDefinition,
     Query,
@@ -196,6 +207,13 @@ struct Frame {
     element: Element,
     in_database: bool,
     table: Option<usize>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum NamespaceKind {
+    Office,
+    Database,
+    Other,
 }
 
 fn parse(source: &str, limits: Limits) -> Result<OwnedCatalog> {
@@ -225,11 +243,11 @@ fn parse(source: &str, limits: Limits) -> Result<OwnedCatalog> {
             return Err(invalid("ODB semantic catalog exceeds the event limit"));
         }
 
-        let (resolved, event) = reader
+        let (resolved, raw_event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| invalid(&format!("invalid ODB semantic XML: {error}")))?;
         let namespace = namespace_kind(&resolved);
-        let event = event.into_owned();
+        let event = raw_event.into_owned();
         match event {
             Event::Start(element) => {
                 let frame = start(
@@ -287,7 +305,12 @@ fn parse(source: &str, limits: Limits) -> Result<OwnedCatalog> {
                 return Err(invalid("DOCTYPE is not permitted in ODB content.xml"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -321,6 +344,9 @@ fn start(
     let local = element.local_name();
     let kind = classify(parent, namespace, local.as_ref());
     let in_database = parent.is_some_and(|frame| frame.in_database) || kind == Element::Database;
+    if kind == Element::Other && is_catalog_node(namespace, local.as_ref()) {
+        return Err(invalid("ODB schema node has an invalid parent"));
+    }
     let mut table = parent.and_then(|frame| frame.table);
 
     if kind == Element::Database {
@@ -412,7 +438,7 @@ fn add_column(
         .tables
         .get_mut(index)
         .ok_or_else(|| invalid("ODB column table owner is out of bounds"))?;
-    target.push_column(Column::parsed(name));
+    target.try_push_column(Column::parsed(name))?;
     *columns = columns
         .checked_add(1)
         .ok_or_else(|| invalid("ODB column count overflow"))?;
@@ -427,20 +453,54 @@ fn classify(parent: Option<Frame>, namespace: NamespaceKind, local: &[u8]) -> El
         (Some(Element::Document), true, _, b"body") => Element::Body,
         (Some(Element::Body), true, _, b"database") => Element::Database,
         (Some(Element::Database), _, true, b"data-source") => Element::DataSource,
-        (_, _, true, b"table-representation") => Element::TableRepresentation,
-        (_, _, true, b"table-definition") => Element::TableDefinition,
-        (_, _, true, b"column") => Element::Column,
-        (_, _, true, b"column-definition") => Element::ColumnDefinition,
-        (_, _, true, b"query") => Element::Query,
+        (Some(Element::Database), _, true, b"queries") => Element::Queries,
+        (Some(Element::Queries | Element::QueryCollection), _, true, b"query-collection") => {
+            Element::QueryCollection
+        },
+        (Some(Element::Queries | Element::QueryCollection), _, true, b"query") => Element::Query,
+        (Some(Element::Database), _, true, b"table-representations") => {
+            Element::TableRepresentations
+        },
+        (Some(Element::TableRepresentations), _, true, b"table-representation") => {
+            Element::TableRepresentation
+        },
+        (Some(Element::TableRepresentation | Element::Query), _, true, b"columns") => {
+            Element::Columns
+        },
+        (Some(Element::Columns), _, true, b"column") => Element::Column,
+        (Some(Element::Database), _, true, b"schema-definition") => Element::SchemaDefinition,
+        (Some(Element::SchemaDefinition), _, true, b"table-definitions") => {
+            Element::TableDefinitions
+        },
+        (Some(Element::TableDefinitions), _, true, b"table-definition") => Element::TableDefinition,
+        (Some(Element::TableDefinition), _, true, b"column-definitions") => {
+            Element::ColumnDefinitions
+        },
+        (Some(Element::ColumnDefinitions), _, true, b"column-definition") => {
+            Element::ColumnDefinition
+        },
         _ => Element::Other,
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum NamespaceKind {
-    Office,
-    Database,
-    Other,
+fn is_catalog_node(namespace: NamespaceKind, local: &[u8]) -> bool {
+    namespace == NamespaceKind::Database
+        && matches!(
+            local,
+            b"data-source"
+                | b"queries"
+                | b"query-collection"
+                | b"query"
+                | b"table-representations"
+                | b"table-representation"
+                | b"columns"
+                | b"column"
+                | b"schema-definition"
+                | b"table-definitions"
+                | b"table-definition"
+                | b"column-definitions"
+                | b"column-definition"
+        )
 }
 
 fn namespace_kind(namespace: &ResolveResult<'_>) -> NamespaceKind {
@@ -476,9 +536,9 @@ fn optional_db_attr(
     limits: Limits,
 ) -> Result<Option<String>> {
     let mut found = None;
-    for attribute in element.attributes() {
+    for raw_attribute in element.attributes() {
         let attribute =
-            attribute.map_err(|error| invalid(&format!("invalid ODB attribute: {error}")))?;
+            raw_attribute.map_err(|error| invalid(&format!("invalid ODB attribute: {error}")))?;
         let (namespace, name) = reader.resolver().resolve_attribute(attribute.key);
         if matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == DATABASE_NAMESPACE)
             && name.as_ref() == local
@@ -528,10 +588,8 @@ fn select<'a, T>(
 ) -> Result<Option<&'a T>> {
     let mut selected = None;
     for value in values {
-        if name_of(value) == name {
-            if selected.replace(value).is_some() {
-                return Err(invalid(&format!("ODB {kind} name '{name}' is ambiguous")));
-            }
+        if name_of(value) == name && selected.replace(value).is_some() {
+            return Err(invalid(&format!("ODB {kind} name '{name}' is ambiguous")));
         }
     }
     Ok(selected)

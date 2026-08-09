@@ -65,6 +65,32 @@ fn checksum_at(package: &Package, part: &str) -> Checksum {
         .clone()
 }
 
+fn main_relationships(package: &Package) -> Vec<(String, String, String, bool)> {
+    let document = package
+        .opc_package()
+        .main_document_part()
+        .unwrap()
+        .partname()
+        .clone();
+    let mut relationships = package
+        .opc_package()
+        .get_part(&document)
+        .unwrap()
+        .rels()
+        .iter()
+        .map(|relationship| {
+            (
+                relationship.r_id().to_owned(),
+                relationship.reltype().to_owned(),
+                relationship.target_ref().to_owned(),
+                relationship.is_external(),
+            )
+        })
+        .collect::<Vec<_>>();
+    relationships.sort_unstable();
+    relationships
+}
+
 #[test]
 fn generated_add_find_update_replace_reorder_remove_round_trip() {
     let directory = tempfile::tempdir().unwrap();
@@ -532,12 +558,27 @@ fn same_order_is_signed_noop_and_changed_order_is_managed() {
     let mut package = Package::new().unwrap();
     package.add_custom_xml(store(ITEM_A, "first")).unwrap();
     package.add_custom_xml(store(ITEM_B, "second")).unwrap();
+    package
+        .edit_opc(|opc| {
+            let document = opc.main_document_part()?.partname().clone();
+            opc.get_part_mut(&document)?.rels_mut().add_relationship(
+                "urn:test:opaque".to_owned(),
+                "https://example.test/keep?a=1&b=2".to_owned(),
+                "rIdOpaque".to_owned(),
+                true,
+            );
+            Ok(())
+        })
+        .unwrap();
+    let relationship_snapshot = main_relationships(&package);
     mark_signed(&mut package);
 
     package
         .order_custom_xml(&[ITEM_A.to_owned(), ITEM_B.to_owned()])
         .unwrap();
     assert!(package.is_signed());
+    let after_noop = main_relationships(&package);
+    assert_eq!(after_noop, relationship_snapshot);
 
     package
         .order_custom_xml(&[ITEM_B.to_owned(), ITEM_A.to_owned()])
@@ -554,6 +595,22 @@ fn same_order_is_signed_noop_and_changed_order_is_managed() {
     let items = package.custom_xml().unwrap();
     assert_eq!(items[0].props().unwrap().id, ITEM_B);
     assert_eq!(items[1].props().unwrap().id, ITEM_A);
+    let relationships = main_relationships(&package);
+    let before_ids = relationship_snapshot
+        .iter()
+        .map(|(id, _, _, _)| id)
+        .collect::<Vec<_>>();
+    let after_ids = relationships
+        .iter()
+        .map(|(id, _, _, _)| id)
+        .collect::<Vec<_>>();
+    assert_eq!(after_ids, before_ids);
+    assert!(relationships.iter().any(|relationship| {
+        relationship.0 == "rIdOpaque"
+            && relationship.1 == "urn:test:opaque"
+            && relationship.2 == "https://example.test/keep?a=1&b=2"
+            && relationship.3
+    }));
 }
 
 #[test]

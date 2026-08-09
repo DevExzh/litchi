@@ -559,7 +559,7 @@ fn reorder_custom_xml(package: &mut OpcPackage, ordered_ids: &[String]) -> Resul
         let item = *by_id
             .get(&key)
             .ok_or_else(|| Error::InvalidFormat(format!("unknown reorder itemID '{id}'")))?;
-        let reltype = package
+        package
             .get_part(&source_part)?
             .rels()
             .get(item.rel_id())
@@ -568,48 +568,31 @@ fn reorder_custom_xml(package: &mut OpcPackage, ordered_ids: &[String]) -> Resul
                     "Custom XML relationship '{}' disappeared during reorder",
                     item.rel_id()
                 ))
-            })?
-            .reltype()
-            .to_string();
-        ordered.push((item, reltype));
+            })?;
+        ordered.push(item);
     }
-    let source = package.get_part(&source_part)?;
-    let reserved = source
-        .rels()
+    // Relationship XML is serialized in rId order.  Preserve each original
+    // relationship identity and retarget those stable slots to the requested
+    // item order; deleting and recreating relationships would change rIds and
+    // invalidate otherwise opaque references to them.
+    let source_base_uri = package
+        .main_document_part()?
+        .partname()
+        .base_uri()
+        .to_string();
+    let retargets = items
         .iter()
-        .filter(|relationship| {
-            !items
-                .iter()
-                .any(|item| item.rel_id() == relationship.r_id())
+        .zip(ordered)
+        .map(|(slot, item)| {
+            (
+                slot.rel_id().to_owned(),
+                item.part().relative_ref(&source_base_uri),
+            )
         })
-        .map(|relationship| relationship.r_id().to_string())
-        .collect::<std::collections::HashSet<_>>();
-    let ids = (1usize..=MAX_ITEMS + 1)
-        .filter_map(|batch| {
-            let candidates = (0..ordered.len())
-                .map(|index| format!("rIdCustomXmlOrder{batch:04}_{index:06}"))
-                .collect::<Vec<_>>();
-            candidates
-                .iter()
-                .all(|id| !reserved.contains(id))
-                .then_some(candidates)
-        })
-        .next()
-        .ok_or_else(|| {
-            Error::InvalidFormat("Custom XML reorder relationship ID space is exhausted".into())
-        })?;
+        .collect::<Vec<_>>();
     let source = package.get_part_mut(&source_part)?;
-    let source_base_uri = source.partname().base_uri().to_string();
-    for item in &items {
-        source.rels_mut().remove(item.rel_id());
-    }
-    for ((item, reltype), id) in ordered.into_iter().zip(ids) {
-        source.rels_mut().add_relationship(
-            reltype,
-            item.part().relative_ref(&source_base_uri),
-            id,
-            false,
-        );
+    for (relationship_id, target_ref) in retargets {
+        source.rels_mut().retarget(&relationship_id, target_ref)?;
     }
     Ok(())
 }
