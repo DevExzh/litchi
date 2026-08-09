@@ -103,6 +103,7 @@ pub struct Element {
     attributes: HashMap<String, String>,
     namespace_context: NamespaceContext,
     text_content: String,
+    encode_text_as_references: bool,
     pub(crate) children: Vec<Element>,
 }
 
@@ -142,6 +143,7 @@ impl Element {
             attributes: HashMap::new(),
             namespace_context: NamespaceContext::default(),
             text_content: String::new(),
+            encode_text_as_references: false,
             children: Vec::new(),
         }
     }
@@ -155,6 +157,7 @@ impl Element {
             attributes: HashMap::new(),
             namespace_context,
             text_content: String::new(),
+            encode_text_as_references: false,
             children: Vec::new(),
         }
     }
@@ -191,6 +194,10 @@ impl Element {
         self.namespace_context.add_namespace(prefix, uri);
         // Re-parse qualified name with updated context
         self.qualified_name = self.namespace_context.parse_qualified_name(&self.tag_name);
+    }
+
+    pub(crate) fn encode_text_as_character_references(&mut self) {
+        self.encode_text_as_references = true;
     }
 
     /// Check if element name matches (namespace-aware)
@@ -379,10 +386,14 @@ impl Element {
             if !self.text_content.is_empty() {
                 // Escape text content
                 for ch in self.text_content.chars() {
-                    match ch {
-                        '&' => output.push_str("&amp;"),
-                        '<' => output.push_str("&lt;"),
-                        '>' => output.push_str("&gt;"),
+                    match (self.encode_text_as_references, ch) {
+                        (true, ' ') => output.push_str("&#32;"),
+                        (true, '\t') => output.push_str("&#9;"),
+                        (true, '\n') => output.push_str("&#10;"),
+                        (true, '\r') => output.push_str("&#13;"),
+                        (_, '&') => output.push_str("&amp;"),
+                        (_, '<') => output.push_str("&lt;"),
+                        (_, '>') => output.push_str("&gt;"),
                         _ => output.push(ch),
                     }
                 }

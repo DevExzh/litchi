@@ -7,6 +7,9 @@
     reason = "parser bindings are intentionally refined after validation"
 )]
 use crate::error::{Error, Result};
+use quick_xml::Reader;
+use quick_xml::encoding::Decoder;
+use quick_xml::events::{BytesStart, Event};
 use std::fmt::Write as FmtWrite;
 
 use super::model::{MutableDocument, Protection};
@@ -37,6 +40,200 @@ impl MutableDocument {
     ) -> Result<()> {
         self.section.write_xml(xml, Some(rel_mapper))
     }
+}
+
+pub(super) fn compact_changed_document_xml(source: &str) -> Result<String> {
+    let mut reader = Reader::from_str(source);
+    reader.config_mut().trim_text(false);
+    let mut output = String::with_capacity(source.len());
+    let mut preserve_space = Vec::new();
+    let mut pending_whitespace = String::new();
+    let mut text_run_has_content = false;
+    let mut roots = 0_usize;
+
+    loop {
+        match reader.read_event().map_err(Error::from)? {
+            Event::Start(element) => {
+                finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+                if preserve_space.is_empty() {
+                    roots = roots.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormat("document XML root count overflowed".into())
+                    })?;
+                }
+                let inherited = preserve_space.last().copied().unwrap_or(false);
+                preserve_space.push(element_preserves_space(
+                    &element,
+                    reader.decoder(),
+                    inherited,
+                )?);
+                write_compact_start(&mut output, &element, reader.decoder(), false)?;
+            },
+            Event::Empty(element) => {
+                finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+                if preserve_space.is_empty() {
+                    roots = roots.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormat("document XML root count overflowed".into())
+                    })?;
+                }
+                let inherited = preserve_space.last().copied().unwrap_or(false);
+                let _ = element_preserves_space(&element, reader.decoder(), inherited)?;
+                write_compact_start(&mut output, &element, reader.decoder(), true)?;
+            },
+            Event::End(element) => {
+                finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+                preserve_space.pop().ok_or_else(|| {
+                    Error::InvalidFormat("unexpected document XML end element".into())
+                })?;
+                output.push_str("</");
+                push_utf8(&mut output, element.name().as_ref())?;
+                output.push('>');
+            },
+            Event::Text(text) => {
+                let bytes = text.as_ref();
+                if preserve_space.is_empty() {
+                    if bytes.iter().all(u8::is_ascii_whitespace) {
+                        continue;
+                    }
+                    return Err(Error::InvalidFormat(
+                        "character data outside the document XML root".into(),
+                    ));
+                }
+                if bytes.iter().all(u8::is_ascii_whitespace)
+                    && !preserve_space.last().copied().unwrap_or(false)
+                {
+                    if text_run_has_content {
+                        push_utf8(&mut output, bytes)?;
+                    } else {
+                        push_utf8(&mut pending_whitespace, bytes)?;
+                    }
+                } else {
+                    output.push_str(&pending_whitespace);
+                    pending_whitespace.clear();
+                    push_utf8(&mut output, bytes)?;
+                    text_run_has_content = true;
+                }
+            },
+            Event::CData(data) => {
+                if preserve_space.is_empty() {
+                    return Err(Error::InvalidFormat(
+                        "CDATA outside the document XML root".into(),
+                    ));
+                }
+                output.push_str(&pending_whitespace);
+                pending_whitespace.clear();
+                output.push_str("<![CDATA[");
+                push_utf8(&mut output, data.as_ref())?;
+                output.push_str("]]>");
+                text_run_has_content = true;
+            },
+            Event::GeneralRef(reference) => {
+                if preserve_space.is_empty() {
+                    return Err(Error::InvalidFormat(
+                        "entity reference outside the document XML root".into(),
+                    ));
+                }
+                output.push_str(&pending_whitespace);
+                pending_whitespace.clear();
+                output.push('&');
+                push_utf8(&mut output, reference.as_ref())?;
+                output.push(';');
+                text_run_has_content = true;
+            },
+            Event::Decl(declaration) => {
+                finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+                output.push_str("<?");
+                push_utf8(&mut output, declaration.as_ref())?;
+                output.push_str("?>");
+            },
+            Event::PI(instruction) => {
+                finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+                output.push_str("<?");
+                push_utf8(&mut output, instruction.as_ref())?;
+                output.push_str("?>");
+            },
+            Event::Comment(comment) => {
+                finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+                output.push_str("<!--");
+                push_utf8(&mut output, comment.as_ref())?;
+                output.push_str("-->");
+            },
+            Event::DocType(_) => {
+                return Err(Error::InvalidFormat(
+                    "document XML type declarations are not publishable".into(),
+                ));
+            },
+            Event::Eof => {
+                finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+                break;
+            },
+        }
+    }
+    if !preserve_space.is_empty() || roots != 1 {
+        return Err(Error::InvalidFormat(
+            "document XML must contain exactly one closed root".into(),
+        ));
+    }
+    Ok(output)
+}
+
+fn finish_compact_text_run(pending_whitespace: &mut String, has_content: &mut bool) {
+    pending_whitespace.clear();
+    *has_content = false;
+}
+
+fn element_preserves_space(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    inherited: bool,
+) -> Result<bool> {
+    let mut preserve = inherited;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if attribute.key.as_ref() != b"xml:space" {
+            continue;
+        }
+        let value = attribute
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+            .map_err(Error::from)?;
+        preserve = match value.as_ref() {
+            "preserve" => true,
+            "default" => false,
+            _ => {
+                return Err(Error::InvalidFormat(
+                    "xml:space must be 'default' or 'preserve'".into(),
+                ));
+            },
+        };
+    }
+    Ok(preserve)
+}
+
+fn write_compact_start(
+    output: &mut String,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    empty: bool,
+) -> Result<()> {
+    output.push('<');
+    push_utf8(output, element.name().as_ref())?;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        output.push(' ');
+        push_utf8(output, attribute.key.as_ref())?;
+        output.push_str("=\"");
+        let value = attribute
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+            .map_err(Error::from)?;
+        output.push_str(quick_xml::escape::escape(value.as_ref()).as_ref());
+        output.push('"');
+    }
+    output.push_str(if empty { "/>" } else { ">" });
+    Ok(())
+}
+
+fn push_utf8(output: &mut String, bytes: &[u8]) -> Result<()> {
+    output.push_str(std::str::from_utf8(bytes).map_err(|error| Error::Xml(error.to_string()))?);
+    Ok(())
 }
 
 pub(super) fn write_document_protection(

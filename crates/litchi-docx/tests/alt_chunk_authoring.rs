@@ -250,17 +250,18 @@ fn generated_internal_formats_have_canonical_content_types_and_reorder() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("formats.docx");
     let mut package = Package::new().unwrap();
+    let wordprocessingml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>"#;
     let imports = [
-        Data::Docm(b"opaque macro document".to_vec()),
-        Data::Dotx(b"opaque template".to_vec()),
-        Data::Dotm(b"opaque macro template".to_vec()),
+        Data::Docm(wordprocessingml.to_vec()),
+        Data::Dotx(wordprocessingml.to_vec()),
+        Data::Dotm(wordprocessingml.to_vec()),
         Data::Mime(b"From: sender@example.invalid\r\n\r\nbody".to_vec()),
         Data::Html(b"<p>html</p>".to_vec()),
         Data::Xhtml(b"<html xmlns=\"http://www.w3.org/1999/xhtml\"/>".to_vec()),
         Data::Rtf(br"{\rtf1 rtf}".to_vec()),
         Data::Text(b"plain".to_vec()),
         Data::Xml(b"<root/>".to_vec()),
-        Data::Docx(b"opaque nested package".to_vec()),
+        Data::Docx(wordprocessingml.to_vec()),
     ];
     for (index, data) in imports.into_iter().enumerate() {
         package

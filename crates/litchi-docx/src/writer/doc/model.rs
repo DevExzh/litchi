@@ -41,7 +41,9 @@ use super::super::watermark::{ImageWatermark, Watermark};
 use std::collections::HashSet;
 // Import settings types
 use super::super::super::settings::ProtectionType;
-use super::codec::{patch_document_protection, write_document_protection};
+use super::codec::{
+    compact_changed_document_xml, patch_document_protection, write_document_protection,
+};
 use super::package::{
     BodyElement, DocumentBody, collect_explicit_section_relationships, collect_section_parts,
     shift_toc_index_on_insert, shift_toc_index_on_remove,
@@ -1688,7 +1690,7 @@ impl MutableDocument {
             self.section.write_xml(&mut xml, None)?;
         }
         self.write_document_suffix(&mut xml);
-        Ok(xml)
+        compact_changed_document_xml(&xml)
     }
 
     /// Generate XML with actual relationship IDs from the mapper.
@@ -1713,7 +1715,7 @@ impl MutableDocument {
         }
 
         self.write_document_suffix(&mut xml);
-        Ok(xml)
+        compact_changed_document_xml(&xml)
     }
 }
 

@@ -1648,6 +1648,15 @@ impl DynamicTextField {
             },
             Self::MetaField { .. } => unreachable!("meta-field uses ordered mixed serializer"),
         }
+        let display_text = self.display_text();
+        if !display_text.is_empty()
+            && display_text
+                .as_bytes()
+                .iter()
+                .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+        {
+            element.encode_text_as_character_references();
+        }
         Ok(element)
     }
 }
