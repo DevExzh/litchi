@@ -57,6 +57,13 @@ impl ObjectSubtype {
 }
 
 impl Metadata {
+    /// Parse the 24-byte `ExOleObjAtom` payload carried by `record`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record header or size is invalid, if a
+    /// fixed-width field contains an out-of-range value, or if the object or
+    /// persist ID is zero.
     pub fn parse(record: &Record) -> Result<Self> {
         require_atom(
             record,
@@ -72,7 +79,12 @@ impl Metadata {
             id: u32_at(&record.data, 8),
             subtype: ObjectSubtype::parse(u32_at(&record.data, 12))?,
             persist_id: u32_at(&record.data, 16),
-            unused: record.data[20..24].try_into().expect("fixed slice"),
+            unused: [
+                record.data[20],
+                record.data[21],
+                record.data[22],
+                record.data[23],
+            ],
         };
         value.validate()?;
         Ok(value)
@@ -88,10 +100,23 @@ impl Metadata {
         Ok(())
     }
 
+    /// Serialize as a fully parsed `ExOleObjAtom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the object or persist ID is zero, if the record
+    /// payload exceeds the encodable size, or if the encoded record cannot be
+    /// re-parsed.
     pub fn to_record(&self) -> Result<Record> {
         Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 
+    /// Serialize to the raw bytes of a complete `ExOleObjAtom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the object or persist ID is zero or if the record
+    /// payload exceeds the encodable size.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         self.validate()?;
         let mut data = [0; 24];
@@ -121,7 +146,7 @@ impl DimensionPolicy {
         match value {
             0 => Self::Send,
             1 => Self::Omit,
-            value => Self::ProducerDefined(value),
+            other => Self::ProducerDefined(other),
         }
     }
 
@@ -135,6 +160,12 @@ impl DimensionPolicy {
 }
 
 impl EmbedPreferences {
+    /// Parse the 8-byte `ExOleEmbedAtom` payload carried by `record`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record header or size is invalid or if a
+    /// fixed-width field contains an out-of-range value.
     pub fn parse(record: &Record) -> Result<Self> {
         require_atom(
             record,
@@ -153,16 +184,27 @@ impl EmbedPreferences {
         })
     }
 
+    /// Serialize as a fully parsed `ExOleEmbedAtom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record payload exceeds the encodable size or
+    /// if the encoded record cannot be re-parsed.
     pub fn to_record(&self) -> Result<Record> {
         Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 
+    /// Serialize to the raw bytes of a complete `ExOleEmbedAtom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record payload exceeds the encodable size.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         let mut data = [0; 8];
         data[0..4].copy_from_slice(&(self.color_follow as u32).to_le_bytes());
-        data[4] = self.cannot_lock_server as u8;
+        data[4] = u8::from(self.cannot_lock_server);
         data[5] = self.dimension_policy.value();
-        data[6] = self.is_word_table as u8;
+        data[6] = u8::from(self.is_word_table);
         data[7] = self.unused;
         record_bytes(0, 0, RecordType::ExternalOleEmbedAtom, &data)
     }
@@ -179,6 +221,12 @@ impl UpdateMode {
 }
 
 impl LinkInfo {
+    /// Parse the 12-byte `ExOleLinkAtom` payload carried by `record`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record header or size is invalid or if the
+    /// update-mode field contains an out-of-range value.
     pub fn parse(record: &Record) -> Result<Self> {
         require_atom(
             record,
@@ -192,14 +240,30 @@ impl LinkInfo {
         Ok(Self {
             slide_id: (slide_id != 0).then_some(slide_id),
             update_mode: UpdateMode::parse(u32_at(&record.data, 4))?,
-            unused: record.data[8..12].try_into().expect("fixed slice"),
+            unused: [
+                record.data[8],
+                record.data[9],
+                record.data[10],
+                record.data[11],
+            ],
         })
     }
 
+    /// Serialize as a fully parsed `ExOleLinkAtom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record payload exceeds the encodable size or
+    /// if the encoded record cannot be re-parsed.
     pub fn to_record(&self) -> Result<Record> {
         Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 
+    /// Serialize to the raw bytes of a complete `ExOleLinkAtom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record payload exceeds the encodable size.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         let mut data = [0; 12];
         data[0..4].copy_from_slice(&self.slide_id.unwrap_or(0).to_le_bytes());

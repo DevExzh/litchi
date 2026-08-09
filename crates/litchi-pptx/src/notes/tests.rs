@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::package::is_notes_slide_rel;
 use super::*;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -443,14 +449,10 @@ fn source_checked_transaction_inverse_restores_master_and_theme() {
     let snapshot = Snapshot::load(&package, &name).unwrap().unwrap();
     let mut edit = snapshot.edit();
     edit.replace_master_xml(
-        format!(
-            "<p:notesMaster xmlns:p=\"{}\"><p:cSld/><p:extLst/></p:notesMaster>",
-            P
-        )
-        .into_bytes(),
+        format!("<p:notesMaster xmlns:p=\"{P}\"><p:cSld/><p:extLst/></p:notesMaster>").into_bytes(),
     )
     .unwrap();
-    edit.replace_theme_xml(format!("<a:theme xmlns:a=\"{}\"/>", A).into_bytes())
+    edit.replace_theme_xml(format!("<a:theme xmlns:a=\"{A}\"/>").into_bytes())
         .unwrap();
     let commit = edit.commit().unwrap();
     commit.patch().apply(&mut package).unwrap();

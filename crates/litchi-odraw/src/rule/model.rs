@@ -30,6 +30,10 @@ impl Kind {
 
 /// The fixed-layout `OfficeArtFConnectorRule` record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[allow(
+    clippy::struct_field_names,
+    reason = "fields mirror the [MS-ODRAW] OfficeArtFConnectorRule layout (spidA/spidB/spidC) and the public accessors"
+)]
 pub struct Connector {
     rule_id: u32,
     start_shape_id: u32,
@@ -184,6 +188,12 @@ impl<'data> Opaque<'data> {
     #[must_use]
     pub const fn len(&self) -> u32 {
         self.record.len()
+    }
+
+    /// Returns whether the declared body length is zero.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.record.len() == 0
     }
 
     /// Returns the borrowed, uninterpreted record body.

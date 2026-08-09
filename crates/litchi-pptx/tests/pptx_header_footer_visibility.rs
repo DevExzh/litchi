@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use litchi_opc::{OpcPackage, PackURI, Part};
 use litchi_pptx::Package;
 use litchi_pptx::parts::SlidePart;

@@ -29,7 +29,7 @@ const SEMANTIC_WHITESPACE_CONTENT: &str = concat!(
 
 #[test]
 fn focused_modules_are_the_canonical_semantic_api() {
-    assert_eq!(Page::new("Page 1").name(), "Page 1");
+    assert_eq!(Page::new("Page 1").name(), Some("Page 1"));
     assert_eq!(Layer::new("Foreground").name(), "Foreground");
 
     let bytes = Builder::new().build().unwrap();

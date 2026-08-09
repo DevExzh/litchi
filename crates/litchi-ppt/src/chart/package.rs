@@ -1,4 +1,4 @@
-//! PowerPoint package integration for embedded OLE2 chart objects.
+//! `PowerPoint` package integration for embedded OLE2 chart objects.
 
 use litchi_ograph::Limits;
 
@@ -14,7 +14,7 @@ pub(crate) const MAX_CHART_OBJECTS: usize = 512;
 
 /// Enumerate embedded native charts, degrading malformed payloads per object.
 pub(crate) fn enumerate(presentation: &Presentation, limits: Limits) -> Result<Inventory> {
-    let limits = limits.validate()?;
+    let validated_limits = limits.validate()?;
     let document = presentation.live_document_record()?;
     let Some(objects) = Collection::parse(&document)? else {
         return Ok(Inventory::default());
@@ -24,7 +24,7 @@ pub(crate) fn enumerate(presentation: &Presentation, limits: Limits) -> Result<I
     let mut wanted = Vec::new();
     wanted
         .try_reserve(objects.objects.len().min(MAX_CHART_OBJECTS))
-        .map_err(|_| litchi_ograph::Error::Allocation {
+        .map_err(|_err| litchi_ograph::Error::Allocation {
             resource: "PPT chart object identifiers",
         })?;
     for object in &objects.objects {
@@ -47,7 +47,7 @@ pub(crate) fn enumerate(presentation: &Presentation, limits: Limits) -> Result<I
     let mut inventory = Inventory::default();
     inventory
         .try_reserve(wanted.len())
-        .map_err(|_| litchi_ograph::Error::Allocation {
+        .map_err(|_err| litchi_ograph::Error::Allocation {
             resource: "PPT chart inventory",
         })?;
     for object in objects.objects {
@@ -65,11 +65,11 @@ pub(crate) fn enumerate(presentation: &Presentation, limits: Limits) -> Result<I
             definition.object.id,
             definition.object.persist_id,
             definition.program_id,
-            frames
-                .iter()
-                .find_map(|(object, frame)| (*object == definition.object.id).then_some(*frame)),
+            frames.iter().find_map(|(object_id, frame)| {
+                (*object_id == definition.object.id).then_some(*frame)
+            }),
         );
-        match parse(presentation, info.persist_id(), kind, limits) {
+        match parse(presentation, info.persist_id(), kind, validated_limits) {
             Ok(Parsed::Graph {
                 package,
                 book,
@@ -90,7 +90,20 @@ pub(super) fn classify(subtype: ObjectSubtype, program: Option<&str>) -> Option<
     match subtype {
         ObjectSubtype::Graph => return Some(Kind::Graph),
         ObjectSubtype::ExcelChart => return Some(Kind::Excel),
-        _ => {},
+        ObjectSubtype::Default
+        | ObjectSubtype::ClipArtGallery
+        | ObjectSubtype::WordTable
+        | ObjectSubtype::Excel
+        | ObjectSubtype::OrganizationChart
+        | ObjectSubtype::Equation
+        | ObjectSubtype::WordArt
+        | ObjectSubtype::Sound
+        | ObjectSubtype::Image
+        | ObjectSubtype::Presentation
+        | ObjectSubtype::Slide
+        | ObjectSubtype::Project
+        | ObjectSubtype::NoteIt
+        | ObjectSubtype::MediaPlayer => {},
     }
     let base = program_base(program?);
     if base.eq_ignore_ascii_case("MSGraph.Chart") || base.eq_ignore_ascii_case("MSGraph") {
@@ -117,7 +130,7 @@ fn chart_frames(presentation: &Presentation, wanted: &[u32]) -> Result<Vec<(u32,
     let mut frames = Vec::new();
     frames
         .try_reserve(wanted.len())
-        .map_err(|_| litchi_ograph::Error::Allocation {
+        .map_err(|_err| litchi_ograph::Error::Allocation {
             resource: "PPT chart frames",
         })?;
     let Ok(slides) = presentation.slides() else {
@@ -151,7 +164,11 @@ pub(super) fn collect_frames(
                 }
             },
             ShapeEnum::Group(group) => collect_frames(group.children(), slide, wanted, frames),
-            _ => {},
+            ShapeEnum::TextBox(_)
+            | ShapeEnum::Placeholder(_)
+            | ShapeEnum::AutoShape(_)
+            | ShapeEnum::Table(_)
+            | ShapeEnum::Line(_) => {},
         }
     }
 }

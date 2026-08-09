@@ -26,7 +26,10 @@ pub(crate) fn write_data_pilot_tables(
     codec::write_data_pilot_tables(output, tables)
 }
 
-pub(crate) fn write_data_pilot_table_fragment(table: &Table) -> litchi_core::Result<String> {
+/// # Errors
+///
+/// Returns an error when the value cannot be serialized.
+pub fn write_data_pilot_table_fragment(table: &Table) -> litchi_core::Result<String> {
     codec::write_data_pilot_table_fragment(table)
 }
 

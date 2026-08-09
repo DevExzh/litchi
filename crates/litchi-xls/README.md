@@ -17,6 +17,20 @@ as a compatibility alias.
 litchi-xls = "0.0.1"
 ```
 
+## Safety and mutation boundary
+
+`Worksheet` is an authoring model. A worksheet decoded from an existing
+workbook is source-bound because `litchi-xls` does not provide a whole-sheet
+BIFF8 re-save path; its public create-only mutators return a typed refusal
+instead of accepting an edit that could be dropped. Use an existing
+feature-specific transaction where one applies, or create a new worksheet with
+`Writer`.
+
+`Writer::set_password` permits the RC4 profiles. Legacy BIFF8 XOR obfuscation
+is intentionally decode-only by default and can only be authored with the
+explicit `WeakEncryptionPolicy::allow_xor_obfuscation()` capability and
+`Writer::set_xor_obfuscation_password`; it is not confidentiality protection.
+
 ```rust
 use litchi_xls::Workbook;
 use std::fs::File;

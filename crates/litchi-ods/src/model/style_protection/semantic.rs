@@ -19,12 +19,18 @@ use quick_xml::{
 };
 use std::collections::{HashMap, HashSet};
 
-pub(crate) fn common_table_cell_style_names(styles_xml: Option<&str>) -> Result<HashSet<String>> {
+/// # Errors
+///
+/// Returns an error when the styles XML is malformed.
+pub fn common_table_cell_style_names(styles_xml: Option<&str>) -> Result<HashSet<String>> {
     let registry = CellStyleRegistry::parse(styles_xml, "")?;
     Ok(registry.common_table_cell_styles)
 }
 
-pub(crate) fn validate_protection_style_document(
+/// # Errors
+///
+/// Returns an error when a value violates the format or resource constraints.
+pub fn validate_protection_style_document(
     styles_xml: Option<&str>,
     automatic_styles_xml: &str,
     authored: &[TableStyle],
@@ -68,7 +74,8 @@ impl CellStyleRegistry {
         &self.conditional_styles
     }
 
-    pub(crate) fn conditional_style(&self, name: &str) -> Option<&ConditionalStyle> {
+    #[must_use]
+    pub fn conditional_style(&self, name: &str) -> Option<&ConditionalStyle> {
         self.conditional_style_index
             .get(name)
             .and_then(|index| self.conditional_styles.get(*index))
@@ -78,7 +85,10 @@ impl CellStyleRegistry {
         &self.automatic_protection_styles
     }
 
-    pub(crate) fn resolve(&self, style_name: Option<&str>) -> Result<Option<Protection>> {
+    /// # Errors
+    ///
+    /// Returns an error when the style inheritance chain is cyclic.
+    pub fn resolve(&self, style_name: Option<&str>) -> Result<Option<Protection>> {
         let Some(mut name) = style_name else {
             return Ok(self.default);
         };

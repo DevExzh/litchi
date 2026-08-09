@@ -31,6 +31,10 @@ use super::data_validation::{DataValidationRule, DataValidationSettings};
 #[derive(Debug, Clone)]
 pub struct Worksheet {
     name: String,
+    /// Decoded worksheets have no whole-sheet serialization path. Public
+    /// create-only mutators therefore refuse rather than accepting edits that
+    /// a caller could only drop.
+    source_bound: bool,
     cells: BTreeMap<(u32, u32), Cell>,
     array_formulas: Vec<Arc<ArrayFormula>>,
     max_row: u32,
@@ -95,6 +99,7 @@ impl Worksheet {
     pub fn new(name: String) -> Self {
         Worksheet {
             name,
+            source_bound: false,
             cells: BTreeMap::new(),
             array_formulas: Vec::new(),
             max_row: 0,
@@ -142,6 +147,7 @@ impl Worksheet {
     pub fn with_shared_strings(name: String, shared_strings: Arc<Vec<String>>) -> Self {
         Worksheet {
             name,
+            source_bound: false,
             cells: BTreeMap::new(),
             array_formulas: Vec::new(),
             max_row: 0,
@@ -185,12 +191,17 @@ impl Worksheet {
         }
     }
 
-    /// Add a cell to the worksheet
-    pub fn add_cell(&mut self, cell: Cell) {
+    /// Add a cell to an authored worksheet.
+    ///
+    /// Decoded worksheets are source-bound and reject this create-only edit
+    /// because this crate has no whole-sheet BIFF8 save path for them.
+    pub fn add_cell(&mut self, cell: Cell) -> Result<()> {
+        self.ensure_authored("add_cell")?;
         let pos = (cell.row(), cell.column());
         self.max_row = self.max_row.max(cell.row());
         self.max_col = self.max_col.max(cell.column());
         self.cells.insert(pos, cell);
+        Ok(())
     }
 
     /// Set worksheet dimensions
@@ -200,10 +211,12 @@ impl Worksheet {
         last_row: u32,
         _first_col: u32,
         last_col: u32,
-    ) {
+    ) -> Result<()> {
+        self.ensure_authored("set_dimensions")?;
         // Adjust max_row and max_col based on dimensions
         self.max_row = self.max_row.max(last_row.saturating_sub(1));
         self.max_col = self.max_col.max(last_col.saturating_sub(1));
+        Ok(())
     }
 
     /// Get shared strings reference
@@ -219,6 +232,23 @@ impl Worksheet {
         let mut worksheet = Self::with_shared_strings(name, shared_strings);
         worksheet.shared_string_properties = Some(shared_string_properties);
         worksheet
+    }
+
+    /// Whether this worksheet was decoded from an existing workbook.
+    pub fn is_source_bound(&self) -> bool {
+        self.source_bound
+    }
+
+    pub(crate) fn mark_source_bound(&mut self) {
+        self.source_bound = true;
+    }
+
+    fn ensure_authored(&self, operation: &'static str) -> Result<()> {
+        if self.source_bound {
+            Err(Error::SourceBoundWorksheetMutation { operation })
+        } else {
+            Ok(())
+        }
     }
 
     /// Rich-text and phonetic metadata for a zero-based shared-string index.
@@ -266,8 +296,10 @@ impl Worksheet {
     // -- Merged cells --
 
     /// Add merged cell ranges parsed from a MERGECELLS record.
-    pub fn add_merged_cells(&mut self, ranges: &[MergedCellRange]) {
+    pub fn add_merged_cells(&mut self, ranges: &[MergedCellRange]) -> Result<()> {
+        self.ensure_authored("add_merged_cells")?;
         self.merged_cells.extend_from_slice(ranges);
+        Ok(())
     }
 
     /// All merged cell ranges in this worksheet.
@@ -300,18 +332,22 @@ impl Worksheet {
     // -- AutoFilter --
 
     /// Initialize AutoFilter with the given column count (from AUTOFILTERINFO).
-    pub fn set_autofilter_info(&mut self, column_count: u16) {
+    pub fn set_autofilter_info(&mut self, column_count: u16) -> Result<()> {
+        self.ensure_authored("set_autofilter_info")?;
         self.autofilter = Some(AutoFilterInfo {
             column_count,
             columns: Vec::new(),
         });
+        Ok(())
     }
 
     /// Add an AutoFilter column definition (from AUTOFILTER record).
-    pub fn add_autofilter_column(&mut self, col: AutoFilterColumn) {
+    pub fn add_autofilter_column(&mut self, col: AutoFilterColumn) -> Result<()> {
+        self.ensure_authored("add_autofilter_column")?;
         if let Some(ref mut af) = self.autofilter {
             af.columns.push(col);
         }
+        Ok(())
     }
 
     /// AutoFilter configuration, if any.
@@ -322,8 +358,10 @@ impl Worksheet {
     // -- Sort --
 
     /// Set the sort configuration (from SORT record).
-    pub fn set_sort_info(&mut self, info: SortInfo) {
+    pub fn set_sort_info(&mut self, info: SortInfo) -> Result<()> {
+        self.ensure_authored("set_sort_info")?;
         self.sort_info = Some(info);
+        Ok(())
     }
 
     /// Sort configuration, if any.
@@ -420,8 +458,10 @@ impl Worksheet {
     // -- Pivot tables --
 
     /// Add a fully assembled pivot table.
-    pub fn add_pivot_table(&mut self, pt: PivotTable) {
+    pub fn add_pivot_table(&mut self, pt: PivotTable) -> Result<()> {
+        self.ensure_authored("add_pivot_table")?;
         self.pivot_tables.push(pt);
+        Ok(())
     }
 
     /// All pivot tables in this worksheet.
@@ -494,9 +534,13 @@ impl Worksheet {
         &self.protection
     }
 
-    /// Get a mutable reference to the sheet protection state.
-    pub fn protection_mut(&mut self) -> &mut SheetProtection {
-        &mut self.protection
+    /// Get mutable protection state for an authored worksheet.
+    ///
+    /// Parsed protection metadata is source-bound because ordinary worksheet
+    /// serialization is not available.
+    pub fn protection_mut(&mut self) -> Result<&mut SheetProtection> {
+        self.ensure_authored("protection_mut")?;
+        Ok(&mut self.protection)
     }
 
     pub(crate) fn set_formatting(&mut self, formatting: Arc<Formatting>) {

@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{
     RtfDocument, RtfWriter, TableHorizontalPosition, TableHorizontalReference,
     TableVerticalPosition, TableVerticalReference,
@@ -5,7 +14,7 @@ use litchi_rtf::{
 
 #[test]
 fn parses_full_family_and_round_trips_deterministically() {
-    let source = r#"{\rtf1\trowd\tphmrg\tposxc\tpvpg\tposnegy-16\tdfrmtxtLeft187\tdfrmtxtRight188\tdfrmtxtTop189\tdfrmtxtBottom190\tabsnoovrlp1\cellx1000\intbl A\cell\row}"#;
+    let source = r"{\rtf1\trowd\tphmrg\tposxc\tpvpg\tposnegy-16\tdfrmtxtLeft187\tdfrmtxtRight188\tdfrmtxtTop189\tdfrmtxtBottom190\tabsnoovrlp1\cellx1000\intbl A\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     let position = document.tables()[0].rows()[0].positioning();
     assert_eq!(
@@ -112,7 +121,7 @@ fn parses_all_symbolic_positions_and_references() {
 
 #[test]
 fn resets_groups_and_inert_destinations() {
-    let source = r#"{\rtf1\trowd\tphpg\tposxr{\tphmrg\tposxl}\trowd{\*\unknown\tphpg\tposx999\tdfrmtxtLeft999\tabsnoovrlp1 ignored}\cellx1000\intbl A\cell\row}"#;
+    let source = r"{\rtf1\trowd\tphpg\tposxr{\tphmrg\tposxl}\trowd{\*\unknown\tphpg\tposx999\tdfrmtxtLeft999\tabsnoovrlp1 ignored}\cellx1000\intbl A\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     assert!(document.tables()[0].rows()[0].positioning().is_empty());
 }
@@ -128,7 +137,7 @@ fn parses_real_libreoffice_fixtures() {
         floating
             .tables()
             .iter()
-            .flat_map(|table| table.rows())
+            .flat_map(litchi_rtf::raw::Table::rows)
             .any(|row| {
                 let p = row.positioning();
                 p.horizontal_reference == Some(TableHorizontalReference::Column)
@@ -147,7 +156,7 @@ fn parses_real_libreoffice_fixtures() {
         overlap
             .tables()
             .iter()
-            .flat_map(|table| table.rows())
+            .flat_map(litchi_rtf::raw::Table::rows)
             .any(|row| row.positioning().no_overlap)
     );
 }
@@ -155,22 +164,22 @@ fn parses_real_libreoffice_fixtures() {
 #[test]
 fn rejects_malformed_parameters_and_caps() {
     for source in [
-        r#"{\rtf1\trowd\tposx X}"#,
-        r#"{\rtf1\trowd\tposx-1 X}"#,
-        r#"{\rtf1\trowd\tposx31681 X}"#,
-        r#"{\rtf1\trowd\tposnegx1 X}"#,
-        r#"{\rtf1\trowd\tposnegx-31681 X}"#,
-        r#"{\rtf1\trowd\tposyc1 X}"#,
-        r#"{\rtf1\trowd\tphmrg1 X}"#,
-        r#"{\rtf1\trowd\tdfrmtxtLeft X}"#,
-        r#"{\rtf1\trowd\tdfrmtxtLeft-1 X}"#,
-        r#"{\rtf1\trowd\tdfrmtxtLeft31681 X}"#,
-        r#"{\rtf1\trowd\tabsnoovrlp2 X}"#,
+        r"{\rtf1\trowd\tposx X}",
+        r"{\rtf1\trowd\tposx-1 X}",
+        r"{\rtf1\trowd\tposx31681 X}",
+        r"{\rtf1\trowd\tposnegx1 X}",
+        r"{\rtf1\trowd\tposnegx-31681 X}",
+        r"{\rtf1\trowd\tposyc1 X}",
+        r"{\rtf1\trowd\tphmrg1 X}",
+        r"{\rtf1\trowd\tdfrmtxtLeft X}",
+        r"{\rtf1\trowd\tdfrmtxtLeft-1 X}",
+        r"{\rtf1\trowd\tdfrmtxtLeft31681 X}",
+        r"{\rtf1\trowd\tabsnoovrlp2 X}",
     ] {
         assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
     }
     assert!(
-        RtfDocument::parse(r#"{\rtf1\trowd\tabsnoovrlp0\cellx1\intbl X\cell\row}"#)
+        RtfDocument::parse(r"{\rtf1\trowd\tabsnoovrlp0\cellx1\intbl X\cell\row}")
             .unwrap()
             .tables()[0]
             .rows()[0]

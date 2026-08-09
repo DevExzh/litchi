@@ -1,4 +1,4 @@
-//! Typed, inert PowerPoint font models.
+//! Typed, inert `PowerPoint` font models.
 
 use crate::package::RecordLimits;
 use std::sync::Arc;
@@ -64,6 +64,7 @@ enum SharedFontDataInner {
 }
 
 impl SharedFontData {
+    #[must_use]
     pub fn as_slice(&self) -> &[u8] {
         match &self.0 {
             SharedFontDataInner::Vec(bytes) => bytes.as_slice(),
@@ -72,6 +73,7 @@ impl SharedFontData {
     }
 
     /// Whether two owners point at the same backing allocation and range.
+    #[must_use]
     pub fn ptr_eq(&self, other: &Self) -> bool {
         match (&self.0, &other.0) {
             (SharedFontDataInner::Vec(left), SharedFontDataInner::Vec(right)) => {
@@ -84,11 +86,17 @@ impl SharedFontData {
         }
     }
 
+    /// Extract the uniquely owned byte vector behind this payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(Self)` with the payload unchanged when it is not a
+    /// uniquely owned `Vec` (shared owner or slice-backed).
     pub fn try_unwrap_vec(self) -> Result<Vec<u8>, Self> {
         match self.0 {
             SharedFontDataInner::Vec(bytes) => match Arc::try_unwrap(bytes) {
-                Ok(bytes) => Ok(bytes),
-                Err(bytes) => Err(Self(SharedFontDataInner::Vec(bytes))),
+                Ok(owned) => Ok(owned),
+                Err(shared) => Err(Self(SharedFontDataInner::Vec(shared))),
             },
             SharedFontDataInner::Slice(bytes) => Err(Self(SharedFontDataInner::Slice(bytes))),
         }
@@ -160,12 +168,19 @@ pub struct EmbeddedFont {
 }
 
 impl EmbeddedFont {
+    /// Create one embedded font facet from EOT bytes validated against the
+    /// default limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `data` is not a structurally valid EOT 1.0 payload
+    /// within the default limits.
     pub fn new(facet: Facet, data: impl Into<SharedFontData>) -> crate::package::Result<Self> {
-        let data = data.into();
-        validate_eot_facet(data.as_ref(), Limits::default())?;
+        let payload = data.into();
+        validate_eot_facet(payload.as_ref(), Limits::default())?;
         Ok(Self {
             style: facet as u8,
-            data,
+            data: payload,
         })
     }
 
@@ -177,10 +192,16 @@ impl EmbeddedFont {
     }
 
     /// Exact inert EOT bytes. Cloning the owner does not clone this payload.
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.data
     }
 
+    /// The typed facet for this embedded font.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the retained facet index is outside `0..=3`.
     pub fn facet(&self) -> crate::package::Result<Facet> {
         Facet::try_from(self.style)
     }
@@ -188,98 +209,17 @@ impl EmbeddedFont {
     /// Inspect the fixed header of a structurally plausible uncompressed EOT
     /// 1.0 payload. This remains a cheap inert probe; the optional font crate
     /// performs authoritative SFNT and licensing validation.
+    #[must_use]
     pub fn eot_metadata(&self) -> Option<EotMetadata> {
         validate_eot_facet(self.data.as_ref(), Limits::default()).ok()
     }
 }
 
-/// Validate the inert structural envelope required for newly authored EOT 1.0
-/// data. This does not decompress, load, render, register, or execute the font.
-pub fn validate_eot_facet(bytes: &[u8], limits: Limits) -> crate::package::Result<EotMetadata> {
-    use crate::package::Error;
-
-    if bytes.len() > limits.max_facet_bytes {
-        return Err(Error::ResourceLimit(
-            "embedded font facet exceeds its byte limit".into(),
-        ));
-    }
-    if bytes.len() < 96 {
-        return Err(Error::Corrupted("EOT 1.0 envelope is truncated".into()));
-    }
-    let data = bytes.get(..36).expect("minimum EOT header was checked");
-    let u32_at = |offset: usize| {
-        u32::from_le_bytes(data[offset..offset + 4].try_into().expect("fixed slice"))
-    };
-    let metadata = EotMetadata {
-        declared_size: u32_at(0),
-        font_data_size: u32_at(4),
-        version: u32_at(8),
-        flags: u32_at(12),
-        charset: data[26],
-        italic: data[27] != 0,
-        weight: u32_at(28),
-        embedding_permissions: u16::from_le_bytes([data[32], data[33]]),
-        magic: u16::from_le_bytes([data[34], data[35]]),
-    };
-    let declared_size = usize::try_from(metadata.declared_size)
-        .map_err(|_| Error::Corrupted("EOT declared size overflows this platform".into()))?;
-    let font_data_size = usize::try_from(metadata.font_data_size)
-        .map_err(|_| Error::Corrupted("EOT font size overflows this platform".into()))?;
-    if metadata.magic != 0x504c || metadata.version != 0x0001_0000 || declared_size != bytes.len() {
-        return Err(Error::Corrupted(
-            "EOT header magic, version, or declared size is invalid".into(),
-        ));
-    }
-    let mut cursor = 82usize;
-    for index in 0..4 {
-        let length_end = cursor
-            .checked_add(2)
-            .ok_or_else(|| Error::Corrupted("EOT name offset overflow".into()))?;
-        let length_bytes = bytes
-            .get(cursor..length_end)
-            .ok_or_else(|| Error::Corrupted("EOT name length is truncated".into()))?;
-        let length = usize::from(u16::from_le_bytes([length_bytes[0], length_bytes[1]]));
-        if length % 2 != 0 {
-            return Err(Error::Corrupted(
-                "EOT UTF-16 name has an odd byte length".into(),
-            ));
-        }
-        cursor = length_end
-            .checked_add(length)
-            .ok_or_else(|| Error::Corrupted("EOT name range overflow".into()))?;
-        let name_start = length_end;
-        let name = bytes
-            .get(name_start..cursor)
-            .ok_or_else(|| Error::Corrupted("EOT name is truncated".into()))?;
-        if char::decode_utf16(
-            name.chunks_exact(2)
-                .map(|pair| u16::from_le_bytes([pair[0], pair[1]])),
-        )
-        .any(|value| value.is_err())
-        {
-            return Err(Error::Corrupted(
-                "EOT name contains malformed UTF-16".into(),
-            ));
-        }
-        if index != 3 {
-            let padding = bytes
-                .get(cursor..cursor + 2)
-                .ok_or_else(|| Error::Corrupted("EOT name padding is truncated".into()))?;
-            if padding != [0, 0] {
-                return Err(Error::Corrupted("EOT name padding is nonzero".into()));
-            }
-            cursor += 2;
-        }
-    }
-    if cursor.checked_add(font_data_size) != Some(declared_size) {
-        return Err(Error::Corrupted(
-            "EOT font data size does not match its trailing payload".into(),
-        ));
-    }
-    Ok(metadata)
-}
-
 /// Font attributes from one `FontEntityAtom`.
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "each bool mirrors one MS-PPT `FontEntityAtom` flag bit; merging them would obscure the format projection"
+)]
 #[derive(Debug, Clone)]
 pub struct Font {
     /// Stable zero-based ordinal used by `FontIndexRef`/`FontIndexRef10`.
@@ -342,6 +282,7 @@ impl Font {
         }
     }
 
+    #[must_use]
     pub fn facet(&self, facet: Facet) -> Option<&EmbeddedFont> {
         self.embedded_fonts
             .iter()
@@ -349,7 +290,7 @@ impl Font {
     }
 }
 
-/// Parsed base or PowerPoint 10 font collection.
+/// Parsed base or `PowerPoint` 10 font collection.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FontCollection {
     /// Retained compatibility projection of [`Self::scope`].
@@ -358,6 +299,7 @@ pub struct FontCollection {
 }
 
 impl FontCollection {
+    #[must_use]
     pub fn new(scope: Scope) -> Self {
         Self {
             international: scope == Scope::International,
@@ -365,6 +307,7 @@ impl FontCollection {
         }
     }
 
+    #[must_use]
     pub const fn scope(&self) -> Scope {
         if self.international {
             Scope::International
@@ -373,6 +316,7 @@ impl FontCollection {
         }
     }
 
+    #[must_use]
     pub fn get(&self, index: u16) -> Option<&Font> {
         self.fonts.get(usize::from(index))
     }
@@ -381,23 +325,32 @@ impl FontCollection {
         self.fonts.get_mut(usize::from(index))
     }
 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.fonts.len()
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.fonts.is_empty()
     }
 
+    #[must_use]
     pub fn has_embedded_fonts(&self) -> bool {
         self.fonts
             .iter()
             .any(|font| !font.embedded_fonts.is_empty())
     }
 
+    /// Append a font, assigning it the next ordinal, and return that ordinal.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the collection already holds 129 fonts or the
+    /// ordinal exceeds `u16`.
     pub fn try_push(&mut self, mut font: Font) -> crate::package::Result<u16> {
         let index = u16::try_from(self.fonts.len())
-            .map_err(|_| crate::package::Error::Corrupted("font ordinal exceeds u16".into()))?;
+            .map_err(|_err| crate::package::Error::Corrupted("font ordinal exceeds u16".into()))?;
         if index > 128 {
             return Err(crate::package::Error::Corrupted(
                 "font collection exceeds the 129-font format limit".into(),
@@ -410,6 +363,12 @@ impl FontCollection {
         Ok(index)
     }
 
+    /// Replace the font at `index`, retaining its raw instance, and return the
+    /// previous font.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `index` is not a known font ordinal.
     pub fn replace(&mut self, index: u16, mut font: Font) -> crate::package::Result<Font> {
         let slot = self.get_mut(index).ok_or_else(|| {
             crate::package::Error::Corrupted(format!("unknown font ordinal {index}"))
@@ -422,15 +381,22 @@ impl FontCollection {
         Ok(std::mem::replace(slot, font))
     }
 
+    /// Validate and set one embedded facet on the font at `index`, returning
+    /// the replaced facet if one existed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `index` is unknown or `data` is not a structurally
+    /// valid EOT 1.0 payload within the default limits.
     pub fn set_facet(
         &mut self,
         index: u16,
         facet: Facet,
         data: impl Into<SharedFontData>,
     ) -> crate::package::Result<Option<EmbeddedFont>> {
-        let data = data.into();
-        validate_eot_facet(data.as_ref(), Limits::default())?;
-        self.set_facet_preserved(index, facet, data)
+        let payload = data.into();
+        validate_eot_facet(payload.as_ref(), Limits::default())?;
+        self.set_facet_preserved(index, facet, payload)
     }
 
     pub(crate) fn set_facet_preserved(
@@ -439,7 +405,7 @@ impl FontCollection {
         facet: Facet,
         data: impl Into<SharedFontData>,
     ) -> crate::package::Result<Option<EmbeddedFont>> {
-        let data = data.into();
+        let payload = data.into();
         let font = self.get_mut(index).ok_or_else(|| {
             crate::package::Error::Corrupted(format!("unknown font ordinal {index}"))
         })?;
@@ -450,23 +416,37 @@ impl FontCollection {
         {
             return Ok(Some(std::mem::replace(
                 &mut font.embedded_fonts[position],
-                EmbeddedFont::from_preserved(facet, data),
+                EmbeddedFont::from_preserved(facet, payload),
             )));
         }
         let position = font
             .embedded_fonts
             .partition_point(|value| value.style < facet as u8);
         font.embedded_fonts
-            .insert(position, EmbeddedFont::from_preserved(facet, data));
+            .insert(position, EmbeddedFont::from_preserved(facet, payload));
         Ok(None)
     }
 
+    /// Check that appending `font` would keep the collection valid under
+    /// `limits`, without mutating it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the resulting collection would violate the format
+    /// or `limits`.
     pub fn validate_append(&self, font: &Font, limits: Limits) -> crate::package::Result<()> {
         let mut candidate = self.clone();
         candidate.try_push(font.clone())?;
         super::validation::validate_authored_collection(&candidate, limits)
     }
 
+    /// Check that replacing the font at `index` with `font` would keep the
+    /// collection valid under `limits`, without mutating it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `index` is unknown or the resulting collection
+    /// would violate the format or `limits`.
     pub fn validate_replacement(
         &self,
         index: u16,
@@ -478,6 +458,13 @@ impl FontCollection {
         super::validation::validate_authored_collection(&candidate, limits)
     }
 
+    /// Check that setting `facet` with `data` on the font at `index` would
+    /// keep the collection valid under `limits`, without mutating it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `index` is unknown, `data` fails EOT validation, or
+    /// the resulting collection would violate the format or `limits`.
     pub fn validate_facet(
         &self,
         index: u16,
@@ -490,6 +477,11 @@ impl FontCollection {
         super::validation::validate_authored_collection(&candidate, limits)
     }
 
+    /// Remove `facet` from the font at `index`, returning it if present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `index` is not a known font ordinal.
     pub fn remove_facet(
         &mut self,
         index: u16,
@@ -506,7 +498,7 @@ impl FontCollection {
     }
 }
 
-/// PowerPoint 10 document-wide embedding settings.
+/// `PowerPoint` 10 document-wide embedding settings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FontEmbeddingFlags {
     /// Undefined bits 2..=31 are retained.
@@ -516,6 +508,7 @@ pub struct FontEmbeddingFlags {
 }
 
 impl FontEmbeddingFlags {
+    #[must_use]
     pub const fn new(subset: bool, subset_option_confirmed: bool) -> Self {
         Self {
             raw: (subset as u32) | ((subset_option_confirmed as u32) << 1),
@@ -534,6 +527,7 @@ pub struct FontCollections {
 }
 
 impl FontCollections {
+    #[must_use]
     pub fn collection(&self, scope: Scope) -> Option<&FontCollection> {
         match scope {
             Scope::Base => self.base.as_ref(),
@@ -548,10 +542,12 @@ impl FontCollections {
         }
     }
 
+    #[must_use]
     pub fn get_base(&self, index: u16) -> Option<&Font> {
         self.base.as_ref()?.get(index)
     }
 
+    #[must_use]
     pub fn get_international(&self, index: u16) -> Option<&Font> {
         self.international.as_ref()?.get(index)
     }
@@ -591,4 +587,101 @@ impl Default for Limits {
             max_embedded_bytes: 128 * 1024 * 1024,
         }
     }
+}
+
+/// Validate the inert structural envelope required for newly authored EOT 1.0
+/// data. This does not decompress, load, render, register, or execute the font.
+///
+/// # Errors
+///
+/// Returns an error if the payload exceeds the facet byte limit or is not a
+/// structurally valid EOT 1.0 envelope.
+pub fn validate_eot_facet(bytes: &[u8], limits: Limits) -> crate::package::Result<EotMetadata> {
+    use crate::package::Error;
+
+    if bytes.len() > limits.max_facet_bytes {
+        return Err(Error::ResourceLimit(
+            "embedded font facet exceeds its byte limit".into(),
+        ));
+    }
+    if bytes.len() < 96 {
+        return Err(Error::Corrupted("EOT 1.0 envelope is truncated".into()));
+    }
+    // The 96-byte minimum above guarantees the fixed 36-byte header prefix.
+    let data = &bytes[..36];
+    let u32_at = |offset: usize| {
+        u32::from_le_bytes([
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+        ])
+    };
+    let metadata = EotMetadata {
+        declared_size: u32_at(0),
+        font_data_size: u32_at(4),
+        version: u32_at(8),
+        flags: u32_at(12),
+        charset: data[26],
+        italic: data[27] != 0,
+        weight: u32_at(28),
+        embedding_permissions: u16::from_le_bytes([data[32], data[33]]),
+        magic: u16::from_le_bytes([data[34], data[35]]),
+    };
+    let declared_size = usize::try_from(metadata.declared_size)
+        .map_err(|_err| Error::Corrupted("EOT declared size overflows this platform".into()))?;
+    let font_data_size = usize::try_from(metadata.font_data_size)
+        .map_err(|_err| Error::Corrupted("EOT font size overflows this platform".into()))?;
+    if metadata.magic != 0x504c || metadata.version != 0x0001_0000 || declared_size != bytes.len() {
+        return Err(Error::Corrupted(
+            "EOT header magic, version, or declared size is invalid".into(),
+        ));
+    }
+    let mut cursor = 82usize;
+    for index in 0..4 {
+        let length_end = cursor
+            .checked_add(2)
+            .ok_or_else(|| Error::Corrupted("EOT name offset overflow".into()))?;
+        let length_bytes = bytes
+            .get(cursor..length_end)
+            .ok_or_else(|| Error::Corrupted("EOT name length is truncated".into()))?;
+        let length = usize::from(u16::from_le_bytes([length_bytes[0], length_bytes[1]]));
+        if length % 2 != 0 {
+            return Err(Error::Corrupted(
+                "EOT UTF-16 name has an odd byte length".into(),
+            ));
+        }
+        cursor = length_end
+            .checked_add(length)
+            .ok_or_else(|| Error::Corrupted("EOT name range overflow".into()))?;
+        let name_start = length_end;
+        let name = bytes
+            .get(name_start..cursor)
+            .ok_or_else(|| Error::Corrupted("EOT name is truncated".into()))?;
+        if char::decode_utf16(
+            name.chunks_exact(2)
+                .map(|pair| u16::from_le_bytes([pair[0], pair[1]])),
+        )
+        .any(|value| value.is_err())
+        {
+            return Err(Error::Corrupted(
+                "EOT name contains malformed UTF-16".into(),
+            ));
+        }
+        if index != 3 {
+            let padding = bytes
+                .get(cursor..cursor + 2)
+                .ok_or_else(|| Error::Corrupted("EOT name padding is truncated".into()))?;
+            if padding != [0, 0] {
+                return Err(Error::Corrupted("EOT name padding is nonzero".into()));
+            }
+            cursor += 2;
+        }
+    }
+    if cursor.checked_add(font_data_size) != Some(declared_size) {
+        return Err(Error::Corrupted(
+            "EOT font data size does not match its trailing payload".into(),
+        ));
+    }
+    Ok(metadata)
 }

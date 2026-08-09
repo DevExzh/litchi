@@ -118,7 +118,7 @@ impl std::fmt::Debug for DetectedFormat {
 pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
     {
-        return detect_format_smart_with_limits(bytes, crate::opc::ReadLimits::default());
+        detect_format_smart_with_limits(bytes, crate::opc::ReadLimits::default())
     }
 
     #[cfg(not(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")))]
@@ -181,7 +181,10 @@ fn detect_format_smart_without_ooxml(bytes: Vec<u8>) -> Option<DetectedFormat> {
 
         #[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
         if let Ok(Some(format)) = litchi_iwa_detect::bytes(&bytes) {
-            #[allow(unreachable_patterns)]
+            #[allow(
+                unreachable_patterns,
+                reason = "match arms are feature-gated; some are unreachable depending on the enabled features"
+            )]
             let detected = match format {
                 #[cfg(feature = "pages")]
                 litchi_iwa_detect::Format::Pages => DetectedFormat::Pages(bytes),
@@ -299,7 +302,10 @@ pub fn detect_format_smart_with_limits(
 
         #[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
         if let Ok(Some(format)) = litchi_iwa_detect::bytes(&bytes) {
-            #[allow(unreachable_patterns)]
+            #[allow(
+                unreachable_patterns,
+                reason = "match arms are feature-gated; some are unreachable depending on the enabled features"
+            )]
             let detected = match format {
                 #[cfg(feature = "pages")]
                 litchi_iwa_detect::Format::Pages => DetectedFormat::Pages(bytes),

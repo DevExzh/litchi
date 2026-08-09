@@ -25,7 +25,15 @@ use crate::consts::RecordType;
 use crate::package::{Error, Result};
 use crate::records::Record;
 
-/// Parse an exact, canonically ordered PowerPoint 2002 extended time node.
+/// Parse an exact, canonically ordered `PowerPoint` 2002 extended time node.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "`RecordType` spans the full MS-PPT record ID space; children outside the recognized timing containers are rejected uniformly"
+)]
 pub fn parse_extended_time_node(record: &Record) -> Result<ExtendedTimeNode> {
     require_container(record, RecordType::ExtTimeNode, 1, "ExtTimeNode")?;
     let atom_record = record
@@ -205,6 +213,14 @@ pub fn parse_extended_time_node(record: &Record) -> Result<ExtendedTimeNode> {
 }
 
 /// Parse an exact, canonically ordered subordinate time-node effect.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "`RecordType` spans the full MS-PPT record ID space; children outside the recognized subeffect containers are rejected uniformly"
+)]
 pub fn parse_time_sub_effect(record: &Record) -> Result<TimeSubEffect> {
     require_container(
         record,
@@ -289,7 +305,10 @@ pub fn parse_time_sub_effect(record: &Record) -> Result<TimeSubEffect> {
                         parts.end_conditions.push(condition);
                         7
                     },
-                    _ => {
+                    TimeConditionType::None
+                    | TimeConditionType::Next
+                    | TimeConditionType::Previous
+                    | TimeConditionType::EndSync => {
                         return Err(Error::InvalidFormat(
                             "subeffect conditions must be Begin or End".to_string(),
                         ));

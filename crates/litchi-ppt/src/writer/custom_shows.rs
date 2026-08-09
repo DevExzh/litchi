@@ -34,6 +34,7 @@ impl CustomShow {
     /// // Create a custom show with slides 0, 2, and 4
     /// let show = CustomShow::new("Executive Summary", &[0, 2, 4]);
     /// ```
+    #[must_use]
     pub fn new(name: &str, slide_indices: &[usize]) -> Self {
         Self {
             name: name.to_string(),
@@ -42,26 +43,36 @@ impl CustomShow {
     }
 }
 
-/// Build the NamedShows container for the Document.
+/// Build the `NamedShows` container for the Document.
 ///
-/// Returns the serialized NamedShows container bytes, or an empty Vec if
+/// Returns the serialized `NamedShows` container bytes, or an empty Vec if
 /// there are no custom shows.
 ///
 /// # Arguments
 ///
 /// * `shows` - Slice of custom show definitions
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
 pub fn build_named_shows(shows: &[CustomShow]) -> Result<Vec<u8>, Error> {
     if shows.is_empty() {
         return Ok(Vec::new());
     }
-    let shows = shows
+    let checked_shows = shows
         .iter()
         .map(checked_named_show)
         .collect::<Result<Vec<_>, _>>()?;
-    build_named_shows_typed(&NamedShows { shows })
+    build_named_shows_typed(&NamedShows {
+        shows: checked_shows,
+    })
 }
 
 /// Serialize the strict typed named-show model, including an empty container.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
 pub fn build_named_shows_typed(shows: &NamedShows) -> Result<Vec<u8>, Error> {
     shows
         .to_record_bytes()
@@ -71,13 +82,13 @@ pub fn build_named_shows_typed(shows: &NamedShows) -> Result<Vec<u8>, Error> {
 fn checked_named_show(show: &CustomShow) -> Result<NamedShow, Error> {
     let mut slide_ids = Vec::with_capacity(show.slide_indices.len());
     for &index in &show.slide_indices {
-        let index = u32::try_from(index).map_err(|_| {
+        let index_u32 = u32::try_from(index).map_err(|_err| {
             Error::new(
                 ErrorKind::InvalidInput,
                 "custom-show slide index exceeds u32",
             )
         })?;
-        let slide_id = index
+        let slide_id = index_u32
             .checked_add(0x100)
             .filter(|id| *id <= 0x7fff_ffff)
             .ok_or_else(|| {
@@ -95,6 +106,11 @@ fn checked_named_show(show: &CustomShow) -> Result<NamedShow, Error> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use crate::consts::RecordType;

@@ -58,7 +58,7 @@ pub(crate) fn put<'k>(
 
     let part = package.get_part_mut(&owner_name)?;
     crate::parts::validate_content_type(part, ct::PML_SLIDE)?;
-    if part.blob() != &owner_blob {
+    if part.blob() != owner_blob {
         return Err(Error::UnsafeEdit {
             operation: "put_classification",
             reason: "the selected slide changed during classification staging",
@@ -107,7 +107,7 @@ pub(crate) fn remove<'k>(
 
     let part = package.get_part_mut(&owner_name)?;
     crate::parts::validate_content_type(part, ct::PML_SLIDE)?;
-    if part.blob() != &owner_blob {
+    if part.blob() != owner_blob {
         return Err(Error::UnsafeEdit {
             operation: "remove_classification",
             reason: "the selected slide changed during classification staging",

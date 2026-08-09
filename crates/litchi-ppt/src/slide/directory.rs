@@ -1,4 +1,4 @@
-//! Normative logical slide directory for binary PowerPoint files.
+//! Normative logical slide directory for binary `PowerPoint` files.
 
 use crate::consts::RecordType;
 use crate::current_user::CurrentUser;
@@ -25,37 +25,48 @@ pub struct SlideDirectoryEntry {
 }
 
 impl SlideDirectoryEntry {
+    #[must_use]
     pub fn persist_id(&self) -> u32 {
         self.persist_id
     }
 
+    #[must_use]
     pub fn slide_id(&self) -> u32 {
         self.slide_id
     }
 
+    #[must_use]
     pub fn flags(&self) -> u32 {
         self.flags
     }
 
+    #[must_use]
     pub fn text_placeholder_count(&self) -> u32 {
         self.text_placeholder_count
     }
 
+    #[must_use]
     pub fn list_text(&self) -> &str {
         &self.list_text
     }
 
+    #[must_use]
     pub fn outline_text_interactions(&self) -> &[crate::TextBodyInteractions] {
         &self.outline_text_interactions
     }
 
     /// Validated outline text references of this slide's shapes.
+    #[must_use]
     pub fn outline_text_refs(&self) -> &[crate::OutlineTextRef] {
         &self.outline_text_refs
     }
 }
 
 /// Ordered logical presentation slides from the live `DocumentContainer`.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`SlideDirectory` is the established public API name re-exported as `slide::SlideDirectory`; renaming it would break downstream crates"
+)]
 #[derive(Debug, Clone)]
 pub struct SlideDirectory {
     document_persist_id: u32,
@@ -94,8 +105,10 @@ impl SlideDirectory {
             )));
         }
         let current_user = CurrentUser::parse_with_limits(current_user_data, limits)?;
-        let user_edit_offset = usize::try_from(current_user.current_edit_offset())
-            .map_err(|_| Error::Corrupted("current edit offset does not fit usize".to_string()))?;
+        let user_edit_offset =
+            usize::try_from(current_user.current_edit_offset()).map_err(|_err| {
+                Error::Corrupted("current edit offset does not fit usize".to_string())
+            })?;
         let user_edit = read_header(document_data, user_edit_offset, "UserEditAtom")?;
         if user_edit.version != 0
             || user_edit.instance != 0
@@ -133,10 +146,11 @@ impl SlideDirectory {
                     "document persist ID {document_persist_id} has no directory entry"
                 ))
             })?;
-        let document_offset = usize::try_from(document_offset).map_err(|_| {
+        let document_offset_usize = usize::try_from(document_offset).map_err(|_err| {
             Error::Corrupted("document persist offset does not fit usize".to_string())
         })?;
-        let (document, _) = Record::parse_with_limits(document_data, document_offset, limits)?;
+        let (document, _) =
+            Record::parse_with_limits(document_data, document_offset_usize, limits)?;
         if document.record_type != RecordType::Document
             || document.version != 0x0f
             || document.instance != 0
@@ -166,17 +180,17 @@ impl SlideDirectory {
         let mut entries: Vec<SlideDirectoryEntry> = Vec::new();
         let mut by_slide_id = HashMap::new();
         let mut by_persist_id = HashMap::new();
-        if let Some(slide_list) = slide_list {
+        if let Some(slide_list_container) = slide_list {
             entries
-                .try_reserve(slide_list.children.len())
-                .map_err(|_| Error::AllocationFailed("PPT slide directory"))?;
+                .try_reserve(slide_list_container.children.len())
+                .map_err(|_err| Error::AllocationFailed("PPT slide directory"))?;
             by_slide_id
-                .try_reserve(slide_list.children.len())
-                .map_err(|_| Error::AllocationFailed("PPT slide ID index"))?;
+                .try_reserve(slide_list_container.children.len())
+                .map_err(|_err| Error::AllocationFailed("PPT slide ID index"))?;
             by_persist_id
-                .try_reserve(slide_list.children.len())
-                .map_err(|_| Error::AllocationFailed("PPT slide persist index"))?;
-            for child in &slide_list.children {
+                .try_reserve(slide_list_container.children.len())
+                .map_err(|_err| Error::AllocationFailed("PPT slide persist index"))?;
+            for child in &slide_list_container.children {
                 if child.record_type != RecordType::SlidePersistAtom {
                     if let Some(entry) = entries.last_mut()
                         && let Ok(value) = child.extract_text()
@@ -229,10 +243,11 @@ impl SlideDirectory {
                         "slide persist ID {persist_id} has no directory entry"
                     ))
                 })?;
-                let slide_offset = usize::try_from(slide_offset).map_err(|_| {
+                let slide_offset_usize = usize::try_from(slide_offset).map_err(|_err| {
                     Error::Corrupted("slide persist offset does not fit usize".to_string())
                 })?;
-                let slide_header = read_header(document_data, slide_offset, "SlideContainer")?;
+                let slide_header =
+                    read_header(document_data, slide_offset_usize, "SlideContainer")?;
                 if slide_header.record_type != SLIDE_CONTAINER
                     || slide_header.version != 0x0f
                     || slide_header.instance != 0
@@ -254,7 +269,7 @@ impl SlideDirectory {
                 by_slide_id.insert(slide_id, index);
                 by_persist_id.insert(persist_id, index);
             }
-            for set in slide_list.group_into_slide_atoms_sets() {
+            for set in slide_list_container.group_into_slide_atoms_sets() {
                 let slide_id =
                     read_u32(&set.slide_persist_atom.data, 12, "SlidePersistAtom.slideId")?;
                 let Some(&index) = by_slide_id.get(&slide_id) else {
@@ -269,37 +284,43 @@ impl SlideDirectory {
 
         Ok(Self {
             document_persist_id,
-            document_offset,
+            document_offset: document_offset_usize,
             entries,
             by_slide_id,
             by_persist_id,
         })
     }
 
+    #[must_use]
     pub fn entries(&self) -> &[SlideDirectoryEntry] {
         &self.entries
     }
 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.entries.len()
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
 
+    #[must_use]
     pub fn get_by_slide_id(&self, slide_id: u32) -> Option<&SlideDirectoryEntry> {
         self.by_slide_id
             .get(&slide_id)
             .map(|&index| &self.entries[index])
     }
 
+    #[must_use]
     pub fn get_by_persist_id(&self, persist_id: u32) -> Option<&SlideDirectoryEntry> {
         self.by_persist_id
             .get(&persist_id)
             .map(|&index| &self.entries[index])
     }
 
+    #[must_use]
     pub fn document_persist_id(&self) -> u32 {
         self.document_persist_id
     }
@@ -330,9 +351,9 @@ struct RawHeader {
 
 fn read_header(data: &[u8], offset: usize, name: &str) -> Result<RawHeader> {
     let bytes = checked_slice(data, offset, 8, &format!("{name} header"))?;
-    let version_instance = u16::from_le_bytes(bytes[0..2].try_into().unwrap());
-    let data_len = usize::try_from(u32::from_le_bytes(bytes[4..8].try_into().unwrap()))
-        .map_err(|_| Error::Corrupted(format!("{name} length does not fit usize")))?;
+    let version_instance = u16::from_le_bytes([bytes[0], bytes[1]]);
+    let data_len = usize::try_from(u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]))
+        .map_err(|_err| Error::Corrupted(format!("{name} length does not fit usize")))?;
     let total = 8usize
         .checked_add(data_len)
         .ok_or_else(|| Error::Corrupted(format!("{name} length overflow")))?;
@@ -340,7 +361,7 @@ fn read_header(data: &[u8], offset: usize, name: &str) -> Result<RawHeader> {
     Ok(RawHeader {
         version: version_instance & 0x000f,
         instance: version_instance >> 4,
-        record_type: u16::from_le_bytes(bytes[2..4].try_into().unwrap()),
+        record_type: u16::from_le_bytes([bytes[2], bytes[3]]),
         data_len,
     })
 }
@@ -355,10 +376,15 @@ fn checked_slice<'a>(data: &'a [u8], offset: usize, len: usize, name: &str) -> R
 
 fn read_u32(data: &[u8], offset: usize, name: &str) -> Result<u32> {
     let bytes = checked_slice(data, offset, 4, name)?;
-    Ok(u32::from_le_bytes(bytes.try_into().unwrap()))
+    Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use crate::Package;
@@ -367,7 +393,7 @@ mod tests {
         let mut bytes = Vec::with_capacity(8 + data.len());
         bytes.extend_from_slice(&(version | (instance << 4)).to_le_bytes());
         bytes.extend_from_slice(&record_type.to_le_bytes());
-        bytes.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(&u32::try_from(data.len()).unwrap().to_le_bytes());
         bytes.extend_from_slice(data);
         bytes
     }
@@ -410,16 +436,16 @@ mod tests {
         let mut mapping = PersistMapping::new();
         mapping.add_mapping(1, 0);
         for &(persist_id, _, _) in entries {
-            let offset = stream.len() as u32;
+            let offset = u32::try_from(stream.len()).unwrap();
             mapping.add_mapping(persist_id, offset);
             stream.extend_from_slice(&record(0x0f, 0, 0x03ee, &[]));
         }
         if extra_slide {
-            let offset = stream.len() as u32;
+            let offset = u32::try_from(stream.len()).unwrap();
             mapping.add_mapping(99, offset);
             stream.extend_from_slice(&record(0x0f, 0, 0x03ee, &[]));
         }
-        let edit_offset = stream.len() as u32;
+        let edit_offset = u32::try_from(stream.len()).unwrap();
         let mut edit = vec![0u8; 28];
         edit[16..20].copy_from_slice(&1u32.to_le_bytes());
         stream.extend_from_slice(&record(0, 0, 0x0ff5, &edit));
@@ -435,7 +461,7 @@ mod tests {
             directory
                 .entries()
                 .iter()
-                .map(|entry| entry.persist_id())
+                .map(SlideDirectoryEntry::persist_id)
                 .collect::<Vec<_>>(),
             [11, 5, 9]
         );
@@ -449,11 +475,11 @@ mod tests {
         let mut document_data = master_list;
         document_data.extend_from_slice(&slide_list);
         let mut stream = record(0x0f, 0, 0x03e8, &document_data);
-        let master_offset = stream.len() as u32;
+        let master_offset = u32::try_from(stream.len()).unwrap();
         stream.extend_from_slice(&record(0x0f, 0, 0x03ee, &[]));
-        let slide_offset = stream.len() as u32;
+        let slide_offset = u32::try_from(stream.len()).unwrap();
         stream.extend_from_slice(&record(0x0f, 0, 0x03ee, &[]));
-        let edit_offset = stream.len() as u32;
+        let edit_offset = u32::try_from(stream.len()).unwrap();
         let mut edit = vec![0u8; 28];
         edit[16..20].copy_from_slice(&1u32.to_le_bytes());
         stream.extend_from_slice(&record(0, 0, 0x0ff5, &edit));
@@ -475,25 +501,25 @@ mod tests {
             synthetic_directory(&[(3, 256, 0), (4, 256, 0)], false);
         assert!(SlideDirectory::build(&stream, &current_user, &mapping).is_err());
 
-        let (stream, current_user, mapping) = synthetic_directory(&[(3, 256, 9)], false);
-        assert!(SlideDirectory::build(&stream, &current_user, &mapping).is_err());
+        let (dup_stream, dup_user, dup_mapping) = synthetic_directory(&[(3, 256, 9)], false);
+        assert!(SlideDirectory::build(&dup_stream, &dup_user, &dup_mapping).is_err());
 
-        let (stream, current_user, mut mapping) = synthetic_directory(&[(3, 256, 0)], false);
-        mapping.add_mapping(3, 0);
-        assert!(SlideDirectory::build(&stream, &current_user, &mapping).is_err());
+        let (zero_stream, zero_user, mut zero_mapping) = synthetic_directory(&[(3, 256, 0)], false);
+        zero_mapping.add_mapping(3, 0);
+        assert!(SlideDirectory::build(&zero_stream, &zero_user, &zero_mapping).is_err());
     }
 
     #[test]
     fn current_user_selects_live_document_in_multi_edit_stream() {
         let (mut stream, _, mut mapping) = synthetic_directory(&[(3, 256, 0)], false);
-        let live_document_offset = stream.len() as u32;
+        let live_document_offset = u32::try_from(stream.len()).unwrap();
         let live_list = record(0x0f, 0, 0x0ff0, &slide_persist(4, 900, 0));
         stream.extend_from_slice(&record(0x0f, 0, 0x03e8, &live_list));
         mapping.add_mapping(2, live_document_offset);
-        let slide_offset = stream.len() as u32;
+        let slide_offset = u32::try_from(stream.len()).unwrap();
         stream.extend_from_slice(&record(0x0f, 0, 0x03ee, &[]));
         mapping.add_mapping(4, slide_offset);
-        let edit_offset = stream.len() as u32;
+        let edit_offset = u32::try_from(stream.len()).unwrap();
         let mut edit = vec![0u8; 28];
         edit[16..20].copy_from_slice(&2u32.to_le_bytes());
         stream.extend_from_slice(&record(0, 0, 0x0ff5, &edit));
@@ -517,9 +543,9 @@ mod tests {
         slide_list_data.extend_from_slice(&anchor);
         let slide_list = record(0x0f, 0, 4080, &slide_list_data);
         let mut stream = record(0x0f, 0, 1000, &slide_list);
-        let slide_offset = stream.len() as u32;
+        let slide_offset = u32::try_from(stream.len()).unwrap();
         stream.extend_from_slice(&record(0x0f, 0, 1006, &[]));
-        let edit_offset = stream.len() as u32;
+        let edit_offset = u32::try_from(stream.len()).unwrap();
         let mut edit = vec![0u8; 28];
         edit[16..20].copy_from_slice(&1u32.to_le_bytes());
         stream.extend_from_slice(&record(0, 0, 4085, &edit));
@@ -546,14 +572,14 @@ mod tests {
         assert_eq!(
             slides
                 .iter()
-                .map(|slide| slide.slide_id())
+                .map(super::super::types::Slide::slide_id)
                 .collect::<Vec<_>>(),
             [256, 258, 257]
         );
         assert_eq!(
             slides
                 .iter()
-                .map(|slide| slide.persist_id())
+                .map(super::super::types::Slide::persist_id)
                 .collect::<Vec<_>>(),
             [3, 5, 4]
         );
@@ -562,24 +588,24 @@ mod tests {
             assert!(text.contains(title), "expected {title:?}, got {text:?}");
         }
 
-        let mut package = Package::open(root.join("basic_test_ppt_file.ppt")).unwrap();
-        let presentation = package.presentation().unwrap();
-        let slides = presentation.slides().unwrap();
+        let mut basic_package = Package::open(root.join("basic_test_ppt_file.ppt")).unwrap();
+        let basic_presentation = basic_package.presentation().unwrap();
+        let basic_slides = basic_presentation.slides().unwrap();
         assert_eq!(
-            slides
+            basic_slides
                 .iter()
-                .map(|slide| slide.slide_id())
+                .map(super::super::types::Slide::slide_id)
                 .collect::<Vec<_>>(),
             [256, 257]
         );
         assert_eq!(
-            slides
+            basic_slides
                 .iter()
-                .map(|slide| slide.persist_id())
+                .map(super::super::types::Slide::persist_id)
                 .collect::<Vec<_>>(),
             [4, 6]
         );
-        assert_eq!(presentation.slide_count(), 2);
-        assert_eq!(presentation.extract_text_fast().unwrap().len(), 2);
+        assert_eq!(basic_presentation.slide_count(), 2);
+        assert_eq!(basic_presentation.extract_text_fast().unwrap().len(), 2);
     }
 }

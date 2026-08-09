@@ -24,6 +24,10 @@ pub enum StyleType {
     Table,
 }
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent RTF feature flags stay flat for direct access"
+)]
 /// Inert conditional-formatting scope and banding metadata of a table style
 /// definition (`\tsN`).
 ///
@@ -65,6 +69,7 @@ pub struct TableStyleConditionalFormatting {
 impl TableStyleConditionalFormatting {
     /// Whether no conditional-formatting metadata is present.
     #[inline]
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         !self.row_defaults_marker
             && !self.first_row
@@ -80,6 +85,10 @@ impl TableStyleConditionalFormatting {
     }
 }
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent RTF feature flags stay flat for direct access"
+)]
 /// RTF style definition
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Style<'a> {
@@ -130,6 +139,10 @@ pub struct Style<'a> {
 }
 
 impl<'a> Style<'a> {
+    #[allow(
+        clippy::large_types_passed_by_value,
+        reason = "the paragraph moves into the constructed style; borrowing would force an extra clone"
+    )]
     fn new(
         id: u16,
         name: Cow<'a, str>,
@@ -164,36 +177,42 @@ impl<'a> Style<'a> {
 
     /// Create a new paragraph style
     #[inline]
+    #[must_use]
     pub fn paragraph(id: u16, name: Cow<'a, str>) -> Self {
         Self::new(id, name, StyleType::Paragraph, Some(Paragraph::default()))
     }
 
     /// Create a new character style
     #[inline]
+    #[must_use]
     pub fn character(id: u16, name: Cow<'a, str>) -> Self {
         Self::new(id, name, StyleType::Character, None)
     }
 
     /// Create a new section style.
     #[inline]
+    #[must_use]
     pub fn section(id: u16, name: Cow<'a, str>) -> Self {
         Self::new(id, name, StyleType::Section, None)
     }
 
     /// Create a new table style.
     #[inline]
+    #[must_use]
     pub fn table(id: u16, name: Cow<'a, str>) -> Self {
         Self::new(id, name, StyleType::Table, None)
     }
 
     /// Check if this is a paragraph style
     #[inline]
+    #[must_use]
     pub fn is_paragraph_style(&self) -> bool {
         self.style_type == StyleType::Paragraph
     }
 
     /// Check if this is a character style
     #[inline]
+    #[must_use]
     pub fn is_character_style(&self) -> bool {
         self.style_type == StyleType::Character
     }
@@ -209,6 +228,7 @@ pub struct StyleSheet<'a> {
 impl<'a> StyleSheet<'a> {
     /// Create a new stylesheet
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self { styles: Vec::new() }
     }
@@ -220,11 +240,13 @@ impl<'a> StyleSheet<'a> {
     }
 
     /// Get a style by ID
+    #[must_use]
     pub fn get(&self, id: u16) -> Option<&Style<'a>> {
         self.styles.iter().find(|s| s.id == id)
     }
 
     /// Get a style by type and ID.
+    #[must_use]
     pub fn get_typed(&self, style_type: StyleType, id: u16) -> Option<&Style<'a>> {
         self.styles
             .iter()
@@ -232,17 +254,20 @@ impl<'a> StyleSheet<'a> {
     }
 
     /// Get a style by name
+    #[must_use]
     pub fn get_by_name(&self, name: &str) -> Option<&Style<'a>> {
         self.styles.iter().find(|s| s.name.as_ref() == name)
     }
 
     /// Get all styles
     #[inline]
+    #[must_use]
     pub fn styles(&self) -> &[Style<'a>] {
         &self.styles
     }
 
     /// Get all paragraph styles
+    #[must_use]
     pub fn paragraph_styles(&self) -> Vec<&Style<'a>> {
         self.styles
             .iter()
@@ -251,6 +276,7 @@ impl<'a> StyleSheet<'a> {
     }
 
     /// Get all character styles
+    #[must_use]
     pub fn character_styles(&self) -> Vec<&Style<'a>> {
         self.styles
             .iter()
@@ -261,6 +287,9 @@ impl<'a> StyleSheet<'a> {
     /// Return the based-on chain from the root ancestor to the selected style.
     ///
     /// Raw definitions remain unchanged so explicit resets survive writing.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn inheritance_chain(&self, style_type: StyleType, id: u16) -> RtfResult<Vec<&Style<'a>>> {
         let mut chain = Vec::new();
         let mut seen = HashSet::new();

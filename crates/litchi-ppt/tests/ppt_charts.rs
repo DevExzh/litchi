@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use std::io::Cursor;
 use std::path::PathBuf;
 
@@ -23,7 +29,7 @@ fn fixture(name: &str) -> PathBuf {
 
 fn record(kind: u16, data: &[u8]) -> Vec<u8> {
     let mut out = kind.to_le_bytes().to_vec();
-    out.extend((data.len() as u16).to_le_bytes());
+    out.extend(u16::try_from(data.len()).unwrap().to_le_bytes());
     out.extend(data);
     out
 }
@@ -168,37 +174,37 @@ fn graph_and_excel_objects_use_neutral_typed_views() {
     assert_eq!(graph.info().object_id(), 7);
     assert_eq!(graph.info().program(), Some("MSGraph.Chart.8"));
     assert!(graph.info().frame().is_none());
-    let Chart::Graph(graph) = graph else {
+    let Chart::Graph(typed_graph) = graph else {
         panic!("kind and variant must agree");
     };
-    assert_eq!(graph.package().topology().stream_count(), 1);
-    assert_eq!(graph.book().len(), 1);
-    let chart = graph
+    assert_eq!(typed_graph.package().topology().stream_count(), 1);
+    assert_eq!(typed_graph.book().len(), 1);
+    let graph_chart = typed_graph
         .book()
         .charts()
         .next()
         .expect("one chart")
         .expect("validated chart");
-    assert_eq!(chart.kind(), GraphKind::Graph);
-    assert_eq!(chart.records().count(), 3);
-    assert!(chart.offset() > 0);
+    assert_eq!(graph_chart.kind(), GraphKind::Graph);
+    assert_eq!(graph_chart.records().count(), 3);
+    assert!(graph_chart.offset() > 0);
 
     let excel = inventory.get(1).expect("Excel chart");
     assert_eq!(excel.kind(), Kind::Excel);
     assert_eq!(excel.info().object_id(), 8);
-    let Chart::Excel(excel) = excel else {
+    let Chart::Excel(typed_excel) = excel else {
         panic!("kind and variant must agree");
     };
-    assert_eq!(excel.book().len(), 1);
-    let chart = excel
+    assert_eq!(typed_excel.book().len(), 1);
+    let excel_chart = typed_excel
         .book()
         .charts()
         .next()
         .expect("one chart")
         .expect("validated chart");
-    assert_eq!(chart.kind(), GraphKind::Excel);
-    assert_eq!(chart.records().count(), 3);
-    assert!(chart.offset() > 0);
+    assert_eq!(excel_chart.kind(), GraphKind::Excel);
+    assert_eq!(excel_chart.records().count(), 3);
+    assert!(excel_chart.offset() > 0);
 
     assert!(
         inventory
@@ -263,17 +269,23 @@ fn graph_package_replacement_uses_typed_host_storage_transaction() {
     let rewritten = host.finish().expect("finish host transaction");
 
     let mut reopened = Package::from_reader(Cursor::new(rewritten)).expect("reopen package");
-    let presentation = reopened
+    let rewritten_presentation = reopened
         .presentation()
         .expect("read rewritten presentation");
-    let inventory = presentation.charts().expect("enumerate rewritten charts");
-    let Chart::Graph(graph) = inventory.get(0).expect("rewritten Graph chart") else {
+    let rewritten_inventory = rewritten_presentation
+        .charts()
+        .expect("enumerate rewritten charts");
+    let Chart::Graph(rewritten_graph) = rewritten_inventory.get(0).expect("rewritten Graph chart")
+    else {
         panic!("expected rewritten Graph chart");
     };
-    let workbook = graph.package().workbook().expect("rewritten Workbook");
+    let workbook = rewritten_graph
+        .package()
+        .workbook()
+        .expect("rewritten Workbook");
     assert_eq!(workbook.chart().as_bytes(), replacement.as_slice());
-    assert_eq!(graph.info().object_id(), 7);
-    assert_eq!(graph.info().persist_id(), persist_id);
+    assert_eq!(rewritten_graph.info().object_id(), 7);
+    assert_eq!(rewritten_graph.info().persist_id(), persist_id);
 }
 
 #[test]

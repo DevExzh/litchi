@@ -13,32 +13,50 @@ pub(super) const HEADER_LEN: usize = 8;
 
 impl Data {
     /// Parse an exact anchor payload using the default bound.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(bytes: impl AsRef<[u8]>) -> Result<Self> {
         Self::parse_with_limits(bytes, Limits::default())
     }
 
     /// Parse an exact anchor payload with an explicit resource bound.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
-        let bytes = bytes.as_ref();
-        validation::payload_len(bytes.len(), limits)?;
-        match bytes.len() {
+        let payload = bytes.as_ref();
+        validation::payload_len(payload.len(), limits)?;
+        match payload.len() {
             SMALL_RECT_LEN => Ok(Self::Small(SmallRect::new(
-                i16_at(bytes, 2),
-                i16_at(bytes, 0),
-                i16_at(bytes, 4),
-                i16_at(bytes, 6),
+                i16_at(payload, 2),
+                i16_at(payload, 0),
+                i16_at(payload, 4),
+                i16_at(payload, 6),
             )?)),
             RECT_LEN => Ok(Self::Full(Rect::new(
-                i32_at(bytes, 4),
-                i32_at(bytes, 0),
-                i32_at(bytes, 8),
-                i32_at(bytes, 12),
+                i32_at(payload, 4),
+                i32_at(payload, 0),
+                i32_at(payload, 8),
+                i32_at(payload, 12),
             )?)),
             _ => unreachable!("payload length was validated"),
         }
     }
 
     /// Serialize only the host-defined payload.
+    ///
+    /// # Panics
+    ///
+    /// Panics only if writing to the in-memory buffer fails, which `Write for
+    /// Vec<u8>` documents as impossible.
+    #[must_use]
+    #[allow(
+        clippy::expect_used,
+        reason = "`Write for Vec<u8>` is documented as infallible, so the result is always `Ok`"
+    )]
     pub fn to_bytes(self) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(self.encoded_len());
         self.write_to(&mut bytes)
@@ -46,6 +64,11 @@ impl Data {
         bytes
     }
 
+    /// Write only the host-defined payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying writer reports an error.
     pub fn write_to<W: Write>(self, writer: &mut W) -> io::Result<()> {
         match self {
             Self::Small(value) => {
@@ -67,42 +90,60 @@ impl Data {
 
 impl Anchor {
     /// Parse one exact complete record using the default bound.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(bytes: impl AsRef<[u8]>) -> Result<Self> {
         Self::parse_with_limits(bytes, Limits::default())
     }
 
     /// Parse one exact complete record with an explicit resource bound.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
-        let bytes = bytes.as_ref();
-        if bytes.len() < HEADER_LEN {
+        let record = bytes.as_ref();
+        if record.len() < HEADER_LEN {
             return Err(Error::Corrupted(
                 "OfficeArtClientAnchor header is truncated".into(),
             ));
         }
-        let version_instance = u16::from_le_bytes([bytes[0], bytes[1]]);
+        let version_instance = u16::from_le_bytes([record[0], record[1]]);
         validation::header(
             version_instance & 0x000F,
             version_instance >> 4,
-            u16::from_le_bytes([bytes[2], bytes[3]]),
+            u16::from_le_bytes([record[2], record[3]]),
         )?;
-        let payload_len = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]) as usize;
+        let payload_len = u32::from_le_bytes([record[4], record[5], record[6], record[7]]) as usize;
         validation::payload_len(payload_len, limits)?;
         let expected_len = HEADER_LEN
             .checked_add(payload_len)
             .ok_or_else(|| Error::Corrupted("OfficeArtClientAnchor length overflows".into()))?;
-        if bytes.len() != expected_len {
+        if record.len() != expected_len {
             return Err(Error::Corrupted(format!(
                 "OfficeArtClientAnchor record length is {}, expected {expected_len}",
-                bytes.len()
+                record.len()
             )));
         }
         Ok(Self::new(Data::parse_with_limits(
-            &bytes[HEADER_LEN..],
+            &record[HEADER_LEN..],
             limits,
         )?))
     }
 
     /// Serialize the complete record.
+    ///
+    /// # Panics
+    ///
+    /// Panics only if writing to the in-memory buffer fails, which `Write for
+    /// Vec<u8>` documents as impossible.
+    #[must_use]
+    #[allow(
+        clippy::expect_used,
+        reason = "`Write for Vec<u8>` is documented as infallible, so the result is always `Ok`"
+    )]
     pub fn to_bytes(self) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(self.encoded_len());
         self.write_to(&mut bytes)
@@ -111,10 +152,19 @@ impl Anchor {
     }
 
     /// Write the complete record without changing its compact/full representation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the underlying writer reports an error.
     pub fn write_to<W: Write>(self, writer: &mut W) -> io::Result<()> {
         writer.write_all(&0u16.to_le_bytes())?;
         writer.write_all(&RECORD_TYPE.to_le_bytes())?;
-        writer.write_all(&(self.data().encoded_len() as u32).to_le_bytes())?;
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "the anchor payload is exactly `SMALL_RECT_LEN` or `RECT_LEN` bytes, so its length always fits in `u32`"
+        )]
+        let payload_len = self.data().encoded_len() as u32;
+        writer.write_all(&payload_len.to_le_bytes())?;
         self.data().write_to(writer)
     }
 }

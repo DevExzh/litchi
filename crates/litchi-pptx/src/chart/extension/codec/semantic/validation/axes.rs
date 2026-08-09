@@ -1,6 +1,14 @@
-//! Plot-area axes and layout validation concerns for the ChartEx graph.
+//! Plot-area axes and layout validation concerns for the `ChartEx` graph.
 
-use super::*;
+use super::{
+    Axis, AxisScaling, AxisTitle, AxisUnit, AxisUnits, AxisUnitsLabel, Binning, BinningChoice, CX,
+    ClosedSide, ElementVisibility, Gridlines, LayoutProperties, MiniNode, ParentLabelLayout,
+    PlotSurface, RegionLabelLayout, Result, TickLabels, TickMarkType, TickMarks, invalid,
+    invalid_error, optional, parse_bool, parse_double_or_auto, parse_drawing_payload,
+    parse_geography, parse_nonnegative_or_auto, parse_number_format, parse_offset,
+    parse_positive_or_auto, parse_shared_text, parse_statistics, parse_subtotals, parse_u32,
+    reject_unknown, require_empty_content, require_empty_element, required, valid_xml_double,
+};
 use std::collections::HashSet;
 
 pub(super) fn parse_plot_surface(node: &MiniNode) -> Result<PlotSurface> {
@@ -100,16 +108,16 @@ pub(super) fn parse_axis(node: &MiniNode, offset_allowed: bool) -> Result<Axis> 
                 "title" => title = Some(parse_axis_title(child, offset_allowed)?),
                 "units" => units = Some(parse_axis_units(child)?),
                 "majorGridlines" => {
-                    major_gridlines = Some(parse_gridlines(child, "majorGridlines")?)
+                    major_gridlines = Some(parse_gridlines(child, "majorGridlines")?);
                 },
                 "minorGridlines" => {
-                    minor_gridlines = Some(parse_gridlines(child, "minorGridlines")?)
+                    minor_gridlines = Some(parse_gridlines(child, "minorGridlines")?);
                 },
                 "majorTickMarks" => {
-                    major_tick_marks = Some(parse_tick_marks(child, "majorTickMarks")?)
+                    major_tick_marks = Some(parse_tick_marks(child, "majorTickMarks")?);
                 },
                 "minorTickMarks" => {
-                    minor_tick_marks = Some(parse_tick_marks(child, "minorTickMarks")?)
+                    minor_tick_marks = Some(parse_tick_marks(child, "minorTickMarks")?);
                 },
                 "tickLabels" => tick_labels = Some(parse_tick_labels(child)?),
                 "numFmt" => number_format = Some(parse_number_format(child)?),
@@ -272,10 +280,10 @@ pub(super) fn parse_axis_units_label(node: &MiniNode) -> Result<AxisUnitsLabel> 
         match child.name.as_str() {
             "tx" => text = Some(parse_shared_text(child, "axis units label tx")?),
             "spPr" => {
-                shape_properties = Some(parse_drawing_payload(child, "axis units label spPr")?)
+                shape_properties = Some(parse_drawing_payload(child, "axis units label spPr")?);
             },
             "txPr" => {
-                text_properties = Some(parse_drawing_payload(child, "axis units label txPr")?)
+                text_properties = Some(parse_drawing_payload(child, "axis units label txPr")?);
             },
             "extLst" => has_extension_list = true,
             _ => unreachable!(),

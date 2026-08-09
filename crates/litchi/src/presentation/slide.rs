@@ -4,7 +4,10 @@ use super::types::{LegacySlideData, SlideData};
 use litchi_core::Result;
 
 /// A slide in a PowerPoint presentation.
-#[allow(clippy::large_enum_variant)] // public facade enum; boxing would break the API
+#[allow(
+    clippy::large_enum_variant,
+    reason = "public facade enum; boxing the large variant would break the API"
+)]
 pub enum Slide {
     /// Legacy PPT slide with extracted data
     Ppt(LegacySlideData),

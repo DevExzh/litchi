@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{
     EndnoteRestart, FootnoteRestart, NoteNumberingStyle, RtfDocument, RtfWriter,
     SectionFootnotePlacement, SectionNoteOptions,
@@ -110,7 +119,7 @@ fn supports_all_42_section_numbering_control_spellings() {
     ];
 
     for (footnote, endnote, style) in cases {
-        let source = format!(r#"{{\rtf1\sectd\{footnote}\{endnote} X}}"#);
+        let source = format!(r"{{\rtf1\sectd\{footnote}\{endnote} X}}");
         let document = RtfDocument::parse(&source).unwrap();
         let options = document.sections()[0].properties.note_options;
         assert_eq!(options.footnote_numbering, Some(style));
@@ -121,16 +130,15 @@ fn supports_all_42_section_numbering_control_spellings() {
             .write_document(&document)
             .unwrap();
         let output = String::from_utf8(output).unwrap();
-        assert!(output.contains(&format!(r#"\{footnote}"#)));
-        assert!(output.contains(&format!(r#"\{endnote}"#)));
+        assert!(output.contains(&format!(r"\{footnote}")));
+        assert!(output.contains(&format!(r"\{endnote}")));
     }
 }
 
 #[test]
 fn preserves_inheritance_and_sectd_reset() {
     let inherited =
-        RtfDocument::parse(r#"{\rtf1\sectd\sftnbj\sftnnchi First\sect\sftnstart2 Second}"#)
-            .unwrap();
+        RtfDocument::parse(r"{\rtf1\sectd\sftnbj\sftnnchi First\sect\sftnstart2 Second}").unwrap();
     assert_eq!(inherited.sections().len(), 2);
     let first = inherited.sections()[0].properties.note_options;
     let second = inherited.sections()[1].properties.note_options;
@@ -139,7 +147,7 @@ fn preserves_inheritance_and_sectd_reset() {
     assert_eq!(second.footnote_start, Some(2));
 
     let reset =
-        RtfDocument::parse(r#"{\rtf1\sectd\sftnbj\sftnnchi First\sect\sectd Second}"#).unwrap();
+        RtfDocument::parse(r"{\rtf1\sectd\sftnbj\sftnnchi First\sect\sectd Second}").unwrap();
     assert_eq!(reset.sections().len(), 2);
     assert!(reset.sections()[1].properties.note_options.is_empty());
 }
@@ -147,24 +155,24 @@ fn preserves_inheritance_and_sectd_reset() {
 #[test]
 fn rejects_invalid_values_and_non_root_or_late_section_note_options() {
     let malformed = [
-        r#"{\rtf1\sectd\sftnstart0 Body}"#,
-        r#"{\rtf1\sectd\sftnstart-1 Body}"#,
-        r#"{\rtf1\sectd\saftnstart0 Body}"#,
-        r#"{\rtf1\sectd\saftnstart-1 Body}"#,
-        r#"{\rtf1\sectd\sftnstart2147483648 Body}"#,
-        r#"{\rtf1\sectd Body\sftnbj}"#,
-        r#"{\rtf1\sectd\'41\sftnbj}"#,
-        r#"{\rtf1\sectd\u65?\sftnbj}"#,
-        r#"{\rtf1\sectd{\sftnbj}Body}"#,
-        r#"{\rtf1\sectd{\*\sftnbj}Body}"#,
-        r#"{\rtf1\sectd{\header\sftnbj X}Body}"#,
-        r#"{\rtf1\sectd{\footer\saftnnar X}Body}"#,
-        r#"{\rtf1\sectd{\annotation\sftnstart2 X}Body}"#,
-        r#"{\rtf1\sectd{\footnote\sftnrstpg X}Body}"#,
-        r#"{\rtf1\sectd{\field\sftnnar X}Body}"#,
-        r#"{\rtf1\sectd{\object\saftnnar X}Body}"#,
-        r#"{\rtf1\sectd{\sftnbj\bin2 AB}Body}"#,
-        r#"{\rtf1\sectd{\header H}\sftnbj Body}"#,
+        r"{\rtf1\sectd\sftnstart0 Body}",
+        r"{\rtf1\sectd\sftnstart-1 Body}",
+        r"{\rtf1\sectd\saftnstart0 Body}",
+        r"{\rtf1\sectd\saftnstart-1 Body}",
+        r"{\rtf1\sectd\sftnstart2147483648 Body}",
+        r"{\rtf1\sectd Body\sftnbj}",
+        r"{\rtf1\sectd\'41\sftnbj}",
+        r"{\rtf1\sectd\u65?\sftnbj}",
+        r"{\rtf1\sectd{\sftnbj}Body}",
+        r"{\rtf1\sectd{\*\sftnbj}Body}",
+        r"{\rtf1\sectd{\header\sftnbj X}Body}",
+        r"{\rtf1\sectd{\footer\saftnnar X}Body}",
+        r"{\rtf1\sectd{\annotation\sftnstart2 X}Body}",
+        r"{\rtf1\sectd{\footnote\sftnrstpg X}Body}",
+        r"{\rtf1\sectd{\field\sftnnar X}Body}",
+        r"{\rtf1\sectd{\object\saftnnar X}Body}",
+        r"{\rtf1\sectd{\sftnbj\bin2 AB}Body}",
+        r"{\rtf1\sectd{\header H}\sftnbj Body}",
     ];
     for source in malformed {
         assert!(
@@ -186,7 +194,7 @@ fn rejects_invalid_values_and_non_root_or_late_section_note_options() {
 
 #[test]
 fn document_note_options_do_not_materialize_section_overrides() {
-    let document = RtfDocument::parse(r#"{\rtf1\ftnnar\aftnnruc\sectd Body}"#).unwrap();
+    let document = RtfDocument::parse(r"{\rtf1\ftnnar\aftnnruc\sectd Body}").unwrap();
     assert!(document.sections()[0].properties.note_options.is_empty());
 }
 
@@ -207,14 +215,14 @@ fn permits_inert_section_note_controls_only_in_body_field_results() {
     );
 
     let malformed = [
-        r#"{\rtf1{\field{\*\fldinst TOC \sftnbj}{\fldrslt X}}}"#,
-        r#"{\rtf1{\header{\field{\*\fldinst X}{\fldrslt\sftnbj X}}}Body}"#,
-        r#"{\rtf1{\footer{\field{\*\fldinst X}{\fldrslt\sftnbj X}}}Body}"#,
-        r#"{\rtf1{\annotation{\field{\*\fldinst X}{\fldrslt\sftnbj X}}}Body}"#,
-        r#"{\rtf1{\footnote{\field{\*\fldinst X}{\fldrslt\sftnbj X}}}Body}"#,
-        r#"{\rtf1{\object{\result{\field{\*\fldinst X}{\fldrslt\sftnbj X}}}}Body}"#,
-        r#"{\rtf1{\pict{\field{\*\fldinst X}{\fldrslt\sftnbj X}}}Body}"#,
-        r#"{\rtf1{\shp{\field{\*\fldinst X}{\fldrslt\sftnbj X}}}Body}"#,
+        r"{\rtf1{\field{\*\fldinst TOC \sftnbj}{\fldrslt X}}}",
+        r"{\rtf1{\header{\field{\*\fldinst X}{\fldrslt\sftnbj X}}}Body}",
+        r"{\rtf1{\footer{\field{\*\fldinst X}{\fldrslt\sftnbj X}}}Body}",
+        r"{\rtf1{\annotation{\field{\*\fldinst X}{\fldrslt\sftnbj X}}}Body}",
+        r"{\rtf1{\footnote{\field{\*\fldinst X}{\fldrslt\sftnbj X}}}Body}",
+        r"{\rtf1{\object{\result{\field{\*\fldinst X}{\fldrslt\sftnbj X}}}}Body}",
+        r"{\rtf1{\pict{\field{\*\fldinst X}{\fldrslt\sftnbj X}}}Body}",
+        r"{\rtf1{\shp{\field{\*\fldinst X}{\fldrslt\sftnbj X}}}Body}",
     ];
     for source in malformed {
         assert!(
@@ -227,15 +235,15 @@ fn permits_inert_section_note_controls_only_in_body_field_results() {
 #[test]
 fn permits_section_note_controls_in_explicit_body_section_format_snapshots() {
     let document =
-        RtfDocument::parse(r#"{\rtf1\sectd\sftnnar Before{\sectd\sftnbj{\b snapshot}}After}"#)
+        RtfDocument::parse(r"{\rtf1\sectd\sftnnar Before{\sectd\sftnbj{\b snapshot}}After}")
             .unwrap();
     assert_eq!(document.text(), "BeforesnapshotAfter");
 
     for source in [
-        r#"{\rtf1\sectd{\sftnbj}Body}"#,
-        r#"{\rtf1\sectd{\*\sectd\sftnbj}Body}"#,
-        r#"{\rtf1\sectd{\header{\sectd\sftnbj}H}Body}"#,
-        r#"{\rtf1\sectd{\object{\sectd\sftnbj}}Body}"#,
+        r"{\rtf1\sectd{\sftnbj}Body}",
+        r"{\rtf1\sectd{\*\sectd\sftnbj}Body}",
+        r"{\rtf1\sectd{\header{\sectd\sftnbj}H}Body}",
+        r"{\rtf1\sectd{\object{\sectd\sftnbj}}Body}",
     ] {
         assert!(
             RtfDocument::parse(source).is_err(),
@@ -262,9 +270,9 @@ fn permits_section_note_controls_in_explicit_root_section_format_runs() {
     );
 
     for source in [
-        r#"{\rtf1\sectd Before\sectd\ltrsect Boundary\sftnbj}"#,
-        r#"{\rtf1\sectd Before\sectd{\b boundary}\sftnbj}"#,
-        r#"{\rtf1\sectd Before\sectd\sbk\sftnbj}"#,
+        r"{\rtf1\sectd Before\sectd\ltrsect Boundary\sftnbj}",
+        r"{\rtf1\sectd Before\sectd{\b boundary}\sftnbj}",
+        r"{\rtf1\sectd Before\sectd\sbk\sftnbj}",
     ] {
         assert!(
             RtfDocument::parse(source).is_err(),
@@ -308,13 +316,13 @@ fn permits_inert_section_format_runs_at_direct_field_instruction_level() {
             .all(|section| section.properties.note_options.is_empty())
     );
 
-    let nested = r#"{\rtf1{\field{\*\fldinst IF {\sectd\sftnbj} x}{\fldrslt value}}}"#;
+    let nested = r"{\rtf1{\field{\*\fldinst IF {\sectd\sftnbj} x}{\fldrslt value}}}";
     assert!(RtfDocument::parse(nested).is_err());
 }
 
 #[test]
 fn ignores_section_note_controls_after_the_parsed_document_group() {
-    let document = RtfDocument::parse(r#"{\rtf1 Body}\sectd\sftnbj"#).unwrap();
+    let document = RtfDocument::parse(r"{\rtf1 Body}\sectd\sftnbj").unwrap();
     assert_eq!(document.text(), "Body");
     assert!(
         document
@@ -323,7 +331,7 @@ fn ignores_section_note_controls_after_the_parsed_document_group() {
             .all(|section| section.properties.note_options.is_empty())
     );
 
-    assert!(RtfDocument::parse(r#"{\rtf1 Body\sftnbj}"#).is_err());
+    assert!(RtfDocument::parse(r"{\rtf1 Body\sftnbj}").is_err());
 }
 
 #[test]

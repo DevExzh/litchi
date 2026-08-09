@@ -165,7 +165,7 @@ fn typed_caches_coexist_with_workbook_global_stream_ids() {
         workbook
             .pivot_caches()
             .iter()
-            .map(|cache| cache.stream_id())
+            .map(litchi_xls::PivotCache::stream_id)
             .collect::<Vec<_>>(),
         vec![1, 2]
     );
@@ -193,8 +193,8 @@ fn reads_libreoffice_boolean_and_empty_pivot_caches() {
             workbook
                 .pivot_caches()
                 .iter()
-                .flat_map(|cache| cache.fields())
-                .flat_map(|field| field.items())
+                .flat_map(litchi_xls::PivotCache::fields)
+                .flat_map(litchi_xls::PivotCacheField::items)
                 .any(|item| item == &expected)
         );
     }

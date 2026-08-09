@@ -12,6 +12,14 @@ use crate::error::{OpcError, Result};
 /// permissions are preserved on Unix, and symbolic-link or non-file
 /// destinations are rejected before any replacement is attempted. Windows
 /// permission preservation is not currently promised.
+///
+/// # Errors
+///
+/// Returns an error when `path` is not a usable file destination, when the
+/// temporary file cannot be written, synchronized, or persisted, or when the
+/// `write` callback fails. If the destination was already replaced but the
+/// parent directory could not be synchronized, the error is
+/// [`OpcError::Committed`].
 pub fn replace(path: &Path, write: impl FnOnce(&mut File) -> Result<()>) -> Result<()> {
     replace_with(path, write)
 }
@@ -20,6 +28,13 @@ pub fn replace(path: &Path, write: impl FnOnce(&mut File) -> Result<()>) -> Resu
 ///
 /// Filesystem validation and persistence failures are converted from
 /// [`OpcError`], while an error returned by `write` is passed through exactly.
+///
+/// # Errors
+///
+/// Returns an error when `path` is not a usable file destination, when the
+/// temporary file cannot be written, synchronized, or persisted, or when the
+/// `write` callback fails. Filesystem failures are converted into `E` from
+/// [`OpcError`]; a `write` failure is returned unchanged.
 pub fn replace_with<E>(
     path: &Path,
     write: impl FnOnce(&mut File) -> std::result::Result<(), E>,
@@ -58,10 +73,10 @@ where
         .map_err(E::from)?;
 
     write(temporary.as_file_mut())?;
-    if let Some(permissions) = permissions {
+    if let Some(existing_permissions) = permissions {
         temporary
             .as_file()
-            .set_permissions(permissions)
+            .set_permissions(existing_permissions)
             .map_err(OpcError::from)
             .map_err(E::from)?;
     }

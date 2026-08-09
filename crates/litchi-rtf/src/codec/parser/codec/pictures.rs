@@ -1,4 +1,12 @@
-use super::*;
+#![allow(
+    clippy::shadow_reuse,
+    clippy::shadow_unrelated,
+    reason = "decoding steps deliberately rebind a working value as it is refined through the parse pipeline"
+)]
+use super::{
+    ControlWord, Cow, Destination, MAX_PICTURE_DATA_BYTES, ParsedBodyStoryEvent, Parser, RtfError,
+    RtfResult, Token, control_symbol_text,
+};
 
 impl<'a> Parser<'a> {
     /// Parse picture/image content.
@@ -94,6 +102,10 @@ impl<'a> Parser<'a> {
     ///
     /// Pictures in RTF have the format:
     /// {\pict\emfblip\picw<width>\pich<height>...<hex data>}
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn parse_picture(&mut self) -> RtfResult<()> {
         let shape_properties = self.scan_picture_shape_properties()?;
         self.pos += 1; // Skip \pict
@@ -126,22 +138,22 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     match control {
                         ControlWord::Emfblip => {
-                            image_type = super::super::super::picture::ImageType::Emf
+                            image_type = super::super::super::picture::ImageType::Emf;
                         },
                         ControlWord::Pngblip => {
-                            image_type = super::super::super::picture::ImageType::Png
+                            image_type = super::super::super::picture::ImageType::Png;
                         },
                         ControlWord::Jpegblip => {
-                            image_type = super::super::super::picture::ImageType::Jpeg
+                            image_type = super::super::super::picture::ImageType::Jpeg;
                         },
                         ControlWord::Macpict => {
-                            image_type = super::super::super::picture::ImageType::Pict
+                            image_type = super::super::super::picture::ImageType::Pict;
                         },
                         ControlWord::Wmetafile(_) | ControlWord::Pmmetafile(_) => {
-                            image_type = super::super::super::picture::ImageType::Wmf
+                            image_type = super::super::super::picture::ImageType::Wmf;
                         },
                         ControlWord::Dibitmap(_) => {
-                            image_type = super::super::super::picture::ImageType::Dib
+                            image_type = super::super::super::picture::ImageType::Dib;
                         },
                         ControlWord::Wbitmap(_) => {
                             image_type = super::super::super::picture::ImageType::Dib;
@@ -231,7 +243,12 @@ impl<'a> Parser<'a> {
                             "piccropr",
                         )?,
                         ControlWord::PictureCropTop(value) => {
-                            Self::set_picture_crop(&mut crop.top, *value, data_started, "piccropt")?
+                            Self::set_picture_crop(
+                                &mut crop.top,
+                                *value,
+                                data_started,
+                                "piccropt",
+                            )?;
                         },
                         ControlWord::PictureCropBottom(value) => Self::set_picture_crop(
                             &mut crop.bottom,
@@ -254,7 +271,7 @@ impl<'a> Parser<'a> {
                                     "RTF blipupi is duplicated, late, or out of order".to_string(),
                                 ));
                             }
-                            let value = u16::try_from(*value).map_err(|_| {
+                            let value = u16::try_from(*value).map_err(|_err| {
                                 RtfError::MalformedDocument(
                                     "RTF blipupi is outside 1..=65535".to_string(),
                                 )
@@ -371,8 +388,7 @@ impl<'a> Parser<'a> {
                 let identity = super::super::super::picture::PictureIdentity {
                     tag: blip_tag,
                     units_per_inch: blip_upi,
-                    uid: blip_uid
-                        .map(|uid| Cow::Borrowed(self.arena.alloc_slice_copy(&uid) as &[u8])),
+                    uid: blip_uid.map(|uid| Cow::Borrowed(self.arena.alloc_slice_copy(&uid))),
                 };
                 identity.validate()?;
                 picture.identity = Some(identity);
@@ -606,8 +622,8 @@ impl<'a> Parser<'a> {
         }
         self.pos += 1;
         Ok(crate::ShapeProperty {
-            name: Cow::Borrowed(self.arena.alloc_str(&name) as &str),
-            value: Cow::Borrowed(self.arena.alloc_str(&value) as &str),
+            name: Cow::Borrowed(self.arena.alloc_str(&name)),
+            value: Cow::Borrowed(self.arena.alloc_str(&value)),
             binary_value: binary_value.map(Cow::Owned),
             theme_value,
             hyperlink: None,
@@ -743,7 +759,7 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_shape_hyperlink_string(&mut self) -> RtfResult<Cow<'a, str>> {
         self.pos += 2; // opening brace and destination control
         let mut value = String::new();
-        let mut unicode_skip = self.current_state()?.unicode_skip.max(0) as usize;
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0).cast_unsigned() as usize;
         let mut fallback_skip = 0usize;
         loop {
             match self.tokens.get(self.pos) {
@@ -786,7 +802,7 @@ impl<'a> Parser<'a> {
 
     pub(super) fn parse_picture_property_text(
         &mut self,
-        expected: ControlWord,
+        expected: ControlWord<'_>,
         name: &str,
     ) -> RtfResult<String> {
         if !matches!(self.tokens.get(self.pos), Some(Token::OpenBrace))

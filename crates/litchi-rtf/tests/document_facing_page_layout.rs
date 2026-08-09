@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{DocumentPrintLayoutSettings, MAX_DOCUMENT_GUTTER_TWIPS, RtfDocument, RtfWriter};
 
 fn write(document: &RtfDocument<'_>) -> Result<Vec<u8>, std::io::Error> {
@@ -9,7 +18,7 @@ fn write(document: &RtfDocument<'_>) -> Result<Vec<u8>, std::io::Error> {
 #[test]
 fn parses_toggle_flag_and_global_gutter() {
     let document =
-        RtfDocument::parse(r#"{\rtf1\facingp\margmirror\gutter720\gutterprl\twoonone Body}"#)
+        RtfDocument::parse(r"{\rtf1\facingp\margmirror\gutter720\gutterprl\twoonone Body}")
             .unwrap();
     assert_eq!(
         *document.print_layout_settings(),
@@ -22,7 +31,7 @@ fn parses_toggle_flag_and_global_gutter() {
         }
     );
 
-    let disabled = RtfDocument::parse(r#"{\rtf1\facingp0 Body}"#).unwrap();
+    let disabled = RtfDocument::parse(r"{\rtf1\facingp0 Body}").unwrap();
     assert!(!disabled.print_layout_settings().facing_pages);
 }
 
@@ -38,7 +47,7 @@ fn global_gutter_is_inherited_and_guttersxn_overrides_after_reset() {
     assert_eq!(document.sections()[1].properties.margin_gutter, 720);
     assert_eq!(document.sections()[2].properties.margin_gutter, 0);
 
-    let serializable = RtfDocument::parse(r#"{\rtf1\gutter720\sectd\guttersxn360 First}"#).unwrap();
+    let serializable = RtfDocument::parse(r"{\rtf1\gutter720\sectd\guttersxn360 First}").unwrap();
     let reparsed = RtfDocument::parse_bytes(&write(&serializable).unwrap()).unwrap();
     assert_eq!(
         reparsed.print_layout_settings(),
@@ -49,7 +58,7 @@ fn global_gutter_is_inherited_and_guttersxn_overrides_after_reset() {
 
 #[test]
 fn public_setters_are_atomic_and_writer_rejects_direct_invalid_values() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     let valid = DocumentPrintLayoutSettings {
         facing_pages: true,
         mirror_margins: true,
@@ -81,7 +90,7 @@ fn public_setters_are_atomic_and_writer_rejects_direct_invalid_values() {
     assert_eq!(*document.print_layout_settings(), valid);
 
     document.print_layout_settings().validate().unwrap();
-    let mut invalid_document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let mut invalid_document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     let mut invalid_settings = *invalid_document.print_layout_settings();
     invalid_settings.document_gutter_twips = Some(MAX_DOCUMENT_GUTTER_TWIPS + 1);
     assert!(
@@ -100,7 +109,7 @@ fn public_setters_are_atomic_and_writer_rejects_direct_invalid_values() {
 
 #[test]
 fn writer_uses_canonical_order_and_round_trips() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     document
         .set_print_layout_settings(DocumentPrintLayoutSettings {
             facing_pages: true,
@@ -133,20 +142,20 @@ fn writer_uses_canonical_order_and_round_trips() {
 #[test]
 fn rejects_malformed_bounds_duplicates_grouping_and_late_placement() {
     for source in [
-        r#"{\rtf1\gutter Body}"#,
-        r#"{\rtf1\gutter-1 Body}"#,
-        r#"{\rtf1\gutter31681 Body}"#,
-        r#"{\rtf1\gutter99999999999 Body}"#,
-        r#"{\rtf1\margmirror0 Body}"#,
-        r#"{\rtf1\facingp\facingp0 Body}"#,
-        r#"{\rtf1\margmirror\margmirror Body}"#,
-        r#"{\rtf1\gutter1\gutter2 Body}"#,
-        r#"{\rtf1{\facingp}Body}"#,
-        r#"{\rtf1{\margmirror}Body}"#,
-        r#"{\rtf1{\gutter720}Body}"#,
-        r#"{\rtf1 Body\facingp}"#,
-        r#"{\rtf1 Body\margmirror}"#,
-        r#"{\rtf1 Body\gutter720}"#,
+        r"{\rtf1\gutter Body}",
+        r"{\rtf1\gutter-1 Body}",
+        r"{\rtf1\gutter31681 Body}",
+        r"{\rtf1\gutter99999999999 Body}",
+        r"{\rtf1\margmirror0 Body}",
+        r"{\rtf1\facingp\facingp0 Body}",
+        r"{\rtf1\margmirror\margmirror Body}",
+        r"{\rtf1\gutter1\gutter2 Body}",
+        r"{\rtf1{\facingp}Body}",
+        r"{\rtf1{\margmirror}Body}",
+        r"{\rtf1{\gutter720}Body}",
+        r"{\rtf1 Body\facingp}",
+        r"{\rtf1 Body\margmirror}",
+        r"{\rtf1 Body\gutter720}",
     ] {
         assert!(
             RtfDocument::parse(source).is_err(),
@@ -157,15 +166,15 @@ fn rejects_malformed_bounds_duplicates_grouping_and_late_placement() {
 
 #[test]
 fn destination_controls_never_leak_into_document_settings() {
-    let ignored = RtfDocument::parse(r#"{\rtf1{\*\facingp}Body}"#).unwrap();
+    let ignored = RtfDocument::parse(r"{\rtf1{\*\facingp}Body}").unwrap();
     assert!(ignored.print_layout_settings().is_empty());
     assert_eq!(ignored.text(), "Body");
 
     for source in [
-        r#"{\rtf1{\header\facingp\margmirror\gutter720 Header}Body}"#,
-        r#"{\rtf1{\footer\facingp\margmirror\gutter720 Footer}Body}"#,
-        r#"{\rtf1{\footnote\facingp\margmirror\gutter720 Note}Body}"#,
-        r#"{\rtf1{\*\unknown\facingp\margmirror\gutter720 Hidden}Body}"#,
+        r"{\rtf1{\header\facingp\margmirror\gutter720 Header}Body}",
+        r"{\rtf1{\footer\facingp\margmirror\gutter720 Footer}Body}",
+        r"{\rtf1{\footnote\facingp\margmirror\gutter720 Note}Body}",
+        r"{\rtf1{\*\unknown\facingp\margmirror\gutter720 Hidden}Body}",
     ] {
         if let Ok(document) = RtfDocument::parse(source) {
             assert!(

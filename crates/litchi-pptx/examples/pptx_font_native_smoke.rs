@@ -1,4 +1,4 @@
-//! Re-author the checked-in Boldonse graph for native PowerPoint verification.
+//! Re-author the checked-in Boldonse graph for native `PowerPoint` verification.
 //!
 //! Run with:
 //!
@@ -44,10 +44,10 @@ fn main() -> Result<()> {
         println!("{}", path.canonicalize()?.display());
         return Ok(());
     }
-    let directory = args
-        .first()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("target/office-verification"));
+    let directory = args.first().map_or_else(
+        || PathBuf::from("target/office-verification"),
+        PathBuf::from,
+    );
     std::fs::create_dir_all(&directory)?;
 
     let package = Package::open(SOURCE)?;

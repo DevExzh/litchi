@@ -10,11 +10,19 @@ use super::transaction::{Commit, Patch, Snapshot};
 use crate::{Error, Result};
 
 /// Read the typed extended-guide value from the package's main presentation.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load(package: &OpcPackage) -> Result<Guides> {
     Ok(load_snapshot(package)?.guides().clone())
 }
 
 /// Capture the typed guide value and exact owning presentation source.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load_snapshot(package: &OpcPackage) -> Result<Snapshot> {
     let presentation = package.main_document_part()?;
     require_presentation(presentation.content_type())?;
@@ -26,6 +34,10 @@ pub fn load_snapshot(package: &OpcPackage) -> Result<Snapshot> {
 }
 
 /// Replace the typed guide value while preserving unrelated presentation XML.
+///
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn store(package: &mut OpcPackage, value: &Guides) -> Result<()> {
     let source = load_snapshot(package)?;
     let mut edit = source.edit();
@@ -35,6 +47,10 @@ pub fn store(package: &mut OpcPackage, value: &Guides) -> Result<()> {
 }
 
 /// Remove both guide lists and return their previous typed value.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn remove(package: &mut OpcPackage) -> Result<Guides> {
     let source = load_snapshot(package)?;
     let previous = source.guides().clone();
@@ -45,6 +61,10 @@ pub fn remove(package: &mut OpcPackage) -> Result<Guides> {
 }
 
 /// Apply a committed guide patch atomically after a complete source check.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
     let current = load_snapshot(package)?;
     if !current.same_source(patch.before()) {
@@ -78,6 +98,10 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
 }
 
 /// Apply a committed edit and return its validated post-publication snapshot.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
     apply_patch(package, commit.patch())
 }

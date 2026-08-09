@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{
     MathElementRole, MathObject, MathPropertiesKind, MathPropertyName, MathStructureChild,
     MathStructureKind, MathZoneKind, RtfDocument, RtfWriter,
@@ -14,7 +23,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 #[test]
 fn parses_inline_fraction_with_properties_and_round_trips() {
     let document = RtfDocument::parse(
-        r#"{\rtf1\ansi before{\mmath{\mf{\mfPr{\mtype bar}}{\mnum{\mr 1}}{\mden{\mr 2}}}} after}"#,
+        r"{\rtf1\ansi before{\mmath{\mf{\mfPr{\mtype bar}}{\mnum{\mr 1}}{\mden{\mr 2}}}} after}",
     )
     .unwrap();
     // Math run text stays in the typed tree and out of the body story.
@@ -143,7 +152,7 @@ fn skips_mmath_pict_fallback_and_accepts_momath_aliases() {
 #[test]
 fn coexists_with_body_markup_positions() {
     let document =
-        RtfDocument::parse(r#"{\rtf1 ab{\mmath{\mr 1}}cd{\*\bkmkstart bm}ef{\*\bkmkend bm}}"#)
+        RtfDocument::parse(r"{\rtf1 ab{\mmath{\mr 1}}cd{\*\bkmkstart bm}ef{\*\bkmkend bm}}")
             .unwrap();
     assert_eq!(document.text(), "abcdef");
     assert_eq!(document.math_zones()[0].position, 2);

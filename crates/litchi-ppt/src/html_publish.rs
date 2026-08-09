@@ -1,4 +1,4 @@
-//! Inert PowerPoint 9 Web-publishing metadata from MS-PPT 2.4.18.
+//! Inert `PowerPoint` 9 Web-publishing metadata from MS-PPT 2.4.18.
 
 use crate::consts::RecordType;
 
@@ -17,10 +17,12 @@ const MAX_NAMED_SHOW_BYTES: usize = 62;
 pub struct CodePage(u32);
 
 impl CodePage {
+    #[must_use]
     pub const fn new(id: u32) -> Self {
         Self(id)
     }
 
+    #[must_use]
     pub const fn id(self) -> u32 {
         self.0
     }
@@ -65,6 +67,10 @@ pub enum WebOutput {
 
 /// Strictly typed `HTMLDocInfo9Atom` settings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "fields mirror the independent `HTMLDocInfo9Atom` flag bits one-to-one"
+)]
 pub struct HtmlDocumentSettings {
     pub encoding: CodePage,
     pub frame_colors: WebFrameColors,
@@ -81,6 +87,11 @@ pub struct HtmlDocumentSettings {
 
 impl HtmlDocumentSettings {
     /// Parse one strict `HTMLDocInfo9Atom`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record header or size is invalid, an enum field
+    /// is out of range, or a reserved flag bit is set.
     pub fn parse(record: &Record) -> Result<Self> {
         if record.record_type_raw != HTML_DOC_INFO_RECORD_TYPE
             || record.version != 0
@@ -91,8 +102,13 @@ impl HtmlDocumentSettings {
                 "HTMLDocInfo9Atom has an invalid record header or size".to_string(),
             ));
         }
-        let encoding = CodePage::new(u32::from_le_bytes(record.data[4..8].try_into().unwrap()));
-        let frame_colors = match u16::from_le_bytes(record.data[8..10].try_into().unwrap()) {
+        let encoding = CodePage::new(u32::from_le_bytes([
+            record.data[4],
+            record.data[5],
+            record.data[6],
+            record.data[7],
+        ]));
+        let frame_colors = match u16::from_le_bytes([record.data[8], record.data[9]]) {
             0 => WebFrameColors::Browser,
             1 => WebFrameColors::PresentationText,
             2 => WebFrameColors::PresentationAccent,
@@ -171,6 +187,7 @@ impl HtmlDocumentSettings {
     }
 
     /// Encode a canonical atom with undefined fields zeroed.
+    #[must_use]
     pub fn to_record(self) -> Record {
         let mut data = vec![0; 16];
         data[4..8].copy_from_slice(&self.encoding.id().to_le_bytes());
@@ -202,6 +219,14 @@ impl HtmlDocumentSettings {
 /// them, even when [`Self::use_slide_range`] is false. `load_in_browser` is
 /// exposed as inert intent only; this library never launches a browser.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`HtmlPublishSettings` is the established public API name; renaming it would break downstream crates"
+)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "fields mirror the independent `HTMLPublishInfoAtom` flag bits one-to-one"
+)]
 pub struct HtmlPublishSettings {
     pub file_name: String,
     pub named_show: Option<String>,
@@ -216,6 +241,10 @@ pub struct HtmlPublishSettings {
 
 impl HtmlPublishSettings {
     /// Validate an in-memory publication description without performing it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn validate(&self) -> Result<()> {
         validate_printable_unicode(
             &self.file_name,
@@ -243,6 +272,11 @@ impl HtmlPublishSettings {
     }
 
     /// Parse one exact `HTMLPublishInfo9Container`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the container header, child grammar, or any atom
+    /// field is malformed or out of range.
     pub fn parse(record: &Record) -> Result<Self> {
         if record.record_type_raw != HTML_PUBLISH_CONTAINER_RECORD_TYPE
             || record.version != 0x0f
@@ -285,13 +319,20 @@ impl HtmlPublishSettings {
             ));
         }
 
-        let start_slide = i32::from_le_bytes(info.data[0..4].try_into().unwrap());
-        let end_slide = i32::from_le_bytes(info.data[4..8].try_into().unwrap());
-        if start_slide < 0 || end_slide < 0 {
+        let start_slide_raw =
+            i32::from_le_bytes([info.data[0], info.data[1], info.data[2], info.data[3]]);
+        let end_slide_raw =
+            i32::from_le_bytes([info.data[4], info.data[5], info.data[6], info.data[7]]);
+        let Ok(start_slide) = u32::try_from(start_slide_raw) else {
             return Err(Error::Corrupted(
                 "HTMLPublishInfoAtom contains a negative slide index".to_string(),
             ));
-        }
+        };
+        let Ok(end_slide) = u32::try_from(end_slide_raw) else {
+            return Err(Error::Corrupted(
+                "HTMLPublishInfoAtom contains a negative slide index".to_string(),
+            ));
+        };
         let output = parse_web_output(info.data[8], "HTMLPublishInfoAtom")?;
         let flags = info.data[9];
         if flags & 0xf0 != 0 {
@@ -302,8 +343,8 @@ impl HtmlPublishSettings {
         let value = Self {
             file_name,
             named_show,
-            start_slide: start_slide as u32,
-            end_slide: end_slide as u32,
+            start_slide,
+            end_slide,
             output,
             use_slide_range: flags & 0x01 != 0,
             use_named_show: flags & 0x02 != 0,
@@ -348,25 +389,39 @@ impl HtmlPublishSettings {
     }
 
     /// Encode a canonical `HTMLPublishInfo9Container` with undefined bytes zeroed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_record(&self) -> Result<Record> {
         self.validate()?;
         let file_name = encode_printable_unicode(&self.file_name);
         let mut data = record_bytes(0, 0, C_STRING_RECORD_TYPE, &file_name)?;
         if let Some(named_show) = &self.named_show {
-            let named_show = encode_printable_unicode(named_show);
-            data.extend_from_slice(&record_bytes(0, 1, C_STRING_RECORD_TYPE, &named_show)?);
+            let encoded_show = encode_printable_unicode(named_show);
+            data.extend_from_slice(&record_bytes(0, 1, C_STRING_RECORD_TYPE, &encoded_show)?);
         }
 
+        let start_slide = i32::try_from(self.start_slide).map_err(|_err| {
+            Error::Corrupted(
+                "HTML publication slide index exceeds the signed 32-bit range".to_string(),
+            )
+        })?;
+        let end_slide = i32::try_from(self.end_slide).map_err(|_err| {
+            Error::Corrupted(
+                "HTML publication slide index exceeds the signed 32-bit range".to_string(),
+            )
+        })?;
         let mut info = [0u8; 12];
-        info[0..4].copy_from_slice(&(self.start_slide as i32).to_le_bytes());
-        info[4..8].copy_from_slice(&(self.end_slide as i32).to_le_bytes());
+        info[0..4].copy_from_slice(&start_slide.to_le_bytes());
+        info[4..8].copy_from_slice(&end_slide.to_le_bytes());
         info[8] = self.output as u8;
         info[9] = u8::from(self.use_slide_range)
             | u8::from(self.use_named_show) << 1
             | u8::from(self.load_in_browser) << 2
             | u8::from(self.show_speaker_notes) << 3;
         data.extend_from_slice(&record_bytes(0, 0, HTML_PUBLISH_INFO_RECORD_TYPE, &info)?);
-        let data_length = u32::try_from(data.len()).map_err(|_| {
+        let data_length = u32::try_from(data.len()).map_err(|_err| {
             Error::Corrupted("HTML publication container length overflow".to_string())
         })?;
         Ok(Record {
@@ -419,7 +474,7 @@ fn parse_printable_unicode(
         units.push(unit);
     }
     String::from_utf16(&units)
-        .map_err(|_| Error::Corrupted(format!("{record_name} contains invalid UTF-16")))
+        .map_err(|_err| Error::Corrupted(format!("{record_name} contains invalid UTF-16")))
 }
 
 fn validate_printable_unicode(value: &str, max_bytes: usize, field_name: &str) -> Result<()> {
@@ -451,7 +506,7 @@ const fn is_forbidden_printable_unit(unit: u16) -> bool {
 }
 
 fn record_bytes(version: u16, instance: u16, record_type: u16, data: &[u8]) -> Result<Vec<u8>> {
-    let data_length = u32::try_from(data.len()).map_err(|_| {
+    let data_length = u32::try_from(data.len()).map_err(|_err| {
         Error::Corrupted("PowerPoint Web-publishing record length overflow".to_string())
     })?;
     let mut bytes = Vec::with_capacity(8 + data.len());
@@ -463,6 +518,11 @@ fn record_bytes(version: u16, instance: u16, record_type: u16, data: &[u8]) -> R
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -589,7 +649,7 @@ mod tests {
         );
         let mut record = valid.clone();
         record.data = wrong_order;
-        record.data_length = record.data.len() as u32;
+        record.data_length = u32::try_from(record.data.len()).unwrap();
         assert!(HtmlPublishSettings::parse(&record).is_err());
 
         let mut negative = valid.clone();

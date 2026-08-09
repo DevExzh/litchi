@@ -29,11 +29,13 @@ impl Persist {
     }
 
     /// The persist-object identifier used by MS-PPT references.
+    #[must_use]
     pub const fn id(self) -> u32 {
         self.id
     }
 
     /// The byte offset currently associated with this persist identifier.
+    #[must_use]
     pub const fn offset(self) -> u32 {
         self.offset
     }
@@ -52,11 +54,13 @@ impl Identity {
     }
 
     /// The persist reference for this master.
+    #[must_use]
     pub const fn persist(self) -> Persist {
         self.persist
     }
 
     /// The MS-PPT master identifier.
+    #[must_use]
     pub const fn master_id(self) -> u32 {
         self.master_id
     }
@@ -75,11 +79,13 @@ impl<'a> RecordRef<'a> {
     }
 
     /// The persist reference of the source record.
+    #[must_use]
     pub const fn persist(self) -> Persist {
         self.persist
     }
 
     /// The lossless parsed record.
+    #[must_use]
     pub const fn record(self) -> &'a Record {
         self.record
     }
@@ -98,36 +104,46 @@ impl<'a> Unknown<'a> {
     }
 
     /// The semantic owner in which this record occurred.
+    #[must_use]
     pub const fn scope(self) -> Scope {
         self.scope
     }
 
     /// The raw numeric record type from the record header.
+    #[must_use]
     pub const fn raw_type(self) -> u16 {
         self.record.record_type_raw
     }
 
     /// The record version from the record header.
+    #[must_use]
     pub const fn version(self) -> u16 {
         self.record.version
     }
 
     /// The record instance from the record header.
+    #[must_use]
     pub const fn instance(self) -> u16 {
         self.record.instance
     }
 
     /// The original record body bytes.
+    #[must_use]
     pub const fn bytes(self) -> &'a [u8] {
         self.record.data.as_slice()
     }
 
     /// The original parsed record reference, including nested children.
+    #[must_use]
     pub const fn record(self) -> &'a Record {
         self.record
     }
 
     /// Reconstruct the complete PPT record bytes without normalizing payloads.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn wire(self) -> Result<Vec<u8>> {
         encode_record(self.record)
     }
@@ -175,26 +191,31 @@ impl<'a> Main<'a> {
     }
 
     /// Stable persist/master identity.
+    #[must_use]
     pub const fn identity(&self) -> Identity {
         self.identity
     }
 
     /// The source `MainMaster` record.
+    #[must_use]
     pub const fn record(&self) -> &'a Record {
         self.source.record()
     }
 
     /// The persist reference used to locate the source record.
+    #[must_use]
     pub const fn persist(&self) -> Persist {
         self.source.persist()
     }
 
     /// The original `MasterPersistAtom` reference record.
+    #[must_use]
     pub const fn reference(&self) -> &'a Record {
         self.reference
     }
 
     /// Unknown or intentionally uninterpreted child records.
+    #[must_use]
     pub fn unknown(&self) -> &[Unknown<'a>] {
         &self.unknown
     }
@@ -228,31 +249,37 @@ impl<'a> Title<'a> {
     }
 
     /// Stable persist/master identity.
+    #[must_use]
     pub const fn identity(&self) -> Identity {
         self.identity
     }
 
     /// The main master referenced by this title master.
+    #[must_use]
     pub const fn based_on(&self) -> Identity {
         self.based_on
     }
 
     /// The source title `Slide` record.
+    #[must_use]
     pub const fn record(&self) -> &'a Record {
         self.source.record()
     }
 
     /// The persist reference used to locate the source record.
+    #[must_use]
     pub const fn persist(&self) -> Persist {
         self.source.persist()
     }
 
     /// The original `MasterPersistAtom` reference record.
+    #[must_use]
     pub const fn reference(&self) -> &'a Record {
         self.reference
     }
 
     /// Unknown or intentionally uninterpreted child records.
+    #[must_use]
     pub fn unknown(&self) -> &[Unknown<'a>] {
         &self.unknown
     }
@@ -271,16 +298,19 @@ impl<'a> Notes<'a> {
     }
 
     /// The persist reference used to locate the notes master.
+    #[must_use]
     pub const fn persist(&self) -> Persist {
         self.source.persist()
     }
 
     /// The source `Notes` record.
+    #[must_use]
     pub const fn record(&self) -> &'a Record {
         self.source.record()
     }
 
     /// Unknown or intentionally uninterpreted child records.
+    #[must_use]
     pub fn unknown(&self) -> &[Unknown<'a>] {
         &self.unknown
     }
@@ -299,16 +329,19 @@ impl<'a> Handout<'a> {
     }
 
     /// The persist reference used to locate the handout master.
+    #[must_use]
     pub const fn persist(&self) -> Persist {
         self.source.persist()
     }
 
     /// The source `Handout` record.
+    #[must_use]
     pub const fn record(&self) -> &'a Record {
         self.source.record()
     }
 
     /// Unknown or intentionally uninterpreted child records.
+    #[must_use]
     pub fn unknown(&self) -> &[Unknown<'a>] {
         &self.unknown
     }
@@ -322,6 +355,10 @@ pub struct Objects<'a> {
 
 impl<'a> Objects<'a> {
     /// Build a deterministic persist-object catalog from existing records.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn from_records<I>(records: I) -> Result<Self>
     where
         I: IntoIterator<Item = (u32, &'a Record)>,
@@ -345,11 +382,13 @@ impl<'a> Objects<'a> {
     }
 
     /// Number of records available for persist resolution.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.entries.len()
     }
 
     /// Whether the catalog has no records.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
@@ -371,11 +410,13 @@ pub struct Object<'a> {
 
 impl<'a> Object<'a> {
     /// The persist identifier.
+    #[must_use]
     pub const fn id(self) -> u32 {
         self.id
     }
 
     /// The lossless source record.
+    #[must_use]
     pub const fn record(self) -> &'a Record {
         self.record
     }
@@ -409,26 +450,31 @@ impl<'a> Inventory<'a> {
     }
 
     /// Main masters in master-list order.
+    #[must_use]
     pub fn main(&self) -> &[Main<'a>] {
         &self.main
     }
 
     /// Title masters in master-list order.
+    #[must_use]
     pub fn title(&self) -> &[Title<'a>] {
         &self.title
     }
 
     /// The optional notes master.
+    #[must_use]
     pub fn notes(&self) -> Option<&Notes<'a>> {
         self.notes.as_ref()
     }
 
     /// The optional handout master.
+    #[must_use]
     pub fn handout(&self) -> Option<&Handout<'a>> {
         self.handout.as_ref()
     }
 
     /// Unknown records retained directly under the document owner.
+    #[must_use]
     pub fn unknown(&self) -> &[Unknown<'a>] {
         &self.unknown
     }
@@ -465,8 +511,9 @@ pub enum Master<'a> {
     Title(&'a Title<'a>),
 }
 
-impl<'a> Master<'a> {
+impl Master<'_> {
     /// The contextual kind of this entry.
+    #[must_use]
     pub const fn kind(self) -> Kind {
         match self {
             Self::Main(_) => Kind::Main,
@@ -475,6 +522,7 @@ impl<'a> Master<'a> {
     }
 
     /// The stable identity of this entry.
+    #[must_use]
     pub const fn identity(self) -> Identity {
         match self {
             Self::Main(value) => value.identity,

@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::write::Writer;
 use litchi_rtf::{Document, read};
 use litchi_rtf::{text, text::Inline};
@@ -12,10 +21,7 @@ fn document_is_a_small_shared_snapshot() {
     assert_borrowed_view_traits::<litchi_rtf::font::Font<'static>>();
     assert_borrowed_view_traits::<litchi_rtf::color::Palette<'static>>();
     assert_borrowed_view_traits::<litchi_rtf::color::Value>();
-    assert_eq!(
-        std::mem::size_of::<Document>(),
-        std::mem::size_of::<usize>()
-    );
+    assert_eq!(size_of::<Document>(), size_of::<usize>());
 
     let document = Document::parse(r"{\rtf1\ansi first\par second}").unwrap();
     let shared = document.clone();
@@ -29,7 +35,7 @@ fn document_is_a_small_shared_snapshot() {
 #[test]
 fn contextual_reader_uses_checked_limits() {
     let limits = read::Limits::new().with_max_source_bytes(8);
-    assert!(read::Document::parse_with_limits(r"{\rtf1 too large}", limits).is_err());
+    assert!(Document::parse_with_limits(r"{\rtf1 too large}", limits).is_err());
 }
 
 #[test]
@@ -57,18 +63,27 @@ fn font_catalog_hides_sparse_rtf_slots_and_resolves_runs() {
     let fonts = document.fonts();
     assert_eq!(fonts.len(), 2);
     assert_eq!(fonts.iter().count(), 2);
-    assert_eq!(fonts.at(0).map(|font| font.name()), Some("Sparse Sans"));
-    assert_eq!(fonts.at(1).map(|font| font.name()), Some("Story Serif"));
+    assert_eq!(
+        fonts.at(0).map(litchi_rtf::font::Font::name),
+        Some("Sparse Sans")
+    );
+    assert_eq!(
+        fonts.at(1).map(litchi_rtf::font::Font::name),
+        Some("Story Serif")
+    );
     assert!(fonts.at(2).is_none());
     assert_eq!(
-        fonts.find("Story Serif").unwrap().map(|font| font.name()),
+        fonts
+            .find("Story Serif")
+            .unwrap()
+            .map(litchi_rtf::font::Font::name),
         Some("Story Serif")
     );
     assert!(fonts.find("missing").unwrap().is_none());
 
     let run = document.body().runs().next().unwrap();
     assert_eq!(
-        run.format().font().map(|font| font.name()),
+        run.format().font().map(litchi_rtf::font::Font::name),
         Some("Story Serif")
     );
 }
@@ -186,7 +201,7 @@ fn structural_break_kinds_survive_snapshot_round_trip() {
     let paragraphs: Vec<_> = reparsed
         .body()
         .paragraphs()
-        .map(|paragraph| paragraph.to_text())
+        .map(text::Paragraph::to_text)
         .collect();
     assert_eq!(paragraphs, ["first\nsecond", "third"]);
 }
@@ -200,7 +215,7 @@ fn literal_line_feed_is_text_not_a_structural_break() {
             .body()
             .paragraphs()
             .next()
-            .map(|value| value.to_text()),
+            .map(text::Paragraph::to_text),
         Some("A\nB".to_string())
     );
     assert!(

@@ -1,4 +1,4 @@
-//! Inert document routing-slip metadata from legacy PowerPoint files.
+//! Inert document routing-slip metadata from legacy `PowerPoint` files.
 //!
 //! The public model is kept separate from the strict binary codec. The model
 //! uses names scoped by this module (`Slip`, `Address`, and `Text`), while the

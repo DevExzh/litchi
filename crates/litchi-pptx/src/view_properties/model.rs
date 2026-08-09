@@ -1,4 +1,4 @@
-//! Package-independent PresentationML view-property values.
+//! Package-independent `PresentationML` view-property values.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ViewKind {

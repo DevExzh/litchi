@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::codec::encode_record;
 use super::*;
 use crate::consts::RecordType;
@@ -14,8 +20,13 @@ fn string_tag(name: &str, value: Option<&str>) -> Vec<u8> {
             .collect::<Vec<_>>()
     };
     let mut data = record(0, 0, RecordType::CString.as_u16(), &units(name));
-    if let Some(value) = value {
-        data.extend_from_slice(&record(0, 1, RecordType::CString.as_u16(), &units(value)));
+    if let Some(tag_value) = value {
+        data.extend_from_slice(&record(
+            0,
+            1,
+            RecordType::CString.as_u16(),
+            &units(tag_value),
+        ));
     }
     record(0x0f, 0, RecordType::ProgStringTag.as_u16(), &data)
 }
@@ -77,8 +88,8 @@ fn parses_document_scope_variants_and_round_trips_exactly() {
     assert!(unknown.records().is_err());
     assert_eq!(
         parsed.tags.iter().find_map(|tag| match tag {
-            ProgTag::String(tag) => tag.value.as_deref(),
-            _ => None,
+            ProgTag::String(string) => string.value.as_deref(),
+            ProgTag::Binary(_) => None,
         }),
         Some("Ada")
     );
@@ -150,8 +161,13 @@ fn rejects_malformed_strings_headers_truncation_and_every_limit() {
     truncated.pop();
     assert!(ProgTags::parse_payload(&truncated, 0, ProgTagScope::Document, defaults).is_err());
 
-    let invalid_utf16 = record(0, 0, RecordType::CString.as_u16(), &[0x00, 0xd8]);
-    let invalid_utf16 = record(0x0f, 0, RecordType::ProgStringTag.as_u16(), &invalid_utf16);
+    let invalid_utf16_atom = record(0, 0, RecordType::CString.as_u16(), &[0x00, 0xd8]);
+    let invalid_utf16 = record(
+        0x0f,
+        0,
+        RecordType::ProgStringTag.as_u16(),
+        &invalid_utf16_atom,
+    );
     assert!(ProgTags::parse_payload(&invalid_utf16, 0, ProgTagScope::Document, defaults).is_err());
 
     let control_name = string_tag("bad\nname", None);
@@ -239,13 +255,13 @@ fn parse_document_locates_prog_tags_inside_doc_info_list() {
         &[doc_info_list.clone(), doc_info_list.clone()].concat(),
     );
     assert!(ProgTags::parse_document(&duplicate_list, limits).is_err());
-    let duplicate_tags = record(
+    let duplicate_tags_list = record(
         0x0f,
         0,
         RecordType::DocInfoList.as_u16(),
         &[prog_tags.clone(), prog_tags].concat(),
     );
-    let duplicate_tags = parsed_container(0x0f, RecordType::Document, &duplicate_tags);
+    let duplicate_tags = parsed_container(0x0f, RecordType::Document, &duplicate_tags_list);
     assert!(ProgTags::parse_document(&duplicate_tags, limits).is_err());
 
     // A non-Document record cannot provide document tags.

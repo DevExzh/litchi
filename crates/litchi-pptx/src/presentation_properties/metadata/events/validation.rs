@@ -15,10 +15,10 @@ pub(crate) fn validate_draft(value: &Draft) -> Result<()> {
     if value.time().as_str().len() > MAX_EVENT_STRING_BYTES {
         return Err(limit("slide-show event time offset"));
     }
-    if let Kind::Seek { at } = value.kind() {
-        if at.as_str().len() > MAX_EVENT_STRING_BYTES {
-            return Err(limit("slide-show seek offset"));
-        }
+    if let Kind::Seek { at } = value.kind()
+        && at.as_str().len() > MAX_EVENT_STRING_BYTES
+    {
+        return Err(limit("slide-show seek offset"));
     }
     Ok(())
 }

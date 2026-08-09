@@ -64,6 +64,8 @@
 //! - odfpy: `odf/text.py`, `odf/table.py`
 //! - ODF Toolkit: Simple API - Document class
 
+#![forbid(unsafe_code)]
+
 pub use litchi_odf_common::core;
 pub use litchi_odf_common::{constants, coordinates, datatype, namespace};
 
@@ -114,6 +116,7 @@ pub mod ruby_family;
 pub mod section_properties;
 pub mod settings;
 pub mod style;
+pub mod transaction;
 pub mod variable_declaration;
 
 #[allow(
@@ -188,11 +191,12 @@ pub(crate) use media::Image;
     reason = "ODT facade exposes ODF chart models for embedded charts"
 )]
 pub(crate) use odc::{
-    Attribute, Axis, AxisSpec, AxisUpdate, CachedCell, CachedRow, CachedTable, CachedValue, Class,
-    DataLabelSpec, DataPoint, DataPointSpec, Definition, Dimension, DomainSpec, Element,
-    EquationSpec, ExtensionAttribute, ExtensionElement, Extensions, Grid, GridSpec, Labels, Legend,
-    LegendSpec, PlotArea, PlotAreaSpec, RegressionSpec, Series, SeriesSpec, SeriesUpdate,
-    StyleElement, Text, serialize_axis_fragment, serialize_content, serialize_series_fragment,
+    Attribute, Axis, AxisSpec, AxisUpdate, CachedCell, CachedRow, CachedTable, CachedValue,
+    ChartClass, ChartClassKind, Class, DataLabelSpec, DataPoint, DataPointSpec, Definition,
+    Dimension, DomainSpec, Element, EquationSpec, ExtensionAttribute, ExtensionElement, Extensions,
+    Grid, GridSpec, Labels, Legend, LegendSpec, PlotArea, PlotAreaSpec, RegressionSpec, Series,
+    SeriesSpec, SeriesUpdate, StyleElement, Text, serialize_axis_fragment, serialize_content,
+    serialize_series_fragment,
 };
 #[allow(
     unused_imports,

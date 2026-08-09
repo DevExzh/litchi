@@ -1,4 +1,4 @@
-//! Layered PresentationML timing codec facade.
+//! Layered `PresentationML` timing codec facade.
 //!
 //! [`semantic`] owns typed model operations, [`xml`] owns namespace-aware
 //! parsing/writing, and [`validation`] owns bounded values and safety policy.

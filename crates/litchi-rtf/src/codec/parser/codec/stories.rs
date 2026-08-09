@@ -1,4 +1,12 @@
-use super::*;
+#![allow(
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    reason = "decoding steps deliberately rebind a working value as it is refined through the parse pipeline"
+)]
+use super::{
+    ControlWord, Cow, MAX_STORY_GROUP_DEPTH, ParsedBodyStoryEvent, Parser, RtfError, RtfResult,
+    SmallVec, State, Token, control_symbol_text, is_section_control, require_parameterless,
+};
 
 impl<'a> Parser<'a> {
     /// Parse header or footer content.
@@ -153,7 +161,7 @@ impl<'a> Parser<'a> {
                     self.current_hf_story_offset =
                         self.current_hf_story_offset.saturating_add(decoded.len());
                 },
-                _ => {
+                Token::Binary(_) => {
                     self.pos += 1;
                 },
             }
@@ -246,7 +254,7 @@ impl<'a> Parser<'a> {
                     return Ok(());
                 },
                 Some(Token::OpenBrace) => {
-                    self.parse_header_footer_group(hf, text_buffer, pending_paragraph_break)?
+                    self.parse_header_footer_group(hf, text_buffer, pending_paragraph_break)?;
                 },
                 Some(Token::Control(ControlWord::Tab)) => {
                     self.pos += 1;
@@ -349,11 +357,16 @@ impl<'a> Parser<'a> {
         }
     }
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "RTF \\uN parameters are signed 16-bit; the u16 wrap implements the specified negative-value conversion"
+    )]
     pub(super) fn parse_destination_unicode_sequence(
         &mut self,
         first_code: i32,
     ) -> RtfResult<String> {
-        let skip_count = self.current_state()?.unicode_skip.max(0) as usize;
+        let skip_count = self.current_state()?.unicode_skip.max(0).cast_unsigned() as usize;
         let mut utf16 = SmallVec::<[u16; 4]>::new();
         utf16.push(first_code as u16);
         self.pos += 1;
@@ -376,12 +389,11 @@ impl<'a> Parser<'a> {
                     }
                     self.pos += 1;
                 },
-                Some(Token::Control(ControlWord::Unicode(_))) => break,
+                Some(Token::Control(ControlWord::Unicode(_))) | None => break,
                 Some(_) => {
                     fallback_skip = fallback_skip.saturating_sub(1);
                     self.pos += 1;
                 },
-                None => break,
             }
         }
         let mut decoded = String::from_utf16(&utf16).map_err(|error| {
@@ -460,7 +472,7 @@ impl<'a> Parser<'a> {
                     self.current_note_buffer
                         .extend_from_slice(decoded.as_bytes());
                 },
-                _ => {
+                Token::Binary(_) => {
                     self.pos += 1;
                 },
             }

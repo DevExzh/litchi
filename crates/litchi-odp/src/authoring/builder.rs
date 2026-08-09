@@ -2,6 +2,13 @@
 //!
 //! This module provides a builder pattern for creating new ODP presentations from scratch.
 
+mod edit;
+mod package;
+mod snapshot;
+mod transition;
+mod validation;
+mod xml;
+
 use crate::Reference;
 use crate::Slide;
 use crate::model::action::write_event_listeners;
@@ -15,14 +22,8 @@ use litchi_odf_common::{
     media::authoring::{allocate_picture_path, validate_payload},
 };
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::Write as _;
 use std::path::Path;
-
-mod edit;
-mod package;
-mod snapshot;
-mod transition;
-mod validation;
-mod xml;
 
 pub(crate) use self::transition::{
     DEFAULT_DRAWING_PAGE_STYLE, DEFAULT_DRAWING_PAGE_STYLE_NAME, generate_transition_styles,
@@ -141,6 +142,9 @@ impl Builder {
     }
 
     /// Replace all custom page-layout definitions written by this builder.
+    ///
+    /// # Errors
+    /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
     pub fn set_layouts(
         &mut self,
         layouts: crate::model::page_layout::Collection,
@@ -151,6 +155,9 @@ impl Builder {
     }
 
     /// Add one custom page layout without changing existing builder behavior.
+    ///
+    /// # Errors
+    /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
     pub fn add_layout(&mut self, layout: crate::model::page_layout::Layout) -> Result<&mut Self> {
         let mut layouts = self.page_layouts.clone();
         layouts.layouts.push(layout);
@@ -166,9 +173,12 @@ impl Builder {
     }
 
     /// Set or clear validated slide-show settings without executing them.
+    ///
+    /// # Errors
+    /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
     pub fn set_settings(&mut self, settings: Option<crate::Settings>) -> Result<&mut Self> {
-        if let Some(settings) = &settings {
-            settings.validate()?;
+        if let Some(new_settings) = &settings {
+            new_settings.validate()?;
         }
         self.settings = settings;
         Ok(self)
@@ -181,12 +191,15 @@ impl Builder {
     }
 
     /// Set or clear validated presentation declarations and page bindings.
+    ///
+    /// # Errors
+    /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
     pub fn set_declarations(
         &mut self,
         declarations: Option<crate::model::declaration::Collection>,
     ) -> Result<&mut Self> {
-        if let Some(declarations) = &declarations {
-            declarations.validate()?;
+        if let Some(new_declarations) = &declarations {
+            new_declarations.validate()?;
         }
         self.declarations = declarations;
         Ok(self)
@@ -199,12 +212,15 @@ impl Builder {
     }
 
     /// Set or clear validated static page metadata.
+    ///
+    /// # Errors
+    /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
     pub fn set_pages(
         &mut self,
         metadata: Option<crate::model::page_metadata::Collection>,
     ) -> Result<&mut Self> {
-        if let Some(metadata) = &metadata {
-            metadata.validate()?;
+        if let Some(new_metadata) = &metadata {
+            new_metadata.validate()?;
         }
         self.page_metadata = metadata;
         Ok(self)
@@ -223,6 +239,9 @@ impl Builder {
     ///
     /// The returned inert reference can be attached to a shape with
     /// [`crate::Shape::with_media`]. External resources are never fetched.
+    ///
+    /// # Errors
+    /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
     pub fn embed_media(
         &mut self,
         path: impl Into<String>,
@@ -233,6 +252,9 @@ impl Builder {
     }
 
     /// Embed a PNG, JPEG, or GIF image and add it as a picture frame to a slide.
+    ///
+    /// # Errors
+    /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
     pub fn insert_image(
         &mut self,
         slide_index: usize,
@@ -296,8 +318,11 @@ impl Builder {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
     pub fn add_slide_with_title(&mut self, title: &str, text: &str) -> Result<&mut Self> {
-        self.append_slide(edit::titled_slide(self.slides.len(), title, text))
+        Ok(self.append_slide(edit::titled_slide(self.slides.len(), title, text)))
     }
 
     /// Add a slide with only text content (no title)
@@ -317,8 +342,11 @@ impl Builder {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
     pub fn add_slide(&mut self, text: &str) -> Result<&mut Self> {
-        self.append_slide(edit::text_slide(self.slides.len(), text))
+        Ok(self.append_slide(edit::text_slide(self.slides.len(), text)))
     }
 
     /// Add a Slide element directly
@@ -348,8 +376,11 @@ impl Builder {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
     pub fn add_slide_element(&mut self, slide: Slide) -> Result<&mut Self> {
-        self.append_slide(slide)
+        Ok(self.append_slide(slide))
     }
 
     /// Generate XML for a shape
@@ -358,6 +389,10 @@ impl Builder {
         Self::generate_shape_xml_at_depth(shape, idx, 0, None, &mut node_count)
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "ShapeType is a non-exhaustive litchi-core enum, so a wildcard arm is required and intentionally covers any future variants"
+    )]
     fn generate_shape_xml_at_depth(
         shape: &crate::Shape,
         idx: usize,
@@ -439,29 +474,43 @@ impl Builder {
         );
         if let Some(z_index) = &shape.z_index {
             validate_z_index(z_index)?;
-            shape_attributes.push_str(&format!(r#" draw:z-index="{}""#, escape_xml(z_index)));
+            let _ = write!(
+                shape_attributes,
+                r#" draw:z-index="{}""#,
+                escape_xml(z_index)
+            );
         }
         if let Some(transform) = &shape.transform {
-            shape_attributes.push_str(&format!(r#" draw:transform="{}""#, escape_xml(transform)));
+            let _ = write!(
+                shape_attributes,
+                r#" draw:transform="{}""#,
+                escape_xml(transform)
+            );
         }
         let presentation_class = shape
             .presentation_class
             .as_deref()
             .or_else(|| (shape.shape_type == ShapeType::Placeholder).then_some("object"));
         if let Some(class) = presentation_class {
-            shape_attributes.push_str(&format!(r#" presentation:class="{}""#, escape_xml(class)));
+            let _ = write!(
+                shape_attributes,
+                r#" presentation:class="{}""#,
+                escape_xml(class)
+            );
         }
         if let Some(placeholder) = shape.presentation_placeholder {
-            shape_attributes.push_str(&format!(
+            let _ = write!(
+                shape_attributes,
                 r#" presentation:placeholder="{}""#,
                 if placeholder { "true" } else { "false" }
-            ));
+            );
         }
         if let Some(user_transformed) = shape.presentation_user_transformed {
-            shape_attributes.push_str(&format!(
+            let _ = write!(
+                shape_attributes,
                 r#" presentation:user-transformed="{}""#,
                 if user_transformed { "true" } else { "false" }
-            ));
+            );
         }
         let mut drawing_attribute_names = BTreeSet::new();
         for attribute in &shape.drawing_attributes {
@@ -653,11 +702,9 @@ impl Builder {
             },
             ShapeType::GraphicFrame if shape.media.is_some() => {
                 let mut plugin = String::new();
-                shape
-                    .media
-                    .as_ref()
-                    .expect("media checked by match guard")
-                    .write_xml(&mut plugin)?;
+                if let Some(media) = shape.media.as_ref() {
+                    media.write_xml(&mut plugin)?;
+                }
                 format!(r"<draw:frame{shape_attributes}{position_attributes}>{plugin}</draw:frame>")
             },
             ShapeType::Group => {
@@ -740,11 +787,11 @@ impl Builder {
 
     pub(super) fn generate_notes_xml(notes: Option<&str>) -> String {
         notes
-            .filter(|notes| !notes.is_empty())
-            .map(|notes| {
+            .filter(|text| !text.is_empty())
+            .map(|text| {
                 format!(
                     r#"<presentation:notes><draw:frame draw:layer="layout" presentation:class="notes"><draw:text-box>{}</draw:text-box></draw:frame></presentation:notes>"#,
-                    generate_text_paragraphs(notes, None)
+                    generate_text_paragraphs(text, None)
                 )
             })
             .unwrap_or_default()
@@ -762,13 +809,13 @@ impl Builder {
         estimated += self
             .slides
             .iter()
-            .map(|s| s.text.len() + s.title.as_ref().map(|t| t.len()).unwrap_or(0))
+            .map(|s| s.text.len() + s.title.as_ref().map_or(0, String::len))
             .sum::<usize>();
         estimated += self
             .slides
             .iter()
             .flat_map(|s| s.shapes.iter())
-            .map(|sh| sh.text.len() + sh.name.as_ref().map(|n| n.len()).unwrap_or(0))
+            .map(|sh| sh.text.len() + sh.name.as_ref().map_or(0, String::len))
             .sum::<usize>();
 
         let mut body = String::with_capacity(estimated);
@@ -806,10 +853,11 @@ impl Builder {
 
             // Add title frame if title exists
             if let Some(ref title) = slide.title {
-                body.push_str(&format!(
+                let _ = write!(
+                    body,
                     r#"<draw:frame draw:style-name="gr1" draw:text-style-name="P1" draw:layer="layout" presentation:class="title" svg:width="25.199cm" svg:height="3.506cm" svg:x="1.4cm" svg:y="0.962cm"><draw:text-box>{}</draw:text-box></draw:frame>"#,
                     generate_text_paragraphs(title, Some("P1"))
-                ));
+                );
             }
 
             // Add text frame
@@ -819,11 +867,12 @@ impl Builder {
                 } else {
                     "2.0cm"
                 };
-                body.push_str(&format!(
+                let _ = write!(
+                    body,
                     r#"<draw:frame draw:style-name="gr2" draw:text-style-name="P2" draw:layer="layout" presentation:class="object" svg:width="25.199cm" svg:height="10cm" svg:x="1.4cm" svg:y="{}"><draw:text-box>{}</draw:text-box></draw:frame>"#,
                     y_position,
                     generate_text_paragraphs(&slide.text, Some("P2"))
-                ));
+                );
             }
 
             // Add custom shapes
@@ -905,11 +954,11 @@ impl Builder {
 
         // Add optional metadata fields
         if let Some(ref title) = self.metadata.title {
-            meta.push_str(&format!("<dc:title>{}</dc:title>", escape_xml(title)));
+            let _ = write!(meta, "<dc:title>{}</dc:title>", escape_xml(title));
         }
 
         if let Some(ref author) = self.metadata.author {
-            meta.push_str(&format!("<dc:creator>{}</dc:creator>", escape_xml(author)));
+            let _ = write!(meta, "<dc:creator>{}</dc:creator>", escape_xml(author));
         }
 
         meta.push_str("</office:meta>");
@@ -932,8 +981,11 @@ impl Builder {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
     pub fn build(self) -> Result<Vec<u8>> {
-        package::build(self)
+        package::build(&self)
     }
 
     /// Build and save the presentation to a file
@@ -954,6 +1006,9 @@ impl Builder {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
     pub fn save<P: AsRef<Path>>(self, path: P) -> Result<()> {
         let bytes = self.build()?;
         std::fs::write(path, bytes)?;
@@ -962,6 +1017,11 @@ impl Builder {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use crate::core::OwnedPackage;

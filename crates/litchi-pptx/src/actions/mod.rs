@@ -1,4 +1,4 @@
-//! Layered, inert PresentationML action-setting discovery.
+//! Layered, inert `PresentationML` action-setting discovery.
 //!
 //! The model contains the semantic action vocabulary, the codec performs a
 //! bounded XML scan, and the package layer resolves declared OPC targets

@@ -182,6 +182,11 @@ impl Relationship {
     /// Get the absolute target partname for internal relationships.
     ///
     /// Returns an error if this is an external relationship.
+    ///
+    /// # Errors
+    /// Returns an error if this is an external relationship, if the target has
+    /// no part path and no source URI is known, or if the resolved partname is
+    /// not a valid pack URI.
     pub fn target_partname(&self) -> Result<PackURI> {
         if self.is_external() {
             return Err(OpcError::InvalidRelationship(
@@ -203,20 +208,6 @@ impl Relationship {
         }
         PackURI::from_rel_ref(&self.base_uri, path).map_err(OpcError::InvalidPackUri)
     }
-}
-
-pub(crate) fn relationship_target_components(
-    reference: &str,
-) -> (&str, Option<&str>, Option<&str>) {
-    let (before_fragment, fragment) = reference
-        .split_once('#')
-        .map_or((reference, None), |(before, fragment)| {
-            (before, Some(fragment))
-        });
-    let (path, query) = before_fragment
-        .split_once('?')
-        .map_or((before_fragment, None), |(path, query)| (path, Some(query)));
-    (path, query, fragment)
 }
 
 /// Collection of relationships from a single source.
@@ -297,6 +288,9 @@ impl Relationships {
     }
 
     /// Add a relationship without replacing an existing ID.
+    ///
+    /// # Errors
+    /// Returns an error if a relationship with the given ID already exists.
     pub fn try_add_relationship(
         &mut self,
         reltype: String,
@@ -350,8 +344,10 @@ impl Relationships {
                     && relationship.target_ref() == target_ref
                     && !relationship.is_external()
             })
-            .map(|relationship| relationship.r_id().to_string())
-            .unwrap_or_else(|| self.next_r_id());
+            .map_or_else(
+                || self.next_r_id(),
+                |relationship| relationship.r_id().to_string(),
+            );
         self.add_relationship(reltype.to_string(), target_ref.to_string(), r_id, false)
     }
 
@@ -416,6 +412,10 @@ impl Relationships {
     ///
     /// Returns an error if no relationship of the type is found,
     /// or if multiple relationships of the type exist.
+    ///
+    /// # Errors
+    /// Returns an error if no relationship of the type is found, or if multiple
+    /// relationships of the type exist.
     pub fn part_with_reltype(&self, reltype: &str) -> Result<&Relationship> {
         let matching: Vec<&Relationship> = self
             .rels
@@ -483,7 +483,7 @@ impl Relationships {
         for rel in rels {
             let target_mode = match rel.target_mode() {
                 TargetMode::Internal => "",
-                mode => match mode.as_xml_value() {
+                mode @ TargetMode::External => match mode.as_xml_value() {
                     "External" => r#" TargetMode="External""#,
                     _ => "",
                 },
@@ -509,6 +509,20 @@ impl Default for Relationships {
     fn default() -> Self {
         Self::new("/".to_string())
     }
+}
+
+pub(crate) fn relationship_target_components(
+    reference: &str,
+) -> (&str, Option<&str>, Option<&str>) {
+    let (before_fragment, fragment) = reference
+        .split_once('#')
+        .map_or((reference, None), |(before, fragment)| {
+            (before, Some(fragment))
+        });
+    let (path, query) = before_fragment
+        .split_once('?')
+        .map_or((before_fragment, None), |(path, query)| (path, Some(query)));
+    (path, query, fragment)
 }
 
 #[cfg(test)]
@@ -555,18 +569,18 @@ mod tests {
 
     #[test]
     fn test_get_or_add() {
-        let mut rels = Relationships::new("/word".to_string());
+        let mut relationships = Relationships::new("/word".to_string());
 
-        let rel1 = rels.get_or_add("type1", "target1");
-        assert_eq!(rel1.r_id(), "rId1");
+        let first_rel = relationships.get_or_add("type1", "target1");
+        assert_eq!(first_rel.r_id(), "rId1");
 
         // Getting the same relationship should return the same rId
-        let rel2 = rels.get_or_add("type1", "target1");
-        assert_eq!(rel2.r_id(), "rId1");
+        let same_rel = relationships.get_or_add("type1", "target1");
+        assert_eq!(same_rel.r_id(), "rId1");
 
         // Different target should create new relationship
-        let rel3 = rels.get_or_add("type1", "target2");
-        assert_eq!(rel3.r_id(), "rId2");
+        let second_rel = relationships.get_or_add("type1", "target2");
+        assert_eq!(second_rel.r_id(), "rId2");
     }
 
     #[test]

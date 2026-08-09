@@ -31,11 +31,19 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Validate and capture one contextual master record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn from_record(context: Context, root: Record) -> Result<Self> {
         Self::from_inner(master_layout::Snapshot::from_record(context, root)?)
     }
 
     /// Validate and capture one contextual master under explicit tree limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn from_record_with_limits(context: Context, root: Record, limits: Limits) -> Result<Self> {
         Self::from_inner(master_layout::Snapshot::from_record_with_limits(
             context, root, limits,
@@ -43,11 +51,19 @@ impl Snapshot {
     }
 
     /// Parse one complete contextual master record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(context: Context, bytes: &[u8]) -> Result<Self> {
         Self::from_inner(master_layout::Snapshot::parse(context, bytes)?)
     }
 
     /// Parse one complete contextual master under explicit tree limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_with_limits(context: Context, bytes: &[u8], limits: Limits) -> Result<Self> {
         Self::from_inner(master_layout::Snapshot::parse_with_limits(
             context, bytes, limits,
@@ -60,41 +76,58 @@ impl Snapshot {
     }
 
     /// The contextual master kind.
+    #[must_use]
     pub const fn context(&self) -> Context {
         self.inner.context()
     }
 
     /// The validated source record tree.
+    #[must_use]
     pub const fn record(&self) -> &Record {
         self.inner.record()
     }
 
     /// The exact encoded bytes represented by this snapshot.
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         self.inner.bytes()
     }
 
     /// The stable content revision used for optimistic edits.
+    #[must_use]
     pub fn revision(&self) -> Revision {
         self.inner.revision()
     }
 
     /// Read the optional `[MS-PPT]` slide name from this master.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn name(&self) -> Result<Option<Name>> {
         codec::read(self.context(), self.record())
     }
 
     /// Read the optional main-master design name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn template_name(&self) -> Result<Option<template::Name>> {
         template::codec::read(self.context(), self.record())
     }
 
     /// Read the optional notes-master `txStyles` round-trip package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn notes_styles(&self) -> Result<Option<notes_styles::Styles>> {
         notes_styles::codec::read(self.context(), self.record())
     }
 
     /// Open an isolated semantic edit.
+    #[must_use]
     pub fn edit(&self) -> Editor {
         Editor {
             inner: self.inner.edit(),
@@ -110,108 +143,140 @@ pub struct Editor {
 
 impl Editor {
     /// The contextual master kind being edited.
+    #[must_use]
     pub const fn context(&self) -> Context {
         self.inner.context()
     }
 
     /// Read the candidate name without committing the edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn name(&self) -> Result<Option<Name>> {
         codec::read(self.context(), self.inner.record())
     }
 
     /// Read the candidate main-master design name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn template_name(&self) -> Result<Option<template::Name>> {
         template::codec::read(self.context(), self.inner.record())
     }
 
     /// Read the candidate notes-master `txStyles` round-trip package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn notes_styles(&self) -> Result<Option<notes_styles::Styles>> {
         notes_styles::codec::read(self.context(), self.inner.record())
     }
 
     /// Borrow the transaction-local master record.
+    #[must_use]
     pub fn record(&self) -> &Record {
         self.inner.record()
     }
 
     /// Whether this editor contains an uncommitted change.
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.inner.is_changed()
     }
 
     /// The current semantic change set.
+    #[must_use]
     pub fn changes(&self) -> &[Change] {
         self.inner.changes()
     }
 
     /// Set or replace the master name atomically in the private candidate.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_name(&mut self, value: impl Into<String>) -> Result<()> {
         let name = Name::new(value)?;
         let replacement = codec::encode(&name)?;
-        let index = validation::name_index(self.context(), self.inner.record())?;
-        match index {
-            Some(index) => {
-                self.inner
-                    .replace(master_layout::Path::root().child(index), replacement)?;
-            },
-            None => {
-                let index = validation::name_insertion_index(self.context(), self.inner.record());
-                self.inner
-                    .add(master_layout::Path::root(), index, replacement)?;
-            },
+        let existing = validation::name_index(self.context(), self.inner.record())?;
+        if let Some(index) = existing {
+            self.inner
+                .replace(master_layout::Path::root().child(index), replacement)?;
+        } else {
+            let insertion = validation::name_insertion_index(self.context(), self.inner.record());
+            self.inner
+                .add(master_layout::Path::root(), insertion, replacement)?;
         }
         Ok(())
     }
 
     /// Set or replace the main-master design name atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_template_name(&mut self, value: impl Into<String>) -> Result<()> {
         let name = template::Name::new(value)?;
         let replacement = template::codec::encode(&name)?;
-        let index = template::validation::template_index(self.context(), self.inner.record())?;
-        match index {
-            Some(index) => {
-                self.inner
-                    .replace(master_layout::Path::root().child(index), replacement)?;
-            },
-            None => {
-                let index = template::validation::template_insertion_index(
-                    self.context(),
-                    self.inner.record(),
-                )?;
-                self.inner
-                    .add(master_layout::Path::root(), index, replacement)?;
-            },
+        let existing = template::validation::template_index(self.context(), self.inner.record())?;
+        if let Some(index) = existing {
+            self.inner
+                .replace(master_layout::Path::root().child(index), replacement)?;
+        } else {
+            let insertion = template::validation::template_insertion_index(
+                self.context(),
+                self.inner.record(),
+            )?;
+            self.inner
+                .add(master_layout::Path::root(), insertion, replacement)?;
         }
         Ok(())
     }
 
     /// Set or replace the notes-master `txStyles` package atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "callers hand over the authored `Styles` package; taking it by reference would \
+                  churn the established public API and its callers"
+    )]
     pub fn set_notes_styles(&mut self, styles: notes_styles::Styles) -> Result<()> {
         let replacement = notes_styles::codec::encode(&styles)?;
-        let index = notes_styles::validation::styles_index(self.context(), self.inner.record())?;
-        match index {
-            Some(index) => {
-                self.inner
-                    .replace(master_layout::Path::root().child(index), replacement)?;
-            },
-            None => {
-                let index = notes_styles::validation::styles_insertion_index(
-                    self.context(),
-                    self.inner.record(),
-                )?;
-                self.inner
-                    .add(master_layout::Path::root(), index, replacement)?;
-            },
+        let existing = notes_styles::validation::styles_index(self.context(), self.inner.record())?;
+        if let Some(index) = existing {
+            self.inner
+                .replace(master_layout::Path::root().child(index), replacement)?;
+        } else {
+            let insertion = notes_styles::validation::styles_insertion_index(
+                self.context(),
+                self.inner.record(),
+            )?;
+            self.inner
+                .add(master_layout::Path::root(), insertion, replacement)?;
         }
         Ok(())
     }
 
     /// Build and set a notes-master `txStyles` package from XML atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_notes_styles_xml(&mut self, xml: impl AsRef<[u8]>) -> Result<()> {
         self.set_notes_styles(notes_styles::Styles::from_xml(xml)?)
     }
 
     /// Remove the master name atom, returning whether one was present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn clear_name(&mut self) -> Result<bool> {
         let Some(index) = validation::name_index(self.context(), self.inner.record())? else {
             return Ok(false);
@@ -222,6 +287,10 @@ impl Editor {
     }
 
     /// Remove the main-master design name atom, returning whether one was present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn clear_template_name(&mut self) -> Result<bool> {
         let Some(index) =
             template::validation::template_index(self.context(), self.inner.record())?
@@ -234,6 +303,10 @@ impl Editor {
     }
 
     /// Remove the notes-master `txStyles` package, returning whether one was present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn clear_notes_styles(&mut self) -> Result<bool> {
         let Some(index) =
             notes_styles::validation::styles_index(self.context(), self.inner.record())?
@@ -246,11 +319,19 @@ impl Editor {
     }
 
     /// Capture the current candidate without publishing it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn snapshot(&self) -> Result<Snapshot> {
         Snapshot::from_inner(self.inner.snapshot()?)
     }
 
     /// Validate and publish the candidate as an immutable snapshot and patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn commit(self) -> Result<Commit> {
         let (snapshot, changes) = self.inner.commit()?.into_parts();
         Ok(Commit {
@@ -260,6 +341,7 @@ impl Editor {
     }
 
     /// Discard the candidate and recover the original snapshot.
+    #[must_use]
     pub fn rollback(self) -> Snapshot {
         Snapshot {
             inner: self.inner.rollback(),
@@ -276,31 +358,46 @@ pub struct Commit {
 
 impl Commit {
     /// The immutable target snapshot.
+    #[must_use]
     pub const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// The structural patch produced by the semantic edit.
+    #[must_use]
     pub const fn changes(&self) -> &ChangeSet {
         &self.changes
     }
 
     /// Read the committed notes-master `txStyles` round-trip package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn notes_styles(&self) -> Result<Option<notes_styles::Styles>> {
         self.snapshot.notes_styles()
     }
 
     /// Undo this patch against its exact target snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         Snapshot::from_inner(self.changes.undo(&current.inner)?)
     }
 
     /// Redo this patch against its exact source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         Snapshot::from_inner(self.changes.redo(&current.inner)?)
     }
 
     /// Split the commit into its target and reusable patch.
+    #[must_use]
     pub fn into_parts(self) -> (Snapshot, ChangeSet) {
         (self.snapshot, self.changes)
     }

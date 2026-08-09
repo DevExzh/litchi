@@ -2,7 +2,7 @@
 
 use super::types::Result;
 use super::workbook_types::WorkbookImpl;
-#[allow(unused_imports)] // Used by sheet implementations
+#[allow(unused_imports, reason = "re-exported for sheet implementations")]
 use crate::sheet::WorkbookTrait;
 use litchi_core::{Error, Metadata};
 #[cfg(feature = "xls")]
@@ -218,7 +218,10 @@ impl Workbook {
             },
 
             // Handle mismatched formats
-            #[allow(unreachable_patterns)]
+            #[allow(
+                unreachable_patterns,
+                reason = "match arms are feature-gated; the fallback is unreachable when every format feature is enabled"
+            )]
             _ => {
                 return Err(
                     Box::new(Error::NotOfficeFile) as Box<dyn std::error::Error + Send + Sync>
@@ -397,7 +400,7 @@ impl Workbook {
                             if idx > 0 {
                                 out.push('\t');
                             }
-                            append_cell_text(&mut out, &cell);
+                            append_cell_text(&mut out, cell);
                         }
                         out.push('\n');
                     }
@@ -416,7 +419,7 @@ impl Workbook {
                             if idx > 0 {
                                 out.push('\t');
                             }
-                            append_cell_text(&mut out, &cell);
+                            append_cell_text(&mut out, cell);
                         }
                         out.push('\n');
                     }

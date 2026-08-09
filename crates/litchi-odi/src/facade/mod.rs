@@ -62,6 +62,19 @@ impl Image {
         self.package.files()
     }
 
+    /// Returns the inert semantic frame inventory from `content.xml`.
+    ///
+    /// Links and embedded bytes are reported only. They are never fetched,
+    /// executed, or otherwise activated.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the content part is malformed, DTD-bearing, or
+    /// structurally unsupported ODI XML.
+    pub fn frames(&self) -> Result<Vec<crate::frame::Frame>> {
+        crate::flat::frames_from_content(self.content_xml())
+    }
+
     /// Consumes the snapshot and returns the raw package bytes.
     #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {

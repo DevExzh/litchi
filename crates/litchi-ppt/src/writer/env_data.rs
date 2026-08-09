@@ -2,11 +2,16 @@
 //!
 //! Structured types for Environment child atoms based on MS-PPT specification.
 
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items are deliberately grouped by MS-PPT specification section rather than by item kind"
+)]
+
 // =============================================================================
 // SrKinsokuAtom (MS-PPT 2.9.26)
 // =============================================================================
 
-/// SrKinsokuAtom - Line breaking rules for CJK text
+/// `SrKinsokuAtom` - Line breaking rules for CJK text
 #[derive(Debug, Clone, Copy)]
 pub struct SrKinsokuAtom {
     /// Kinsoku type: 1 = Japanese, 2 = Korean, 3 = Simplified Chinese, 4 = Traditional Chinese
@@ -17,6 +22,7 @@ impl SrKinsokuAtom {
     /// Default: Japanese line breaking rules
     pub const DEFAULT: Self = Self { kinsoku_type: 1 };
 
+    #[must_use]
     pub fn to_bytes(&self) -> [u8; 4] {
         self.kinsoku_type.to_le_bytes()
     }
@@ -26,10 +32,10 @@ impl SrKinsokuAtom {
 // TxCFStyleAtom (MS-PPT 2.9.52) - Character Formatting Defaults
 // =============================================================================
 
-/// TxCFStyleAtom - Default character formatting for text
+/// `TxCFStyleAtom` - Default character formatting for text
 #[derive(Debug, Clone, Copy)]
 pub struct TxCFStyleAtom {
-    /// Mask indicating which fields are valid (MS-PPT 2.9.6 TextCFException)
+    /// Mask indicating which fields are valid (MS-PPT 2.9.6 `TextCFException`)
     pub cf_mask: u16,
     /// Character formatting flags
     pub cf_flags: u16,
@@ -48,6 +54,7 @@ impl TxCFStyleAtom {
         font_ref: 0xFFFF, // no font specified
     };
 
+    #[must_use]
     pub fn to_bytes(&self) -> [u8; 8] {
         let mut data = [0u8; 8];
         data[0..2].copy_from_slice(&self.cf_mask.to_le_bytes());
@@ -62,10 +69,10 @@ impl TxCFStyleAtom {
 // TxPFStyleAtom (MS-PPT 2.9.53) - Paragraph Formatting Defaults
 // =============================================================================
 
-/// TxPFStyleAtom - Default paragraph formatting for text
+/// `TxPFStyleAtom` - Default paragraph formatting for text
 #[derive(Debug, Clone, Copy)]
 pub struct TxPFStyleAtom {
-    /// Mask indicating which fields are valid (MS-PPT 2.9.18 TextPFException)
+    /// Mask indicating which fields are valid (MS-PPT 2.9.18 `TextPFException`)
     pub pf_mask: u32,
     /// Bullet character (Unicode code point)
     pub bullet_char: u32,
@@ -81,6 +88,7 @@ impl TxPFStyleAtom {
         pf_flags: 0x0000_0002, // paragraph flags
     };
 
+    #[must_use]
     pub fn to_bytes(&self) -> [u8; 12] {
         let mut data = [0u8; 12];
         data[0..4].copy_from_slice(&self.pf_mask.to_le_bytes());
@@ -102,7 +110,7 @@ pub mod lang_id {
     pub const NEUTRAL: u16 = 0x0002;
 }
 
-/// TxSIStyleAtom - Special text info (language, spell check)
+/// `TxSIStyleAtom` - Special text info (language, spell check)
 #[derive(Debug, Clone, Copy)]
 pub struct TxSIStyleAtom {
     /// Mask indicating which fields are valid
@@ -124,6 +132,7 @@ impl TxSIStyleAtom {
         reserved: 0,
     };
 
+    #[must_use]
     pub fn to_bytes(&self) -> [u8; 10] {
         let mut data = [0u8; 10];
         data[0..4].copy_from_slice(&self.si_mask.to_le_bytes());
@@ -138,7 +147,7 @@ impl TxSIStyleAtom {
 // SheetPropertiesAtom (undocumented, reverse-engineered from POI)
 // =============================================================================
 
-/// SheetPropertiesAtom - Document timestamps and flags
+/// `SheetPropertiesAtom` - Document timestamps and flags
 #[derive(Debug, Clone, Copy)]
 pub struct SheetPropertiesAtom {
     /// Creation timestamp (Windows FILETIME)
@@ -160,6 +169,7 @@ impl SheetPropertiesAtom {
         reserved: 0x0000,
     };
 
+    #[must_use]
     pub fn to_bytes(&self) -> [u8; 20] {
         let mut data = [0u8; 20];
         data[0..8].copy_from_slice(&self.creation_time.to_le_bytes());
@@ -170,14 +180,14 @@ impl SheetPropertiesAtom {
     }
 }
 
-/// SheetProperties child atom type (undocumented)
+/// `SheetProperties` child atom type (undocumented)
 pub const SHEET_PROPERTIES_CHILD_TYPE: u16 = 0x0415;
 
 // =============================================================================
 // SlideViewInfoAtom (MS-PPT 2.4.21.3)
 // =============================================================================
 
-/// SlideViewInfoAtom - View state for slide editing
+/// `SlideViewInfoAtom` - View state for slide editing
 #[derive(Debug, Clone, Copy)]
 pub struct SlideViewInfoAtom {
     /// Snap to grid enabled
@@ -196,11 +206,12 @@ impl SlideViewInfoAtom {
         show_guides: false,
     };
 
+    #[must_use]
     pub fn to_bytes(&self) -> [u8; 3] {
         [
-            self.snap_to_grid as u8,
-            self.snap_to_shape as u8,
-            self.show_guides as u8,
+            u8::from(self.snap_to_grid),
+            u8::from(self.snap_to_shape),
+            u8::from(self.show_guides),
         ]
     }
 }
@@ -209,7 +220,7 @@ impl SlideViewInfoAtom {
 // VBAInfoAtom (MS-PPT 2.10.1)
 // =============================================================================
 
-/// VBAInfoAtom - VBA macro information
+/// `VBAInfoAtom` - VBA macro information
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct VBAInfoAtom {
     /// Persist ID reference to VBA storage (0 if none)
@@ -228,6 +239,7 @@ impl VBAInfoAtom {
         runtime_version: 2,
     };
 
+    #[must_use]
     pub fn to_bytes(&self) -> [u8; 12] {
         let mut data = [0u8; 12];
         data[0..4].copy_from_slice(&self.persist_id_ref.to_le_bytes());
@@ -238,6 +250,11 @@ impl VBAInfoAtom {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -639,12 +656,12 @@ mod tests {
         let view = SlideViewInfoAtom::DEFAULT;
         let vba = VBAInfoAtom::DEFAULT;
 
-        assert!(format!("{:?}", sr).contains("SrKinsokuAtom"));
-        assert!(format!("{:?}", cf).contains("TxCFStyleAtom"));
-        assert!(format!("{:?}", pf).contains("TxPFStyleAtom"));
-        assert!(format!("{:?}", si).contains("TxSIStyleAtom"));
-        assert!(format!("{:?}", sheet).contains("SheetPropertiesAtom"));
-        assert!(format!("{:?}", view).contains("SlideViewInfoAtom"));
-        assert!(format!("{:?}", vba).contains("VBAInfoAtom"));
+        assert!(format!("{sr:?}").contains("SrKinsokuAtom"));
+        assert!(format!("{cf:?}").contains("TxCFStyleAtom"));
+        assert!(format!("{pf:?}").contains("TxPFStyleAtom"));
+        assert!(format!("{si:?}").contains("TxSIStyleAtom"));
+        assert!(format!("{sheet:?}").contains("SheetPropertiesAtom"));
+        assert!(format!("{view:?}").contains("SlideViewInfoAtom"));
+        assert!(format!("{vba:?}").contains("VBAInfoAtom"));
     }
 }

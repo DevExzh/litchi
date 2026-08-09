@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+    ControlWord, Cow, Destination, DrawingStoryCapture, InfoTextField, InfoTimeField,
+    MAX_INFO_TEXT_BYTES, Parser, RtfError, RtfResult, SmallVec, State, Token, control_symbol_text,
+};
 use std::mem::size_of;
 
 impl<'a> Parser<'a> {
@@ -47,14 +50,20 @@ impl<'a> Parser<'a> {
                     while let Some(Token::Control(ControlWord::Unicode(code))) =
                         self.tokens.get(self.pos)
                     {
+                        #[allow(
+                            clippy::cast_possible_truncation,
+                            clippy::cast_sign_loss,
+                            reason = "RTF \\uN parameters are signed 16-bit; the u16 wrap implements the specified negative-value conversion"
+                        )]
                         utf16.push(*code as u16);
                         self.pos += 1;
                     }
                     value.push_str(&String::from_utf16(&utf16).map_err(|error| {
                         RtfError::InvalidUnicode(format!("Invalid info Unicode: {error}"))
                     })?);
-                    fallback_skip =
-                        self.current_state()?.unicode_skip.max(0) as usize * utf16.len();
+                    fallback_skip = self.current_state()?.unicode_skip.max(0).cast_unsigned()
+                        as usize
+                        * utf16.len();
                 },
                 Some(Token::Control(ControlWord::UnicodeSkip(count))) => {
                     self.current_state_mut()?.unicode_skip = *count;
@@ -77,23 +86,27 @@ impl<'a> Parser<'a> {
             return Err(RtfError::UnexpectedEof);
         }
         let allocated = self.arena.alloc_str(value.trim_end_matches(['\r', '\n']));
-        let value = Some(Cow::Borrowed(&*allocated));
+        let text_value = Some(Cow::Borrowed(&*allocated));
         match field {
-            InfoTextField::Title => self.info.title = value,
-            InfoTextField::Subject => self.info.subject = value,
-            InfoTextField::Author => self.info.author = value,
-            InfoTextField::Manager => self.info.manager = value,
-            InfoTextField::Company => self.info.company = value,
-            InfoTextField::Operator => self.info.operator = value,
-            InfoTextField::Category => self.info.category = value,
-            InfoTextField::Keywords => self.info.keywords = value,
-            InfoTextField::Comment => self.info.comment = value,
-            InfoTextField::DocumentComment => self.info.document_comment = value,
-            InfoTextField::HyperlinkBase => self.info.hyperlink_base = value,
+            InfoTextField::Title => self.info.title = text_value,
+            InfoTextField::Subject => self.info.subject = text_value,
+            InfoTextField::Author => self.info.author = text_value,
+            InfoTextField::Manager => self.info.manager = text_value,
+            InfoTextField::Company => self.info.company = text_value,
+            InfoTextField::Operator => self.info.operator = text_value,
+            InfoTextField::Category => self.info.category = text_value,
+            InfoTextField::Keywords => self.info.keywords = text_value,
+            InfoTextField::Comment => self.info.comment = text_value,
+            InfoTextField::DocumentComment => self.info.document_comment = text_value,
+            InfoTextField::HyperlinkBase => self.info.hyperlink_base = text_value,
         }
         Ok(())
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn parse_info_time(&mut self, field: InfoTimeField) -> RtfResult<()> {
         let duplicate = match field {
             InfoTimeField::Creation => self.info.creation_timestamp.is_some(),
@@ -159,7 +172,7 @@ impl<'a> Parser<'a> {
                 "RTF info numeric control {name} occurs more than once"
             )));
         }
-        *slot = Some(u32::try_from(value).map_err(|_| {
+        *slot = Some(u32::try_from(value).map_err(|_err| {
             RtfError::MalformedDocument(format!(
                 "RTF info numeric control {name} cannot be negative"
             ))
@@ -196,8 +209,8 @@ impl<'a> Parser<'a> {
         value: Option<i32>,
         name: &str,
     ) -> RtfResult<()> {
-        let value = value.unwrap_or(1);
-        Self::set_required_protection_flag(slot, value, name)
+        let flag = value.unwrap_or(1);
+        Self::set_required_protection_flag(slot, flag, name)
     }
 
     pub(super) fn set_required_protection_flag(
@@ -246,7 +259,7 @@ impl<'a> Parser<'a> {
             match token {
                 Token::OpenBrace => depth += 1,
                 Token::CloseBrace => depth -= 1,
-                _ => {},
+                Token::Control(_) | Token::Text(_) | Token::Binary(_) => {},
             }
             self.pos += 1;
         }
@@ -254,7 +267,7 @@ impl<'a> Parser<'a> {
         (depth == 0).then_some(()).ok_or(RtfError::UnexpectedEof)
     }
 
-    /// Skip an entire group starting from the OpenBrace token.
+    /// Skip an entire group starting from the `OpenBrace` token.
     pub(super) fn skip_group(&mut self) -> RtfResult<()> {
         // Must be positioned at OpenBrace
         if !matches!(self.tokens.get(self.pos), Some(Token::OpenBrace)) {
@@ -271,7 +284,7 @@ impl<'a> Parser<'a> {
             match token {
                 Token::OpenBrace => depth += 1,
                 Token::CloseBrace => depth -= 1,
-                _ => {},
+                Token::Control(_) | Token::Text(_) | Token::Binary(_) => {},
             }
             self.pos += 1;
         }
@@ -384,12 +397,12 @@ impl<'a> Parser<'a> {
         let mut bytes = Vec::new();
         bytes
             .try_reserve(observed)
-            .map_err(|_| RtfError::AllocationFailed {
+            .map_err(|_err| RtfError::AllocationFailed {
                 resource: "opaque node bytes",
                 requested: observed,
             })?;
         for character in fragment.chars() {
-            let byte = u8::try_from(u32::from(character)).map_err(|_| {
+            let byte = u8::try_from(u32::from(character)).map_err(|_err| {
                 RtfError::InvalidUnicode(
                     "RTF opaque transport contains a non-Latin-1 scalar".to_string(),
                 )
@@ -439,7 +452,7 @@ impl<'a> Parser<'a> {
         };
         self.opaque_nodes
             .try_reserve(1)
-            .map_err(|_| RtfError::AllocationFailed {
+            .map_err(|_err| RtfError::AllocationFailed {
                 resource: "opaque nodes",
                 requested: node_count.saturating_mul(size_of::<crate::opaque::Node>()),
             })?;
@@ -450,12 +463,11 @@ impl<'a> Parser<'a> {
     }
 
     /// Expect a specific token.
-    pub(super) fn expect_token(&mut self, expected: Token) -> RtfResult<()> {
+    pub(super) fn expect_token(&mut self, expected: &Token<'_>) -> RtfResult<()> {
         let actual = self.tokens.get(self.pos).ok_or(RtfError::UnexpectedEof)?;
-        if actual != &expected {
+        if actual != expected {
             return Err(RtfError::ParserError(format!(
-                "Expected {:?}, found {:?}",
-                expected, actual
+                "Expected {expected:?}, found {actual:?}"
             )));
         }
 

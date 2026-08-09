@@ -26,6 +26,7 @@ impl Revision {
     }
 
     /// Compact source fingerprint useful for optimistic owner checks.
+    #[must_use]
     pub const fn value(self) -> u64 {
         self.0
     }
@@ -74,6 +75,7 @@ pub enum Change {
 
 impl Change {
     /// Semantic category of this operation.
+    #[must_use]
     pub const fn kind(&self) -> ChangeKind {
         match self {
             Self::SlidesReordered { .. } => ChangeKind::SlidesReordered,
@@ -136,15 +138,23 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parse exactly one complete `DocumentContainer` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(bytes: impl AsRef<[u8]>) -> Result<Self> {
         Self::parse_with_limits(bytes, Limits::default())
     }
 
     /// Parse one document structure with explicit resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
-        let limits = limits.validate()?;
+        let validated_limits = limits.validate()?;
         let input = bytes.as_ref();
-        if input.len() > limits.max_bytes {
+        if input.len() > validated_limits.max_bytes {
             return Err(Error::InvalidFormat(
                 "document-structure snapshot exceeds its byte limit".into(),
             ));
@@ -155,7 +165,7 @@ impl Snapshot {
                 "document-structure input contains trailing bytes".into(),
             ));
         }
-        let structure = validation::validate_document(&root, limits)?;
+        let structure = validation::validate_document(&root, validated_limits)?;
         let encoded = codec::encode_document(&root)?;
         if encoded != input {
             return Err(Error::Corrupted(
@@ -166,26 +176,34 @@ impl Snapshot {
             Arc::from(input.to_vec().into_boxed_slice()),
             root,
             structure,
-            limits,
+            validated_limits,
         ))
     }
 
     /// Capture a parsed record tree using the default resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn from_record(root: Record) -> Result<Self> {
         Self::from_record_with_limits(root, Limits::default())
     }
 
     /// Capture a parsed record tree with explicit resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn from_record_with_limits(mut root: Record, limits: Limits) -> Result<Self> {
-        let limits = limits.validate()?;
+        let validated_limits = limits.validate()?;
         codec::synchronize(&mut root)?;
         let bytes = codec::encode_document(&root)?;
-        if bytes.len() > limits.max_bytes {
+        if bytes.len() > validated_limits.max_bytes {
             return Err(Error::InvalidFormat(
                 "document-structure snapshot exceeds its byte limit".into(),
             ));
         }
-        Self::parse_with_limits(bytes, limits)
+        Self::parse_with_limits(bytes, validated_limits)
     }
 
     fn from_parts(
@@ -205,26 +223,31 @@ impl Snapshot {
     }
 
     /// Exact source or committed `DocumentContainer` bytes.
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
     /// Parsed record tree retained for advanced, read-only inspection.
+    #[must_use]
     pub const fn record(&self) -> &Record {
         &self.root
     }
 
     /// Typed structural inventory in source order.
+    #[must_use]
     pub const fn structure(&self) -> &DocumentStructure {
         &self.structure
     }
 
     /// Typed master references in source order.
+    #[must_use]
     pub fn masters(&self) -> &[Master] {
         self.structure.masters()
     }
 
     /// Typed presentation-slide references in source order.
+    #[must_use]
     pub fn slides(&self) -> &[Slide] {
         self.structure.slides()
     }
@@ -238,16 +261,19 @@ impl Snapshot {
     }
 
     /// Compact identity of the exact serialized snapshot.
+    #[must_use]
     pub const fn revision(&self) -> Revision {
         self.revision
     }
 
     /// Resource bounds retained for subsequent edits and patch application.
+    #[must_use]
     pub const fn limits(&self) -> Limits {
         self.limits
     }
 
     /// Start an isolated semantic edit over this snapshot.
+    #[must_use]
     pub fn edit(&self) -> Transaction {
         Transaction {
             source: self.clone(),
@@ -267,41 +293,61 @@ pub struct Transaction {
 
 impl Transaction {
     /// Immutable source snapshot used for optimistic conflict checks.
+    #[must_use]
     pub const fn source(&self) -> &Snapshot {
         &self.source
     }
 
     /// Current transaction-local record tree.
+    #[must_use]
     pub const fn record(&self) -> &Record {
         &self.candidate
     }
 
     /// Current transaction-local structural inventory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn structure(&self) -> Result<DocumentStructure> {
         validation::validate_document(&self.candidate, self.source.limits)
     }
 
     /// Current transaction-local master references.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn masters(&self) -> Result<Vec<Master>> {
         Ok(self.structure()?.masters().to_vec())
     }
 
     /// Current transaction-local slide references.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn slides(&self) -> Result<Vec<Slide>> {
         Ok(self.structure()?.slides().to_vec())
     }
 
     /// Whether any staged operation changes the candidate tree.
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.candidate != self.source.root
     }
 
     /// Semantic operations staged in call order.
+    #[must_use]
     pub fn changes(&self) -> &[Change] {
         &self.changes
     }
 
     /// Move one slide from its current zero-based position to `destination`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn move_slide(&mut self, from: usize, destination: usize) -> Result<()> {
         let count = self.slides()?.len();
         if from >= count || destination >= count {
@@ -314,6 +360,10 @@ impl Transaction {
     }
 
     /// Move a slide selected by its semantic `slideId`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn move_slide_id(&mut self, slide_id: u32, destination: usize) -> Result<()> {
         let index = self
             .slides()?
@@ -324,6 +374,10 @@ impl Transaction {
     }
 
     /// Reorder all slide groups using a checked permutation of current positions.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn reorder_slides(&mut self, order: &[usize]) -> Result<()> {
         let structure = self.structure()?;
         let before = structure
@@ -342,6 +396,10 @@ impl Transaction {
     }
 
     /// Move one master from its current zero-based position to `destination`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn move_master(&mut self, from: usize, destination: usize) -> Result<()> {
         let count = self.masters()?.len();
         if from >= count || destination >= count {
@@ -354,6 +412,10 @@ impl Transaction {
     }
 
     /// Move a master selected by its semantic `masterId`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn move_master_id(&mut self, master_id: u32, destination: usize) -> Result<()> {
         let index = self
             .masters()?
@@ -366,6 +428,10 @@ impl Transaction {
     }
 
     /// Reorder all master groups using a checked permutation of current positions.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn reorder_masters(&mut self, order: &[usize]) -> Result<()> {
         let structure = self.structure()?;
         let before = structure
@@ -385,6 +451,10 @@ impl Transaction {
     }
 
     /// Move an existing custom-table-style atom before or after the end atom.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn move_custom_table_styles(
         &mut self,
         placement: CustomTableStylesPlacement,
@@ -418,6 +488,10 @@ impl Transaction {
     }
 
     /// Insert one opaque custom-table-style atom at the document tail.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn insert_custom_table_styles(
         &mut self,
         record: Record,
@@ -445,6 +519,10 @@ impl Transaction {
     }
 
     /// Remove the custom-table-style atom and return its opaque record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_custom_table_styles(&mut self) -> Result<Record> {
         let placement = self.structure()?.custom_table_styles.ok_or_else(|| {
             Error::InvalidFormat("the document has no custom table-style atom".into())
@@ -461,6 +539,10 @@ impl Transaction {
     }
 
     /// Replace custom-table-style bytes without changing their placement.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace_custom_table_styles(&mut self, record: Record) -> Result<Record> {
         validate_custom_styles_record(&record)?;
         let placement = self.structure()?.custom_table_styles.ok_or_else(|| {
@@ -483,6 +565,10 @@ impl Transaction {
     }
 
     /// Capture the current candidate without publishing it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn snapshot(&self) -> Result<Snapshot> {
         let bytes = self.encoded_candidate()?;
         if bytes.as_slice() == self.source.bytes.as_ref() {
@@ -492,6 +578,10 @@ impl Transaction {
     }
 
     /// Validate and publish the candidate atomically with its reversible patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn commit(self) -> Result<Commit> {
         let bytes = self.encoded_candidate()?;
         let source = self.source;
@@ -517,11 +607,16 @@ impl Transaction {
     }
 
     /// Alias for move-owned writer terminology.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn finish(self) -> Result<Commit> {
         self.commit()
     }
 
     /// Discard all staged edits and recover the exact source snapshot.
+    #[must_use]
     pub fn rollback(self) -> Snapshot {
         self.source
     }
@@ -580,26 +675,37 @@ pub struct Commit {
 
 impl Commit {
     /// Published target snapshot.
+    #[must_use]
     pub const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Reversible patch from the source to this target.
+    #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Undo this commit against its exact target snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.patch.undo(current)
     }
 
     /// Redo this commit against its exact source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.patch.redo(current)
     }
 
     /// Split the published target and patch.
+    #[must_use]
     pub fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
@@ -618,46 +724,58 @@ pub struct Patch {
 
 impl Patch {
     /// Source revision required for forward application.
+    #[must_use]
     pub const fn base(&self) -> Revision {
         self.base
     }
 
     /// Target revision produced by forward application.
+    #[must_use]
     pub const fn target(&self) -> Revision {
         self.target
     }
 
     /// Semantic operations represented by this patch.
+    #[must_use]
     pub fn changes(&self) -> &[Change] {
         &self.changes
     }
 
     /// Exact source bytes bound to this patch.
+    #[must_use]
     pub fn before(&self) -> &[u8] {
         &self.before
     }
 
     /// Exact target bytes bound to this patch.
+    #[must_use]
     pub fn after(&self) -> &[u8] {
         &self.after
     }
 
     /// Compatibility-free explicit aliases for byte-oriented callers.
+    #[must_use]
     pub fn before_bytes(&self) -> &[u8] {
         self.before()
     }
 
     /// Exact target bytes bound to this patch.
+    #[must_use]
     pub fn after_bytes(&self) -> &[u8] {
         self.after()
     }
 
     /// Whether this patch is an exact byte-for-byte no-op.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.before.as_ref() == self.after.as_ref()
     }
 
     /// Apply only to the exact source snapshot used to create this patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn apply(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision != self.base || current.bytes.as_ref() != self.before.as_ref() {
             return Err(Error::InvalidFormat(
@@ -671,16 +789,25 @@ impl Patch {
     }
 
     /// Apply the inverse to the exact committed target.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.inverse().apply(current)
     }
 
     /// Reapply this patch to its exact source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.apply(current)
     }
 
     /// Build a source-checked inverse patch.
+    #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
             base: self.target,

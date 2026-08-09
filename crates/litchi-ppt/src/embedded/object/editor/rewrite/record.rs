@@ -1,4 +1,4 @@
-//! Primitive PowerPoint record framing helpers.
+//! Primitive `PowerPoint` record framing helpers.
 
 use crate::embedded::object::editor::Result;
 use crate::package::Error;
@@ -21,7 +21,9 @@ pub(crate) fn type_of(record: &[u8]) -> Result<u16> {
 }
 
 pub(crate) fn u32_at(data: &[u8], offset: usize) -> Result<u32> {
-    data.get(offset..offset + 4)
-        .map(|value| u32::from_le_bytes(value.try_into().unwrap()))
-        .ok_or_else(|| Error::Corrupted("truncated u32".into()))
+    let bytes: &[u8; 4] = data
+        .get(offset..offset + 4)
+        .and_then(|value| value.try_into().ok())
+        .ok_or_else(|| Error::Corrupted("truncated u32".into()))?;
+    Ok(u32::from_le_bytes(*bytes))
 }

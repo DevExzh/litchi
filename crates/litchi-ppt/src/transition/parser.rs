@@ -1,6 +1,6 @@
 //! Slide transition parser.
 //!
-//! Parses PowerPoint binary slide transition records.
+//! Parses `PowerPoint` binary slide transition records.
 
 use super::types::{
     AdvanceMode, SoundAction, TransitionDirection, TransitionInfo, TransitionSpeed, TransitionType,
@@ -10,7 +10,11 @@ use crate::package::{Error, Result};
 use crate::records::Record;
 use zerocopy::{FromBytes, byteorder::LittleEndian, byteorder::U16, byteorder::U32};
 
-/// Parse transition info from SSSlideInfoAtom record.
+/// Parse transition info from `SSSlideInfoAtom` record.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_transition(record: &Record) -> Result<TransitionInfo> {
     if record.record_type != RecordType::SSSlideInfoAtom {
         return Err(Error::InvalidFormat(format!(
@@ -27,25 +31,20 @@ pub fn parse_transition(record: &Record) -> Result<TransitionInfo> {
 
     let mut transition = TransitionInfo::new();
 
-    let slide_time = U32::<LittleEndian>::read_from_bytes(&record.data[0..4])
-        .map(|v| v.get())
-        .unwrap_or(0);
+    let slide_time = U32::<LittleEndian>::read_from_bytes(&record.data[0..4]).map_or(0, U32::get);
 
     if slide_time > 0 {
         transition.advance_time_ms = Some(slide_time);
     }
 
-    let sound_id_ref = U32::<LittleEndian>::read_from_bytes(&record.data[4..8])
-        .map(|v| v.get())
-        .unwrap_or(0);
+    let sound_id_ref = U32::<LittleEndian>::read_from_bytes(&record.data[4..8]).map_or(0, U32::get);
 
     let effect_direction = record.data.get(8).copied().unwrap_or(0);
 
-    let effect_type = record.data.get(9).copied().map(u16::from).unwrap_or(0);
+    let effect_type = record.data.get(9).copied().map_or(0, u16::from);
 
     let flags = U16::<LittleEndian>::read_from_bytes(&record.data[10..12])
-        .map(|v| u32::from(v.get()))
-        .unwrap_or(0);
+        .map_or(0, |v| u32::from(v.get()));
 
     let effect_speed = record.data.get(12).copied().unwrap_or(0);
 
@@ -65,7 +64,6 @@ pub fn parse_transition(record: &Record) -> Result<TransitionInfo> {
 /// Parse transition type from effect type value.
 fn parse_transition_type(effect_type: u16) -> TransitionType {
     match effect_type {
-        0 => TransitionType::None,
         1 => TransitionType::Blinds,
         2 => TransitionType::Checkerboard,
         3 => TransitionType::Cover,
@@ -113,53 +111,55 @@ fn parse_transition_type(effect_type: u16) -> TransitionType {
 }
 
 /// Parse transition direction from effect direction value.
+///
+/// Direction values follow MS-PPT 2.6.6 (`SlideShowSlideInfoAtom`) and are the
+/// exact inverse of `encode_transition_direction` in the writer.
 fn parse_transition_direction(direction: u8, effect_type: u16) -> TransitionDirection {
     match effect_type {
+        // Blinds: 0=Vertical, 1=Horizontal
         1 => {
             if direction == 0 {
-                TransitionDirection::Horizontal
-            } else {
                 TransitionDirection::Vertical
+            } else {
+                TransitionDirection::Horizontal
             }
         },
-        2 => {
+        // Checkerboard / Random Bars: 0=Horizontal, 1=Vertical
+        2 | 7 => {
             if direction == 0 {
                 TransitionDirection::Horizontal
             } else {
                 TransitionDirection::Vertical
             }
         },
-        3 | 6 | 9 => match direction {
+        // Cover / Uncover / Wipe / Push: 0=Left, 1=Up, 2=Right, 3=Down
+        3 | 6 | 9 | 18 => match direction {
             0 => TransitionDirection::FromLeft,
             1 => TransitionDirection::FromTop,
             2 => TransitionDirection::FromRight,
             3 => TransitionDirection::FromBottom,
             _ => TransitionDirection::None,
         },
-        7 => {
-            if direction == 0 {
-                TransitionDirection::Horizontal
-            } else {
-                TransitionDirection::Vertical
-            }
-        },
+        // Strips: 4=Left Up, 5=Right Up, 6=Left Down, 7=Right Down
         8 => match direction {
-            0 => TransitionDirection::LeftDown,
-            1 => TransitionDirection::LeftUp,
-            2 => TransitionDirection::RightDown,
-            3 => TransitionDirection::RightUp,
+            4 => TransitionDirection::LeftUp,
+            5 => TransitionDirection::RightUp,
+            6 => TransitionDirection::LeftDown,
+            7 => TransitionDirection::RightDown,
             _ => TransitionDirection::None,
         },
-        10 => {
+        // Box / Zoom: 0=Out, 1=In
+        10 | 20 => {
             if direction == 0 {
-                TransitionDirection::In
-            } else {
                 TransitionDirection::Out
+            } else {
+                TransitionDirection::In
             }
         },
+        // Split: 0|1=Horizontal variants, 2|3=Vertical variants
         13 => match direction {
-            0 => TransitionDirection::Horizontal,
-            1 => TransitionDirection::Vertical,
+            0 | 1 => TransitionDirection::Horizontal,
+            2 | 3 => TransitionDirection::Vertical,
             _ => TransitionDirection::None,
         },
         _ => TransitionDirection::None,
@@ -170,7 +170,6 @@ fn parse_transition_direction(direction: u8, effect_type: u16) -> TransitionDire
 fn parse_transition_speed(speed: u8) -> TransitionSpeed {
     match speed {
         0 => TransitionSpeed::Slow,
-        1 => TransitionSpeed::Medium,
         2 => TransitionSpeed::Fast,
         _ => TransitionSpeed::Medium,
     }
@@ -220,10 +219,15 @@ fn parse_sound_action(sound_id: u32) -> SoundAction {
         }
     }
 
-    SoundAction::builtin(format!("Sound{}", sound_id))
+    SoundAction::builtin(format!("Sound{sound_id}"))
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -263,7 +267,7 @@ mod tests {
             record_type_raw: 0x03F9,
             version: 0,
             instance: 0,
-            data_length: data.len() as u32,
+            data_length: u32::try_from(data.len()).unwrap(),
             data,
             children: Vec::new(),
         }

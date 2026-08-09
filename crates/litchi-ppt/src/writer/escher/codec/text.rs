@@ -1,11 +1,11 @@
-//! PPT ClientTextbox and text-interaction record assembly.
+//! PPT `ClientTextbox` and text-interaction record assembly.
 
 use litchi_odraw::write::Header;
 use zerocopy::IntoBytes;
 
 use super::super::Error;
 
-/// Builds a plain-text ClientTextbox record.
+/// Builds a plain-text `ClientTextbox` record.
 pub(crate) fn build_client_textbox(text: &str, text_type: u32) -> Result<Vec<u8>, Error> {
     build_client_textbox_with_interactions(text, text_type, &[])
 }
@@ -42,7 +42,7 @@ pub(crate) fn build_client_textbox_with_interactions(
             "ClientTextbox text exceeds the PPT size limit",
         )
     };
-    let text_units = u32::try_from(text.encode_utf16().count()).map_err(|_| too_large())?;
+    let text_units = u32::try_from(text.encode_utf16().count()).map_err(|_err| too_large())?;
     let char_count = text_units.checked_add(1).ok_or_else(too_large)?;
     let mut style_atom = RecordBuilder::new(0, 0, ppt_rt::STYLE_TEXT_PROP_ATOM);
     style_atom.write_data(&char_count.to_le_bytes());
@@ -58,7 +58,12 @@ pub(crate) fn build_client_textbox_with_interactions(
         crate::TextInteractionLimits::default(),
     )?;
 
-    let header = Header::new(0x0F, 0, 0xF00D, ppt_content.len() as u32);
+    let header = Header::new(
+        0x0F,
+        0,
+        0xF00D,
+        u32::try_from(ppt_content.len()).map_err(|_err| too_large())?,
+    );
     result.extend_from_slice(header.as_bytes());
     result.extend_from_slice(&ppt_content);
     Ok(result)
@@ -93,7 +98,7 @@ pub(super) fn build_client_textbox_formatted_with_interactions(
     }
 
     let text_chars = builder.build_text_chars();
-    let text_units = u32::try_from(text_chars.len() / 2).map_err(|_| {
+    let text_units = u32::try_from(text_chars.len() / 2).map_err(|_err| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
             "ClientTextbox text exceeds the PPT size limit",
@@ -114,7 +119,17 @@ pub(super) fn build_client_textbox_formatted_with_interactions(
         crate::TextInteractionLimits::default(),
     )?;
 
-    let header = Header::new(0x0F, 0, 0xF00D, ppt_content.len() as u32);
+    let header = Header::new(
+        0x0F,
+        0,
+        0xF00D,
+        u32::try_from(ppt_content.len()).map_err(|_err| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "ClientTextbox text exceeds the PPT size limit",
+            )
+        })?,
+    );
     result.extend_from_slice(header.as_bytes());
     result.extend_from_slice(&ppt_content);
     Ok(result)

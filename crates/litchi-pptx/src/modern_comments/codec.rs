@@ -558,10 +558,16 @@ mod authors {
     }
 
     impl Authors {
+        /// # Errors
+        ///
+        /// Returns an error if the input cannot be read or is malformed.
         pub fn parse(xml: &[u8]) -> Result<Self> {
             parse_author_list(xml)
         }
 
+        /// # Errors
+        ///
+        /// Returns an error if the output cannot be encoded or written.
         pub fn to_xml(&self) -> Result<Vec<u8>> {
             validate_author_model(self)?;
             let mut out = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#.to_vec();

@@ -1,7 +1,20 @@
+#![allow(
+    clippy::expect_used,
+    clippy::float_cmp,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design, rebind fixture names across steps, and compare exact fixture fractions"
+)]
+
 use litchi_rtf::{RtfDocument, RtfWriter, UserPropertyType, UserPropertyValue};
 
 // The fixture value 3.1400 exercises lexical round-tripping; it is not the constant PI.
-#[allow(clippy::approx_constant)]
+#[allow(
+    clippy::approx_constant,
+    reason = "the fixture value 3.1400 exercises lexical round-tripping and is not the constant PI"
+)]
 #[test]
 fn parses_all_typed_values_in_normative_order() {
     let document = RtfDocument::parse(concat!(
@@ -112,16 +125,16 @@ fn parses_libreoffice_user_property_fixtures_when_available() {
 #[test]
 fn rejects_noncanonical_malformed_and_active_properties() {
     for source in [
-        r#"{\rtf1{\userprops{\propname A}\proptype30{\staticval x}}}"#,
-        r#"{\rtf1{\*\userprops{\propname A}{\staticval x}\proptype30}}"#,
-        r#"{\rtf1{\*\userprops{\propname A}\proptype{\staticval x}}}"#,
-        r#"{\rtf1{\*\userprops{\propname A}\proptype11{\staticval true}}}"#,
-        r#"{\rtf1{\*\userprops{\propname A}\proptype64{\staticval 2023. 02. 29.}}}"#,
-        r#"{\rtf1{\*\userprops{\propname A}\proptype30{\staticval x}{\propname A}\proptype30{\staticval y}}}"#,
-        r#"{\rtf1{\*\userprops{\propname A}\proptype30{\staticval {nested}}}}"#,
-        r#"{\rtf1{\*\userprops{\propname A}\proptype30{\staticval \bin4 abcd}}}"#,
-        r#"{\rtf1{\*\userprops{\propname A}\proptype30{\staticval \field danger}}}"#,
-        r#"{\rtf1{\*\userprops}Body{\*\userprops}}"#,
+        r"{\rtf1{\userprops{\propname A}\proptype30{\staticval x}}}",
+        r"{\rtf1{\*\userprops{\propname A}{\staticval x}\proptype30}}",
+        r"{\rtf1{\*\userprops{\propname A}\proptype{\staticval x}}}",
+        r"{\rtf1{\*\userprops{\propname A}\proptype11{\staticval true}}}",
+        r"{\rtf1{\*\userprops{\propname A}\proptype64{\staticval 2023. 02. 29.}}}",
+        r"{\rtf1{\*\userprops{\propname A}\proptype30{\staticval x}{\propname A}\proptype30{\staticval y}}}",
+        r"{\rtf1{\*\userprops{\propname A}\proptype30{\staticval {nested}}}}",
+        r"{\rtf1{\*\userprops{\propname A}\proptype30{\staticval \bin4 abcd}}}",
+        r"{\rtf1{\*\userprops{\propname A}\proptype30{\staticval \field danger}}}",
+        r"{\rtf1{\*\userprops}Body{\*\userprops}}",
     ] {
         assert!(RtfDocument::parse(source).is_err(), "{source}");
     }

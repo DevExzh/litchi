@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 //! Shared and specialized animation behavior round trips and validation.
 use super::super::*;
 use crate::animation::types::{is_valid_time_set_value, time_set_attribute_value_type};
@@ -146,10 +152,10 @@ fn rejects_malformed_shared_time_behaviors() {
         kind: TimeVisualElementKind::Audio,
         sound_id_ref: 42,
     };
-    let bytes = write_time_visual_element(&sound).unwrap();
-    let (mut record, _) = Record::parse(&bytes, 0).unwrap();
-    record.children[0].data[12..16].copy_from_slice(&0u32.to_le_bytes());
-    assert!(parse_time_visual_element(&record).is_err());
+    let sound_bytes = write_time_visual_element(&sound).unwrap();
+    let (mut sound_record, _) = Record::parse(&sound_bytes, 0).unwrap();
+    sound_record.children[0].data[12..16].copy_from_slice(&0u32.to_le_bytes());
+    assert!(parse_time_visual_element(&sound_record).is_err());
 }
 
 #[test]
@@ -480,25 +486,25 @@ fn rejects_malformed_image_effect_behaviors() {
         assert!(write_time_effect_behavior(&invalid).is_err());
     }
 
-    let mut bytes = write_time_effect_behavior_atom(&TimeEffectBehaviorAtom {
+    let mut atom_bytes = write_time_effect_behavior_atom(&TimeEffectBehaviorAtom {
         transition: None,
         filter_used: false,
         progress_used: false,
         runtime_context_used: false,
     });
-    bytes[12..16].copy_from_slice(&1u32.to_le_bytes());
-    let (record, _) = Record::parse(&bytes, 0).unwrap();
-    assert!(parse_time_effect_behavior_atom(&record).is_err());
+    atom_bytes[12..16].copy_from_slice(&1u32.to_le_bytes());
+    let (atom_record, _) = Record::parse(&atom_bytes, 0).unwrap();
+    assert!(parse_time_effect_behavior_atom(&atom_record).is_err());
 
     let bytes = write_time_effect_behavior(&valid).unwrap();
-    let (mut record, _) = Record::parse(&bytes, 0).unwrap();
-    record.children[1].data = vec![3, b'n', 0, b'o', 0, b'p', 0, b'e', 0];
-    record.children[1].data_length = 9;
-    assert!(parse_time_effect_behavior(&record).is_err());
+    let (mut bad_filter_record, _) = Record::parse(&bytes, 0).unwrap();
+    bad_filter_record.children[1].data = vec![3, b'n', 0, b'o', 0, b'p', 0, b'e', 0];
+    bad_filter_record.children[1].data_length = 9;
+    assert!(parse_time_effect_behavior(&bad_filter_record).is_err());
 
-    let (mut record, _) = Record::parse(&bytes, 0).unwrap();
-    record.children.swap(1, 2);
-    assert!(parse_time_effect_behavior(&record).is_err());
+    let (mut swapped_record, _) = Record::parse(&bytes, 0).unwrap();
+    swapped_record.children.swap(1, 2);
+    assert!(parse_time_effect_behavior(&swapped_record).is_err());
 }
 
 #[test]
@@ -552,7 +558,7 @@ fn round_trips_motion_behaviors_and_formula_paths() {
         Some(TimeMotionOrigin::SlideLegacy),
         Some(TimeMotionOrigin::ObjectCenter),
     ] {
-        let expected = TimeMotionBehaviorAtom {
+        let motion_atom = TimeMotionBehaviorAtom {
             by: None,
             from: None,
             to: None,
@@ -561,9 +567,12 @@ fn round_trips_motion_behaviors_and_formula_paths() {
             edit_rotation_used: false,
             points_types_used: false,
         };
-        let bytes = write_time_motion_behavior_atom(&expected).unwrap();
-        let (record, _) = Record::parse(&bytes, 0).unwrap();
-        assert_eq!(parse_time_motion_behavior_atom(&record).unwrap(), expected);
+        let atom_bytes = write_time_motion_behavior_atom(&motion_atom).unwrap();
+        let (atom_record, _) = Record::parse(&atom_bytes, 0).unwrap();
+        assert_eq!(
+            parse_time_motion_behavior_atom(&atom_record).unwrap(),
+            motion_atom
+        );
     }
 }
 
@@ -727,15 +736,15 @@ fn round_trips_rotation_and_scale_behaviors() {
         },
         behavior: common(Some(vec!["ignored".to_string()]), false),
     };
-    let atom_bytes = write_time_scale_behavior_atom(&scale.atom).unwrap();
-    let (atom_record, _) = Record::parse(&atom_bytes, 0).unwrap();
+    let scale_atom_bytes = write_time_scale_behavior_atom(&scale.atom).unwrap();
+    let (scale_atom_record, _) = Record::parse(&scale_atom_bytes, 0).unwrap();
     assert_eq!(
-        parse_time_scale_behavior_atom(&atom_record).unwrap(),
+        parse_time_scale_behavior_atom(&scale_atom_record).unwrap(),
         scale.atom
     );
-    let bytes = write_time_scale_behavior(&scale).unwrap();
-    let (record, _) = Record::parse(&bytes, 0).unwrap();
-    assert_eq!(parse_time_scale_behavior(&record).unwrap(), scale);
+    let scale_bytes = write_time_scale_behavior(&scale).unwrap();
+    let (scale_record, _) = Record::parse(&scale_bytes, 0).unwrap();
+    assert_eq!(parse_time_scale_behavior(&scale_record).unwrap(), scale);
 }
 
 #[test]
@@ -755,27 +764,27 @@ fn rejects_malformed_rotation_and_scale_behaviors() {
     };
     assert!(write_time_scale_behavior_atom(&invalid_scale).is_err());
 
-    let mut bytes = write_time_rotation_behavior_atom(&TimeRotationBehaviorAtom {
+    let mut rot_bytes = write_time_rotation_behavior_atom(&TimeRotationBehaviorAtom {
         by_degrees: None,
         from_degrees: None,
         to_degrees: None,
         direction: None,
     })
     .unwrap();
-    bytes[20..24].copy_from_slice(&0f32.to_le_bytes());
-    let (record, _) = Record::parse(&bytes, 0).unwrap();
-    assert!(parse_time_rotation_behavior_atom(&record).is_err());
+    rot_bytes[20..24].copy_from_slice(&0f32.to_le_bytes());
+    let (rot_record, _) = Record::parse(&rot_bytes, 0).unwrap();
+    assert!(parse_time_rotation_behavior_atom(&rot_record).is_err());
 
-    let mut bytes = write_time_scale_behavior_atom(&TimeScaleBehaviorAtom {
+    let mut scale_bytes = write_time_scale_behavior_atom(&TimeScaleBehaviorAtom {
         by_percent: None,
         from_percent: None,
         to_percent: None,
         zoom_contents: None,
     })
     .unwrap();
-    bytes[36] = 0;
-    let (record, _) = Record::parse(&bytes, 0).unwrap();
-    assert!(parse_time_scale_behavior_atom(&record).is_err());
+    scale_bytes[36] = 0;
+    let (scale_record, _) = Record::parse(&scale_bytes, 0).unwrap();
+    assert!(parse_time_scale_behavior_atom(&scale_record).is_err());
 }
 
 #[test]
@@ -844,15 +853,18 @@ fn round_trips_generic_animate_behaviors_and_keyframes() {
     assert_eq!(consumed, bytes.len());
     assert_eq!(parse_time_animate_behavior(&record).unwrap(), expected);
 
-    let bytes = write_time_animation_value_list(&values).unwrap();
-    let (record, _) = Record::parse(&bytes, 0).unwrap();
-    assert_eq!(parse_time_animation_value_list(&record).unwrap(), values);
+    let list_bytes = write_time_animation_value_list(&values).unwrap();
+    let (list_record, _) = Record::parse(&list_bytes, 0).unwrap();
+    assert_eq!(
+        parse_time_animation_value_list(&list_record).unwrap(),
+        values
+    );
 
     for (attribute, value_type, value) in [
         ("image", TimeAnimateValueType::String, "arbitrary 👋"),
         ("fill.color", TimeAnimateValueType::Color, "#A0b1C2"),
     ] {
-        let expected = TimeAnimateBehavior {
+        let discrete_expected = TimeAnimateBehavior {
             atom: TimeAnimateBehaviorAtom {
                 calculation_mode: Some(TimeAnimateCalculationMode::Discrete),
                 by_used: true,
@@ -867,9 +879,12 @@ fn round_trips_generic_animate_behaviors_and_keyframes() {
             to: Some(value.to_string()),
             behavior: common(attribute),
         };
-        let bytes = write_time_animate_behavior(&expected).unwrap();
-        let (record, _) = Record::parse(&bytes, 0).unwrap();
-        assert_eq!(parse_time_animate_behavior(&record).unwrap(), expected);
+        let discrete_bytes = write_time_animate_behavior(&discrete_expected).unwrap();
+        let (discrete_record, _) = Record::parse(&discrete_bytes, 0).unwrap();
+        assert_eq!(
+            parse_time_animate_behavior(&discrete_record).unwrap(),
+            discrete_expected
+        );
     }
 
     for mode in [
@@ -884,7 +899,7 @@ fn round_trips_generic_animate_behaviors_and_keyframes() {
             Some(TimeAnimateValueType::Number),
             Some(TimeAnimateValueType::Color),
         ] {
-            let expected = TimeAnimateBehaviorAtom {
+            let animate_atom = TimeAnimateBehaviorAtom {
                 calculation_mode: mode,
                 by_used: false,
                 from_used: false,
@@ -892,9 +907,12 @@ fn round_trips_generic_animate_behaviors_and_keyframes() {
                 animation_values_used: false,
                 value_type,
             };
-            let bytes = write_time_animate_behavior_atom(&expected);
-            let (record, _) = Record::parse(&bytes, 0).unwrap();
-            assert_eq!(parse_time_animate_behavior_atom(&record).unwrap(), expected);
+            let atom_bytes = write_time_animate_behavior_atom(&animate_atom);
+            let (atom_record, _) = Record::parse(&atom_bytes, 0).unwrap();
+            assert_eq!(
+                parse_time_animate_behavior_atom(&atom_record).unwrap(),
+                animate_atom
+            );
         }
     }
 }
@@ -1337,22 +1355,22 @@ fn round_trips_iterate_and_sequence_data_atoms() {
     let (record, _) = Record::parse(&bytes, 0).unwrap();
     assert_eq!(parse_time_sequence_data(&record).unwrap(), expected);
 
-    let mut bytes = write_time_iterate_data(&TimeIterateData {
+    let mut bad_iterate_bytes = write_time_iterate_data(&TimeIterateData {
         interval: None,
         iterate_type: None,
         direction: None,
         interval_type: None,
     });
-    bytes[8] = 1;
-    let (record, _) = Record::parse(&bytes, 0).unwrap();
-    assert!(parse_time_iterate_data(&record).is_err());
+    bad_iterate_bytes[8] = 1;
+    let (bad_iterate_record, _) = Record::parse(&bad_iterate_bytes, 0).unwrap();
+    assert!(parse_time_iterate_data(&bad_iterate_record).is_err());
 
-    let mut bytes = write_time_sequence_data(&TimeSequenceData {
+    let mut bad_sequence_bytes = write_time_sequence_data(&TimeSequenceData {
         concurrent: Some(false),
         next_action: None,
         previous_action: None,
     });
-    bytes[8] = 2;
-    let (record, _) = Record::parse(&bytes, 0).unwrap();
-    assert!(parse_time_sequence_data(&record).is_err());
+    bad_sequence_bytes[8] = 2;
+    let (bad_sequence_record, _) = Record::parse(&bad_sequence_bytes, 0).unwrap();
+    assert!(parse_time_sequence_data(&bad_sequence_record).is_err());
 }

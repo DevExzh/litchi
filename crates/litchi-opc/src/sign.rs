@@ -118,97 +118,6 @@ impl Report {
     }
 }
 
-/// Discovers and verifies every signature with an explicit policy.
-pub(crate) fn signatures(package: &OpcPackage, policy: &Policy) -> Result<Vec<Report>> {
-    let graph = Graph::read(package, policy.limits())?;
-    verify_graph(package, &graph, policy)
-}
-
-fn verify_graph(package: &OpcPackage, graph: &Graph, policy: &Policy) -> Result<Vec<Report>> {
-    if graph.signatures.is_empty() {
-        return Ok(Vec::new());
-    }
-    let resolver = PackageResolver::new(package, policy.limits())?;
-    let mut reports = Vec::new();
-    reports
-        .try_reserve(graph.signatures.len())
-        .map_err(|_err| litchi_sign::Error::Limit("signature report allocation failed".into()))?;
-    for signature in &graph.signatures {
-        let part = package.get_part(&signature.part).map_err(graph_error)?;
-        let mut certificates = Vec::new();
-        certificates
-            .try_reserve(signature.certificates.len())
-            .map_err(|_err| limit("certificate reference allocation failed"))?;
-        for uri in &signature.certificates {
-            certificates.push(package.get_part(uri).map_err(graph_error)?.blob());
-        }
-        let details = xml::verify_with_certs(
-            Profile::Package,
-            part.blob(),
-            &resolver,
-            &certificates,
-            policy,
-        )?;
-        reports.push(Report {
-            part: signature.part.clone(),
-            details,
-        });
-    }
-    Ok(reports)
-}
-
-/// Adds one signature after verifying every existing signature.
-pub(crate) fn sign(package: &mut OpcPackage, signer: &Signer, limits: &Limits) -> Result<PackURI> {
-    let graph = Graph::read(package, limits)?;
-    if !graph.signatures.is_empty() {
-        let policy = Policy::strict().with_limits(limits.clone());
-        for report in verify_graph(package, &graph, &policy)? {
-            if report.details.integrity() != Status::Valid
-                || report.details.signature() != Status::Valid
-            {
-                return Err(Error::ExistingInvalid { part: report.part });
-            }
-        }
-    }
-
-    let signature_uri = next_signature_uri(package)?;
-    let signature_xml = author(package, signer, limits)?;
-    let mut staged = package.clone();
-    install(
-        &mut staged,
-        graph.origin.as_ref(),
-        signature_uri.clone(),
-        signature_xml,
-    )?;
-    Graph::read(&staged, limits)?;
-    *package = staged;
-    Ok(signature_uri)
-}
-
-/// Replaces a structurally valid signature graph with one new signature.
-pub(crate) fn resign(
-    package: &mut OpcPackage,
-    signer: &Signer,
-    limits: &Limits,
-) -> Result<PackURI> {
-    Graph::read(package, limits)?;
-    let signature_uri = pack_uri("/_xmlsignatures/sig1.xml")?;
-    let signature_xml = author(package, signer, limits)?;
-
-    let mut staged = package.clone();
-    staged.strip_signature_graph();
-    install(&mut staged, None, signature_uri.clone(), signature_xml)?;
-    Graph::read(&staged, limits)?;
-    *package = staged;
-    Ok(signature_uri)
-}
-
-fn author(package: &OpcPackage, signer: &Signer, limits: &Limits) -> Result<Vec<u8>> {
-    let resolver = PackageResolver::new(package, limits)?;
-    let references = resolver.into_author_references()?;
-    Ok(xml::author(Profile::Package, signer, &references, limits)?)
-}
-
 #[derive(Debug)]
 struct Graph {
     origin: Option<PackURI>,
@@ -323,7 +232,7 @@ impl Graph {
             if signature_part
                 .rels()
                 .iter()
-                .any(|relationship| relationship.reltype() != CERTIFICATE_REL)
+                .any(|owned| owned.reltype() != CERTIFICATE_REL)
             {
                 return Err(Error::Graph(format!(
                     "signature part {} has an unexpected relationship",
@@ -346,8 +255,11 @@ impl Graph {
                 .try_reserve(related_certificates)
                 .map_err(|_err| limit("certificate graph allocation failed"))?;
             for certificate_relationship in signature_part.rels().iter() {
-                let requested = internal_target(certificate_relationship, "certificate")?;
-                let certificate_part = package.get_part(&requested).map_err(graph_error)?;
+                let requested_certificate =
+                    internal_target(certificate_relationship, "certificate")?;
+                let certificate_part = package
+                    .get_part(&requested_certificate)
+                    .map_err(graph_error)?;
                 let certificate_uri = certificate_part.partname().clone();
                 require_signature_path(&certificate_uri, "certificate")?;
                 if certificates.iter().any(|existing: &PackURI| {
@@ -413,159 +325,6 @@ impl Graph {
             signatures,
         })
     }
-}
-
-fn reject_orphan_graph(package: &OpcPackage) -> Result<()> {
-    if let Some(part) = package.iter_parts().find(|part| is_infrastructure(*part)) {
-        return Err(Error::Graph(format!(
-            "orphan or spoofed signature infrastructure part {}",
-            part.partname().as_str()
-        )));
-    }
-    if let Some(relationship) = package
-        .rels()
-        .iter()
-        .find(|relationship| is_signature_relationship(relationship.reltype()))
-    {
-        return Err(Error::Graph(format!(
-            "unexpected package-level signature relationship {}",
-            relationship.r_id()
-        )));
-    }
-    for part in package.iter_parts() {
-        if let Some(relationship) = part
-            .rels()
-            .iter()
-            .find(|relationship| is_signature_relationship(relationship.reltype()))
-        {
-            return Err(Error::Graph(format!(
-                "part {} owns stray signature relationship {}",
-                part.partname().as_str(),
-                relationship.r_id()
-            )));
-        }
-    }
-    Ok(())
-}
-
-fn reject_inbound_spoofs(
-    package: &OpcPackage,
-    reachable: &HashSet<PackURI>,
-    origin_id: &str,
-) -> Result<()> {
-    for relationship in package.rels().iter() {
-        if relationship.r_id() != origin_id && targets_graph(relationship, reachable)? {
-            return Err(Error::Graph(format!(
-                "package relationship {} points into signature infrastructure",
-                relationship.r_id()
-            )));
-        }
-    }
-    for part in package
-        .iter_parts()
-        .filter(|part| !reachable.contains(part.partname()))
-    {
-        for relationship in part.rels().iter() {
-            if is_signature_relationship(relationship.reltype()) {
-                return Err(Error::Graph(format!(
-                    "part {} owns stray signature relationship {}",
-                    part.partname().as_str(),
-                    relationship.r_id()
-                )));
-            }
-            if targets_graph(relationship, reachable)? {
-                return Err(Error::Graph(format!(
-                    "part {} points into signature infrastructure",
-                    part.partname().as_str()
-                )));
-            }
-        }
-    }
-    Ok(())
-}
-
-fn targets_graph(relationship: &Relationship, reachable: &HashSet<PackURI>) -> Result<bool> {
-    if relationship.is_external() {
-        return Ok(false);
-    }
-    match relationship.target_partname() {
-        Ok(target) => Ok(reachable
-            .iter()
-            .any(|part| part.as_str().eq_ignore_ascii_case(target.as_str()))),
-        Err(error) if signature_hint(relationship.target_path()) => Err(graph_error(error)),
-        Err(_) => Ok(false),
-    }
-}
-
-fn internal_target(relationship: &Relationship, description: &str) -> Result<PackURI> {
-    if relationship.target_mode() != TargetMode::Internal {
-        return Err(Error::Graph(format!(
-            "{description} relationship must be internal"
-        )));
-    }
-    if relationship.target_query().is_some() || relationship.target_fragment().is_some() {
-        return Err(Error::Graph(format!(
-            "{description} relationship target cannot contain a query or fragment"
-        )));
-    }
-    relationship.target_partname().map_err(graph_error)
-}
-
-fn require_type(part: &dyn Part, expected: &str, description: &str) -> Result<()> {
-    if part.content_type() != expected {
-        return Err(Error::Graph(format!(
-            "{description} part {} has content type {}, expected {expected}",
-            part.partname().as_str(),
-            part.content_type()
-        )));
-    }
-    Ok(())
-}
-
-fn require_signature_path(uri: &PackURI, description: &str) -> Result<()> {
-    if !is_signature_path(uri.as_str()) {
-        return Err(Error::Graph(format!(
-            "{description} part must be under {SIGNATURE_DIR}"
-        )));
-    }
-    Ok(())
-}
-
-pub(crate) fn is_signature_relationship(kind: &str) -> bool {
-    matches!(kind, ORIGIN_REL | SIGNATURE_REL | CERTIFICATE_REL)
-}
-
-pub(crate) fn is_signature_path(path: &str) -> bool {
-    path.as_bytes()
-        .get(..SIGNATURE_DIR.len())
-        .is_some_and(|prefix| prefix.eq_ignore_ascii_case(SIGNATURE_DIR.as_bytes()))
-}
-
-fn signature_hint(path: &str) -> bool {
-    const HINT: &[u8] = b"_xmlsignatures";
-    path.as_bytes()
-        .windows(HINT.len())
-        .any(|window| window.eq_ignore_ascii_case(HINT))
-}
-
-pub(crate) fn is_infrastructure(part: &dyn Part) -> bool {
-    is_signature_path(part.partname().as_str())
-        || matches!(
-            part.content_type(),
-            ORIGIN_TYPE | SIGNATURE_TYPE | CERTIFICATE_TYPE
-        )
-}
-
-fn graph_error(error: impl std::fmt::Display) -> Error {
-    Error::Graph(error.to_string())
-}
-
-fn limit(message: impl Into<String>) -> Error {
-    litchi_sign::Error::Limit(message.into()).into()
-}
-
-fn pack_uri(value: &str) -> Result<PackURI> {
-    PackURI::new(value).map_err(graph_error)
 }
 
 enum Resource<'a> {
@@ -729,8 +488,8 @@ impl xml::Resolver for PackageResolver<'_> {
                     Coverage::Partial
                 };
                 let mut data = relationship_xml(relationships, selected, self.limits)?;
-                if let Some(canon) = canon {
-                    data = xml::canonicalize(&data, canon, self.limits)?;
+                if let Some(algorithm) = canon {
+                    data = xml::canonicalize(&data, algorithm, self.limits)?;
                 }
                 Ok((Cow::Owned(data), coverage))
             },
@@ -791,6 +550,250 @@ impl ResolverShape {
         }
         Ok(())
     }
+}
+
+/// Discovers and verifies every signature with an explicit policy.
+pub(crate) fn signatures(package: &OpcPackage, policy: &Policy) -> Result<Vec<Report>> {
+    let graph = Graph::read(package, policy.limits())?;
+    verify_graph(package, &graph, policy)
+}
+
+fn verify_graph(package: &OpcPackage, graph: &Graph, policy: &Policy) -> Result<Vec<Report>> {
+    if graph.signatures.is_empty() {
+        return Ok(Vec::new());
+    }
+    let resolver = PackageResolver::new(package, policy.limits())?;
+    let mut reports = Vec::new();
+    reports
+        .try_reserve(graph.signatures.len())
+        .map_err(|_err| litchi_sign::Error::Limit("signature report allocation failed".into()))?;
+    for signature in &graph.signatures {
+        let part = package.get_part(&signature.part).map_err(graph_error)?;
+        let mut certificates = Vec::new();
+        certificates
+            .try_reserve(signature.certificates.len())
+            .map_err(|_err| limit("certificate reference allocation failed"))?;
+        for uri in &signature.certificates {
+            certificates.push(package.get_part(uri).map_err(graph_error)?.blob());
+        }
+        let details = xml::verify_with_certs(
+            Profile::Package,
+            part.blob(),
+            &resolver,
+            &certificates,
+            policy,
+        )?;
+        reports.push(Report {
+            part: signature.part.clone(),
+            details,
+        });
+    }
+    Ok(reports)
+}
+
+/// Adds one signature after verifying every existing signature.
+pub(crate) fn sign(package: &mut OpcPackage, signer: &Signer, limits: &Limits) -> Result<PackURI> {
+    let graph = Graph::read(package, limits)?;
+    if !graph.signatures.is_empty() {
+        let policy = Policy::strict().with_limits(limits.clone());
+        for report in verify_graph(package, &graph, &policy)? {
+            if report.details.integrity() != Status::Valid
+                || report.details.signature() != Status::Valid
+            {
+                return Err(Error::ExistingInvalid { part: report.part });
+            }
+        }
+    }
+
+    let signature_uri = next_signature_uri(package)?;
+    let signature_xml = author(package, signer, limits)?;
+    let mut staged = package.clone();
+    install(
+        &mut staged,
+        graph.origin.as_ref(),
+        &signature_uri,
+        signature_xml,
+    )?;
+    Graph::read(&staged, limits)?;
+    *package = staged;
+    Ok(signature_uri)
+}
+
+/// Replaces a structurally valid signature graph with one new signature.
+pub(crate) fn resign(
+    package: &mut OpcPackage,
+    signer: &Signer,
+    limits: &Limits,
+) -> Result<PackURI> {
+    Graph::read(package, limits)?;
+    let signature_uri = pack_uri("/_xmlsignatures/sig1.xml")?;
+    let signature_xml = author(package, signer, limits)?;
+
+    let mut staged = package.clone();
+    staged.strip_signature_graph();
+    install(&mut staged, None, &signature_uri, signature_xml)?;
+    Graph::read(&staged, limits)?;
+    *package = staged;
+    Ok(signature_uri)
+}
+
+fn author(package: &OpcPackage, signer: &Signer, limits: &Limits) -> Result<Vec<u8>> {
+    let resolver = PackageResolver::new(package, limits)?;
+    let references = resolver.into_author_references()?;
+    Ok(xml::author(Profile::Package, signer, &references, limits)?)
+}
+
+fn reject_orphan_graph(package: &OpcPackage) -> Result<()> {
+    if let Some(part) = package.iter_parts().find(|part| is_infrastructure(*part)) {
+        return Err(Error::Graph(format!(
+            "orphan or spoofed signature infrastructure part {}",
+            part.partname().as_str()
+        )));
+    }
+    if let Some(relationship) = package
+        .rels()
+        .iter()
+        .find(|relationship| is_signature_relationship(relationship.reltype()))
+    {
+        return Err(Error::Graph(format!(
+            "unexpected package-level signature relationship {}",
+            relationship.r_id()
+        )));
+    }
+    for part in package.iter_parts() {
+        if let Some(relationship) = part
+            .rels()
+            .iter()
+            .find(|relationship| is_signature_relationship(relationship.reltype()))
+        {
+            return Err(Error::Graph(format!(
+                "part {} owns stray signature relationship {}",
+                part.partname().as_str(),
+                relationship.r_id()
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn reject_inbound_spoofs(
+    package: &OpcPackage,
+    reachable: &HashSet<PackURI>,
+    origin_id: &str,
+) -> Result<()> {
+    for relationship in package.rels().iter() {
+        if relationship.r_id() != origin_id && targets_graph(relationship, reachable)? {
+            return Err(Error::Graph(format!(
+                "package relationship {} points into signature infrastructure",
+                relationship.r_id()
+            )));
+        }
+    }
+    for part in package
+        .iter_parts()
+        .filter(|part| !reachable.contains(part.partname()))
+    {
+        for relationship in part.rels().iter() {
+            if is_signature_relationship(relationship.reltype()) {
+                return Err(Error::Graph(format!(
+                    "part {} owns stray signature relationship {}",
+                    part.partname().as_str(),
+                    relationship.r_id()
+                )));
+            }
+            if targets_graph(relationship, reachable)? {
+                return Err(Error::Graph(format!(
+                    "part {} points into signature infrastructure",
+                    part.partname().as_str()
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn targets_graph(relationship: &Relationship, reachable: &HashSet<PackURI>) -> Result<bool> {
+    if relationship.is_external() {
+        return Ok(false);
+    }
+    match relationship.target_partname() {
+        Ok(target) => Ok(reachable
+            .iter()
+            .any(|part| part.as_str().eq_ignore_ascii_case(target.as_str()))),
+        Err(error) if signature_hint(relationship.target_path()) => Err(graph_error(error)),
+        Err(_) => Ok(false),
+    }
+}
+
+fn internal_target(relationship: &Relationship, description: &str) -> Result<PackURI> {
+    if relationship.target_mode() != TargetMode::Internal {
+        return Err(Error::Graph(format!(
+            "{description} relationship must be internal"
+        )));
+    }
+    if relationship.target_query().is_some() || relationship.target_fragment().is_some() {
+        return Err(Error::Graph(format!(
+            "{description} relationship target cannot contain a query or fragment"
+        )));
+    }
+    relationship.target_partname().map_err(graph_error)
+}
+
+fn require_type(part: &dyn Part, expected: &str, description: &str) -> Result<()> {
+    if part.content_type() != expected {
+        return Err(Error::Graph(format!(
+            "{description} part {} has content type {}, expected {expected}",
+            part.partname().as_str(),
+            part.content_type()
+        )));
+    }
+    Ok(())
+}
+
+fn require_signature_path(uri: &PackURI, description: &str) -> Result<()> {
+    if !is_signature_path(uri.as_str()) {
+        return Err(Error::Graph(format!(
+            "{description} part must be under {SIGNATURE_DIR}"
+        )));
+    }
+    Ok(())
+}
+
+pub(crate) fn is_signature_relationship(kind: &str) -> bool {
+    matches!(kind, ORIGIN_REL | SIGNATURE_REL | CERTIFICATE_REL)
+}
+
+pub(crate) fn is_signature_path(path: &str) -> bool {
+    path.as_bytes()
+        .get(..SIGNATURE_DIR.len())
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case(SIGNATURE_DIR.as_bytes()))
+}
+
+fn signature_hint(path: &str) -> bool {
+    const HINT: &[u8] = b"_xmlsignatures";
+    path.as_bytes()
+        .windows(HINT.len())
+        .any(|window| window.eq_ignore_ascii_case(HINT))
+}
+
+pub(crate) fn is_infrastructure(part: &dyn Part) -> bool {
+    is_signature_path(part.partname().as_str())
+        || matches!(
+            part.content_type(),
+            ORIGIN_TYPE | SIGNATURE_TYPE | CERTIFICATE_TYPE
+        )
+}
+
+fn graph_error(error: impl std::fmt::Display) -> Error {
+    Error::Graph(error.to_string())
+}
+
+fn limit(message: impl Into<String>) -> Error {
+    litchi_sign::Error::Limit(message.into()).into()
+}
+
+fn pack_uri(value: &str) -> Result<PackURI> {
+    PackURI::new(value).map_err(graph_error)
 }
 
 fn resolver_shape(package: &OpcPackage, limits: &Limits) -> Result<ResolverShape> {
@@ -905,8 +908,8 @@ fn relationship_reference_len(source: Option<&str>) -> Result<usize> {
             &["/_rels/.rels?ContentType=", RELATIONSHIPS_TYPE],
             "relationship reference URI",
         ),
-        Some(source) => {
-            let (directory, file) = relationship_source(source)?;
+        Some(path) => {
+            let (directory, file) = relationship_source(path)?;
             joined_len(
                 &[
                     directory,
@@ -928,8 +931,8 @@ fn relationship_reference_uri(source: Option<&str>, maximum: usize) -> Result<St
             maximum,
             "relationship reference URI",
         ),
-        Some(source) => {
-            let (directory, file) = relationship_source(source)?;
+        Some(path) => {
+            let (directory, file) = relationship_source(path)?;
             bounded_join(
                 &[
                     directory,
@@ -1032,13 +1035,9 @@ fn push_attr(output: &mut Vec<u8>, value: &str, maximum: usize) -> litchi_sign::
             '\t' => push(output, b"&#x9;", maximum)?,
             '\n' => push(output, b"&#xA;", maximum)?,
             '\r' => push(output, b"&#xD;", maximum)?,
-            character => {
+            other => {
                 let mut encoded = [0; 4];
-                push(
-                    output,
-                    character.encode_utf8(&mut encoded).as_bytes(),
-                    maximum,
-                )?;
+                push(output, other.encode_utf8(&mut encoded).as_bytes(), maximum)?;
             },
         }
     }
@@ -1063,7 +1062,7 @@ fn next_signature_uri(package: &OpcPackage) -> Result<PackURI> {
 fn install(
     package: &mut OpcPackage,
     existing_origin: Option<&PackURI>,
-    signature_uri: PackURI,
+    signature_uri: &PackURI,
     signature_xml: Vec<u8>,
 ) -> Result<()> {
     package.try_add_part(Box::new(BlobPart::new(
@@ -1072,24 +1071,23 @@ fn install(
         signature_xml,
     )))?;
 
-    let origin = match existing_origin {
-        Some(origin) => origin.clone(),
-        None => {
-            let origin = pack_uri(ORIGIN_NAME)?;
-            package.try_add_part(Box::new(BlobPart::new(
-                origin.clone(),
-                ORIGIN_TYPE.to_string(),
-                Vec::new(),
-            )))?;
-            let id = next_relationship_id(package.rels())?;
-            package.rels_mut().try_add_relationship(
-                ORIGIN_REL.to_string(),
-                origin.as_str().to_string(),
-                id,
-                TargetMode::Internal,
-            )?;
-            origin
-        },
+    let origin = if let Some(existing) = existing_origin {
+        existing.clone()
+    } else {
+        let origin = pack_uri(ORIGIN_NAME)?;
+        package.try_add_part(Box::new(BlobPart::new(
+            origin.clone(),
+            ORIGIN_TYPE.to_string(),
+            Vec::new(),
+        )))?;
+        let id = next_relationship_id(package.rels())?;
+        package.rels_mut().try_add_relationship(
+            ORIGIN_REL.to_string(),
+            origin.as_str().to_string(),
+            id,
+            TargetMode::Internal,
+        )?;
+        origin
     };
 
     let id = {
@@ -1283,19 +1281,19 @@ mod tests {
                 TargetMode::External,
             )
             .expect("relationship");
-        let report = relationships
+        let relationship_report = relationships
             .signatures_with(&Policy::compatible())
             .expect("compatible")
             .remove(0);
-        assert_eq!(report.coverage(), Coverage::Partial);
+        assert_eq!(relationship_report.coverage(), Coverage::Partial);
         assert!(relationships.signatures().is_err());
 
         let mut limited = package();
         limited.sign(&signer(7)).expect("sign");
         let limits = Limits::standard().references(1).expect("limits");
-        let before = limited.part_count();
+        let before_limited = limited.part_count();
         assert!(limited.sign_with(&signer(8), &limits).is_err());
-        assert_eq!(limited.part_count(), before);
+        assert_eq!(limited.part_count(), before_limited);
     }
 
     #[test]
@@ -1348,13 +1346,13 @@ mod tests {
 
         let mut certificates = package();
         let signature = certificates.sign(&signer(9)).expect("signature");
-        for index in 1..=2 {
+        for index in 1u8..=2 {
             let uri = PackURI::new(format!("/_xmlsignatures/cert{index}.cer")).expect("URI");
             certificates
                 .try_add_part(Box::new(BlobPart::new(
                     uri,
                     CERTIFICATE_TYPE.into(),
-                    vec![index as u8; 2],
+                    vec![index; 2],
                 )))
                 .expect("certificate part");
             certificates
@@ -1371,9 +1369,9 @@ mod tests {
         }
 
         let one_certificate = Limits::standard().certificates(1).expect("limits");
-        let policy = Policy::compatible().with_limits(one_certificate);
+        let certificate_policy = Policy::compatible().with_limits(one_certificate);
         assert!(matches!(
-            certificates.signatures_with(&policy),
+            certificates.signatures_with(&certificate_policy),
             Err(Error::Signature(litchi_sign::Error::Limit(message)))
                 if message.contains("certificate count")
         ));
@@ -1381,31 +1379,31 @@ mod tests {
         let three_certificate_bytes = Limits::standard()
             .total_certificate_bytes(3)
             .expect("limits");
-        let policy = Policy::compatible().with_limits(three_certificate_bytes);
+        let byte_policy = Policy::compatible().with_limits(three_certificate_bytes);
         assert!(matches!(
-            certificates.signatures_with(&policy),
+            certificates.signatures_with(&byte_policy),
             Err(Error::Signature(litchi_sign::Error::Limit(message)))
                 if message.contains("certificate bytes")
         ));
 
         let mut parts = package();
-        for index in 1..=2 {
+        for index in 1u8..=2 {
             parts
                 .try_add_part(Box::new(BlobPart::new(
                     PackURI::new(format!("/extra{index}.bin")).expect("URI"),
                     "application/octet-stream".into(),
-                    vec![index as u8],
+                    vec![index],
                 )))
                 .expect("extra part");
         }
         let two_references = Limits::standard().references(2).expect("limits");
-        let before_parts = parts.part_count();
+        let before_extra_parts = parts.part_count();
         assert!(matches!(
             parts.sign_with(&signer(10), &two_references),
             Err(Error::Signature(litchi_sign::Error::Limit(message)))
                 if message.contains("part reference count")
         ));
-        assert_eq!(parts.part_count(), before_parts);
+        assert_eq!(parts.part_count(), before_extra_parts);
         assert!(!parts.is_signed());
 
         let mut relationships = package();
@@ -1440,13 +1438,13 @@ mod tests {
             )
             .expect("large relationship identifier");
         let compact_metadata = Limits::standard().signature_bytes(128).expect("limits");
-        let before_relationships = metadata.rels().len();
+        let before_metadata_relationships = metadata.rels().len();
         assert!(matches!(
             metadata.sign_with(&signer(12), &compact_metadata),
             Err(Error::Signature(litchi_sign::Error::Limit(message)))
                 if message.contains("reference metadata")
         ));
-        assert_eq!(metadata.rels().len(), before_relationships);
+        assert_eq!(metadata.rels().len(), before_metadata_relationships);
         assert!(!metadata.is_signed());
     }
 

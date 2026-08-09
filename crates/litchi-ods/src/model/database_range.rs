@@ -12,11 +12,8 @@ pub use semantic::{
     Order, Orientation, Range, Rule, Rules, Sort, SortGroups, Source,
 };
 
-#[allow(unused_imports)]
-pub(crate) use codec::{
+pub use codec::{
     parse_database_ranges, parse_filter, parse_source_query, parse_source_sql, parse_source_table,
     write_database_range_fragment, write_database_ranges, write_database_source, write_filter,
 };
-
-#[allow(unused_imports)]
-pub(crate) use validation::{validate_database_range_collection, validate_filter};
+pub use validation::{validate_database_range_collection, validate_filter};

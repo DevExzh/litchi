@@ -26,6 +26,10 @@ impl Package {
     /// The shared OOXML owner validates the complete package-level relationship
     /// graph and preserves its bounded value semantics. See MS-OI29500 3.11,
     /// "Reserved Custom File Properties".
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn custom_props(&self) -> Result<Props> {
         Ok(Props::read_for(&self.opc, Host::PowerPoint)?)
     }
@@ -36,6 +40,10 @@ impl Package {
     /// The shared OOXML owner validates and stages the graph before publication,
     /// preserving no-op and signature-invalidation behavior. See MS-OI29500
     /// 3.11, "Reserved Custom File Properties".
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn put_custom_props(&mut self, props: Props) -> Result<()> {
         self.edit_typed(move |opc| Ok(props.write_for(opc, Host::PowerPoint)?))
     }
@@ -44,11 +52,86 @@ impl Package {
     ///
     /// This is idempotent. See MS-OI29500 3.11, "Reserved Custom File
     /// Properties".
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_custom_props(&mut self) -> Result<()> {
         self.put_custom_props(Props::new())
     }
 
+    /// Read the complete inert Office Add-in task-pane graph, when present.
+    ///
+    /// The returned model covers MS-OWEXML task panes, `webextensionref`
+    /// relationships, add-in references, bindings, properties, snapshots, and
+    /// retained extension lists. It is data only: this crate never contacts
+    /// external references or executes add-in content.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when managed authoring state is stale or the bounded
+    /// package graph is malformed.
+    pub fn task_panes(&self) -> Result<Option<crate::web::Panes>> {
+        self.ensure_graph_current("task_panes")?;
+        Ok(litchi_ooxml_common::web::load(&self.opc)?)
+    }
+
+    /// Plan an exact, reversible replacement for the inert task-pane graph.
+    ///
+    /// The patch records the precise source graph and must be published with
+    /// [`Self::apply_task_panes_patch`]. An unchanged replacement yields an
+    /// empty patch and consequently preserves digital signatures.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when managed authoring state is stale or the graph or
+    /// candidate violates bounded MS-OWEXML/OPC invariants.
+    pub fn task_panes_patch(
+        &self,
+        panes: crate::web::Panes,
+        conformance: crate::web::Conformance,
+    ) -> Result<crate::web::Patch> {
+        self.ensure_graph_current("task_panes_patch")?;
+        Ok(litchi_ooxml_common::web::plan_put(
+            &self.opc,
+            panes,
+            conformance,
+        )?)
+    }
+
+    /// Plan removal of the inert Office Add-in task-pane graph.
+    ///
+    /// An absent graph yields an empty patch. Referenced resources are removed
+    /// only when OPC ownership checks prove they are not shared.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when managed authoring state is stale or the bounded
+    /// package graph is malformed.
+    pub fn clear_task_panes_patch(&self) -> Result<crate::web::Patch> {
+        self.ensure_graph_current("clear_task_panes_patch")?;
+        Ok(litchi_ooxml_common::web::plan_remove(&self.opc)?)
+    }
+
+    /// Apply an exact source-checked Office Add-in task-pane patch atomically.
+    ///
+    /// A stale patch is rejected before publication. Its [`crate::web::Patch::inverse`]
+    /// can restore the original graph when no intervening change occurred.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when managed authoring state is stale, package policy
+    /// rejects mutation, or the patch's source no longer matches the package.
+    pub fn apply_task_panes_patch(&mut self, patch: &crate::web::Patch) -> Result<bool> {
+        self.ensure_graph_current("apply_task_panes_patch")?;
+        self.edit_typed(|opc| Ok(patch.apply(opc)?))
+    }
+
     /// Borrow the canonical presentation graph when no mutable state is stale.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn presentation(&self) -> Result<Presentation<'_>> {
         self.ensure_graph_current("presentation")?;
         Ok(Presentation::new(
@@ -58,6 +141,10 @@ impl Package {
     }
 
     /// Borrow the mutable presentation model for a newly authored package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn presentation_mut(&mut self) -> Result<&mut MutablePresentation> {
         self.ensure_plain_mutation("presentation_mut")?;
         self.mutable_pres.as_mut().ok_or(Error::UnsafeEdit {
@@ -195,6 +282,10 @@ impl Package {
     }
 
     /// Read the presentation-owned embedded-font collection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn fonts(&self) -> Result<Option<crate::font::Fonts>> {
         self.ensure_graph_current("fonts")?;
         crate::font::load(&self.opc)
@@ -204,16 +295,28 @@ impl Package {
     ///
     /// This is the explicit, inert font-resource API. It remains independent
     /// from the optional system-font discovery policy used at managed save.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn put_fonts(&mut self, fonts: crate::font::Fonts) -> Result<bool> {
         self.edit_typed(move |opc| crate::font::put(opc, fonts))
     }
 
     /// Remove all presentation-owned embedded fonts and orphaned resources.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_fonts(&mut self) -> Result<Option<crate::font::Fonts>> {
         self.edit_typed(crate::font::remove)
     }
 
     /// Whether a mutable model is currently pending managed publication.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn is_modified(&self) -> bool {
         self.mutable_pres
             .as_ref()
@@ -225,6 +328,10 @@ impl Package {
     /// For a package with retained encryption provenance, this is an explicit
     /// declassification boundary: the borrowed graph is plaintext. Merely
     /// borrowing it does not discard the retained output policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn opc(&self) -> Result<&OpcPackage> {
         self.ensure_graph_current("opc")?;
         Ok(&self.opc)
@@ -234,6 +341,10 @@ impl Package {
     ///
     /// For encrypted provenance this explicitly exposes plaintext OPC content;
     /// retained output policy remains active after the closure returns.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn with_opc<T>(&self, operation: impl FnOnce(&OpcPackage) -> Result<T>) -> Result<T> {
         self.ensure_graph_current("with_opc")?;
         operation(&self.opc)
@@ -244,6 +355,10 @@ impl Package {
     /// Names are the ordinary selector and zero-based presentation positions
     /// remain available for ordered repair workflows. The returned list owns
     /// its bounded strings, so the read does not borrow the package graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn tags<'a>(
         &self,
         slide: impl Into<crate::slide::Key<'a>>,
@@ -257,6 +372,10 @@ impl Package {
     ///
     /// The list is moved into the package transaction and the staged owner
     /// relationship and part are published together.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn put_tags<'a>(
         &mut self,
         slide: impl Into<crate::slide::Key<'a>>,
@@ -271,6 +390,10 @@ impl Package {
     ///
     /// Removal is idempotent and only collects an orphaned tag part after the
     /// package-wide inbound-edge check succeeds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_tags<'a>(
         &mut self,
         slide: impl Into<crate::slide::Key<'a>>,
@@ -281,6 +404,10 @@ impl Package {
     }
 
     /// Read the source-bound Designer tags owned by one stable slide ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn slide_designer_tags<'a>(
         &self,
         slide: impl Into<crate::slide::Key<'a>>,
@@ -289,6 +416,10 @@ impl Package {
     }
 
     /// Read slide-ID Designer tags under caller-supplied resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn slide_designer_tags_with_limits<'a>(
         &self,
         slide: impl Into<crate::slide::Key<'a>>,
@@ -302,6 +433,10 @@ impl Package {
     }
 
     /// Create or replace Designer tags on one stable slide ID atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn put_slide_designer_tags<'a>(
         &mut self,
         slide: impl Into<crate::slide::Key<'a>>,
@@ -315,6 +450,10 @@ impl Package {
     }
 
     /// Create or replace slide-ID Designer tags under explicit bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn put_slide_designer_tags_with_limits<'a>(
         &mut self,
         slide: impl Into<crate::slide::Key<'a>>,
@@ -335,6 +474,10 @@ impl Package {
     }
 
     /// Remove Designer tags from one stable slide ID atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_slide_designer_tags<'a>(
         &mut self,
         slide: impl Into<crate::slide::Key<'a>>,
@@ -346,6 +489,10 @@ impl Package {
     }
 
     /// Remove slide-ID Designer tags under explicit resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_slide_designer_tags_with_limits<'a>(
         &mut self,
         slide: impl Into<crate::slide::Key<'a>>,
@@ -365,6 +512,10 @@ impl Package {
     }
 
     /// Read the typed document-level math defaults from presentation properties.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn math_properties(
         &self,
     ) -> Result<Option<crate::presentation_properties::math::Properties>> {
@@ -373,6 +524,10 @@ impl Package {
     }
 
     /// Replace the document-level math defaults transactionally.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn put_math_properties(
         &mut self,
         value: crate::presentation_properties::math::Properties,
@@ -382,6 +537,10 @@ impl Package {
     }
 
     /// Remove the document-level math defaults transactionally.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_math_properties(
         &mut self,
     ) -> Result<Option<crate::presentation_properties::math::Properties>> {
@@ -390,6 +549,10 @@ impl Package {
     }
 
     /// Read the lossless zoom owner of one slide.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn zooms<'a>(
         &self,
         slide: impl Into<crate::slide::Key<'a>>,
@@ -400,6 +563,10 @@ impl Package {
     }
 
     /// Replace one slide's zoom owner transactionally.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn put_zooms<'a>(
         &mut self,
         slide: impl Into<crate::slide::Key<'a>>,
@@ -411,6 +578,10 @@ impl Package {
     }
 
     /// Remove all zoom metadata from one slide while retaining its other XML.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_zooms<'a>(
         &mut self,
         slide: impl Into<crate::slide::Key<'a>>,
@@ -421,6 +592,10 @@ impl Package {
     }
 
     /// Read one semantic shape's optional programmable-tag list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn shape_tags<'s, 'k>(
         &self,
         slide: impl Into<crate::slide::Key<'s>>,
@@ -433,6 +608,10 @@ impl Package {
     }
 
     /// Create or replace one semantic shape's programmable-tag list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn put_shape_tags<'s, 'k>(
         &mut self,
         slide: impl Into<crate::slide::Key<'s>>,
@@ -445,6 +624,10 @@ impl Package {
     }
 
     /// Remove one semantic shape's programmable-tag list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_shape_tags<'s, 'k>(
         &mut self,
         slide: impl Into<crate::slide::Key<'s>>,
@@ -458,6 +641,10 @@ impl Package {
     /// Read the optional classification outcome attached to one semantic
     /// shape. The shape selector uses its exact producer name by default and
     /// retains checked source-order indices for repair workflows.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn shape_classification<'s, 'k>(
         &self,
         slide: impl Into<crate::slide::Key<'s>>,
@@ -470,6 +657,10 @@ impl Package {
 
     /// Create or replace one semantic shape's typed classification outcome
     /// transactionally while retaining unrelated extension markup.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn put_shape_classification<'s, 'k>(
         &mut self,
         slide: impl Into<crate::slide::Key<'s>>,
@@ -485,6 +676,10 @@ impl Package {
 
     /// Remove one semantic shape's typed classification element
     /// transactionally. Unknown extension entries remain intact.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_shape_classification<'s, 'k>(
         &mut self,
         slide: impl Into<crate::slide::Key<'s>>,
@@ -498,6 +693,10 @@ impl Package {
     /// Read the optional `p15:designElem` value attached to one semantic
     /// shape. The selector is name-first, with checked source-order indices
     /// retained for repair workflows.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn shape_design_element<'s, 'k>(
         &self,
         slide: impl Into<crate::slide::Key<'s>>,
@@ -510,6 +709,10 @@ impl Package {
 
     /// Create or replace one shape's typed `p15:designElem` boolean
     /// transactionally while retaining unrelated extension entries.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn put_shape_design_element<'s, 'k>(
         &mut self,
         slide: impl Into<crate::slide::Key<'s>>,
@@ -522,6 +725,10 @@ impl Package {
     }
 
     /// Remove one shape's typed `p15:designElem` value transactionally.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_shape_design_element<'s, 'k>(
         &mut self,
         slide: impl Into<crate::slide::Key<'s>>,
@@ -532,7 +739,11 @@ impl Package {
         self.edit_typed(move |opc| crate::shape::designer::remove(opc, &slide_name, shape))
     }
 
-    /// Read one shape's source-bound PowerPoint 2020 Designer properties.
+    /// Read one shape's source-bound `PowerPoint` 2020 Designer properties.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn shape_designer_properties<'s, 'k>(
         &self,
         slide: impl Into<crate::slide::Key<'s>>,
@@ -546,6 +757,10 @@ impl Package {
     }
 
     /// Read shape Designer properties under caller-supplied resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn shape_designer_properties_with_limits<'s, 'k>(
         &self,
         slide: impl Into<crate::slide::Key<'s>>,
@@ -558,6 +773,10 @@ impl Package {
     }
 
     /// Create or replace one shape's Designer drawing properties atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn put_shape_designer_properties<'s, 'k>(
         &mut self,
         slide: impl Into<crate::slide::Key<'s>>,
@@ -575,6 +794,10 @@ impl Package {
     }
 
     /// Create or replace shape Designer properties under explicit bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn put_shape_designer_properties_with_limits<'s, 'k>(
         &mut self,
         slide: impl Into<crate::slide::Key<'s>>,
@@ -600,6 +823,10 @@ impl Package {
     }
 
     /// Remove one shape's Designer drawing properties atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_shape_designer_properties<'s, 'k>(
         &mut self,
         slide: impl Into<crate::slide::Key<'s>>,
@@ -616,6 +843,10 @@ impl Package {
     }
 
     /// Remove shape Designer properties under explicit resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_shape_designer_properties_with_limits<'s, 'k>(
         &mut self,
         slide: impl Into<crate::slide::Key<'s>>,
@@ -640,6 +871,10 @@ impl Package {
     }
 
     /// Read all contextual 3D-model owners on one slide in source order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn model3ds<'a>(
         &self,
         slide: impl Into<crate::slide::Key<'a>>,
@@ -650,6 +885,10 @@ impl Package {
     }
 
     /// Read the model3d owner attached to one semantic shape, if present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn model3d<'s, 'k>(
         &self,
         slide: impl Into<crate::slide::Key<'s>>,
@@ -661,6 +900,10 @@ impl Package {
     }
 
     /// Replace one existing model3d owner transactionally.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn put_model3d<'s, 'k>(
         &mut self,
         slide: impl Into<crate::slide::Key<'s>>,
@@ -675,6 +918,10 @@ impl Package {
     }
 
     /// Remove one model3d owner and collect unreachable binary resources.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_model3d<'s, 'k>(
         &mut self,
         slide: impl Into<crate::slide::Key<'s>>,
@@ -685,7 +932,11 @@ impl Package {
         self.edit_typed(move |opc| crate::model3d::package::remove(opc, &slide_name, shape.into()))
     }
 
-    /// Load the presentation's optional DrawingML table-style catalog.
+    /// Load the presentation's optional `DrawingML` table-style catalog.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn styles(&self) -> Result<Option<crate::table::style::List>> {
         // Table styles are owned by their OPC part, independently of the
         // slide-authoring model. They remain a safe immutable read while a
@@ -694,21 +945,37 @@ impl Package {
     }
 
     /// Create or replace the presentation's table-style catalog atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn put_styles(&mut self, styles: crate::table::style::List) -> Result<bool> {
         self.edit_typed(move |opc| crate::table::style::put(opc, styles))
     }
 
     /// Remove the presentation's optional table-style catalog atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_styles(&mut self) -> Result<Option<crate::table::style::List>> {
         self.edit_typed(crate::table::style::remove)
     }
 
-    /// Add a slide master and update the PresentationML relationship graph.
+    /// Add a slide master and update the `PresentationML` relationship graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add_slide_master(&mut self) -> Result<crate::master_layout::AuthoredSlideMaster> {
         self.edit_typed(crate::master_layout::add_slide_master)
     }
 
     /// Add a layout to an existing master and update both sides of the graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add_slide_layout(
         &mut self,
         master_part_name: &PackURI,
@@ -722,6 +989,10 @@ impl Package {
     }
 
     /// Add or replace one master/layout placeholder shape.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
     pub fn store_placeholder_shape(
         &mut self,
         part_name: &PackURI,
@@ -731,16 +1002,28 @@ impl Package {
     }
 
     /// Remove an unreferenced layout and its owning relationship.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_slide_layout(&mut self, layout_part_name: &PackURI) -> Result<()> {
         self.edit_typed(|opc| crate::master_layout::remove_slide_layout(opc, layout_part_name))
     }
 
     /// Validate every master/layout relationship reachable from the package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn validate_master_layout_graph(&self) -> Result<()> {
         self.with_opc(crate::master_layout::validate_master_layout_graph)
     }
 
     /// Load all contextual slide-library synchronization metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn load_slide_sync(
         &self,
     ) -> Result<Vec<crate::presentation_properties::metadata::slide_sync::Part>> {
@@ -748,6 +1031,10 @@ impl Package {
     }
 
     /// Attach one slide-library synchronization part transactionally.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
     pub fn store_slide_sync(
         &mut self,
         value: &crate::presentation_properties::metadata::slide_sync::Part,
@@ -766,6 +1053,10 @@ impl Package {
     /// contextual methods on this facade. For retained encryption provenance,
     /// choosing this raw escape hatch explicitly declassifies the package. A
     /// successful edit clears provenance; a failed edit preserves it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn edit_opc<T>(
         &mut self,
         operation: impl FnOnce(&mut OpcPackage) -> Result<T>,

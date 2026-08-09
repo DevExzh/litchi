@@ -1,4 +1,4 @@
-//! Source-preserving ownership of PowerPoint shape anchors.
+//! Source-preserving ownership of `PowerPoint` shape anchors.
 //!
 //! [`Anchor`] and its rectangle values form the semantic model, [`Snapshot`]
 //! retains one exact MS-PPT `OfficeArtClientAnchor` record, and

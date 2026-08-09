@@ -12,6 +12,10 @@ use crate::animation::types::{
 /// here prevents the record parser from scattering raw bit masks while the
 /// public snapshot model continues to represent explicit values with `Option`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "each bool mirrors one independent fXxxProperty bit of the `TimeNodeAtom` flags dword, matching the MS-PPT bitfield layout"
+)]
 pub(super) struct AtomFlags {
     pub(super) fill_property: bool,
     pub(super) restart_property: bool,

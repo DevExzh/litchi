@@ -16,6 +16,14 @@ struct Descriptor {
 
 impl<'data> Props<'data> {
     /// Parses an Opt-family record while borrowing all complex values.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::MalformedProperties` when the record is not an
+    /// Opt-family table, has the wrong `recVer`, declares truncated or
+    /// overlapping headers and complex payloads, repeats a property
+    /// identifier, or leaves unclaimed trailing bytes, and
+    /// `Error::ArithmeticOverflow` when a computed offset overflows.
     pub fn parse(opt: &Record<'data>) -> Result<Self> {
         if !matches!(
             opt.kind(),

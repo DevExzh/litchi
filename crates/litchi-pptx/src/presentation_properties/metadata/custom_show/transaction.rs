@@ -8,7 +8,7 @@ use super::model::{List, Show};
 use super::{package, wire};
 use crate::{Error, Result};
 
-/// Stable fingerprint of the exact PresentationML source and relationship topology.
+/// Stable fingerprint of the exact `PresentationML` source and relationship topology.
 pub type Revision = u64;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -24,11 +24,19 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Load a validated source-bound custom-show snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn load(package: &OpcPackage) -> Result<Self> {
         package::load_snapshot(package)
     }
 
     /// Alias emphasizing that the result is bound to exact source bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn read(package: &OpcPackage) -> Result<Self> {
         Self::load(package)
     }
@@ -63,42 +71,49 @@ impl Snapshot {
 
     /// Borrow the typed custom-show list in source order.
     #[inline]
+    #[must_use]
     pub fn list(&self) -> &List {
         &self.list
     }
 
     /// Alias for callers using the domain name rather than the wire list name.
     #[inline]
+    #[must_use]
     pub fn custom_shows(&self) -> &List {
         self.list()
     }
 
-    /// Return the owning PresentationML part name.
+    /// Return the owning `PresentationML` part name.
     #[inline]
+    #[must_use]
     pub fn presentation_part_name(&self) -> &str {
         &self.presentation_part_name
     }
 
-    /// Return the owning PresentationML content type.
+    /// Return the owning `PresentationML` content type.
     #[inline]
+    #[must_use]
     pub fn presentation_content_type(&self) -> &str {
         &self.presentation_content_type
     }
 
-    /// Borrow the exact PresentationML bytes captured by this snapshot.
+    /// Borrow the exact `PresentationML` bytes captured by this snapshot.
     #[inline]
+    #[must_use]
     pub fn source_xml(&self) -> &[u8] {
         self.source_xml.as_slice()
     }
 
     /// Return the revision used for optimistic stale-source checks.
     #[inline]
+    #[must_use]
     pub const fn revision(&self) -> Revision {
         self.revision
     }
 
     /// Start an isolated edit over the typed custom-show list.
     #[inline]
+    #[must_use]
     pub fn edit(&self) -> Transaction {
         Transaction {
             original: self.clone(),
@@ -129,23 +144,30 @@ pub struct Transaction {
 impl Transaction {
     /// Borrow the currently staged typed list.
     #[inline]
+    #[must_use]
     pub fn list(&self) -> &List {
         &self.working
     }
 
     /// Alias for list.
     #[inline]
+    #[must_use]
     pub fn snapshot(&self) -> &List {
         self.list()
     }
 
     /// Return whether the semantic list differs from the source.
     #[inline]
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.original.list.shows != self.working.shows
     }
 
     /// Replace the complete typed list after validating all slide references.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace(&mut self, value: List) -> Result<bool> {
         validate(&self.original, &value)?;
         if self.working.shows == value.shows {
@@ -156,6 +178,10 @@ impl Transaction {
     }
 
     /// Apply a checked mutation to a cloned list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn edit(&mut self, edit: impl FnOnce(&mut List) -> Result<()>) -> Result<()> {
         let mut candidate = self.working.clone();
         edit(&mut candidate)?;
@@ -165,16 +191,28 @@ impl Transaction {
     }
 
     /// Add a complete custom show.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add(&mut self, show: Show) -> Result<()> {
         self.insert(self.working.shows.len(), show)
     }
 
     /// Alias for add.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn push(&mut self, show: Show) -> Result<()> {
         self.add(show)
     }
 
     /// Create a show using the list's next available ID and return that ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn create(&mut self, name: impl Into<String>, slide_ids: Vec<u32>) -> Result<u32> {
         let mut candidate = self.working.clone();
         let id = candidate.create(name, slide_ids).id;
@@ -184,6 +222,10 @@ impl Transaction {
     }
 
     /// Insert a show at a source-order position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn insert(&mut self, index: usize, show: Show) -> Result<()> {
         if index > self.working.shows.len() {
             return Err(index_error(index, self.working.shows.len()));
@@ -196,6 +238,10 @@ impl Transaction {
     }
 
     /// Remove a show by stable ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove(&mut self, id: u32) -> Result<Show> {
         let mut candidate = self.working.clone();
         let removed = candidate
@@ -207,6 +253,10 @@ impl Transaction {
     }
 
     /// Remove a show by display name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_by_name(&mut self, name: &str) -> Result<Show> {
         let mut candidate = self.working.clone();
         let removed = candidate
@@ -218,6 +268,10 @@ impl Transaction {
     }
 
     /// Replace one show while retaining its stable ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace_show(&mut self, id: u32, replacement: Show) -> Result<bool> {
         let mut candidate = self.working.clone();
         let before = candidate
@@ -232,6 +286,10 @@ impl Transaction {
     }
 
     /// Set a show's display name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_name(&mut self, id: u32, name: impl Into<String>) -> Result<bool> {
         let mut candidate = self.working.clone();
         let show = candidate
@@ -248,6 +306,10 @@ impl Transaction {
     }
 
     /// Replace one show's slide membership in source order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_slides(&mut self, id: u32, slide_ids: Vec<u32>) -> Result<bool> {
         let mut candidate = self.working.clone();
         let show = candidate
@@ -263,6 +325,10 @@ impl Transaction {
     }
 
     /// Add one slide to a show.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add_slide(&mut self, show_id: u32, slide_id: u32) -> Result<()> {
         let mut candidate = self.working.clone();
         let show = candidate
@@ -275,6 +341,10 @@ impl Transaction {
     }
 
     /// Remove one slide from a show.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_slide(&mut self, show_id: u32, slide_id: u32) -> Result<bool> {
         let mut candidate = self.working.clone();
         let show = candidate
@@ -290,6 +360,10 @@ impl Transaction {
     }
 
     /// Reorder custom shows by a complete ID permutation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn reorder(&mut self, ordered_ids: &[u32]) -> Result<()> {
         let mut candidate = self.working.clone();
         candidate.reorder(ordered_ids)?;
@@ -299,6 +373,10 @@ impl Transaction {
     }
 
     /// Reorder one show's slides by a complete membership permutation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn reorder_slides(&mut self, show_id: u32, ordered_ids: &[u32]) -> Result<()> {
         let mut candidate = self.working.clone();
         let show = candidate
@@ -323,6 +401,10 @@ impl Transaction {
     }
 
     /// Consume the edit into a source-checked commit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn commit(self) -> Result<Commit> {
         if !self.is_changed() {
             let patch = Patch::new(self.original.clone(), self.original.clone());
@@ -374,29 +456,35 @@ pub struct Commit {
 
 impl Commit {
     #[inline]
+    #[must_use]
     pub const fn changed(&self) -> bool {
         self.changed
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_changed(&self) -> bool {
         self.changed
     }
 
     #[inline]
+    #[must_use]
     pub fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     #[inline]
+    #[must_use]
     pub fn patch(&self) -> &Patch {
         &self.patch
     }
 
+    #[must_use]
     pub fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
 
+    #[must_use]
     pub fn into_patch(self) -> Patch {
         self.patch
     }
@@ -415,25 +503,30 @@ impl Patch {
     }
 
     #[inline]
+    #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
     #[inline]
+    #[must_use]
     pub fn after(&self) -> &Snapshot {
         &self.after
     }
 
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
     #[inline]
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         !self.is_empty()
     }
 
+    #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
@@ -442,10 +535,14 @@ impl Patch {
     }
 
     #[inline]
+    #[must_use]
     pub const fn expected_revision(&self) -> Revision {
         self.before.revision
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn apply(&self, target: &mut OpcPackage) -> Result<Snapshot> {
         package::apply_patch(target, self)
     }
@@ -461,11 +558,11 @@ fn fingerprint(
     part_name: &str,
     content_type: &str,
 ) -> Revision {
-    let mut hash = 0xcbf29ce484222325u64;
+    let mut hash = 0xcbf2_9ce4_8422_2325u64;
     for value in [source, part_name.as_bytes(), content_type.as_bytes()] {
         for byte in value {
             hash ^= u64::from(*byte);
-            hash = hash.wrapping_mul(0x100000001b3);
+            hash = hash.wrapping_mul(0x100_0000_01b3);
         }
     }
     for relationship in relationships {
@@ -477,7 +574,7 @@ fn fingerprint(
         ] {
             for byte in value {
                 hash ^= u64::from(*byte);
-                hash = hash.wrapping_mul(0x100000001b3);
+                hash = hash.wrapping_mul(0x100_0000_01b3);
             }
         }
     }

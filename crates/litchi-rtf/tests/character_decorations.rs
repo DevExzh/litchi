@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{CharacterBorderStyle, RtfDocument, RtfWriter};
 
 #[test]
@@ -82,7 +91,7 @@ fn inherits_resets_writes_and_keeps_ignored_destinations_inert() {
         .unwrap();
     let written = String::from_utf8(output).unwrap();
     assert!(written.contains(
-        r#"\chbrdr\brdrs\brdrw10\brdrcf2\brsp3\brdrsh\brdrframe\chshdng2500\chcfpat3\chcbpat4"#
+        r"\chbrdr\brdrs\brdrw10\brdrcf2\brsp3\brdrsh\brdrframe\chshdng2500\chcfpat3\chcbpat4"
     ));
     let reparsed = RtfDocument::parse(&written).unwrap();
     assert!(reparsed.blocks().iter().any(|block| {
@@ -96,23 +105,21 @@ fn inherits_resets_writes_and_keeps_ignored_destinations_inert() {
 #[test]
 fn rejects_malformed_character_decorations() {
     for source in [
-        r#"{\rtf1\chbrdr1\brdrs X}"#,
-        r#"{\rtf1\chbrdr\brdrs\brdrs X}"#,
-        r#"{\rtf1\chbrdr\brdrw X}"#,
-        r#"{\rtf1\chbrdr\brdrw-1 X}"#,
-        r#"{\rtf1\chbrdr\brdrw76 X}"#,
-        r#"{\rtf1\chbrdr\brdrcf-1 X}"#,
-        r#"{\rtf1\chbrdr\brdrcf65536 X}"#,
-        r#"{\rtf1\chshdng X}"#,
-        r#"{\rtf1\chshdng-1 X}"#,
-        r#"{\rtf1\chshdng10001 X}"#,
-        r#"{\rtf1\chcfpat65536 X}"#,
-        r#"{\rtf1\chcbpat-1 X}"#,
+        r"{\rtf1\chbrdr1\brdrs X}",
+        r"{\rtf1\chbrdr\brdrs\brdrs X}",
+        r"{\rtf1\chbrdr\brdrw X}",
+        r"{\rtf1\chbrdr\brdrw-1 X}",
+        r"{\rtf1\chbrdr\brdrw76 X}",
+        r"{\rtf1\chbrdr\brdrcf-1 X}",
+        r"{\rtf1\chbrdr\brdrcf65536 X}",
+        r"{\rtf1\chshdng X}",
+        r"{\rtf1\chshdng-1 X}",
+        r"{\rtf1\chshdng10001 X}",
+        r"{\rtf1\chcfpat65536 X}",
+        r"{\rtf1\chcbpat-1 X}",
     ] {
         assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
     }
 
-    assert!(
-        RtfDocument::parse(r#"{\rtf1{\*\unknown\chbrdr1\chshdng10001 ignored}Visible}"#).is_ok()
-    );
+    assert!(RtfDocument::parse(r"{\rtf1{\*\unknown\chbrdr1\chshdng10001 ignored}Visible}").is_ok());
 }

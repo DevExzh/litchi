@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use litchi_pptx::{Error, Package};
@@ -27,7 +33,7 @@ fn slide_shape_placeholders_preserve_type_decoding_errors() {
 
     assert!(matches!(
         slide.shapes(),
-        Err(Error::Decode(_)) | Err(Error::Xml(_)) | Err(Error::Invalid(_))
+        Err(Error::Decode(_) | Error::Xml(_) | Error::Invalid(_))
     ));
 }
 

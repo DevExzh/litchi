@@ -12,6 +12,71 @@ use super::model::{
     SlideBinaryTagExtension12, SlideTagExtensions,
 };
 
+/// Implement `parse_records`/`to_payload` for an extension grammar.
+//
+// Grammars are an ordered sequence of greedy arrays (consumed while the
+// record type matches), optional single records, and required single
+// records, exactly as the spec tables list them. Slots are declared in
+// grammar order: `array(label, field, type, version)` for a record-type
+// array, `opt(label, field, type, instance, version)` for an optional
+// record.
+#[allow(
+    unused_macro_rules,
+    reason = "schema variants use different required/optional field combinations"
+)]
+macro_rules! extension_struct {
+    (
+        $name:ident, $context:literal,
+        $($kind:ident($label:literal, $field:ident $(, $args:expr)*)),* $(,)?
+    ) => {
+        impl $name {
+            /// Parse and validate the ordered record sequence of the extension
+            /// payload. Records are consumed, not copied.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if the operation fails.
+            pub fn parse_records(records: Vec<Record>) -> Result<Self> {
+                let mut cursor = RecordCursor::new(records, $context);
+                $(extension_struct!(@parse cursor, $kind($label, $field $(, $args)*));)*
+                cursor.finish()?;
+                Ok(Self { $($field,)* })
+            }
+
+            /// Serialize the extension payload byte-for-byte.
+            ///
+            /// The encoded payload is reparsed before returning so public-field
+            /// mutations cannot serialize an invalid grammar.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if the operation fails.
+            pub fn to_payload(&self) -> Result<Vec<u8>> {
+                let mut payload = Vec::new();
+                $(extension_struct!(@encode self, payload, $kind, $field);)*
+                Self::parse_records(Record::parse_sequence_strict(&payload, $context)?)?;
+                Ok(payload)
+            }
+        }
+    };
+    (@parse $cursor:ident, array($label:literal, $field:ident, $ty:expr, $version:expr)) => {
+        let $field = $cursor.take_array($ty, $version, $label)?;
+    };
+    (@parse $cursor:ident, opt($label:literal, $field:ident, $ty:expr, $instance:expr, $version:expr)) => {
+        let $field = $cursor.take_optional($ty, $instance, $version, $label)?;
+    };
+    (@encode $this:ident, $payload:ident, array, $field:ident) => {
+        for record in &$this.$field {
+            $payload.extend_from_slice(&encode_record(record)?);
+        }
+    };
+    (@encode $this:ident, $payload:ident, opt, $field:ident) => {
+        if let Some(record) = &$this.$field {
+            $payload.extend_from_slice(&encode_record(record)?);
+        }
+    };
+}
+
 /// `RT_PresentationAdvisorFlags9Atom` (MS-PPT 2.13.24).
 pub(super) const PRES_ADVISOR_FLAGS_9_ATOM: u16 = 0x177a;
 /// `RT_HtmlDocInfo9Atom` (MS-PPT 2.13.24).
@@ -38,64 +103,6 @@ pub(super) const MODIFY_PASSWORD_INSTANCE: u16 = 0x003;
 pub(super) const CONTAINER_VERSION: u16 = 0x0f;
 /// Atom record version nibble.
 pub(super) const ATOM_VERSION: u16 = 0x00;
-
-/// Implement `parse_records`/`to_payload` for an extension grammar.
-//
-// Grammars are an ordered sequence of greedy arrays (consumed while the
-// record type matches), optional single records, and required single
-// records, exactly as the spec tables list them. Slots are declared in
-// grammar order: `array(label, field, type, version)` for a record-type
-// array, `opt(label, field, type, instance, version)` for an optional
-// record.
-#[allow(
-    unused_macro_rules,
-    reason = "schema variants use different required/optional field combinations"
-)]
-#[allow(unused_macro_rules)]
-macro_rules! extension_struct {
-    (
-        $name:ident, $context:literal,
-        $($kind:ident($label:literal, $field:ident $(, $args:expr)*)),* $(,)?
-    ) => {
-        impl $name {
-            /// Parse and validate the ordered record sequence of the extension
-            /// payload. Records are consumed, not copied.
-            pub fn parse_records(records: Vec<Record>) -> Result<Self> {
-                let mut cursor = RecordCursor::new(records, $context);
-                $(extension_struct!(@parse cursor, $kind($label, $field $(, $args)*));)*
-                cursor.finish()?;
-                Ok(Self { $($field,)* })
-            }
-
-            /// Serialize the extension payload byte-for-byte.
-            ///
-            /// The encoded payload is reparsed before returning so public-field
-            /// mutations cannot serialize an invalid grammar.
-            pub fn to_payload(&self) -> Result<Vec<u8>> {
-                let mut payload = Vec::new();
-                $(extension_struct!(@encode self, payload, $kind, $field);)*
-                Self::parse_records(Record::parse_sequence_strict(&payload, $context)?)?;
-                Ok(payload)
-            }
-        }
-    };
-    (@parse $cursor:ident, array($label:literal, $field:ident, $ty:expr, $version:expr)) => {
-        let $field = $cursor.take_array($ty, $version, $label)?;
-    };
-    (@parse $cursor:ident, opt($label:literal, $field:ident, $ty:expr, $instance:expr, $version:expr)) => {
-        let $field = $cursor.take_optional($ty, $instance, $version, $label)?;
-    };
-    (@encode $this:ident, $payload:ident, array, $field:ident) => {
-        for record in &$this.$field {
-            $payload.extend_from_slice(&encode_record(record)?);
-        }
-    };
-    (@encode $this:ident, $payload:ident, opt, $field:ident) => {
-        if let Some(record) = &$this.$field {
-            $payload.extend_from_slice(&encode_record(record)?);
-        }
-    };
-}
 
 extension_struct! {
     DocBinaryTagExtension9, "PP9DocBinaryTagExtension",
@@ -155,6 +162,10 @@ extension_struct! {
 
 impl SlideBinaryTagExtension10 {
     /// Parse and validate the ordered record sequence of the extension payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_records(records: Vec<Record>) -> Result<Self> {
         const CONTEXT: &str = "PP10SlideBinaryTagExtension";
         let mut cursor = RecordCursor::new(records, CONTEXT);
@@ -179,11 +190,11 @@ impl SlideBinaryTagExtension10 {
         // linkedSlideAtom.cLinkedShapes and cannot appear without the atom.
         match &linked_slide {
             Some(atom) => {
-                let data: [u8; 8] = atom.data.as_slice().try_into().map_err(|_| {
+                let data: [u8; 8] = atom.data.as_slice().try_into().map_err(|_err| {
                     Error::Corrupted("LinkedSlide10Atom payload must be 8 bytes".into())
                 })?;
                 let count = i32::from_le_bytes([data[4], data[5], data[6], data[7]]);
-                if count < 0 || linked_shapes.len() != count as usize {
+                if usize::try_from(count) != Ok(linked_shapes.len()) {
                     return corrupted(
                         "LinkedShape10Atom count does not match LinkedSlide10Atom.cLinkedShapes",
                     );
@@ -242,6 +253,10 @@ impl SlideBinaryTagExtension10 {
     ///
     /// The encoded payload is reparsed before returning so public-field
     /// mutations cannot serialize an invalid grammar.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_payload(&self) -> Result<Vec<u8>> {
         let mut payload = Vec::new();
         for record in &self.text_master_styles {
@@ -279,6 +294,10 @@ impl SlideBinaryTagExtension10 {
 impl DocBinaryTagExtension {
     /// Decode a versioned document-scope binary tag payload. Returns `Ok(None)`
     /// for unassigned (unknown) tags.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(version: ProgBinaryTagVersion, records: Vec<Record>) -> Result<Option<Self>> {
         match version {
             ProgBinaryTagVersion::PowerPoint9 => Ok(Some(Self::PowerPoint9(Box::new(
@@ -298,6 +317,10 @@ impl DocBinaryTagExtension {
     }
 
     /// Serialize the tag payload byte-for-byte.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_payload(&self) -> Result<Vec<u8>> {
         match self {
             Self::PowerPoint9(extension) => extension.to_payload(),
@@ -311,6 +334,10 @@ impl DocBinaryTagExtension {
 impl SlideBinaryTagExtension {
     /// Decode a versioned slide-scope binary tag payload. Returns `Ok(None)`
     /// for unassigned (unknown) tags.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(version: ProgBinaryTagVersion, records: Vec<Record>) -> Result<Option<Self>> {
         match version {
             ProgBinaryTagVersion::PowerPoint9 => Ok(Some(Self::PowerPoint9(Box::new(
@@ -330,6 +357,10 @@ impl SlideBinaryTagExtension {
     }
 
     /// Serialize the tag payload byte-for-byte.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_payload(&self) -> Result<Vec<u8>> {
         match self {
             Self::PowerPoint9(extension) => extension.to_payload(),
@@ -344,6 +375,10 @@ impl ProgBinaryTag {
     ///
     /// Returns `Ok(None)` for unassigned (unknown) tags, whose payloads are
     /// preserved without interpretation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn doc_extension(&self) -> Result<Option<DocBinaryTagExtension>> {
         DocBinaryTagExtension::parse(self.version, self.records()?)
     }
@@ -353,6 +388,10 @@ impl ProgBinaryTag {
     /// Returns `Ok(None)` for unassigned (unknown) tags. `___PPT11` is not
     /// assigned at slide scope (MS-PPT 2.5.22), so decoding it as a slide
     /// extension is an error.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn slide_extension(&self) -> Result<Option<SlideBinaryTagExtension>> {
         SlideBinaryTagExtension::parse(self.version, self.records()?)
     }
@@ -363,16 +402,20 @@ impl ProgTags {
     ///
     /// Unknown tags are skipped; their payloads remain available through
     /// [`ProgTags::binary_tag`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn document_extensions(&self) -> Result<DocumentTagExtensions> {
         if self.scope != ProgTagScope::Document {
             return corrupted("slide-scope ProgTags cannot hold document extensions");
         }
         let mut extensions = DocumentTagExtensions::default();
         for tag in &self.tags {
-            let ProgTag::Binary(tag) = tag else {
+            let ProgTag::Binary(binary_tag) = tag else {
                 continue;
             };
-            match tag.doc_extension()? {
+            match binary_tag.doc_extension()? {
                 Some(DocBinaryTagExtension::PowerPoint9(extension)) => {
                     extensions.powerpoint9 = Some(*extension);
                 },
@@ -395,16 +438,20 @@ impl ProgTags {
     ///
     /// Unknown tags are skipped; their payloads remain available through
     /// [`ProgTags::binary_tag`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn slide_extensions(&self) -> Result<SlideTagExtensions> {
         if self.scope != ProgTagScope::Slide {
             return corrupted("document-scope ProgTags cannot hold slide extensions");
         }
         let mut extensions = SlideTagExtensions::default();
         for tag in &self.tags {
-            let ProgTag::Binary(tag) = tag else {
+            let ProgTag::Binary(binary_tag) = tag else {
                 continue;
             };
-            match tag.slide_extension()? {
+            match binary_tag.slide_extension()? {
                 Some(SlideBinaryTagExtension::PowerPoint9(extension)) => {
                     extensions.powerpoint9 = Some(*extension);
                 },
@@ -497,12 +544,12 @@ fn encode_record(record: &Record) -> Result<Vec<u8>> {
         return corrupted("PPT record version or instance exceeds its bit field");
     }
     let declared = usize::try_from(record.data_length)
-        .map_err(|_| Error::Corrupted("PPT record length overflow".into()))?;
+        .map_err(|_err| Error::Corrupted("PPT record length overflow".into()))?;
     if declared != record.data.len() {
         return corrupted("PPT record length does not match its payload");
     }
     let length = u32::try_from(record.data.len())
-        .map_err(|_| Error::Corrupted("PPT record payload exceeds u32".into()))?;
+        .map_err(|_err| Error::Corrupted("PPT record payload exceeds u32".into()))?;
     let mut result = Vec::with_capacity(8usize.saturating_add(record.data.len()));
     result.extend_from_slice(&((record.instance << 4) | record.version).to_le_bytes());
     result.extend_from_slice(&record.record_type_raw.to_le_bytes());

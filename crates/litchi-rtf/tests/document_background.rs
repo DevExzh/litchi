@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use std::borrow::Cow;
 
 use litchi_rtf::{RtfDocument, RtfWriter, Shape, ShapeProperty, ShapeType};
@@ -37,7 +46,7 @@ fn parses_and_rewrites_real_producer_background_with_provenance() {
 
 #[test]
 fn typed_api_round_trips_unknown_scalar_properties_and_clears() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     let mut shape = Shape::new(ShapeType::Ellipse);
     shape.geometry.x = 10;
     shape.geometry.y = 20;
@@ -73,15 +82,15 @@ fn typed_api_round_trips_unknown_scalar_properties_and_clears() {
 #[test]
 fn rejects_malformed_destination_grammar_and_duplicates() {
     for source in [
-        r#"{\rtf1{\background{\shp}}}"#,
-        r#"{\rtf1{\*\background1{\shp}}}"#,
-        r#"{\rtf1{\*\background}}"#,
-        r#"{\rtf1{\*\background text{\shp}}}"#,
-        r#"{\rtf1{\*\background{\*\shp}}}"#,
-        r#"{\rtf1{\*\background{\shp}{\shp}}}"#,
-        r#"{\rtf1{\*\background{\shp{\sp{\sn }{\sv 1}}}}}"#,
-        r#"{\rtf1{\*\background{\shp}}{\*\background{\shp}}}"#,
-        r#"{\rtf1 Body{\*\background{\shp}}}"#,
+        r"{\rtf1{\background{\shp}}}",
+        r"{\rtf1{\*\background1{\shp}}}",
+        r"{\rtf1{\*\background}}",
+        r"{\rtf1{\*\background text{\shp}}}",
+        r"{\rtf1{\*\background{\*\shp}}}",
+        r"{\rtf1{\*\background{\shp}{\shp}}}",
+        r"{\rtf1{\*\background{\shp{\sp{\sn }{\sv 1}}}}}",
+        r"{\rtf1{\*\background{\shp}}{\*\background{\shp}}}",
+        r"{\rtf1 Body{\*\background{\shp}}}",
     ] {
         assert!(
             RtfDocument::parse(source).is_err(),
@@ -92,7 +101,7 @@ fn rejects_malformed_destination_grammar_and_duplicates() {
 
 #[test]
 fn enforces_typed_resource_and_geometry_bounds() {
-    let mut document = RtfDocument::parse(r#"{\rtf1}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1}").unwrap();
     let mut shape = Shape::new(ShapeType::Rectangle);
     shape.geometry.x = i32::MAX;
     shape.geometry.width = 1;

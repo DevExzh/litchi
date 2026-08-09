@@ -32,6 +32,7 @@ pub struct Limits {
 impl Limits {
     /// Construct the safe default Designer bounds.
     #[inline]
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             tag_count: DEFAULT_TAG_COUNT,
@@ -46,42 +47,49 @@ impl Limits {
 
     /// Return the maximum number of tags in one tag collection.
     #[inline]
+    #[must_use]
     pub const fn tag_count(self) -> usize {
         self.tag_count
     }
 
     /// Return the maximum UTF-8 byte length of one tag name or value.
     #[inline]
+    #[must_use]
     pub const fn string_bytes(self) -> usize {
         self.string_bytes
     }
 
     /// Return the maximum combined UTF-8 byte length of all tag strings.
     #[inline]
+    #[must_use]
     pub const fn aggregate_bytes(self) -> usize {
         self.aggregate_bytes
     }
 
     /// Maximum bytes in one Designer payload, before or after authoring.
     #[inline]
+    #[must_use]
     pub const fn xml_bytes(self) -> usize {
         self.xml_bytes
     }
 
     /// Maximum XML events in one Designer payload.
     #[inline]
+    #[must_use]
     pub const fn xml_nodes(self) -> usize {
         self.xml_nodes
     }
 
     /// Maximum element nesting depth in one Designer payload.
     #[inline]
+    #[must_use]
     pub const fn xml_depth(self) -> usize {
         self.xml_depth
     }
 
     /// Maximum raw or decoded bytes in one Designer attribute.
     #[inline]
+    #[must_use]
     pub const fn attribute_bytes(self) -> usize {
         self.attribute_bytes
     }
@@ -162,11 +170,19 @@ pub struct Tag {
 
 impl Tag {
     /// Construct a tag under the default resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(name: impl Into<String>, value: impl Into<String>) -> Result<Self> {
         Self::new_with_limits(name, value, Limits::default())
     }
 
     /// Construct a tag under caller-supplied resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new_with_limits(
         name: impl Into<String>,
         value: impl Into<String>,
@@ -181,12 +197,14 @@ impl Tag {
 
     /// Return the inert name exactly as supplied.
     #[inline]
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Return the inert value exactly as supplied.
     #[inline]
+    #[must_use]
     pub fn value(&self) -> &str {
         &self.value
     }
@@ -222,6 +240,7 @@ pub struct Tags {
 impl Tags {
     /// Construct a present, empty tag collection.
     #[inline]
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             entries: Vec::new(),
@@ -230,6 +249,10 @@ impl Tags {
     }
 
     /// Construct an ordered tag collection under caller-supplied bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_iter_with_limits(
         entries: impl IntoIterator<Item = Tag>,
         limits: Limits,
@@ -243,41 +266,54 @@ impl Tags {
 
     /// Return the tags in source order.
     #[inline]
+    #[must_use]
     pub fn as_slice(&self) -> &[Tag] {
         &self.entries
     }
 
     /// Iterate over tags in source order.
     #[inline]
+    #[must_use]
     pub fn iter(&self) -> impl ExactSizeIterator<Item = &Tag> {
         self.entries.iter()
     }
 
     /// Return the number of tags.
     #[inline]
+    #[must_use]
     pub fn len(&self) -> usize {
         self.entries.len()
     }
 
     /// Report whether this present collection is empty.
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
 
     /// Return the combined UTF-8 byte length of stored names and values.
     #[inline]
+    #[must_use]
     pub const fn aggregate_bytes(&self) -> usize {
         self.bytes
     }
 
     /// Append a tag under the default resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     #[inline]
     pub fn push(&mut self, entry: Tag) -> Result<()> {
         self.push_with_limits(entry, Limits::default())
     }
 
     /// Append a tag under caller-supplied resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn push_with_limits(&mut self, entry: Tag, limits: Limits) -> Result<()> {
         self.check_add(&entry, limits)?;
         self.entries
@@ -295,6 +331,10 @@ impl Tags {
     }
 
     /// Insert a tag at a source-order position under caller-supplied bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn insert_with_limits(&mut self, index: usize, entry: Tag, limits: Limits) -> Result<()> {
         if index > self.entries.len() {
             return Err(Error::IndexOutOfBounds {
@@ -318,6 +358,10 @@ impl Tags {
     }
 
     /// Replace one tag, returning the previous entry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace_with_limits(&mut self, index: usize, entry: Tag, limits: Limits) -> Result<Tag> {
         let previous = self.entries.get(index).ok_or(Error::IndexOutOfBounds {
             index,
@@ -344,6 +388,10 @@ impl Tags {
     }
 
     /// Remove and return one tag at a source-order position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove(&mut self, index: usize) -> Result<Tag> {
         let entry = self.entries.get(index).ok_or(Error::IndexOutOfBounds {
             index,
@@ -430,6 +478,7 @@ pub struct DrawingProperties {
 impl DrawingProperties {
     /// Construct properties with both optional members absent.
     #[inline]
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             editable: None,
@@ -439,12 +488,14 @@ impl DrawingProperties {
 
     /// Return the explicitly stored editable value, if present.
     #[inline]
+    #[must_use]
     pub const fn editable(&self) -> Option<bool> {
         self.editable
     }
 
     /// Return the effective editable value, applying the schema default.
     #[inline]
+    #[must_use]
     pub const fn effective_editable(&self) -> bool {
         match self.editable {
             Some(value) => value,
@@ -454,6 +505,7 @@ impl DrawingProperties {
 
     /// Return the optional tag collection.
     #[inline]
+    #[must_use]
     pub fn tags(&self) -> Option<&Tags> {
         self.tags.as_ref()
     }
@@ -465,6 +517,10 @@ impl DrawingProperties {
     }
 
     /// Replace the optional tag collection after bounded validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_tags(&mut self, value: Option<Tags>, limits: Limits) -> Result<()> {
         if let Some(tags) = &value {
             tags.validate(limits)?;
@@ -482,6 +538,10 @@ impl DrawingProperties {
     }
 
     /// Set the optional tag collection while building properties.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn with_tags(mut self, value: Option<Tags>, limits: Limits) -> Result<Self> {
         self.set_tags(value, limits)?;
         Ok(self)
@@ -497,6 +557,7 @@ pub struct Opaque {
 impl Opaque {
     /// Borrow the exact extension bytes retained by the bounded snapshot.
     #[inline]
+    #[must_use]
     pub fn xml(&self) -> &[u8] {
         &self.xml
     }
@@ -529,6 +590,7 @@ pub struct Snapshot {
 impl Snapshot {
     /// Construct a snapshot with an explicit design-element value.
     #[inline]
+    #[must_use]
     pub fn new(value: bool) -> Self {
         Self {
             value: Some(value),
@@ -538,18 +600,21 @@ impl Snapshot {
 
     /// Return the optional `designElem/@val` value.
     #[inline]
+    #[must_use]
     pub const fn value(&self) -> Option<bool> {
         self.value
     }
 
     /// Borrow unrelated extension entries retained byte-for-byte.
     #[inline]
+    #[must_use]
     pub fn unknown_extensions(&self) -> &[Opaque] {
         &self.unknown_extensions
     }
 
     /// Start a detached atomic edit of this snapshot.
     #[inline]
+    #[must_use]
     pub fn edit(&self) -> crate::shape::designer::Editor {
         crate::shape::designer::Editor::new(self.clone())
     }
@@ -594,6 +659,11 @@ impl Snapshot {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::{DrawingProperties, Limits, Tag, Tags};
     use crate::Error;

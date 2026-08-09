@@ -9,28 +9,44 @@ use super::validation::{
 };
 use crate::animation::diagram_build::{self, BuildType};
 
-/// Parse a native diagram inventory from a BuildList and its PPDrawing body.
+/// Fixed offsets inside one validated `DiagramBuildContainer` record.
+///
+/// The transaction edits only these two fields and copies every other source
+/// byte unchanged.  The constants mirror the fixed records in [MS-PPT]
+/// §§2.8.13–2.8.14.
+const SHAPE_ID_OFFSET: usize = 24;
+const MODE_OFFSET: usize = 40;
+
+/// Parse a native diagram inventory from a `BuildList` and its `PPDrawing` body.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse<'data>(build_list: &Record, drawing: &'data [u8]) -> Result<Inventory<'data>> {
     parse_with_limits(build_list, drawing, Limits::default())
 }
 
 /// Parse a native diagram inventory with explicit resource ceilings.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_with_limits<'data>(
     build_list: &Record,
     drawing: &'data [u8],
     limits: Limits,
 ) -> Result<Inventory<'data>> {
     let builds = diagram_builds(build_list, limits)?;
-    let drawing = crate::odraw::parse_drawing(drawing)?;
-    validate_shape_ids(&drawing)?;
+    let parsed_drawing = crate::odraw::parse_drawing(drawing)?;
+    validate_shape_ids(&parsed_drawing)?;
 
     let mut diagrams = Vec::new();
     diagrams
         .try_reserve(builds.len())
-        .map_err(|_| Error::Corrupted("unable to allocate diagram inventory".to_string()))?;
+        .map_err(|_err| Error::Corrupted("unable to allocate diagram inventory".to_string()))?;
     for build in builds {
         let root = ShapeRef::new(build.shape_id());
-        let root_shape = root.resolve(&drawing).ok_or_else(|| {
+        let root_shape = root.resolve(&parsed_drawing).ok_or_else(|| {
             Error::InvalidFormat(format!(
                 "diagram build ({}, {}) references missing OfficeArt shape {}",
                 build.build_id(),
@@ -41,15 +57,23 @@ pub fn parse_with_limits<'data>(
         let (shapes, payloads) = collect_associated(root_shape, limits)?;
         diagrams.push(Diagram::new(build, shapes, payloads));
     }
-    Ok(Inventory::new(drawing, diagrams))
+    Ok(Inventory::new(parsed_drawing, diagrams))
 }
 
-/// Parse one exact serialized BuildList record and a PPDrawing body.
+/// Parse one exact serialized `BuildList` record and a `PPDrawing` body.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_bytes<'data>(build_list: &[u8], drawing: &'data [u8]) -> Result<Inventory<'data>> {
     parse_bytes_with_limits(build_list, drawing, Limits::default())
 }
 
-/// Parse one exact serialized BuildList record with explicit limits.
+/// Parse one exact serialized `BuildList` record with explicit limits.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_bytes_with_limits<'data>(
     build_list: &[u8],
     drawing: &'data [u8],
@@ -62,16 +86,8 @@ pub fn parse_bytes_with_limits<'data>(
     parse_with_limits(&record, drawing, limits)
 }
 
-/// Fixed offsets inside one validated `DiagramBuildContainer` record.
-///
-/// The transaction edits only these two fields and copies every other source
-/// byte unchanged.  The constants mirror the fixed records in [MS-PPT]
-/// §§2.8.13–2.8.14.
-const SHAPE_ID_OFFSET: usize = 24;
-const MODE_OFFSET: usize = 40;
-
 /// Parse typed diagram builds and retain their source offsets without
-/// rebuilding the surrounding BuildList.
+/// rebuilding the surrounding `BuildList`.
 pub(super) fn parse_entries(
     bytes: &[u8],
     shape_ids: &[u32],
@@ -86,7 +102,7 @@ pub(super) fn parse_entries(
     let mut entries = Vec::new();
     entries
         .try_reserve(record.children.len().min(limits.max_diagrams))
-        .map_err(|_| {
+        .map_err(|_err| {
             Error::Corrupted("unable to allocate diagram transaction state".to_string())
         })?;
     let mut offset = 8usize;
@@ -155,7 +171,7 @@ pub(super) fn rewrite_mode(bytes: &mut [u8], offset: usize, mode: BuildType) -> 
     Ok(())
 }
 
-/// Rewrite only the fixed-width BuildAtom `shapeIdRef` field.
+/// Rewrite only the fixed-width `BuildAtom` `shapeIdRef` field.
 pub(super) fn rewrite_shape_id(bytes: &mut [u8], offset: usize, shape_id: u32) -> Result<()> {
     let start = offset
         .checked_add(SHAPE_ID_OFFSET)

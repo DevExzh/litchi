@@ -40,12 +40,16 @@ impl Conformance {
     }
 }
 
-/// A validated DrawingML table-style GUID stored without heap allocation.
+/// A validated `DrawingML` table-style GUID stored without heap allocation.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Id([u8; 16]);
 
 impl Id {
     /// Parse the required braced GUID wire form.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(value: &str) -> Result<Self> {
         value.parse()
     }
@@ -74,7 +78,7 @@ impl Id {
             self.0[14],
             self.0[15],
         )
-        .map_err(|_| Error::Write)
+        .map_err(|_err| Error::Write)
     }
 }
 
@@ -165,7 +169,8 @@ bitflags! {
 }
 
 impl Parts {
-    /// Return the DrawingML element name for one single-region flag.
+    /// Return the `DrawingML` element name for one single-region flag.
+    #[must_use]
     pub fn xml_name(self) -> Option<&'static str> {
         PARTS
             .iter()
@@ -242,6 +247,10 @@ impl fmt::Debug for Def {
 
 impl Def {
     /// Create a style with no conditional region payloads.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(id: Id, name: impl Into<String>) -> Result<Self> {
         let name = name.into();
         validate_name(&name)?;
@@ -258,23 +267,31 @@ impl Def {
         })
     }
 
+    #[must_use]
     pub fn id(&self) -> Id {
         self.id
     }
 
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    #[must_use]
     pub fn parts(&self) -> Parts {
         self.parts
     }
 
+    #[must_use]
     pub fn has(&self, parts: Parts) -> bool {
         self.parts.contains(parts)
     }
 
     /// Rename this detached definition while preserving its cell-style body.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn rename(&mut self, name: impl Into<String>) -> Result<String> {
         let name = name.into();
         validate_name(&name)?;
@@ -358,6 +375,7 @@ impl fmt::Debug for List {
 
 impl List {
     /// Create an empty catalog with an explicitly selected default style.
+    #[must_use]
     pub fn new(conformance: Conformance, default: Id) -> Self {
         Self {
             conformance,
@@ -370,14 +388,20 @@ impl List {
     }
 
     /// Parse and take ownership of bounded table-style XML.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(xml: impl Into<Vec<u8>>) -> Result<Self> {
         parse_owned(xml.into())
     }
 
+    #[must_use]
     pub fn conformance(&self) -> Conformance {
         self.conformance
     }
 
+    #[must_use]
     pub fn default(&self) -> Id {
         self.default
     }
@@ -390,36 +414,44 @@ impl List {
         std::mem::replace(&mut self.default, id)
     }
 
+    #[must_use]
     pub fn styles(&self) -> &[Def] {
         &self.defs
     }
 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.defs.len()
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.defs.is_empty()
     }
 
     /// Checked raw-position lookup for ordered inspection.
+    #[must_use]
     pub fn at(&self, index: usize) -> Option<&Def> {
         self.defs.get(index)
     }
 
     /// Preferred stable-identity lookup.
+    #[must_use]
     pub fn get(&self, id: Id) -> Option<&Def> {
         self.defs.iter().find(|style| style.id == id)
     }
 
     /// Return every definition with this non-identity display name.
     ///
-    /// DrawingML permits duplicate and empty `styleName` values, so this
+    /// `DrawingML` permits duplicate and empty `styleName` values, so this
     /// method deliberately returns all matches rather than selecting one.
     pub fn named<'a>(&'a self, name: &'a str) -> impl Iterator<Item = &'a Def> + 'a {
         self.defs.iter().filter(move |style| style.name == name)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add(&mut self, style: Def) -> Result<()> {
         validate_def(&style)?;
         self.ensure_unique_id(style.id, None)?;
@@ -435,6 +467,10 @@ impl List {
     }
 
     /// Rename one style by stable ID while retaining its opaque formatting.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn rename(&mut self, id: Id, name: impl Into<String>) -> Result<String> {
         let name = name.into();
         validate_name(&name)?;
@@ -453,6 +489,10 @@ impl List {
     }
 
     /// Replace one style while retaining the selected stable GUID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace(&mut self, id: Id, mut replacement: Def) -> Result<Def> {
         replacement.id = id;
         validate_def(&replacement)?;
@@ -469,6 +509,10 @@ impl List {
     }
 
     /// Remove one non-default style by stable GUID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove(&mut self, id: Id) -> Result<Option<Def>> {
         if id == self.default {
             return Err(invalid(
@@ -485,11 +529,16 @@ impl List {
     }
 
     /// Return original producer XML when the list has not been edited.
+    #[must_use]
     pub fn source_xml(&self) -> Option<&[u8]> {
         (!self.dirty).then_some(self.source.as_slice())
     }
 
     /// Consume and encode the catalog, moving unchanged source bytes directly.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
     pub fn into_xml(self) -> Result<Vec<u8>> {
         validate_list(&self)?;
         if !self.dirty {
@@ -531,16 +580,19 @@ pub struct Link<'a> {
 
 impl<'a> Link<'a> {
     /// Return the exact relationship ID stored by the producer.
+    #[must_use]
     pub fn id(self) -> &'a str {
         self.id
     }
 
     /// Return the exact Strict or Transitional relationship type.
+    #[must_use]
     pub fn kind(self) -> &'a str {
         self.kind
     }
 
     /// Return the producer's unmodified relative target reference.
+    #[must_use]
     pub fn target(self) -> &'a str {
         self.target
     }

@@ -8,19 +8,20 @@ pub(super) const PRESENTATIONML_NAMESPACE: &str =
 pub(super) const STRICT_PRESENTATIONML_NAMESPACE: &str =
     "http://purl.oclc.org/ooxml/presentationml/main";
 
-/// The PresentationML namespace dialect used by a laser-trace writer.
+/// The `PresentationML` namespace dialect used by a laser-trace writer.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub enum Conformance {
-    /// The ISO Transitional PresentationML namespace.
+    /// The ISO Transitional `PresentationML` namespace.
     #[default]
     Transitional,
-    /// The ISO Strict PresentationML namespace.
+    /// The ISO Strict `PresentationML` namespace.
     Strict,
 }
 
 impl Conformance {
-    /// Return the PresentationML namespace URI used by this profile.
+    /// Return the `PresentationML` namespace URI used by this profile.
     #[inline]
+    #[must_use]
     pub const fn namespace(self) -> &'static str {
         match self {
             Self::Transitional => PRESENTATIONML_NAMESPACE,
@@ -28,8 +29,9 @@ impl Conformance {
         }
     }
 
-    /// Select the profile for a detected PresentationML namespace.
+    /// Select the profile for a detected `PresentationML` namespace.
     #[inline]
+    #[must_use]
     pub fn from_namespace(namespace: &str) -> Self {
         if namespace == STRICT_PRESENTATIONML_NAMESPACE {
             Self::Strict
@@ -39,7 +41,7 @@ impl Conformance {
     }
 }
 
-/// A persisted laser-pointer point from a PowerPoint slide show.
+/// A persisted laser-pointer point from a `PowerPoint` slide show.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TracePoint {
     pub(super) time: Offset,
@@ -49,6 +51,7 @@ pub struct TracePoint {
 
 impl TracePoint {
     /// Create a trace point from exact, checked time and coordinate values.
+    #[must_use]
     pub fn new(time: Offset, x: Coordinate, y: Coordinate) -> Self {
         Self { time, x, y }
     }
@@ -59,13 +62,13 @@ impl TracePoint {
         &self.time
     }
 
-    /// Return the checked horizontal DrawingML coordinate.
+    /// Return the checked horizontal `DrawingML` coordinate.
     #[inline]
     pub fn x(&self) -> &Coordinate {
         &self.x
     }
 
-    /// Return the checked vertical DrawingML coordinate.
+    /// Return the checked vertical `DrawingML` coordinate.
     #[inline]
     pub fn y(&self) -> &Coordinate {
         &self.y
@@ -83,24 +86,28 @@ pub struct Trace {
 impl Trace {
     /// Return the zero-based index of the slide that owns this trace.
     #[inline]
+    #[must_use]
     pub fn slide_index(&self) -> usize {
         self.slide_index
     }
 
     /// Return the zero-based source-order index of this trace on its slide.
     #[inline]
+    #[must_use]
     pub fn trace_index(&self) -> usize {
         self.trace_index
     }
 
     /// Return the stored trace points in source order.
     #[inline]
+    #[must_use]
     pub fn points(&self) -> &[TracePoint] {
         &self.points
     }
 
     /// Return the number of stored trace points.
     #[inline]
+    #[must_use]
     pub fn point_count(&self) -> usize {
         self.points.len()
     }

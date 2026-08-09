@@ -13,6 +13,10 @@ pub struct Data(Arc<Vec<u8>>);
 
 impl Data {
     /// Adopt model or preview bytes after applying the owner-independent bound.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(bytes: Vec<u8>) -> Result<Self> {
         Self::from_shared(Arc::new(bytes))
     }
@@ -46,6 +50,10 @@ impl Data {
     }
 
     /// Recover the vector without copying when this is the sole owner.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn try_into_vec(self) -> std::result::Result<Vec<u8>, Self> {
         Arc::try_unwrap(self.0).map_err(Self)
     }
@@ -68,6 +76,10 @@ pub struct Link(Box<str>);
 
 impl Link {
     /// Construct a bounded external target URI.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(value: impl AsRef<str>) -> Result<Self> {
         let value = value.as_ref();
         if value.is_empty()
@@ -100,6 +112,10 @@ pub struct Asset {
 
 impl Asset {
     /// Construct an asset with one embedded glTF payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     #[must_use]
     pub fn embedded(data: Data) -> Self {
         Self {
@@ -109,6 +125,10 @@ impl Asset {
     }
 
     /// Construct an asset with one external model target.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn linked(target: impl AsRef<str>) -> Result<Self> {
         Ok(Self {
             embedded: None,
@@ -117,6 +137,10 @@ impl Asset {
     }
 
     /// Construct an asset retaining both schema relationship attributes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn both(data: Data, target: impl AsRef<str>) -> Result<Self> {
         Ok(Self {
             embedded: Some(data),
@@ -144,6 +168,10 @@ impl Asset {
     }
 
     /// Add or replace the external target.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_linked(&mut self, target: Option<Link>) {
         self.linked = target;
     }
@@ -160,11 +188,19 @@ pub struct Preview {
 
 impl Preview {
     /// Construct an inert preview with an image content type.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(data: Data, content_type: impl AsRef<str>) -> Result<Self> {
         Self::embedded(data, content_type)
     }
 
     /// Construct an embedded raster preview.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn embedded(data: Data, content_type: impl AsRef<str>) -> Result<Self> {
         let content_type = checked_content_type(content_type.as_ref())?;
         Ok(Self {
@@ -176,6 +212,10 @@ impl Preview {
 
     /// Construct a linked raster preview without attempting to infer a MIME
     /// type from an external target.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn linked(target: impl AsRef<str>) -> Result<Self> {
         Ok(Self {
             embedded: None,
@@ -185,6 +225,10 @@ impl Preview {
     }
 
     /// Construct a preview retaining both schema relationship attributes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn both(
         data: Data,
         content_type: impl AsRef<str>,

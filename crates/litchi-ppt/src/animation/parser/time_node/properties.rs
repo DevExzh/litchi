@@ -1,7 +1,7 @@
 //! Time-node property-list decoding.
 
 use super::super::behavior::require_time_variant_payload;
-use super::super::support::{parse_bool1, require_container};
+use super::super::support::{parse_bool1, read_f32, read_i32, require_container};
 use super::validation::{validate_properties, validate_property_context};
 use crate::animation::types::{
     TimeEffectNodeType, TimeEffectType, TimeMasterRelation, TimeNodeProperty, TimeNodePropertyList,
@@ -13,6 +13,10 @@ use crate::records::Record;
 use std::collections::HashSet;
 
 /// Parse a time-node property list in its containing-node context.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_node_property_list(
     record: &Record,
     context: TimePropertyListContext,
@@ -48,9 +52,7 @@ fn parse_time_node_property(record: &Record) -> Result<TimeNodeProperty> {
                 "invalid integer time variant".to_string(),
             ));
         }
-        Ok(i32::from_le_bytes(
-            data[1..5].try_into().expect("length checked"),
-        ))
+        Ok(read_i32(data, 1))
     };
     let boolean = || -> Result<bool> {
         if data.len() != 2 || data[0] != 0 {
@@ -72,7 +74,7 @@ fn parse_time_node_property(record: &Record) -> Result<TimeNodeProperty> {
                 .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
                 .collect::<Vec<_>>(),
         )
-        .map_err(|_| Error::InvalidFormat("invalid UTF-16 time variant".to_string()))
+        .map_err(|_err| Error::InvalidFormat("invalid UTF-16 time variant".to_string()))
     };
     Ok(match record.instance {
         0x02 => TimeNodeProperty::DisplayHidden(match int()? {
@@ -145,8 +147,8 @@ fn parse_time_node_property(record: &Record) -> Result<TimeNodeProperty> {
             if data.len() != 5 || data[0] != 2 {
                 return Err(Error::InvalidFormat("invalid media volume".to_string()));
             }
-            let value = f32::from_le_bytes(data[1..5].try_into().expect("length checked"));
-            if !value.is_finite() || !(0.0..=100000.0).contains(&value) {
+            let value = read_f32(data, 1);
+            if !value.is_finite() || !(0.0..=100_000.0).contains(&value) {
                 return Err(Error::InvalidFormat(
                     "media volume out of range".to_string(),
                 ));

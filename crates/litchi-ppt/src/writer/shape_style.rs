@@ -5,11 +5,6 @@
 //!
 //! Reference: [MS-ODRAW] Section 2.3 - Property Tables
 
-// Shape styling structures don't need zerocopy for now
-
-use litchi_core::unit::{EMUS_PER_PT, pt_f32_to_emu_u32};
-use litchi_odraw::image::Id as PictureId;
-
 // =============================================================================
 // Escher Property IDs for Shape Styling (MS-ODRAW 2.3)
 // =============================================================================
@@ -97,6 +92,11 @@ pub mod shadow_prop {
     /// Shadow boolean properties
     pub const SHADOW_STYLE_BOOL: u16 = 0x023F;
 }
+
+// Shape styling structures don't need zerocopy for now
+
+use litchi_core::unit::{EMUS_PER_PT, pt_f32_to_emu_u32};
+use litchi_odraw::image::Id as PictureId;
 
 // =============================================================================
 // Fill Types
@@ -245,7 +245,7 @@ pub enum ArrowSize {
 // Color
 // =============================================================================
 
-/// Shape color (same format as TextColor but separate for clarity)
+/// Shape color (same format as `TextColor` but separate for clarity)
 #[derive(Debug, Clone, Copy)]
 pub struct ShapeColor {
     /// Red component (0-255)
@@ -256,7 +256,7 @@ pub struct ShapeColor {
     pub b: u8,
     /// Use scheme color instead of RGB
     pub use_scheme: bool,
-    /// Scheme color index (if use_scheme is true)
+    /// Scheme color index (if `use_scheme` is true)
     pub scheme_index: u8,
 }
 
@@ -290,6 +290,7 @@ impl ShapeColor {
     pub const LIGHT_GRAY: Self = Self::rgb(192, 192, 192);
 
     /// Create an RGB color
+    #[must_use]
     pub const fn rgb(r: u8, g: u8, b: u8) -> Self {
         Self {
             r,
@@ -301,6 +302,7 @@ impl ShapeColor {
     }
 
     /// Create from hex value (0xRRGGBB)
+    #[must_use]
     pub const fn from_hex(hex: u32) -> Self {
         Self::rgb(
             ((hex >> 16) & 0xFF) as u8,
@@ -310,6 +312,7 @@ impl ShapeColor {
     }
 
     /// Create a scheme color reference
+    #[must_use]
     pub const fn scheme(index: u8) -> Self {
         Self {
             r: 0,
@@ -321,27 +324,31 @@ impl ShapeColor {
     }
 
     /// Scheme fill color (index 4)
+    #[must_use]
     pub const fn scheme_fill() -> Self {
         Self::scheme(4)
     }
 
     /// Scheme line color (index 1)
+    #[must_use]
     pub const fn scheme_line() -> Self {
         Self::scheme(1)
     }
 
     /// Scheme shadow color (index 2)
+    #[must_use]
     pub const fn scheme_shadow() -> Self {
         Self::scheme(2)
     }
 
-    /// Convert to RGB format for PPT (PowerPoint uses RedGreenBlue format)
+    /// Convert to RGB format for PPT (`PowerPoint` uses `RedGreenBlue` format)
+    #[must_use]
     pub fn to_rgbx(&self) -> u32 {
         if self.use_scheme {
-            0x0800_0000 | (self.scheme_index as u32)
+            0x0800_0000 | u32::from(self.scheme_index)
         } else {
             // PPT uses RGB: Red in byte 0, Green in byte 1, Blue in byte 2
-            (self.r as u32) | ((self.g as u32) << 8) | ((self.b as u32) << 16)
+            u32::from(self.r) | (u32::from(self.g) << 8) | (u32::from(self.b) << 16)
         }
     }
 }
@@ -377,6 +384,7 @@ pub struct FillStyle {
 
 impl FillStyle {
     /// No fill
+    #[must_use]
     pub fn none() -> Self {
         Self {
             fill_type: FillType::Solid,
@@ -390,6 +398,7 @@ impl FillStyle {
     }
 
     /// Solid fill with color
+    #[must_use]
     pub fn solid(color: ShapeColor) -> Self {
         Self {
             fill_type: FillType::Solid,
@@ -403,16 +412,19 @@ impl FillStyle {
     }
 
     /// Solid fill from RGB
+    #[must_use]
     pub fn solid_rgb(r: u8, g: u8, b: u8) -> Self {
         Self::solid(ShapeColor::rgb(r, g, b))
     }
 
     /// Solid fill from hex
+    #[must_use]
     pub fn solid_hex(hex: u32) -> Self {
         Self::solid(ShapeColor::from_hex(hex))
     }
 
     /// Gradient fill
+    #[must_use]
     pub fn gradient(color1: ShapeColor, color2: ShapeColor, angle: i16) -> Self {
         Self {
             fill_type: FillType::Shade,
@@ -426,6 +438,7 @@ impl FillStyle {
     }
 
     /// Picture fill
+    #[must_use]
     pub fn picture(id: PictureId) -> Self {
         Self {
             fill_type: FillType::Picture,
@@ -439,12 +452,14 @@ impl FillStyle {
     }
 
     /// Set opacity (0-100)
+    #[must_use]
     pub fn with_opacity(mut self, opacity: u8) -> Self {
         self.opacity = opacity.min(100);
         self
     }
 
     /// Build Escher properties for this fill
+    #[must_use]
     pub fn build_properties(&self) -> Vec<(u16, u32)> {
         let mut props = Vec::new();
 
@@ -465,7 +480,7 @@ impl FillStyle {
 
         // Opacity (convert 0-100 to 0-65536)
         if self.opacity < 100 {
-            let opacity_value = ((self.opacity as u32) * 65536) / 100;
+            let opacity_value = (u32::from(self.opacity) * 65536) / 100;
             props.push((fill_prop::FILL_OPACITY, opacity_value));
         }
 
@@ -476,7 +491,7 @@ impl FillStyle {
 
         // Gradient angle
         if let Some(angle) = self.gradient_angle {
-            let angle_value = (angle as i32 * 65536) as u32;
+            let angle_value = (i32::from(angle) * 65536).cast_unsigned();
             props.push((fill_prop::FILL_ANGLE, angle_value));
         }
 
@@ -540,6 +555,7 @@ pub struct LineStyleConfig {
 
 impl LineStyleConfig {
     /// No line
+    #[must_use]
     pub fn none() -> Self {
         Self {
             color: ShapeColor::TRANSPARENT,
@@ -560,6 +576,11 @@ impl LineStyleConfig {
     }
 
     /// Default line (1pt black)
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "`EMUS_PER_PT` is the constant 12_700, which always fits u32"
+    )]
+    #[must_use]
     pub fn default_line() -> Self {
         Self {
             color: ShapeColor::scheme_line(),
@@ -580,6 +601,7 @@ impl LineStyleConfig {
     }
 
     /// Create line with color and width in points
+    #[must_use]
     pub fn with_color_and_width(color: ShapeColor, width_pt: f32) -> Self {
         Self {
             color,
@@ -600,30 +622,35 @@ impl LineStyleConfig {
     }
 
     /// Set width in points
+    #[must_use]
     pub fn width_pt(mut self, points: f32) -> Self {
         self.width = pt_f32_to_emu_u32(points);
         self
     }
 
     /// Set dash style
+    #[must_use]
     pub fn dashed(mut self, style: LineDashStyle) -> Self {
         self.dash = style;
         self
     }
 
     /// Set start arrow
+    #[must_use]
     pub fn start_arrow(mut self, style: ArrowStyle) -> Self {
         self.start_arrow = style;
         self
     }
 
     /// Set end arrow
+    #[must_use]
     pub fn end_arrow(mut self, style: ArrowStyle) -> Self {
         self.end_arrow = style;
         self
     }
 
     /// Build Escher properties for this line
+    #[must_use]
     pub fn build_properties(&self) -> Vec<(u16, u32)> {
         let mut props = Vec::new();
 
@@ -641,7 +668,7 @@ impl LineStyleConfig {
 
         // Opacity
         if self.opacity < 100 {
-            let opacity_value = ((self.opacity as u32) * 65536) / 100;
+            let opacity_value = (u32::from(self.opacity) * 65536) / 100;
             props.push((line_prop::LINE_OPACITY, opacity_value));
         }
 
@@ -743,6 +770,7 @@ pub struct ShadowStyle {
 
 impl ShadowStyle {
     /// No shadow
+    #[must_use]
     pub fn none() -> Self {
         Self {
             shadow_type: ShadowType::Offset,
@@ -755,6 +783,7 @@ impl ShadowStyle {
     }
 
     /// Default drop shadow
+    #[must_use]
     pub fn drop_shadow() -> Self {
         Self {
             shadow_type: ShadowType::Offset,
@@ -767,6 +796,7 @@ impl ShadowStyle {
     }
 
     /// Custom shadow
+    #[must_use]
     pub fn custom(color: ShapeColor, offset_x: i32, offset_y: i32, opacity: u8) -> Self {
         Self {
             shadow_type: ShadowType::Offset,
@@ -779,6 +809,7 @@ impl ShadowStyle {
     }
 
     /// Build Escher properties for this shadow
+    #[must_use]
     pub fn build_properties(&self) -> Vec<(u16, u32)> {
         let mut props = Vec::new();
 
@@ -797,11 +828,11 @@ impl ShadowStyle {
         props.push((shadow_prop::SHADOW_COLOR, self.color.to_rgbx()));
 
         // Offsets
-        props.push((shadow_prop::SHADOW_OFFSET_X, self.offset_x as u32));
-        props.push((shadow_prop::SHADOW_OFFSET_Y, self.offset_y as u32));
+        props.push((shadow_prop::SHADOW_OFFSET_X, self.offset_x.cast_unsigned()));
+        props.push((shadow_prop::SHADOW_OFFSET_Y, self.offset_y.cast_unsigned()));
 
         // Opacity
-        let opacity_value = ((self.opacity as u32) * 65536) / 100;
+        let opacity_value = (u32::from(self.opacity) * 65536) / 100;
         props.push((shadow_prop::SHADOW_OPACITY, opacity_value));
 
         // Boolean properties (shadow enabled)
@@ -837,29 +868,34 @@ pub struct ShapeStyle {
 
 impl ShapeStyle {
     /// Create new empty style
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Set fill
+    #[must_use]
     pub fn with_fill(mut self, fill: FillStyle) -> Self {
         self.fill = fill;
         self
     }
 
     /// Set line
+    #[must_use]
     pub fn with_line(mut self, line: LineStyleConfig) -> Self {
         self.line = line;
         self
     }
 
     /// Set shadow
+    #[must_use]
     pub fn with_shadow(mut self, shadow: ShadowStyle) -> Self {
         self.shadow = shadow;
         self
     }
 
     /// No fill, default line
+    #[must_use]
     pub fn no_fill() -> Self {
         Self {
             fill: FillStyle::none(),
@@ -869,6 +905,7 @@ impl ShapeStyle {
     }
 
     /// Solid fill, no line
+    #[must_use]
     pub fn solid_no_line(color: ShapeColor) -> Self {
         Self {
             fill: FillStyle::solid(color),
@@ -878,6 +915,7 @@ impl ShapeStyle {
     }
 
     /// Build all Escher properties
+    #[must_use]
     pub fn build_properties(&self) -> Vec<(u16, u32)> {
         let mut props = Vec::new();
         props.extend(self.fill.build_properties());
@@ -892,6 +930,11 @@ impl ShapeStyle {
 // =============================================================================
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -899,18 +942,18 @@ mod tests {
     fn test_shape_color() {
         // Red = RGB(255, 0, 0) -> OfficeArt COLORREF stores R in byte 0, G in byte 1, B in byte 2
         let red = ShapeColor::RED;
-        assert_eq!(red.to_rgbx(), 0x000000FF);
+        assert_eq!(red.to_rgbx(), 0x0000_00FF);
 
         // 0x336699 = RGB(0x33, 0x66, 0x99) -> 0x00996633 in COLORREF byte layout
-        let hex = ShapeColor::from_hex(0x336699);
+        let hex = ShapeColor::from_hex(0x33_6699);
         assert_eq!(hex.r, 0x33);
         assert_eq!(hex.g, 0x66);
         assert_eq!(hex.b, 0x99);
-        assert_eq!(hex.to_rgbx(), 0x00996633);
+        assert_eq!(hex.to_rgbx(), 0x0099_6633);
 
         let scheme = ShapeColor::scheme_fill();
         assert!(scheme.use_scheme);
-        assert_eq!(scheme.to_rgbx(), 0x08000004);
+        assert_eq!(scheme.to_rgbx(), 0x0800_0004);
     }
 
     #[test]

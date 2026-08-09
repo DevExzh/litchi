@@ -42,7 +42,11 @@ impl Limits {
     }
 }
 
-/// Load the inert OLE inventory for one PresentationML slide.
+/// Load the inert OLE inventory for one `PresentationML` slide.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load_slide(
     package: &OpcPackage,
     slide_index: usize,

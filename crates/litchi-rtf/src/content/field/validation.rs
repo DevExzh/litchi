@@ -1,4 +1,4 @@
-use super::model::*;
+use super::model::{PageBreak, StoryEvent};
 
 pub(crate) fn validate_story_events(
     text: &str,

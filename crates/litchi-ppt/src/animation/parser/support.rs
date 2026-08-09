@@ -54,7 +54,7 @@ pub(super) fn require_header(
     if record.version != version
         || record.instance != instance
         || record.data_length as usize != record.data.len()
-        || length.is_some_and(|length| record.data.len() != length)
+        || length.is_some_and(|expected_length| record.data.len() != expected_length)
     {
         return Err(Error::Corrupted(format!(
             "invalid {name} header: version {}, instance {}, length {}",
@@ -95,14 +95,37 @@ pub(super) fn parse_optional_time_value<T>(
     }
 }
 
+pub(super) fn read_u16(data: &[u8], offset: usize) -> u16 {
+    u16::from_le_bytes([data[offset], data[offset + 1]])
+}
+
+pub(super) fn read_i16(data: &[u8], offset: usize) -> i16 {
+    i16::from_le_bytes([data[offset], data[offset + 1]])
+}
+
 pub(super) fn read_u32(data: &[u8], offset: usize) -> u32 {
-    u32::from_le_bytes(data[offset..offset + 4].try_into().expect("length checked"))
+    u32::from_le_bytes([
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+    ])
 }
 
 pub(super) fn read_i32(data: &[u8], offset: usize) -> i32 {
-    i32::from_le_bytes(data[offset..offset + 4].try_into().expect("length checked"))
+    i32::from_le_bytes([
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+    ])
 }
 
 pub(super) fn read_f32(data: &[u8], offset: usize) -> f32 {
-    f32::from_le_bytes(data[offset..offset + 4].try_into().expect("length checked"))
+    f32::from_le_bytes([
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+    ])
 }

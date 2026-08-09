@@ -9,12 +9,16 @@ pub(crate) fn build_shape_properties(shape: &UserShapeData) -> Vec<Property> {
     let mut props = Vec::with_capacity(16);
 
     if let Some(rotation) = shape.rotation {
-        props.push(Property::new(prop_id::ROTATION, rotation as u32));
+        props.push(Property::new(prop_id::ROTATION, rotation.cast_unsigned()));
     }
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "shape validation caps adjustment values at 10 entries"
+    )]
     for (index, &value) in shape.adjust_values.iter().enumerate() {
         props.push(Property::new(
             prop_id::ADJUST_VALUE + index as u16,
-            value as u32,
+            value.cast_unsigned(),
         ));
     }
 
@@ -40,7 +44,7 @@ pub(crate) fn build_shape_properties(shape: &UserShapeData) -> Vec<Property> {
             props.push(Property::new(prop_id::FILL_BACK_COLOR, back_color));
         }
         if let Some(angle) = shape.fill_angle {
-            props.push(Property::new(prop_id::FILL_ANGLE, angle as u32));
+            props.push(Property::new(prop_id::FILL_ANGLE, angle.cast_unsigned()));
         }
         if let Some(opacity) = shape.fill_opacity {
             props.push(Property::new(prop_id::FILL_OPACITY, opacity));
@@ -69,7 +73,7 @@ pub(crate) fn build_shape_properties(shape: &UserShapeData) -> Vec<Property> {
             props.push(Property::new(prop_id::LINE_OPACITY, opacity));
         }
         if let Some(width) = shape.line_width {
-            props.push(Property::new(prop_id::LINE_WIDTH, width as u32));
+            props.push(Property::new(prop_id::LINE_WIDTH, width.cast_unsigned()));
         }
         if let Some(style) = shape.line_style {
             props.push(Property::new(prop_id::LINE_STYLE, style));
@@ -123,11 +127,11 @@ pub(crate) fn build_shape_properties(shape: &UserShapeData) -> Vec<Property> {
         ));
         props.push(Property::new(
             prop_id::SHADOW_OFFSET_X,
-            shape.shadow_offset_x.unwrap_or(25400) as u32,
+            shape.shadow_offset_x.unwrap_or(25400).cast_unsigned(),
         ));
         props.push(Property::new(
             prop_id::SHADOW_OFFSET_Y,
-            shape.shadow_offset_y.unwrap_or(25400) as u32,
+            shape.shadow_offset_y.unwrap_or(25400).cast_unsigned(),
         ));
         if let Some(opacity) = shape.shadow_opacity {
             props.push(Property::new(prop_id::SHADOW_OPACITY, opacity));

@@ -47,6 +47,24 @@ impl Master {
         self.package.metadata()
     }
 
+    /// Returns the projected document title, if the package has metadata.
+    #[must_use]
+    pub fn title(&self) -> Option<&str> {
+        self.metadata()
+            .and_then(|metadata| metadata.title.as_deref())
+    }
+
+    /// Returns subdocument references in document order.
+    ///
+    /// Targets are classified but never opened, resolved, fetched, or
+    /// executed. The snapshot is intentionally read-only because the current
+    /// archive adapter cannot rewrite this XML dependency closure without
+    /// normalizing unknown package records.
+    #[must_use]
+    pub fn subdocuments(&self) -> &[crate::model::subdocument::Reference] {
+        self.package.references()
+    }
+
     /// Returns the raw package bytes.
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {

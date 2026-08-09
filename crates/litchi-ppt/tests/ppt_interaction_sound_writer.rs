@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use litchi_ppt::animation::{AnimationInfo, AnimationSound, BuiltinSound};
 use litchi_ppt::writer::Writer;
 use litchi_ppt::{
@@ -56,14 +62,14 @@ fn action_only_builtin_sounds_are_collected_remapped_and_repeatable() {
     assert_eq!(sounds.sound_id_seed, 2);
     assert_eq!(sounds.sounds.len(), 2);
 
-    let slide = &presentation.slides().unwrap()[0];
-    let shape = &slide.shape_interactions().unwrap()[0].interactions[0];
+    let read_slide = &presentation.slides().unwrap()[0];
+    let shape = &read_slide.shape_interactions().unwrap()[0].interactions[0];
     let shape_sound = shape.sound(&sounds).unwrap();
     assert_eq!(shape_sound.name, "Click");
     assert_eq!(shape_sound.builtin_id, Some(BuiltinId::Click));
     shape.validate_sound_collection(&sounds).unwrap();
 
-    let text = &slide.shape_text_interactions().unwrap()[0].interactions[0].interaction;
+    let text = &read_slide.shape_text_interactions().unwrap()[0].interactions[0].interaction;
     let text_sound = text.sound(&sounds).unwrap();
     assert_eq!(text_sound.name, "Whoosh");
     assert_eq!(text_sound.builtin_id, Some(BuiltinId::Whoosh));
@@ -110,11 +116,11 @@ fn embedded_animation_sound_can_be_shared_by_shape_action() {
     assert_eq!(sounds.sounds[0].name, "Custom tone");
     assert_eq!(sounds.sounds[0].data, minimal_wave());
 
-    let slide = &presentation.slides().unwrap()[0];
-    let interaction = &slide.shape_interactions().unwrap()[0].interactions[0];
-    assert_eq!(interaction.sound(&sounds).unwrap().name, "Custom tone");
-    let animation = &slide.animations().unwrap()[0].animation;
-    let atom = animation.legacy_atom.as_ref().unwrap();
+    let read_slide = &presentation.slides().unwrap()[0];
+    let read_interaction = &read_slide.shape_interactions().unwrap()[0].interactions[0];
+    assert_eq!(read_interaction.sound(&sounds).unwrap().name, "Custom tone");
+    let read_animation = &read_slide.animations().unwrap()[0].animation;
+    let atom = read_animation.legacy_atom.as_ref().unwrap();
     assert!(atom.has_sound);
     assert_eq!(atom.sound_id_ref, sounds.sounds[0].id);
 }

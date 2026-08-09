@@ -6,6 +6,10 @@ use std::fmt::Write;
 
 /// Generate a minimal, valid XLSX package containing one worksheet of chart
 /// data. The chart itself is intentionally not coupled to a PPTX chart part.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn generate(chart: &Chart) -> Result<Vec<u8>> {
     chart.validate()?;
     let mut writer = PhysPkgWriter::new();
@@ -70,7 +74,7 @@ fn worksheet(chart: &Chart) -> String {
     let mut xml = String::with_capacity(4096);
     xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1">"#);
     for (index, series) in chart.series.iter().enumerate() {
-        let _ = write!(
+        let _result = write!(
             xml,
             r#"<c r="{}1" t="inlineStr"><is><t>{}</t></is></c>"#,
             column(index + 1),
@@ -80,13 +84,13 @@ fn worksheet(chart: &Chart) -> String {
     xml.push_str("</row>");
     for row in 0..rows {
         let number = row + 2;
-        let _ = write!(xml, r#"<row r="{number}">"#);
+        let _result = write!(xml, r#"<row r="{number}">"#);
         if let Some(category) = chart
             .series
             .first()
             .and_then(|series| series.categories.get(row))
         {
-            let _ = write!(
+            let _result = write!(
                 xml,
                 r#"<c r="A{number}" t="inlineStr"><is><t>{}</t></is></c>"#,
                 escape(category)
@@ -94,7 +98,7 @@ fn worksheet(chart: &Chart) -> String {
         }
         for (index, series) in chart.series.iter().enumerate() {
             if let Some(value) = series.values.get(row) {
-                let _ = write!(
+                let _result = write!(
                     xml,
                     r#"<c r="{}{number}"><v>{value}</v></c>"#,
                     column(index + 1)
@@ -133,7 +137,7 @@ fn xy_worksheet(chart: &Chart) -> String {
         } else {
             vec![(0, " X"), (1, "")]
         } {
-            let _ = write!(
+            let _result = write!(
                 xml,
                 r#"<c r="{}1" t="inlineStr"><is><t>{}{suffix}</t></is></c>"#,
                 column(first + offset),
@@ -144,7 +148,7 @@ fn xy_worksheet(chart: &Chart) -> String {
     xml.push_str("</row>");
     for row in 0..rows {
         let number = row + 2;
-        let _ = write!(xml, r#"<row r="{number}">"#);
+        let _result = write!(xml, r#"<row r="{number}">"#);
         for (series_index, series) in chart.series.iter().enumerate() {
             let first = series_index * stride;
             let x_value = series.x_values.get(row).copied().or_else(|| {
@@ -157,21 +161,21 @@ fn xy_worksheet(chart: &Chart) -> String {
                 })
             });
             if let Some(value) = x_value {
-                let _ = write!(
+                let _result = write!(
                     xml,
                     r#"<c r="{}{number}"><v>{value}</v></c>"#,
                     column(first)
                 );
             }
             if let Some(value) = series.values.get(row) {
-                let _ = write!(
+                let _result = write!(
                     xml,
                     r#"<c r="{}{number}"><v>{value}</v></c>"#,
                     column(first + 1)
                 );
             }
             if bubble && let Some(value) = series.bubble_sizes.get(row) {
-                let _ = write!(
+                let _result = write!(
                     xml,
                     r#"<c r="{}{number}"><v>{value}</v></c>"#,
                     column(first + 2)
@@ -206,6 +210,11 @@ fn escape(value: &str) -> String {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use litchi_opc::OpcPackage;

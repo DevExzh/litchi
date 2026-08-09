@@ -27,6 +27,10 @@ fn limit(what: &str) -> Error {
 }
 
 /// Load every synchronization part and validate its slide relationship graph.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load(package: &OpcPackage) -> Result<Vec<Part>> {
     if package
         .rels()
@@ -121,6 +125,10 @@ pub fn load(package: &OpcPackage) -> Result<Vec<Part>> {
 }
 
 /// Attach one synchronization part to its source slide.
+///
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn store(package: &mut OpcPackage, value: &Part) -> Result<()> {
     validate_ncname(&value.relationship_id)?;
     let slide_name = &value.slide_part_name;

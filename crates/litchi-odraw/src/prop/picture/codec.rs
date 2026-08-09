@@ -7,11 +7,6 @@ const IS_COMPLEX: u16 = 0x8000;
 const PROPERTY_ID_MASK: u16 = 0x3FFF;
 const MAX_PROPERTIES: usize = 0x0FFF;
 
-/// Parses one Opt-family record as an immutable picture metadata snapshot.
-pub fn parse<'data>(record: &Record<'data>) -> Result<Snapshot<'data>> {
-    Snapshot::parse(record)
-}
-
 /// An immutable picture metadata snapshot backed by the caller's record bytes.
 #[derive(Debug)]
 pub struct Snapshot<'data> {
@@ -21,6 +16,12 @@ pub struct Snapshot<'data> {
 
 impl<'data> Snapshot<'data> {
     /// Parses and validates picture-name metadata without copying source bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::MalformedProperties` when the record exceeds the safe
+    /// property-record bound, or an error from property parsing or picture
+    /// metadata validation when the name or flags are malformed.
     pub fn parse(record: &Record<'data>) -> Result<Self> {
         if record.data().len() > MAX_SNAPSHOT_BYTES {
             return Err(Error::MalformedProperties {
@@ -48,12 +49,23 @@ impl<'data> Snapshot<'data> {
     }
 
     /// Returns the typed picture-name projection, if this table contains one.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::MalformedProperties` when the picture name or flags
+    /// violate their `[MS-ODRAW]` invariants.
     pub fn metadata(&self) -> Result<Option<Metadata<'data>>> {
         decode(&self.properties)
     }
 
     /// Returns the exact source record bytes reconstructed from its checked
     /// header fields and borrowed body.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::MalformedProperties` or `Error::ArithmeticOverflow`
+    /// when the reconstructed property table exceeds the `OfficeArt` header
+    /// or snapshot bounds.
     pub fn encode(&self) -> Result<Vec<u8>> {
         encode_record(&self.record, entries(&self.properties)?)
     }
@@ -97,6 +109,12 @@ impl Owned {
     }
 
     /// Borrows the committed bytes as a fresh immutable semantic snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::TrailingData` when the committed record does not
+    /// consume every byte, or an error from [`Snapshot::parse`] when the
+    /// picture metadata is malformed.
     pub fn snapshot(&self) -> Result<Snapshot<'_>> {
         let (record, consumed) = Record::parse(&self.bytes, 0)?;
         if consumed != self.bytes.len() {
@@ -169,6 +187,11 @@ pub struct Edit<'snapshot, 'data> {
 
 impl Edit<'_, '_> {
     /// Replaces the picture comment, file name, or URL with checked text.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::MalformedProperties` when the text contains an
+    /// interior NUL or exceeds the bounded UTF-16 name length.
     pub fn set_name(&mut self, text: &str) -> Result<&mut Self> {
         self.name = Some(NameChange::Set(encode_name(text)?));
         Ok(self)
@@ -187,6 +210,13 @@ impl Edit<'_, '_> {
     }
 
     /// Validates and commits the edit without mutating its source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::MalformedProperties` when the source metadata or the
+    /// edited name violates its `[MS-ODRAW]` invariants, or
+    /// `Error::ArithmeticOverflow` when the reconstructed record exceeds the
+    /// `OfficeArt` header bounds.
     pub fn commit(self) -> Result<Commit> {
         let before_name = self
             .source
@@ -240,6 +270,16 @@ struct Entry {
     complex: Option<Vec<u8>>,
 }
 
+/// Parses one Opt-family record as an immutable picture metadata snapshot.
+///
+/// # Errors
+///
+/// Returns an error from [`Snapshot::parse`] when the record exceeds the
+/// safe property-record bound or its picture metadata is malformed.
+pub fn parse<'data>(record: &Record<'data>) -> Result<Snapshot<'data>> {
+    Snapshot::parse(record)
+}
+
 fn entries(properties: &Props<'_>) -> Result<Vec<Entry>> {
     properties
         .iter()
@@ -263,8 +303,8 @@ fn apply_name(entries: &mut Vec<Entry>, change: &NameChange) -> Result<()> {
         .iter()
         .position(|entry| entry.opid & PROPERTY_ID_MASK == Id::PictureFileName.raw());
     match (index, change) {
-        (Some(index), NameChange::Set(bytes)) => {
-            let entry = &mut entries[index];
+        (Some(slot), NameChange::Set(bytes)) => {
+            let entry = &mut entries[slot];
             entry.opid |= IS_COMPLEX;
             entry.value =
                 i32::try_from(bytes.len()).map_err(|_err| Error::MalformedProperties {
@@ -272,8 +312,8 @@ fn apply_name(entries: &mut Vec<Entry>, change: &NameChange) -> Result<()> {
                 })?;
             entry.complex = Some(bytes.clone());
         },
-        (Some(index), NameChange::Clear) => {
-            let entry = &mut entries[index];
+        (Some(slot), NameChange::Clear) => {
+            let entry = &mut entries[slot];
             entry.opid &= !IS_COMPLEX;
             entry.value = 0;
             entry.complex = None;
@@ -297,15 +337,15 @@ fn apply_flags(entries: &mut Vec<Entry>, flags: Flags) {
     let index = entries
         .iter()
         .position(|entry| entry.opid & PROPERTY_ID_MASK == Id::BlipFlags.raw());
-    if let Some(index) = index {
-        let entry = &mut entries[index];
+    if let Some(slot) = index {
+        let entry = &mut entries[slot];
         entry.opid &= !IS_COMPLEX;
-        entry.value = flags.raw() as i32;
+        entry.value = flags.raw().cast_signed();
         entry.complex = None;
     } else {
         entries.push(Entry {
             opid: Id::BlipFlags.raw(),
-            value: flags.raw() as i32,
+            value: flags.raw().cast_signed(),
             complex: None,
         });
     }
@@ -317,7 +357,7 @@ fn raw_flags(property: &Prop<'_>) -> Result<u32> {
             reason: "picture flags must be a simple property",
         });
     }
-    Ok(property.raw_value() as u32)
+    Ok(property.raw_value().cast_unsigned())
 }
 
 fn encode_record(record: &Record<'_>, entries: Vec<Entry>) -> Result<Vec<u8>> {

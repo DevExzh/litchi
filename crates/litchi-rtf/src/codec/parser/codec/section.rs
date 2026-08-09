@@ -1,6 +1,18 @@
-use super::*;
+#![allow(
+    clippy::shadow_reuse,
+    reason = "decoding steps deliberately rebind a working value as it is refined through the parse pipeline"
+)]
+use super::{
+    ControlWord, Destination, MAX_SECTIONS, ParsedBodyStoryEvent, Parser, RtfError, RtfResult,
+    TextDirection, Token, is_section_control, nonnegative_author_index, paper_source_bin,
+    parser_classification_error, require_parameterless, section_style_reference,
+};
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn apply_review_display_control(
         &mut self,
         control: &ControlWord<'_>,
@@ -35,6 +47,10 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn apply_document_view_control(
         &mut self,
         control: &ControlWord<'_>,
@@ -75,7 +91,7 @@ impl<'a> Parser<'a> {
                 self.document_view.kind = Some(crate::DocumentViewKind::from_rtf(value)?);
             },
             ControlWord::DocumentViewScale(_) => {
-                let value = u16::try_from(value).map_err(|_| {
+                let value = u16::try_from(value).map_err(|_err| {
                     RtfError::MalformedDocument(format!(
                         "RTF viewscale must be in 1..={}",
                         crate::MAX_DOCUMENT_VIEW_SCALE_PERCENT
@@ -111,6 +127,10 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn apply_document_hyphenation_control(
         &mut self,
         control: &ControlWord<'_>,
@@ -149,7 +169,7 @@ impl<'a> Parser<'a> {
                     )
                 })?;
                 self.hyphenation.consecutive_line_limit =
-                    Some(u32::try_from(value).map_err(|_| {
+                    Some(u32::try_from(value).map_err(|_err| {
                         RtfError::MalformedDocument(format!(
                             "RTF hyphconsec must be in 0..={}",
                             crate::MAX_HYPHENATION_CONSECUTIVE_LINES
@@ -162,7 +182,7 @@ impl<'a> Parser<'a> {
                         "RTF hyphhotz requires a numeric parameter".to_string(),
                     )
                 })?;
-                let value = u32::try_from(value).map_err(|_| {
+                let value = u32::try_from(value).map_err(|_err| {
                     RtfError::MalformedDocument("RTF hyphhotz cannot be negative".to_string())
                 })?;
                 if value > crate::MAX_HYPHENATION_HOT_ZONE_TWIPS {
@@ -212,7 +232,8 @@ impl<'a> Parser<'a> {
             section.properties.margin_gutter = self
                 .print_layout_settings
                 .document_gutter_twips
-                .unwrap_or_default() as i32;
+                .unwrap_or_default()
+                .cast_signed();
         }
         let section_index = self.sections.len();
         self.sections.push(section);
@@ -223,6 +244,15 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "adjacent range checks bound each narrowing conversion to the target type's range"
+    )]
     pub(super) fn apply_section_control(&mut self, control: &ControlWord<'_>) -> RtfResult<bool> {
         use super::super::super::section::{PageOrientation, SectionBreakType, VerticalAlignment};
 
@@ -351,7 +381,7 @@ impl<'a> Parser<'a> {
                 properties.section_style = Some(section_style_reference(*value)?);
             },
             ControlWord::SectionRsid(value) => {
-                properties.section_rsid = Some(*value as u32);
+                properties.section_rsid = Some((*value).cast_unsigned());
             },
             ControlWord::TitlePage => properties.title_page = true,
             ControlWord::SectionEndnoteHere => properties.note_options.endnote_here = true,
@@ -360,7 +390,8 @@ impl<'a> Parser<'a> {
                 properties.margin_gutter = self
                     .print_layout_settings
                     .document_gutter_twips
-                    .unwrap_or_default() as i32;
+                    .unwrap_or_default()
+                    .cast_signed();
                 self.states
                     .last_mut()
                     .ok_or_else(|| RtfError::ParserError("missing RTF parser state".to_string()))?
@@ -441,7 +472,7 @@ impl<'a> Parser<'a> {
             ControlWord::Landscape => properties.orientation = PageOrientation::Landscape,
             ControlWord::Columns(value) => {
                 let value = value.unwrap_or(1);
-                let count = u16::try_from(value).map_err(|_| {
+                let count = u16::try_from(value).map_err(|_err| {
                     RtfError::MalformedDocument(format!(
                         "RTF section-column count must be in 1..={}",
                         super::super::super::section::MAX_SECTION_COLUMNS
@@ -476,7 +507,7 @@ impl<'a> Parser<'a> {
                         "RTF colno requires a numeric parameter".to_string(),
                     )
                 })?;
-                let number = u16::try_from(value).map_err(|_| {
+                let number = u16::try_from(value).map_err(|_err| {
                     RtfError::MalformedDocument(
                         "RTF colno must select an existing one-based section column".to_string(),
                     )
@@ -590,7 +621,7 @@ impl<'a> Parser<'a> {
             },
             ControlWord::SectionDefaultColumns(param) => {
                 require_parameterless(*param, "sectdefaultcl")?;
-                properties.columns = Default::default();
+                properties.columns = crate::SectionColumns::default();
             },
             ControlWord::PageNumberFormat(format) => {
                 properties.page_number_format = *format;
@@ -674,14 +705,15 @@ impl<'a> Parser<'a> {
             },
             ControlWord::LineNumberStart(value) => {
                 let value = value.unwrap_or(1);
-                if value <= 0 || value as u32 > super::super::super::section::MAX_SECTION_LINE_START
+                if value <= 0
+                    || value.cast_unsigned() > super::super::super::section::MAX_SECTION_LINE_START
                 {
                     return Err(RtfError::MalformedDocument(format!(
                         "RTF starting line number must be in 1..={}",
                         super::super::super::section::MAX_SECTION_LINE_START
                     )));
                 }
-                properties.line_numbering.start = Some(value as u32);
+                properties.line_numbering.start = Some(value.cast_unsigned());
             },
             ControlWord::LineNumberRestartSection => {
                 properties.line_numbering.restart =
@@ -700,6 +732,10 @@ impl<'a> Parser<'a> {
         Ok(true)
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn parse_page_border_run(&mut self) -> RtfResult<crate::PageBorder> {
         let mut border = crate::PageBorder::default();
         let mut saw_style = false;
@@ -775,7 +811,7 @@ impl<'a> Parser<'a> {
                             "RTF brdrart requires a numeric parameter".to_string(),
                         )
                     })?;
-                    border.art = Some(u8::try_from(value).map_err(|_| {
+                    border.art = Some(u8::try_from(value).map_err(|_err| {
                         RtfError::MalformedDocument("invalid RTF page-border art".to_string())
                     })?);
                     saw_style = true;
@@ -791,7 +827,7 @@ impl<'a> Parser<'a> {
                             "RTF page brdrw requires a numeric parameter".to_string(),
                         )
                     })?)
-                    .map_err(|_| {
+                    .map_err(|_err| {
                         RtfError::MalformedDocument("invalid RTF page-border width".to_string())
                     })?;
                     seen |= 1;
@@ -807,7 +843,7 @@ impl<'a> Parser<'a> {
                             "RTF page brdrcf requires a numeric parameter".to_string(),
                         )
                     })?)
-                    .map_err(|_| {
+                    .map_err(|_err| {
                         RtfError::MalformedDocument("invalid RTF page-border color".to_string())
                     })?;
                     seen |= 2;
@@ -823,7 +859,7 @@ impl<'a> Parser<'a> {
                             "RTF page brsp requires a numeric parameter".to_string(),
                         )
                     })?)
-                    .map_err(|_| {
+                    .map_err(|_err| {
                         RtfError::MalformedDocument("invalid RTF page-border spacing".to_string())
                     })?;
                     seen |= 4;

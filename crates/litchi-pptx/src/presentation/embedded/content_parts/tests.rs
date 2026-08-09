@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::{
     Anchor, Limits, Payload, Relationship, Snapshot, Target, TargetMode, apply_commit, apply_patch,
     load_slide, load_snapshot,

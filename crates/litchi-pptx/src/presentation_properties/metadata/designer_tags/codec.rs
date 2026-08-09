@@ -129,7 +129,7 @@ pub(crate) fn locate(xml: &[u8], slide_id: u32, limits: Limits) -> Result<Locate
             .ok_or_else(|| invalid("p:sldId is missing its unqualified id attribute"))?;
         let id = raw_id
             .parse::<u32>()
-            .map_err(|_| invalid("p:sldId has an invalid numeric id"))?;
+            .map_err(|_err| invalid("p:sldId has an invalid numeric id"))?;
         if !(256..2_147_483_648).contains(&id) {
             return Err(invalid("p:sldId id is outside ST_SlideId"));
         }
@@ -543,10 +543,8 @@ fn attributes(
             if id.replace(value.into_owned()).is_some() {
                 return Err(invalid("element has duplicate unqualified id attributes"));
             }
-        } else if key == b"uri" {
-            if uri.replace(value.into_owned()).is_some() {
-                return Err(invalid("element has duplicate unqualified uri attributes"));
-            }
+        } else if key == b"uri" && uri.replace(value.into_owned()).is_some() {
+            return Err(invalid("element has duplicate unqualified uri attributes"));
         }
     }
     let relationship_id =
@@ -786,7 +784,7 @@ fn copy_name(value: &[u8], limits: Limits) -> Result<Vec<u8>> {
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("Designer-tag owner XML position does not fit usize"))
+        .map_err(|_err| invalid("Designer-tag owner XML position does not fit usize"))
 }
 
 struct Output {

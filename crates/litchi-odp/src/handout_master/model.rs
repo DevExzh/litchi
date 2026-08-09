@@ -60,6 +60,9 @@ impl Eq for Master {}
 
 impl Master {
     /// Create an empty schema-valid handout master.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(page_layout_name: impl Into<String>) -> Result<Self> {
         let value = Self {
             page_layout_name: page_layout_name.into(),
@@ -76,26 +79,41 @@ impl Master {
     }
 
     /// Parse one exact `style:handout-master` fragment.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn from_xml_fragment(xml: &str) -> Result<Self> {
         codec::parse_fragment(xml)
     }
 
     /// Return the exact source fragment or the next validated serialization.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn xml(&self) -> Result<String> {
         codec::write(self)
     }
 
     /// Serialize this master as one validated XML element.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn to_xml_fragment(&self) -> Result<String> {
         codec::write(self)
     }
 
     /// Validate semantic fields and every direct drawing child.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> Result<()> {
         super::validation::validate(self)
     }
 
     /// Append one direct drawing child after validating its complete XML.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_child(&mut self, child: Child) -> Result<()> {
         if child.kind != ChildKind::Shape {
             return Err(litchi_core::Error::InvalidFormat(
@@ -108,6 +126,9 @@ impl Master {
     }
 
     /// Replace the direct drawing-child list atomically.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_children(&mut self, children: Vec<Child>) -> Result<()> {
         let candidate = Self {
             children,
@@ -119,6 +140,9 @@ impl Master {
     }
 
     /// Resolve the optional presentation page-layout layer exactly once.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn resolve(&self, layouts: &Collection) -> Result<Resolved> {
         self.validate()?;
         let presentation_layout = self

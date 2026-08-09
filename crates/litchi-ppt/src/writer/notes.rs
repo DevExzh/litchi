@@ -5,6 +5,38 @@
 //!
 //! Reference: [MS-PPT] Section 2.5.5 - NotesContainer
 
+// =============================================================================
+// PPT Record Types for Notes
+// =============================================================================
+
+/// Record types for notes
+pub mod record_type {
+    /// Notes container (`RT_Notes`)
+    pub const NOTES: u16 = 0x03F0;
+    /// `NotesAtom`
+    pub const NOTES_ATOM: u16 = 0x03F1;
+    /// `PPDrawing` (contains Escher records)
+    pub const PP_DRAWING: u16 = 0x040C;
+    /// `TextHeader` (type of text)
+    pub const TEXT_HEADER_ATOM: u16 = 0x0F9F;
+    /// `TextCharsAtom` (UTF-16 text)
+    pub const TEXT_CHARS_ATOM: u16 = 0x0FA0;
+    /// `TextBytesAtom` (ASCII text)
+    pub const TEXT_BYTES_ATOM: u16 = 0x0FA8;
+    /// `StyleTextPropAtom`
+    pub const STYLE_TEXT_PROP_ATOM: u16 = 0x0FA1;
+    /// `ColorSchemeAtom`
+    pub const COLOR_SCHEME_ATOM: u16 = 0x07F0;
+    /// `SlideListWithText` for notes (instance=2)
+    pub const SLIDE_LIST_WITH_TEXT: u16 = 0x0FF0;
+    /// `SlidePersistAtom`
+    pub const SLIDE_PERSIST_ATOM: u16 = 0x03F3;
+    /// `TextRuler`
+    pub const TEXT_RULER_ATOM: u16 = 0x0FA2;
+    /// `NotesTextViewInfo`
+    pub const NOTES_TEXT_VIEW_INFO: u16 = 0x0413;
+}
+
 use std::io::Write;
 use zerocopy::IntoBytes as _;
 use zerocopy_derive::{Immutable, IntoBytes, KnownLayout};
@@ -14,42 +46,14 @@ use litchi_core::unit::ppt_master_i64_to_emu_i32;
 use super::text_format::Paragraph;
 
 // =============================================================================
-// PPT Record Types for Notes
-// =============================================================================
-
-/// Record types for notes
-pub mod record_type {
-    /// Notes container (RT_Notes)
-    pub const NOTES: u16 = 0x03F0;
-    /// NotesAtom
-    pub const NOTES_ATOM: u16 = 0x03F1;
-    /// PPDrawing (contains Escher records)
-    pub const PP_DRAWING: u16 = 0x040C;
-    /// TextHeader (type of text)
-    pub const TEXT_HEADER_ATOM: u16 = 0x0F9F;
-    /// TextCharsAtom (UTF-16 text)
-    pub const TEXT_CHARS_ATOM: u16 = 0x0FA0;
-    /// TextBytesAtom (ASCII text)
-    pub const TEXT_BYTES_ATOM: u16 = 0x0FA8;
-    /// StyleTextPropAtom
-    pub const STYLE_TEXT_PROP_ATOM: u16 = 0x0FA1;
-    /// ColorSchemeAtom
-    pub const COLOR_SCHEME_ATOM: u16 = 0x07F0;
-    /// SlideListWithText for notes (instance=2)
-    pub const SLIDE_LIST_WITH_TEXT: u16 = 0x0FF0;
-    /// SlidePersistAtom
-    pub const SLIDE_PERSIST_ATOM: u16 = 0x03F3;
-    /// TextRuler
-    pub const TEXT_RULER_ATOM: u16 = 0x0FA2;
-    /// NotesTextViewInfo
-    pub const NOTES_TEXT_VIEW_INFO: u16 = 0x0413;
-}
-
-// =============================================================================
 // NotesAtom (MS-PPT 2.5.5.1)
 // =============================================================================
 
-/// NotesAtom structure (8 bytes)
+/// `NotesAtom` structure (8 bytes)
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`NotesAtom` is the established public API name matching the MS-PPT record name"
+)]
 #[derive(Debug, Clone, Copy, IntoBytes, Immutable, KnownLayout)]
 #[repr(C, packed)]
 pub struct NotesAtom {
@@ -61,21 +65,11 @@ pub struct NotesAtom {
     pub reserved: u16,
 }
 
-impl NotesAtom {
-    /// Size of the atom data
-    pub const SIZE: usize = 8;
-
-    /// Create a new NotesAtom
-    pub fn new(slide_id_ref: u32) -> Self {
-        Self {
-            slide_id_ref,
-            flags: 0x0006, // fFollowMasterObjects | fFollowMasterScheme
-            reserved: 0,
-        }
-    }
-}
-
 /// Notes flags
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`notes_flags` mirrors the flag field of `NotesAtom`; renaming it would break downstream crates"
+)]
 pub mod notes_flags {
     /// Follow master objects
     pub const FOLLOW_MASTER_OBJECTS: u16 = 0x0001;
@@ -85,11 +79,30 @@ pub mod notes_flags {
     pub const FOLLOW_MASTER_BACKGROUND: u16 = 0x0004;
 }
 
+impl NotesAtom {
+    /// Size of the atom data
+    pub const SIZE: usize = 8;
+
+    /// Create a new `NotesAtom`
+    #[must_use]
+    pub fn new(slide_id_ref: u32) -> Self {
+        Self {
+            slide_id_ref,
+            flags: 0x0006, // fFollowMasterObjects | fFollowMasterScheme
+            reserved: 0,
+        }
+    }
+}
+
 // =============================================================================
 // Placeholder Types for Notes
 // =============================================================================
 
 /// Placeholder types used in notes pages
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`NotesPlaceholderType` is the established public API name; renaming it would break downstream crates"
+)]
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NotesPlaceholderType {
@@ -112,6 +125,14 @@ pub enum NotesPlaceholderType {
 // =============================================================================
 
 /// Complete notes page definition
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`NotesPage` is the established public API name; renaming it would break downstream crates"
+)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "the four bools map one-to-one to independent header/footer/slide-number/date visibility flags of the notes page format"
+)]
 #[derive(Debug, Clone)]
 pub struct NotesPage {
     /// Persist ID (assigned during save)
@@ -136,6 +157,7 @@ pub struct NotesPage {
 
 impl NotesPage {
     /// Create a new notes page for a slide
+    #[must_use]
     pub fn new(slide_id_ref: u32) -> Self {
         Self {
             persist_id: 0,
@@ -151,17 +173,20 @@ impl NotesPage {
     }
 
     /// Create a simple notes page with text
+    #[must_use]
     pub fn simple(slide_id_ref: u32, text: &str) -> Self {
         Self::new(slide_id_ref).with_text(text)
     }
 
     /// Set notes text from a string
+    #[must_use]
     pub fn with_text(mut self, text: &str) -> Self {
         self.text = vec![Paragraph::new(text)];
         self
     }
 
     /// Set notes text from paragraphs
+    #[must_use]
     pub fn with_paragraphs(mut self, paragraphs: Vec<Paragraph>) -> Self {
         self.text = paragraphs;
         self
@@ -173,6 +198,7 @@ impl NotesPage {
     }
 
     /// Enable header with text
+    #[must_use]
     pub fn with_header(mut self, text: &str) -> Self {
         self.show_header = true;
         self.header_text = Some(text.to_string());
@@ -180,6 +206,7 @@ impl NotesPage {
     }
 
     /// Enable footer with text
+    #[must_use]
     pub fn with_footer(mut self, text: &str) -> Self {
         self.show_footer = true;
         self.footer_text = Some(text.to_string());
@@ -187,27 +214,31 @@ impl NotesPage {
     }
 
     /// Enable slide number
+    #[must_use]
     pub fn with_slide_number(mut self) -> Self {
         self.show_slide_number = true;
         self
     }
 
     /// Enable date
+    #[must_use]
     pub fn with_date(mut self) -> Self {
         self.show_date = true;
         self
     }
 
     /// Get combined text
+    #[must_use]
     pub fn text_content(&self) -> String {
         self.text
             .iter()
-            .map(|p| p.text())
+            .map(Paragraph::text)
             .collect::<Vec<_>>()
             .join("\r")
     }
 
     /// Check if notes page has content
+    #[must_use]
     pub fn has_content(&self) -> bool {
         !self.text.is_empty() || self.show_header || self.show_footer || self.show_slide_number
     }
@@ -218,9 +249,17 @@ impl NotesPage {
 // =============================================================================
 
 /// Error type for notes operations
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`NotesError` is the established public API name; renaming it would break downstream crates"
+)]
 pub type NotesError = std::io::Error;
 
 /// Builder for Notes container record
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`NotesContainerBuilder` is the established public API name; renaming it would break downstream crates"
+)]
 pub struct NotesContainerBuilder {
     notes: NotesPage,
     drawing_id: u32,
@@ -228,11 +267,20 @@ pub struct NotesContainerBuilder {
 
 impl NotesContainerBuilder {
     /// Create a new builder
+    #[must_use]
     pub fn new(notes: NotesPage, drawing_id: u32) -> Self {
         Self { notes, drawing_id }
     }
 
     /// Build the complete Notes container
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the underlying writer reports an error.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Notes container children are small in-memory records whose total size is bounded far below u32::MAX"
+    )]
     pub fn build(&self) -> Result<Vec<u8>, NotesError> {
         let mut container = Vec::new();
         let mut children = Vec::new();
@@ -246,7 +294,7 @@ impl NotesContainerBuilder {
         children.push(ppdrawing);
 
         // 3) ColorSchemeAtom
-        let color_scheme = self.build_color_scheme()?;
+        let color_scheme = Self::build_color_scheme()?;
         children.push(color_scheme);
 
         // Calculate total content size
@@ -263,7 +311,11 @@ impl NotesContainerBuilder {
         Ok(container)
     }
 
-    /// Build NotesAtom record
+    /// Build `NotesAtom` record
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "`NotesAtom::SIZE` is the constant 8, which always fits u32"
+    )]
     fn build_notes_atom(&self) -> Result<Vec<u8>, NotesError> {
         let mut record = Vec::new();
         let atom = NotesAtom::new(self.notes.slide_id_ref);
@@ -280,7 +332,7 @@ impl NotesContainerBuilder {
         Ok(record)
     }
 
-    /// Build PPDrawing with notes placeholders
+    /// Build `PPDrawing` with notes placeholders
     /// Uses the existing escher functions that work for slides
     fn build_ppdrawing(&self) -> Result<Vec<u8>, NotesError> {
         use super::escher::{UserShapeData, create_dg_container_with_shapes};
@@ -320,10 +372,13 @@ impl NotesContainerBuilder {
                     .flat_map(|paragraph| &mut paragraph.runs)
                     .enumerate()
                 {
-                    run.style.pp9_run_id = Some(
-                        u8::try_from(ordinal % 16)
-                            .expect("a modulo-16 run identifier always fits u8"),
-                    );
+                    let run_id = u8::try_from(ordinal % 16).map_err(|_err| {
+                        NotesError::new(
+                            std::io::ErrorKind::InvalidInput,
+                            "PP9 run identifier does not fit u8",
+                        )
+                    })?;
+                    run.style.pp9_run_id = Some(run_id);
                     mappings.push(super::smart_tags::ShapeTextExtensionRun {
                         smart_tags: Vec::new(),
                         international_east_asian_font: run.international_east_asian_font_index,
@@ -340,9 +395,16 @@ impl NotesContainerBuilder {
         wrap_dg_into_ppdrawing(&dg)
     }
 
-    /// Build DgContainer with notes shapes
-    /// Per POI PPDrawing.create(): DgContainer contains DgRecord, SpgrContainer, and background SpContainer
-    #[allow(dead_code)]
+    /// Build `DgContainer` with notes shapes
+    /// Per POI `PPDrawing.create()`: `DgContainer` contains `DgRecord`, `SpgrContainer`, and background `SpContainer`
+    #[allow(
+        dead_code,
+        reason = "builder mirrors POI's PPDrawing structure and is retained for pending notes-writing support"
+    )]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "drawing IDs and notes Escher record sizes are small values bounded far below u16/u32 limits"
+    )]
     fn build_dg_container(&self) -> Result<Vec<u8>, NotesError> {
         let mut dg_container = Vec::new();
         let mut dg_children = Vec::new();
@@ -371,7 +433,7 @@ impl NotesContainerBuilder {
         dg_children.push(spgr);
 
         // Background SpContainer (per POI PPDrawing.create() - directly in DgContainer)
-        let bg_sp = self.build_background_shape(base_spid + shape_count + 1)?;
+        let bg_sp = Self::build_background_shape(base_spid + shape_count + 1)?;
         dg_children.push(bg_sp);
 
         // Calculate size
@@ -387,9 +449,16 @@ impl NotesContainerBuilder {
         Ok(dg_container)
     }
 
-    /// Build background SpContainer (per POI PPDrawing.create())
-    #[allow(dead_code)]
-    fn build_background_shape(&self, spid: u32) -> Result<Vec<u8>, NotesError> {
+    /// Build background `SpContainer` (per POI `PPDrawing.create()`)
+    #[allow(
+        dead_code,
+        reason = "builder mirrors POI's PPDrawing structure and is retained for pending notes-writing support"
+    )]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the background shape uses a fixed 8-entry property table and small in-memory records, so counts and sizes always fit u16/u32"
+    )]
+    fn build_background_shape(spid: u32) -> Result<Vec<u8>, NotesError> {
         let mut sp_container = Vec::new();
         let mut sp_children = Vec::new();
 
@@ -405,14 +474,14 @@ impl NotesContainerBuilder {
 
         // EscherOpt with background properties (per POI)
         let bg_props: [(u16, u32); 8] = [
-            (0x0181, 0x08000000), // fillColor
-            (0x0183, 0x08000005), // fillBackColor
-            (0x0193, 0x0099CCEE), // fillRectRight (approximation)
-            (0x0194, 0x0076B0DE), // fillRectBottom
-            (0x01BF, 0x00120012), // fNoFillHitTest
-            (0x01FF, 0x00080000), // lineBool
-            (0x0304, 0x00000009), // blackAndWhiteMode
-            (0x033F, 0x00010001), // fBackground
+            (0x0181, 0x0800_0000), // fillColor
+            (0x0183, 0x0800_0005), // fillBackColor
+            (0x0193, 0x0099_CCEE), // fillRectRight (approximation)
+            (0x0194, 0x0076_B0DE), // fillRectBottom
+            (0x01BF, 0x0012_0012), // fNoFillHitTest
+            (0x01FF, 0x0008_0000), // lineBool
+            (0x0304, 0x0000_0009), // blackAndWhiteMode
+            (0x033F, 0x0001_0001), // fBackground
         ];
         let mut opt = Vec::new();
         write_escher_header(
@@ -438,18 +507,21 @@ impl NotesContainerBuilder {
         Ok(sp_container)
     }
 
-    /// Build SpgrContainer with group and placeholder shapes
-    #[allow(dead_code)]
+    /// Build `SpgrContainer` with group and placeholder shapes
+    #[allow(
+        dead_code,
+        reason = "builder mirrors POI's PPDrawing structure and is retained for pending notes-writing support"
+    )]
     fn build_spgr_container(&self) -> Result<Vec<u8>, NotesError> {
         let mut content = Vec::new();
         let base_spid = self.drawing_id << 10;
 
         // Group patriarch
-        let group = self.build_group_patriarch(base_spid)?;
+        let group = Self::build_group_patriarch(base_spid)?;
         content.extend_from_slice(&group);
 
         // Slide image placeholder
-        let slide_image = self.build_slide_image_placeholder(base_spid + 1)?;
+        let slide_image = Self::build_slide_image_placeholder(base_spid + 1)?;
         content.extend_from_slice(&slide_image);
 
         // Notes body placeholder
@@ -459,9 +531,16 @@ impl NotesContainerBuilder {
         Ok(content)
     }
 
-    /// Build group patriarch SpContainer
-    #[allow(dead_code)]
-    fn build_group_patriarch(&self, spid: u32) -> Result<Vec<u8>, NotesError> {
+    /// Build group patriarch `SpContainer`
+    #[allow(
+        dead_code,
+        reason = "builder mirrors POI's PPDrawing structure and is retained for pending notes-writing support"
+    )]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the patriarch container holds two small fixed Escher records, so its size always fits u32"
+    )]
+    fn build_group_patriarch(spid: u32) -> Result<Vec<u8>, NotesError> {
         let mut sp_container = Vec::new();
         let mut sp_children = Vec::new();
 
@@ -488,18 +567,28 @@ impl NotesContainerBuilder {
         Ok(sp_container)
     }
 
-    /// Build slide image placeholder SpContainer
-    #[allow(dead_code)]
-    fn build_slide_image_placeholder(&self, spid: u32) -> Result<Vec<u8>, NotesError> {
-        self.build_placeholder_shape(
+    /// Build slide image placeholder `SpContainer`
+    #[allow(
+        dead_code,
+        reason = "builder mirrors POI's PPDrawing structure and is retained for pending notes-writing support"
+    )]
+    fn build_slide_image_placeholder(spid: u32) -> Result<Vec<u8>, NotesError> {
+        Self::build_placeholder_shape(
             spid,
             NotesPlaceholderType::SlideImage,
             (685, 576, 5486, 3514), // Typical notes slide image position
         )
     }
 
-    /// Build notes body placeholder SpContainer with text
-    #[allow(dead_code)]
+    /// Build notes body placeholder `SpContainer` with text
+    #[allow(
+        dead_code,
+        reason = "builder mirrors POI's PPDrawing structure and is retained for pending notes-writing support"
+    )]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the notes body placeholder uses a fixed 4-entry property table and small in-memory records, so counts and sizes always fit u16/u32"
+    )]
     fn build_notes_body_placeholder(&self, spid: u32) -> Result<Vec<u8>, NotesError> {
         let mut sp_container = Vec::new();
         let mut sp_children = Vec::new();
@@ -514,10 +603,10 @@ impl NotesContainerBuilder {
 
         // Opt record (properties)
         let props: [(u16, u32); 4] = [
-            (0x007F, 0x00010005), // lockAggr
-            (0x0181, 0x08000004), // fillColor (scheme fill)
-            (0x01BF, 0x00010001), // fNoFillHitTest (filled)
-            (0x01FF, 0x00090001), // shapeBool
+            (0x007F, 0x0001_0005), // lockAggr
+            (0x0181, 0x0800_0004), // fillColor (scheme fill)
+            (0x01BF, 0x0001_0001), // fNoFillHitTest (filled)
+            (0x01FF, 0x0009_0001), // shapeBool
         ];
         let mut opt = Vec::new();
         write_escher_header(
@@ -571,8 +660,15 @@ impl NotesContainerBuilder {
         Ok(sp_container)
     }
 
-    /// Build ClientTextbox record with notes text
-    #[allow(dead_code)]
+    /// Build `ClientTextbox` record with notes text
+    #[allow(
+        dead_code,
+        reason = "builder mirrors POI's PPDrawing structure and is retained for pending notes-writing support"
+    )]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "notes text is a short speaker-note string whose UTF-16 byte length is bounded far below u32::MAX"
+    )]
     fn build_client_textbox(&self) -> Result<Vec<u8>, NotesError> {
         let mut textbox = Vec::new();
         let mut children = Vec::new();
@@ -615,10 +711,16 @@ impl NotesContainerBuilder {
         Ok(textbox)
     }
 
-    /// Build a placeholder shape SpContainer (without text)
-    #[allow(dead_code)]
+    /// Build a placeholder shape `SpContainer` (without text)
+    #[allow(
+        dead_code,
+        reason = "builder mirrors POI's PPDrawing structure and is retained for pending notes-writing support"
+    )]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "placeholder shapes use a fixed 4-entry property table and small in-memory records, so counts and sizes always fit u16/u32"
+    )]
     fn build_placeholder_shape(
-        &self,
         spid: u32,
         placeholder_type: NotesPlaceholderType,
         anchor: (u16, u16, u16, u16),
@@ -635,10 +737,10 @@ impl NotesContainerBuilder {
 
         // Opt record (properties)
         let props: [(u16, u32); 4] = [
-            (0x007F, 0x00010005), // lockAggr
-            (0x0181, 0x08000004), // fillColor (scheme fill)
-            (0x01BF, 0x00010001), // fNoFillHitTest (filled)
-            (0x01FF, 0x00090001), // shapeBool
+            (0x007F, 0x0001_0005), // lockAggr
+            (0x0181, 0x0800_0004), // fillColor (scheme fill)
+            (0x01BF, 0x0001_0001), // fNoFillHitTest (filled)
+            (0x01FF, 0x0009_0001), // shapeBool
         ];
         let mut opt = Vec::new();
         write_escher_header(
@@ -686,20 +788,20 @@ impl NotesContainerBuilder {
         Ok(sp_container)
     }
 
-    /// Build ColorSchemeAtom
-    fn build_color_scheme(&self) -> Result<Vec<u8>, NotesError> {
+    /// Build `ColorSchemeAtom`
+    fn build_color_scheme() -> Result<Vec<u8>, NotesError> {
         let mut record = Vec::new();
 
         // Default color scheme (same as slides)
         let colors: [u32; 8] = [
-            0x00FFFFFF, // background
-            0x00000000, // text
-            0x00808080, // shadow
-            0x00000000, // title
-            0x00E3E0BB, // fill
-            0x00993333, // accent
-            0x00999900, // hyperlink
-            0x000099CC, // followed hyperlink
+            0x00FF_FFFF, // background
+            0x0000_0000, // text
+            0x0080_8080, // shadow
+            0x0000_0000, // title
+            0x00E3_E0BB, // fill
+            0x0099_3333, // accent
+            0x0099_9900, // hyperlink
+            0x0000_99CC, // followed hyperlink
         ];
 
         write_record_header(&mut record, 0x00, 1, record_type::COLOR_SCHEME_ATOM, 32)?;
@@ -716,6 +818,10 @@ impl NotesContainerBuilder {
 // =============================================================================
 
 /// Collection of notes pages for a presentation
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`NotesCollection` is the established public API name; renaming it would break downstream crates"
+)]
 #[derive(Debug, Default)]
 pub struct NotesCollection {
     notes: Vec<NotesPage>,
@@ -723,6 +829,7 @@ pub struct NotesCollection {
 
 impl NotesCollection {
     /// Create new empty collection
+    #[must_use]
     pub fn new() -> Self {
         Self { notes: Vec::new() }
     }
@@ -735,6 +842,7 @@ impl NotesCollection {
     }
 
     /// Get notes by index
+    #[must_use]
     pub fn get(&self, index: usize) -> Option<&NotesPage> {
         self.notes.get(index)
     }
@@ -745,16 +853,19 @@ impl NotesCollection {
     }
 
     /// Find notes for a slide by slide persist ID
+    #[must_use]
     pub fn find_for_slide(&self, slide_id_ref: u32) -> Option<&NotesPage> {
         self.notes.iter().find(|n| n.slide_id_ref == slide_id_ref)
     }
 
     /// Get number of notes pages
+    #[must_use]
     pub fn len(&self) -> usize {
         self.notes.len()
     }
 
     /// Check if empty
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.notes.is_empty()
     }
@@ -764,7 +875,15 @@ impl NotesCollection {
         self.notes.iter()
     }
 
-    /// Build SlideListWithText for notes (instance=2)
+    /// Build `SlideListWithText` for notes (instance=2)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the underlying writer reports an error.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "each child is a fixed-size `SlidePersistAtom`, so the total size is bounded far below u32::MAX"
+    )]
     pub fn build_slide_list_with_text(
         &self,
         persist_ids: &[(u32, u32)],
@@ -813,7 +932,7 @@ fn write_record_header<W: Write>(
     rec_type: u16,
     length: u32,
 ) -> Result<(), NotesError> {
-    let ver_inst = (version as u16 & 0x0F) | ((instance & 0x0FFF) << 4);
+    let ver_inst = (u16::from(version) & 0x0F) | ((instance & 0x0FFF) << 4);
     writer.write_all(&ver_inst.to_le_bytes())?;
     writer.write_all(&rec_type.to_le_bytes())?;
     writer.write_all(&length.to_le_bytes())?;
@@ -830,7 +949,10 @@ fn write_container_header<W: Write>(
 }
 
 /// Write an Escher record header
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "builder mirrors POI's PPDrawing structure and is retained for pending notes-writing support"
+)]
 fn write_escher_header<W: Write>(
     writer: &mut W,
     version: u8,
@@ -838,15 +960,18 @@ fn write_escher_header<W: Write>(
     rec_type: u16,
     length: u32,
 ) -> Result<(), NotesError> {
-    let ver_inst = (version as u16 & 0x0F) | ((instance & 0x0FFF) << 4);
+    let ver_inst = (u16::from(version) & 0x0F) | ((instance & 0x0FFF) << 4);
     writer.write_all(&ver_inst.to_le_bytes())?;
     writer.write_all(&rec_type.to_le_bytes())?;
     writer.write_all(&length.to_le_bytes())?;
     Ok(())
 }
 
-/// Build OEPlaceholderAtom PPT record
-#[allow(dead_code)]
+/// Build `OEPlaceholderAtom` PPT record
+#[allow(
+    dead_code,
+    reason = "builder mirrors POI's PPDrawing structure and is retained for pending notes-writing support"
+)]
 fn build_oe_placeholder_atom(position: u32, placeholder_type: u8) -> Result<Vec<u8>, NotesError> {
     let mut record = Vec::new();
 
@@ -862,7 +987,7 @@ fn build_oe_placeholder_atom(position: u32, placeholder_type: u8) -> Result<Vec<
     Ok(record)
 }
 
-/// Build SlidePersistAtom record
+/// Build `SlidePersistAtom` record
 fn build_slide_persist_atom(persist_id_ref: u32, identifier: u32) -> Result<Vec<u8>, NotesError> {
     let mut record = Vec::new();
 
@@ -884,6 +1009,11 @@ fn build_slide_persist_atom(persist_id_ref: u32, identifier: u32) -> Result<Vec<
 // =============================================================================
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -932,8 +1062,7 @@ mod tests {
 
     #[test]
     fn test_notes_background_uses_shape_boolean_group() {
-        let builder = NotesContainerBuilder::new(NotesPage::new(1), 3);
-        let background = builder.build_background_shape(0x0C04).unwrap();
+        let background = NotesContainerBuilder::build_background_shape(0x0C04).unwrap();
         let expected_properties = [
             (0x0181u16, 0x0800_0000u32),
             (0x0183, 0x0800_0005),

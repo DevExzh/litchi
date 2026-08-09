@@ -12,6 +12,7 @@ pub struct DocumentRevisionPolicies {
 
 impl DocumentRevisionPolicies {
     /// Return whether both revision-policy controls were omitted.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.track_moves.is_none() && self.track_formatting.is_none()
     }

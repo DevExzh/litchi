@@ -89,7 +89,7 @@ fn publish_and_reopen(xml: &str, expected: &Master) -> Result<(), Box<dyn std::e
 
     let bytes = package.to_bytes()?;
     let reopened = Package::from_bytes(&bytes)?;
-    let parsed = reopened.with_opc(|opc| load_handout(opc))?;
+    let parsed = reopened.with_opc(load_handout)?;
 
     assert_eq!(parsed.layout, Layout::default());
     assert_eq!(
@@ -135,9 +135,7 @@ fn store_handout(opc: &mut OpcPackage, xml: &str) -> litchi_pptx::Result<()> {
     let presentation_xml = if original.contains("<p:handoutMasterIdLst") {
         original
     } else {
-        original
-            .replace(marker, &format!("{marker}{handout_ids}"))
-            .into()
+        original.replace(marker, &format!("{marker}{handout_ids}"))
     };
     if !presentation_xml.contains("<p:handoutMasterId r:id=\"rIdHandout\"") {
         return Err(Error::Invalid(

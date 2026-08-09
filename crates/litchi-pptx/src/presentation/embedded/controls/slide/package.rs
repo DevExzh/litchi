@@ -1,4 +1,4 @@
-//! OPC ownership and atomic publication for one slide-owned ActiveX graph.
+//! OPC ownership and atomic publication for one slide-owned `ActiveX` graph.
 
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -16,6 +16,10 @@ use crate::presentation::embedded::invalid;
 use crate::{Error, Result};
 
 /// Load one typed control snapshot from its owning slide.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load(
     package: &OpcPackage,
     slide_index: usize,
@@ -28,7 +32,7 @@ pub fn load(
     let control = controls
         .get(control_index)
         .cloned()
-        .ok_or_else(|| Error::IndexOutOfBounds {
+        .ok_or(Error::IndexOutOfBounds {
             index: control_index,
             len: controls.len(),
         })?;
@@ -73,6 +77,10 @@ pub fn load(
 }
 
 /// Apply a source-checked patch to its owning slide atomically.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
     let before = patch.before();
     let slide = package.get_part(&before.slide_part_name)?;
@@ -111,6 +119,10 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
 }
 
 /// Apply a committed transaction and return the validated post-publication snapshot.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
     let patch = commit.into_patch();
     apply_patch(package, &patch)
@@ -124,8 +136,8 @@ fn install_patch(package: &mut OpcPackage, patch: &Patch) -> Result<()> {
 
     let before_descriptor = before.control.descriptor.as_ref();
     let after_descriptor = after.control.descriptor.as_ref();
-    if before_descriptor.map(|value| value.part_name())
-        != after_descriptor.map(|value| value.part_name())
+    if before_descriptor.map(super::super::model::Descriptor::part_name)
+        != after_descriptor.map(super::super::model::Descriptor::part_name)
     {
         return Err(invalid(
             "ActiveX descriptor identity cannot change in a patch",
@@ -161,12 +173,11 @@ fn install_patch(package: &mut OpcPackage, patch: &Patch) -> Result<()> {
         descriptor_part.set_blob(descriptor_xml.as_ref().clone());
     }
 
-    if after.binary.is_none() {
-        if let Some(binary) = before.binary.as_ref() {
-            if !has_inbound_relationship(package, &binary.part_name)? {
-                package.remove_part(&binary.part_name);
-            }
-        }
+    if after.binary.is_none()
+        && let Some(binary) = before.binary.as_ref()
+        && !has_inbound_relationship(package, &binary.part_name)?
+    {
+        package.remove_part(&binary.part_name);
     }
     Ok(())
 }

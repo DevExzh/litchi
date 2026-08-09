@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{
     MAX_MAIL_MERGE_STRING_BYTES, MailMerge, MailMergeColumnIndex, MailMergeDataSourceObject,
     MailMergeDataSourceType, MailMergeFieldMapping, RtfDocument, RtfWriter,
@@ -53,7 +62,7 @@ fn parses_and_round_trips_complete_inert_mail_merge_metadata() {
 
 #[test]
 fn ergonomic_api_round_trips_without_interpreting_values() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 Safe body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Safe body}").unwrap();
     let mut object = MailMergeDataSourceObject {
         source_type: Some(MailMergeDataSourceType::from_rtf(99)),
         ..MailMergeDataSourceObject::default()
@@ -82,11 +91,11 @@ fn ergonomic_api_round_trips_without_interpreting_values() {
 #[test]
 fn rejects_duplicate_nonstarred_nested_and_oversized_metadata() {
     for malformed in [
-        r#"{\rtf1{\*\mailmerge{\*\mmquery one}{\*\mmquery two}}}"#,
-        r#"{\rtf1{\mailmerge{\*\mmquery one}}}"#,
-        r#"{\rtf1{\*\mailmerge{\mmquery one}}}"#,
-        r#"{\rtf1{\*\mailmerge{\*\mmquery before{nested}after}}}"#,
-        r#"{\rtf1{\*\mailmerge{\*\mmodso{\*\mmodsofldmpdata{\*\mmodsoname MissingColumn}}}}}"#,
+        r"{\rtf1{\*\mailmerge{\*\mmquery one}{\*\mmquery two}}}",
+        r"{\rtf1{\mailmerge{\*\mmquery one}}}",
+        r"{\rtf1{\*\mailmerge{\mmquery one}}}",
+        r"{\rtf1{\*\mailmerge{\*\mmquery before{nested}after}}}",
+        r"{\rtf1{\*\mailmerge{\*\mmodso{\*\mmodsofldmpdata{\*\mmodsoname MissingColumn}}}}}",
     ] {
         assert!(
             RtfDocument::parse(malformed).is_err(),
@@ -95,6 +104,6 @@ fn rejects_duplicate_nonstarred_nested_and_oversized_metadata() {
     }
 
     let oversized = "x".repeat(MAX_MAIL_MERGE_STRING_BYTES + 1);
-    let malformed = [r#"{\rtf1{\*\mailmerge{\*\mmquery "#, &oversized, "}}}}"].concat();
+    let malformed = [r"{\rtf1{\*\mailmerge{\*\mmquery ", &oversized, "}}}}"].concat();
     assert!(RtfDocument::parse(&malformed).is_err());
 }

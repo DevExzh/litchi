@@ -51,9 +51,9 @@ pub(super) fn validate_collections(value: &FontCollections, limits: Limits) -> R
         .ok_or_else(|| Error::Corrupted("font copied-byte count overflow".into()))?;
     let record_count = font_count
         .checked_add(facets)
-        .and_then(|count| count.checked_add(value.base.is_some() as usize))
-        .and_then(|count| count.checked_add(value.international.is_some() as usize))
-        .and_then(|count| count.checked_add(value.embedding_flags.is_some() as usize))
+        .and_then(|count| count.checked_add(usize::from(value.base.is_some())))
+        .and_then(|count| count.checked_add(usize::from(value.international.is_some())))
+        .and_then(|count| count.checked_add(usize::from(value.embedding_flags.is_some())))
         .ok_or_else(|| Error::Corrupted("font record count overflow".into()))?;
     if copied > limits.records.max_copied_payload_bytes
         || record_count > limits.records.max_records

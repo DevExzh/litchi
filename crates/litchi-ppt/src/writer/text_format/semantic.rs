@@ -5,9 +5,6 @@
 //!
 //! Reference: [MS-PPT] Section 2.9 - Text Formatting
 
-use crate::writer::smart_tags::SmartTagIndex;
-use zerocopy_derive::{Immutable, IntoBytes, KnownLayout};
-
 // =============================================================================
 // Text Property Mask Flags (MS-PPT 2.9.20 TextPFException)
 // =============================================================================
@@ -58,7 +55,7 @@ pub mod para_mask {
     pub const TEXT_DIRECTION: u32 = 0x0020_0000;
 }
 
-/// Character property mask flags (MS-PPT 2.9.21 TextCFException)
+/// Character property mask flags (MS-PPT 2.9.21 `TextCFException`)
 pub mod char_mask {
     /// Bold
     pub const BOLD: u32 = 0x0001;
@@ -76,7 +73,7 @@ pub mod char_mask {
     pub const LEGACY_STRIKETHROUGH: u32 = 0x0100;
     /// Emboss
     pub const EMBOSS: u32 = 0x0200;
-    /// PowerPoint 9 additional-property run grouping bits
+    /// `PowerPoint` 9 additional-property run grouping bits
     pub const PP9_RUN_ID: u32 = 0x3C00;
     /// Font reference present
     pub const FONT_REF: u32 = 0x0001_0000;
@@ -93,6 +90,9 @@ pub mod char_mask {
     /// Symbol font reference present
     pub const SYMBOL_FONT_REF: u32 = 0x0080_0000;
 }
+
+use crate::writer::smart_tags::SmartTagIndex;
+use zerocopy_derive::{Immutable, IntoBytes, KnownLayout};
 
 // =============================================================================
 // Text Alignment
@@ -157,7 +157,7 @@ pub enum TabAlign {
     Decimal = 3,
 }
 
-/// A paragraph tab stop in PowerPoint master units.
+/// A paragraph tab stop in `PowerPoint` master units.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TabStop {
     /// Signed position in master units.
@@ -168,6 +168,7 @@ pub struct TabStop {
 
 impl TabStop {
     /// Create a tab stop.
+    #[must_use]
     pub const fn new(position: i16, alignment: TabAlign) -> Self {
         Self {
             position,
@@ -181,6 +182,10 @@ impl TabStop {
 // =============================================================================
 
 /// Font style flags
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "each bool maps to an independent `TextCFException` style bit (MS-PPT 2.9.21); the bits are combined freely on disk, so a state machine would misrepresent the format"
+)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct FontStyle {
     /// Bold text
@@ -199,7 +204,7 @@ pub struct FontStyle {
     pub kumi: bool,
     /// De facto legacy strikethrough (`unused3` in MS-PPT)
     pub strikethrough: bool,
-    /// PowerPoint 9 additional-property run grouping identifier
+    /// `PowerPoint` 9 additional-property run grouping identifier
     pub pp9_run_id: Option<u8>,
     /// Validity bits to emit even when their corresponding value is false
     pub specified_mask: u16,
@@ -207,6 +212,11 @@ pub struct FontStyle {
 
 impl FontStyle {
     /// Create bold style
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "char_mask::BOLD is 0x0001 and always fits in u16; const fn cannot use u16::try_from"
+    )]
+    #[must_use]
     pub const fn bold() -> Self {
         Self {
             bold: true,
@@ -223,6 +233,11 @@ impl FontStyle {
     }
 
     /// Create italic style
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "char_mask::ITALIC is 0x0002 and always fits in u16; const fn cannot use u16::try_from"
+    )]
+    #[must_use]
     pub const fn italic() -> Self {
         Self {
             bold: false,
@@ -239,6 +254,11 @@ impl FontStyle {
     }
 
     /// Create bold and italic style
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "char_mask::BOLD | char_mask::ITALIC is 0x0003 and always fits in u16; const fn cannot use u16::try_from"
+    )]
+    #[must_use]
     pub const fn bold_italic() -> Self {
         Self {
             bold: true,
@@ -254,7 +274,8 @@ impl FontStyle {
         }
     }
 
-    /// Convert to mask value for TextCFException
+    /// Convert to mask value for `TextCFException`
+    #[must_use]
     pub fn to_mask(&self) -> u32 {
         let mut mask = u32::from(self.specified_mask);
         if self.bold {
@@ -288,6 +309,7 @@ impl FontStyle {
     }
 
     /// Convert to flags value
+    #[must_use]
     pub fn to_flags(&self) -> u16 {
         let mut flags = 0u16;
         if self.bold {
@@ -334,7 +356,7 @@ pub struct TextColor {
     pub b: u8,
     /// Use scheme color instead of RGB
     pub use_scheme: bool,
-    /// Scheme color index (if use_scheme is true)
+    /// Scheme color index (if `use_scheme` is true)
     pub scheme_index: u8,
 }
 
@@ -351,6 +373,7 @@ impl TextColor {
     pub const BLUE: Self = Self::rgb(0, 0, 255);
 
     /// Create an RGB color
+    #[must_use]
     pub const fn rgb(r: u8, g: u8, b: u8) -> Self {
         Self {
             r,
@@ -362,6 +385,7 @@ impl TextColor {
     }
 
     /// Create from hex value (0xRRGGBB)
+    #[must_use]
     pub const fn from_hex(hex: u32) -> Self {
         Self::rgb(
             ((hex >> 16) & 0xFF) as u8,
@@ -371,6 +395,7 @@ impl TextColor {
     }
 
     /// Create a scheme color reference
+    #[must_use]
     pub const fn scheme(index: u8) -> Self {
         Self {
             r: 0,
@@ -382,16 +407,17 @@ impl TextColor {
     }
 
     /// Convert to PPT font color format
-    /// POI uses: new Color(blue, green, red, 254).getRGB() which produces
+    /// POI uses: new Color(blue, green, red, `254).getRGB()` which produces
     /// (254 << 24) | (blue << 16) | (green << 8) | red
+    #[must_use]
     pub fn to_ppt_color(&self) -> u32 {
         if self.use_scheme {
             // ColorIndexStruct stores the scheme index in its fourth byte.
-            (self.scheme_index as u32) << 24
+            u32::from(self.scheme_index) << 24
         } else {
             // Format: R | (G << 8) | (B << 16) | (alpha << 24)
             // Alpha = 0xFE (254) for opaque colors
-            (self.r as u32) | ((self.g as u32) << 8) | ((self.b as u32) << 16) | 0xFE00_0000
+            u32::from(self.r) | (u32::from(self.g) << 8) | (u32::from(self.b) << 16) | 0xFE00_0000
         }
     }
 }
@@ -417,7 +443,7 @@ pub struct TextRun {
     pub font_size: u16,
     /// Text color
     pub color: TextColor,
-    /// Font index (reference to FontCollection, 0 = default)
+    /// Font index (reference to `FontCollection`, 0 = default)
     pub font_index: u16,
     /// East Asian font reference
     pub asian_font_index: Option<u16>,
@@ -425,13 +451,13 @@ pub struct TextRun {
     pub ansi_font_index: Option<u16>,
     /// Symbol font reference
     pub symbol_font_index: Option<u16>,
-    /// East Asian font reference in the PowerPoint 10 international collection.
+    /// East Asian font reference in the `PowerPoint` 10 international collection.
     pub international_east_asian_font_index: Option<u16>,
-    /// Complex-script font reference in the PowerPoint 10 international collection.
+    /// Complex-script font reference in the `PowerPoint` 10 international collection.
     pub complex_script_font_index: Option<u16>,
     /// Baseline position as a percentage of line height
     pub baseline_position: Option<i16>,
-    /// Zero-based indices into the presentation-wide PowerPoint 11 smart-tag store.
+    /// Zero-based indices into the presentation-wide `PowerPoint` 11 smart-tag store.
     pub smart_tag_indices: Vec<SmartTagIndex>,
 }
 
@@ -455,6 +481,11 @@ impl TextRun {
     }
 
     /// Set bold
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "char_mask::BOLD is 0x0001 and always fits in u16"
+    )]
+    #[must_use]
     pub fn bold(mut self) -> Self {
         self.style.bold = true;
         self.style.specified_mask |= char_mask::BOLD as u16;
@@ -462,6 +493,11 @@ impl TextRun {
     }
 
     /// Explicitly set bold formatting, including false.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "char_mask::BOLD is 0x0001 and always fits in u16"
+    )]
+    #[must_use]
     pub fn bold_value(mut self, enabled: bool) -> Self {
         self.style.bold = enabled;
         self.style.specified_mask |= char_mask::BOLD as u16;
@@ -469,6 +505,11 @@ impl TextRun {
     }
 
     /// Set italic
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "char_mask::ITALIC is 0x0002 and always fits in u16"
+    )]
+    #[must_use]
     pub fn italic(mut self) -> Self {
         self.style.italic = true;
         self.style.specified_mask |= char_mask::ITALIC as u16;
@@ -476,6 +517,11 @@ impl TextRun {
     }
 
     /// Explicitly set italic formatting, including false.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "char_mask::ITALIC is 0x0002 and always fits in u16"
+    )]
+    #[must_use]
     pub fn italic_value(mut self, enabled: bool) -> Self {
         self.style.italic = enabled;
         self.style.specified_mask |= char_mask::ITALIC as u16;
@@ -483,6 +529,11 @@ impl TextRun {
     }
 
     /// Set underline
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "char_mask::UNDERLINE is 0x0004 and always fits in u16"
+    )]
+    #[must_use]
     pub fn underline(mut self) -> Self {
         self.style.underline = true;
         self.style.specified_mask |= char_mask::UNDERLINE as u16;
@@ -490,6 +541,11 @@ impl TextRun {
     }
 
     /// Explicitly set underline formatting, including false.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "char_mask::UNDERLINE is 0x0004 and always fits in u16"
+    )]
+    #[must_use]
     pub fn underline_value(mut self, enabled: bool) -> Self {
         self.style.underline = enabled;
         self.style.specified_mask |= char_mask::UNDERLINE as u16;
@@ -497,6 +553,11 @@ impl TextRun {
     }
 
     /// Set shadow formatting.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "char_mask::SHADOW is 0x0010 and always fits in u16"
+    )]
+    #[must_use]
     pub fn shadow(mut self) -> Self {
         self.style.shadow = true;
         self.style.specified_mask |= char_mask::SHADOW as u16;
@@ -504,6 +565,11 @@ impl TextRun {
     }
 
     /// Explicitly set shadow formatting, including false.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "char_mask::SHADOW is 0x0010 and always fits in u16"
+    )]
+    #[must_use]
     pub fn shadow_value(mut self, enabled: bool) -> Self {
         self.style.shadow = enabled;
         self.style.specified_mask |= char_mask::SHADOW as u16;
@@ -511,6 +577,11 @@ impl TextRun {
     }
 
     /// Set embossed/relief formatting.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "char_mask::EMBOSS is 0x0200 and always fits in u16"
+    )]
+    #[must_use]
     pub fn embossed(mut self) -> Self {
         self.style.emboss = true;
         self.style.specified_mask |= char_mask::EMBOSS as u16;
@@ -518,6 +589,11 @@ impl TextRun {
     }
 
     /// Explicitly set embossed formatting, including false.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "char_mask::EMBOSS is 0x0200 and always fits in u16"
+    )]
+    #[must_use]
     pub fn embossed_value(mut self, enabled: bool) -> Self {
         self.style.emboss = enabled;
         self.style.specified_mask |= char_mask::EMBOSS as u16;
@@ -525,6 +601,11 @@ impl TextRun {
     }
 
     /// Mark the run as originating from double-byte input.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "char_mask::FE_HINT is 0x0020 and always fits in u16"
+    )]
+    #[must_use]
     pub fn fe_hint(mut self, enabled: bool) -> Self {
         self.style.fe_hint = enabled;
         self.style.specified_mask |= char_mask::FE_HINT as u16;
@@ -532,111 +613,136 @@ impl TextRun {
     }
 
     /// Set Kumimoji formatting for vertical text.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "char_mask::KUMI is 0x0080 and always fits in u16"
+    )]
+    #[must_use]
     pub fn kumi(mut self, enabled: bool) -> Self {
         self.style.kumi = enabled;
         self.style.specified_mask |= char_mask::KUMI as u16;
         self
     }
 
-    /// Set the de facto legacy strikethrough bit used by PowerPoint and POI.
+    /// Set the de facto legacy strikethrough bit used by `PowerPoint` and POI.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "char_mask::LEGACY_STRIKETHROUGH is 0x0100 and always fits in u16"
+    )]
+    #[must_use]
     pub fn strikethrough(mut self, enabled: bool) -> Self {
         self.style.strikethrough = enabled;
         self.style.specified_mask |= char_mask::LEGACY_STRIKETHROUGH as u16;
         self
     }
 
-    /// Set the PowerPoint 9 additional-property run grouping identifier.
+    /// Set the `PowerPoint` 9 additional-property run grouping identifier.
+    #[must_use]
     pub fn pp9_run_id(mut self, id: u8) -> Self {
         self.style.pp9_run_id = Some(id);
         self
     }
 
-    /// Attach one document-wide PowerPoint 11 smart tag to this text run.
+    /// Attach one document-wide `PowerPoint` 11 smart tag to this text run.
+    #[must_use]
     pub fn with_smart_tag(mut self, index: SmartTagIndex) -> Self {
         self.smart_tag_indices.push(index);
         self
     }
 
-    /// Attach document-wide PowerPoint 11 smart tags to this text run.
+    /// Attach document-wide `PowerPoint` 11 smart tags to this text run.
+    #[must_use]
     pub fn with_smart_tags(mut self, indices: impl IntoIterator<Item = SmartTagIndex>) -> Self {
         self.smart_tag_indices.extend(indices);
         self
     }
 
-    /// Attach one document-wide PowerPoint 11 smart tag in place.
+    /// Attach one document-wide `PowerPoint` 11 smart tag in place.
     pub fn add_smart_tag(&mut self, index: SmartTagIndex) {
         self.smart_tag_indices.push(index);
     }
 
     /// Set font size in points
+    #[must_use]
     pub fn size(mut self, points: u16) -> Self {
         self.font_size = points;
         self
     }
 
     /// Set color from RGB
+    #[must_use]
     pub fn color_rgb(mut self, r: u8, g: u8, b: u8) -> Self {
         self.color = TextColor::rgb(r, g, b);
         self
     }
 
     /// Set color from hex
+    #[must_use]
     pub fn color_hex(mut self, hex: u32) -> Self {
         self.color = TextColor::from_hex(hex);
         self
     }
 
     /// Set a color-scheme index.
+    #[must_use]
     pub fn color_scheme(mut self, index: u8) -> Self {
         self.color = TextColor::scheme(index);
         self
     }
 
     /// Set font index
+    #[must_use]
     pub fn font(mut self, index: u16) -> Self {
         self.font_index = index;
         self
     }
 
     /// Set the East Asian font reference.
+    #[must_use]
     pub fn asian_font(mut self, index: u16) -> Self {
         self.asian_font_index = Some(index);
         self
     }
 
     /// Set the ANSI font reference.
+    #[must_use]
     pub fn ansi_font(mut self, index: u16) -> Self {
         self.ansi_font_index = Some(index);
         self
     }
 
     /// Set the symbol font reference.
+    #[must_use]
     pub fn symbol_font(mut self, index: u16) -> Self {
         self.symbol_font_index = Some(index);
         self
     }
 
     /// Select an East Asian face from `FontCollection10Container`.
+    #[must_use]
     pub fn international_east_asian_font(mut self, index: u16) -> Self {
         self.international_east_asian_font_index = Some(index);
         self
     }
 
     /// Select a complex-script face from `FontCollection10Container`.
+    #[must_use]
     pub fn complex_script_font(mut self, index: u16) -> Self {
         self.complex_script_font_index = Some(index);
         self
     }
 
     /// Set superscript (positive) or subscript (negative) baseline position.
+    #[must_use]
     pub fn baseline_position(mut self, percent: i16) -> Self {
         self.baseline_position = Some(percent);
         self
     }
 
     /// Get the number of UTF-16 code units in this run.
+    #[must_use]
     pub fn char_count(&self) -> u32 {
-        self.text.encode_utf16().count() as u32
+        u32::try_from(self.text.encode_utf16().count()).unwrap_or(u32::MAX)
     }
 }
 
@@ -729,6 +835,7 @@ impl Paragraph {
     }
 
     /// Create from multiple runs
+    #[must_use]
     pub fn with_runs(runs: Vec<TextRun>) -> Self {
         Self {
             runs,
@@ -759,6 +866,7 @@ impl Paragraph {
     }
 
     /// Set alignment
+    #[must_use]
     pub fn align(mut self, alignment: TextAlign) -> Self {
         self.alignment = alignment;
         self.explicit_mask |= para_mask::ALIGNMENT;
@@ -766,6 +874,7 @@ impl Paragraph {
     }
 
     /// Center align
+    #[must_use]
     pub fn center(mut self) -> Self {
         self.alignment = TextAlign::Center;
         self.explicit_mask |= para_mask::ALIGNMENT;
@@ -773,6 +882,7 @@ impl Paragraph {
     }
 
     /// Right align
+    #[must_use]
     pub fn right(mut self) -> Self {
         self.alignment = TextAlign::Right;
         self.explicit_mask |= para_mask::ALIGNMENT;
@@ -780,6 +890,7 @@ impl Paragraph {
     }
 
     /// Set line spacing (percent)
+    #[must_use]
     pub fn line_spacing(mut self, percent: i16) -> Self {
         self.line_spacing = percent;
         self.explicit_mask |= para_mask::LINE_SPACING;
@@ -787,6 +898,7 @@ impl Paragraph {
     }
 
     /// Set space before
+    #[must_use]
     pub fn space_before(mut self, units: i16) -> Self {
         self.space_before = units;
         self.explicit_mask |= para_mask::SPACE_BEFORE;
@@ -794,6 +906,7 @@ impl Paragraph {
     }
 
     /// Set space after
+    #[must_use]
     pub fn space_after(mut self, units: i16) -> Self {
         self.space_after = units;
         self.explicit_mask |= para_mask::SPACE_AFTER;
@@ -801,6 +914,7 @@ impl Paragraph {
     }
 
     /// Set the left margin in master units, including an explicit zero.
+    #[must_use]
     pub fn left_margin(mut self, units: i16) -> Self {
         self.left_margin = units;
         self.explicit_mask |= para_mask::LEFT_MARGIN;
@@ -808,6 +922,7 @@ impl Paragraph {
     }
 
     /// Set the first-line indent in master units, including an explicit zero.
+    #[must_use]
     pub fn first_line_indent(mut self, units: i16) -> Self {
         self.indent = units;
         self.explicit_mask |= para_mask::INDENT;
@@ -815,6 +930,7 @@ impl Paragraph {
     }
 
     /// Add bullet
+    #[must_use]
     pub fn with_bullet(mut self, ch: char) -> Self {
         self.bullet_char = Some(ch);
         self.bullet_enabled = Some(true);
@@ -822,12 +938,14 @@ impl Paragraph {
     }
 
     /// Explicitly enable or disable paragraph bullets.
+    #[must_use]
     pub fn bullet_enabled(mut self, enabled: bool) -> Self {
         self.bullet_enabled = Some(enabled);
         self
     }
 
     /// Set the bullet font reference and mark it active.
+    #[must_use]
     pub fn bullet_font(mut self, index: u16) -> Self {
         self.bullet_font_index = Some(index);
         self.bullet_font_enabled = Some(true);
@@ -835,12 +953,14 @@ impl Paragraph {
     }
 
     /// Explicitly enable or disable the bullet font override.
+    #[must_use]
     pub fn bullet_font_enabled(mut self, enabled: bool) -> Self {
         self.bullet_font_enabled = Some(enabled);
         self
     }
 
     /// Set the raw `BulletSize` value and mark it active.
+    #[must_use]
     pub fn bullet_size(mut self, size: i16) -> Self {
         self.bullet_size = Some(size);
         self.bullet_size_enabled = Some(true);
@@ -848,12 +968,14 @@ impl Paragraph {
     }
 
     /// Explicitly enable or disable the bullet size override.
+    #[must_use]
     pub fn bullet_size_enabled(mut self, enabled: bool) -> Self {
         self.bullet_size_enabled = Some(enabled);
         self
     }
 
     /// Set a direct sRGB bullet color.
+    #[must_use]
     pub fn bullet_color_rgb(mut self, r: u8, g: u8, b: u8) -> Self {
         self.bullet_color = Some(TextColor::rgb(r, g, b));
         self.bullet_color_enabled = Some(true);
@@ -861,6 +983,7 @@ impl Paragraph {
     }
 
     /// Set a color-scheme index for the bullet.
+    #[must_use]
     pub fn bullet_color_scheme(mut self, index: u8) -> Self {
         self.bullet_color = Some(TextColor::scheme(index));
         self.bullet_color_enabled = Some(true);
@@ -868,71 +991,83 @@ impl Paragraph {
     }
 
     /// Explicitly enable or disable the bullet color override.
+    #[must_use]
     pub fn bullet_color_enabled(mut self, enabled: bool) -> Self {
         self.bullet_color_enabled = Some(enabled);
         self
     }
 
     /// Set the paragraph indent level.
+    #[must_use]
     pub fn indent_level(mut self, level: u16) -> Self {
         self.indent_level = level;
         self
     }
 
     /// Set the default tab size in master units.
+    #[must_use]
     pub fn default_tab_size(mut self, size: i16) -> Self {
         self.default_tab_size = Some(size);
         self
     }
 
     /// Set explicit paragraph tab stops.
+    #[must_use]
     pub fn tab_stops(mut self, stops: Vec<TabStop>) -> Self {
         self.tab_stops = Some(stops);
         self
     }
 
     /// Set font alignment within the line.
+    #[must_use]
     pub fn font_alignment(mut self, alignment: TextFontAlign) -> Self {
         self.font_alignment = Some(alignment);
         self
     }
 
     /// Set the East Asian character-wrapping override.
+    #[must_use]
     pub fn character_wrap(mut self, enabled: bool) -> Self {
         self.character_wrap = Some(enabled);
         self
     }
 
     /// Set the word-wrapping override.
+    #[must_use]
     pub fn word_wrap(mut self, enabled: bool) -> Self {
         self.word_wrap = Some(enabled);
         self
     }
 
     /// Set the hanging-punctuation override.
+    #[must_use]
     pub fn overflow(mut self, enabled: bool) -> Self {
         self.overflow = Some(enabled);
         self
     }
 
     /// Set paragraph text direction.
+    #[must_use]
     pub fn text_direction(mut self, direction: TextDirection) -> Self {
         self.text_direction = Some(direction);
         self
     }
 
     /// Get total character count for this paragraph's runs only (no paragraph marker)
+    #[must_use]
     pub fn runs_char_count(&self) -> u32 {
-        self.runs.iter().map(|r| r.char_count()).sum::<u32>()
+        self.runs.iter().map(TextRun::char_count).sum::<u32>()
     }
 
     /// Get total character count including paragraph separator
     /// Note: The last paragraph in a sequence should NOT include +1
+    #[must_use]
     pub fn char_count(&self) -> u32 {
         self.runs_char_count() + 1 // +1 for paragraph end marker (CR)
     }
 
     /// Get combined text
+    #[must_use]
     pub fn text(&self) -> String {
         self.runs.iter().map(|r| r.text.as_str()).collect()
     }
@@ -942,7 +1077,7 @@ impl Paragraph {
 // Text Style Header Structures
 // =============================================================================
 
-/// TextHeaderAtom type codes
+/// `TextHeaderAtom` type codes
 #[repr(u32)]
 #[derive(Debug, Clone, Copy)]
 pub enum TextHeaderType {
@@ -964,7 +1099,7 @@ pub enum TextHeaderType {
     QuarterBody = 8,
 }
 
-/// StyleTextPropAtom header
+/// `StyleTextPropAtom` header
 #[derive(Debug, Clone, Copy, IntoBytes, Immutable, KnownLayout)]
 #[repr(C, packed)]
 pub struct StyleTextPropHeader {
@@ -975,7 +1110,7 @@ pub struct StyleTextPropHeader {
 // Font Entity
 // =============================================================================
 
-/// Font entity for FontCollection
+/// Font entity for `FontCollection`
 #[derive(Debug, Clone)]
 pub struct FontEntity {
     /// Font face name (max 32 characters)
@@ -990,6 +1125,7 @@ pub struct FontEntity {
 
 impl FontEntity {
     /// Create Arial font (default)
+    #[must_use]
     pub fn arial() -> Self {
         Self {
             name: "Arial".to_string(),
@@ -1000,6 +1136,7 @@ impl FontEntity {
     }
 
     /// Create Times New Roman font
+    #[must_use]
     pub fn times_new_roman() -> Self {
         Self {
             name: "Times New Roman".to_string(),
@@ -1019,11 +1156,15 @@ impl FontEntity {
         }
     }
 
-    /// Build a checked FontEntityAtom payload (68 bytes).
+    /// Build a checked `FontEntityAtom` payload (68 bytes).
     ///
     /// Names shorter than 32 UTF-16 code units are NUL-terminated by the
     /// zero-filled field. Exactly 32 units are retained without a terminator.
     /// Longer names are rejected rather than truncated.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the conversion fails.
     pub fn try_build(&self) -> Result<Vec<u8>, crate::writer::WriteError> {
         if self.name.contains('\0') {
             return Err(crate::writer::WriteError::InvalidData(
@@ -1058,10 +1199,21 @@ impl FontEntity {
         Ok(data)
     }
 
-    /// Build a FontEntityAtom payload for compatibility with the original API.
+    /// Build a `FontEntityAtom` payload for compatibility with the original API.
     ///
     /// Invalid values panic instead of being silently truncated. Prefer
     /// [`Self::try_build`] in fallible authoring code.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the font face name contains a NUL character, is empty or
+    /// longer than 32 UTF-16 code units, or if reserved `font_type` bits are
+    /// set; see [`Self::try_build`] for the exact error conditions.
+    #[allow(
+        clippy::expect_used,
+        reason = "this is the documented panicking compatibility wrapper over try_build(); changing its signature would break the public API"
+    )]
+    #[must_use]
     pub fn build(&self) -> Vec<u8> {
         self.try_build()
             .expect("invalid PowerPoint FontEntity cannot be serialized")

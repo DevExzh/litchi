@@ -4,7 +4,7 @@
 //! The shared view value is still constructed and validated while source tables
 //! are published through `Workbook::edit`.
 
-use litchi::sheet::view::{Mode, Scale, View};
+use litchi::sheet::view::{Mode, Scale, View, Zoom};
 use litchi::xlsx::{Number, Workbook};
 use std::env;
 
@@ -13,9 +13,14 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .nth(1)
         .unwrap_or_else(|| "page-breaks.xlsx".to_string());
 
-    let mut page_view = View::default();
-    page_view.mode = Mode::PageBreakPreview;
-    page_view.zoom.current = Scale::new(85)?;
+    let page_view = View {
+        mode: Mode::PageBreakPreview,
+        zoom: Zoom {
+            current: Scale::new(85)?,
+            ..Zoom::default()
+        },
+        ..View::default()
+    };
     let page_breaks = [("row", 21_u32), ("row", 41), ("column", 3)];
 
     let workbook = Workbook::create()?;

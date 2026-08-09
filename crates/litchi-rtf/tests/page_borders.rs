@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{
     PageBorder, PageBorderAppliesTo, PageBorderDepth, PageBorderOffset, PageBorderStyle,
     RtfDocument, RtfWriter,
@@ -21,7 +30,7 @@ fn parses_libreoffice_page_border_export_and_round_trips_deterministically() {
         .write_document(&document)
         .unwrap();
     let text = String::from_utf8(output).unwrap();
-    let expected = r#"\pgbrdrt\brdrs\brdrw10\brdrcf0\brsp480\pgbrdrl\brdrs\brdrw20\brdrcf0\brsp480\pgbrdrb\brdrs\brdrw30\brdrcf0\brsp480\pgbrdrr\brdrs\brdrw40\brdrcf0\brsp480"#;
+    let expected = r"\pgbrdrt\brdrs\brdrw10\brdrcf0\brsp480\pgbrdrl\brdrs\brdrw20\brdrcf0\brsp480\pgbrdrb\brdrs\brdrw30\brdrcf0\brsp480\pgbrdrr\brdrs\brdrw40\brdrcf0\brsp480";
     assert!(text.contains(expected), "{text}");
     let reparsed = RtfDocument::parse(&text).unwrap();
     assert_eq!(reparsed.sections()[0].properties.page_borders, borders);
@@ -29,7 +38,7 @@ fn parses_libreoffice_page_border_export_and_round_trips_deterministically() {
 
 #[test]
 fn parses_options_group_boundaries_destinations_and_sectd_reset() {
-    let rtf = r#"{\rtf1{\*\unknown\pgbrdrt\brdrs\brdrw75}\sectd\pgbrdropt43\pgbrdrhead\pgbrdrfoot\pgbrdrsnap{\pgbrdrt\brdrdb\brdrw25\brdrcf7\brsp30\brdrsh}\sectd\pgbrdrb\brdrdot\brdrw5 Body}"#;
+    let rtf = r"{\rtf1{\*\unknown\pgbrdrt\brdrs\brdrw75}\sectd\pgbrdropt43\pgbrdrhead\pgbrdrfoot\pgbrdrsnap{\pgbrdrt\brdrdb\brdrw25\brdrcf7\brsp30\brdrsh}\sectd\pgbrdrb\brdrdot\brdrw5 Body}";
     let document = RtfDocument::parse(rtf).unwrap();
     let borders = document.sections()[0].properties.page_borders;
     assert!(borders.top.is_none());
@@ -58,7 +67,7 @@ fn writer_emits_typed_options_and_art_in_canonical_order() {
     RtfWriter::new(&mut output).write_section(&section).unwrap();
     let text = String::from_utf8(output).unwrap();
     assert!(
-        text.contains(r#"\pgbrdropt43\pgbrdrhead\pgbrdrt\brdrart42\brdrw12\brdrcf3\brsp20"#),
+        text.contains(r"\pgbrdropt43\pgbrdrhead\pgbrdrt\brdrart42\brdrw12\brdrcf3\brsp20"),
         "{text}"
     );
 }
@@ -66,19 +75,19 @@ fn writer_emits_typed_options_and_art_in_canonical_order() {
 #[test]
 fn rejects_malformed_page_borders_and_negative_libreoffice_fixture() {
     for rtf in [
-        r#"{\rtf1\pgbrdrt Body}"#,
-        r#"{\rtf1\pgbrdrt\brdrw10\brdrs Body}"#,
-        r#"{\rtf1\pgbrdrt\brdrs\brdrdb Body}"#,
-        r#"{\rtf1\pgbrdrt\brdrs\brdrw Body}"#,
-        r#"{\rtf1\pgbrdrt\brdrs\brdrw76 Body}"#,
-        r#"{\rtf1\pgbrdrt\brdrs\brsp1441 Body}"#,
-        r#"{\rtf1\pgbrdrt\brdrart0 Body}"#,
-        r#"{\rtf1\pgbrdrt\brdrart166 Body}"#,
-        r#"{\rtf1\pgbrdropt Body}"#,
-        r#"{\rtf1\pgbrdropt4 Body}"#,
-        r#"{\rtf1\pgbrdropt16 Body}"#,
-        r#"{\rtf1\pgbrdropt64 Body}"#,
-        r#"{\rtf1\pgbrdrt\brdrs\brdrw10\pgbrdrt\brdrs Body}"#,
+        r"{\rtf1\pgbrdrt Body}",
+        r"{\rtf1\pgbrdrt\brdrw10\brdrs Body}",
+        r"{\rtf1\pgbrdrt\brdrs\brdrdb Body}",
+        r"{\rtf1\pgbrdrt\brdrs\brdrw Body}",
+        r"{\rtf1\pgbrdrt\brdrs\brdrw76 Body}",
+        r"{\rtf1\pgbrdrt\brdrs\brsp1441 Body}",
+        r"{\rtf1\pgbrdrt\brdrart0 Body}",
+        r"{\rtf1\pgbrdrt\brdrart166 Body}",
+        r"{\rtf1\pgbrdropt Body}",
+        r"{\rtf1\pgbrdropt4 Body}",
+        r"{\rtf1\pgbrdropt16 Body}",
+        r"{\rtf1\pgbrdropt64 Body}",
+        r"{\rtf1\pgbrdrt\brdrs\brdrw10\pgbrdrt\brdrs Body}",
     ] {
         assert!(RtfDocument::parse(rtf).is_err(), "accepted {rtf}");
     }

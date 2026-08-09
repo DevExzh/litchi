@@ -1,4 +1,4 @@
-//! Semantic PresentationML zoom values and the lossless shape owner.
+//! Semantic `PresentationML` zoom values and the lossless shape owner.
 
 use std::slice;
 
@@ -8,7 +8,7 @@ use super::codec;
 
 /// A bounded percentage in the `ST_Percentage` wire domain.
 ///
-/// PresentationML stores percentages in thousandths of a percent. The whole
+/// `PresentationML` stores percentages in thousandths of a percent. The whole
 /// signed 32-bit range is the schema domain, so every value representable by
 /// this type is safe to write without a late string/range escape hatch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -23,12 +23,14 @@ impl Percentage {
 
     /// Construct a schema-valid percentage in thousandths of a percent.
     #[inline]
+    #[must_use]
     pub const fn new(value: i32) -> Self {
         Self(value)
     }
 
     /// Return the thousandths-of-a-percent value.
     #[inline]
+    #[must_use]
     pub const fn value(self) -> i32 {
         self.0
     }
@@ -44,7 +46,7 @@ pub enum ImageType {
     Cover,
 }
 
-/// Whether a DrawingML image reference is embedded or externally linked.
+/// Whether a `DrawingML` image reference is embedded or externally linked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Link {
     /// `a:blip@r:embed`; the relationship must be internal.
@@ -63,6 +65,10 @@ pub struct Relationship {
 
 impl Relationship {
     /// Construct a relationship reference without resolving a package target.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(id: impl Into<String>, link: Link) -> Result<Self> {
         let id = id.into();
         if id.is_empty() || id.len() > codec::MAX_RELATIONSHIP_ID_BYTES {
@@ -79,18 +85,21 @@ impl Relationship {
 
     /// Relationship ID used by `a:blip`.
     #[inline]
+    #[must_use]
     pub fn id(&self) -> &str {
         &self.id
     }
 
     /// Whether the reference is embedded or external.
     #[inline]
+    #[must_use]
     pub const fn link(&self) -> Link {
         self.link
     }
 
     /// Resolved target metadata when this owner came from a package context.
     #[inline]
+    #[must_use]
     pub fn target(&self) -> Option<&Target> {
         self.target.as_ref()
     }
@@ -112,6 +121,7 @@ pub enum Target {
 
 impl Target {
     /// Return the internal OPC part name, if this is an embedded target.
+    #[must_use]
     pub fn part_name(&self) -> Option<&str> {
         match self {
             Self::Internal { part_name, .. } => Some(part_name),
@@ -120,6 +130,7 @@ impl Target {
     }
 
     /// Return the validated content type, if this is an embedded target.
+    #[must_use]
     pub fn content_type(&self) -> Option<&str> {
         match self {
             Self::Internal { content_type, .. } => Some(content_type),
@@ -128,6 +139,7 @@ impl Target {
     }
 
     /// Return the external URI, if this is an externally linked target.
+    #[must_use]
     pub fn uri(&self) -> Option<&str> {
         match self {
             Self::External { uri } => Some(uri),
@@ -150,7 +162,11 @@ pub struct Properties {
 }
 
 impl Properties {
-    /// Create typed zoom properties from the required DrawingML child XML.
+    /// Create typed zoom properties from the required `DrawingML` child XML.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(
         id: impl Into<String>,
         blip_fill_xml: impl Into<Vec<u8>>,
@@ -180,12 +196,14 @@ impl Properties {
 
     /// Stable GUID identifying the zoom object.
     #[inline]
+    #[must_use]
     pub fn id(&self) -> &str {
         &self.id
     }
 
     /// Whether slideshow navigation returns to the parent slide.
     #[inline]
+    #[must_use]
     pub const fn return_to_parent(&self) -> bool {
         self.return_to_parent
     }
@@ -198,6 +216,7 @@ impl Properties {
 
     /// Select preview or cover-image behavior.
     #[inline]
+    #[must_use]
     pub const fn image_type(&self) -> ImageType {
         self.image_type
     }
@@ -210,6 +229,7 @@ impl Properties {
 
     /// Optional transition duration.
     #[inline]
+    #[must_use]
     pub fn transition(&self) -> Option<&crate::time::Offset> {
         self.transition.as_ref()
     }
@@ -222,6 +242,7 @@ impl Properties {
 
     /// Whether the destination background is shown during the zoom.
     #[inline]
+    #[must_use]
     pub const fn show_background(&self) -> bool {
         self.show_background
     }
@@ -234,11 +255,16 @@ impl Properties {
 
     /// Borrow the preserved `a:blipFill` payload.
     #[inline]
+    #[must_use]
     pub fn blip_fill_xml(&self) -> &[u8] {
         &self.blip_fill_xml
     }
 
     /// Replace the `a:blipFill` payload and refresh its typed relationship.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_blip_fill_xml(&mut self, value: impl Into<Vec<u8>>) -> Result<()> {
         let value = value.into();
         if value.is_empty() {
@@ -252,11 +278,16 @@ impl Properties {
 
     /// Borrow the preserved `a:spPr` payload.
     #[inline]
+    #[must_use]
     pub fn shape_properties_xml(&self) -> &[u8] {
         &self.shape_properties_xml
     }
 
     /// Replace the preserved `a:spPr` payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_shape_properties_xml(&mut self, value: impl Into<Vec<u8>>) -> Result<()> {
         let value = value.into();
         if value.is_empty() {
@@ -270,6 +301,7 @@ impl Properties {
 
     /// Borrow the image relationship metadata, if `a:blip` declares one.
     #[inline]
+    #[must_use]
     pub fn image_relationship(&self) -> Option<&Relationship> {
         self.image.as_ref()
     }
@@ -291,6 +323,10 @@ pub struct Section {
 
 impl Section {
     /// Create a section zoom with a preserved or authored `p:pic` fallback.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(
         section_id: impl Into<String>,
         properties: Properties,
@@ -315,12 +351,14 @@ impl Section {
 
     /// Stable section GUID targeted by this object.
     #[inline]
+    #[must_use]
     pub fn section_id(&self) -> &str {
         &self.section_id
     }
 
     /// Shared zoom properties.
     #[inline]
+    #[must_use]
     pub fn properties(&self) -> &Properties {
         &self.properties
     }
@@ -333,18 +371,21 @@ impl Section {
 
     /// Borrow the exact fallback shape XML.
     #[inline]
+    #[must_use]
     pub fn fallback_xml(&self) -> &[u8] {
         &self.fallback_xml
     }
 
     /// Borrow the optional preserved object extension list.
     #[inline]
+    #[must_use]
     pub fn extension_xml(&self) -> Option<&[u8]> {
         self.extension_xml.as_deref()
     }
 
     /// Borrow unsupported choice payloads retained beside the typed choice.
     #[inline]
+    #[must_use]
     pub fn unknown_xml(&self) -> &[Vec<u8>] {
         &self.unknown_xml
     }
@@ -363,6 +404,10 @@ pub struct Slide {
 
 impl Slide {
     /// Create a slide zoom with a preserved or authored `p:pic` fallback.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(
         slide_id: u32,
         properties: Properties,
@@ -383,14 +428,16 @@ impl Slide {
         })
     }
 
-    /// Stable PresentationML slide ID targeted by this object.
+    /// Stable `PresentationML` slide ID targeted by this object.
     #[inline]
+    #[must_use]
     pub const fn slide_id(&self) -> u32 {
         self.slide_id
     }
 
     /// Optional creation ID associated with the slide zoom.
     #[inline]
+    #[must_use]
     pub const fn creation_id(&self) -> Option<u32> {
         self.creation_id
     }
@@ -403,6 +450,7 @@ impl Slide {
 
     /// Shared zoom properties.
     #[inline]
+    #[must_use]
     pub fn properties(&self) -> &Properties {
         &self.properties
     }
@@ -415,18 +463,21 @@ impl Slide {
 
     /// Borrow the exact fallback shape XML.
     #[inline]
+    #[must_use]
     pub fn fallback_xml(&self) -> &[u8] {
         &self.fallback_xml
     }
 
     /// Borrow the optional preserved object extension list.
     #[inline]
+    #[must_use]
     pub fn extension_xml(&self) -> Option<&[u8]> {
         self.extension_xml.as_deref()
     }
 
     /// Borrow unsupported choice payloads retained beside the typed choice.
     #[inline]
+    #[must_use]
     pub fn unknown_xml(&self) -> &[Vec<u8>] {
         &self.unknown_xml
     }
@@ -458,6 +509,10 @@ pub struct Item {
 
 impl Item {
     /// Create a summary item with schema defaults for text, offset, and scale.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(section_id: impl Into<String>, properties: Properties) -> Result<Self> {
         let section_id = section_id.into();
         codec::validate_guid(&section_id)?;
@@ -477,12 +532,14 @@ impl Item {
 
     /// Stable section GUID targeted by this summary item.
     #[inline]
+    #[must_use]
     pub fn section_id(&self) -> &str {
         &self.section_id
     }
 
     /// Alternative-text title.
     #[inline]
+    #[must_use]
     pub fn title(&self) -> &str {
         &self.title
     }
@@ -495,6 +552,7 @@ impl Item {
 
     /// Alternative-text description.
     #[inline]
+    #[must_use]
     pub fn description(&self) -> &str {
         &self.description
     }
@@ -507,12 +565,14 @@ impl Item {
 
     /// Horizontal layout offset.
     #[inline]
+    #[must_use]
     pub const fn offset_x(&self) -> Percentage {
         self.offset_x
     }
 
     /// Vertical layout offset.
     #[inline]
+    #[must_use]
     pub const fn offset_y(&self) -> Percentage {
         self.offset_y
     }
@@ -526,12 +586,14 @@ impl Item {
 
     /// Horizontal layout scale.
     #[inline]
+    #[must_use]
     pub const fn scale_x(&self) -> Percentage {
         self.scale_x
     }
 
     /// Vertical layout scale.
     #[inline]
+    #[must_use]
     pub const fn scale_y(&self) -> Percentage {
         self.scale_y
     }
@@ -545,6 +607,7 @@ impl Item {
 
     /// Shared zoom properties.
     #[inline]
+    #[must_use]
     pub fn properties(&self) -> &Properties {
         &self.properties
     }
@@ -557,12 +620,14 @@ impl Item {
 
     /// Borrow the optional preserved object extension list.
     #[inline]
+    #[must_use]
     pub fn extension_xml(&self) -> Option<&[u8]> {
         self.extension_xml.as_deref()
     }
 
     /// Borrow unsupported choice payloads retained beside the typed choice.
     #[inline]
+    #[must_use]
     pub fn unknown_xml(&self) -> &[Vec<u8>] {
         &self.unknown_xml
     }
@@ -580,6 +645,10 @@ pub struct Summary {
 
 impl Summary {
     /// Create a summary zoom with a preserved or authored `p:grpSp` fallback.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(layout: Layout, fallback_xml: impl Into<Vec<u8>>) -> Result<Self> {
         let fallback_xml = fallback_xml.into();
         if fallback_xml.is_empty() {
@@ -598,6 +667,7 @@ impl Summary {
 
     /// Layout mode used by the summary container.
     #[inline]
+    #[must_use]
     pub const fn layout(&self) -> Layout {
         self.layout
     }
@@ -610,11 +680,16 @@ impl Summary {
 
     /// Borrow summary items in source order.
     #[inline]
+    #[must_use]
     pub fn items(&self) -> &[Item] {
         &self.items
     }
 
     /// Add one summary item, rejecting duplicate section or object IDs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add_item(&mut self, item: Item) -> Result<()> {
         if self.items.iter().any(|value| {
             value.section_id == item.section_id || value.properties.id == item.properties.id
@@ -628,6 +703,10 @@ impl Summary {
     }
 
     /// Remove a summary item by zero-based position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_item(&mut self, index: usize) -> Result<Item> {
         if index >= self.items.len() {
             return Err(Error::Invalid(format!(
@@ -640,18 +719,21 @@ impl Summary {
 
     /// Borrow the exact fallback group XML.
     #[inline]
+    #[must_use]
     pub fn fallback_xml(&self) -> &[u8] {
         &self.fallback_xml
     }
 
     /// Borrow the optional preserved container extension list.
     #[inline]
+    #[must_use]
     pub fn extension_xml(&self) -> Option<&[u8]> {
         self.extension_xml.as_deref()
     }
 
     /// Borrow unsupported choice payloads retained beside the typed choice.
     #[inline]
+    #[must_use]
     pub fn unknown_xml(&self) -> &[Vec<u8>] {
         &self.unknown_xml
     }
@@ -665,6 +747,10 @@ pub struct Unknown {
 
 impl Unknown {
     /// Preserve an opaque `mc:AlternateContent` element.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(xml: impl Into<Vec<u8>>) -> Result<Self> {
         let xml = xml.into();
         if xml.is_empty() {
@@ -675,6 +761,7 @@ impl Unknown {
 
     /// Borrow the exact opaque alternate-content XML.
     #[inline]
+    #[must_use]
     pub fn xml(&self) -> &[u8] {
         &self.xml
     }
@@ -696,6 +783,7 @@ pub enum Zoom {
 
 impl Zoom {
     /// Shared properties for a section or slide zoom.
+    #[must_use]
     pub fn properties(&self) -> Option<&Properties> {
         match self {
             Self::Section(value) => Some(&value.properties),
@@ -736,11 +824,19 @@ pub struct Owner {
 
 impl Owner {
     /// Read zoom entries from a complete slide or shape-tree XML owner.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn read(xml: &[u8]) -> Result<Self> {
         codec::read_owner(xml)
     }
 
     /// Alias for [`Self::read`] used by package-facing code.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     #[inline]
     pub fn from_xml(xml: &[u8]) -> Result<Self> {
         Self::read(xml)
@@ -748,11 +844,16 @@ impl Owner {
 
     /// Current complete owner XML.
     #[inline]
+    #[must_use]
     pub fn xml(&self) -> &[u8] {
         &self.xml
     }
 
     /// Serialize the current owner without normalizing unrelated markup.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
     #[inline]
     pub fn to_xml(&self) -> Result<Vec<u8>> {
         Ok(self.xml.clone())
@@ -760,18 +861,21 @@ impl Owner {
 
     /// Number of zoom alternate-content entries, including unknown entries.
     #[inline]
+    #[must_use]
     pub fn len(&self) -> usize {
         self.entries.len()
     }
 
     /// Whether the owner contains no zoom entries.
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
 
     /// Borrow one zoom by checked source order.
     #[inline]
+    #[must_use]
     pub fn get(&self, index: usize) -> Option<&Zoom> {
         self.entries.get(index)
     }
@@ -783,6 +887,10 @@ impl Owner {
     }
 
     /// Append one zoom to the first shape tree in the owner.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add(&mut self, value: Zoom) -> Result<usize> {
         let fragment = codec::write_zoom(&value, self)?;
         let mut xml = self.xml.clone();
@@ -831,6 +939,10 @@ impl Owner {
     }
 
     /// Replace one zoom and return the previous semantic value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace(&mut self, index: usize, value: Zoom) -> Result<Zoom> {
         let old =
             self.entries.get(index).cloned().ok_or_else(|| {
@@ -849,6 +961,10 @@ impl Owner {
     }
 
     /// Remove one zoom and return the previous semantic value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove(&mut self, index: usize) -> Result<Zoom> {
         let old =
             self.entries.get(index).cloned().ok_or_else(|| {
@@ -866,6 +982,10 @@ impl Owner {
     }
 
     /// Remove every zoom entry while retaining all unrelated slide markup.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn clear(&mut self) -> Result<()> {
         let mut xml = self.xml.clone();
         for &(start, end) in self.spans.iter().rev() {

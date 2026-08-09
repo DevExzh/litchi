@@ -19,6 +19,9 @@ use quick_xml::reader::NsReader;
 use smallvec::SmallVec;
 use std::collections::{HashMap, HashSet, TryReserveError};
 
+/// Reserved ZIP item name of the content types stream (ECMA-376 Part 2 §10.1.2.2).
+const CONTENT_TYPES_MEMBER: &str = "[Content_Types].xml";
+
 /// Serialized part with its content and relationships.
 ///
 /// Represents a part as loaded from the physical package, before
@@ -81,11 +84,11 @@ mod physical_part_tests {
 
         let reserialized = PackageWriter::to_bytes(&loaded).unwrap();
         let reloaded = OpcPackage::from_bytes(&reserialized).unwrap();
-        let orphan = reloaded
+        let surviving_orphan = reloaded
             .iter_parts()
             .find(|part| part.partname().as_str() == ORPHAN_PART_NAME)
             .expect("unreferenced physical part must survive save and reopen");
-        assert_eq!(orphan.blob(), ORPHAN_CONTENT);
+        assert_eq!(surviving_orphan.blob(), ORPHAN_CONTENT);
     }
 }
 
@@ -126,6 +129,10 @@ impl SerializedRelationship {
     ///
     /// Resolves the relative target reference against the base URI
     /// to produce an absolute `PackURI`.
+    ///
+    /// # Errors
+    /// Returns an error for external relationships, for internal targets with no
+    /// resolvable part path, or when the resolved name is not a valid `PackURI`.
     pub fn target_partname(&self) -> Result<PackURI> {
         if self.is_external() {
             return Err(OpcError::InvalidRelationship(
@@ -165,14 +172,6 @@ pub struct PackageReader {
     non_part_members: Vec<NonPartMember>,
 }
 
-/// Reserved ZIP item name of the content types stream (ECMA-376 Part 2 §10.1.2.2).
-const CONTENT_TYPES_MEMBER: &str = "[Content_Types].xml";
-
-/// Whether a ZIP error reports a missing member rather than a damaged one.
-fn is_member_missing(error: &soapberry_zip::Error) -> bool {
-    matches!(error.kind(), soapberry_zip::ErrorKind::FileNotFound(_))
-}
-
 impl PackageReader {
     /// Open and parse an OPC package from a byte slice.
     ///
@@ -191,6 +190,12 @@ impl PackageReader {
     ///
     /// # Returns
     /// A new `PackageReader` with all parts and relationships loaded
+    ///
+    /// # Errors
+    /// Returns an error when the package violates the OPC specification (missing
+    /// content types stream, malformed relationships manifest, invalid part
+    /// names or content types), when a ZIP member cannot be read, or when any
+    /// configured read limit is exceeded.
     pub fn from_phys_reader(phys_reader: &PhysPkgReader<'_>) -> Result<Self> {
         let archive = phys_reader.archive();
         let limits = phys_reader.limits();
@@ -352,7 +357,12 @@ impl PackageReader {
                     ));
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::GeneralRef(_) => {},
             }
         }
 
@@ -659,7 +669,10 @@ impl PackageReader {
         let Some((directory, filename)) = member_name.rsplit_once('/') else {
             return false;
         };
-        filename.ends_with(".rels") && (directory == "_rels" || directory.ends_with("/_rels"))
+        let has_rels_extension = filename
+            .rsplit_once('.')
+            .is_some_and(|(_, extension)| extension.eq_ignore_ascii_case("rels"));
+        has_rels_extension && (directory == "_rels" || directory.ends_with("/_rels"))
     }
 
     fn relationship_part_has_relationships(member_name: &str) -> bool {
@@ -701,190 +714,6 @@ impl PackageReader {
     pub fn take_non_part_members(&mut self) -> Vec<NonPartMember> {
         std::mem::take(&mut self.non_part_members)
     }
-}
-
-#[allow(clippy::too_many_arguments)]
-fn inspect_relationship_element(
-    relationships: &mut SmallVec<[SerializedRelationship; 8]>,
-    ids: &mut HashSet<String>,
-    resolved_namespace: &ResolveResult<'_>,
-    element: &quick_xml::events::BytesStart<'_>,
-    decoder: quick_xml::Decoder,
-    base_uri: &str,
-    source_uri: Option<&str>,
-    depth: usize,
-    root_seen: &mut bool,
-    limits: ReadLimits,
-    ledger: &mut RelationshipLedger,
-) -> Result<()> {
-    let correct_namespace = matches!(
-        resolved_namespace,
-        ResolveResult::Bound(Namespace(value))
-            if *value == namespace::OPC_RELATIONSHIPS.as_bytes()
-    );
-    if depth == 0 {
-        if *root_seen {
-            return Err(OpcError::InvalidRelationshipsManifest(
-                "multiple root elements".to_string(),
-            ));
-        }
-        *root_seen = true;
-        if element.local_name().as_ref() != b"Relationships" || !correct_namespace {
-            return Err(OpcError::InvalidRelationshipsManifest(
-                "root must be Relationships in the OPC relationships namespace".to_string(),
-            ));
-        }
-        return Ok(());
-    }
-    if depth != 1 || element.local_name().as_ref() != b"Relationship" || !correct_namespace {
-        return Err(OpcError::InvalidRelationshipsManifest(
-            "only direct Relationship children are permitted".to_string(),
-        ));
-    }
-    let next_relationship_count = checked_increment(
-        relationships.len(),
-        limits.max_relationships_per_part(),
-        ReadResource::RelationshipsPerPart,
-    )?;
-
-    let mut id = None;
-    let mut relationship_type = None;
-    let mut target = None;
-    let mut target_mode = TargetMode::Internal;
-    for attribute in element.attributes() {
-        let attribute = attribute.map_err(|error| {
-            OpcError::InvalidRelationshipsManifest(format!(
-                "invalid Relationship attribute: {error}"
-            ))
-        })?;
-        limits.check(
-            ReadResource::XmlAttributeBytes,
-            attribute.value.as_ref().len() as u64,
-            limits.max_xml_attribute_bytes() as u64,
-        )?;
-        let value = attribute
-            .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
-            .map(|value| value.to_string())
-            .map_err(|error| {
-                OpcError::InvalidRelationshipsManifest(format!(
-                    "invalid Relationship attribute value: {error}"
-                ))
-            })?;
-        limits.check(
-            ReadResource::XmlAttributeBytes,
-            value.len() as u64,
-            limits.max_xml_attribute_bytes() as u64,
-        )?;
-        match attribute.key.as_ref() {
-            b"Id" => id = Some(value),
-            b"Type" => relationship_type = Some(value),
-            b"Target" => target = Some(value),
-            b"TargetMode" => target_mode = TargetMode::parse(&value)?,
-            b"xmlns" => {},
-            name if name.starts_with(b"xmlns:") => {},
-            _ => {
-                return Err(OpcError::InvalidRelationshipsManifest(
-                    "unexpected Relationship attribute".to_string(),
-                ));
-            },
-        }
-    }
-    let id = required_relationship_attribute(id, "Id")?;
-    let relationship_type = required_relationship_attribute(relationship_type, "Type")?;
-    let target = required_relationship_attribute(target, "Target")?;
-    limits.check(
-        ReadResource::RelationshipTargetBytes,
-        target.len() as u64,
-        limits.max_relationship_target_bytes() as u64,
-    )?;
-    if !is_xml_id(&id) {
-        return Err(OpcError::InvalidRelationshipsManifest(format!(
-            "relationship Id '{id}' is not an XML ID"
-        )));
-    }
-    ids.try_reserve(1)
-        .map_err(|source| allocation("OPC relationship IDs", source))?;
-    if !ids.insert(id.clone()) {
-        return Err(OpcError::DuplicateRelationshipId(id));
-    }
-    if relationship_type.chars().any(char::is_whitespace)
-        || relationship_type.chars().any(char::is_control)
-        || target.chars().any(char::is_control)
-    {
-        return Err(OpcError::InvalidRelationshipsManifest(
-            "relationship Type or Target is not a valid URI reference".to_string(),
-        ));
-    }
-    relationships.try_reserve(1).map_err(|source| {
-        OpcError::InvalidRelationshipsManifest(format!(
-            "unable to reserve relationship storage: {source}"
-        ))
-    })?;
-    ledger.add_relationship(limits)?;
-    debug_assert_eq!(next_relationship_count, relationships.len() + 1);
-    relationships.push(SerializedRelationship {
-        base_uri: base_uri.to_string(),
-        source_uri: source_uri.map(str::to_string),
-        r_id: id,
-        reltype: relationship_type,
-        target_ref: target,
-        target_mode,
-    });
-    Ok(())
-}
-
-fn required_relationship_attribute(value: Option<String>, name: &str) -> Result<String> {
-    value.filter(|value| !value.is_empty()).ok_or_else(|| {
-        OpcError::InvalidRelationshipsManifest(format!(
-            "Relationship requires a non-empty {name} attribute"
-        ))
-    })
-}
-
-fn is_xml_id(value: &str) -> bool {
-    let mut characters = value.chars();
-    characters.next().is_some_and(is_ncname_start) && characters.all(is_ncname_char)
-}
-
-fn is_ncname_start(character: char) -> bool {
-    matches!(
-        character,
-        'A'..='Z'
-            | '_'
-            | 'a'..='z'
-            | '\u{00c0}'..='\u{00d6}'
-            | '\u{00d8}'..='\u{00f6}'
-            | '\u{00f8}'..='\u{02ff}'
-            | '\u{0370}'..='\u{037d}'
-            | '\u{037f}'..='\u{1fff}'
-            | '\u{200c}'..='\u{200d}'
-            | '\u{2070}'..='\u{218f}'
-            | '\u{2c00}'..='\u{2fef}'
-            | '\u{3001}'..='\u{d7ff}'
-            | '\u{f900}'..='\u{fdcf}'
-            | '\u{fdf0}'..='\u{fffd}'
-            | '\u{10000}'..='\u{effff}'
-    )
-}
-
-fn is_ncname_char(character: char) -> bool {
-    is_ncname_start(character)
-        || matches!(
-            character,
-            '-' | '.' | '0'..='9' | '\u{00b7}' | '\u{0300}'..='\u{036f}' | '\u{203f}'..='\u{2040}'
-        )
-}
-
-fn is_core_properties_relationship(relationship_type: &str) -> bool {
-    matches!(
-        relationship_type,
-        "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties"
-            | "http://purl.oclc.org/ooxml/package/relationships/metadata/core-properties"
-    )
-}
-
-fn allocation(resource: &'static str, source: TryReserveError) -> OpcError {
-    OpcError::Allocation { resource, source }
 }
 
 #[derive(Default)]
@@ -945,6 +774,198 @@ impl RelationshipLedger {
         )?;
         Ok(())
     }
+}
+
+#[allow(
+    clippy::too_many_arguments,
+    reason = "relationship element parsing threads the shared parse state; bundling it into a struct would not reduce complexity"
+)]
+fn inspect_relationship_element(
+    relationships: &mut SmallVec<[SerializedRelationship; 8]>,
+    ids: &mut HashSet<String>,
+    resolved_namespace: &ResolveResult<'_>,
+    element: &quick_xml::events::BytesStart<'_>,
+    decoder: quick_xml::Decoder,
+    base_uri: &str,
+    source_uri: Option<&str>,
+    depth: usize,
+    root_seen: &mut bool,
+    limits: ReadLimits,
+    ledger: &mut RelationshipLedger,
+) -> Result<()> {
+    let correct_namespace = matches!(
+        resolved_namespace,
+        ResolveResult::Bound(Namespace(value))
+            if *value == namespace::OPC_RELATIONSHIPS.as_bytes()
+    );
+    if depth == 0 {
+        if *root_seen {
+            return Err(OpcError::InvalidRelationshipsManifest(
+                "multiple root elements".to_string(),
+            ));
+        }
+        *root_seen = true;
+        if element.local_name().as_ref() != b"Relationships" || !correct_namespace {
+            return Err(OpcError::InvalidRelationshipsManifest(
+                "root must be Relationships in the OPC relationships namespace".to_string(),
+            ));
+        }
+        return Ok(());
+    }
+    if depth != 1 || element.local_name().as_ref() != b"Relationship" || !correct_namespace {
+        return Err(OpcError::InvalidRelationshipsManifest(
+            "only direct Relationship children are permitted".to_string(),
+        ));
+    }
+    let next_relationship_count = checked_increment(
+        relationships.len(),
+        limits.max_relationships_per_part(),
+        ReadResource::RelationshipsPerPart,
+    )?;
+
+    let mut id_attribute = None;
+    let mut type_attribute = None;
+    let mut target_attribute = None;
+    let mut target_mode = TargetMode::Internal;
+    for attribute_result in element.attributes() {
+        let attribute = attribute_result.map_err(|error| {
+            OpcError::InvalidRelationshipsManifest(format!(
+                "invalid Relationship attribute: {error}"
+            ))
+        })?;
+        limits.check(
+            ReadResource::XmlAttributeBytes,
+            attribute.value.as_ref().len() as u64,
+            limits.max_xml_attribute_bytes() as u64,
+        )?;
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+            .map(|value| value.to_string())
+            .map_err(|error| {
+                OpcError::InvalidRelationshipsManifest(format!(
+                    "invalid Relationship attribute value: {error}"
+                ))
+            })?;
+        limits.check(
+            ReadResource::XmlAttributeBytes,
+            value.len() as u64,
+            limits.max_xml_attribute_bytes() as u64,
+        )?;
+        match attribute.key.as_ref() {
+            b"Id" => id_attribute = Some(value),
+            b"Type" => type_attribute = Some(value),
+            b"Target" => target_attribute = Some(value),
+            b"TargetMode" => target_mode = TargetMode::parse(&value)?,
+            b"xmlns" => {},
+            name if name.starts_with(b"xmlns:") => {},
+            _ => {
+                return Err(OpcError::InvalidRelationshipsManifest(
+                    "unexpected Relationship attribute".to_string(),
+                ));
+            },
+        }
+    }
+    let id = required_relationship_attribute(id_attribute, "Id")?;
+    let relationship_type = required_relationship_attribute(type_attribute, "Type")?;
+    let target = required_relationship_attribute(target_attribute, "Target")?;
+    limits.check(
+        ReadResource::RelationshipTargetBytes,
+        target.len() as u64,
+        limits.max_relationship_target_bytes() as u64,
+    )?;
+    if !is_xml_id(&id) {
+        return Err(OpcError::InvalidRelationshipsManifest(format!(
+            "relationship Id '{id}' is not an XML ID"
+        )));
+    }
+    ids.try_reserve(1)
+        .map_err(|source| allocation("OPC relationship IDs", source))?;
+    if !ids.insert(id.clone()) {
+        return Err(OpcError::DuplicateRelationshipId(id));
+    }
+    if relationship_type.chars().any(char::is_whitespace)
+        || relationship_type.chars().any(char::is_control)
+        || target.chars().any(char::is_control)
+    {
+        return Err(OpcError::InvalidRelationshipsManifest(
+            "relationship Type or Target is not a valid URI reference".to_string(),
+        ));
+    }
+    relationships.try_reserve(1).map_err(|source| {
+        OpcError::InvalidRelationshipsManifest(format!(
+            "unable to reserve relationship storage: {source}"
+        ))
+    })?;
+    ledger.add_relationship(limits)?;
+    debug_assert_eq!(next_relationship_count, relationships.len() + 1);
+    relationships.push(SerializedRelationship {
+        base_uri: base_uri.to_string(),
+        source_uri: source_uri.map(str::to_string),
+        r_id: id,
+        reltype: relationship_type,
+        target_ref: target,
+        target_mode,
+    });
+    Ok(())
+}
+
+fn required_relationship_attribute(value: Option<String>, name: &str) -> Result<String> {
+    value.filter(|text| !text.is_empty()).ok_or_else(|| {
+        OpcError::InvalidRelationshipsManifest(format!(
+            "Relationship requires a non-empty {name} attribute"
+        ))
+    })
+}
+
+fn is_xml_id(value: &str) -> bool {
+    let mut characters = value.chars();
+    characters.next().is_some_and(is_ncname_start) && characters.all(is_ncname_char)
+}
+
+fn is_ncname_start(character: char) -> bool {
+    matches!(
+        character,
+        'A'..='Z'
+            | '_'
+            | 'a'..='z'
+            | '\u{00c0}'..='\u{00d6}'
+            | '\u{00d8}'..='\u{00f6}'
+            | '\u{00f8}'..='\u{02ff}'
+            | '\u{0370}'..='\u{037d}'
+            | '\u{037f}'..='\u{1fff}'
+            | '\u{200c}'..='\u{200d}'
+            | '\u{2070}'..='\u{218f}'
+            | '\u{2c00}'..='\u{2fef}'
+            | '\u{3001}'..='\u{d7ff}'
+            | '\u{f900}'..='\u{fdcf}'
+            | '\u{fdf0}'..='\u{fffd}'
+            | '\u{10000}'..='\u{effff}'
+    )
+}
+
+fn is_ncname_char(character: char) -> bool {
+    is_ncname_start(character)
+        || matches!(
+            character,
+            '-' | '.' | '0'..='9' | '\u{00b7}' | '\u{0300}'..='\u{036f}' | '\u{203f}'..='\u{2040}'
+        )
+}
+
+fn is_core_properties_relationship(relationship_type: &str) -> bool {
+    matches!(
+        relationship_type,
+        "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties"
+            | "http://purl.oclc.org/ooxml/package/relationships/metadata/core-properties"
+    )
+}
+
+fn allocation(resource: &'static str, source: TryReserveError) -> OpcError {
+    OpcError::Allocation { resource, source }
+}
+
+/// Whether a ZIP error reports a missing member rather than a damaged one.
+fn is_member_missing(error: &soapberry_zip::Error) -> bool {
+    matches!(error.kind(), soapberry_zip::ErrorKind::FileNotFound(_))
 }
 
 fn checked_increment(current: usize, maximum: usize, resource: ReadResource) -> Result<usize> {
@@ -1017,9 +1038,9 @@ mod tests {
         let uri = PackURI::new("/test.xml").unwrap();
         assert_eq!(ct_map.get(&uri).unwrap(), "application/xml");
 
-        let uri = PackURI::new("/word/document.xml").unwrap();
+        let document_uri = PackURI::new("/word/document.xml").unwrap();
         assert_eq!(
-            ct_map.get(&uri).unwrap(),
+            ct_map.get(&document_uri).unwrap(),
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
         );
     }
@@ -1042,13 +1063,14 @@ mod tests {
             .is_empty()
         );
 
-        let bytes = package_bytes(
+        let malformed_bytes = package_bytes(
             br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="urn:test" Target="document""#,
             b"document",
         );
-        let archive = soapberry_zip::office::LazyArchiveReader::new(&bytes).unwrap();
+        let malformed_archive =
+            soapberry_zip::office::LazyArchiveReader::new(&malformed_bytes).unwrap();
         let error = PackageReader::load_rels_lazy(
-            &archive,
+            &malformed_archive,
             &package_uri,
             ReadLimits::default(),
             &mut RelationshipLedger::default(),
@@ -1069,9 +1091,8 @@ mod tests {
         bytes[position] ^= 0xff;
 
         let physical = PhysPkgReader::new(&bytes).unwrap();
-        let error = match PackageReader::from_phys_reader(&physical) {
-            Ok(_) => panic!("corrupt required part unexpectedly loaded"),
-            Err(error) => error,
+        let Err(error) = PackageReader::from_phys_reader(&physical) else {
+            panic!("corrupt required part unexpectedly loaded")
         };
         assert!(matches!(error, OpcError::ZipError(_)));
     }
@@ -1081,9 +1102,8 @@ mod tests {
         let relationships = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="officeDocument" Target="../escape.xml"/></Relationships>"#;
         let bytes = package_bytes(relationships, b"document");
         let physical = PhysPkgReader::new(&bytes).unwrap();
-        let error = match PackageReader::from_phys_reader(&physical) {
-            Ok(_) => panic!("invalid relationship target unexpectedly loaded"),
-            Err(error) => error,
+        let Err(error) = PackageReader::from_phys_reader(&physical) else {
+            panic!("invalid relationship target unexpectedly loaded")
         };
         assert!(matches!(error, OpcError::InvalidPackUri(_)));
     }
@@ -1105,19 +1125,18 @@ mod tests {
     fn rejects_equivalent_and_derived_physical_part_names() {
         let bytes = package_with_physical_parts("word/document.xml", "WORD/DOCUMENT.XML");
         let physical = PhysPkgReader::new(&bytes).unwrap();
-        let error = match PackageReader::from_phys_reader(&physical) {
-            Ok(_) => panic!("case-equivalent part names unexpectedly loaded"),
-            Err(error) => error,
+        let Err(error) = PackageReader::from_phys_reader(&physical) else {
+            panic!("case-equivalent part names unexpectedly loaded")
         };
         assert!(matches!(error, OpcError::EquivalentPartNames { .. }));
 
-        let bytes = package_with_physical_parts("word/document.xml", "word/document.xml/image.gif");
-        let physical = PhysPkgReader::new(&bytes).unwrap();
-        let error = match PackageReader::from_phys_reader(&physical) {
-            Ok(_) => panic!("derived part names unexpectedly loaded"),
-            Err(error) => error,
+        let derived_bytes =
+            package_with_physical_parts("word/document.xml", "word/document.xml/image.gif");
+        let derived_physical = PhysPkgReader::new(&derived_bytes).unwrap();
+        let Err(derived_error) = PackageReader::from_phys_reader(&derived_physical) else {
+            panic!("derived part names unexpectedly loaded")
         };
-        assert!(matches!(error, OpcError::DerivedPartNames { .. }));
+        assert!(matches!(derived_error, OpcError::DerivedPartNames { .. }));
     }
 
     #[test]
@@ -1126,9 +1145,8 @@ mod tests {
             .join("../../test-data/poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx");
         let bytes = std::fs::read(path).unwrap();
         let physical = PhysPkgReader::new(&bytes).unwrap();
-        let error = match PackageReader::from_phys_reader(&physical) {
-            Ok(_) => panic!("Apache POI derived-name failure fixture unexpectedly loaded"),
-            Err(error) => error,
+        let Err(error) = PackageReader::from_phys_reader(&physical) else {
+            panic!("Apache POI derived-name failure fixture unexpectedly loaded")
         };
         assert!(matches!(error, OpcError::DerivedPartNames { .. }));
     }
@@ -1450,9 +1468,9 @@ mod tests {
                 .unwrap(),
             ReadResource::XmlAttributeBytes,
         );
-        let external = relationships_xml(&format!(
-            r#"<Relationship Id="rId1" Type="urn:x" Target="https://x" TargetMode="External"/>"#
-        ));
+        let external = relationships_xml(
+            r#"<Relationship Id="rId1" Type="urn:x" Target="https://x" TargetMode="External"/>"#,
+        );
         assert_limit(
             &package_with_extra_parts(external.as_bytes(), &[("word/document.xml", b"x")], None),
             ReadLimits::builder()
@@ -1503,9 +1521,8 @@ mod tests {
             .join("../../test-data/poi/test-data/openxml4j/PackageRelsHasEntities.ooxml");
         let bytes = std::fs::read(path).unwrap();
         let physical = PhysPkgReader::new(&bytes).unwrap();
-        let error = match PackageReader::from_phys_reader(&physical) {
-            Ok(_) => panic!("entity-bearing relationships fixture unexpectedly loaded"),
-            Err(error) => error,
+        let Err(error) = PackageReader::from_phys_reader(&physical) else {
+            panic!("entity-bearing relationships fixture unexpectedly loaded")
         };
         assert!(matches!(error, OpcError::InvalidRelationshipsManifest(_)));
     }

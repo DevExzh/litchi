@@ -1,6 +1,7 @@
 //! Small XML codecs used by the semantic authoring layer.
 
 use litchi_core::xml::escape_xml;
+use std::fmt::Write as _;
 
 fn encode_text_content(text: &str) -> String {
     fn flush_plain(output: &mut String, plain: &mut String) {
@@ -26,7 +27,7 @@ fn encode_text_content(text: &str) -> String {
                 } else if count == 1 {
                     output.push_str("<text:s/>");
                 } else {
-                    output.push_str(&format!(r#"<text:s text:c="{count}"/>"#));
+                    let _ = write!(output, r#"<text:s text:c="{count}"/>"#);
                 }
             },
             '\t' => {
@@ -63,11 +64,11 @@ pub(crate) fn generate_text_paragraphs(text: &str, style_name: Option<&str>) -> 
 }
 
 pub(super) fn push_optional_attribute(output: &mut String, name: &str, value: Option<&str>) {
-    if let Some(value) = value {
+    if let Some(text) = value {
         output.push(' ');
         output.push_str(name);
         output.push_str("=\"");
-        output.push_str(&escape_xml(value));
+        output.push_str(&escape_xml(text));
         output.push('"');
     }
 }

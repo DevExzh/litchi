@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{DocumentStyleSortMethod, RtfDocument, RtfWriter};
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
@@ -17,7 +26,7 @@ fn parses_every_specified_numeric_value() {
         (3, DocumentStyleSortMethod::BasedOnStyle),
         (4, DocumentStyleSortMethod::StyleType),
     ] {
-        let source = format!(r#"{{\rtf1\stylesortmethod{value} Body}}"#);
+        let source = format!(r"{{\rtf1\stylesortmethod{value} Body}}");
         let document = RtfDocument::parse(&source).unwrap();
         assert_eq!(document.style_sort_method(), Some(expected));
         assert_eq!(document.effective_style_sort_method(), expected);
@@ -27,25 +36,25 @@ fn parses_every_specified_numeric_value() {
 
 #[test]
 fn omission_and_missing_parameter_use_host_default_but_preserve_presence() {
-    let omitted = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let omitted = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     assert_eq!(omitted.style_sort_method(), None);
     assert_eq!(
         omitted.effective_style_sort_method(),
         DocumentStyleSortMethod::HostDefault
     );
 
-    let present = RtfDocument::parse(r#"{\rtf1\stylesortmethod Body}"#).unwrap();
+    let present = RtfDocument::parse(r"{\rtf1\stylesortmethod Body}").unwrap();
     assert_eq!(
         present.style_sort_method(),
         Some(DocumentStyleSortMethod::HostDefault)
     );
     let serialized = String::from_utf8(write(&present)).unwrap();
-    assert!(serialized.contains(r#"\stylesortmethod1"#));
+    assert!(serialized.contains(r"\stylesortmethod1"));
 }
 
 #[test]
 fn typed_api_round_trips_and_clears_passive_metadata() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     document.set_style_sort_method(DocumentStyleSortMethod::BasedOnStyle);
     let output = write(&document);
     let reparsed = RtfDocument::parse_bytes(&output).unwrap();
@@ -78,13 +87,13 @@ fn coexists_independently_with_filter_and_transform_metadata_in_stable_order() {
 #[test]
 fn rejects_undefined_duplicates_starred_grouped_and_late_values() {
     for source in [
-        r#"{\rtf1\stylesortmethod-1 Body}"#,
-        r#"{\rtf1\stylesortmethod5 Body}"#,
-        r#"{\rtf1\stylesortmethod2147483647 Body}"#,
-        r#"{\rtf1\stylesortmethod1\stylesortmethod2 Body}"#,
-        r#"{\rtf1{\*\stylesortmethod2}Body}"#,
-        r#"{\rtf1{\stylesortmethod2}Body}"#,
-        r#"{\rtf1 Body\stylesortmethod2}"#,
+        r"{\rtf1\stylesortmethod-1 Body}",
+        r"{\rtf1\stylesortmethod5 Body}",
+        r"{\rtf1\stylesortmethod2147483647 Body}",
+        r"{\rtf1\stylesortmethod1\stylesortmethod2 Body}",
+        r"{\rtf1{\*\stylesortmethod2}Body}",
+        r"{\rtf1{\stylesortmethod2}Body}",
+        r"{\rtf1 Body\stylesortmethod2}",
     ] {
         assert!(
             RtfDocument::parse(source).is_err(),

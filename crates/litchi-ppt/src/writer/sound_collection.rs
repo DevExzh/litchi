@@ -17,6 +17,10 @@ use crate::consts::RecordType;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Resource limits for sound collection authoring.
+#[allow(
+    clippy::struct_field_names,
+    reason = "the shared `max_` prefix documents that every field is a resource bound; renaming would churn sibling modules that reference these fields"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SoundCollectionLimits {
     pub max_sounds: usize,
@@ -109,7 +113,7 @@ impl<'a> SoundCollectionBuilder<'a> {
             return Ok((Vec::new(), HashMap::new()));
         }
         let seed = u32::try_from(self.sounds.len())
-            .map_err(|_| invalid_error("sound collection count exceeds u32"))?;
+            .map_err(|_err| invalid_error("sound collection count exceeds u32"))?;
         let mut mapping = HashMap::with_capacity(self.sounds.len());
         let mut children = Vec::new();
         let mut seed_atom = RecordBuilder::new(0x00, 0, RecordType::SoundCollectionAtom as u16);
@@ -118,16 +122,16 @@ impl<'a> SoundCollectionBuilder<'a> {
 
         for (index, (source_id, sound)) in self.sounds.into_iter().enumerate() {
             let file_id = u32::try_from(index + 1)
-                .map_err(|_| invalid_error("sound identifier exceeds u32"))?;
+                .map_err(|_err| invalid_error("sound identifier exceeds u32"))?;
             mapping.insert(source_id, file_id);
             match sound {
-                PlannedSound::Builtin(sound) => {
-                    let wav_data = generate_wav_tone(get_builtin_sound_freq(sound.id()));
+                PlannedSound::Builtin(builtin) => {
+                    let wav_data = generate_wav_tone(get_builtin_sound_freq(builtin.id()));
                     children.extend(build_sound_container(
-                        sound.name(),
+                        builtin.name(),
                         ".WAV",
                         file_id,
-                        builtin_description_id(sound),
+                        builtin_description_id(builtin),
                         &wav_data,
                     )?);
                 },
@@ -212,13 +216,13 @@ fn get_builtin_sound_freq(id: u32) -> f64 {
         11 => 293.66, // Explosion - D4
         12 => 329.63, // Hammer - E4
         13 => 392.00, // Laser - G4
-        14 => 440.00, // Push - A4
         15 => 493.88, // Suction - B4
         16 => 349.23, // Swoosh - F4
         17 => 369.99, // Type - F#4
         18 => 415.30, // Voltage - G#4
         19 => 466.16, // Whoosh - A#4
         20 => 277.18, // Wind - C#4
+        // 14 (Push) and any unknown ID fall back to A4
         _ => 440.0,
     }
 }
@@ -227,6 +231,12 @@ fn get_builtin_sound_freq(id: u32) -> f64 {
 ///
 /// Each built-in sound gets a unique frequency so they are distinguishable.
 /// Duration: ~0.15 seconds (1200 samples at 8000 Hz).
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    reason = "sample indices stay below 1200 (exactly representable as f64), and samples are clamped to 0.0..=255.0 so the float-to-u8 truncation toward zero is the intended PCM quantization"
+)]
 fn generate_wav_tone(freq: f64) -> Vec<u8> {
     const SAMPLE_RATE: u32 = 8000;
     const NUM_SAMPLES: usize = 1200; // 0.15 seconds
@@ -262,7 +272,7 @@ fn generate_wav_tone(freq: f64) -> Vec<u8> {
 
     // Generate sine wave samples (8-bit unsigned: 0-255, center=128)
     for i in 0..NUM_SAMPLES {
-        let t = i as f64 / SAMPLE_RATE as f64;
+        let t = i as f64 / f64::from(SAMPLE_RATE);
         // Apply simple fade-in/fade-out envelope to avoid clicks
         let envelope = if i < 100 {
             i as f64 / 100.0
@@ -278,7 +288,7 @@ fn generate_wav_tone(freq: f64) -> Vec<u8> {
     wav
 }
 
-/// Write a UTF-16LE CString atom with the given instance number.
+/// Write a UTF-16LE `CString` atom with the given instance number.
 fn write_cstring(instance: u16, text: &str) -> Result<Vec<u8>, Error> {
     let mut atom = RecordBuilder::new(0x00, instance, 0x0FBA);
     for ch in text.encode_utf16() {
@@ -289,12 +299,12 @@ fn write_cstring(instance: u16, text: &str) -> Result<Vec<u8>, Error> {
 
 /// Build a Sound container with embedded WAV or AIFF data.
 ///
-/// Structure per LibreOffice `pptexsoundcollection.cxx` `ExSoundEntry::Write`:
+/// Structure per `LibreOffice` `pptexsoundcollection.cxx` `ExSoundEntry::Write`:
 /// - Sound container (0x0F, type 0x07E6)
-///   - CString (instance 0): sound name (e.g. "Whoosh")
-///   - CString (instance 1): extension (".wav")
-///   - CString (instance 2): reference ID string — matched by `AnimationInfoAtom.nSoundRef`
-///   - SoundData (type 0x07E7): actual WAV binary data
+///   - `CString` (instance 0): sound name (e.g. "Whoosh")
+///   - `CString` (instance 1): extension (".wav")
+///   - `CString` (instance 2): reference ID string — matched by `AnimationInfoAtom.nSoundRef`
+///   - `SoundData` (type 0x07E7): actual WAV binary data
 fn build_sound_container(
     name: &str,
     extension: &str,
@@ -313,8 +323,8 @@ fn build_sound_container(
     // CString instance 2 — reference ID (matched against AnimationInfoAtom.nSoundRef)
     children.extend(write_cstring(2, &ref_id.to_string())?);
 
-    if let Some(builtin_id) = builtin_id {
-        children.extend(write_cstring(3, &builtin_id.value().to_string())?);
+    if let Some(id) = builtin_id {
+        children.extend(write_cstring(3, &id.value().to_string())?);
     }
 
     // SoundData atom with actual WAV or AIFF binary data
@@ -328,12 +338,20 @@ fn build_sound_container(
     container.build()
 }
 
-/// Build a SoundCollection container for the selected built-in sounds.
+/// Build a `SoundCollection` container for the selected built-in sounds.
 ///
 /// `AnimationInfoAtom.nSoundRef` is the 1-based index into this collection, which is
-/// matched against CString instance 2 of each Sound container (the reference ID string).
+/// matched against `CString` instance 2 of each Sound container (the reference ID string).
 ///
 /// Returns `(binary_data, mapping)` where mapping is `builtin_sound_id → collection_ref_id`.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
+#[allow(
+    clippy::implicit_hasher,
+    reason = "the public API intentionally accepts `HashSet` with the default hasher; generalizing over hashers would complicate the established signature for no practical benefit"
+)]
 pub fn build_sound_collection(
     sound_ids: &HashSet<u32>,
 ) -> Result<(Vec<u8>, HashMap<u32, u32>), Error> {
@@ -390,6 +408,11 @@ fn invalid_error(message: impl Into<String>) -> Error {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -455,9 +478,9 @@ mod tests {
         builder.register(42, &embedded).unwrap();
         assert!(builder.register(42, &conflicting).is_err());
 
-        let mut builder = SoundCollectionBuilder::new(SoundCollectionLimits::default());
-        builder.register(42, &embedded).unwrap();
-        let (bytes, mapping) = builder.build().unwrap();
+        let mut output_builder = SoundCollectionBuilder::new(SoundCollectionLimits::default());
+        output_builder.register(42, &embedded).unwrap();
+        let (bytes, mapping) = output_builder.build().unwrap();
         let (record, consumed) = crate::Record::parse(&bytes, 0).unwrap();
         assert_eq!(consumed, bytes.len());
         let collection = crate::sound_collection::Collection::parse(&record).unwrap();

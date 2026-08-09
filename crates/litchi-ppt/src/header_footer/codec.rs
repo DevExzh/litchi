@@ -1,4 +1,4 @@
-//! Bounded binary codecs for PowerPoint header/footer records.
+//! Bounded binary codecs for `PowerPoint` header/footer records.
 
 use super::model::{DateTimeFormatId, HeaderFooter, HeaderFooterOptions, HeaderFooterScope};
 use crate::consts::RecordType;
@@ -55,12 +55,14 @@ impl HeaderFooterOptions {
                 "HeadersFootersAtom must have exactly four data bytes",
             ));
         }
-        let format_id = i16::from_le_bytes([record.data[0], record.data[1]]);
-        if !(0..=i16::from(DateTimeFormatId::MAX)).contains(&format_id) {
+        let format_id_raw = i16::from_le_bytes([record.data[0], record.data[1]]);
+        if !(0..=i16::from(DateTimeFormatId::MAX)).contains(&format_id_raw) {
             return Err(corrupted(
                 "header/footer datetime format ID is outside 0..=13",
             ));
         }
+        let format_id = u8::try_from(format_id_raw)
+            .map_err(|_err| corrupted("header/footer datetime format ID is outside 0..=13"))?;
         let mask = u16::from_le_bytes([record.data[2], record.data[3]]);
         if mask & !KNOWN_FLAG_MASK != 0 {
             return Err(corrupted(
@@ -68,7 +70,7 @@ impl HeaderFooterOptions {
             ));
         }
         Ok(Self {
-            datetime_format: DateTimeFormatId::new(format_id as u8)?,
+            datetime_format: DateTimeFormatId::new(format_id)?,
             show_date: mask & 0x0001 != 0,
             use_current_datetime: mask & 0x0002 != 0,
             use_user_date: mask & 0x0004 != 0,
@@ -94,6 +96,10 @@ impl HeaderFooter {
     /// The supplied scope is checked against the record instance. Direct-parent
     /// placement is validated by [`HeaderFooters`] when parsing a
     /// complete presentation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_record(record: &Record, scope: HeaderFooterScope) -> Result<Self> {
         let mut aggregate = 0usize;
         Self::parse_record_bounded(record, scope, &mut aggregate)
@@ -192,15 +198,20 @@ impl HeaderFooter {
     ///
     /// Serialization is record-local and deterministic. It does not evaluate a
     /// date or modify an OLE persistence directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         self.validate_for_write()?;
         let mut body = Vec::new();
 
+        let option_mask = self.options.mask().to_le_bytes();
         let atom_data = [
             self.options.datetime_format.get(),
             0,
-            self.options.mask() as u8,
-            (self.options.mask() >> 8) as u8,
+            option_mask[0],
+            option_mask[1],
         ];
         append_record(
             &mut body,
@@ -242,8 +253,8 @@ impl HeaderFooter {
             (HEADER_INSTANCE, self.header.as_deref()),
             (FOOTER_INSTANCE, self.footer.as_deref()),
         ] {
-            let Some(value) = value else { continue };
-            let bytes = validated_encoded_len(value)?;
+            let Some(text) = value else { continue };
+            let bytes = validated_encoded_len(text)?;
             if kind == USER_DATE_INSTANCE && bytes > USER_DATE_MAX_BYTES {
                 return Err(corrupted("UserDateAtom exceeds 510 bytes"));
             }
@@ -304,7 +315,7 @@ pub(crate) fn decode_printable_unicode(data: &[u8]) -> Result<String> {
         units.push(unit);
     }
     String::from_utf16(&units)
-        .map_err(|_| corrupted("PrintableUnicodeString contains invalid UTF-16"))
+        .map_err(|_err| corrupted("PrintableUnicodeString contains invalid UTF-16"))
 }
 
 fn is_forbidden_printable_unit(unit: u16) -> bool {
@@ -354,10 +365,10 @@ fn append_record(
         return Err(corrupted("PowerPoint record header field overflow"));
     }
     let length = u32::try_from(data.len())
-        .map_err(|_| corrupted("PowerPoint record payload exceeds u32"))?;
+        .map_err(|_err| corrupted("PowerPoint record payload exceeds u32"))?;
     output
         .try_reserve(8usize.saturating_add(data.len()))
-        .map_err(|_| corrupted("unable to reserve header/footer record memory"))?;
+        .map_err(|_err| corrupted("unable to reserve header/footer record memory"))?;
     let version_instance = version | (instance << 4);
     output.extend_from_slice(&version_instance.to_le_bytes());
     output.extend_from_slice(&record_type.to_le_bytes());

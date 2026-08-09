@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{DocumentStyleRestrictions, RtfDocument, RtfWriter};
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
@@ -11,7 +20,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 #[test]
 fn parses_all_four_flags_as_passive_metadata() {
     let document = RtfDocument::parse(
-        r#"{\rtf1\stylelock\stylelockenforced\stylelockbackcomp\autofmtoverride Body}"#,
+        r"{\rtf1\stylelock\stylelockenforced\stylelockbackcomp\autofmtoverride Body}",
     )
     .unwrap();
     assert_eq!(
@@ -30,21 +39,21 @@ fn parses_all_four_flags_as_passive_metadata() {
 fn accepts_independent_producer_combinations_without_enforcement() {
     for (source, expected) in [
         (
-            r#"{\rtf1\stylelock Body}"#,
+            r"{\rtf1\stylelock Body}",
             DocumentStyleRestrictions {
                 restrictions_present: true,
                 ..DocumentStyleRestrictions::default()
             },
         ),
         (
-            r#"{\rtf1\stylelockenforced Body}"#,
+            r"{\rtf1\stylelockenforced Body}",
             DocumentStyleRestrictions {
                 enforced: true,
                 ..DocumentStyleRestrictions::default()
             },
         ),
         (
-            r#"{\rtf1\stylelockbackcomp Body}"#,
+            r"{\rtf1\stylelockbackcomp Body}",
             DocumentStyleRestrictions {
                 backward_compatibility: true,
                 ..DocumentStyleRestrictions::default()
@@ -59,7 +68,7 @@ fn accepts_independent_producer_combinations_without_enforcement() {
 
 #[test]
 fn omission_remains_empty_and_is_not_serialized() {
-    let document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     assert!(document.style_restrictions().is_empty());
     let serialized = String::from_utf8(write(&document)).unwrap();
     assert!(!serialized.contains("stylelock"));
@@ -68,7 +77,7 @@ fn omission_remains_empty_and_is_not_serialized() {
 
 #[test]
 fn typed_api_round_trips_in_stable_order_and_clears_passively() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     document.set_style_restrictions(DocumentStyleRestrictions {
         restrictions_present: true,
         enforced: true,
@@ -136,17 +145,17 @@ fn rejects_parameters_duplicates_starred_grouped_and_late_flags() {
         "autofmtoverride",
     ] {
         for suffix in ["0", "1", "2147483647", "99999999999"] {
-            let source = format!(r#"{{\rtf1\{name}{suffix} Body}}"#);
+            let source = format!(r"{{\rtf1\{name}{suffix} Body}}");
             assert!(
                 RtfDocument::parse(&source).is_err(),
                 "accepted malformed {source}"
             );
         }
         for source in [
-            format!(r#"{{\rtf1\{name}\{name} Body}}"#),
-            format!(r#"{{\rtf1{{\*\{name}}}Body}}"#),
-            format!(r#"{{\rtf1{{\{name}}}Body}}"#),
-            format!(r#"{{\rtf1 Body\{name}}}"#),
+            format!(r"{{\rtf1\{name}\{name} Body}}"),
+            format!(r"{{\rtf1{{\*\{name}}}Body}}"),
+            format!(r"{{\rtf1{{\{name}}}Body}}"),
+            format!(r"{{\rtf1 Body\{name}}}"),
         ] {
             assert!(
                 RtfDocument::parse(&source).is_err(),

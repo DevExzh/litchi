@@ -1,4 +1,13 @@
-use super::*;
+#![allow(
+    clippy::shadow_reuse,
+    clippy::shadow_unrelated,
+    reason = "decoding steps deliberately rebind a working value as it is refined through the parse pipeline"
+)]
+use super::{
+    Color, ControlWord, Cow, DeferredText, EmbeddedFont, EmbeddedFontFormat, Font, FontCharset,
+    FontFamily, FontPage, FontPitch, FontRef, FontTheme, InfoTextField, InfoTimeField, Parser,
+    RtfEncoding, RtfError, RtfResult, Token, control_symbol_text,
+};
 
 impl<'a> Parser<'a> {
     pub(super) fn parse_file_table(&mut self) -> RtfResult<crate::FileTable<'a>> {
@@ -59,6 +68,10 @@ impl<'a> Parser<'a> {
         Err(RtfError::UnexpectedEof)
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn parse_file_table_entry(&mut self) -> RtfResult<crate::FileTableEntry<'a>> {
         self.pos += 2; // opening brace and file
         let mut id = None;
@@ -95,7 +108,7 @@ impl<'a> Parser<'a> {
                     entry.validate()?;
                     return Ok(entry);
                 },
-                Some(Token::OpenBrace) | Some(Token::Binary(_)) => {
+                Some(Token::OpenBrace | Token::Binary(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF file entry cannot contain fields, objects, nested destinations, or binary data".to_string(),
                     ));
@@ -106,10 +119,10 @@ impl<'a> Parser<'a> {
                     continue;
                 },
                 Some(Token::Control(ControlWord::UnicodeSkip(value))) => {
-                    unicode_skip = (*value).max(0)
+                    unicode_skip = (*value).max(0);
                 },
                 Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
-                    name.push_str(control_symbol_text(control).unwrap_or_default())
+                    name.push_str(control_symbol_text(control).unwrap_or_default());
                 },
                 Some(Token::Control(control)) => match control {
                     ControlWord::FileId(value) => {
@@ -118,7 +131,7 @@ impl<'a> Parser<'a> {
                                 "duplicate RTF fid".to_string(),
                             ));
                         }
-                        id = Some(u32::try_from(*value).map_err(|_| {
+                        id = Some(u32::try_from(*value).map_err(|_err| {
                             RtfError::MalformedDocument("invalid RTF fid".to_string())
                         })?);
                     },
@@ -128,7 +141,7 @@ impl<'a> Parser<'a> {
                                 "duplicate RTF frelative".to_string(),
                             ));
                         }
-                        relative = Some(u8::try_from(*value).map_err(|_| {
+                        relative = Some(u8::try_from(*value).map_err(|_err| {
                             RtfError::MalformedDocument("invalid RTF frelative".to_string())
                         })?);
                     },
@@ -138,7 +151,7 @@ impl<'a> Parser<'a> {
                                 "duplicate RTF fosnum".to_string(),
                             ));
                         }
-                        operating_system = Some(u8::try_from(*value).map_err(|_| {
+                        operating_system = Some(u8::try_from(*value).map_err(|_err| {
                             RtfError::MalformedDocument("invalid RTF fosnum".to_string())
                         })?);
                     },
@@ -238,7 +251,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     self.preserve_unknown_control_in(token, crate::opaque::Context::Metadata)?;
                 },
-                _ => {
+                Token::Control(_) | Token::Text(_) | Token::Binary(_) => {
                     self.pos += 1;
                 },
             }
@@ -254,7 +267,7 @@ impl<'a> Parser<'a> {
         let mut font_num = None;
         let mut font_family = FontFamily::Nil;
         let mut charset = None;
-        let mut pitch = crate::FontPitch::Default;
+        let mut pitch = FontPitch::Default;
         let mut code_page = None;
         let mut theme = None;
         let mut bidi = false;
@@ -359,7 +372,7 @@ impl<'a> Parser<'a> {
                             "duplicate RTF font ID".to_string(),
                         ));
                     }
-                    font_num = Some(FontRef::try_from(*n).map_err(|_| {
+                    font_num = Some(FontRef::try_from(*n).map_err(|_err| {
                         RtfError::MalformedDocument("invalid RTF font ID".to_string())
                     })?);
                     self.pos += 1;
@@ -387,7 +400,7 @@ impl<'a> Parser<'a> {
                             "duplicate RTF font charset".to_string(),
                         ));
                     }
-                    let charset_id = u8::try_from(*cs).map_err(|_| {
+                    let charset_id = u8::try_from(*cs).map_err(|_err| {
                         RtfError::MalformedDocument("invalid RTF font charset".to_string())
                     })?;
                     charset = Some(FontCharset::new(charset_id).ok_or_else(|| {
@@ -404,9 +417,9 @@ impl<'a> Parser<'a> {
                         ));
                     }
                     pitch = match *value {
-                        0 => crate::FontPitch::Default,
-                        1 => crate::FontPitch::Fixed,
-                        2 => crate::FontPitch::Variable,
+                        0 => FontPitch::Default,
+                        1 => FontPitch::Fixed,
+                        2 => FontPitch::Variable,
                         _ => {
                             return Err(RtfError::MalformedDocument(
                                 "invalid RTF font pitch".to_string(),
@@ -421,7 +434,7 @@ impl<'a> Parser<'a> {
                             "duplicate RTF font code page".to_string(),
                         ));
                     }
-                    let page = u32::try_from(*value).map_err(|_| {
+                    let page = u32::try_from(*value).map_err(|_err| {
                         RtfError::MalformedDocument("invalid RTF font code page".to_string())
                     })?;
                     code_page = Some(FontPage::new(page).ok_or_else(|| {
@@ -437,7 +450,7 @@ impl<'a> Parser<'a> {
                             "duplicate RTF font theme selector".to_string(),
                         ));
                     }
-                    theme = super::super::super::types::FontTheme::from_control_word(word);
+                    theme = FontTheme::from_control_word(word);
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::FontBidi(parameter)) => {
@@ -474,7 +487,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     self.preserve_unknown_control_in(token, crate::opaque::Context::Metadata)?;
                 },
-                _ => {
+                Token::Control(_) | Token::Binary(_) => {
                     self.pos += 1;
                 },
             }
@@ -491,9 +504,10 @@ impl<'a> Parser<'a> {
         let encoding = match (code_page, charset) {
             (Some(page), _) => RtfEncoding::from_font_page(page),
             (None, Some(FontCharset::Default) | None) => header_encoding,
-            (None, Some(charset)) => match charset.page() {
-                Some(page) => RtfEncoding::from_font_page(page),
-                None => {
+            (None, Some(charset)) => {
+                if let Some(page) = charset.page() {
+                    RtfEncoding::from_font_page(page)
+                } else {
                     let has_non_ascii = name.has_non_ascii_transport()
                         || alternate_name
                             .as_ref()
@@ -510,7 +524,7 @@ impl<'a> Parser<'a> {
                     // ASCII transport and explicit Unicode escapes are invariant
                     // across the unavailable legacy charset and the header page.
                     header_encoding
-                },
+                }
             },
         };
         let decode_name = |value: DeferredText, context: &str| -> RtfResult<String> {
@@ -597,12 +611,12 @@ impl<'a> Parser<'a> {
                     continue;
                 },
                 Some(Token::Control(ControlWord::UnicodeSkip(count))) => {
-                    unicode_skip = (*count).max(0)
+                    unicode_skip = (*count).max(0);
                 },
                 Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
-                    value.push_unicode(control_symbol_text(control).unwrap_or_default())
+                    value.push_unicode(control_symbol_text(control).unwrap_or_default());
                 },
-                Some(Token::OpenBrace) | Some(Token::Control(_)) | Some(Token::Binary(_)) => {
+                Some(Token::OpenBrace | Token::Control(_) | Token::Binary(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF font-name destination contains non-text content".to_string(),
                     ));
@@ -651,7 +665,7 @@ impl<'a> Parser<'a> {
                     return Ok(panose);
                 },
                 Some(Token::Text(text)) => digits.push_str(text),
-                Some(Token::OpenBrace) | Some(Token::Control(_)) | Some(Token::Binary(_)) => {
+                Some(Token::OpenBrace | Token::Control(_) | Token::Binary(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF panose contains non-hexadecimal content".to_string(),
                     ));
@@ -669,9 +683,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse the inert `fontemb` destination of a font-table entry.
-    pub(super) fn parse_font_embedded_destination(
-        &mut self,
-    ) -> RtfResult<crate::EmbeddedFont<'static>> {
+    pub(super) fn parse_font_embedded_destination(&mut self) -> RtfResult<EmbeddedFont<'static>> {
         self.pos += 1; // opening brace
         if matches!(
             self.tokens.get(self.pos),
@@ -685,7 +697,7 @@ impl<'a> Parser<'a> {
             ));
         }
         self.pos += 1;
-        let mut embedded = crate::EmbeddedFont::default();
+        let mut embedded = EmbeddedFont::default();
         let mut format_seen = false;
         let mut file_seen = false;
         let mut data = Vec::new();
@@ -713,8 +725,8 @@ impl<'a> Parser<'a> {
                     }
                     format_seen = true;
                     embedded.format = match *kind {
-                        "truetype" => crate::EmbeddedFontFormat::TrueType,
-                        _ => crate::EmbeddedFontFormat::Nil,
+                        "truetype" => EmbeddedFontFormat::TrueType,
+                        _ => EmbeddedFontFormat::Nil,
                     };
                     self.pos += 1;
                 },
@@ -753,7 +765,7 @@ impl<'a> Parser<'a> {
                         })?;
                         if let Some(high) = high_nibble.take() {
                             data.push((high << 4) | nibble);
-                            if data.len() > crate::EmbeddedFont::MAX_DATA_BYTES {
+                            if data.len() > EmbeddedFont::MAX_DATA_BYTES {
                                 return Err(RtfError::MalformedDocument(
                                     "RTF embedded font data exceeds the safety limit".to_string(),
                                 ));
@@ -771,14 +783,14 @@ impl<'a> Parser<'a> {
                         ));
                     }
                     data.extend_from_slice(bytes);
-                    if data.len() > crate::EmbeddedFont::MAX_DATA_BYTES {
+                    if data.len() > EmbeddedFont::MAX_DATA_BYTES {
                         return Err(RtfError::MalformedDocument(
                             "RTF embedded font data exceeds the safety limit".to_string(),
                         ));
                     }
                     self.pos += 1;
                 },
-                _ => self.pos += 1,
+                Token::Control(_) => self.pos += 1,
             }
         }
         Err(RtfError::UnexpectedEof)
@@ -807,13 +819,12 @@ impl<'a> Parser<'a> {
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
                     let encoding = code_page
-                        .map(RtfEncoding::from_font_page)
-                        .unwrap_or(self.current_state()?.encoding);
+                        .map_or(self.current_state()?.encoding, RtfEncoding::from_font_page);
                     let name = name
                         .decode(encoding, "embedded font file name")?
                         .trim()
                         .to_string();
-                    if name.is_empty() || name.len() > crate::EmbeddedFont::MAX_FILE_NAME_BYTES {
+                    if name.is_empty() || name.len() > EmbeddedFont::MAX_FILE_NAME_BYTES {
                         return Err(RtfError::MalformedDocument(
                             "invalid or oversized RTF embedded font file name".to_string(),
                         ));
@@ -826,7 +837,7 @@ impl<'a> Parser<'a> {
                             "duplicate RTF fontfile code page".to_string(),
                         ));
                     }
-                    let page = u32::try_from(*value).map_err(|_| {
+                    let page = u32::try_from(*value).map_err(|_err| {
                         RtfError::MalformedDocument("invalid RTF fontfile code page".to_string())
                     })?;
                     code_page = Some(FontPage::new(page).ok_or_else(|| {
@@ -846,7 +857,7 @@ impl<'a> Parser<'a> {
                 Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
                     name.push_unicode(control_symbol_text(control).unwrap_or_default());
                 },
-                Some(Token::OpenBrace) | Some(Token::Control(_)) | Some(Token::Binary(_)) => {
+                Some(Token::OpenBrace | Token::Control(_) | Token::Binary(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF fontfile destination contains unsupported content".to_string(),
                     ));
@@ -854,7 +865,7 @@ impl<'a> Parser<'a> {
                 None => return Err(RtfError::UnexpectedEof),
             }
             self.pos += 1;
-            if name.source_len() > crate::EmbeddedFont::MAX_FILE_NAME_BYTES {
+            if name.source_len() > EmbeddedFont::MAX_FILE_NAME_BYTES {
                 return Err(RtfError::MalformedDocument(
                     "RTF embedded font file name exceeds the safety limit".to_string(),
                 ));
@@ -864,6 +875,10 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse color table.
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "the clamp bounds each color component to the u8 range"
+    )]
     pub(super) fn parse_color_table(&mut self) -> RtfResult<()> {
         self.pos += 1; // Skip \colortbl
 
@@ -921,7 +936,7 @@ impl<'a> Parser<'a> {
                     has_component = false;
                     self.pos += 1;
                 },
-                _ => {
+                Token::Control(_) | Token::Text(_) | Token::Binary(_) => {
                     self.pos += 1;
                 },
             }
@@ -931,6 +946,10 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse the standard RTF `info` destination.
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn parse_info(&mut self) -> RtfResult<()> {
         if self.saw_info_group {
             return Err(RtfError::MalformedDocument(
@@ -1013,19 +1032,19 @@ impl<'a> Parser<'a> {
                 Some(Token::Control(control)) => {
                     match control {
                         ControlWord::InfoVersion(value) => {
-                            Self::set_info_number(&mut self.info.version, *value, "version")?
+                            Self::set_info_number(&mut self.info.version, *value, "version")?;
                         },
                         ControlWord::InfoRevision(value) => {
-                            Self::set_info_number(&mut self.info.revision, *value, "vern")?
+                            Self::set_info_number(&mut self.info.revision, *value, "vern")?;
                         },
                         ControlWord::EditingTime(value) => {
-                            Self::set_info_number(&mut self.info.editing_time, *value, "edmins")?
+                            Self::set_info_number(&mut self.info.editing_time, *value, "edmins")?;
                         },
                         ControlWord::NumberOfPages(value) => {
-                            Self::set_info_number(&mut self.info.pages, *value, "nofpages")?
+                            Self::set_info_number(&mut self.info.pages, *value, "nofpages")?;
                         },
                         ControlWord::NumberOfWords(value) => {
-                            Self::set_info_number(&mut self.info.words, *value, "nofwords")?
+                            Self::set_info_number(&mut self.info.words, *value, "nofwords")?;
                         },
                         ControlWord::NumberOfCharacters(value) => {
                             Self::set_info_number(&mut self.info.characters, *value, "nofchars")?;
@@ -1038,14 +1057,14 @@ impl<'a> Parser<'a> {
                             )?;
                         },
                         ControlWord::DocumentId(value) => {
-                            Self::set_info_number(&mut self.info.id, *value, "id")?
+                            Self::set_info_number(&mut self.info.id, *value, "id")?;
                         },
                         _ => {},
                     }
                     self.pos += 1;
                 },
                 Some(Token::Text(text)) if self.decode_transport_text(text)?.trim().is_empty() => {
-                    self.pos += 1
+                    self.pos += 1;
                 },
                 Some(Token::Text(_) | Token::Binary(_)) => {
                     return Err(RtfError::MalformedDocument(

@@ -46,7 +46,7 @@ pub struct Properties {
     pub style_id: Option<String>,
 }
 
-/// A borrowed DrawingML table (`a:tbl`).
+/// A borrowed `DrawingML` table (`a:tbl`).
 #[derive(Debug, Clone, Copy)]
 pub struct Table<'a> {
     xml: &'a [u8],
@@ -55,6 +55,10 @@ pub struct Table<'a> {
 
 impl<'a> Table<'a> {
     /// Index a standalone `a:tbl` owner without copying its bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_xml(xml: &'a [u8]) -> Result<Self> {
         let span = scan(xml, b"tbl")?
             .into_iter()
@@ -63,18 +67,30 @@ impl<'a> Table<'a> {
         Ok(Self { xml, span })
     }
 
-    /// Locate the first DrawingML table inside a graphic-frame owner.
+    /// Locate the first `DrawingML` table inside a graphic-frame owner.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_graphic_frame(xml: &'a [u8]) -> Result<Self> {
         Self::from_xml(xml)
     }
 
     /// Borrow the exact table element.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     #[inline]
     pub fn xml(self) -> Result<&'a [u8]> {
         self.span.get(self.xml)
     }
 
     /// Count table rows without allocating row values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn row_count(self) -> Result<usize> {
         let table = self.xml()?;
         let count = scan(table, b"tr")?.len();
@@ -85,11 +101,19 @@ impl<'a> Table<'a> {
     }
 
     /// Count columns from the first row, or return zero for an empty table.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn column_count(self) -> Result<usize> {
         Ok(self.rows()?.first().map_or(0, |row| row.cell_count()))
     }
 
     /// Index rows as borrowed views over the table's source XML.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn rows(self) -> Result<Vec<Row<'a>>> {
         let table = self.xml()?;
         let spans = scan(table, b"tr")?;
@@ -103,6 +127,10 @@ impl<'a> Table<'a> {
     }
 
     /// Get one cell by zero-based row and column position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn cell(self, row: usize, column: usize) -> Result<Option<Cell<'a>>> {
         let Some(row) = self.rows()?.get(row).copied() else {
             return Ok(None);
@@ -111,6 +139,10 @@ impl<'a> Table<'a> {
     }
 
     /// Read the optional `a:tblPr` values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn properties(self) -> Result<Option<Properties>> {
         parse_properties(self.xml()?)
     }
@@ -124,15 +156,22 @@ pub struct Row<'a> {
 }
 
 impl<'a> Row<'a> {
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     #[inline]
     pub fn xml(self) -> Result<&'a [u8]> {
         self.span.get(self.xml)
     }
 
+    #[must_use]
     pub fn cell_count(self) -> usize {
         scan(self.xml().unwrap_or_default(), b"tc").map_or(0, |spans| spans.len())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn cells(self) -> Result<Vec<Cell<'a>>> {
         let row = self.xml()?;
         let spans = scan(row, b"tc")?;
@@ -154,12 +193,19 @@ pub struct Cell<'a> {
 }
 
 impl<'a> Cell<'a> {
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     #[inline]
     pub fn xml(self) -> Result<&'a [u8]> {
         self.span.get(self.xml)
     }
 
-    /// Decode DrawingML text, preserving paragraph, break, and tab markers.
+    /// Decode `DrawingML` text, preserving paragraph, break, and tab markers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn text(self) -> Result<String> {
         extract_text(self.xml()?)
     }
@@ -215,7 +261,7 @@ fn scan(xml: &[u8], target: &[u8]) -> Result<Vec<Span>> {
 
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("table XML offset exceeds usize"))?;
+            .map_err(|_err| invalid("table XML offset exceeds usize"))?;
         let event = {
             let (namespace, event) = reader
                 .read_resolved_event()
@@ -251,7 +297,7 @@ fn scan(xml: &[u8], target: &[u8]) -> Result<Vec<Span>> {
             }
         };
         let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("table XML offset exceeds usize"))?;
+            .map_err(|_err| invalid("table XML offset exceeds usize"))?;
         nodes = nodes
             .checked_add(1)
             .ok_or_else(|| invalid("table XML node count overflow"))?;
@@ -347,10 +393,9 @@ fn parse_properties(xml: &[u8]) -> Result<Option<Properties>> {
                         b"tableStyleId",
                         &fragment_prefix,
                     )
+                    && style_depth.replace(depth).is_some()
                 {
-                    if style_depth.replace(depth).is_some() {
-                        return Err(invalid("table has multiple tableStyleId elements"));
-                    }
+                    return Err(invalid("table has multiple tableStyleId elements"));
                 }
             },
             Event::Empty(element) => {
@@ -518,7 +563,7 @@ fn extract_text(xml: &[u8]) -> Result<String> {
                 );
             },
             Event::GeneralRef(reference) if text_depth.is_some() => {
-                result.push_str(&decode_xml_reference(&reference)?)
+                result.push_str(&decode_xml_reference(&reference)?);
             },
             Event::End(element) => {
                 if text_depth == Some(depth)
@@ -544,6 +589,11 @@ fn extract_text(xml: &[u8]) -> Result<String> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

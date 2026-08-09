@@ -18,18 +18,18 @@ pub fn text(input: &str) -> Cow<'_, str> {
         }
         special.then_some(index)
     });
-    let Some(first_special) = first_special else {
+    let Some(first_special_index) = first_special else {
         return Cow::Borrowed(input);
     };
 
     let mut output = String::with_capacity(input.len().saturating_add(8));
-    output.push_str(&input[..first_special]);
-    line_start = input[..first_special]
+    output.push_str(&input[..first_special_index]);
+    line_start = input[..first_special_index]
         .rfind('\n')
         .map_or(0, |index| index.saturating_add(1));
 
-    for (relative, character) in input[first_special..].char_indices() {
-        let index = first_special + relative;
+    for (relative, character) in input[first_special_index..].char_indices() {
+        let index = first_special_index + relative;
         if needs_backslash(input, line_start, index, character) {
             output.push('\\');
         }

@@ -7,13 +7,16 @@ use std::sync::Arc;
 /// Limits applied while scanning and editing embedded chart parts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
-    max_charts: usize,
-    max_part_bytes: usize,
-    max_total_bytes: usize,
+    charts: usize,
+    part_bytes: usize,
+    total_bytes: usize,
 }
 
 impl Limits {
     /// Construct a positive chart resource budget.
+    ///
+    /// # Errors
+    /// Returns an error when the chart data is malformed or a configured limit is exceeded.
     pub fn new(
         max_charts: usize,
         max_part_bytes: usize,
@@ -30,34 +33,34 @@ impl Limits {
             ));
         }
         Ok(Self {
-            max_charts,
-            max_part_bytes,
-            max_total_bytes,
+            charts: max_charts,
+            part_bytes: max_part_bytes,
+            total_bytes: max_total_bytes,
         })
     }
 
     #[must_use]
     pub const fn max_charts(self) -> usize {
-        self.max_charts
+        self.charts
     }
 
     #[must_use]
     pub const fn max_part_bytes(self) -> usize {
-        self.max_part_bytes
+        self.part_bytes
     }
 
     #[must_use]
     pub const fn max_total_bytes(self) -> usize {
-        self.max_total_bytes
+        self.total_bytes
     }
 }
 
 impl Default for Limits {
     fn default() -> Self {
         Self {
-            max_charts: 4_096,
-            max_part_bytes: 16 * 1024 * 1024,
-            max_total_bytes: 64 * 1024 * 1024,
+            charts: 4_096,
+            part_bytes: 16 * 1024 * 1024,
+            total_bytes: 64 * 1024 * 1024,
         }
     }
 }

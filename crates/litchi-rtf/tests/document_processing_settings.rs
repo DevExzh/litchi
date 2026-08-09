@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{
     AbstractNumberingCleanupStatus, DocumentEventMask, DocumentProcessingSettings, RtfDocument,
     RtfWriter,
@@ -14,7 +23,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 #[test]
 fn parses_explicit_values_and_preserves_zero_separately_from_omission() {
     let explicit =
-        RtfDocument::parse(r#"{\rtf1\fracwidth\ilfomacatclnup0\grfdocevents0 Body}"#).unwrap();
+        RtfDocument::parse(r"{\rtf1\fracwidth\ilfomacatclnup0\grfdocevents0 Body}").unwrap();
     assert!(
         explicit
             .processing_settings()
@@ -32,7 +41,7 @@ fn parses_explicit_values_and_preserves_zero_separately_from_omission() {
     assert!(serialized.contains("\\ilfomacatclnup0"));
     assert!(serialized.contains("\\grfdocevents0"));
 
-    let omitted = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let omitted = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     assert!(omitted.processing_settings().is_empty());
     assert_eq!(
         omitted
@@ -68,7 +77,7 @@ fn every_document_event_bit_including_reserved_bits_round_trips() {
     for (bit, flag) in flags.into_iter().enumerate() {
         assert_eq!(flag.bits(), 1 << bit);
         assert!(DocumentEventMask::ALL.contains(flag));
-        let source = format!(r#"{{\rtf1\grfdocevents{} Body}}"#, flag.bits());
+        let source = format!(r"{{\rtf1\grfdocevents{} Body}}", flag.bits());
         let document = RtfDocument::parse(&source).unwrap();
         assert_eq!(document.processing_settings().event_mask, Some(flag));
         let output = write(&document);
@@ -85,7 +94,7 @@ fn every_document_event_bit_including_reserved_bits_round_trips() {
 
 #[test]
 fn typed_api_round_trips_all_bits_in_stable_order_without_side_effects() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     document.set_processing_settings(DocumentProcessingSettings {
         fractional_character_widths_for_printing: true,
         abstract_numbering_cleanup: Some(AbstractNumberingCleanupStatus::Incomplete),
@@ -137,29 +146,29 @@ fn coexists_with_adjacent_output_and_rendering_properties() {
 #[test]
 fn rejects_missing_invalid_overflow_duplicate_starred_grouped_and_late_forms() {
     for source in [
-        r#"{\rtf1\fracwidth0 Body}"#,
-        r#"{\rtf1\ilfomacatclnup Body}"#,
-        r#"{\rtf1\ilfomacatclnup-1 Body}"#,
-        r#"{\rtf1\ilfomacatclnup2 Body}"#,
-        r#"{\rtf1\ilfomacatclnup6 Body}"#,
-        r#"{\rtf1\ilfomacatclnup99999999999 Body}"#,
-        r#"{\rtf1\grfdocevents Body}"#,
-        r#"{\rtf1\grfdocevents-1 Body}"#,
-        r#"{\rtf1\grfdocevents32768 Body}"#,
-        r#"{\rtf1\grfdocevents2147483647 Body}"#,
-        r#"{\rtf1\grfdocevents99999999999 Body}"#,
-        r#"{\rtf1\fracwidth\fracwidth Body}"#,
-        r#"{\rtf1\ilfomacatclnup0\ilfomacatclnup1 Body}"#,
-        r#"{\rtf1\grfdocevents0\grfdocevents1 Body}"#,
-        r#"{\rtf1{\*\fracwidth}Body}"#,
-        r#"{\rtf1{\*\ilfomacatclnup0}Body}"#,
-        r#"{\rtf1{\*\grfdocevents0}Body}"#,
-        r#"{\rtf1{\fracwidth}Body}"#,
-        r#"{\rtf1{\ilfomacatclnup0}Body}"#,
-        r#"{\rtf1{\grfdocevents0}Body}"#,
-        r#"{\rtf1 Body\fracwidth}"#,
-        r#"{\rtf1 Body\ilfomacatclnup0}"#,
-        r#"{\rtf1 Body\grfdocevents0}"#,
+        r"{\rtf1\fracwidth0 Body}",
+        r"{\rtf1\ilfomacatclnup Body}",
+        r"{\rtf1\ilfomacatclnup-1 Body}",
+        r"{\rtf1\ilfomacatclnup2 Body}",
+        r"{\rtf1\ilfomacatclnup6 Body}",
+        r"{\rtf1\ilfomacatclnup99999999999 Body}",
+        r"{\rtf1\grfdocevents Body}",
+        r"{\rtf1\grfdocevents-1 Body}",
+        r"{\rtf1\grfdocevents32768 Body}",
+        r"{\rtf1\grfdocevents2147483647 Body}",
+        r"{\rtf1\grfdocevents99999999999 Body}",
+        r"{\rtf1\fracwidth\fracwidth Body}",
+        r"{\rtf1\ilfomacatclnup0\ilfomacatclnup1 Body}",
+        r"{\rtf1\grfdocevents0\grfdocevents1 Body}",
+        r"{\rtf1{\*\fracwidth}Body}",
+        r"{\rtf1{\*\ilfomacatclnup0}Body}",
+        r"{\rtf1{\*\grfdocevents0}Body}",
+        r"{\rtf1{\fracwidth}Body}",
+        r"{\rtf1{\ilfomacatclnup0}Body}",
+        r"{\rtf1{\grfdocevents0}Body}",
+        r"{\rtf1 Body\fracwidth}",
+        r"{\rtf1 Body\ilfomacatclnup0}",
+        r"{\rtf1 Body\grfdocevents0}",
     ] {
         assert!(
             RtfDocument::parse(source).is_err(),

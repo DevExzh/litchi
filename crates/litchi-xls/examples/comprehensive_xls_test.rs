@@ -3,7 +3,7 @@
 //! This example demonstrates all features available in the XLS writer.
 //! Tests multiple sheets, data types, formulas, and formatting.
 //!
-//! Run with: cargo run --example comprehensive_xls_test
+//! Run with: cargo run --example `comprehensive_xls_test`
 
 use litchi_xls::Writer;
 
@@ -160,7 +160,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for (i, (id, name, dept, salary, bonus, active)) in employees.iter().enumerate() {
         let row = (i + 1) as u32;
-        writer.write_number(employee_sheet, row, 0, *id as f64)?;
+        writer.write_number(employee_sheet, row, 0, f64::from(*id))?;
         writer.write_string(employee_sheet, row, 1, name)?;
         writer.write_string(employee_sheet, row, 2, dept)?;
         writer.write_number(employee_sheet, row, 3, *salary)?;

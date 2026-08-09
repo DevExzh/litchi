@@ -1,5 +1,7 @@
 use super::super::super::invalid;
-use super::super::super::model::*;
+use super::super::super::model::{
+    EffectInstance, EventFilter, GraphicBuildMode, GroupId, SequenceContext, Trigger,
+};
 use super::super::validation::TimingValue;
 use crate::Result;
 use std::ops::Range;

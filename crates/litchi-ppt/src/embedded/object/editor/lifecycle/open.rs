@@ -4,6 +4,7 @@ use super::super::{Collection, Editor, Result, mapping, rewrite};
 use crate::package::Error;
 use litchi_cfb::OleFile;
 use litchi_ole_common::protection::is_protected_component;
+use std::collections::{HashMap, HashSet};
 use std::io::{Cursor, Read, Seek};
 use std::sync::Arc;
 
@@ -95,8 +96,8 @@ fn open_with_limit(
         current_edit_offset,
         document_persist_id,
         collection,
-        staged_storage: Default::default(),
-        removed_persist_ids: Default::default(),
+        staged_storage: HashMap::default(),
+        removed_persist_ids: HashSet::default(),
         rewrite_object_list: false,
         changed: false,
     })

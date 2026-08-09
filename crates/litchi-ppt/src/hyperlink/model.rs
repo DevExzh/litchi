@@ -1,4 +1,4 @@
-//! Typed semantic hyperlink and interaction values for legacy PowerPoint.
+//! Typed semantic hyperlink and interaction values for legacy `PowerPoint`.
 
 /// Mouse event that triggers an interactive action.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,7 +54,7 @@ pub enum InteractionLinkTarget {
 pub struct InteractionLimits {
     /// Maximum complete container size, including its eight-byte header.
     pub max_record_bytes: usize,
-    /// Maximum MacroNameAtom UTF-16 payload size.
+    /// Maximum `MacroNameAtom` UTF-16 payload size.
     pub max_macro_name_bytes: usize,
 }
 
@@ -67,7 +67,11 @@ impl Default for InteractionLimits {
     }
 }
 
-/// Typed payload of an MS-PPT §2.6.10 InteractiveInfoAtom.
+/// Typed payload of an MS-PPT §2.6.10 `InteractiveInfoAtom`.
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "each bool maps directly to one flag bit of the sixteen-byte MS-PPT wire atom; the flat public layout is the established API"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InteractiveInfoAtom {
     pub sound_id: u32,
@@ -84,7 +88,7 @@ pub struct InteractiveInfoAtom {
     pub unused: [u8; 3],
 }
 
-/// Inert MS-PPT §2.6.11 MacroNameAtom data.
+/// Inert MS-PPT §2.6.11 `MacroNameAtom` data.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MacroNameAtom {
     pub(super) text: String,
@@ -92,6 +96,10 @@ pub struct MacroNameAtom {
 }
 
 /// One click or mouse-over action attached to a shape or text range.
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "the bools mirror the `InteractiveInfoAtom` wire flag bits one-to-one; merging them into two-variant enums would churn the established public API"
+)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Interaction {
     pub trigger: InteractionTrigger,
@@ -108,20 +116,20 @@ pub struct Interaction {
     pub macro_name: Option<String>,
     /// Undefined atom bytes retained verbatim.
     pub unused: [u8; 3],
-    /// Exact inert MacroNameAtom UTF-16 data, if present.
+    /// Exact inert `MacroNameAtom` UTF-16 data, if present.
     pub macro_name_data: Option<Vec<u8>>,
 }
 
 /// Click and mouse-over actions attached to one slide shape.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShapeInteractionEntry {
-    /// OfficeArt shape identifier.
+    /// `OfficeArt` shape identifier.
     pub shape_id: u32,
     /// At most one action for each [`InteractionTrigger`].
     pub interactions: Vec<Interaction>,
 }
 
-/// Additional hyperlink data introduced by PowerPoint 9.
+/// Additional hyperlink data introduced by `PowerPoint` 9.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HyperlinkExtension {
     /// Optional text displayed as a hover screen tip.
@@ -134,7 +142,7 @@ pub struct HyperlinkExtension {
     pub named_show_returns_to_slide: bool,
 }
 
-/// One base PowerPoint hyperlink definition.
+/// One base `PowerPoint` hyperlink definition.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Hyperlink {
     /// Positive identifier referenced by interactive information records.
@@ -145,11 +153,11 @@ pub struct Hyperlink {
     pub target: Option<String>,
     /// Optional location within the destination.
     pub location: Option<String>,
-    /// Optional PowerPoint 9 metadata for this hyperlink.
+    /// Optional `PowerPoint` 9 metadata for this hyperlink.
     pub extension: Option<HyperlinkExtension>,
 }
 
-/// Hyperlink definitions resolved with their PowerPoint 9 extensions.
+/// Hyperlink definitions resolved with their `PowerPoint` 9 extensions.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Hyperlinks {
     /// Seed used when allocating new external-object or hyperlink identifiers.

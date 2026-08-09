@@ -92,17 +92,18 @@ pub(crate) fn replace(source: &[u8], location: &Location, replacement: &[u8]) ->
     }
     let old_len = location.range.len();
     let delta = replacement.len() as i128 - old_len as i128;
-    let output_len = source.len() as i128 + delta;
-    let output_len = usize::try_from(output_len)
-        .map_err(|_| Error::Corrupted("external-media publication size overflows usize".into()))?;
+    let output_len_wide = source.len() as i128 + delta;
+    let output_len = usize::try_from(output_len_wide).map_err(|_err| {
+        Error::Corrupted("external-media publication size overflows usize".into())
+    })?;
     let mut output = Vec::with_capacity(output_len);
     output.extend_from_slice(&source[..location.range.start]);
     output.extend_from_slice(replacement);
     output.extend_from_slice(&source[location.range.end..]);
 
     for ancestor in &location.ancestors {
-        let new_payload_len = ancestor.payload_len as i128 + delta;
-        let new_payload_len = u32::try_from(new_payload_len).map_err(|_| {
+        let new_payload_len_wide = ancestor.payload_len as i128 + delta;
+        let new_payload_len = u32::try_from(new_payload_len_wide).map_err(|_err| {
             Error::Corrupted("owning PPT record payload exceeds u32 after publication".into())
         })?;
         let length_end = ancestor
@@ -141,11 +142,11 @@ pub(crate) fn append_to_document(
             "DocumentContainer source length does not match its record header".into(),
         ));
     }
-    let new_payload_len = old_payload_len
+    let new_payload_len_usize = old_payload_len
         .checked_add(replacement.len())
         .ok_or_else(|| Error::Corrupted("DocumentContainer payload size overflows usize".into()))?;
-    let new_payload_len = u32::try_from(new_payload_len)
-        .map_err(|_| Error::Corrupted("DocumentContainer payload exceeds u32".into()))?;
+    let new_payload_len = u32::try_from(new_payload_len_usize)
+        .map_err(|_err| Error::Corrupted("DocumentContainer payload exceeds u32".into()))?;
     let mut output = Vec::with_capacity(source.len().saturating_add(replacement.len()));
     output.extend_from_slice(&source[..4]);
     output.extend_from_slice(&new_payload_len.to_le_bytes());

@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::model::Presentation;
 use crate::Error;
 use crate::consts::RecordType;
@@ -12,7 +18,7 @@ fn record(record_type: RecordType, data: Vec<u8>, children: Vec<Record>) -> Reco
         record_type_raw: 0,
         version: 0,
         instance: 0,
-        data_length: data.len() as u32,
+        data_length: u32::try_from(data.len()).unwrap(),
         data,
         children,
     }
@@ -22,7 +28,7 @@ fn record_bytes(version: u16, instance: u16, record_type: RecordType, data: &[u8
     let mut bytes = Vec::with_capacity(8 + data.len());
     bytes.extend_from_slice(&((instance << 4) | version).to_le_bytes());
     bytes.extend_from_slice(&record_type.as_u16().to_le_bytes());
-    bytes.extend_from_slice(&(data.len() as u32).to_le_bytes());
+    bytes.extend_from_slice(&u32::try_from(data.len()).unwrap().to_le_bytes());
     bytes.extend_from_slice(data);
     bytes
 }
@@ -40,7 +46,7 @@ fn presentation_with_vba_storage() -> Presentation {
     storage_data.extend_from_slice(&4096u32.to_le_bytes());
     storage_data.extend_from_slice(&[0x78, 0x9c, 1, 2, 3]);
     let storage = record_bytes(0, 1, RecordType::ExternalOleObjectStg, &storage_data);
-    let storage_offset = vba_info.len() as u32;
+    let storage_offset = u32::try_from(vba_info.len()).unwrap();
 
     let mut powerpoint_document = vba_info;
     powerpoint_document.extend_from_slice(&storage);
@@ -87,10 +93,7 @@ fn named_shows(children: Vec<Record>) -> Record {
 }
 
 fn named_show(name: &str, slide_ids: &[u32]) -> Record {
-    let name_bytes: Vec<u8> = name
-        .encode_utf16()
-        .flat_map(|unit| unit.to_le_bytes())
-        .collect();
+    let name_bytes: Vec<u8> = name.encode_utf16().flat_map(u16::to_le_bytes).collect();
     let slide_bytes: Vec<u8> = slide_ids.iter().flat_map(|id| id.to_le_bytes()).collect();
     record(
         RecordType::NamedShow,

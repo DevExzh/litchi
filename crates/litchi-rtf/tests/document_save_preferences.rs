@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{
     DocumentReadOnlyRecommendation, DocumentSavePreferences, DocumentThumbnailPreference,
     RtfDocument, RtfWriter,
@@ -13,7 +22,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_both_parameterless_passive_flags() {
-    let document = RtfDocument::parse(r#"{\rtf1\readonlyrecommended\saveprevpict Body}"#).unwrap();
+    let document = RtfDocument::parse(r"{\rtf1\readonlyrecommended\saveprevpict Body}").unwrap();
     assert_eq!(
         *document.save_preferences(),
         DocumentSavePreferences {
@@ -26,7 +35,7 @@ fn parses_both_parameterless_passive_flags() {
 
 #[test]
 fn omission_preserves_unspecified_semantics() {
-    let document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     assert!(document.save_preferences().is_empty());
     assert_eq!(
         document.save_preferences().thumbnail,
@@ -36,7 +45,7 @@ fn omission_preserves_unspecified_semantics() {
 
 #[test]
 fn typed_api_round_trips_in_stable_order_and_clears() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     document.set_save_preferences(DocumentSavePreferences {
         read_only: DocumentReadOnlyRecommendation::Recommended,
         thumbnail: DocumentThumbnailPreference::RequiredIfSupported,
@@ -77,18 +86,18 @@ fn coexists_after_existing_passive_root_metadata_in_deterministic_order() {
 #[test]
 fn rejects_parameters_duplicates_starred_grouped_and_late_flags() {
     for source in [
-        r#"{\rtf1\readonlyrecommended0 Body}"#,
-        r#"{\rtf1\readonlyrecommended1 Body}"#,
-        r#"{\rtf1\saveprevpict0 Body}"#,
-        r#"{\rtf1\saveprevpict-1 Body}"#,
-        r#"{\rtf1\readonlyrecommended\readonlyrecommended Body}"#,
-        r#"{\rtf1\saveprevpict\saveprevpict Body}"#,
-        r#"{\rtf1{\*\readonlyrecommended}Body}"#,
-        r#"{\rtf1{\*\saveprevpict}Body}"#,
-        r#"{\rtf1{\readonlyrecommended}Body}"#,
-        r#"{\rtf1{\saveprevpict}Body}"#,
-        r#"{\rtf1 Body\readonlyrecommended}"#,
-        r#"{\rtf1 Body\saveprevpict}"#,
+        r"{\rtf1\readonlyrecommended0 Body}",
+        r"{\rtf1\readonlyrecommended1 Body}",
+        r"{\rtf1\saveprevpict0 Body}",
+        r"{\rtf1\saveprevpict-1 Body}",
+        r"{\rtf1\readonlyrecommended\readonlyrecommended Body}",
+        r"{\rtf1\saveprevpict\saveprevpict Body}",
+        r"{\rtf1{\*\readonlyrecommended}Body}",
+        r"{\rtf1{\*\saveprevpict}Body}",
+        r"{\rtf1{\readonlyrecommended}Body}",
+        r"{\rtf1{\saveprevpict}Body}",
+        r"{\rtf1 Body\readonlyrecommended}",
+        r"{\rtf1 Body\saveprevpict}",
     ] {
         assert!(
             RtfDocument::parse(source).is_err(),

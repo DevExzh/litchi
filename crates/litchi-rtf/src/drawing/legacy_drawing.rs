@@ -17,6 +17,9 @@ pub struct LegacyDrawingGeometry {
 }
 
 impl LegacyDrawingGeometry {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(self) -> RtfResult<()> {
         if self.width < 0 || self.height < 0 {
             return Err(RtfError::MalformedDocument(
@@ -45,18 +48,21 @@ pub enum LegacyDrawingColor {
 }
 
 impl LegacyDrawingColor {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn gray_half_percent(value: i32) -> RtfResult<Self> {
-        let value = u8::try_from(value).map_err(|_| {
+        let gray = u8::try_from(value).map_err(|_err| {
             RtfError::MalformedDocument(
                 "RTF legacy drawing grayscale is outside 0..=200".to_string(),
             )
         })?;
-        if value > 200 {
+        if gray > 200 {
             return Err(RtfError::MalformedDocument(
                 "RTF legacy drawing grayscale is outside 0..=200".to_string(),
             ));
         }
-        Ok(Self::Gray(value))
+        Ok(Self::Gray(gray))
     }
 }
 
@@ -222,6 +228,10 @@ pub enum LegacyCalloutAttachment {
     Absolute,
 }
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent RTF feature flags stay flat for direct access"
+)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LegacyCallout<'a> {
     pub callout_type: LegacyCalloutType,
@@ -474,8 +484,10 @@ pub struct LegacyDrawing<'a> {
     pub locked: bool,
     pub primitive: LegacyDrawingPrimitive<'a>,
 }
-
 impl LegacyDrawing<'_> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         let mut primitives = 0;
         let mut points = 0;

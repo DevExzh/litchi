@@ -105,26 +105,6 @@ impl NonPartMember {
     }
 }
 
-/// Map a ZIP item name onto an OPC part name.
-///
-/// Returns `None` when the item cannot denote a part, which makes it archive
-/// junk rather than a malformed package (ECMA-376 Part 2 §9.1.1.1).
-pub(crate) fn part_name_for_member(
-    member_name: &str,
-    max_member_name_bytes: usize,
-) -> Option<PackURI> {
-    if member_name.len() > max_member_name_bytes {
-        return None;
-    }
-    let mut absolute = String::new();
-    absolute
-        .try_reserve(member_name.len().checked_add(1)?)
-        .ok()?;
-    absolute.push('/');
-    absolute.push_str(member_name);
-    PackURI::new(absolute).ok()
-}
-
 /// Collection of accepted part names, checked for OPC name conflicts.
 ///
 /// Enforces the three rules that make a part-name collection unambiguous:
@@ -265,6 +245,26 @@ impl PartNameIndex {
         self.by_folded.insert(folded, at);
         Ok(())
     }
+}
+
+/// Map a ZIP item name onto an OPC part name.
+///
+/// Returns `None` when the item cannot denote a part, which makes it archive
+/// junk rather than a malformed package (ECMA-376 Part 2 §9.1.1.1).
+pub(crate) fn part_name_for_member(
+    member_name: &str,
+    max_member_name_bytes: usize,
+) -> Option<PackURI> {
+    if member_name.len() > max_member_name_bytes {
+        return None;
+    }
+    let mut absolute = String::new();
+    absolute
+        .try_reserve(member_name.len().checked_add(1)?)
+        .ok()?;
+    absolute.push('/');
+    absolute.push_str(member_name);
+    PackURI::new(absolute).ok()
 }
 
 fn ascii_lowercase(value: &str) -> Result<String> {

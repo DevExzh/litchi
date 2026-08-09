@@ -1,11 +1,15 @@
 //! Text extraction utilities for PPT records.
 //!
 //! This module provides functions to extract text from various PPT record types,
-//! including TextCharsAtom (UTF-16LE), TextBytesAtom (ISO-8859-1), and CString.
+//! including `TextCharsAtom` (UTF-16LE), `TextBytesAtom` (ISO-8859-1), and `CString`.
 
 use crate::package::Result;
-/// Parse TextCharsAtom record (UTF-16LE text content).
-/// Based on POI's TextCharsAtom.getText() method.
+/// Parse `TextCharsAtom` record (UTF-16LE text content).
+/// Based on POI's `TextCharsAtom.getText()` method.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_text_chars_atom(data: &[u8]) -> Result<String> {
     if data.is_empty() {
         return Ok(String::new());
@@ -16,14 +20,15 @@ pub fn parse_text_chars_atom(data: &[u8]) -> Result<String> {
     let text = from_utf16le_lossy(data);
 
     // POI strips the trailing return character and null terminator if present
-    let text = text.trim_end_matches(['\r', '\u{0}']).to_string();
+    let trimmed = text.trim_end_matches(['\r', '\u{0}']).to_string();
 
-    Ok(text)
+    Ok(trimmed)
 }
 
 /// Convert UTF-16LE bytes to String (lossy conversion).
 /// This follows POI's StringUtil.getFromUnicodeLE logic.
 /// Optimized for performance with minimal allocations.
+#[must_use]
 pub fn from_utf16le_lossy(bytes: &[u8]) -> String {
     if bytes.is_empty() {
         return String::new();
@@ -42,8 +47,12 @@ pub(crate) fn decode_text_bytes(data: &[u8]) -> String {
     data.iter().map(|&byte| char::from(byte)).collect()
 }
 
-/// Parse TextBytesAtom record (byte text content).
-/// Based on POI's TextBytesAtom.getText() method.
+/// Parse `TextBytesAtom` record (byte text content).
+/// Based on POI's `TextBytesAtom.getText()` method.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_text_bytes_atom(data: &[u8]) -> Result<String> {
     if data.is_empty() {
         return Ok(String::new());
@@ -53,22 +62,31 @@ pub fn parse_text_bytes_atom(data: &[u8]) -> Result<String> {
     let text = decode_text_bytes(data);
 
     // POI strips the trailing return character and null terminator if present
-    let text = text.trim_end_matches(['\r', '\u{0}']).to_string();
+    let trimmed = text.trim_end_matches(['\r', '\u{0}']).to_string();
 
-    Ok(text)
+    Ok(trimmed)
 }
 
 /// Parse a `CString` record containing a UTF-16LE string.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_cstring(data: &[u8]) -> Result<String> {
     let text = from_utf16le_lossy(data);
 
     // Strip a non-conforming trailing return for compatibility with old producers.
-    let text = text.trim_end_matches('\r').to_string();
+    let trimmed = text.trim_end_matches('\r').to_string();
 
-    Ok(text)
+    Ok(trimmed)
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -118,14 +136,14 @@ mod tests {
         }
 
         // Record parsing preserves internal tag names; callers decide whether to expose them.
-        let text = parse_cstring(&utf16("___PPT10")).unwrap();
-        assert_eq!(text, "___PPT10");
+        let tag_text = parse_cstring(&utf16("___PPT10")).unwrap();
+        assert_eq!(tag_text, "___PPT10");
 
-        let text = parse_cstring(&utf16("Default Design")).unwrap();
-        assert_eq!(text, "Default Design");
+        let design_text = parse_cstring(&utf16("Default Design")).unwrap();
+        assert_eq!(design_text, "Default Design");
 
         // Should preserve the complete UTF-16 string, including surrogate pairs.
-        let text = parse_cstring(&utf16("普通の😀")).unwrap();
-        assert_eq!(text, "普通の😀");
+        let unicode_text = parse_cstring(&utf16("普通の😀")).unwrap();
+        assert_eq!(unicode_text, "普通の😀");
     }
 }

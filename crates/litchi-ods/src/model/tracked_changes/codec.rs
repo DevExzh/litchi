@@ -68,7 +68,6 @@ pub(crate) struct RecordSpan {
 #[derive(Clone, Debug)]
 pub(crate) struct SourceMap {
     pub(crate) changes: Option<Changes>,
-    pub(crate) body: ElementSpan,
     pub(crate) spreadsheet: ElementSpan,
     pub(crate) owner: Option<OwnerSpan>,
     pub(crate) schema_insert: usize,
@@ -540,7 +539,9 @@ fn inspect_source(xml: &str, limits: &Limits) -> Result<SourceMap> {
     if !root_seen || !root_closed || !stack.is_empty() {
         return invalid("incomplete ODS content.xml document");
     }
-    let body = body.ok_or_else(|| invalid_error("ODS content.xml has no direct office:body"))?;
+    if body.is_none() {
+        return Err(invalid_error("ODS content.xml has no direct office:body"));
+    }
     let spreadsheet = spreadsheet
         .ok_or_else(|| invalid_error("ODS content.xml has no direct office:spreadsheet"))?;
     let schema_insert = spreadsheet.open.end;
@@ -556,7 +557,6 @@ fn inspect_source(xml: &str, limits: &Limits) -> Result<SourceMap> {
     record_resources.extend(records.iter().map(|record| record.resources));
     Ok(SourceMap {
         changes: None,
-        body,
         spreadsheet,
         owner,
         schema_insert,
@@ -922,7 +922,10 @@ fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(invalid_error(message))
 }
 
-pub(crate) fn parse_tracked_changes(xml: &str) -> Result<Option<Changes>> {
+/// # Errors
+///
+/// Returns an error when the input is malformed or exceeds the parser's resource limits.
+pub fn parse_tracked_changes(xml: &str) -> Result<Option<Changes>> {
     Ok(inspect_tracked_changes_source(xml, &Limits::default())?.changes)
 }
 
@@ -1901,7 +1904,10 @@ impl Changes {
     }
 }
 
-pub(crate) fn write_tracked_changes(output: &mut String, changes: Option<&Changes>) -> Result<()> {
+/// # Errors
+///
+/// Returns an error when the value cannot be serialized.
+pub fn write_tracked_changes(output: &mut String, changes: Option<&Changes>) -> Result<()> {
     if let Some(changes) = changes {
         let fragment =
             write_tracked_changes_owner(changes, Some(changes.enabled), &Limits::default())?;
@@ -3085,16 +3091,6 @@ fn collapse_atomic(value: &str) -> &str {
 fn ensure_nonempty(value: &str, name: &str) -> Result<()> {
     if value.is_empty() {
         Err(Error::InvalidFormat(format!("{name} must not be empty")))
-    } else {
-        Ok(())
-    }
-}
-
-fn ensure_value_bound(value: &str, kind: &str) -> Result<()> {
-    if value.len() > MAX_VALUE_BYTES {
-        Err(Error::InvalidFormat(format!(
-            "tracked-change {kind} exceeds 64 KiB"
-        )))
     } else {
         Ok(())
     }

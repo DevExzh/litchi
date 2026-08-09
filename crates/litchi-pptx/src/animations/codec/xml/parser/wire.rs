@@ -1,6 +1,17 @@
-use super::super::super::super::{invalid, model::*};
+use super::super::super::super::{
+    invalid,
+    model::{
+        CommonTimeNode, ConditionEvent, ConditionTarget, Duration, NextAction, PresetClass,
+        PresetTimeNode, PreviousAction, RuntimeTrigger, Sequence, TimeCondition, TimeNodeType,
+        TimingChild, TimingNode, TimingNodeKind, TimingTree,
+    },
+};
 use super::semantic::TimingParser;
-use super::validation::*;
+use super::validation::{
+    MAX_TIMING_DEPTH, MAX_TIMING_NODES, MAX_TIMING_TEXT_BYTES, TimingValue, attribute,
+    check_attribute_count, is_presentationml_name, parse_shape_id, parse_timing_value,
+    parse_xml_bool,
+};
 use crate::{Error, Result};
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
@@ -112,7 +123,7 @@ pub(super) fn parse_recursive_timing_tree(xml: &str) -> Result<TimingTree> {
                             .map(|value| {
                                 value
                                     .parse::<u32>()
-                                    .map_err(|_| invalid("invalid common time-node ID"))
+                                    .map_err(|_err| invalid("invalid common time-node ID"))
                             })
                             .transpose()?;
                         frame.node.common.duration = attribute(element, b"dur", reader.decoder())?
@@ -129,7 +140,7 @@ pub(super) fn parse_recursive_timing_tree(xml: &str) -> Result<TimingTree> {
                         if let Some(value) = attribute(element, b"presetID", reader.decoder())? {
                             let preset_id = value
                                 .parse::<u32>()
-                                .map_err(|_| invalid("invalid animation preset ID"))?;
+                                .map_err(|_err| invalid("invalid animation preset ID"))?;
                             let class = PresetClass::parse(
                                 attribute(element, b"presetClass", reader.decoder())?
                                     .as_deref()
@@ -138,7 +149,7 @@ pub(super) fn parse_recursive_timing_tree(xml: &str) -> Result<TimingTree> {
                             let subtype = attribute(element, b"presetSubtype", reader.decoder())?
                                 .map(|v| {
                                     v.parse::<u32>()
-                                        .map_err(|_| invalid("invalid animation preset subtype"))
+                                        .map_err(|_err| invalid("invalid animation preset subtype"))
                                 })
                                 .transpose()?;
                             frame.node.common.preset = Some(PresetTimeNode {
@@ -185,9 +196,9 @@ pub(super) fn parse_recursive_timing_tree(xml: &str) -> Result<TimingTree> {
                                 .node
                                 .common;
                             if start {
-                                common.start_conditions.push(current)
+                                common.start_conditions.push(current);
                             } else {
-                                common.end_conditions.push(current)
+                                common.end_conditions.push(current);
                             }
                         } else if condition.replace((depth, start, current)).is_some() {
                             return Err(invalid("nested animation conditions are invalid"));
@@ -207,7 +218,7 @@ pub(super) fn parse_recursive_timing_tree(xml: &str) -> Result<TimingTree> {
                                     invalid("condition time-node target is missing its ID")
                                 })?
                                 .parse::<u32>()
-                                .map_err(|_| invalid("invalid condition time-node ID"))?;
+                                .map_err(|_err| invalid("invalid condition time-node ID"))?;
                             current.target = Some(ConditionTarget::TimeNode(id));
                         } else if is_presentationml_name(&namespace, element.name(), b"rtn") {
                             current.target = Some(ConditionTarget::Runtime(RuntimeTrigger::parse(
@@ -233,9 +244,9 @@ pub(super) fn parse_recursive_timing_tree(xml: &str) -> Result<TimingTree> {
                         .node
                         .common;
                     if start {
-                        common.start_conditions.push(value)
+                        common.start_conditions.push(value);
                     } else {
-                        common.end_conditions.push(value)
+                        common.end_conditions.push(value);
                     }
                 }
                 if condition_lists.last().is_some_and(|(d, _)| *d == depth) {
@@ -248,9 +259,9 @@ pub(super) fn parse_recursive_timing_tree(xml: &str) -> Result<TimingTree> {
                     let child = TimingChild::Node(frame.node);
                     if let Some(parent) = frames.last_mut() {
                         if frame.sub_node {
-                            parent.node.common.sub_nodes.push(child)
+                            parent.node.common.sub_nodes.push(child);
                         } else {
-                            parent.node.common.children.push(child)
+                            parent.node.common.children.push(child);
                         }
                     } else {
                         roots.push(child);
@@ -303,7 +314,7 @@ pub(super) fn parse_processed_timing(xml: &[u8], require_valid_targets: bool) ->
 
     loop {
         let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("animation XML offset does not fit usize"))?;
+            .map_err(|_err| invalid("animation XML offset does not fit usize"))?;
         let decoder = reader.decoder();
         let event = reader
             .read_event()
@@ -312,7 +323,7 @@ pub(super) fn parse_processed_timing(xml: &[u8], require_valid_targets: bool) ->
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("animation XML offset does not fit usize"))?;
+            .map_err(|_err| invalid("animation XML offset does not fit usize"))?;
         nodes = nodes
             .checked_add(1)
             .ok_or_else(|| invalid("animation XML node counter overflow"))?;

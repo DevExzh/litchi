@@ -12,9 +12,13 @@ const DOCUMENT_ATOM_PAYLOAD: usize = 40;
 const PERSIST_ATOM_PAYLOAD: usize = 20;
 
 /// Validate one complete document tree and build its typed structural view.
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "`RecordType` has hundreds of variants; only the document-structure members are meaningful here"
+)]
 pub(super) fn validate_document(document: &Record, limits: Limits) -> Result<DocumentStructure> {
-    let limits = limits.validate()?;
-    validate_budget(document, 0, &mut 0usize, limits)?;
+    let validated_limits = limits.validate()?;
+    validate_budget(document, 0, &mut 0usize, validated_limits)?;
     header(document, RecordType::Document, 0x0f, 0)?;
 
     let mut document_atom = None;
@@ -84,7 +88,6 @@ pub(super) fn validate_document(document: &Record, limits: Limits) -> Result<Doc
 
     let end_index = match end_document.as_slice() {
         [index] => *index,
-        [] => return corrupted("DocumentContainer must contain exactly one EndDocumentAtom"),
         _ => return corrupted("DocumentContainer must contain exactly one EndDocumentAtom"),
     };
     let custom_table_styles = match custom_styles.as_slice() {
@@ -188,10 +191,10 @@ fn parse_slide_list(
     let mut current: Option<(u32, usize)> = None;
     for (index, child) in list.children.iter().enumerate() {
         if child.record_type == RecordType::SlidePersistAtom {
-            if let Some((text_count, seen_texts)) = current.take() {
-                if seen_texts > usize::try_from(text_count).unwrap_or(usize::MAX) {
-                    return corrupted("slide list contains more text headers than cTexts");
-                }
+            if let Some((text_count, seen_texts)) = current.take()
+                && seen_texts > usize::try_from(text_count).unwrap_or(usize::MAX)
+            {
+                return corrupted("slide list contains more text headers than cTexts");
             }
             let (persist_id, flags, text_count, slide_id) = parse_slide_persist(child)?;
             if !persist_ids.insert(persist_id) {
@@ -214,10 +217,10 @@ fn parse_slide_list(
             return corrupted("slide-list text records precede their SlidePersistAtom");
         }
     }
-    if let Some((text_count, seen_texts)) = current {
-        if seen_texts > usize::try_from(text_count).unwrap_or(usize::MAX) {
-            return corrupted("slide list contains more text headers than cTexts");
-        }
+    if let Some((text_count, seen_texts)) = current
+        && seen_texts > usize::try_from(text_count).unwrap_or(usize::MAX)
+    {
+        return corrupted("slide list contains more text headers than cTexts");
     }
     Ok(())
 }
@@ -344,7 +347,7 @@ fn read_u32(record: &Record, offset: usize, name: &str) -> Result<u32> {
         .data
         .get(offset..end)
         .ok_or_else(|| Error::Corrupted(format!("{name} is truncated")))?;
-    Ok(u32::from_le_bytes(bytes.try_into().map_err(|_| {
+    Ok(u32::from_le_bytes(bytes.try_into().map_err(|_err| {
         Error::Corrupted(format!("{name} is truncated"))
     })?))
 }
@@ -379,10 +382,11 @@ fn validate_budget(record: &Record, depth: usize, count: &mut usize, limits: Lim
 pub(super) fn list_index(document: &Record, instance: u16) -> Result<Option<usize>> {
     let mut found = None;
     for (index, child) in document.children.iter().enumerate() {
-        if child.record_type == RecordType::SlideListWithText && child.instance == instance {
-            if found.replace(index).is_some() {
-                return corrupted("DocumentContainer contains duplicate structural lists");
-            }
+        if child.record_type == RecordType::SlideListWithText
+            && child.instance == instance
+            && found.replace(index).is_some()
+        {
+            return corrupted("DocumentContainer contains duplicate structural lists");
         }
     }
     Ok(found)

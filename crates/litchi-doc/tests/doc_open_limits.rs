@@ -1,6 +1,6 @@
 use litchi_cfb::OleFile;
 use litchi_doc::writer::{Picture, Writer};
-use litchi_doc::{Error, Limits, OpenOptions, Package, ResourceKind};
+use litchi_doc::{Error, Limits, OpenOptions, Package, PackageOpenOptions, Password, ResourceKind};
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -145,6 +145,31 @@ fn package_limit_accepts_exact_size_and_rejects_one_less() {
         u64::try_from(exact.max_package_bytes() - 1).unwrap()
     );
     assert_eq!(core_limit.scope.as_ref(), "DOC package");
+}
+
+#[test]
+fn default_limits_are_bounded_and_package_open_options_apply_them() {
+    let defaults = Limits::default();
+    assert!(defaults.max_package_bytes() < Limits::MAX_PACKAGE_BYTES);
+    assert!(defaults.max_input_bytes() < Limits::MAX_INPUT_BYTES);
+    assert!(defaults.max_aggregate_input_bytes() < Limits::MAX_AGGREGATE_INPUT_BYTES);
+
+    let bytes = document_bytes();
+    let exact = exact_limits(&bytes);
+    let path = temporary_path();
+    std::fs::write(&path, &bytes).unwrap();
+    let package =
+        Package::open_with(&path, PackageOpenOptions::default().with_limits(exact)).unwrap();
+    std::fs::remove_file(path).unwrap();
+    assert_eq!(package.limits(), exact);
+}
+
+#[test]
+fn typed_password_is_redacted_and_moves_into_open_options() {
+    let password = Password::new("not-in-debug-output".to_owned());
+    assert_eq!(format!("{password:?}"), "Password([REDACTED])");
+    let options = OpenOptions::default().with_password(password);
+    assert!(!format!("{options:?}").contains("not-in-debug-output"));
 }
 
 #[test]

@@ -1,3 +1,7 @@
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent RTF feature flags stay flat for direct access"
+)]
 /// Passive legacy table-layout compatibility requests.
 ///
 /// These flags are retained for round trips only. This crate does not alter
@@ -25,6 +29,7 @@ pub struct DocumentTableLayoutCompatibility {
 
 impl DocumentTableLayoutCompatibility {
     /// Return whether every table-layout compatibility request was omitted.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         !self.combine_borders_like_word_5
             && !self.do_not_align_rows_independently

@@ -1,3 +1,9 @@
+#![allow(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "this command-line example intentionally prints its results"
+)]
+
 use litchi_cfb::OleFile;
 use litchi_ppt::Record;
 use litchi_ppt::RecordType;
@@ -45,12 +51,9 @@ fn dump_persist_dir(data: &[u8]) {
         if i == 0 {
             let base = v & 0x000F_FFFF;
             let count = (v >> 20) & 0x0FFF;
-            println!(
-                "    info[0]=0x{:08X} (base_id={}, count={})",
-                v, base, count
-            );
+            println!("    info[0]=0x{v:08X} (base_id={base}, count={count})");
         } else {
-            println!("    dword[{}]=0x{:08X}", i, v);
+            println!("    dword[{i}]=0x{v:08X}");
         }
     }
 }
@@ -69,14 +72,14 @@ fn dump_user_edit(data: &[u8]) {
     let last_view = u16::from_le_bytes([data[24], data[25]]);
     let unused = u16::from_le_bytes([data[26], data[27]]);
     println!("  UserEditAtom:");
-    println!("    lastViewedSlideID={}", last_viewed);
-    println!("    pptVersion=0x{:08X}", ppt_version);
-    println!("    offsetLastEdit=0x{:08X}", off_last_edit);
-    println!("    offsetPersistDir=0x{:08X}", off_persist);
-    println!("    docPersistRef={}", doc_ref);
-    println!("    maxPersistWritten={}", max_persist);
-    println!("    lastViewType={}", last_view);
-    println!("    unused=0x{:04X}", unused);
+    println!("    lastViewedSlideID={last_viewed}");
+    println!("    pptVersion=0x{ppt_version:08X}");
+    println!("    offsetLastEdit=0x{off_last_edit:08X}");
+    println!("    offsetPersistDir=0x{off_persist:08X}");
+    println!("    docPersistRef={doc_ref}");
+    println!("    maxPersistWritten={max_persist}");
+    println!("    lastViewType={last_view}");
+    println!("    unused=0x{unused:04X}");
 }
 
 fn dump_current_user_stream(data: &[u8]) {
@@ -127,7 +130,7 @@ fn dump_current_user_stream(data: &[u8]) {
                 if cu == 0 {
                     break;
                 }
-                if let Some(ch) = char::from_u32(cu as u32) {
+                if let Some(ch) = char::from_u32(u32::from(cu)) {
                     chars.push(ch);
                 }
                 i += 2;
@@ -137,24 +140,21 @@ fn dump_current_user_stream(data: &[u8]) {
     }
 
     println!("  CurrentUser atom:");
-    println!(
-        "    ver_inst=0x{:04X}, rec_type=0x{:04X}",
-        ver_inst, rec_type
-    );
-    println!("    atomSize={} (bytes after header)", atom_size);
-    println!("    detailSize={}", detail_size);
-    println!("    headerToken=0x{:08X}", header_token);
-    println!("    currentEditOffset=0x{:08X}", cur_edit);
-    println!("    usernameLen={} (bytes, ASCII)", username_len);
-    println!("    docFinalVersion=0x{:04X}", doc_final_version);
-    println!("    docVersion={}.{}", doc_major, doc_minor);
-    println!("    reserved=0x{:04X}", reserved);
-    println!("    releaseVersion={}", release_version);
+    println!("    ver_inst=0x{ver_inst:04X}, rec_type=0x{rec_type:04X}");
+    println!("    atomSize={atom_size} (bytes after header)");
+    println!("    detailSize={detail_size}");
+    println!("    headerToken=0x{header_token:08X}");
+    println!("    currentEditOffset=0x{cur_edit:08X}");
+    println!("    usernameLen={username_len} (bytes, ASCII)");
+    println!("    docFinalVersion=0x{doc_final_version:04X}");
+    println!("    docVersion={doc_major}.{doc_minor}");
+    println!("    reserved=0x{reserved:04X}");
+    println!("    releaseVersion={release_version}");
     if !ascii_username.is_empty() {
-        println!("    asciiUsername={:?}", ascii_username);
+        println!("    asciiUsername={ascii_username:?}");
     }
     if !unicode_username.is_empty() {
-        println!("    unicodeUsername={:?}", unicode_username);
+        println!("    unicodeUsername={unicode_username:?}");
     }
 }
 
@@ -170,10 +170,7 @@ fn dump_escher_dgg(data: &[u8]) {
     let ver_inst = u16::from_le_bytes([data[0], data[1]]);
     let r#type = u16::from_le_bytes([data[2], data[3]]);
     let len = u32::from_le_bytes([data[4], data[5], data[6], data[7]]) as usize;
-    println!(
-        "  [Escher DggContainer] ver_inst=0x{:04X}, type=0x{:04X}, len={}",
-        ver_inst, r#type, len
-    );
+    println!("  [Escher DggContainer] ver_inst=0x{ver_inst:04X}, type=0x{type:04X}, len={len}");
 
     if r#type != 0xF000 {
         println!("    (unexpected Escher type for DggContainer, expected 0xF000)");
@@ -194,10 +191,7 @@ fn dump_escher_dgg(data: &[u8]) {
         data[dgg_header_start + 6],
         data[dgg_header_start + 7],
     ]) as usize;
-    println!(
-        "    Dgg: ver_inst=0x{:04X}, type=0x{:04X}, len={}",
-        dgg_ver_inst, dgg_type, dgg_len
-    );
+    println!("    Dgg: ver_inst=0x{dgg_ver_inst:04X}, type=0x{dgg_type:04X}, len={dgg_len}");
 
     if dgg_type != 0xF006 {
         println!("    (unexpected Dgg record type, expected 0xF006)");
@@ -207,7 +201,7 @@ fn dump_escher_dgg(data: &[u8]) {
     let dgg_body_start = dgg_header_start + 8;
     let dgg_body_end = dgg_body_start.saturating_add(dgg_len);
     if data.len() < dgg_body_end || dgg_len < 16 {
-        println!("    (Dgg body too short: len={})", dgg_len);
+        println!("    (Dgg body too short: len={dgg_len})");
         return;
     }
 
@@ -236,13 +230,10 @@ fn dump_escher_dgg(data: &[u8]) {
         data[dgg_body_start + 15],
     ]);
 
-    println!("    shapeIdMax={} (next shape id)", shape_id_max);
-    println!(
-        "    numIdClustersField={} (numIdClusters field)",
-        num_id_clusters_field
-    );
-    println!("    numShapesSaved={}", num_shapes_saved);
-    println!("    drawingsSaved={}", drawings_saved);
+    println!("    shapeIdMax={shape_id_max} (next shape id)");
+    println!("    numIdClustersField={num_id_clusters_field} (numIdClusters field)");
+    println!("    numShapesSaved={num_shapes_saved}");
+    println!("    drawingsSaved={drawings_saved}");
 
     let mut pos = dgg_body_start + 16;
     let mut idx = 0usize;
@@ -250,10 +241,7 @@ fn dump_escher_dgg(data: &[u8]) {
         let dg_id = u32::from_le_bytes([data[pos], data[pos + 1], data[pos + 2], data[pos + 3]]);
         let num_shape_ids_used =
             u32::from_le_bytes([data[pos + 4], data[pos + 5], data[pos + 6], data[pos + 7]]);
-        println!(
-            "    cluster[{}]: dgId={}, numShapeIdsUsed={}",
-            idx, dg_id, num_shape_ids_used
-        );
+        println!("    cluster[{idx}]: dgId={dg_id}, numShapeIdsUsed={num_shape_ids_used}");
         idx += 1;
         pos += 8;
     }
@@ -271,10 +259,7 @@ fn dump_escher_dg(data: &[u8]) {
     let ver_inst = u16::from_le_bytes([data[0], data[1]]);
     let r#type = u16::from_le_bytes([data[2], data[3]]);
     let len = u32::from_le_bytes([data[4], data[5], data[6], data[7]]) as usize;
-    println!(
-        "  [Escher DgContainer] ver_inst=0x{:04X}, type=0x{:04X}, len={}",
-        ver_inst, r#type, len
-    );
+    println!("  [Escher DgContainer] ver_inst=0x{ver_inst:04X}, type=0x{type:04X}, len={len}");
 
     if r#type != 0xF002 {
         println!("    (unexpected Escher type for DgContainer, expected 0xF002)");
@@ -294,7 +279,7 @@ fn dump_escher_dg(data: &[u8]) {
         data[dg_header_start + 6],
         data[dg_header_start + 7],
     ]) as usize;
-    println!("    Dg: type=0x{:04X}, len={}", dg_type, dg_len);
+    println!("    Dg: type=0x{dg_type:04X}, len={dg_len}");
 
     if dg_type != 0xF008 {
         println!("    (unexpected Dg record type, expected 0xF008)");
@@ -304,7 +289,7 @@ fn dump_escher_dg(data: &[u8]) {
     let dg_body_start = dg_header_start + 8;
     let dg_body_end = dg_body_start.saturating_add(dg_len);
     if data.len() < dg_body_end || dg_len < 8 {
-        println!("    (Dg body too short: len={})", dg_len);
+        println!("    (Dg body too short: len={dg_len})");
         return;
     }
 
@@ -320,8 +305,8 @@ fn dump_escher_dg(data: &[u8]) {
         data[dg_body_start + 6],
         data[dg_body_start + 7],
     ]);
-    println!("    csp={} (shapes in drawing)", csp);
-    println!("    spidCur={} (last shape id)", spid_cur);
+    println!("    csp={csp} (shapes in drawing)");
+    println!("    spidCur={spid_cur} (last shape id)");
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -329,7 +314,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(1)
         .unwrap_or_else(|| "minimal.ppt".to_string());
 
-    println!("Analyzing PPT structure: {}", path);
+    println!("Analyzing PPT structure: {path}");
 
     let file = std::fs::File::open(&path)?;
     let mut ole = OleFile::open(file)?;
@@ -347,10 +332,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Current User stream not found");
     }
 
-    let data = if let Ok(d) = ole.open_stream(&["PowerPoint Document"]) {
-        d
-    } else {
-        eprintln!("PowerPoint Document stream not found");
+    let Ok(data) = ole.open_stream(&["PowerPoint Document"]) else {
+        println!("PowerPoint Document stream not found");
         return Ok(());
     };
 
@@ -400,7 +383,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 index += 1;
             },
             Err(e) => {
-                println!("Parse error at 0x{:08X}: {}", offset, e);
+                println!("Parse error at 0x{offset:08X}: {e}");
                 offset += 1;
             },
         }

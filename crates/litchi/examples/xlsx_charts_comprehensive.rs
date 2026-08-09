@@ -34,7 +34,7 @@ fn main() -> ExampleResult<()> {
     write_scatter_data(&mut edit)?;
     write_radar_data(&mut edit)?;
 
-    let charts = vec![
+    let charts = [
         WorksheetChart::bar_chart_with_cache(
             "Quarterly Sales - Bar Chart",
             "Basic Charts!$A$2:$A$5",

@@ -27,6 +27,9 @@ pub struct Text {
 
 impl Text {
     /// Create a validated header/footer declaration.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(name: impl Into<String>, text: impl Into<String>) -> Result<Self> {
         let value = Self {
             name: name.into(),
@@ -76,6 +79,9 @@ pub struct DateTime {
 
 impl DateTime {
     /// Create a validated date/time declaration.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(name: impl Into<String>) -> Result<Self> {
         let value = Self {
             name: name.into(),
@@ -134,11 +140,17 @@ pub struct Collection {
 
 impl Collection {
     /// Validate declaration uniqueness and reference integrity.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> Result<()> {
         self.validate_for_slide_count(None)
     }
 
     /// Validate declaration metadata against a concrete slide count.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate_for_slides(&self, slide_count: usize) -> Result<()> {
         self.validate_for_slide_count(Some(slide_count))
     }
@@ -230,6 +242,9 @@ struct OpenDeclaration {
 }
 
 /// Parse all presentation declarations and their slide/notes bindings.
+///
+/// # Errors
+/// Returns an error when the input is malformed or a configured limit is exceeded.
 pub fn parse(xml: &str) -> Result<Collection> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("presentation declaration XML exceeds 8 MiB"));
@@ -328,47 +343,46 @@ pub fn parse(xml: &str) -> Result<Collection> {
                     return Err(invalid("presentation declarations may contain text only"));
                 }
             },
-            Event::Text(text) if open_declaration.is_some() => {
-                let decoded = text
-                    .xml_content(XmlVersion::Implicit1_0)
-                    .map_err(xml_error)?;
-                let declaration = open_declaration.as_mut().expect("checked above");
-                if declaration.text.len().saturating_add(decoded.len()) > MAX_TEXT_BYTES {
-                    return Err(invalid("presentation declaration text exceeds 1 MiB"));
+            Event::Text(text) => {
+                if let Some(declaration) = open_declaration.as_mut() {
+                    let decoded = text
+                        .xml_content(XmlVersion::Implicit1_0)
+                        .map_err(xml_error)?;
+                    if declaration.text.len().saturating_add(decoded.len()) > MAX_TEXT_BYTES {
+                        return Err(invalid("presentation declaration text exceeds 1 MiB"));
+                    }
+                    declaration.text.push_str(&decoded);
                 }
-                declaration.text.push_str(&decoded);
             },
-            Event::GeneralRef(reference) if open_declaration.is_some() => {
-                let name: &[u8] = reference.as_ref();
-                let replacement = match name {
-                    b"amp" => "&",
-                    b"lt" => "<",
-                    b"gt" => ">",
-                    b"apos" => "'",
-                    b"quot" => "\"",
-                    _ => {
-                        return Err(invalid(
-                            "unsupported entity in presentation declaration text",
-                        ));
-                    },
-                };
-                let declaration = open_declaration.as_mut().expect("checked above");
-                declaration.text.push_str(replacement);
-            },
-            Event::CData(text) if open_declaration.is_some() => {
-                let decoded = reader.decoder().decode(text.as_ref()).map_err(xml_error)?;
-                let declaration = open_declaration.as_mut().expect("checked above");
-                if declaration.text.len().saturating_add(decoded.len()) > MAX_TEXT_BYTES {
-                    return Err(invalid("presentation declaration text exceeds 1 MiB"));
+            Event::GeneralRef(reference) => {
+                if let Some(declaration) = open_declaration.as_mut() {
+                    let name: &[u8] = reference.as_ref();
+                    let replacement = match name {
+                        b"amp" => "&",
+                        b"lt" => "<",
+                        b"gt" => ">",
+                        b"apos" => "'",
+                        b"quot" => "\"",
+                        _ => {
+                            return Err(invalid(
+                                "unsupported entity in presentation declaration text",
+                            ));
+                        },
+                    };
+                    declaration.text.push_str(replacement);
                 }
-                declaration.text.push_str(&decoded);
+            },
+            Event::CData(text) => {
+                if let Some(declaration) = open_declaration.as_mut() {
+                    let decoded = reader.decoder().decode(text.as_ref()).map_err(xml_error)?;
+                    if declaration.text.len().saturating_add(decoded.len()) > MAX_TEXT_BYTES {
+                        return Err(invalid("presentation declaration text exceeds 1 MiB"));
+                    }
+                    declaration.text.push_str(&decoded);
+                }
             },
             Event::End(element) => {
-                if open_declaration
-                    .as_ref()
-                    .is_some_and(|value| value.depth == depth)
-                {
-                    let declaration = open_declaration.take().expect("checked above");
+                if let Some(declaration) = take_finished_declaration(&mut open_declaration, depth) {
                     let expected = match declaration.kind {
                         DeclarationKind::Header => b"header-decl".as_slice(),
                         DeclarationKind::Footer => b"footer-decl".as_slice(),
@@ -400,7 +414,7 @@ pub fn parse(xml: &str) -> Result<Collection> {
                 return Err(invalid("active XML declarations are prohibited"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Comment(_) | Event::Decl(_) => {},
         }
         buffer.clear();
     }
@@ -415,18 +429,18 @@ pub(crate) fn write_declaration_elements(
     declarations: Option<&Collection>,
     slide_count: usize,
 ) -> Result<String> {
-    let Some(declarations) = declarations else {
+    let Some(collection) = declarations else {
         return Ok(String::new());
     };
-    declarations.validate_for_slides(slide_count)?;
+    collection.validate_for_slides(slide_count)?;
     let mut output = String::with_capacity(256);
-    for value in &declarations.headers {
+    for value in &collection.headers {
         write_text_declaration(&mut output, "header-decl", value);
     }
-    for value in &declarations.footers {
+    for value in &collection.footers {
         write_text_declaration(&mut output, "footer-decl", value);
     }
-    for value in &declarations.date_times {
+    for value in &collection.date_times {
         output.push_str("<presentation:date-time-decl presentation:name=\"");
         output.push_str(&escape_xml(&value.name));
         output.push('"');
@@ -469,13 +483,13 @@ pub(crate) fn write_binding_attributes(
 }
 
 pub(crate) fn apply_notes_binding(base: String, attributes: &str) -> Result<String> {
+    const PREFIX: &str = "<presentation:notes";
     if attributes.is_empty() {
         return Ok(base);
     }
     if base.is_empty() {
         return Ok(format!("<presentation:notes{attributes}/>"));
     }
-    const PREFIX: &str = "<presentation:notes";
     if !base.starts_with(PREFIX) {
         return Err(invalid("unexpected generated presentation notes fragment"));
     }
@@ -504,24 +518,24 @@ fn parse_declaration_start(
     kind: DeclarationKind,
     depth: usize,
 ) -> Result<OpenDeclaration> {
-    let mut name = None;
+    let mut declaration_name = None;
     let mut source = None;
     let mut data_style_name = None;
     for attribute in element.attributes() {
-        let attribute = attribute.map_err(xml_error)?;
-        if is_namespace_declaration(attribute.key.as_ref()) {
+        let parsed = attribute.map_err(xml_error)?;
+        if is_namespace_declaration(parsed.key.as_ref()) {
             continue;
         }
-        let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
-        let value = attribute
+        let (namespace, local) = reader.resolver().resolve_attribute(parsed.key);
+        let value = parsed
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
             .map_err(xml_error)?
             .into_owned();
         match (namespace, local.as_ref()) {
             (ResolveResult::Bound(found), b"name")
-                if found == Namespace(PRESENTATION_NAMESPACE) && name.is_none() =>
+                if found == Namespace(PRESENTATION_NAMESPACE) && declaration_name.is_none() =>
             {
-                name = Some(value);
+                declaration_name = Some(value);
             },
             (ResolveResult::Bound(found), b"source")
                 if found == Namespace(PRESENTATION_NAMESPACE)
@@ -545,8 +559,8 @@ fn parse_declaration_start(
             },
         }
     }
-    let name =
-        name.ok_or_else(|| invalid("presentation declaration requires presentation:name"))?;
+    let name = declaration_name
+        .ok_or_else(|| invalid("presentation declaration requires presentation:name"))?;
     validate_name(&name, "presentation declaration name")?;
     Ok(OpenDeclaration {
         depth,
@@ -566,13 +580,13 @@ fn parse_binding(
 ) -> Result<Option<Binding>> {
     let mut value = Binding::new(slide_index, target);
     for attribute in element.attributes() {
-        let attribute = attribute.map_err(xml_error)?;
-        let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+        let parsed = attribute.map_err(xml_error)?;
+        let (namespace, local) = reader.resolver().resolve_attribute(parsed.key);
         if !matches!(namespace, ResolveResult::Bound(found) if found == Namespace(PRESENTATION_NAMESPACE))
         {
             continue;
         }
-        let decoded = attribute
+        let decoded = parsed
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
             .map_err(xml_error)?
             .into_owned();
@@ -587,10 +601,10 @@ fn parse_binding(
                     "duplicate presentation declaration binding attribute",
                 ));
             },
-            _ => continue,
+            _ => {},
         }
     }
-    for (name, description) in [
+    for (reference, description) in [
         (value.header_name.as_deref(), "presentation:use-header-name"),
         (value.footer_name.as_deref(), "presentation:use-footer-name"),
         (
@@ -598,11 +612,25 @@ fn parse_binding(
             "presentation:use-date-time-name",
         ),
     ] {
-        if let Some(name) = name {
+        if let Some(name) = reference {
             validate_name(name, description)?;
         }
     }
     Ok((!value.is_empty()).then_some(value))
+}
+
+fn take_finished_declaration(
+    open_declaration: &mut Option<OpenDeclaration>,
+    depth: usize,
+) -> Option<OpenDeclaration> {
+    if open_declaration
+        .as_ref()
+        .is_some_and(|opened| opened.depth == depth)
+    {
+        open_declaration.take()
+    } else {
+        None
+    }
 }
 
 fn finish_declaration(value: OpenDeclaration, result: &mut Collection) -> Result<()> {
@@ -610,14 +638,14 @@ fn finish_declaration(value: OpenDeclaration, result: &mut Collection) -> Result
         DeclarationKind::Header => result.headers.push(Text::new(value.name, value.text)?),
         DeclarationKind::Footer => result.footers.push(Text::new(value.name, value.text)?),
         DeclarationKind::DateTime => {
-            let value = DateTime {
+            let date_time = DateTime {
                 name: value.name,
                 source: value.source,
                 data_style_name: value.data_style_name,
                 text: value.text,
             };
-            validate_date_time(&value)?;
-            result.date_times.push(value);
+            validate_date_time(&date_time)?;
+            result.date_times.push(date_time);
         },
     }
     Ok(())
@@ -648,13 +676,13 @@ fn validate_date_time(value: &DateTime) -> Result<()> {
 }
 
 fn validate_reference(name: Option<&str>, kind: &str, names: &HashSet<&str>) -> Result<()> {
-    let Some(name) = name else {
+    let Some(reference) = name else {
         return Ok(());
     };
-    validate_name(name, "presentation declaration reference")?;
-    if !names.contains(name) {
+    validate_name(reference, "presentation declaration reference")?;
+    if !names.contains(reference) {
         return Err(invalid(format!(
-            "presentation binding references missing {kind} declaration '{name}'"
+            "presentation binding references missing {kind} declaration '{reference}'"
         )));
     }
     Ok(())
@@ -758,6 +786,10 @@ fn xml_error(error: impl std::fmt::Display) -> Error {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use crate::{Builder, Presentation};

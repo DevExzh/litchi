@@ -71,10 +71,6 @@ const PRESENTATION_DIRECTIONS: &[&str] = &[
     "counter-clockwise",
 ];
 
-fn invalid(name: &str, value: &str) -> Error {
-    Error::InvalidFormat(format!("invalid {name} value '{value}'"))
-}
-
 /// Action requested by an ODF presentation event listener.
 ///
 /// Litchi preserves these requests as metadata and never invokes them.
@@ -146,12 +142,15 @@ pub struct Effect(String);
 
 impl Effect {
     /// Create a schema-defined presentation effect.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(value: impl Into<String>) -> Result<Self> {
-        let value = value.into();
-        if PRESENTATION_EFFECTS.contains(&value.as_str()) {
-            Ok(Self(value))
+        let effect = value.into();
+        if PRESENTATION_EFFECTS.contains(&effect.as_str()) {
+            Ok(Self(effect))
         } else {
-            Err(invalid("presentation:effect", &value))
+            Err(invalid("presentation:effect", &effect))
         }
     }
 
@@ -174,12 +173,15 @@ pub struct EffectDirection(String);
 
 impl EffectDirection {
     /// Create a schema-defined presentation effect direction.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(value: impl Into<String>) -> Result<Self> {
-        let value = value.into();
-        if PRESENTATION_DIRECTIONS.contains(&value.as_str()) {
-            Ok(Self(value))
+        let direction = value.into();
+        if PRESENTATION_DIRECTIONS.contains(&direction.as_str()) {
+            Ok(Self(direction))
         } else {
-            Err(invalid("presentation:direction", &value))
+            Err(invalid("presentation:direction", &direction))
         }
     }
 
@@ -215,11 +217,14 @@ pub struct EventListener {
 
 impl EventListener {
     /// Create a presentation action binding.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(event_name: impl Into<String>, action: Action) -> Result<Self> {
-        let event_name = event_name.into();
-        validate_bounded_xml_value(&event_name, "presentation event name")?;
+        let name = event_name.into();
+        validate_bounded_xml_value(&name, "presentation event name")?;
         Ok(Self {
-            event_name,
+            event_name: name,
             action,
             effect: None,
             direction: None,
@@ -267,6 +272,9 @@ pub struct ScriptEventListener {
 
 impl ScriptEventListener {
     /// Create an inert macro-name binding.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn macro_binding(
         event_name: impl Into<String>,
         language: impl Into<String>,
@@ -284,6 +292,9 @@ impl ScriptEventListener {
     }
 
     /// Create an inert external script reference.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn external_binding(
         event_name: impl Into<String>,
         language: impl Into<String>,
@@ -368,11 +379,14 @@ pub struct DrawingHyperlink {
 
 impl DrawingHyperlink {
     /// Create a hyperlink. The serialized `XLink` type is always `simple`.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(href: impl Into<String>) -> Result<Self> {
-        let href = href.into();
-        validate_href(&href)?;
+        let target = href.into();
+        validate_href(&target)?;
         Ok(Self {
-            href,
+            href: target,
             actuate_on_request: false,
             show: None,
             target_frame_name: None,
@@ -388,10 +402,12 @@ impl DrawingHyperlink {
         &self.href
     }
 
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_href(&mut self, href: impl Into<String>) -> Result<()> {
-        let href = href.into();
-        validate_href(&href)?;
-        self.href = href;
+        let target = href.into();
+        validate_href(&target)?;
+        self.href = target;
         Ok(())
     }
 
@@ -418,8 +434,10 @@ impl DrawingHyperlink {
         self.target_frame_name.as_deref()
     }
 
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_target_frame_name(&mut self, value: Option<String>) -> Result<()> {
-        validate_optional(&value, "hyperlink target frame name")?;
+        validate_optional(value.as_deref(), "hyperlink target frame name")?;
         self.target_frame_name = value;
         Ok(())
     }
@@ -429,8 +447,10 @@ impl DrawingHyperlink {
         self.name.as_deref()
     }
 
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_name(&mut self, value: Option<String>) -> Result<()> {
-        validate_optional(&value, "hyperlink name")?;
+        validate_optional(value.as_deref(), "hyperlink name")?;
         self.name = value;
         Ok(())
     }
@@ -440,8 +460,10 @@ impl DrawingHyperlink {
         self.title.as_deref()
     }
 
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_title(&mut self, value: Option<String>) -> Result<()> {
-        validate_optional(&value, "hyperlink title")?;
+        validate_optional(value.as_deref(), "hyperlink title")?;
         self.title = value;
         Ok(())
     }
@@ -460,9 +482,11 @@ impl DrawingHyperlink {
         self.xml_id.as_deref()
     }
 
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_xml_id(&mut self, value: Option<String>) -> Result<()> {
-        if let Some(value) = &value {
-            validate_ncname(value, "hyperlink XML ID")?;
+        if let Some(xml_id) = &value {
+            validate_ncname(xml_id, "hyperlink XML ID")?;
         }
         self.xml_id = value;
         Ok(())
@@ -470,9 +494,12 @@ impl DrawingHyperlink {
 
     pub(crate) fn validate(&self) -> Result<()> {
         validate_href(&self.href)?;
-        validate_optional(&self.target_frame_name, "hyperlink target frame name")?;
-        validate_optional(&self.name, "hyperlink name")?;
-        validate_optional(&self.title, "hyperlink title")?;
+        validate_optional(
+            self.target_frame_name.as_deref(),
+            "hyperlink target frame name",
+        )?;
+        validate_optional(self.name.as_deref(), "hyperlink name")?;
+        validate_optional(self.title.as_deref(), "hyperlink title")?;
         if let Some(xml_id) = &self.xml_id {
             validate_ncname(xml_id, "hyperlink XML ID")?;
         }
@@ -514,6 +541,10 @@ impl DrawingHyperlink {
     }
 }
 
+fn invalid(name: &str, value: &str) -> Error {
+    Error::InvalidFormat(format!("invalid {name} value '{value}'"))
+}
+
 pub(crate) fn validate_event_listeners(listeners: &[ShapeEventListener]) -> Result<()> {
     if listeners.len() > 4096 {
         return Err(Error::InvalidFormat(
@@ -522,8 +553,8 @@ pub(crate) fn validate_event_listeners(listeners: &[ShapeEventListener]) -> Resu
     }
     for listener in listeners {
         match listener {
-            ShapeEventListener::Action(listener) => listener.validate()?,
-            ShapeEventListener::Script(listener) => listener.validate()?,
+            ShapeEventListener::Action(action) => action.validate()?,
+            ShapeEventListener::Script(script) => script.validate()?,
         }
     }
     Ok(())
@@ -540,52 +571,52 @@ pub(crate) fn write_event_listeners(
     output.push_str("<office:event-listeners>");
     for listener in listeners {
         match listener {
-            ShapeEventListener::Script(listener) => {
+            ShapeEventListener::Script(script) => {
                 output.push_str("<script:event-listener");
-                push_attribute(output, "script:event-name", &listener.event_name);
-                push_attribute(output, "script:language", &listener.language);
-                if let Some(value) = &listener.macro_name {
+                push_attribute(output, "script:event-name", &script.event_name);
+                push_attribute(output, "script:language", &script.language);
+                if let Some(value) = &script.macro_name {
                     push_attribute(output, "script:macro-name", value);
                 }
-                if let Some(value) = &listener.href {
+                if let Some(value) = &script.href {
                     push_attribute(output, "xlink:type", "simple");
                     push_attribute(output, "xlink:href", value);
-                    if listener.actuate_on_request {
+                    if script.actuate_on_request {
                         push_attribute(output, "xlink:actuate", "onRequest");
                     }
                 }
                 output.push_str("/>");
             },
-            ShapeEventListener::Action(listener) => {
+            ShapeEventListener::Action(action) => {
                 output.push_str("<presentation:event-listener");
-                push_attribute(output, "script:event-name", &listener.event_name);
-                push_attribute(output, "presentation:action", listener.action.as_str());
-                if let Some(value) = &listener.effect {
+                push_attribute(output, "script:event-name", &action.event_name);
+                push_attribute(output, "presentation:action", action.action.as_str());
+                if let Some(value) = &action.effect {
                     push_attribute(output, "presentation:effect", value.as_str());
                 }
-                if let Some(value) = &listener.direction {
+                if let Some(value) = &action.direction {
                     push_attribute(output, "presentation:direction", value.as_str());
                 }
-                if let Some(value) = listener.speed {
+                if let Some(value) = action.speed {
                     push_attribute(output, "presentation:speed", value.as_str());
                 }
-                if let Some(value) = &listener.start_scale {
+                if let Some(value) = &action.start_scale {
                     push_attribute(output, "presentation:start-scale", value);
                 }
-                if let Some(value) = &listener.href {
+                if let Some(value) = &action.href {
                     push_attribute(output, "xlink:type", "simple");
                     push_attribute(output, "xlink:href", value);
-                    if listener.show_embed {
+                    if action.show_embed {
                         push_attribute(output, "xlink:show", "embed");
                     }
-                    if listener.actuate_on_request {
+                    if action.actuate_on_request {
                         push_attribute(output, "xlink:actuate", "onRequest");
                     }
                 }
-                if let Some(value) = listener.verb {
+                if let Some(value) = action.verb {
                     push_attribute(output, "presentation:verb", &value.to_string());
                 }
-                if let Some(sound) = &listener.sound {
+                if let Some(sound) = &action.sound {
                     output.push('>');
                     write_sound(output, sound)?;
                     output.push_str("</presentation:event-listener>");
@@ -631,9 +662,9 @@ fn validate_transition_sound(sound: &Sound, description: &str) -> Result<()> {
     Ok(())
 }
 
-fn validate_optional(value: &Option<String>, description: &str) -> Result<()> {
-    if let Some(value) = value {
-        validate_bounded_xml_value(value, description)?;
+fn validate_optional(value: Option<&str>, description: &str) -> Result<()> {
+    if let Some(text) = value {
+        validate_bounded_xml_value(text, description)?;
     }
     Ok(())
 }
@@ -648,6 +679,10 @@ fn validate_percent(value: &str) -> Result<()> {
         number = unsigned;
     }
     let mut parts = number.split('.');
+    #[allow(
+        clippy::expect_used,
+        reason = "str::split always yields at least one part"
+    )]
     let integer = parts.next().expect("split always yields one part");
     let fraction = parts.next();
     if parts.next().is_some()
@@ -669,6 +704,10 @@ fn push_attribute(output: &mut String, name: &str, value: &str) {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

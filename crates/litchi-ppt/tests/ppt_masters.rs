@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use litchi_ppt::RecordType;
 use litchi_ppt::master::{Objects, parse};
 use litchi_ppt::master_layout::{Context, Path, Snapshot};
@@ -12,7 +18,7 @@ fn atom(record_type: RecordType, version: u16, instance: u16, data: &[u8]) -> Re
         record_type_raw: record_type.as_u16(),
         version,
         instance,
-        data_length: data.len() as u32,
+        data_length: u32::try_from(data.len()).unwrap(),
         data: data.to_vec(),
         children: Vec::new(),
     }
@@ -24,7 +30,7 @@ fn unknown(data: &[u8]) -> Record {
         record_type_raw: UNKNOWN_TYPE,
         version: 0,
         instance: 7,
-        data_length: data.len() as u32,
+        data_length: u32::try_from(data.len()).unwrap(),
         data: data.to_vec(),
         children: Vec::new(),
     }
@@ -47,7 +53,7 @@ fn container(record_type: RecordType, children: Vec<Record>) -> Record {
         record_type_raw: record_type.as_u16(),
         version: 0x0f,
         instance: 0,
-        data_length: data.len() as u32,
+        data_length: u32::try_from(data.len()).unwrap(),
         data,
         children,
     }
@@ -83,14 +89,14 @@ fn document(notes_id: u32, handout_id: u32, references: Vec<Record>) -> Record {
     let mut list = container(RecordType::SlideListWithText, references);
     list.instance = 1;
     list.data = list.children.iter().flat_map(wire).collect();
-    list.data_length = list.data.len() as u32;
+    list.data_length = u32::try_from(list.data.len()).unwrap();
     container(RecordType::Document, vec![document_atom, list])
 }
 
 fn mapping(ids: &[u32]) -> PersistMapping {
     let mut mapping = PersistMapping::new();
     for (index, id) in ids.iter().copied().enumerate() {
-        mapping.add_mapping(id, (index * 128) as u32);
+        mapping.add_mapping(id, u32::try_from(index * 128).unwrap());
     }
     mapping
 }

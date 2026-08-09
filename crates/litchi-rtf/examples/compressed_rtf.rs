@@ -1,8 +1,13 @@
-//! Demonstrate the LZFu compressed-RTF helpers: `is_compressed_rtf`, `compress`, `decompress`.
+#![allow(
+    clippy::print_stdout,
+    reason = "this command-line example intentionally prints its results"
+)]
+
+//! Demonstrate the `LZFu` compressed-RTF helpers: `is_compressed_rtf`, `compress`, `decompress`.
 //!
 //! The `compress`/`decompress` pair implements the algorithm used by Outlook for
 //! the `PR_RTF_COMPRESSED` MAPI property. This example round-trips a small RTF
-//! fragment through both compressed (LZFu) and uncompressed framings.
+//! fragment through both compressed (`LZFu`) and uncompressed framings.
 //!
 //! Run from the workspace root:
 //!

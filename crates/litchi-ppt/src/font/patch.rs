@@ -7,6 +7,7 @@ use std::sync::Arc;
 pub struct Revision(u64);
 
 impl Revision {
+    #[must_use]
     pub const fn value(self) -> u64 {
         self.0
     }
@@ -32,26 +33,36 @@ pub struct Patch {
 }
 
 impl Patch {
+    #[must_use]
     pub const fn base(&self) -> Revision {
         self.base
     }
+    #[must_use]
     pub const fn target(&self) -> Revision {
         self.target
     }
+    #[must_use]
     pub fn before_bytes(&self) -> &[u8] {
         &self.before
     }
+    #[must_use]
     pub fn after_bytes(&self) -> &[u8] {
         &self.after
     }
+    #[must_use]
     pub fn changes(&self) -> &[Change] {
         &self.changes
     }
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.before == self.after
     }
 
     /// Apply once, or accept an exact already-applied target for retry safety.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn apply(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision() == self.target && current.bytes() == self.after.as_ref() {
             return Ok(current.clone());
@@ -64,10 +75,22 @@ impl Patch {
         Snapshot::from_arc(self.after.clone(), self.limits)
     }
 
+    /// Re-apply this patch; equivalent to [`Self::apply`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `current` is neither the base source nor the exact
+    /// already-applied target of this patch.
     pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.apply(current)
     }
 
+    /// Revert to the base source, or accept the exact base for retry safety.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `current` is neither the target nor the exact base
+    /// source of this patch.
     pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision() == self.base && current.bytes() == self.before.as_ref() {
             return Ok(current.clone());
@@ -80,6 +103,7 @@ impl Patch {
         Snapshot::from_arc(self.before.clone(), self.limits)
     }
 
+    #[must_use]
     pub fn inverse(&self) -> Self {
         let mut changes = self.changes.clone();
         changes.reverse();

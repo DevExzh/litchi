@@ -1,4 +1,4 @@
-use super::*;
+use super::{ControlWord, Cow, ParsedBodyStoryEvent, Parser, RtfError, RtfResult, Token};
 
 impl<'a> Parser<'a> {
     pub(super) fn is_math_scoped_control(control: &ControlWord<'_>) -> bool {
@@ -113,6 +113,10 @@ impl<'a> Parser<'a> {
     }
 
     /// Map a structure control word to its structure kind.
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn math_structure_kind(
         control: &ControlWord<'_>,
     ) -> Option<crate::MathStructureKind> {
@@ -143,6 +147,10 @@ impl<'a> Parser<'a> {
     }
 
     /// Map a structure property-destination control to its kind.
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn math_structure_properties_kind(
         control: &ControlWord<'_>,
     ) -> Option<crate::MathStructureKind> {
@@ -173,6 +181,10 @@ impl<'a> Parser<'a> {
     }
 
     /// Map an argument control word to its element role.
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn math_element_role(control: &ControlWord<'_>) -> Option<crate::MathElementRole> {
         use crate::MathElementRole as R;
         use crate::lexer::ControlWord as C;
@@ -190,6 +202,10 @@ impl<'a> Parser<'a> {
     }
 
     /// Map a property control word to its name and numeric parameter.
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn math_property_name(
         control: &ControlWord<'_>,
     ) -> Option<(crate::MathPropertyName, Option<i32>)> {
@@ -539,7 +555,7 @@ impl<'a> Parser<'a> {
         let mut properties = None;
         let mut normal_text = false;
         let mut text = String::new();
-        let mut unicode_skip = self.current_state()?.unicode_skip.max(0) as usize;
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0).cast_unsigned() as usize;
         let mut fallback_skip = 0usize;
         loop {
             match self.tokens.get(self.pos) {
@@ -798,7 +814,7 @@ impl<'a> Parser<'a> {
     ) -> RtfResult<crate::MathProperty<'a>> {
         self.pos += 2; // opening brace and property control
         let mut value = String::new();
-        let mut unicode_skip = self.current_state()?.unicode_skip.max(0) as usize;
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0).cast_unsigned() as usize;
         let mut fallback_skip = 0usize;
         loop {
             match self.tokens.get(self.pos) {
@@ -827,21 +843,21 @@ impl<'a> Parser<'a> {
                 },
             }
         }
-        let mut value = value.trim().to_string();
-        if let Some(param) = param {
-            if !value.is_empty() {
+        let mut property_value = value.trim().to_string();
+        if let Some(parameter_value) = param {
+            if !property_value.is_empty() {
                 return Err(RtfError::MalformedDocument(
                     "RTF math property has conflicting parameter and text values".to_string(),
                 ));
             }
-            value = param.to_string();
+            property_value = parameter_value.to_string();
         }
-        self.math_text_bytes = self.math_text_bytes.saturating_add(value.len());
+        self.math_text_bytes = self.math_text_bytes.saturating_add(property_value.len());
         if self.math_text_bytes > crate::math::MAX_MATH_TOTAL_TEXT_BYTES {
             return Err(RtfError::MalformedDocument(
                 "RTF math aggregate text exceeds the safety limit".to_string(),
             ));
         }
-        crate::MathProperty::new(name, Cow::Owned(value))
+        crate::MathProperty::new(name, Cow::Owned(property_value))
     }
 }

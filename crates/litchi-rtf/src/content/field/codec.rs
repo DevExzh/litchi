@@ -1,10 +1,27 @@
 use std::borrow::Cow;
 
-use super::model::*;
+use super::model::{
+    AddressBlockCountryInclusion, AdvanceFieldAdjustment, AdvanceFieldOperation,
+    AutoNumberFieldKind, AutoNumberFieldParts, AutoTextFieldKind, AutoTextListOption,
+    BarcodeDisplayFieldKind, BibliographyOption, BibliographyParts, CitationOption, CitationParts,
+    DdeFieldKind, DdeFieldParts, DdeRepresentation, DocumentContextFieldKind,
+    DocumentContextFieldParts, DocumentInformationFieldKind, DocumentInformationFieldParts,
+    DocumentPropertyFieldParts, DocumentVariableFieldParts, ExternalIncludeOption,
+    ExternalIncludeParts, FieldCodeError, FieldCodeToken, FieldSwitch, HyperlinkCode,
+    IncludeFieldKind, IndexEntryOption, IndexEntryParts, IndexOption, IndexParts, InfoFieldParts,
+    LinkFieldParts, LinkFormatting, LinkResultOption, ListNumberFieldParts,
+    MailMergeConditionalControlKind, MailMergeCounterKind, MailMergeDataFieldParts,
+    MailMergeRecipientFieldKind, MailMergeRecipientFieldParts, MergeFieldParts, ParsedFieldCode,
+    PromptFieldKind, PromptFieldParts, ReferenceCode, ReferencedDocumentFieldParts,
+    StyleReferenceFieldOption, TableOfAuthoritiesEntryOption, TableOfAuthoritiesEntryParts,
+    TableOfAuthoritiesOption, TableOfAuthoritiesParts, TableOfContentsEntryOption,
+    TableOfContentsEntryParts, TableOfContentsOption, TableOfContentsParts, UserIdentityFieldKind,
+    UserIdentityFieldParts, UserIdentityFormatting,
+};
 use super::{MAX_INSTRUCTION_LEN, MAX_TOKENS};
 
-pub(super) fn equation_expression(instruction: &str) -> Option<&str> {
-    let instruction = instruction.trim_start_matches(|value: char| value.is_ascii_whitespace());
+pub(super) fn equation_expression(raw_instruction: &str) -> Option<&str> {
+    let instruction = raw_instruction.trim_start_matches(|value: char| value.is_ascii_whitespace());
     let keyword_len = instruction
         .find(|value: char| value.is_ascii_whitespace())
         .unwrap_or(instruction.len());
@@ -15,11 +32,11 @@ pub(super) fn equation_expression(instruction: &str) -> Option<&str> {
         .then(|| remainder.trim_start_matches(|value: char| value.is_ascii_whitespace()))
 }
 
-pub(super) fn print_field_instructions(instruction: &str) -> Option<&str> {
-    if instruction.len() > MAX_INSTRUCTION_LEN {
+pub(super) fn print_field_instructions(raw_instruction: &str) -> Option<&str> {
+    if raw_instruction.len() > MAX_INSTRUCTION_LEN {
         return None;
     }
-    let instruction = instruction.trim_start_matches(|value: char| value.is_ascii_whitespace());
+    let instruction = raw_instruction.trim_start_matches(|value: char| value.is_ascii_whitespace());
     let keyword_len = instruction
         .find(|value: char| value.is_ascii_whitespace())
         .unwrap_or(instruction.len());
@@ -30,41 +47,44 @@ pub(super) fn print_field_instructions(instruction: &str) -> Option<&str> {
         .then(|| remainder.trim())
 }
 
-pub(super) fn embed_field_instructions(instruction: &str) -> Option<&str> {
-    if instruction.len() > MAX_INSTRUCTION_LEN {
+pub(super) fn embed_field_instructions(raw_instruction: &str) -> Option<&str> {
+    if raw_instruction.len() > MAX_INSTRUCTION_LEN {
         return None;
     }
-    let instruction = instruction.trim_start_matches(|value: char| value.is_ascii_whitespace());
+    let instruction = raw_instruction.trim_start_matches(|value: char| value.is_ascii_whitespace());
     let keyword = instruction.get(.."EMBED".len())?;
     if !keyword.eq_ignore_ascii_case("EMBED") {
         return None;
     }
     let remainder = instruction.get("EMBED".len()..)?;
     match remainder.chars().next() {
-        None | Some('"') | Some('\\') => Some(remainder.trim()),
+        None | Some('"' | '\\') => Some(remainder.trim()),
         Some(value) if value.is_ascii_whitespace() => Some(remainder.trim()),
         Some(_) => None,
     }
 }
 
-pub(super) fn barcode_field_instructions(instruction: &str) -> Option<&str> {
-    if instruction.len() > MAX_INSTRUCTION_LEN {
+pub(super) fn barcode_field_instructions(raw_instruction: &str) -> Option<&str> {
+    if raw_instruction.len() > MAX_INSTRUCTION_LEN {
         return None;
     }
-    let instruction = instruction.trim_start_matches(|value: char| value.is_ascii_whitespace());
+    let instruction = raw_instruction.trim_start_matches(|value: char| value.is_ascii_whitespace());
     let keyword = instruction.get(.."BARCODE".len())?;
     if !keyword.eq_ignore_ascii_case("BARCODE") {
         return None;
     }
     let remainder = instruction.get("BARCODE".len()..)?;
     match remainder.chars().next() {
-        None | Some('"') | Some('\\') => Some(remainder.trim()),
+        None | Some('"' | '\\') => Some(remainder.trim()),
         Some(value) if value.is_ascii_whitespace() => Some(remainder.trim()),
         Some(_) => None,
     }
 }
 
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "the returned tuple mirrors the field-instruction grammar"
+)]
 pub(super) fn barcode_display_field_parts(
     instruction: &str,
 ) -> Option<(
@@ -107,72 +127,72 @@ pub(super) fn barcode_display_field_parts(
     ))
 }
 
-pub(super) fn bidi_outline_field_instructions(instruction: &str) -> Option<&str> {
-    if instruction.len() > MAX_INSTRUCTION_LEN {
+pub(super) fn bidi_outline_field_instructions(raw_instruction: &str) -> Option<&str> {
+    if raw_instruction.len() > MAX_INSTRUCTION_LEN {
         return None;
     }
-    let instruction = instruction.trim_start_matches(|value: char| value.is_ascii_whitespace());
+    let instruction = raw_instruction.trim_start_matches(|value: char| value.is_ascii_whitespace());
     let keyword = instruction.get(.."BIDIOUTLINE".len())?;
     if !keyword.eq_ignore_ascii_case("BIDIOUTLINE") {
         return None;
     }
     let remainder = instruction.get("BIDIOUTLINE".len()..)?;
     match remainder.chars().next() {
-        None | Some('"') | Some('\\') => Some(remainder.trim()),
+        None | Some('"' | '\\') => Some(remainder.trim()),
         Some(value) if value.is_ascii_whitespace() => Some(remainder.trim()),
         Some(_) => None,
     }
 }
 
-pub(super) fn shape_field_instructions(instruction: &str) -> Option<&str> {
-    if instruction.len() > MAX_INSTRUCTION_LEN {
+pub(super) fn shape_field_instructions(raw_instruction: &str) -> Option<&str> {
+    if raw_instruction.len() > MAX_INSTRUCTION_LEN {
         return None;
     }
-    let instruction = instruction.trim_start_matches(|value: char| value.is_ascii_whitespace());
+    let instruction = raw_instruction.trim_start_matches(|value: char| value.is_ascii_whitespace());
     let keyword = instruction.get(.."SHAPE".len())?;
     if !keyword.eq_ignore_ascii_case("SHAPE") {
         return None;
     }
     let remainder = instruction.get("SHAPE".len()..)?;
     match remainder.chars().next() {
-        None | Some('"') | Some('\\') => Some(remainder.trim()),
+        None | Some('"' | '\\') => Some(remainder.trim()),
         Some(value) if value.is_ascii_whitespace() => Some(remainder.trim()),
         Some(_) => None,
     }
 }
 
 pub(super) fn legacy_form_field_instructions<'a>(
-    instruction: &'a str,
+    raw_instruction: &'a str,
     expected_keyword: &str,
 ) -> Option<&'a str> {
-    if instruction.len() > MAX_INSTRUCTION_LEN {
+    if raw_instruction.len() > MAX_INSTRUCTION_LEN {
         return None;
     }
-    let instruction = instruction.trim_start_matches(|value: char| value.is_ascii_whitespace());
+    let instruction = raw_instruction.trim_start_matches(|value: char| value.is_ascii_whitespace());
     let keyword = instruction.get(..expected_keyword.len())?;
     if !keyword.eq_ignore_ascii_case(expected_keyword) {
         return None;
     }
     let remainder = instruction.get(expected_keyword.len()..)?;
     match remainder.chars().next() {
-        None | Some('"') | Some('\\') => Some(remainder.trim()),
+        None | Some('"' | '\\') => Some(remainder.trim()),
         Some(value) if value.is_ascii_whitespace() => Some(remainder.trim()),
         Some(_) => None,
     }
 }
 
-pub(super) fn private_field_instructions(instruction: &str) -> Option<&str> {
-    if instruction.len() > MAX_INSTRUCTION_LEN {
+pub(super) fn private_field_instructions(raw_instruction: &str) -> Option<&str> {
+    if raw_instruction.len() > MAX_INSTRUCTION_LEN {
         return None;
     }
-    let instruction = instruction.trim_start_matches(|value: char| value.is_ascii_whitespace());
+    let instruction = raw_instruction.trim_start_matches(|value: char| value.is_ascii_whitespace());
     let keyword = instruction.get(.."PRIVATE".len())?;
     if !keyword.eq_ignore_ascii_case("PRIVATE") {
         return None;
     }
     let remainder = instruction.get("PRIVATE".len()..)?;
     match remainder.chars().next() {
-        None | Some('"') | Some('\\') => Some(remainder.trim()),
+        None | Some('"' | '\\') => Some(remainder.trim()),
         Some(value) if value.is_ascii_whitespace() => Some(remainder.trim()),
         Some(_) => None,
     }
@@ -220,9 +240,9 @@ pub(super) fn go_to_button_parts(instruction: &str) -> Option<(Cow<'_, str>, Cow
     Some((target.value.clone(), button_text.value.clone()))
 }
 
-pub(super) fn auto_text_field_parts<'a>(
-    instruction: &'a str,
-) -> Option<(AutoTextFieldKind, Cow<'a, str>, Vec<FieldSwitch<'a>>)> {
+pub(super) fn auto_text_field_parts(
+    instruction: &str,
+) -> Option<(AutoTextFieldKind, Cow<'_, str>, Vec<FieldSwitch<'_>>)> {
     let tokens = tokenize(instruction).ok()?;
     let keyword = tokens.first()?;
     let kind = if keyword.value.eq_ignore_ascii_case("GLOSSARY") {
@@ -253,13 +273,16 @@ pub(super) fn auto_text_field_parts<'a>(
     Some((kind, entry_name, unknown_switches))
 }
 
-#[allow(clippy::type_complexity)]
-pub(super) fn auto_text_list_field_parts<'a>(
-    instruction: &'a str,
+#[allow(
+    clippy::type_complexity,
+    reason = "the returned tuple mirrors the field-instruction grammar"
+)]
+pub(super) fn auto_text_list_field_parts(
+    instruction: &str,
 ) -> Option<(
-    Option<Cow<'a, str>>,
-    Vec<AutoTextListOption<'a>>,
-    Vec<FieldSwitch<'a>>,
+    Option<Cow<'_, str>>,
+    Vec<AutoTextListOption<'_>>,
+    Vec<FieldSwitch<'_>>,
 )> {
     let tokens = tokenize(instruction).ok()?;
     let keyword = tokens.first()?;
@@ -464,8 +487,8 @@ pub(super) fn link_field_parts(instruction: &str) -> Option<LinkFieldParts<'_>> 
             },
             "f" => {
                 let value = switch_value(&tokens, index, name).ok()?;
-                let value = value.parse::<i64>().ok()?;
-                formatting_modes.push(match value {
+                let parsed = value.parse::<i64>().ok()?;
+                formatting_modes.push(match parsed {
                     0 => LinkFormatting::Source,
                     2 => LinkFormatting::Destination,
                     4 => LinkFormatting::SpreadsheetSource,
@@ -1647,18 +1670,18 @@ pub(super) fn merge_field_parts(instruction: &str) -> Option<MergeFieldParts<'_>
     })
 }
 
-pub(super) fn database_field_instructions(instruction: &str) -> Option<&str> {
-    if instruction.len() > MAX_INSTRUCTION_LEN {
+pub(super) fn database_field_instructions(raw_instruction: &str) -> Option<&str> {
+    if raw_instruction.len() > MAX_INSTRUCTION_LEN {
         return None;
     }
-    let instruction = instruction.trim_start_matches(|value: char| value.is_ascii_whitespace());
+    let instruction = raw_instruction.trim_start_matches(|value: char| value.is_ascii_whitespace());
     let keyword = instruction.get(.."DATABASE".len())?;
     if !keyword.eq_ignore_ascii_case("DATABASE") {
         return None;
     }
     let remainder = instruction.get("DATABASE".len()..)?;
     match remainder.chars().next() {
-        None | Some('"') | Some('\\') => Some(remainder.trim()),
+        None | Some('"' | '\\') => Some(remainder.trim()),
         Some(value) if value.is_ascii_whitespace() => Some(remainder.trim()),
         Some(_) => None,
     }
@@ -1725,14 +1748,14 @@ pub(super) fn prompt_field_parts(instruction: &str) -> Option<PromptFieldParts<'
 
     let (bookmark, prompt) = match kind {
         PromptFieldKind::Ask => {
-            let bookmark = tokens.first()?;
-            if bookmark.value.is_empty() || switch_name(bookmark).is_some() {
+            let bookmark_token = tokens.first()?;
+            if bookmark_token.value.is_empty() || switch_name(bookmark_token).is_some() {
                 return None;
             }
             let bookmark = tokens.remove(0).value;
 
-            let prompt = tokens.first()?;
-            if switch_name(prompt).is_some() {
+            let prompt_token = tokens.first()?;
+            if switch_name(prompt_token).is_some() {
                 return None;
             }
             let prompt = tokens.remove(0).value;
@@ -1915,8 +1938,8 @@ pub(super) fn mail_merge_recipient_field_parts(
                 if country_inclusion.is_some() {
                     return None;
                 }
-                let value = value?.value.clone();
-                country_inclusion = Some(match value.as_ref() {
+                let inclusion_value = value?.value.clone();
+                country_inclusion = Some(match inclusion_value.as_ref() {
                     "0" => AddressBlockCountryInclusion::Omit,
                     "1" => AddressBlockCountryInclusion::Always,
                     "2" => AddressBlockCountryInclusion::UnlessExcluded,
@@ -2000,11 +2023,11 @@ pub(super) fn is_mail_merge_next_instruction(instruction: &str) -> bool {
 }
 
 pub(super) fn mail_merge_conditional_control_parts(
-    instruction: &str,
+    raw_instruction: &str,
 ) -> Option<(MailMergeConditionalControlKind, &str)> {
-    tokenize(instruction).ok()?;
+    tokenize(raw_instruction).ok()?;
     let instruction =
-        instruction.trim_start_matches(|character: char| character.is_ascii_whitespace());
+        raw_instruction.trim_start_matches(|character: char| character.is_ascii_whitespace());
     let (kind, keyword) = if instruction
         .get(..6)
         .is_some_and(|candidate| candidate.eq_ignore_ascii_case("NEXTIF"))
@@ -2031,12 +2054,12 @@ pub(super) fn mail_merge_conditional_control_parts(
 }
 
 pub(super) fn comparison_field_expression<'a>(
-    instruction: &'a str,
+    raw_instruction: &'a str,
     field_type: &str,
 ) -> Option<&'a str> {
-    tokenize(instruction).ok()?;
+    tokenize(raw_instruction).ok()?;
     let instruction =
-        instruction.trim_start_matches(|character: char| character.is_ascii_whitespace());
+        raw_instruction.trim_start_matches(|character: char| character.is_ascii_whitespace());
     let candidate = instruction.get(..field_type.len())?;
     if !candidate.eq_ignore_ascii_case(field_type) {
         return None;
@@ -2061,8 +2084,8 @@ pub(super) fn compare_field_comparison(instruction: &str) -> Option<&str> {
     comparison_field_expression(instruction, "COMPARE")
 }
 
-pub(super) fn set_field_parts<'a>(instruction: &'a str) -> Option<(Cow<'a, str>, &'a str)> {
-    let tokens = tokenize(instruction).ok()?;
+pub(super) fn set_field_parts(raw_instruction: &str) -> Option<(Cow<'_, str>, &str)> {
+    let tokens = tokenize(raw_instruction).ok()?;
     let keyword = tokens.first()?;
     if !keyword.value.eq_ignore_ascii_case("SET") {
         return None;
@@ -2073,7 +2096,7 @@ pub(super) fn set_field_parts<'a>(instruction: &'a str) -> Option<(Cow<'a, str>,
     }
 
     let instruction =
-        instruction.trim_start_matches(|character: char| character.is_ascii_whitespace());
+        raw_instruction.trim_start_matches(|character: char| character.is_ascii_whitespace());
     let remainder = instruction.get("SET".len()..)?;
     if !remainder
         .chars()
@@ -2093,8 +2116,9 @@ pub(super) fn set_field_parts<'a>(instruction: &'a str) -> Option<(Cow<'a, str>,
     {
         return None;
     }
-    let expression = expression.trim_matches(|character: char| character.is_ascii_whitespace());
-    (!expression.is_empty()).then_some((target_name, expression))
+    let trimmed_expression =
+        expression.trim_matches(|character: char| character.is_ascii_whitespace());
+    (!trimmed_expression.is_empty()).then_some((target_name, trimmed_expression))
 }
 
 pub(super) fn field_argument_end(input: &str) -> Option<usize> {
@@ -2128,11 +2152,14 @@ pub(super) fn field_argument_end(input: &str) -> Option<usize> {
     None
 }
 
-#[allow(clippy::type_complexity)]
-pub(super) fn sequence_field_parts<'a>(
-    instruction: &'a str,
-) -> Option<(Cow<'a, str>, Option<Cow<'a, str>>, &'a str)> {
-    let tokens = tokenize(instruction).ok()?;
+#[allow(
+    clippy::type_complexity,
+    reason = "the returned tuple mirrors the field-instruction grammar"
+)]
+pub(super) fn sequence_field_parts(
+    raw_instruction: &str,
+) -> Option<(Cow<'_, str>, Option<Cow<'_, str>>, &str)> {
+    let tokens = tokenize(raw_instruction).ok()?;
     let keyword = tokens.first()?;
     if !keyword.value.eq_ignore_ascii_case("SEQ") {
         return None;
@@ -2143,7 +2170,7 @@ pub(super) fn sequence_field_parts<'a>(
     }
 
     let instruction =
-        instruction.trim_start_matches(|character: char| character.is_ascii_whitespace());
+        raw_instruction.trim_start_matches(|character: char| character.is_ascii_whitespace());
     let remainder = instruction.get("SEQ".len()..)?;
     if !remainder
         .chars()
@@ -2166,13 +2193,13 @@ pub(super) fn sequence_field_parts<'a>(
     {
         return None;
     }
-    let after_identifier =
+    let trailing =
         after_identifier.trim_start_matches(|character: char| character.is_ascii_whitespace());
-    if after_identifier.is_empty() || after_identifier.starts_with('\\') {
+    if trailing.is_empty() || trailing.starts_with('\\') {
         return Some((
             identifier,
             None,
-            after_identifier.trim_matches(|character: char| character.is_ascii_whitespace()),
+            trailing.trim_matches(|character: char| character.is_ascii_whitespace()),
         ));
     }
 
@@ -2180,8 +2207,8 @@ pub(super) fn sequence_field_parts<'a>(
     if bookmark.is_empty() || switch_name(tokens.get(2)?).is_some() {
         return None;
     }
-    let bookmark_end = field_argument_end(after_identifier)?;
-    let after_bookmark = after_identifier.get(bookmark_end..)?;
+    let bookmark_end = field_argument_end(trailing)?;
+    let after_bookmark = trailing.get(bookmark_end..)?;
     if !after_bookmark.is_empty()
         && !after_bookmark
             .chars()
@@ -2204,9 +2231,7 @@ pub(super) fn formula_field_formula(instruction: &str) -> Option<&str> {
     (!formula.is_empty()).then_some(formula)
 }
 
-pub(super) fn quote_field_parts<'a>(
-    instruction: &'a str,
-) -> Option<(Cow<'a, str>, Vec<FieldSwitch<'a>>)> {
+pub(super) fn quote_field_parts(instruction: &str) -> Option<(Cow<'_, str>, Vec<FieldSwitch<'_>>)> {
     let tokens = tokenize(instruction).ok()?;
     let keyword = tokens.first()?;
     if !keyword.value.eq_ignore_ascii_case("QUOTE") {
@@ -2233,9 +2258,9 @@ pub(super) fn quote_field_parts<'a>(
     Some((text, switches))
 }
 
-pub(super) fn symbol_field_parts<'a>(
-    instruction: &'a str,
-) -> Option<(Cow<'a, str>, Vec<FieldSwitch<'a>>)> {
+pub(super) fn symbol_field_parts(
+    instruction: &str,
+) -> Option<(Cow<'_, str>, Vec<FieldSwitch<'_>>)> {
     let tokens = tokenize(instruction).ok()?;
     let keyword = tokens.first()?;
     if !keyword.value.eq_ignore_ascii_case("SYMBOL") {
@@ -2321,12 +2346,12 @@ pub(super) fn list_number_field_parts(instruction: &str) -> Option<ListNumberFie
     })
 }
 
-pub(super) fn style_reference_field_parts<'a>(
-    instruction: &'a str,
+pub(super) fn style_reference_field_parts(
+    instruction: &str,
 ) -> Option<(
-    Cow<'a, str>,
+    Cow<'_, str>,
     Vec<StyleReferenceFieldOption>,
-    Vec<FieldSwitch<'a>>,
+    Vec<FieldSwitch<'_>>,
 )> {
     let tokens = tokenize(instruction).ok()?;
     let keyword = tokens.first()?;
@@ -2353,14 +2378,14 @@ pub(super) fn style_reference_field_parts<'a>(
             "w" => Some(StyleReferenceFieldOption::ParagraphNumberFullContext),
             _ => None,
         };
-        if let Some(option) = option {
+        if let Some(field_option) = option {
             if tokens
                 .get(index + 1)
                 .is_some_and(|next| switch_name(next).is_none())
             {
                 return None;
             }
-            options.push(option);
+            options.push(field_option);
             index += 1;
             continue;
         }
@@ -2370,13 +2395,14 @@ pub(super) fn style_reference_field_parts<'a>(
             .filter(|next| switch_name(next).is_none());
         unknown_switches.push(FieldSwitch {
             name: Cow::Owned(name.to_string()),
-            value: value.map(|token| token.value.clone()),
+            value: value.map(|switch_token| switch_token.value.clone()),
         });
         index += 1 + usize::from(value.is_some());
     }
     Some((style_name, options, unknown_switches))
 }
 
+#[must_use]
 pub fn parse_field_code(instruction: &str) -> ParsedFieldCode<'_> {
     match parse_field_code_inner(instruction) {
         Ok(parsed) => parsed,
@@ -2393,11 +2419,11 @@ pub(super) fn parse_field_code_inner(
     }
     let keyword = tokens.remove(0);
     if keyword.value.eq_ignore_ascii_case("HYPERLINK") {
-        return parse_hyperlink(tokens).map(ParsedFieldCode::Hyperlink);
+        return parse_hyperlink(&tokens).map(ParsedFieldCode::Hyperlink);
     }
     for (name, constructor) in [("REF", 0u8), ("PAGEREF", 1u8), ("NOTEREF", 2u8)] {
         if keyword.value.eq_ignore_ascii_case(name) {
-            let code = parse_reference(tokens)?;
+            let code = parse_reference(&tokens)?;
             return Ok(match constructor {
                 0 => ParsedFieldCode::Reference(code),
                 1 => ParsedFieldCode::PageReference(code),
@@ -2411,9 +2437,9 @@ pub(super) fn parse_field_code_inner(
     })
 }
 
-pub(super) fn parse_hyperlink(
-    tokens: Vec<FieldCodeToken<'_>>,
-) -> Result<HyperlinkCode<'_>, FieldCodeError> {
+pub(super) fn parse_hyperlink<'a>(
+    tokens: &[FieldCodeToken<'a>],
+) -> Result<HyperlinkCode<'a>, FieldCodeError> {
     let mut code = HyperlinkCode {
         external_target: None,
         bookmark: None,
@@ -2436,7 +2462,7 @@ pub(super) fn parse_hyperlink(
                     index += 1;
                 },
                 "l" | "o" | "t" | "m" => {
-                    let value = switch_value(&tokens, index, name)?;
+                    let value = switch_value(tokens, index, name)?;
                     let slot = match normalized.as_str() {
                         "l" => &mut code.bookmark,
                         "o" => &mut code.screen_tip,
@@ -2461,7 +2487,7 @@ pub(super) fn parse_hyperlink(
                         .filter(|next| switch_name(next).is_none());
                     code.unknown_switches.push(FieldSwitch {
                         name: Cow::Owned(name.to_string()),
-                        value: value.map(|token| token.value.clone()),
+                        value: value.map(|switch_token| switch_token.value.clone()),
                     });
                     index += 1 + usize::from(value.is_some());
                 },
@@ -2481,9 +2507,9 @@ pub(super) fn parse_hyperlink(
     Ok(code)
 }
 
-pub(super) fn parse_reference(
-    tokens: Vec<FieldCodeToken<'_>>,
-) -> Result<ReferenceCode<'_>, FieldCodeError> {
+pub(super) fn parse_reference<'a>(
+    tokens: &[FieldCodeToken<'a>],
+) -> Result<ReferenceCode<'a>, FieldCodeError> {
     let Some(first) = tokens.first() else {
         return Err(FieldCodeError::MissingOperand("bookmark"));
     };
@@ -2515,7 +2541,7 @@ pub(super) fn parse_reference(
                     .filter(|next| switch_name(next).is_none());
                 code.unknown_switches.push(FieldSwitch {
                     name: Cow::Owned(name.to_string()),
-                    value: value.map(|token| token.value.clone()),
+                    value: value.map(|switch_token| switch_token.value.clone()),
                 });
                 if value.is_some() {
                     index += 1;
@@ -2564,10 +2590,7 @@ pub(super) fn tokenize(instruction: &str) -> Result<Vec<FieldCodeToken<'_>>, Fie
     let mut tokens = Vec::new();
     let mut index = 0;
     while index < bytes.len() {
-        while bytes
-            .get(index)
-            .is_some_and(|byte| byte.is_ascii_whitespace())
-        {
+        while bytes.get(index).is_some_and(u8::is_ascii_whitespace) {
             index += 1;
         }
         if index == bytes.len() {

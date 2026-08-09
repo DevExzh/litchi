@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 //! Focused semantic and bounded-scanner coverage for action settings.
 
 use super::codec;

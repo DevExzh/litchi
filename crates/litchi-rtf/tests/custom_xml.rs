@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{CustomXmlAttribute, CustomXmlTag, RtfDocument, RtfWriter};
 use std::borrow::Cow;
 
@@ -105,42 +114,42 @@ fn typed_constructors_validate() {
 fn rejects_malformed_custom_xml_markup() {
     let cases = [
         // Unclosed tag.
-        r#"{\rtf1{\xmlopen a}Body}"#,
+        r"{\rtf1{\xmlopen a}Body}",
         // Mismatched close name.
-        r#"{\rtf1{\xmlopen a}Body{\xmlclose b}}"#,
+        r"{\rtf1{\xmlopen a}Body{\xmlclose b}}",
         // Close without open.
-        r#"{\rtf1 Body{\xmlclose a}}"#,
+        r"{\rtf1 Body{\xmlclose a}}",
         // Empty tag name.
-        r#"{\rtf1{\xmlopen }Body}"#,
+        r"{\rtf1{\xmlopen }Body}",
         // Namespace reference without a namespace table.
-        r#"{\rtf1{\xmlopen \xmlns1 a}B{\xmlclose a}}"#,
+        r"{\rtf1{\xmlopen \xmlns1 a}B{\xmlclose a}}",
         // Namespace reference outside the valid range.
-        r#"{\rtf1{\*\xmlnstbl {\xmlns1 urn:x}}{\xmlopen \xmlns0 a}B{\xmlclose a}}"#,
+        r"{\rtf1{\*\xmlnstbl {\xmlns1 urn:x}}{\xmlopen \xmlns0 a}B{\xmlclose a}}",
         // Unknown namespace reference.
-        r#"{\rtf1{\*\xmlnstbl {\xmlns1 urn:x}}{\xmlopen \xmlns2 a}B{\xmlclose a}}"#,
+        r"{\rtf1{\*\xmlnstbl {\xmlns1 urn:x}}{\xmlopen \xmlns2 a}B{\xmlclose a}}",
         // Duplicate namespace selector.
-        r#"{\rtf1{\*\xmlnstbl {\xmlns1 urn:x}}{\xmlopen \xmlns1\xmlns1 a}B{\xmlclose a}}"#,
+        r"{\rtf1{\*\xmlnstbl {\xmlns1 urn:x}}{\xmlopen \xmlns1\xmlns1 a}B{\xmlclose a}}",
         // Orphan attribute destinations.
-        r#"{\rtf1{\*\xmlattrname id}Body}"#,
-        r#"{\rtf1{\*\xmlattrvalue 5}Body}"#,
+        r"{\rtf1{\*\xmlattrname id}Body}",
+        r"{\rtf1{\*\xmlattrvalue 5}Body}",
         // Attribute value without a name.
-        r#"{\rtf1{\xmlopen a}{\*\xmlattrvalue 5}B{\xmlclose a}}"#,
+        r"{\rtf1{\xmlopen a}{\*\xmlattrvalue 5}B{\xmlclose a}}",
         // Attribute name without a value.
-        r#"{\rtf1{\xmlopen a}{\*\xmlattrname id}B{\xmlclose a}}"#,
-        r#"{\rtf1{\xmlopen a}{\*\xmlattrname id}{\*\xmlattrname id2}B{\xmlclose a}}"#,
-        r#"{\rtf1{\xmlopen a}{\*\xmlattrname id}B{\xmlclose a}{\*\xmlattrvalue 5}}"#,
+        r"{\rtf1{\xmlopen a}{\*\xmlattrname id}B{\xmlclose a}}",
+        r"{\rtf1{\xmlopen a}{\*\xmlattrname id}{\*\xmlattrname id2}B{\xmlclose a}}",
+        r"{\rtf1{\xmlopen a}{\*\xmlattrname id}B{\xmlclose a}{\*\xmlattrvalue 5}}",
         // Duplicate attribute names within one tag.
-        r#"{\rtf1{\xmlopen a}{\*\xmlattrname n}{\*\xmlattrvalue 1}{\*\xmlattrname n}{\*\xmlattrvalue 2}B{\xmlclose a}}"#,
+        r"{\rtf1{\xmlopen a}{\*\xmlattrname n}{\*\xmlattrvalue 1}{\*\xmlattrname n}{\*\xmlattrvalue 2}B{\xmlclose a}}",
         // Starred tag destinations.
-        r#"{\rtf1{\*\xmlopen a}Body{\*\xmlclose a}}"#,
+        r"{\rtf1{\*\xmlopen a}Body{\*\xmlclose a}}",
         // Unstarred attribute destinations.
-        r#"{\rtf1{\xmlopen a}{\xmlattrname id}B{\xmlclose a}}"#,
+        r"{\rtf1{\xmlopen a}{\xmlattrname id}B{\xmlclose a}}",
         // Binary data inside a tag destination.
-        r#"{\rtf1{\xmlopen a\bin2 xx}B{\xmlclose a}}"#,
+        r"{\rtf1{\xmlopen a\bin2 xx}B{\xmlclose a}}",
         // Nested group inside a close destination.
-        r#"{\rtf1{\xmlopen a}B{\xmlclose a{x}}}"#,
+        r"{\rtf1{\xmlopen a}B{\xmlclose a{x}}}",
         // Improper nesting.
-        r#"{\rtf1{\xmlopen a}{\xmlopen b}B{\xmlclose a}{\xmlclose b}}"#,
+        r"{\rtf1{\xmlopen a}{\xmlopen b}B{\xmlclose a}{\xmlclose b}}",
     ];
     for rtf in cases {
         assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");
@@ -149,7 +158,7 @@ fn rejects_malformed_custom_xml_markup() {
 
 #[test]
 fn rejects_excessive_nesting_depth() {
-    let mut rtf = String::from(r#"{\rtf1"#);
+    let mut rtf = String::from(r"{\rtf1");
     for _ in 0..65 {
         rtf.push_str(r"{\xmlopen t}");
     }
@@ -160,7 +169,7 @@ fn rejects_excessive_nesting_depth() {
     rtf.push('}');
     assert!(RtfDocument::parse(&rtf).is_err());
 
-    let mut valid = String::from(r#"{\rtf1"#);
+    let mut valid = String::from(r"{\rtf1");
     for _ in 0..64 {
         valid.push_str(r"{\xmlopen t}");
     }
@@ -185,8 +194,8 @@ fn rejects_custom_xml_markup_in_non_body_stories() {
         r"{\rtf1{\header{\xmlopen t}h{\xmlclose t}}body}",
         r"{\rtf1{\footer{\*\xmlattrvalue v}f}body}",
         // Shape text story.
-        r#"{\rtf1 body{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 202}}{\shptxt{\xmlopen t}s{\xmlclose t}}}}}"#,
-        r#"{\rtf1 body{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 202}}{\shptxt{\*\xmlattrname a}s}}}}"#,
+        r"{\rtf1 body{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 202}}{\shptxt{\xmlopen t}s{\xmlclose t}}}}}",
+        r"{\rtf1 body{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 202}}{\shptxt{\*\xmlattrname a}s}}}}",
         // Field instruction and result stories.
         r"{\rtf1 body{\field{\*\fldinst X}{\fldrslt{\xmlopen t}r{\xmlclose t}}}}",
         r"{\rtf1 body{\field{\*\fldinst{\xmlopen t}X{\xmlclose t}}{\fldrslt r}}}",

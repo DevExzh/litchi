@@ -15,7 +15,7 @@ pub(crate) fn replace_persisted_record(
     }
     if record.len() < 8
         || record.len() > 128 * 1024 * 1024
-        || rewrite::slice(&record, 0).map(|value| value.len())? != record.len()
+        || rewrite::slice(&record, 0).map(<[u8]>::len)? != record.len()
     {
         return Err(Error::Corrupted(
             "replacement persisted record has an invalid length".into(),

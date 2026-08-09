@@ -1,12 +1,13 @@
-use litchi_rtf::{RtfDocument, RtfWriter};
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
-    let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
-    output
-}
+use litchi_rtf::{RtfDocument, RtfWriter};
 
 const SPECIAL_CHARACTERS: &[(&str, &str)] = &[
     (r"\emdash", "\u{2014}"),
@@ -20,6 +21,14 @@ const SPECIAL_CHARACTERS: &[(&str, &str)] = &[
     (r"\zwj", "\u{200D}"),
     (r"\zwnj", "\u{200C}"),
 ];
+
+fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+    let mut output = Vec::new();
+    RtfWriter::new(&mut output)
+        .write_document(document)
+        .unwrap();
+    output
+}
 
 #[test]
 fn special_character_control_words_extract_their_unicode_text() {
@@ -59,7 +68,7 @@ fn dynamic_date_time_stamps_parse_without_extracted_text() {
 
 #[test]
 fn special_character_control_words_survive_inside_generated_list_markers() {
-    let document = RtfDocument::parse(r#"{\rtf1\ansi{\listtext\pard\plain\bullet\tab}B}"#).unwrap();
+    let document = RtfDocument::parse(r"{\rtf1\ansi{\listtext\pard\plain\bullet\tab}B}").unwrap();
     let marker = &document.generated_list_markers()[0];
     assert_eq!(marker.text, "\u{2022}\t");
 

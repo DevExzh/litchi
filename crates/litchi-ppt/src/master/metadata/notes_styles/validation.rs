@@ -65,7 +65,7 @@ pub(crate) fn validate_record(record: &Record) -> Result<()> {
             "notes-master text-style atom has an invalid header or children".into(),
         ));
     }
-    let data_length = usize::try_from(record.data_length).map_err(|_| {
+    let data_length = usize::try_from(record.data_length).map_err(|_err| {
         Error::Corrupted("notes-master text-style atom length exceeds usize".into())
     })?;
     if data_length != record.data.len() {

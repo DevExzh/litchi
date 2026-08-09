@@ -1,4 +1,4 @@
-//! Source-preserving semantic edits for one OfficeArtClientData record.
+//! Source-preserving semantic edits for one `OfficeArtClientData` record.
 
 use std::sync::Arc;
 
@@ -21,6 +21,7 @@ impl Revision {
     }
 
     /// Compact revision value useful for parent-owner conflict checks.
+    #[must_use]
     pub const fn value(self) -> u64 {
         self.0
     }
@@ -49,6 +50,7 @@ pub enum Change {
 
 impl Change {
     /// Child-list index affected by this edit.
+    #[must_use]
     pub const fn index(&self) -> usize {
         match self {
             Self::Insert { index, .. }
@@ -58,6 +60,7 @@ impl Change {
     }
 
     /// The child present before this edit, when there was one.
+    #[must_use]
     pub fn before(&self) -> Option<&ClientDataChild> {
         match self {
             Self::Insert { .. } => None,
@@ -67,6 +70,7 @@ impl Change {
     }
 
     /// The child present after this edit, when there is one.
+    #[must_use]
     pub fn after(&self) -> Option<&ClientDataChild> {
         match self {
             Self::Insert { child, .. } => Some(child),
@@ -87,33 +91,53 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parse one complete record and retain its exact source bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(bytes: impl AsRef<[u8]>) -> Result<Self> {
         Self::parse_with_limits(bytes, ClientDataLimits::default())
     }
 
     /// Parse one complete record under explicit resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: ClientDataLimits) -> Result<Self> {
-        let bytes = bytes.as_ref();
-        let value = ClientData::parse_with_limits(bytes, limits)?;
+        let input = bytes.as_ref();
+        let value = ClientData::parse_with_limits(input, limits)?;
         let encoded = value.to_bytes_with_limits(limits)?;
-        if encoded != bytes {
+        if encoded != input {
             return Err(Error::Corrupted(
                 "OfficeArtClientData is not losslessly representable".into(),
             ));
         }
         Ok(Self::from_parts(
-            Arc::from(bytes.to_vec().into_boxed_slice()),
+            Arc::from(input.to_vec().into_boxed_slice()),
             value,
             limits,
         ))
     }
 
     /// Capture a validated semantic value using the default resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn from_client_data(value: ClientData) -> Result<Self> {
         Self::from_client_data_with_limits(value, ClientDataLimits::default())
     }
 
     /// Capture a validated semantic value under explicit resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "the capture API takes ownership of the semantic value by convention, matching `from_client_data`"
+    )]
     pub fn from_client_data_with_limits(
         value: ClientData,
         limits: ClientDataLimits,
@@ -133,31 +157,37 @@ impl Snapshot {
     }
 
     /// Borrow the validated semantic client-data value.
+    #[must_use]
     pub const fn client_data(&self) -> &ClientData {
         &self.value
     }
 
     /// Borrow ordered typed and opaque children.
+    #[must_use]
     pub fn children(&self) -> &[ClientDataChild] {
         self.value.children()
     }
 
     /// Exact source or committed record bytes.
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
     /// Revision of the exact serialized source.
+    #[must_use]
     pub const fn revision(&self) -> Revision {
         self.revision
     }
 
     /// Resource bounds retained for subsequent edits and patch application.
+    #[must_use]
     pub const fn limits(&self) -> ClientDataLimits {
         self.limits
     }
 
     /// Start an isolated semantic edit over this snapshot.
+    #[must_use]
     pub fn edit(&self) -> Transaction {
         Transaction {
             source: self.clone(),
@@ -180,26 +210,34 @@ pub struct Patch {
 
 impl Patch {
     /// Source revision required by [`Self::apply`].
+    #[must_use]
     pub const fn base(&self) -> Revision {
         self.base
     }
 
     /// Target revision produced by [`Self::apply`].
+    #[must_use]
     pub const fn target(&self) -> Revision {
         self.target
     }
 
     /// Ordered semantic edits represented by this patch.
+    #[must_use]
     pub fn changes(&self) -> &[Change] {
         &self.changes
     }
 
     /// Whether the transaction changed no child bytes.
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.changes.is_empty()
     }
 
     /// Apply only to the exact source snapshot from which this patch came.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn apply(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision != self.base || current.bytes.as_ref() != self.before.as_ref() {
             return Err(Error::InvalidFormat(
@@ -210,16 +248,25 @@ impl Patch {
     }
 
     /// Apply the inverse to the exact committed target snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.inverse().apply(current)
     }
 
     /// Reapply this patch to its exact source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.apply(current)
     }
 
     /// Build a source-checked inverse patch.
+    #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
             base: self.target,
@@ -266,31 +313,40 @@ pub struct Transaction {
 
 impl Transaction {
     /// Borrow the immutable source snapshot.
+    #[must_use]
     pub const fn source(&self) -> &Snapshot {
         &self.source
     }
 
     /// Borrow the current transaction candidate.
+    #[must_use]
     pub const fn client_data(&self) -> &ClientData {
         &self.candidate
     }
 
     /// Borrow the candidate's ordered child list.
+    #[must_use]
     pub fn children(&self) -> &[ClientDataChild] {
         self.candidate.children()
     }
 
     /// Whether any staged operation changes the serialized candidate.
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.candidate != self.source.value
     }
 
     /// Borrow the staged semantic operations.
+    #[must_use]
     pub fn changes(&self) -> &[Change] {
         &self.changes
     }
 
     /// Insert one validated child at an exact ordered position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn insert(&mut self, index: usize, child: ClientDataChild) -> Result<()> {
         if index > self.candidate.children.len() {
             return invalid("client-data insertion index is out of range");
@@ -304,11 +360,19 @@ impl Transaction {
     }
 
     /// Append one validated child after the current ordered sequence.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn append(&mut self, child: ClientDataChild) -> Result<()> {
         self.insert(self.candidate.children.len(), child)
     }
 
     /// Replace one child in place, preserving all other child order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace(
         &mut self,
         index: usize,
@@ -333,6 +397,10 @@ impl Transaction {
     }
 
     /// Remove one child and return the removed value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove(&mut self, index: usize) -> Result<ClientDataChild> {
         if index >= self.candidate.children.len() {
             return Err(Error::InvalidFormat(
@@ -351,6 +419,10 @@ impl Transaction {
     }
 
     /// Capture the current candidate without publishing the transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn snapshot(&self) -> Result<Snapshot> {
         let bytes = self.candidate.to_bytes_with_limits(self.source.limits)?;
         if bytes.as_slice() == self.source.bytes.as_ref() {
@@ -360,6 +432,10 @@ impl Transaction {
     }
 
     /// Validate and publish the candidate atomically with its reversible patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn commit(self) -> Result<Commit> {
         let bytes = self.candidate.to_bytes_with_limits(self.source.limits)?;
         let snapshot = if bytes.as_slice() == self.source.bytes.as_ref() {
@@ -384,18 +460,19 @@ impl Transaction {
     }
 
     /// Alias for move-owned writer terminology.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn finish(self) -> Result<Commit> {
         self.commit()
     }
 
     /// Discard all staged edits and recover the source snapshot.
+    #[must_use]
     pub fn rollback(self) -> Snapshot {
         self.source
     }
-}
-
-fn validate_candidate(candidate: &ClientData, limits: ClientDataLimits) -> Result<()> {
-    candidate.validate_with_limits(limits)
 }
 
 /// A successful immutable target and its source-checked patch.
@@ -407,24 +484,32 @@ pub struct Commit {
 
 impl Commit {
     /// Published target snapshot.
+    #[must_use]
     pub const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Reversible patch from the source to this target.
+    #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Published target semantic value.
+    #[must_use]
     pub const fn client_data(&self) -> &ClientData {
         self.snapshot.client_data()
     }
 
     /// Split the published target and patch.
+    #[must_use]
     pub fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
+}
+
+fn validate_candidate(candidate: &ClientData, limits: ClientDataLimits) -> Result<()> {
+    candidate.validate_with_limits(limits)
 }
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {

@@ -23,46 +23,55 @@ impl<'a> Font<'a> {
     }
 
     /// Primary font name.
+    #[must_use]
     pub fn name(self) -> &'a str {
         self.raw.name.as_ref()
     }
 
     /// Generic font family.
+    #[must_use]
     pub const fn family(self) -> FontFamily {
         self.raw.family
     }
 
     /// Explicit RTF charset selector, if declared.
+    #[must_use]
     pub const fn charset(self) -> Option<FontCharset> {
         self.raw.charset
     }
 
     /// Alternate font name, if declared.
+    #[must_use]
     pub fn alternate_name(self) -> Option<&'a str> {
         self.raw.alternate_name.as_deref()
     }
 
     /// Non-tagged font name, if declared.
+    #[must_use]
     pub fn non_tagged_name(self) -> Option<&'a str> {
         self.raw.non_tagged_name.as_deref()
     }
 
     /// Ten-byte PANOSE classification, if declared.
+    #[must_use]
     pub const fn panose(self) -> Option<&'a [u8; 10]> {
         self.raw.panose.as_ref()
     }
 
     /// Font pitch preference.
+    #[must_use]
     pub const fn pitch(self) -> FontPitch {
         self.raw.pitch
     }
 
     /// Explicit exact font code page, if declared.
+    #[must_use]
     pub const fn code_page(self) -> Option<FontPage> {
         self.raw.code_page
     }
 
     /// Theme-font role, if declared.
+    #[must_use]
     pub const fn theme(self) -> Option<FontTheme> {
         self.raw.theme
     }
@@ -100,21 +109,25 @@ impl<'a> Embedded<'a> {
     }
 
     /// Declared embedded-font format.
+    #[must_use]
     pub const fn format(self) -> EmbeddedFontFormat {
         self.raw.format
     }
 
     /// External font-file name, if declared.
+    #[must_use]
     pub fn file_name(self) -> Option<&'a str> {
         self.raw.file_name.as_deref()
     }
 
     /// Exact code page of the file name, if declared.
+    #[must_use]
     pub const fn file_code_page(self) -> Option<FontPage> {
         self.raw.file_code_page
     }
 
     /// Inline embedded font bytes, if retained.
+    #[must_use]
     pub fn data(self) -> Option<&'a [u8]> {
         self.raw.data.as_deref()
     }
@@ -153,11 +166,13 @@ impl<'a> Catalog<'a> {
     }
 
     /// Number of defined fonts, excluding sparse RTF placeholder slots.
+    #[must_use]
     pub fn len(self) -> usize {
         self.raw.defined.iter().filter(|defined| **defined).count()
     }
 
     /// Whether no font definitions were retained.
+    #[must_use]
     pub fn is_empty(self) -> bool {
         !self.raw.defined.iter().any(|defined| *defined)
     }
@@ -166,6 +181,7 @@ impl<'a> Catalog<'a> {
     ///
     /// Positions use stable catalog order rather than numeric RTF slots.
     /// Sparse placeholders are never returned.
+    #[must_use]
     pub fn at(self, position: usize) -> Option<Font<'a>> {
         self.iter().nth(position)
     }
@@ -174,6 +190,9 @@ impl<'a> Catalog<'a> {
     ///
     /// `Ok(None)` means there is no match. Duplicate matching definitions are
     /// reported explicitly instead of silently selecting one.
+    ///
+    /// # Errors
+    /// Returns an error when the font lookup fails.
     pub fn find(self, name: &str) -> Result<Option<Font<'a>>, LookupError> {
         let mut match_ = None;
         for font in self {
@@ -189,6 +208,7 @@ impl<'a> Catalog<'a> {
     }
 
     /// Lazily traverse defined fonts in stable catalog order.
+    #[must_use]
     pub fn iter(self) -> Iter<'a> {
         Iter {
             catalog: self,

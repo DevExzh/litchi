@@ -1,4 +1,4 @@
-//! Document-level PowerPoint 9 broadcast collection.
+//! Document-level `PowerPoint` 9 broadcast collection.
 
 use super::codec::BROADCAST_CONTAINER_RECORD_TYPE;
 use super::model::{Broadcast, Broadcasts};

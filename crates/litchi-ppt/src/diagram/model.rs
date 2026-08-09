@@ -18,22 +18,25 @@ pub struct Id {
 
 impl Id {
     /// Creates a checked semantic identity from the two MS-PPT fields.
+    #[must_use]
     pub const fn new(build_id: u32, shape_id: u32) -> Self {
         Self { build_id, shape_id }
     }
 
-    /// Returns the PowerPoint build identifier.
+    /// Returns the `PowerPoint` build identifier.
+    #[must_use]
     pub const fn build_id(self) -> u32 {
         self.build_id
     }
 
-    /// Returns the referenced OfficeArt shape identifier.
+    /// Returns the referenced `OfficeArt` shape identifier.
+    #[must_use]
     pub const fn shape_id(self) -> u32 {
         self.shape_id
     }
 }
 
-/// Diagram-specific view of the shared PowerPoint build atom.
+/// Diagram-specific view of the shared `PowerPoint` build atom.
 ///
 /// The underlying fixed-width record is owned by
 /// [`crate::animation::diagram_build`].  This wrapper only supplies concise
@@ -50,6 +53,7 @@ impl Build {
     }
 
     /// Returns the diagram identity represented by this build.
+    #[must_use]
     pub const fn id(self) -> Id {
         Id::new(
             self.record.build().build_id,
@@ -57,46 +61,53 @@ impl Build {
         )
     }
 
-    /// Returns the PowerPoint build identifier.
+    /// Returns the `PowerPoint` build identifier.
+    #[must_use]
     pub const fn build_id(self) -> u32 {
         self.record.build().build_id
     }
 
-    /// Returns the target OfficeArt shape identifier.
+    /// Returns the target `OfficeArt` shape identifier.
+    #[must_use]
     pub const fn shape_id(self) -> u32 {
         self.record.build().shape_id_ref
     }
 
     /// Whether the build is expanded into timing nodes.
+    #[must_use]
     pub const fn expanded(self) -> bool {
         self.record.build().expanded
     }
 
     /// Whether the build is expanded in the authoring UI.
+    #[must_use]
     pub const fn ui_expanded(self) -> bool {
         self.record.build().ui_expanded
     }
 
-    /// Returns the two undefined bytes retained by the source BuildAtom.
+    /// Returns the two undefined bytes retained by the source `BuildAtom`.
+    #[must_use]
     pub const fn reserved(self) -> [u8; 2] {
         self.record.build().reserved()
     }
 
     /// Returns the MS-PPT diagram build mode, retaining unknown values.
+    #[must_use]
     pub const fn mode(self) -> diagram_build::BuildType {
         self.record.atom().build_type
     }
 
     /// Returns the lossless fixed-width owner for advanced callers.
+    #[must_use]
     pub const fn record(self) -> diagram_build::Container {
         self.record
     }
 }
 
-/// A lightweight reference to an OfficeArt shape associated with a diagram.
+/// A lightweight reference to an `OfficeArt` shape associated with a diagram.
 ///
 /// The reference contains only the native shape identifier.  Resolution is
-/// performed against the inventory's borrowed ODraw tree, so a diagram entry
+/// performed against the inventory's borrowed `ODraw` tree, so a diagram entry
 /// does not clone or flatten shape objects.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ShapeRef {
@@ -108,12 +119,14 @@ impl ShapeRef {
         Self { id }
     }
 
-    /// Returns the native OfficeArt shape identifier.
+    /// Returns the native `OfficeArt` shape identifier.
+    #[must_use]
     pub const fn id(self) -> u32 {
         self.id
     }
 
     /// Resolves this reference in a parsed drawing without allocating.
+    #[must_use]
     pub fn resolve<'drawing, 'data>(
         self,
         drawing: &'drawing Drawing<'data>,
@@ -122,7 +135,7 @@ impl ShapeRef {
     }
 }
 
-/// The role of one borrowed, uninterpreted OfficeArt record.
+/// The role of one borrowed, uninterpreted `OfficeArt` record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PayloadKind {
     /// The shape's own `SpContainer` record.
@@ -137,7 +150,7 @@ pub enum PayloadKind {
     Anchor,
 }
 
-/// An inert OfficeArt payload reference.
+/// An inert `OfficeArt` payload reference.
 ///
 /// The record remains borrowed from the caller's drawing bytes and can be
 /// inspected or handed to a lower-level owner.  This facade never interprets
@@ -159,31 +172,37 @@ impl<'data> Payload<'data> {
     }
 
     /// Returns the shape to which this payload belongs.
+    #[must_use]
     pub const fn shape_id(&self) -> u32 {
         self.shape_id
     }
 
     /// Returns the contextual payload role.
+    #[must_use]
     pub const fn kind(&self) -> PayloadKind {
         self.kind
     }
 
-    /// Returns the lossless OfficeArt record handle.
+    /// Returns the lossless `OfficeArt` record handle.
+    #[must_use]
     pub const fn record(&self) -> &Record<'data> {
         &self.record
     }
 
-    /// Returns the record's raw OfficeArt kind.
+    /// Returns the record's raw `OfficeArt` kind.
+    #[must_use]
     pub const fn raw_kind(&self) -> u16 {
         self.record.raw_kind()
     }
 
-    /// Returns the typed OfficeArt kind, including an unknown fallback.
+    /// Returns the typed `OfficeArt` kind, including an unknown fallback.
+    #[must_use]
     pub const fn record_kind(&self) -> RecordKind {
         self.record.kind()
     }
 
     /// Returns the record body without interpreting it.
+    #[must_use]
     pub const fn bytes(&self) -> &'data [u8] {
         self.record.data()
     }
@@ -212,26 +231,31 @@ impl<'data> Diagram<'data> {
     }
 
     /// Returns the stable `(build_id, shape_id)` identity.
+    #[must_use]
     pub const fn id(&self) -> Id {
         self.id
     }
 
     /// Returns the typed build metadata.
+    #[must_use]
     pub const fn build(&self) -> Build {
         self.build
     }
 
     /// Returns the shape at which the diagram build is rooted.
+    #[must_use]
     pub const fn root(&self) -> ShapeRef {
         self.root
     }
 
-    /// Returns the root and all nested OfficeArt shapes in source order.
+    /// Returns the root and all nested `OfficeArt` shapes in source order.
+    #[must_use]
     pub fn shapes(&self) -> &[ShapeRef] {
         &self.shapes
     }
 
     /// Returns inert payload references in associated-shape/source order.
+    #[must_use]
     pub fn payloads(&self) -> &[Payload<'data>] {
         &self.payloads
     }
@@ -260,17 +284,17 @@ impl Default for Limits {
 
 /// Resource ceilings retained by a source-preserving diagram transaction.
 ///
-/// The edit owner never grows a BuildList, but it still bounds all source
+/// The edit owner never grows a `BuildList`, but it still bounds all source
 /// bytes and the shape index it retains before exposing mutation methods.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EditLimits {
-    /// Maximum complete BuildList byte length.
+    /// Maximum complete `BuildList` byte length.
     pub max_build_list_bytes: usize,
-    /// Maximum complete OfficeArt drawing byte length.
+    /// Maximum complete `OfficeArt` drawing byte length.
     pub max_drawing_bytes: usize,
-    /// Maximum diagram entries retained from one BuildList.
+    /// Maximum diagram entries retained from one `BuildList`.
     pub max_diagrams: usize,
-    /// Maximum unique OfficeArt shape identifiers retained for graph checks.
+    /// Maximum unique `OfficeArt` shape identifiers retained for graph checks.
     pub max_shapes: usize,
 }
 
@@ -297,12 +321,20 @@ impl<'data> Inventory<'data> {
         Self { drawing, diagrams }
     }
 
-    /// Parses a build list together with its associated PPDrawing payload.
+    /// Parses a build list together with its associated `PPDrawing` payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(build_list: &crate::records::Record, drawing: &'data [u8]) -> Result<Self> {
         super::codec::parse(build_list, drawing)
     }
 
     /// Parses with explicit resource ceilings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_with_limits(
         build_list: &crate::records::Record,
         drawing: &'data [u8],
@@ -311,32 +343,38 @@ impl<'data> Inventory<'data> {
         super::codec::parse_with_limits(build_list, drawing, limits)
     }
 
-    /// Returns the full borrowed ODraw projection used by this inventory.
+    /// Returns the full borrowed `ODraw` projection used by this inventory.
+    #[must_use]
     pub const fn drawing(&self) -> &Drawing<'data> {
         &self.drawing
     }
 
-    /// Returns diagrams in BuildList source order.
+    /// Returns diagrams in `BuildList` source order.
+    #[must_use]
     pub fn diagrams(&self) -> &[Diagram<'data>] {
         &self.diagrams
     }
 
     /// Returns the number of native diagram builds.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.diagrams.len()
     }
 
     /// Whether the build list contains no diagram builds.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.diagrams.is_empty()
     }
 
     /// Finds a diagram by its checked build identity.
+    #[must_use]
     pub fn get(&self, id: Id) -> Option<&Diagram<'data>> {
         self.diagrams.iter().find(|diagram| diagram.id() == id)
     }
 
-    /// Resolves an associated shape reference against the retained ODraw tree.
+    /// Resolves an associated shape reference against the retained `ODraw` tree.
+    #[must_use]
     pub fn shape<'inventory>(
         &'inventory self,
         reference: ShapeRef,
@@ -346,9 +384,9 @@ impl<'data> Inventory<'data> {
 }
 
 /// One typed diagram build together with its byte offset in the source
-/// BuildList.  The offset is an implementation detail of the transactional
+/// `BuildList`.  The offset is an implementation detail of the transactional
 /// owner; keeping it beside the existing [`Build`] avoids cloning or
-/// reconstructing the surrounding BuildList records during an edit.
+/// reconstructing the surrounding `BuildList` records during an edit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct LocatedBuild {
     pub(super) offset: usize,

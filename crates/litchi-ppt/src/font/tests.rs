@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::{
     Facet, FontCollection, FontCollections, FontEmbeddingFlags, PackageLimits, Scope, Snapshot,
 };
@@ -9,7 +15,7 @@ fn record_bytes(version: u16, instance: u16, kind: u16, payload: &[u8]) -> Vec<u
     let mut data = Vec::new();
     data.extend_from_slice(&((instance << 4) | version).to_le_bytes());
     data.extend_from_slice(&kind.to_le_bytes());
-    data.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+    data.extend_from_slice(&u32::try_from(payload.len()).unwrap().to_le_bytes());
     data.extend_from_slice(payload);
     data
 }
@@ -28,7 +34,7 @@ fn collection(kind: RecordType, payload: Vec<u8>) -> Record {
         record_type_raw: kind.as_u16(),
         version: 0x0f,
         instance: 0,
-        data_length: payload.len() as u32,
+        data_length: u32::try_from(payload.len()).unwrap(),
         data: payload,
         children: Vec::new(),
     }
@@ -47,7 +53,7 @@ fn prog_tags_record(blob_payload: &[u8]) -> Record {
         record_type_raw: RecordType::ProgTags.as_u16(),
         version: 0x0f,
         instance: 0,
-        data_length: tag.len() as u32,
+        data_length: u32::try_from(tag.len()).unwrap(),
         data: tag,
         children: Vec::new(),
     }
@@ -75,7 +81,7 @@ fn entity(instance: u16, name: &str, ignored_type_bits: u8) -> Vec<u8> {
     record_bytes(0, instance, RecordType::FontEntityAtom.as_u16(), &payload)
 }
 
-fn document(base: Record, ppt10: Vec<u8>) -> Record {
+fn document(base: Record, ppt10: &[u8]) -> Record {
     let environment = Record {
         record_type: RecordType::Environment,
         record_type_raw: RecordType::Environment.as_u16(),
@@ -92,7 +98,7 @@ fn document(base: Record, ppt10: Vec<u8>) -> Record {
         instance: 0,
         data_length: 0,
         data: Vec::new(),
-        children: vec![environment, doc_info_list(prog_tags_record(&ppt10))],
+        children: vec![environment, doc_info_list(prog_tags_record(ppt10))],
     }
 }
 
@@ -212,7 +218,7 @@ fn authoring_accepts_129_fonts_and_refuses_the_130th() {
 #[test]
 fn contextual_owner_headers_and_zero_aggregate_limits_are_enforced() {
     let base = collection(RecordType::FontCollection, entity(0, "Base", 0));
-    let valid = document(base.clone(), Vec::new());
+    let valid = document(base.clone(), &[]);
     let mut malformed = valid.clone();
     malformed.children[1].version = 0;
     assert!(FontCollections::parse(&malformed).is_err());
@@ -226,8 +232,10 @@ fn contextual_owner_headers_and_zero_aggregate_limits_are_enforced() {
             .is_none()
     );
 
-    let mut limits = super::Limits::default();
-    limits.max_fonts_per_collection = 0;
+    let limits = super::Limits {
+        max_fonts_per_collection: 0,
+        ..super::Limits::default()
+    };
     assert!(FontCollections::parse_with_limits(&valid, limits).is_err());
 
     let mut copied = super::Limits::default();
@@ -257,15 +265,14 @@ fn nested_programmable_tags_share_one_record_budget() {
         record_type_raw: RecordType::ProgTags.as_u16(),
         version: 0x0f,
         instance: 0,
-        data_length: tags.len() as u32,
+        data_length: u32::try_from(tags.len()).unwrap(),
         data: tags,
         children: Vec::new(),
     };
-    let root = document(
+    let mut root = document(
         collection(RecordType::FontCollection, entity(0, "Base", 0)),
-        Vec::new(),
+        &[],
     );
-    let mut root = root;
     root.children[1] = doc_info_list(prog_tags);
     let mut limits = super::Limits::default();
     limits.records.max_records = 12;
@@ -306,7 +313,7 @@ fn discovers_only_live_environment_and_document_ppt10_owners() {
         RecordType::FontEmbedFlags10Atom.as_u16(),
         &0xffff_ffffu32.to_le_bytes(),
     ));
-    let parsed = FontCollections::parse(&document(base, ppt10)).unwrap();
+    let parsed = FontCollections::parse(&document(base, &ppt10)).unwrap();
     assert_eq!(parsed.get_base(0).unwrap().raw_instance, 12);
     assert_eq!(parsed.get_international(0).unwrap().raw_instance, 44);
     assert_eq!(parsed.embedding_flags.unwrap().raw, u32::MAX);
@@ -444,18 +451,20 @@ fn stale_patch_is_rejected_and_borrowed_source_limit_precedes_copy() {
     let mut left_font = left.fonts().get_base(0).unwrap().clone();
     left_font.name = "Left".into();
     left.replace_font(Scope::Base, 0, left_font).unwrap();
-    let left = left.commit().unwrap();
+    let left_commit = left.commit().unwrap();
 
     let mut right = source.edit().unwrap();
     let mut right_font = right.fonts().get_base(0).unwrap().clone();
     right_font.name = "Right".into();
     right.replace_font(Scope::Base, 0, right_font).unwrap();
-    let right = right.commit().unwrap();
-    assert!(left.patch().apply(right.snapshot()).is_err());
-    assert!(left.patch().undo(right.snapshot()).is_err());
+    let right_commit = right.commit().unwrap();
+    assert!(left_commit.patch().apply(right_commit.snapshot()).is_err());
+    assert!(left_commit.patch().undo(right_commit.snapshot()).is_err());
 
-    let mut limits = PackageLimits::default();
-    limits.max_source_bytes = source.bytes().len() - 1;
+    let limits = PackageLimits {
+        max_source_bytes: source.bytes().len() - 1,
+        ..PackageLimits::default()
+    };
     assert!(Snapshot::parse_with_limits(source.bytes(), limits).is_err());
 }
 
@@ -537,8 +546,10 @@ fn repeated_staging_failure_retains_the_last_committable_candidate() {
 #[test]
 fn changed_publication_is_refused_before_exceeding_the_source_budget() {
     let source = minimal_live_snapshot();
-    let mut limits = PackageLimits::default();
-    limits.max_source_bytes = source.bytes().len();
+    let limits = PackageLimits {
+        max_source_bytes: source.bytes().len(),
+        ..PackageLimits::default()
+    };
     let bounded = Snapshot::from_bytes_with_limits(source.bytes().to_vec(), limits).unwrap();
     let mut transaction = bounded.edit().unwrap();
     let mut font = transaction.fonts().get_base(0).unwrap().clone();
@@ -563,9 +574,9 @@ fn last_facet_removal_clears_subset_state_and_missing_owner_is_unchanged() {
             .remove_facet(Scope::Base, 0, Facet::Plain)
             .unwrap()
     );
-    let font = transaction.fonts().get_base(0).unwrap();
-    assert!(!font.embedded_subset);
-    assert_eq!(font.font_flags & 1, 0);
+    let cleared_font = transaction.fonts().get_base(0).unwrap();
+    assert!(!cleared_font.embedded_subset);
+    assert_eq!(cleared_font.font_flags & 1, 0);
 
     let before = transaction.fonts().clone();
     let changes = transaction.changes().len();
@@ -677,7 +688,7 @@ fn inserts_pp10_font_flags_after_comments_and_before_later_or_opaque_tail() {
         &[],
     ));
     ppt10.extend_from_slice(&record_bytes(0, 0, 0x7abc, &[9, 8, 7]));
-    let mut root = document(base, ppt10);
+    let mut root = document(base, &ppt10);
     let before = FontCollections::parse(&root).unwrap();
     let mut after = before.clone();
     after.embedding_flags = Some(FontEmbeddingFlags::new(true, false));

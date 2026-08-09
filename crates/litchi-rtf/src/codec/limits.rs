@@ -11,6 +11,10 @@ const MEBIBYTE: usize = 1_048_576;
 /// nesting and format integer bounds remain independently hard-limited.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[must_use]
+#[allow(
+    clippy::struct_field_names,
+    reason = "every parse limit is a maximum, so the shared max_ prefix is intentional"
+)]
 pub struct ParseLimits {
     max_source_bytes: usize,
     max_tokens: usize,
@@ -65,41 +69,49 @@ impl ParseLimits {
     }
 
     /// Maximum encoded or uncompressed source bytes accepted before parsing.
+    #[must_use]
     pub const fn max_source_bytes(self) -> usize {
         self.max_source_bytes
     }
 
     /// Maximum number of tokens the lexer may emit.
+    #[must_use]
     pub const fn max_tokens(self) -> usize {
         self.max_tokens
     }
 
     /// Maximum bytes accepted in one `binN` payload.
+    #[must_use]
     pub const fn max_binary_bytes(self) -> usize {
         self.max_binary_bytes
     }
 
     /// Maximum aggregate bytes accepted across all `binN` payloads.
+    #[must_use]
     pub const fn max_total_binary_bytes(self) -> usize {
         self.max_total_binary_bytes
     }
 
     /// Maximum bytes produced by compressed-RTF expansion.
+    #[must_use]
     pub const fn max_decompressed_bytes(self) -> usize {
         self.max_decompressed_bytes
     }
 
     /// Maximum number of unsupported syntax nodes retained per document.
+    #[must_use]
     pub const fn max_opaque_nodes(self) -> usize {
         self.max_opaque_nodes
     }
 
     /// Maximum transport bytes retained by one unsupported syntax node.
+    #[must_use]
     pub const fn max_opaque_node_bytes(self) -> usize {
         self.max_opaque_node_bytes
     }
 
     /// Maximum aggregate transport bytes retained as unsupported syntax.
+    #[must_use]
     pub const fn max_total_opaque_bytes(self) -> usize {
         self.max_total_opaque_bytes
     }

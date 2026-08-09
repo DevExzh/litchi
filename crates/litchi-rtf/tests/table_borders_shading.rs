@@ -1,6 +1,15 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{BorderStyle, RtfDocument, RtfWriter, ShadingPattern};
 
-fn write(document: &RtfDocument) -> String {
+fn write(document: &RtfDocument<'_>) -> String {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -10,7 +19,7 @@ fn write(document: &RtfDocument) -> String {
 
 #[test]
 fn parses_complete_row_and_cell_family_and_writes_canonically() {
-    let source = r#"{\rtf1\trowd\trbrdrt\brdrs\brdrw11\brdrcf1\brsp2\brdrsh\trbrdrl\brdrth\brdrw12\trbrdrb\brdrdashsm\brdrw13\trbrdrr\brdrdashd\brdrw14\trbrdrh\brdrdashdd\brdrw15\trbrdrv\brdrdb\brdrw16\trbgdkcross\trcfpat1\trcbpat2\trshdng3750\clbrdrt\brdrtriple\brdrw17\clbrdrl\brdrtnthsg\brdrw18\clbrdrb\brdrthtnsg\brdrw19\clbrdrr\brdrtnthtnsg\brdrw20\cldglu\brdrwavy\brdrw21\cldgll\brdrwavydb\brdrw22\clbgfdiag\clcfpat2\clcbpat1\clshdng6250\cellx1000\intbl X\cell\row}"#;
+    let source = r"{\rtf1\trowd\trbrdrt\brdrs\brdrw11\brdrcf1\brsp2\brdrsh\trbrdrl\brdrth\brdrw12\trbrdrb\brdrdashsm\brdrw13\trbrdrr\brdrdashd\brdrw14\trbrdrh\brdrdashdd\brdrw15\trbrdrv\brdrdb\brdrw16\trbgdkcross\trcfpat1\trcbpat2\trshdng3750\clbrdrt\brdrtriple\brdrw17\clbrdrl\brdrtnthsg\brdrw18\clbrdrb\brdrthtnsg\brdrw19\clbrdrr\brdrtnthtnsg\brdrw20\cldglu\brdrwavy\brdrw21\cldgll\brdrwavydb\brdrw22\clbgfdiag\clcfpat2\clcbpat1\clshdng6250\cellx1000\intbl X\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     let row = &document.tables()[0].rows()[0];
     assert_eq!(row.borders().top.unwrap().style, BorderStyle::Single);
@@ -47,7 +56,7 @@ fn parses_complete_row_and_cell_family_and_writes_canonically() {
 
 #[test]
 fn restores_groups_resets_trowd_and_snapshots_at_cellx() {
-    let source = r#"{\rtf1\trowd{\trbrdrt\brdrs\brdrw10\trshdng5000\clbrdrt\brdrs\brdrw11\clshdng2500}\trbrdrb\brdrdb\brdrw12\clbrdrl\brdrdot\brdrw13\clcfpat2\cellx1000\clbrdrr\brdrs\brdrw14\clcbpat3\cellx2000\intbl A\cell B\cell\row\trowd\cellx1000\intbl C\cell\row}"#;
+    let source = r"{\rtf1\trowd{\trbrdrt\brdrs\brdrw10\trshdng5000\clbrdrt\brdrs\brdrw11\clshdng2500}\trbrdrb\brdrdb\brdrw12\clbrdrl\brdrdot\brdrw13\clcfpat2\cellx1000\clbrdrr\brdrs\brdrw14\clcbpat3\cellx2000\intbl A\cell B\cell\row\trowd\cellx1000\intbl C\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     let rows = document.tables()[0].rows();
     assert!(rows[0].borders().top.is_none());
@@ -61,14 +70,17 @@ fn restores_groups_resets_trowd_and_snapshots_at_cellx() {
     assert_eq!(rows[0].cells()[0].shading().foreground_color, Some(2));
     assert_eq!(rows[0].cells()[1].borders().right.unwrap().width, 14);
     assert_eq!(rows[0].cells()[1].shading().background_color, Some(3));
-    assert_eq!(*rows[1].borders(), Default::default());
-    assert_eq!(rows[1].shading(), Default::default());
-    assert_eq!(*rows[1].cells()[0].borders(), Default::default());
+    assert_eq!(*rows[1].borders(), litchi_rtf::TableRowBorders::default());
+    assert_eq!(rows[1].shading(), litchi_rtf::TableShading::default());
+    assert_eq!(
+        *rows[1].cells()[0].borders(),
+        litchi_rtf::TableCellBorders::default()
+    );
 }
 
 #[test]
 fn applies_end_defined_nested_decorations_without_outer_leakage() {
-    let source = r#"{\rtf1\trowd\trbrdrt\brdrs\brdrw10\clbrdrt\brdrs\brdrw11\cellx5000\intbl\itap2 Inner\nestcell{\*\nesttableprops\itap2\trowd\trbrdrh\brdrdb\brdrw12\trbghoriz\trshdng1500\cldglu\brdrdot\brdrw13\clbgvert\clshdng2500\cellx1000\nestrow}\intbl\itap1\cell\row}"#;
+    let source = r"{\rtf1\trowd\trbrdrt\brdrs\brdrw10\clbrdrt\brdrs\brdrw11\cellx5000\intbl\itap2 Inner\nestcell{\*\nesttableprops\itap2\trowd\trbrdrh\brdrdb\brdrw12\trbghoriz\trshdng1500\cldglu\brdrdot\brdrw13\clbgvert\clshdng2500\cellx1000\nestrow}\intbl\itap1\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     let outer = &document.tables()[0].rows()[0];
     assert!(outer.borders().horizontal.is_none());
@@ -109,7 +121,7 @@ fn parses_real_libreoffice_row_borders() {
     let row = document
         .tables()
         .iter()
-        .flat_map(|table| table.rows())
+        .flat_map(litchi_rtf::raw::Table::rows)
         .find(|row| row.borders().top.is_some())
         .unwrap();
     assert_eq!(row.borders().top.unwrap().width, 45);
@@ -119,19 +131,19 @@ fn parses_real_libreoffice_row_borders() {
 #[test]
 fn rejects_malformed_parameters_order_duplicates_bounds_and_caps() {
     for source in [
-        r#"{\rtf1\trowd\trbrdrt1\brdrs\cellx1}"#,
-        r#"{\rtf1\trowd\trbrdrt\brdrw10\brdrs\cellx1}"#,
-        r#"{\rtf1\trowd\trbrdrt\brdrs\brdrs\cellx1}"#,
-        r#"{\rtf1\trowd\trbrdrt\brdrs\brdrw76\cellx1}"#,
-        r#"{\rtf1\trowd\trbrdrt\brdrs\brsp31681\cellx1}"#,
-        r#"{\rtf1\trowd\trbrdrt\brdrs\brdrcf-1\cellx1}"#,
-        r#"{\rtf1\trowd\trbrdrt\brdrs\brdrcf65536\cellx1}"#,
-        r#"{\rtf1\trowd\trshdng\cellx1}"#,
-        r#"{\rtf1\trowd\trshdng10001\cellx1}"#,
-        r#"{\rtf1\trowd\trbghoriz1\cellx1}"#,
-        r#"{\rtf1\trowd\trbghoriz\trbgvert\cellx1}"#,
-        r#"{\rtf1\trowd\clcfpat-1\cellx1}"#,
-        r#"{\rtf1\trowd\clcbpat65536\cellx1}"#,
+        r"{\rtf1\trowd\trbrdrt1\brdrs\cellx1}",
+        r"{\rtf1\trowd\trbrdrt\brdrw10\brdrs\cellx1}",
+        r"{\rtf1\trowd\trbrdrt\brdrs\brdrs\cellx1}",
+        r"{\rtf1\trowd\trbrdrt\brdrs\brdrw76\cellx1}",
+        r"{\rtf1\trowd\trbrdrt\brdrs\brsp31681\cellx1}",
+        r"{\rtf1\trowd\trbrdrt\brdrs\brdrcf-1\cellx1}",
+        r"{\rtf1\trowd\trbrdrt\brdrs\brdrcf65536\cellx1}",
+        r"{\rtf1\trowd\trshdng\cellx1}",
+        r"{\rtf1\trowd\trshdng10001\cellx1}",
+        r"{\rtf1\trowd\trbghoriz1\cellx1}",
+        r"{\rtf1\trowd\trbghoriz\trbgvert\cellx1}",
+        r"{\rtf1\trowd\clcfpat-1\cellx1}",
+        r"{\rtf1\trowd\clcbpat65536\cellx1}",
     ] {
         assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
     }

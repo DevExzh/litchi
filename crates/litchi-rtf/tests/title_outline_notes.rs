@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 //! Round-trip tests for `\titlepg`, `\endnhere`, and `\outlinelevelN`.
 
 use litchi_rtf::{RtfDocument, RtfWriter};
@@ -12,7 +21,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn title_page_and_endnote_here_round_trip() {
-    let source = r#"{\rtf1\ansi\titlepg\endnhere Body\par}"#;
+    let source = r"{\rtf1\ansi\titlepg\endnhere Body\par}";
     let document = RtfDocument::parse(source).unwrap();
     let properties = &document.sections()[0].properties;
     assert!(properties.title_page);
@@ -37,7 +46,7 @@ fn title_page_and_endnote_here_round_trip() {
 
 #[test]
 fn outline_level_round_trips() {
-    let source = r#"{\rtf1\ansi\outlinelevel2 Heading\par Body\par}"#;
+    let source = r"{\rtf1\ansi\outlinelevel2 Heading\par Body\par}";
     let document = RtfDocument::parse(source).unwrap();
     let heading = document
         .blocks()

@@ -1,6 +1,6 @@
-//! Contextual chart values used by the PresentationML reader and writer.
+//! Contextual chart values used by the `PresentationML` reader and writer.
 
-/// A supported DrawingML chart family.
+/// A supported `DrawingML` chart family.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Type {
     Bar,
@@ -46,28 +46,32 @@ impl Series {
         }
     }
 
+    #[must_use]
     pub fn with_values(mut self, values: Vec<f64>) -> Self {
         self.values = values;
         self
     }
 
+    #[must_use]
     pub fn with_categories(mut self, categories: Vec<String>) -> Self {
         self.categories = categories;
         self
     }
 
+    #[must_use]
     pub fn with_x_values(mut self, x_values: Vec<f64>) -> Self {
         self.x_values = x_values;
         self
     }
 
+    #[must_use]
     pub fn with_bubble_sizes(mut self, bubble_sizes: Vec<f64>) -> Self {
         self.bubble_sizes = bubble_sizes;
         self
     }
 }
 
-/// Chart data for PresentationML authoring.
+/// Chart data for `PresentationML` authoring.
 #[derive(Debug, Clone)]
 pub struct Chart {
     pub chart_type: Type,
@@ -81,6 +85,7 @@ pub struct Chart {
 }
 
 impl Chart {
+    #[must_use]
     pub fn new(chart_type: Type, x: i64, y: i64, width: i64, height: i64) -> Self {
         Self {
             chart_type,
@@ -94,16 +99,19 @@ impl Chart {
         }
     }
 
+    #[must_use]
     pub fn with_title(mut self, title: impl Into<String>) -> Self {
         self.title = Some(title.into());
         self
     }
 
+    #[must_use]
     pub fn add_series(mut self, series: Series) -> Self {
         self.series.push(series);
         self
     }
 
+    #[must_use]
     pub fn with_legend(mut self, show: bool) -> Self {
         self.show_legend = show;
         self

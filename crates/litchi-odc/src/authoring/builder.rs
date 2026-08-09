@@ -1,6 +1,6 @@
 //! Chart package authoring.
 
-use super::{Definition, serialize_content};
+use super::{ChartClass, Definition, serialize_content};
 use litchi_core::Result;
 use litchi_odf_common::{compact_xml, core::PackageWriter};
 
@@ -14,7 +14,7 @@ impl Builder {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            definition: Definition::new("chart:line"),
+            definition: Definition::new(ChartClass::line()),
         }
     }
 
@@ -63,12 +63,12 @@ impl Default for Builder {
 
 #[cfg(test)]
 mod tests {
-    use super::{Definition, package_content, serialize_content};
+    use super::{ChartClass, Definition, package_content, serialize_content};
     use litchi_core::{Error, xml::CompactnessKind};
 
     #[test]
     fn noncompact_serialized_content_is_rejected_before_publication() {
-        let content = serialize_content(&Definition::new("chart:line")).unwrap();
+        let content = serialize_content(&Definition::new(ChartClass::line())).unwrap();
         let noncompact = content.replacen("><", ">\n<", 1);
         assert!(matches!(
             package_content(noncompact).unwrap_err(),

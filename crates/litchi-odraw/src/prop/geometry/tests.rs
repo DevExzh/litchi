@@ -50,11 +50,16 @@ fn parse_properties<'data>(
     data.clear();
     let mut headers = Vec::new();
     let mut complex_data = Vec::new();
-    if let Some(shape_path) = shape_path {
-        property(&mut headers, Id::ShapePath, false, shape_path as i32);
+    if let Some(shape_path_value) = shape_path {
+        property(
+            &mut headers,
+            Id::ShapePath,
+            false,
+            shape_path_value.cast_signed(),
+        );
     }
-    if let Some(points) = points {
-        let array = points_array(points);
+    if let Some(point_list) = points {
+        let array = points_array(point_list);
         property(
             &mut headers,
             Id::Vertices,
@@ -63,8 +68,8 @@ fn parse_properties<'data>(
         );
         complex_data.extend_from_slice(&array);
     }
-    if let Some(infos) = infos {
-        let array = path_array(infos);
+    if let Some(info_list) = infos {
+        let array = path_array(info_list);
         property(
             &mut headers,
             Id::SegmentInfo,
@@ -75,7 +80,7 @@ fn parse_properties<'data>(
     }
     headers.extend_from_slice(&complex_data);
     data.extend_from_slice(&headers);
-    let count = if shape_path.is_some() { 1 } else { 0 }
+    let count = usize::from(shape_path.is_some())
         + usize::from(points.is_some())
         + usize::from(infos.is_some());
     let record = Record::from_parts(
@@ -117,7 +122,7 @@ fn decodes_custom_vertices_and_path_info_without_copying_payloads() {
     assert_eq!(
         geometry
             .vertices()
-            .map(|point| point.raw())
+            .map(super::model::Point::raw)
             .collect::<Vec<_>>(),
         points
     );
@@ -128,7 +133,7 @@ fn decodes_custom_vertices_and_path_info_without_copying_payloads() {
     assert_eq!(decoded[1].segments(), 2);
     assert_eq!(decoded[3].instruction(), Instruction::Close);
     assert_eq!(decoded[3].raw(), infos[3]);
-    assert_eq!(geometry.raw_segment_info().map(|raw| raw.len()), Some(14));
+    assert_eq!(geometry.raw_segment_info().map(<[u8]>::len), Some(14));
 }
 
 #[test]
@@ -215,14 +220,14 @@ fn rejects_invalid_geometry_array_width_and_point_consumption() {
     ));
 
     let mut invalid_instruction_data = Vec::new();
-    let properties = parse_properties(
+    let invalid_properties = parse_properties(
         &mut invalid_instruction_data,
         Some(4),
         Some(&[(0, 0)]),
         Some(&[2 | (1 << 3)]),
     );
     assert!(matches!(
-        properties.geometry(),
+        invalid_properties.geometry(),
         Err(Error::MalformedGeometry {
             reason: "MSOPATHINFO segment count is invalid for its instruction"
         })

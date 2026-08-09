@@ -1,4 +1,4 @@
-//! OPC graph ownership for ordinary DrawingML chart parts.
+//! OPC graph ownership for ordinary `DrawingML` chart parts.
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::{BlobPart, Part as OpcPart};
@@ -9,7 +9,7 @@ use super::model::Chart;
 use crate::parts::{is_relationship_type, validate_content_type};
 use crate::{Error, Result};
 
-/// Ordinary DrawingML chart content type.
+/// Ordinary `DrawingML` chart content type.
 pub const CONTENT_TYPE: &str = ct::DML_CHART;
 
 /// Borrowed ordinary chart part.
@@ -19,6 +19,10 @@ pub struct Part<'a> {
 
 impl<'a> Part<'a> {
     /// Validate and borrow one chart part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_part(part: &'a dyn OpcPart) -> Result<Self> {
         validate_content_type(part, CONTENT_TYPE)?;
         Ok(Self { part })
@@ -26,18 +30,27 @@ impl<'a> Part<'a> {
 
     /// The underlying OPC part.
     #[inline]
+    #[must_use]
     pub fn part(&self) -> &'a dyn OpcPart {
         self.part
     }
 }
 
 /// Resolve one ordinary chart by package part name.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load<'a>(package: &'a OpcPackage, part_name: &str) -> Result<Part<'a>> {
     let uri = uri(part_name, "chart part")?;
     Part::from_part(package.get_part(&uri)?)
 }
 
 /// Resolve all ordinary charts directly related to a slide or other source part.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn related<'a>(package: &'a OpcPackage, source: &dyn OpcPart) -> Result<Vec<Part<'a>>> {
     let mut charts = Vec::new();
     for relationship in source.rels().iter() {
@@ -56,6 +69,10 @@ pub fn related<'a>(package: &'a OpcPackage, source: &dyn OpcPart) -> Result<Vec<
 }
 
 /// Add a chart part and relationship to an existing source part.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn add(package: &mut OpcPackage, source_name: &str, chart: &Chart) -> Result<String> {
     let source_uri = uri(source_name, "chart source")?;
     let source = package.get_part(&source_uri)?;

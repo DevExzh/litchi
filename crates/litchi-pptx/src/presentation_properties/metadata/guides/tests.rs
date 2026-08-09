@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 
@@ -110,7 +116,7 @@ fn typed_edits_preserve_opaque_extensions_and_update_only_guides() {
     assert!(output.contains("keep-list"));
     assert!(output.contains(r#"id="7"#));
     assert!(output.contains(r#"pos="2400"#));
-    assert!(output.matches(r#"<p15:guide"#).count() == 2);
+    assert_eq!(output.matches(r"<p15:guide").count(), 2);
 
     let parsed = Guides::from_xml(commit.snapshot().source_xml()).expect("committed XML parses");
     assert_eq!(parsed, *commit.snapshot().guides());

@@ -31,6 +31,7 @@ pub struct Speed(pub(in crate::animations) i32);
 
 impl Speed {
     /// Return the encoded OOXML percentage value.
+    #[must_use]
     pub const fn thousandths_percent(self) -> i32 {
         self.0
     }
@@ -42,6 +43,7 @@ pub struct MotionFraction(pub(in crate::animations) u32);
 
 impl MotionFraction {
     /// Return the encoded OOXML percentage value.
+    #[must_use]
     pub const fn thousandths_percent(self) -> u32 {
         self.0
     }
@@ -52,7 +54,7 @@ impl MotionFraction {
 pub enum SyncBehavior {
     CanSlip,
     Locked,
-    /// PowerPoint's assumed synchronization behavior.
+    /// `PowerPoint`'s assumed synchronization behavior.
     None,
 }
 
@@ -65,11 +67,13 @@ pub struct NormalizedTime {
 
 impl NormalizedTime {
     /// Exact numerator of the normalized decimal value.
+    #[must_use]
     pub const fn numerator(self) -> u64 {
         self.numerator
     }
 
     /// Exact power-of-ten scale of the normalized decimal value.
+    #[must_use]
     pub const fn scale(self) -> u64 {
         self.scale
     }
@@ -83,6 +87,7 @@ pub struct TimePoint {
 }
 
 impl TimePoint {
+    #[must_use]
     pub const fn new(local_time: NormalizedTime, warped_time: NormalizedTime) -> Self {
         Self {
             local_time,
@@ -108,11 +113,13 @@ pub enum Duration {
 
 impl Duration {
     /// Construct a finite duration in milliseconds.
+    #[must_use]
     pub const fn milliseconds(value: u32) -> Self {
         Self::Finite(value)
     }
 
     /// Return the finite millisecond value, or `None` for an indefinite duration.
+    #[must_use]
     pub const fn as_milliseconds(self) -> Option<u32> {
         match self {
             Self::Finite(value) => Some(value),

@@ -89,6 +89,9 @@ pub struct DocumentView {
 
 impl DocumentView {
     /// Validate percentage resource bounds.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if self
             .scale_percent
@@ -101,6 +104,7 @@ impl DocumentView {
         Ok(())
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.kind.is_none()
             && self.scale_percent.is_none()

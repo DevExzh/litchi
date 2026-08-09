@@ -1,13 +1,17 @@
 /// Placeholder shape implementation.
 ///
 /// Placeholders are special shapes that define the layout and structure
-/// of PowerPoint slides. They represent positions where content like titles,
+/// of `PowerPoint` slides. They represent positions where content like titles,
 /// text, charts, or media should be placed.
 use super::shape::{Shape, ShapeContainer, ShapeProperties};
 use crate::odraw::ShapeExt as _;
 
 /// Placeholder size options (quarter, half, full).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`PlaceholderSize` is the established public API name; renaming it would break downstream crates"
+)]
 pub enum PlaceholderSize {
     /// Quarter size placeholder
     Quarter,
@@ -27,8 +31,12 @@ impl From<crate::AtomPlaceholderSize> for PlaceholderSize {
     }
 }
 
-/// Types of placeholders in PowerPoint presentations.
+/// Types of placeholders in `PowerPoint` presentations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`PlaceholderType` is the established public API name; renaming it would break downstream crates"
+)]
 pub enum PlaceholderType {
     /// No placeholder shape
     None,
@@ -169,12 +177,12 @@ impl std::fmt::Display for PlaceholderType {
             PlaceholderType::DateAndTime => write!(f, "DateAndTime"),
             PlaceholderType::VerticalObject => write!(f, "VerticalObject"),
             PlaceholderType::Copyright => write!(f, "Copyright"),
-            PlaceholderType::Custom(id) => write!(f, "Custom({})", id),
+            PlaceholderType::Custom(id) => write!(f, "Custom({id})"),
         }
     }
 }
 
-/// A placeholder shape in a PowerPoint presentation.
+/// A placeholder shape in a `PowerPoint` presentation.
 ///
 /// Uses lifetime parameter `'a` to enable zero-copy parsing when the shape
 /// data can be borrowed from a larger buffer.
@@ -183,7 +191,7 @@ pub struct Placeholder<'a> {
     /// Shape container with properties and data
     container: ShapeContainer<'a>,
     /// The type of placeholder
-    placeholder_type: PlaceholderType,
+    kind: PlaceholderType,
     /// Placeholder size (index in the layout)
     size: Option<u8>,
     /// Placeholder index within the slide
@@ -194,10 +202,11 @@ pub struct Placeholder<'a> {
 
 impl<'a> Placeholder<'a> {
     /// Create a new placeholder shape with owned data.
+    #[must_use]
     pub fn new(properties: ShapeProperties, raw_data: Vec<u8>) -> Self {
         Self {
             container: ShapeContainer::new(properties, raw_data),
-            placeholder_type: PlaceholderType::Body, // Default
+            kind: PlaceholderType::Body, // Default
             size: None,
             index: None,
             raw_placeholder_data: None,
@@ -215,7 +224,7 @@ impl<'a> Placeholder<'a> {
         container.text_content = text;
         Self {
             container,
-            placeholder_type,
+            kind: placeholder_type,
             size: Some(match size {
                 PlaceholderSize::Quarter => 2,
                 PlaceholderSize::Half => 1,
@@ -228,8 +237,12 @@ impl<'a> Placeholder<'a> {
 
     /// Create a placeholder from an existing container.
     ///
-    /// Based on POI's HSLFPlaceholder which extracts placeholder info from
-    /// the shape's client data records (OEPlaceholderAtom).
+    /// Based on POI's `HSLFPlaceholder` which extracts placeholder info from
+    /// the shape's client data records (`OEPlaceholderAtom`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn from_container(container: ShapeContainer<'a>) -> super::super::package::Result<Self> {
         let (placeholder_type, size, index) = if container.raw_data.is_empty() {
             (PlaceholderType::Body, None, None)
@@ -257,7 +270,7 @@ impl<'a> Placeholder<'a> {
 
         Ok(Self {
             container,
-            placeholder_type,
+            kind: placeholder_type,
             size,
             index,
             raw_placeholder_data: None,
@@ -265,32 +278,43 @@ impl<'a> Placeholder<'a> {
     }
 
     /// Get the raw placeholder data for advanced parsing.
+    #[must_use]
     pub fn raw_placeholder_data(&self) -> Option<&[u8]> {
         self.raw_placeholder_data.as_deref()
     }
 
     /// Get the placeholder type.
+    #[must_use]
     pub fn placeholder_type(&self) -> PlaceholderType {
-        self.placeholder_type
+        self.kind
     }
 
     /// Set the placeholder type.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_placeholder_type(
         &mut self,
         placeholder_type: PlaceholderType,
     ) -> Result<(), super::shape::MutationError> {
         self.container
             .ensure_mutable(super::shape::Mutation::Placeholder)?;
-        self.placeholder_type = placeholder_type;
+        self.kind = placeholder_type;
         Ok(())
     }
 
     /// Get the placeholder size (layout index).
+    #[must_use]
     pub fn size(&self) -> Option<u8> {
         self.size
     }
 
     /// Set the placeholder size.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_size(&mut self, size: u8) -> Result<(), super::shape::MutationError> {
         self.container
             .ensure_mutable(super::shape::Mutation::Placeholder)?;
@@ -299,11 +323,16 @@ impl<'a> Placeholder<'a> {
     }
 
     /// Get the placeholder index within the slide.
+    #[must_use]
     pub fn index(&self) -> Option<u16> {
         self.index
     }
 
     /// Set the placeholder index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_index(&mut self, index: u16) -> Result<(), super::shape::MutationError> {
         self.container
             .ensure_mutable(super::shape::Mutation::Placeholder)?;
@@ -312,25 +341,25 @@ impl<'a> Placeholder<'a> {
     }
 
     /// Check if this is a title placeholder.
+    #[must_use]
     pub fn is_title(&self) -> bool {
         matches!(
-            self.placeholder_type,
+            self.kind,
             PlaceholderType::Title | PlaceholderType::CenterTitle | PlaceholderType::SubTitle
         )
     }
 
     /// Check if this is a content/body placeholder.
+    #[must_use]
     pub fn is_content(&self) -> bool {
-        matches!(
-            self.placeholder_type,
-            PlaceholderType::Body | PlaceholderType::Content
-        )
+        matches!(self.kind, PlaceholderType::Body | PlaceholderType::Content)
     }
 
     /// Check if this is a media placeholder (picture, chart, etc.).
+    #[must_use]
     pub fn is_media(&self) -> bool {
         matches!(
-            self.placeholder_type,
+            self.kind,
             PlaceholderType::Picture
                 | PlaceholderType::Chart
                 | PlaceholderType::Table
@@ -344,6 +373,7 @@ impl<'a> Placeholder<'a> {
     }
 
     /// Get the placeholder size (quarter, half, full).
+    #[must_use]
     pub fn placeholder_size(&self) -> PlaceholderSize {
         match self.size {
             Some(2) => PlaceholderSize::Quarter,
@@ -353,6 +383,10 @@ impl<'a> Placeholder<'a> {
     }
 
     /// Set the placeholder size.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_placeholder_size(
         &mut self,
         size: PlaceholderSize,
@@ -405,12 +439,20 @@ where
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::super::shape::ShapeType;
     use super::*;
 
     #[test]
-    #[allow(clippy::field_reassign_with_default)]
+    #[allow(
+        clippy::field_reassign_with_default,
+        reason = "the test builds a `ShapeProperties` fixture by mutating the default value"
+    )]
     fn test_placeholder_creation() {
         let mut props = ShapeProperties::default();
         props.id = 2001;
@@ -429,7 +471,10 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::field_reassign_with_default)]
+    #[allow(
+        clippy::field_reassign_with_default,
+        reason = "the test builds a `ShapeProperties` fixture by mutating the default value"
+    )]
     fn test_placeholder_type_operations() {
         let mut props = ShapeProperties::default();
         props.shape_type = ShapeType::Placeholder;
@@ -451,7 +496,10 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::field_reassign_with_default)]
+    #[allow(
+        clippy::field_reassign_with_default,
+        reason = "the test builds a `ShapeProperties` fixture by mutating the default value"
+    )]
     fn test_placeholder_media_check() {
         let mut props = ShapeProperties::default();
         props.shape_type = ShapeType::Placeholder;

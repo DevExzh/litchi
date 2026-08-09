@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{IndexPageReference, NavigationEntry, RtfDocument, RtfWriter};
 
 #[test]
@@ -71,19 +80,19 @@ fn round_trips_unicode_safe_text_positions_and_coexisting_markup() {
 #[test]
 fn rejects_conflicts_active_content_invalid_parameters_and_bad_structure() {
     for source in [
-        r#"{\rtf1{\xe}}"#,
-        r#"{\rtf1{\xe\xef no-param}}"#,
-        r#"{\rtf1{\xe\xef64 bad}}"#,
-        r#"{\rtf1{\xe x{\txe one}{\rxe two}}}"#,
-        r#"{\rtf1{\xe x{\txe}}}"#,
-        r#"{\rtf1{\xe x\yxe}}"#,
-        r#"{\rtf1{\xe x{\*\pxe y}}}"#,
-        r#"{\rtf1{\xe x{\field danger}}}"#,
-        r#"{\rtf1{\xe x{\object danger}}}"#,
+        r"{\rtf1{\xe}}",
+        r"{\rtf1{\xe\xef no-param}}",
+        r"{\rtf1{\xe\xef64 bad}}",
+        r"{\rtf1{\xe x{\txe one}{\rxe two}}}",
+        r"{\rtf1{\xe x{\txe}}}",
+        r"{\rtf1{\xe x\yxe}}",
+        r"{\rtf1{\xe x{\*\pxe y}}}",
+        r"{\rtf1{\xe x{\field danger}}}",
+        r"{\rtf1{\xe x{\object danger}}}",
         "{\\rtf1{\\xe x\\bin4 abcd}}",
-        r#"{\rtf1{\tc\tcf64 bad}}"#,
-        r#"{\rtf1{\tc\tcl10 bad}}"#,
-        r#"{\rtf1{\tc\tcl2\tcl3 bad}}"#,
+        r"{\rtf1{\tc\tcf64 bad}}",
+        r"{\rtf1{\tc\tcl10 bad}}",
+        r"{\rtf1{\tc\tcl2\tcl3 bad}}",
     ] {
         assert!(RtfDocument::parse(source).is_err(), "{source}");
     }
@@ -92,7 +101,7 @@ fn rejects_conflicts_active_content_invalid_parameters_and_bad_structure() {
 #[test]
 fn never_evaluates_generated_navigation_fields_or_bookmark_ranges() {
     let document = RtfDocument::parse(
-        r#"{\rtf1{\xe\v term{\rxe file:///never-opened}}{\field{\*\fldinst INDEX}{\fldrslt stale}}Body}"#,
+        r"{\rtf1{\xe\v term{\rxe file:///never-opened}}{\field{\*\fldinst INDEX}{\fldrslt stale}}Body}",
     )
     .unwrap();
     assert_eq!(document.text(), "Body");

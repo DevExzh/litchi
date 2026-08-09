@@ -5,12 +5,12 @@
 //! value views, property-table records, and shape geometry are independent
 //! semantic groups.
 
-pub(super) use super::{IS_BLIP, IS_COMPLEX, PROPERTY_ID_MASK};
-
 mod geometry;
 mod identifiers;
 mod property;
 mod values;
+
+pub(super) use super::{IS_BLIP, IS_COMPLEX, PROPERTY_ID_MASK};
 
 pub use geometry::Anchor;
 pub use identifiers::{Id, UnknownId};

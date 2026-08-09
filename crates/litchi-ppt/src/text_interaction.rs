@@ -10,6 +10,10 @@ use super::records::Record;
 use crate::consts::RecordType;
 
 /// Resource limits for text-range interaction parsing and authoring.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`TextInteractionLimits` is the established public API name; renaming it would break downstream crates"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TextInteractionLimits {
     /// Limits for each paired `InteractiveInfo` record.
@@ -59,6 +63,7 @@ impl TextType {
     }
 
     /// Numeric value used by the binary record.
+    #[must_use]
     pub const fn value(self) -> u32 {
         match self {
             Self::Title => 0,
@@ -85,6 +90,10 @@ pub struct TextRange {
 
 impl TextRange {
     /// Construct a representable, non-empty range.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(begin: u32, end: u32) -> Result<Self> {
         let value = Self { begin, end };
         value.validate_shape()?;
@@ -92,24 +101,32 @@ impl TextRange {
     }
 
     /// Number of UTF-16 code units covered by this range.
+    #[must_use]
     pub const fn len(self) -> u32 {
         self.end - self.begin
     }
 
+    #[must_use]
     pub const fn begin(self) -> u32 {
         self.begin
     }
 
+    #[must_use]
     pub const fn end(self) -> u32 {
         self.end
     }
 
     /// Text ranges are always non-empty.
+    #[must_use]
     pub const fn is_empty(self) -> bool {
         false
     }
 
     /// Validate this range against serialized text and its final paragraph mark.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn validate_for_text(self, serialized_text_units: u32) -> Result<()> {
         self.validate_shape()?;
         let logical_text_units = serialized_text_units.saturating_add(1);
@@ -142,12 +159,20 @@ pub struct TextInteraction {
 
 impl TextInteraction {
     /// Construct and validate a range/action pair without a text-length bound.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(range: TextRange, interaction: Interaction) -> Result<Self> {
         range.validate_shape()?;
         Ok(Self { range, interaction })
     }
 
     /// Validate the complete pair against resource and corresponding-text bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn validate_for_text(&self, text_units: u32, limits: TextInteractionLimits) -> Result<()> {
         if text_units > limits.max_text_units {
             return corrupted("Corresponding text exceeds the configured interaction limit");
@@ -158,6 +183,10 @@ impl TextInteraction {
     }
 
     /// Serialize the canonical `InteractiveInfo` and matching range atom.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the underlying writer reports an error.
     pub fn to_bytes_for_text(
         &self,
         text_units: u32,
@@ -186,11 +215,11 @@ impl TextInteraction {
         if text_units > limits.max_text_units {
             return corrupted("Corresponding text exceeds the configured interaction limit");
         }
-        let mut records = records.into_iter().peekable();
+        let mut record_iter = records.into_iter().peekable();
         let mut result = Vec::new();
         let mut interaction_section = false;
         let mut terminal_text_records = false;
-        while let Some(record) = records.next() {
+        while let Some(record) = record_iter.next() {
             if record.record_type == RecordType::TextInteractiveInfoAtom {
                 return corrupted("TextInteractiveInfoAtom has no preceding InteractiveInfo");
             }
@@ -221,7 +250,7 @@ impl TextInteraction {
                 return corrupted("Text body exceeds the configured interaction count");
             }
             let interaction = Interaction::parse_with_limits(record, limits.interaction)?;
-            let anchor = records.next().ok_or_else(|| {
+            let anchor = record_iter.next().ok_or_else(|| {
                 Error::Corrupted(
                     "Text InteractiveInfo has no following TextInteractiveInfoAtom".to_string(),
                 )
@@ -245,7 +274,7 @@ pub struct TextBodyInteractions {
     pub metachars: Vec<crate::text_metachar::TextMetachar>,
 }
 
-/// Text interactions attached to one OfficeArt shape.
+/// Text interactions attached to one `OfficeArt` shape.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShapeTextInteractionEntry {
     pub shape_id: u32,
@@ -277,7 +306,12 @@ pub(crate) fn parse_text_bodies(
         {
             return corrupted("TextHeaderAtom has an invalid header or length");
         }
-        let text_type = TextType::parse(u32::from_le_bytes(header.data[..4].try_into().unwrap()))?;
+        let text_type = TextType::parse(u32::from_le_bytes([
+            header.data[0],
+            header.data[1],
+            header.data[2],
+            header.data[3],
+        ]))?;
         let end = records[offset + 1..]
             .iter()
             .position(|record| record.record_type == RecordType::TextHeaderAtom)
@@ -313,6 +347,10 @@ pub(crate) fn text_units_from_records<'a>(
 ) -> Result<u32> {
     let mut text_units = None;
     for record in records {
+        #[allow(
+            clippy::wildcard_enum_match_arm,
+            reason = "`RecordType` mirrors the full MS-PPT record-type enumeration; records that are not character atoms are skipped"
+        )]
         let units = match record.record_type {
             RecordType::TextCharsAtom => {
                 if record.version != 0
@@ -323,7 +361,7 @@ pub(crate) fn text_units_from_records<'a>(
                     return corrupted("TextCharsAtom has an invalid header or UTF-16 length");
                 }
                 u32::try_from(record.data.len() / 2)
-                    .map_err(|_| Error::Corrupted("TextCharsAtom is too large".to_string()))?
+                    .map_err(|_err| Error::Corrupted("TextCharsAtom is too large".to_string()))?
             },
             RecordType::TextBytesAtom => {
                 if record.version != 0
@@ -333,7 +371,7 @@ pub(crate) fn text_units_from_records<'a>(
                     return corrupted("TextBytesAtom has an invalid header or length");
                 }
                 u32::try_from(record.data.len())
-                    .map_err(|_| Error::Corrupted("TextBytesAtom is too large".to_string()))?
+                    .map_err(|_err| Error::Corrupted("TextBytesAtom is too large".to_string()))?
             },
             _ => continue,
         };
@@ -347,6 +385,10 @@ pub(crate) fn text_units_from_records<'a>(
 fn exact_text_from_records<'a>(records: impl IntoIterator<Item = &'a Record>) -> Result<String> {
     let mut text = None;
     for record in records {
+        #[allow(
+            clippy::wildcard_enum_match_arm,
+            reason = "`RecordType` mirrors the full MS-PPT record-type enumeration; records that are not character atoms are skipped"
+        )]
         let value = match record.record_type {
             RecordType::TextCharsAtom => {
                 if record.data.len() % 2 != 0 {
@@ -357,7 +399,7 @@ fn exact_text_from_records<'a>(records: impl IntoIterator<Item = &'a Record>) ->
                     .chunks_exact(2)
                     .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
                     .collect::<Vec<_>>();
-                String::from_utf16(&units).map_err(|_| {
+                String::from_utf16(&units).map_err(|_err| {
                     Error::Corrupted("TextCharsAtom contains invalid UTF-16".to_string())
                 })?
             },
@@ -387,12 +429,22 @@ fn parse_anchor(
             "TextInteractiveInfoAtom has an invalid header, trigger instance, or length",
         );
     }
-    let begin = i32::from_le_bytes(record.data[0..4].try_into().unwrap());
-    let end = i32::from_le_bytes(record.data[4..8].try_into().unwrap());
-    let begin = u32::try_from(begin)
-        .map_err(|_| Error::Corrupted("Text interaction begin position is negative".into()))?;
-    let end = u32::try_from(end)
-        .map_err(|_| Error::Corrupted("Text interaction end position is negative".into()))?;
+    let begin_raw = i32::from_le_bytes([
+        record.data[0],
+        record.data[1],
+        record.data[2],
+        record.data[3],
+    ]);
+    let end_raw = i32::from_le_bytes([
+        record.data[4],
+        record.data[5],
+        record.data[6],
+        record.data[7],
+    ]);
+    let begin = u32::try_from(begin_raw)
+        .map_err(|_err| Error::Corrupted("Text interaction begin position is negative".into()))?;
+    let end = u32::try_from(end_raw)
+        .map_err(|_err| Error::Corrupted("Text interaction end position is negative".into()))?;
     let range = TextRange::new(begin, end)?;
     range.validate_for_text(text_units)?;
     Ok(range)
@@ -410,6 +462,11 @@ fn corrupted<T>(message: impl Into<String>) -> Result<T> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use crate::{InteractionAction, InteractionLinkTarget};
@@ -466,19 +523,34 @@ mod tests {
             &[1, 0, 0, 0, 3, 0, 0, 0],
         );
         assert!(
-            TextInteraction::parse_records([&action, &hover_anchor], 3, Default::default())
+            TextInteraction::parse_records(
+                [&action, &hover_anchor],
+                3,
+                TextInteractionLimits::default()
+            )
+            .is_err()
+        );
+        assert!(
+            TextInteraction::parse_records([&hover_anchor], 3, TextInteractionLimits::default())
                 .is_err()
         );
-        assert!(TextInteraction::parse_records([&hover_anchor], 3, Default::default()).is_err());
-        assert!(click.validate_for_text(2, Default::default()).is_ok());
-        assert!(click.validate_for_text(1, Default::default()).is_err());
+        assert!(
+            click
+                .validate_for_text(2, TextInteractionLimits::default())
+                .is_ok()
+        );
+        assert!(
+            click
+                .validate_for_text(1, TextInteractionLimits::default())
+                .is_err()
+        );
         assert!(
             click
                 .validate_for_text(
                     3,
                     TextInteractionLimits {
                         max_text_units: 2,
-                        ..Default::default()
+                        ..TextInteractionLimits::default()
                     }
                 )
                 .is_err()
@@ -497,7 +569,7 @@ mod tests {
                 3,
                 TextInteractionLimits {
                     max_interactions: 0,
-                    ..Default::default()
+                    ..TextInteractionLimits::default()
                 }
             )
             .is_err()
@@ -511,19 +583,27 @@ mod tests {
         );
         let style = record(0, 0, RecordType::StyleTextPropAtom, &[]);
         assert!(
-            TextInteraction::parse_records([&action, &click_anchor, &style], 3, Default::default())
-                .is_err()
+            TextInteraction::parse_records(
+                [&action, &click_anchor, &style],
+                3,
+                TextInteractionLimits::default()
+            )
+            .is_err()
         );
         let ruler = record(0, 0, RecordType::TextRulerAtom, &[]);
         assert!(
-            TextInteraction::parse_records([&action, &click_anchor, &ruler], 3, Default::default())
-                .is_ok()
+            TextInteraction::parse_records(
+                [&action, &click_anchor, &ruler],
+                3,
+                TextInteractionLimits::default()
+            )
+            .is_ok()
         );
         assert!(
             TextInteraction::parse_records(
                 [&action, &click_anchor, &ruler, &action, &click_anchor],
                 3,
-                Default::default()
+                TextInteractionLimits::default()
             )
             .is_err()
         );
@@ -544,11 +624,13 @@ mod tests {
             &[b'A', 0, 0x3D, 0xD8, 0x00, 0xDE],
         );
         let pair = pair(InteractionTrigger::Click, TextRange::new(1, 3).unwrap());
-        let pair_bytes = pair.to_bytes_for_text(3, Default::default()).unwrap();
+        let pair_bytes = pair
+            .to_bytes_for_text(3, TextInteractionLimits::default())
+            .unwrap();
         let pair_records = Record::parse_sequence_strict(&pair_bytes, "text interaction").unwrap();
         let records = [&header, &text, &pair_records[0], &pair_records[1]];
 
-        let parsed = parse_text_bodies(&records, Default::default()).unwrap();
+        let parsed = parse_text_bodies(&records, TextInteractionLimits::default()).unwrap();
         assert_eq!(parsed.len(), 1);
         assert_eq!(parsed[0].text_header_instance, 2);
         assert_eq!(parsed[0].text_type, TextType::Body);

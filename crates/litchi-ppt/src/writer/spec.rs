@@ -3,6 +3,11 @@
 //! Reference: [MS-PPT] PowerPoint 97-2003 Binary File Format (.ppt)
 //! <https://docs.microsoft.com/en-us/openspecs/office_file_formats/ms-ppt>
 
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items are deliberately grouped by MS-PPT specification section rather than by item kind"
+)]
+
 // =============================================================================
 // Slide Layout Types (MS-PPT 2.13.25 SlideLayoutType)
 // =============================================================================
@@ -11,33 +16,33 @@
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SlideLayoutType {
-    /// SL_TitleSlide - Title slide layout
+    /// `SL_TitleSlide` - Title slide layout
     TitleSlide = 0x0000,
-    /// SL_TitleBody - Title and body layout (used by MainMaster)
+    /// `SL_TitleBody` - Title and body layout (used by `MainMaster`)
     TitleBody = 0x0001,
-    /// SL_MasterTitle - Master title layout
+    /// `SL_MasterTitle` - Master title layout
     MasterTitle = 0x0002,
-    /// SL_TitleOnly - Title only layout
+    /// `SL_TitleOnly` - Title only layout
     TitleOnly = 0x0007,
-    /// SL_TwoColumns - Two column layout
+    /// `SL_TwoColumns` - Two column layout
     TwoColumns = 0x0008,
-    /// SL_TwoRows - Two row layout
+    /// `SL_TwoRows` - Two row layout
     TwoRows = 0x0009,
-    /// SL_ColumnTwoRows - Column with two rows
+    /// `SL_ColumnTwoRows` - Column with two rows
     ColumnTwoRows = 0x000A,
-    /// SL_TwoRowsColumn - Two rows with column
+    /// `SL_TwoRowsColumn` - Two rows with column
     TwoRowsColumn = 0x000B,
-    /// SL_TwoColumnsRow - Two columns with row
+    /// `SL_TwoColumnsRow` - Two columns with row
     TwoColumnsRow = 0x000C,
-    /// SL_Blank - Blank slide layout
+    /// `SL_Blank` - Blank slide layout
     Blank = 0x000D,
-    /// SL_FourObjects - Four objects layout
+    /// `SL_FourObjects` - Four objects layout
     FourObjects = 0x000E,
-    /// SL_BigObject - Big object layout
+    /// `SL_BigObject` - Big object layout
     BigObject = 0x000F,
-    /// SL_VerticalTitleBody - Vertical title and body
+    /// `SL_VerticalTitleBody` - Vertical title and body
     VerticalTitleBody = 0x0010,
-    /// SL_VerticalTwoRows - Vertical two rows
+    /// `SL_VerticalTwoRows` - Vertical two rows
     VerticalTwoRows = 0x0011,
 }
 
@@ -49,27 +54,27 @@ pub enum SlideLayoutType {
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PlaceholderType {
-    /// PT_None - No placeholder
+    /// `PT_None` - No placeholder
     None = 0x00,
-    /// PT_MasterTitle - Master title placeholder
+    /// `PT_MasterTitle` - Master title placeholder
     MasterTitle = 0x01,
-    /// PT_MasterBody - Master body placeholder
+    /// `PT_MasterBody` - Master body placeholder
     MasterBody = 0x02,
-    /// PT_MasterCenterTitle - Master center title
+    /// `PT_MasterCenterTitle` - Master center title
     MasterCenterTitle = 0x03,
-    /// PT_MasterSubTitle - Master subtitle
+    /// `PT_MasterSubTitle` - Master subtitle
     MasterSubTitle = 0x04,
-    /// PT_MasterNotesSlideImage - Notes slide image
+    /// `PT_MasterNotesSlideImage` - Notes slide image
     MasterNotesSlideImage = 0x05,
-    /// PT_MasterNotesBody - Notes body
+    /// `PT_MasterNotesBody` - Notes body
     MasterNotesBody = 0x06,
-    /// PT_MasterDate - Date placeholder
+    /// `PT_MasterDate` - Date placeholder
     MasterDate = 0x07,
-    /// PT_MasterSlideNumber - Slide number placeholder
+    /// `PT_MasterSlideNumber` - Slide number placeholder
     MasterSlideNumber = 0x08,
-    /// PT_MasterFooter - Footer placeholder
+    /// `PT_MasterFooter` - Footer placeholder
     MasterFooter = 0x09,
-    /// PT_MasterHeader - Header placeholder
+    /// `PT_MasterHeader` - Header placeholder
     MasterHeader = 0x0A,
 }
 
@@ -77,7 +82,7 @@ pub enum PlaceholderType {
 // Slide Flags (MS-PPT 2.4.7 SlideAtom)
 // =============================================================================
 
-/// Slide flags from SlideAtom (MS-PPT 2.4.7)
+/// Slide flags from `SlideAtom` (MS-PPT 2.4.7)
 pub mod slide_flags {
     /// fMasterObjects - Follow master objects
     pub const MASTER_OBJECTS: u16 = 0x0001;
@@ -120,17 +125,18 @@ pub struct ColorScheme {
 impl ColorScheme {
     /// POI's default color scheme for slides
     pub const POI_DEFAULT: Self = Self {
-        background: 0x00FFFFFF,
-        text_and_lines: 0x00000000,
-        shadow: 0x00808080,
-        title_text: 0x00000000,
-        fill: 0x00996630,
-        accent: 0x00CC9963,
-        accent_and_hyperlink: 0x00FFCC66,
-        accent_and_followed_hyperlink: 0x00B256AE,
+        background: 0x00FF_FFFF,
+        text_and_lines: 0x0000_0000,
+        shadow: 0x0080_8080,
+        title_text: 0x0000_0000,
+        fill: 0x0099_6630,
+        accent: 0x00CC_9963,
+        accent_and_hyperlink: 0x00FF_CC66,
+        accent_and_followed_hyperlink: 0x00B2_56AE,
     };
 
     /// Convert to 32-byte array for writing
+    #[must_use]
     pub fn to_bytes(&self) -> [u8; 32] {
         let mut data = [0u8; 32];
         data[0..4].copy_from_slice(&self.background.to_le_bytes());
@@ -149,7 +155,7 @@ impl ColorScheme {
 // PPT10 Binary Tag (PowerPoint 2002+ features)
 // =============================================================================
 
-/// PPT10 tag string - marks PowerPoint 2002 (XP) and later features
+/// PPT10 tag string - marks `PowerPoint` 2002 (XP) and later features
 pub struct Tag10;
 
 impl Tag10 {
@@ -157,6 +163,7 @@ impl Tag10 {
     pub const TAG_STRING: &'static str = "___PPT10";
 
     /// Convert to UTF-16LE bytes for writing
+    #[must_use]
     pub fn to_bytes() -> [u8; 16] {
         let mut data = [0u8; 16];
         for (i, ch) in Self::TAG_STRING.encode_utf16().enumerate() {
@@ -168,14 +175,14 @@ impl Tag10 {
     }
 }
 
-/// PP10SlideBinaryTagExtension - Binary tag data structure (MS-PPT 2.4.22.4)
+/// `PP10SlideBinaryTagExtension` - Binary tag data structure (MS-PPT 2.4.22.4)
 ///
-/// Contains extended data for PowerPoint 2002+ features.
+/// Contains extended data for `PowerPoint` 2002+ features.
 #[derive(Debug, Clone, Copy)]
 pub struct BinaryTagData {
     /// Reserved/padding field
     pub reserved: u16,
-    /// Tag type identifier (0x2EEB for MainMaster, 0x040D for Slide/DocInfo)
+    /// Tag type identifier (0x2EEB for `MainMaster`, 0x040D for Slide/DocInfo)
     pub tag_type: u16,
     /// Length of the following data (typically 8)
     pub data_length: u32,
@@ -186,12 +193,12 @@ pub struct BinaryTagData {
 }
 
 impl BinaryTagData {
-    /// Tag type for MainMaster ProgTags
+    /// Tag type for `MainMaster` `ProgTags`
     pub const TAG_TYPE_MAIN_MASTER: u16 = 0x2EEB;
-    /// Tag type for Slide/DocInfo ProgTags
+    /// Tag type for Slide/DocInfo `ProgTags`
     pub const TAG_TYPE_SLIDE: u16 = 0x040D;
 
-    /// MainMaster binary tag data (contains GUID-like timestamp)
+    /// `MainMaster` binary tag data (contains GUID-like timestamp)
     pub const MAIN_MASTER: Self = Self {
         reserved: 0,
         tag_type: Self::TAG_TYPE_MAIN_MASTER,
@@ -209,7 +216,7 @@ impl BinaryTagData {
         data_word2: 0,
     };
 
-    /// DocInfo binary tag data (contains zoom factor)
+    /// `DocInfo` binary tag data (contains zoom factor)
     pub const DOCINFO: Self = Self {
         reserved: 0,
         tag_type: Self::TAG_TYPE_SLIDE,
@@ -218,6 +225,7 @@ impl BinaryTagData {
         data_word2: 0x0000_C000,
     };
 
+    #[must_use]
     pub fn to_bytes(&self) -> [u8; 16] {
         let mut data = [0u8; 16];
         data[0..2].copy_from_slice(&self.reserved.to_le_bytes());
@@ -233,9 +241,9 @@ impl BinaryTagData {
 // UserEditAtom constants (MS-PPT 2.4.16)
 // =============================================================================
 
-/// PPT version field for UserEditAtom
+/// PPT version field for `UserEditAtom`
 /// This opaque value is from POI's empty.ppt
-pub const PPT_VERSION: u32 = 0x0300106D;
+pub const PPT_VERSION: u32 = 0x0300_106D;
 
 /// Default lastViewedSlideID (256 = first slide)
 pub const DEFAULT_LAST_VIEWED_SLIDE_ID: u32 = 256;
@@ -274,8 +282,8 @@ pub mod escher_prop {
 
 /// Escher scheme color values (MS-ODRAW 2.2.2)
 pub mod escher_color {
-    /// Use scheme color - ORed with color index
-    pub const USE_SCHEME: u32 = 0x08000000;
+    /// Use scheme color - `ORed` with color index
+    pub const USE_SCHEME: u32 = 0x0800_0000;
     /// Scheme color index: fill
     pub const SCHEME_FILL: u32 = 0x04;
     /// Scheme color index: line
@@ -292,17 +300,17 @@ pub mod escher_color {
 
 /// Escher record types from MS-ODRAW specification
 pub mod escher_type {
-    /// DggContainer - Drawing group container
+    /// `DggContainer` - Drawing group container
     pub const DGG_CONTAINER: u16 = 0xF000;
     /// Dgg - Drawing group data
     pub const DGG: u16 = 0xF006;
-    /// DgContainer - Drawing container
+    /// `DgContainer` - Drawing container
     pub const DG_CONTAINER: u16 = 0xF002;
     /// Dg - Drawing data
     pub const DG: u16 = 0xF008;
-    /// SpgrContainer - Shape group container
+    /// `SpgrContainer` - Shape group container
     pub const SPGR_CONTAINER: u16 = 0xF003;
-    /// SpContainer - Shape container
+    /// `SpContainer` - Shape container
     pub const SP_CONTAINER: u16 = 0xF004;
     /// Spgr - Shape group data
     pub const SPGR: u16 = 0xF009;
@@ -310,11 +318,11 @@ pub mod escher_type {
     pub const SP: u16 = 0xF00A;
     /// Opt - Property table
     pub const OPT: u16 = 0xF00B;
-    /// ClientAnchor - Anchor data
+    /// `ClientAnchor` - Anchor data
     pub const CLIENT_ANCHOR: u16 = 0xF010;
-    /// ClientData - Client data
+    /// `ClientData` - Client data
     pub const CLIENT_DATA: u16 = 0xF011;
-    /// SplitMenuColors - Menu colors
+    /// `SplitMenuColors` - Menu colors
     pub const SPLIT_MENU_COLORS: u16 = 0xF11E;
 }
 
@@ -362,8 +370,8 @@ pub mod escher_flags {
 // MainMaster SlideAtom Placeholders (MS-PPT 2.4.7)
 // =============================================================================
 
-/// MainMaster placeholder types array for SlideAtom
-/// Order: MasterTitle, MasterBody, MasterDate, MasterFooter, MasterSlideNumber, None, None, None
+/// `MainMaster` placeholder types array for `SlideAtom`
+/// Order: `MasterTitle`, `MasterBody`, `MasterDate`, `MasterFooter`, `MasterSlideNumber`, None, None, None
 pub const MAIN_MASTER_PLACEHOLDERS: [u8; 8] = [
     PlaceholderType::MasterTitle as u8,
     PlaceholderType::MasterBody as u8,
@@ -375,7 +383,7 @@ pub const MAIN_MASTER_PLACEHOLDERS: [u8; 8] = [
     PlaceholderType::None as u8,
 ];
 
-/// MainMaster SlideAtom reserved field value from POI
+/// `MainMaster` `SlideAtom` reserved field value from POI
 pub const MAIN_MASTER_SLIDE_ATOM_RESERVED: u16 = 0x0013;
 
 // =============================================================================
@@ -383,11 +391,12 @@ pub const MAIN_MASTER_SLIDE_ATOM_RESERVED: u16 = 0x0013;
 // =============================================================================
 
 /// Helper to create RGBX color from RGB values
+#[must_use]
 pub const fn rgb(r: u8, g: u8, b: u8) -> u32 {
     (r as u32) | ((g as u32) << 8) | ((b as u32) << 16)
 }
 
-/// Pre-defined color schemes for MainMaster (MS-PPT 2.4.17)
+/// Pre-defined color schemes for `MainMaster` (MS-PPT 2.4.17)
 pub mod color_schemes {
     use super::{ColorScheme, rgb};
 
@@ -535,7 +544,7 @@ pub mod color_schemes {
         accent_and_followed_hyperlink: rgb(0x8C, 0x9E, 0xA0),
     };
 
-    /// All 12 MainMaster color schemes in order
+    /// All 12 `MainMaster` color schemes in order
     pub const ALL: [ColorScheme; 12] = [
         DEFAULT_LIGHT,
         GOLDEN,
@@ -553,6 +562,11 @@ pub mod color_schemes {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -616,14 +630,14 @@ mod tests {
     #[test]
     fn test_color_scheme_poi_default() {
         let scheme = ColorScheme::POI_DEFAULT;
-        assert_eq!(scheme.background, 0x00FFFFFF);
-        assert_eq!(scheme.text_and_lines, 0x00000000);
-        assert_eq!(scheme.shadow, 0x00808080);
-        assert_eq!(scheme.title_text, 0x00000000);
-        assert_eq!(scheme.fill, 0x00996630);
-        assert_eq!(scheme.accent, 0x00CC9963);
-        assert_eq!(scheme.accent_and_hyperlink, 0x00FFCC66);
-        assert_eq!(scheme.accent_and_followed_hyperlink, 0x00B256AE);
+        assert_eq!(scheme.background, 0x00FF_FFFF);
+        assert_eq!(scheme.text_and_lines, 0x0000_0000);
+        assert_eq!(scheme.shadow, 0x0080_8080);
+        assert_eq!(scheme.title_text, 0x0000_0000);
+        assert_eq!(scheme.fill, 0x0099_6630);
+        assert_eq!(scheme.accent, 0x00CC_9963);
+        assert_eq!(scheme.accent_and_hyperlink, 0x00FF_CC66);
+        assert_eq!(scheme.accent_and_followed_hyperlink, 0x00B2_56AE);
     }
 
     #[test]
@@ -635,13 +649,13 @@ mod tests {
         // Check first color (background) - stored in little-endian
         assert_eq!(
             u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
-            0x00FFFFFF
+            0x00FF_FFFF
         );
 
         // Check last color
         assert_eq!(
             u32::from_le_bytes([bytes[28], bytes[29], bytes[30], bytes[31]]),
-            0x00B256AE
+            0x00B2_56AE
         );
     }
 
@@ -742,7 +756,7 @@ mod tests {
 
     #[test]
     fn test_ppt_version() {
-        assert_eq!(PPT_VERSION, 0x0300106D);
+        assert_eq!(PPT_VERSION, 0x0300_106D);
     }
 
     #[test]
@@ -783,7 +797,7 @@ mod tests {
 
     #[test]
     fn test_escher_color_values() {
-        assert_eq!(escher_color::USE_SCHEME, 0x08000000);
+        assert_eq!(escher_color::USE_SCHEME, 0x0800_0000);
         assert_eq!(escher_color::SCHEME_FILL, 0x04);
         assert_eq!(escher_color::SCHEME_LINE, 0x01);
         assert_eq!(escher_color::SCHEME_SHADOW, 0x02);
@@ -885,11 +899,11 @@ mod tests {
 
     #[test]
     fn test_rgb_helper() {
-        assert_eq!(rgb(0xFF, 0x00, 0x00), 0x0000FF); // Red
-        assert_eq!(rgb(0x00, 0xFF, 0x00), 0x00FF00); // Green
-        assert_eq!(rgb(0x00, 0x00, 0xFF), 0xFF0000); // Blue
-        assert_eq!(rgb(0xFF, 0xFF, 0xFF), 0xFFFFFF); // White
-        assert_eq!(rgb(0x00, 0x00, 0x00), 0x000000); // Black
+        assert_eq!(rgb(0xFF, 0x00, 0x00), 0x00_00FF); // Red
+        assert_eq!(rgb(0x00, 0xFF, 0x00), 0x00_FF00); // Green
+        assert_eq!(rgb(0x00, 0x00, 0xFF), 0xFF_0000); // Blue
+        assert_eq!(rgb(0xFF, 0xFF, 0xFF), 0xFF_FFFF); // White
+        assert_eq!(rgb(0x00, 0x00, 0x00), 0x00_0000); // Black
     }
 
     #[test]

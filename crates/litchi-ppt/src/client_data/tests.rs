@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::codec::{OFFICE_ART_CLIENT_DATA_RECORD_TYPE, encode_record};
 use super::model::{ClientData, ClientDataChild, ClientDataChildKind, ClientDataLimits};
 
@@ -371,11 +377,11 @@ fn failed_child_edits_leave_the_candidate_unchanged() {
     )
     .unwrap();
     let mut limited_edit = limited.edit();
-    let original = limited_edit.children().to_vec();
+    let limited_original = limited_edit.children().to_vec();
     assert!(
         limited_edit
             .append(ClientDataChild::opaque(0, 0, 0x3333, vec![0; 3]).unwrap())
             .is_err()
     );
-    assert_eq!(limited_edit.children(), original.as_slice());
+    assert_eq!(limited_edit.children(), limited_original.as_slice());
 }

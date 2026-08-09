@@ -23,6 +23,9 @@ pub struct PictureCompatibilityRecord {
 }
 
 impl PictureCompatibilityRecord {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self, body: &str, picture_count: usize) -> RtfResult<()> {
         if body.get(self.position..self.position).is_none() {
             return Err(RtfError::MalformedDocument(

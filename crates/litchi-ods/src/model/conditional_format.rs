@@ -17,14 +17,14 @@ use litchi_core::{Error, Result, xml::escape_xml};
 use litchi_odf_common::datatype::lexical;
 
 /// Namespace URI of the LibreOffice `calcext` extension.
-pub(crate) const CALCEXT_NAMESPACE_URI: &str =
+pub const CALCEXT_NAMESPACE_URI: &str =
     "urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0";
 /// Namespace declaration written when a document contains conditional formats.
-pub(crate) const CALCEXT_NAMESPACE_DECLARATION: &str =
+pub const CALCEXT_NAMESPACE_DECLARATION: &str =
     " xmlns:calcext=\"urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0\"";
 
 /// Most conditional formats one sheet may declare.
-pub(crate) const MAX_CONDITIONAL_FORMATS_PER_SHEET: usize = 16_384;
+pub const MAX_CONDITIONAL_FORMATS_PER_SHEET: usize = 16_384;
 /// Most inert rules one conditional format may carry.
 pub(crate) const MAX_RULES_PER_FORMAT: usize = 1_024;
 /// Most threshold entries one color scale or icon set may carry.
@@ -128,7 +128,10 @@ pub enum EntryType {
 }
 
 impl EntryType {
-    pub(crate) fn parse(value: &str) -> Result<Self> {
+    /// # Errors
+    ///
+    /// Returns an error when the input is malformed or exceeds the parser's resource limits.
+    pub fn parse(value: &str) -> Result<Self> {
         match value {
             "minimum" => Ok(Self::Minimum),
             "maximum" => Ok(Self::Maximum),
@@ -204,7 +207,10 @@ pub enum DataBarAxisPosition {
 }
 
 impl DataBarAxisPosition {
-    pub(crate) fn parse(value: &str) -> Result<Self> {
+    /// # Errors
+    ///
+    /// Returns an error when the input is malformed or exceeds the parser's resource limits.
+    pub fn parse(value: &str) -> Result<Self> {
         match value {
             "middle" => Ok(Self::Middle),
             "none" => Ok(Self::None),
@@ -290,7 +296,10 @@ pub enum IconSetType {
 }
 
 impl IconSetType {
-    pub(crate) fn parse(value: &str) -> Result<Self> {
+    /// # Errors
+    ///
+    /// Returns an error when the input is malformed or exceeds the parser's resource limits.
+    pub fn parse(value: &str) -> Result<Self> {
         Ok(match value {
             "3Arrows" => Self::ThreeArrows,
             "3ArrowsGray" => Self::ThreeArrowsGray,
@@ -409,7 +418,10 @@ pub enum DateType {
 }
 
 impl DateType {
-    pub(crate) fn parse(value: &str) -> Result<Self> {
+    /// # Errors
+    ///
+    /// Returns an error when the input is malformed or exceeds the parser's resource limits.
+    pub fn parse(value: &str) -> Result<Self> {
         Ok(match value {
             "today" => Self::Today,
             "yesterday" => Self::Yesterday,
@@ -668,7 +680,10 @@ pub(crate) fn validate_conditional_format(format: &Format) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn validate_conditional_formats(formats: &[Format]) -> Result<()> {
+/// # Errors
+///
+/// Returns an error when a value violates the format or resource constraints.
+pub fn validate_conditional_formats(formats: &[Format]) -> Result<()> {
     if formats.len() > MAX_CONDITIONAL_FORMATS_PER_SHEET {
         return Err(Error::InvalidFormat(format!(
             "sheet exceeds the {MAX_CONDITIONAL_FORMATS_PER_SHEET} conditional format safety limit"
@@ -839,7 +854,11 @@ fn validate_entry_value(entry_type: EntryType, value: &str) -> Result<()> {
 }
 
 /// Write a sheet's `calcext:conditional-formats` container after its rows.
-pub(crate) fn write_conditional_formats(out: &mut String, formats: &[Format]) -> Result<()> {
+///
+/// # Errors
+///
+/// Returns an error when the value cannot be serialized.
+pub fn write_conditional_formats(out: &mut String, formats: &[Format]) -> Result<()> {
     validate_conditional_formats(formats)?;
     if formats.is_empty() {
         return Ok(());

@@ -2,4 +2,4 @@
 
 mod content;
 
-pub(crate) use content::validate;
+pub(crate) use content::{Semantics, parse, validate};

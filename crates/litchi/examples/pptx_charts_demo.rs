@@ -40,7 +40,7 @@ fn chart(
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let charts = vec![
+    let charts = [
         chart(
             ChartType::Column,
             "Quarterly Sales Comparison ($K)",

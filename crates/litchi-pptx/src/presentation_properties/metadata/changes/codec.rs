@@ -1,9 +1,9 @@
-//! PowerPoint Changes Information package parts.
+//! `PowerPoint` Changes Information package parts.
 //!
 //! Nested edit descriptors are retained as bounded XML. They are never
 //! executed and relationship-looking content inside them is never resolved.
 
-use super::model::*;
+use super::model::{Data, Descriptor, Info, Kind, List, Namespace, Part};
 use crate::{Error, Result};
 use chrono::{DateTime, NaiveDateTime};
 use litchi_ooxml_common::mce::process_ooxml;
@@ -50,10 +50,16 @@ impl Kind {
 }
 
 impl Info {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(xml: &[u8]) -> Result<Self> {
         parse_changes_information(xml)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
     pub fn to_xml(&self) -> Result<Vec<u8>> {
         validate_model(self)?;
         let prefix = &self.command_prefix;
@@ -565,14 +571,14 @@ fn parse_changes_information(xml: &[u8]) -> Result<Info> {
         match slice {
             PendingSlice::Metadata(from) => {
                 list.author.as_mut().expect("author").extension_xml =
-                    Some(bytes[from..end].to_vec())
+                    Some(bytes[from..end].to_vec());
             },
             PendingSlice::Document(from, kinds) => list.changes.push(Descriptor {
                 change_kinds: kinds,
                 xml: bytes[from..end].to_vec(),
             }),
             PendingSlice::ListExtension(from) => {
-                list.extension_xml = Some(bytes[from..end].to_vec())
+                list.extension_xml = Some(bytes[from..end].to_vec());
             },
         }
     }
@@ -615,13 +621,17 @@ fn parse_changes_data(element: &BytesStart<'_>, decoder: Decoder) -> Result<Data
         validate_date_time(value)?;
     }
     let version = get("v")
-        .map(|value| value.parse().map_err(|_| invalid("invalid change version")))
+        .map(|value| {
+            value
+                .parse()
+                .map_err(|_err| invalid("invalid change version"))
+        })
         .transpose()?;
     let action_id = get("actId")
         .map(|value| {
             value
                 .parse()
-                .map_err(|_| invalid("invalid change action ID"))
+                .map_err(|_err| invalid("invalid change action ID"))
         })
         .transpose()?;
     let change_id = get("id");
@@ -950,8 +960,7 @@ fn element_prefix(element: &BytesStart<'_>) -> Result<String> {
     let qualified = std::str::from_utf8(name.as_ref()).map_err(xml_error)?;
     Ok(qualified
         .rsplit_once(':')
-        .map(|(prefix, _)| prefix)
-        .unwrap_or("")
+        .map_or("", |(prefix, _)| prefix)
         .to_string())
 }
 
@@ -1097,6 +1106,11 @@ fn limit(label: &str) -> Error {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

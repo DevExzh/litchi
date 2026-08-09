@@ -2,6 +2,15 @@
 
 //! RTF document representation.
 
+#![allow(
+    clippy::shadow_reuse,
+    clippy::shadow_unrelated,
+    reason = "builder-style helpers deliberately rebind a working value as it is refined"
+)]
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items stay grouped by RTF feature area rather than by item kind"
+)]
 use super::super::error::{RtfError, RtfResult, try_reserve_one};
 use super::super::lexer::Lexer;
 use super::super::limits::ParseLimits;
@@ -175,7 +184,7 @@ pub struct RtfDocument<'a> {
     save_preferences: crate::DocumentSavePreferences,
     /// Opaque, inert write-reservation metadata.
     write_reservations: crate::DocumentWriteReservations<'a>,
-    /// Passive source and AutoFormat classification metadata.
+    /// Passive source and `AutoFormat` classification metadata.
     origin_metadata: crate::DocumentOriginMetadata,
     /// Passive backup, storage-format, and template flags.
     file_settings: crate::DocumentFileSettings,
@@ -311,11 +320,17 @@ impl<'a> RtfDocument<'a> {
     /// let text = doc.text();
     /// # Ok::<(), litchi_rtf::Error>(())
     /// ```
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn parse(input: &str) -> RtfResult<RtfDocument<'static>> {
         Self::parse_with_limits(input, ParseLimits::default())
     }
 
     /// Parse an RTF string with an explicit finite resource profile.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn parse_with_limits(input: &str, limits: ParseLimits) -> RtfResult<RtfDocument<'static>> {
         Self::parse_internal(input.as_bytes(), limits)
     }
@@ -324,11 +339,17 @@ impl<'a> RtfDocument<'a> {
     ///
     /// Use this entry point when the document can contain `bin` destinations or
     /// legacy-code-page bytes that are not valid UTF-8.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn parse_bytes(input: &[u8]) -> RtfResult<RtfDocument<'static>> {
         Self::parse_bytes_with_limits(input, ParseLimits::default())
     }
 
     /// Parse original RTF bytes with an explicit finite resource profile.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn parse_bytes_with_limits(
         input: &[u8],
         limits: ParseLimits,
@@ -378,7 +399,7 @@ impl<'a> RtfDocument<'a> {
         let mut source = Vec::new();
         source
             .try_reserve(bytes.len())
-            .map_err(|_| RtfError::AllocationFailed {
+            .map_err(|_err| RtfError::AllocationFailed {
                 resource: "preserved RTF source",
                 requested: bytes.len(),
             })?;
@@ -610,7 +631,7 @@ impl<'a> RtfDocument<'a> {
                 .into_iter()
                 .map(crate::GeneratedListMarker::into_owned)
                 .collect(),
-            list_table: Self::convert_list_table_to_owned(parsed.list_table)?,
+            list_table: Self::convert_list_table_to_owned(&parsed.list_table)?,
             list_override_table: parsed.list_override_table,
             legacy_section_numbering: parsed.legacy_section_numbering.into_owned(),
             legacy_paragraph_numbering: parsed
@@ -622,7 +643,7 @@ impl<'a> RtfDocument<'a> {
                 .paragraph_group_table
                 .map(crate::ParagraphGroupPropertyTable::into_owned),
             sections: Self::convert_sections_to_owned(parsed.sections),
-            bookmarks: Self::convert_bookmarks_to_owned(parsed.bookmarks),
+            bookmarks: Self::convert_bookmarks_to_owned(&parsed.bookmarks),
             shapes: Self::convert_shapes_to_owned(parsed.shapes),
             drawing_order: parsed.drawing_order,
             body_boundaries: parsed.body_boundaries,
@@ -639,7 +660,7 @@ impl<'a> RtfDocument<'a> {
                 .map(crate::LegacyDrawing::into_owned)
                 .collect(),
             shape_groups: Self::convert_shape_groups_to_owned(parsed.shape_groups),
-            stylesheet: Self::convert_stylesheet_to_owned(parsed.stylesheet),
+            stylesheet: Self::convert_stylesheet_to_owned(&parsed.stylesheet),
             info: Self::convert_info_to_owned(parsed.info),
             annotations: Self::convert_annotations_to_owned(parsed.annotations),
             notes: Self::convert_notes_to_owned(parsed.notes),
@@ -667,11 +688,17 @@ impl<'a> RtfDocument<'a> {
     /// let text = doc.text();
     /// # Ok::<(), litchi_rtf::Error>(())
     /// ```
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn open<P: AsRef<Path>>(path: P) -> RtfResult<RtfDocument<'static>> {
         Self::open_with_limits(path, ParseLimits::default())
     }
 
     /// Open an RTF file with an explicit finite resource profile.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn open_with_limits<P: AsRef<Path>>(
         path: P,
         limits: ParseLimits,
@@ -694,11 +721,17 @@ impl<'a> RtfDocument<'a> {
     /// let text = doc.text();
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn from_bytes(bytes: &[u8]) -> RtfResult<RtfDocument<'static>> {
         Self::parse_bytes(bytes)
     }
 
     /// Parse RTF bytes with an explicit finite resource profile.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn from_bytes_with_limits(
         bytes: &[u8],
         limits: ParseLimits,
@@ -709,6 +742,7 @@ impl<'a> RtfDocument<'a> {
     /// Get all text content from the document.
     ///
     /// This concatenates all text blocks with their natural separators.
+    #[must_use]
     pub fn text(&self) -> String {
         self.blocks
             .iter()
@@ -720,6 +754,7 @@ impl<'a> RtfDocument<'a> {
     /// Get the number of paragraphs in the document.
     ///
     /// Paragraphs are determined by paragraph breaks in the RTF source.
+    #[must_use]
     pub fn paragraph_count(&self) -> usize {
         self.paragraphs().len()
     }
@@ -727,6 +762,7 @@ impl<'a> RtfDocument<'a> {
     /// Get all paragraphs in the document.
     ///
     /// This groups style blocks into paragraphs based on newline characters.
+    #[must_use]
     pub fn paragraphs(&self) -> Vec<RtfParagraph> {
         let mut paragraphs = Vec::new();
         let mut current_para = RtfParagraph::default();
@@ -766,6 +802,7 @@ impl<'a> RtfDocument<'a> {
     ///
     /// This groups style blocks into paragraphs based on newline characters,
     /// and returns each paragraph with its associated runs.
+    #[must_use]
     pub fn paragraphs_with_content(&self) -> Vec<super::super::types::ParagraphContent<'_>> {
         use std::borrow::Cow;
 
@@ -817,6 +854,7 @@ impl<'a> RtfDocument<'a> {
     /// Get all runs in the document.
     ///
     /// A run is a contiguous block of text with the same formatting.
+    #[must_use]
     pub fn runs(&self) -> Vec<Run<'_>> {
         self.blocks
             .iter()
@@ -827,6 +865,7 @@ impl<'a> RtfDocument<'a> {
     /// Get all tables in the document.
     ///
     /// Returns all tables extracted from the RTF document.
+    #[must_use]
     pub fn tables(&self) -> &[super::super::table::Table<'_>] {
         &self.tables
     }
@@ -887,6 +926,7 @@ impl<'a> RtfDocument<'a> {
     /// }
     /// # Ok::<(), litchi_rtf::Error>(())
     /// ```
+    #[must_use]
     pub fn elements(&self) -> Vec<super::super::DocumentElement<'_>> {
         let mut elements = Vec::new();
 
@@ -904,16 +944,21 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Get the font table.
+    #[must_use]
     pub fn font_table(&self) -> &FontTable<'a> {
         &self.font_table
     }
 
     /// Get the external-file metadata table, if present.
+    #[must_use]
     pub fn file_table(&self) -> Option<&crate::FileTable<'_>> {
         self.file_table.as_ref()
     }
 
     /// Replace the external-file metadata table after validating it.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_file_table(&mut self, table: crate::FileTable<'a>) -> RtfResult<()> {
         table.validate()?;
         self.file_table = Some(table);
@@ -926,16 +971,19 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Get the color table.
+    #[must_use]
     pub fn color_table(&self) -> &ColorTable {
         &self.color_table
     }
 
     /// Get all style blocks.
+    #[must_use]
     pub fn blocks(&self) -> &[StyleBlock<'_>] {
         &self.blocks
     }
 
     /// Borrow unsupported syntax retained as bounded inert data.
+    #[must_use]
     pub fn opaque_nodes(&self) -> &[crate::opaque::Node] {
         &self.opaque_nodes
     }
@@ -963,11 +1011,15 @@ impl<'a> RtfDocument<'a> {
     /// }
     /// # Ok::<(), litchi_rtf::Error>(())
     /// ```
+    #[must_use]
     pub fn pictures(&self) -> &[super::super::picture::Picture<'_>] {
         &self.pictures
     }
 
     /// Replace typed `picprop` metadata on one existing picture without cloning image bytes.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_picture_shape_properties(
         &mut self,
         picture_index: usize,
@@ -985,11 +1037,13 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return positional body `shppict` and `nonshppict` wrapper records.
+    #[must_use]
     pub fn picture_compatibility_records(&self) -> &[crate::PictureCompatibilityRecord] {
         &self.picture_compatibility_records
     }
 
     /// Resolve a wrapper record to its shared picture payload.
+    #[must_use]
     pub fn picture_for_compatibility_record(
         &self,
         record: &crate::PictureCompatibilityRecord,
@@ -998,6 +1052,9 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Append a validated positional wrapper without cloning picture bytes.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_picture_compatibility_record(
         &mut self,
         record: crate::PictureCompatibilityRecord,
@@ -1053,6 +1110,7 @@ impl<'a> RtfDocument<'a> {
     /// }
     /// # Ok::<(), litchi_rtf::Error>(())
     /// ```
+    #[must_use]
     pub fn fields(&self) -> &[super::super::field::Field<'_>] {
         &self.fields
     }
@@ -1071,6 +1129,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert `HYPERLINK` fields in the document.
+    #[must_use]
     pub fn hyperlink_count(&self) -> usize {
         self.fields
             .iter()
@@ -1092,6 +1151,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert cross-reference fields in the document.
+    #[must_use]
     pub fn reference_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1111,6 +1171,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed inert `EQ` fields in the document.
+    #[must_use]
     pub fn equation_count(&self) -> usize {
         self.fields
             .iter()
@@ -1130,6 +1191,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert `MACROBUTTON` fields in the document.
+    #[must_use]
     pub fn macro_button_count(&self) -> usize {
         self.fields
             .iter()
@@ -1150,6 +1212,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert `GOTOBUTTON` fields in the document.
+    #[must_use]
     pub fn go_to_button_count(&self) -> usize {
         self.fields
             .iter()
@@ -1170,6 +1233,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert `PRINT` fields in the document.
+    #[must_use]
     pub fn print_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1191,6 +1255,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert `EMBED` fields in the document.
+    #[must_use]
     pub fn embed_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1212,6 +1277,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert `BARCODE` fields in the document.
+    #[must_use]
     pub fn barcode_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1234,6 +1300,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert barcode display fields in the document.
+    #[must_use]
     pub fn barcode_display_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1255,6 +1322,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert `BIDIOUTLINE` fields in the document.
+    #[must_use]
     pub fn bidi_outline_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1275,6 +1343,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert `SHAPE` drawing-canvas anchor fields.
+    #[must_use]
     pub fn shape_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1297,6 +1366,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert legacy form-code fields.
+    #[must_use]
     pub fn legacy_form_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1318,6 +1388,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert `PRIVATE` conversion-data fields.
+    #[must_use]
     pub fn private_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1340,6 +1411,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert active-content fields in the document.
+    #[must_use]
     pub fn active_content_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1361,6 +1433,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert building-block fields in the document.
+    #[must_use]
     pub fn auto_text_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1382,6 +1455,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert `AUTOTEXTLIST` fields in the document.
+    #[must_use]
     pub fn auto_text_list_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1403,6 +1477,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert `DDE` and `DDEAUTO` fields.
+    #[must_use]
     pub fn dde_link_count(&self) -> usize {
         self.fields
             .iter()
@@ -1424,6 +1499,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert `LINK` fields.
+    #[must_use]
     pub fn link_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1444,6 +1520,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert external include fields in the document.
+    #[must_use]
     pub fn external_include_count(&self) -> usize {
         self.fields
             .iter()
@@ -1464,6 +1541,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert `RD` referenced-document fields.
+    #[must_use]
     pub fn referenced_document_count(&self) -> usize {
         self.fields
             .iter()
@@ -1484,6 +1562,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert CITATION fields in the document.
+    #[must_use]
     pub fn citation_count(&self) -> usize {
         self.fields
             .iter()
@@ -1504,6 +1583,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert BIBLIOGRAPHY fields in the document.
+    #[must_use]
     pub fn bibliography_count(&self) -> usize {
         self.fields
             .iter()
@@ -1524,6 +1604,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert DOCVARIABLE fields in the document.
+    #[must_use]
     pub fn document_variable_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1544,6 +1625,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert `DOCPROPERTY` fields in the document.
+    #[must_use]
     pub fn document_property_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1565,6 +1647,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert explicit legacy `INFO` fields.
+    #[must_use]
     pub fn info_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1586,6 +1669,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert document-information fields.
+    #[must_use]
     pub fn document_information_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1608,6 +1692,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert document-context and runtime fields.
+    #[must_use]
     pub fn document_context_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1628,6 +1713,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert `MERGEFIELD` fields in the document.
+    #[must_use]
     pub fn merge_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1649,6 +1735,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert `DATABASE` query fields.
+    #[must_use]
     pub fn database_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1670,6 +1757,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert `DATA` mail-merge source fields.
+    #[must_use]
     pub fn mail_merge_data_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1690,6 +1778,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert mail-merge counter fields in the document.
+    #[must_use]
     pub fn mail_merge_counter_count(&self) -> usize {
         self.fields
             .iter()
@@ -1710,6 +1799,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert `NEXT` mail-merge control fields.
+    #[must_use]
     pub fn mail_merge_next_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1733,6 +1823,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert conditional mail-merge control fields.
+    #[must_use]
     pub fn mail_merge_conditional_control_count(&self) -> usize {
         self.fields
             .iter()
@@ -1753,6 +1844,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert `IF` fields.
+    #[must_use]
     pub fn if_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1773,6 +1865,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert `COMPARE` fields.
+    #[must_use]
     pub fn compare_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1793,6 +1886,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert `QUOTE` fields.
+    #[must_use]
     pub fn quote_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1814,6 +1908,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert `SYMBOL` fields.
+    #[must_use]
     pub fn symbol_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1835,6 +1930,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert legacy automatic-numbering fields.
+    #[must_use]
     pub fn auto_number_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1856,6 +1952,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert `LISTNUM` fields.
+    #[must_use]
     pub fn list_number_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1877,6 +1974,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert `ASK` and `FILLIN` fields.
+    #[must_use]
     pub fn prompt_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1897,6 +1995,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert user-identity fields.
+    #[must_use]
     pub fn user_identity_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1917,6 +2016,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert `ADVANCE` fields.
+    #[must_use]
     pub fn advance_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1939,6 +2039,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert `ADDRESSBLOCK` and `GREETINGLINE` fields.
+    #[must_use]
     pub fn mail_merge_recipient_field_count(&self) -> usize {
         self.fields
             .iter()
@@ -1960,6 +2061,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert TOC fields in the document.
+    #[must_use]
     pub fn table_of_contents_count(&self) -> usize {
         self.fields
             .iter()
@@ -1980,6 +2082,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert TC entry fields in the document.
+    #[must_use]
     pub fn table_of_contents_entry_count(&self) -> usize {
         self.fields
             .iter()
@@ -2001,6 +2104,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert TA entry fields in the document.
+    #[must_use]
     pub fn table_of_authorities_entry_count(&self) -> usize {
         self.fields
             .iter()
@@ -2022,6 +2126,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert TOA fields in the document.
+    #[must_use]
     pub fn table_of_authorities_count(&self) -> usize {
         self.fields
             .iter()
@@ -2040,6 +2145,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert INDEX fields in the document.
+    #[must_use]
     pub fn index_count(&self) -> usize {
         self.fields
             .iter()
@@ -2060,13 +2166,16 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the number of typed, inert XE index-entry fields in the document.
+    #[must_use]
     pub fn index_entry_count(&self) -> usize {
         self.fields
             .iter()
             .filter(|field| field.index_entry().is_some())
             .count()
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_field(&mut self, field: super::super::field::Field<'a>) -> RtfResult<()> {
         if !matches!(field.owner, crate::FieldOwner::Body) {
             return Err(RtfError::MalformedDocument(
@@ -2106,16 +2215,21 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return ordered positional legacy form fields.
+    #[must_use]
     pub fn form_fields(&self) -> &[super::super::form_field::FormField<'_>] {
         &self.form_fields
     }
 
     /// Return inert producer provenance from the RTF generator destination.
+    #[must_use]
     pub fn generator(&self) -> Option<&crate::DocumentGenerator<'_>> {
         self.generator.as_ref()
     }
 
     /// Set validated inert producer provenance.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_generator(&mut self, generator: crate::DocumentGenerator<'a>) -> RtfResult<()> {
         generator.validate()?;
         self.generator = Some(generator);
@@ -2128,11 +2242,15 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return ordered revision-save/session provenance.
+    #[must_use]
     pub fn revision_save_metadata(&self) -> Option<&crate::RevisionSaveMetadata> {
         self.revision_save.as_ref()
     }
 
     /// Replace revision-save/session provenance after full validation.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_revision_save_metadata(
         &mut self,
         metadata: crate::RevisionSaveMetadata,
@@ -2148,6 +2266,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the ordered inert XML namespace table, preserving empty-table presence.
+    #[must_use]
     pub fn xml_namespaces(&self) -> Option<&[crate::XmlNamespace<'_>]> {
         self.xml_namespaces.as_deref()
     }
@@ -2157,6 +2276,7 @@ impl<'a> RtfDocument<'a> {
     /// The tags are inert `\xmlopen`/`\xmlclose` markup metadata (RTF 1.9.1
     /// custom XML markup): names and attributes are stored verbatim and are
     /// never resolved against a schema.
+    #[must_use]
     pub fn custom_xml_tags(&self) -> &[crate::CustomXmlTag<'_>] {
         &self.custom_xml_tags
     }
@@ -2167,6 +2287,7 @@ impl<'a> RtfDocument<'a> {
     /// mathematics): their typed trees are stored verbatim and are never
     /// evaluated, laid out, or rendered. Math run text does not enter the
     /// document body text (like field results).
+    #[must_use]
     pub fn math_zones(&self) -> &[crate::MathZone<'_>] {
         &self.math_zones
     }
@@ -2176,6 +2297,7 @@ impl<'a> RtfDocument<'a> {
     /// The ranges are inert Word 2003 document-protection metadata: their
     /// identifiers are stored verbatim and no editing restriction is ever
     /// evaluated or enforced.
+    #[must_use]
     pub fn protection_ranges(&self) -> &[crate::ProtectionRange<'_>] {
         &self.protection_ranges
     }
@@ -2184,11 +2306,15 @@ impl<'a> RtfDocument<'a> {
     ///
     /// The regions are inert boundary marks from protected documents: no
     /// editing restriction is ever evaluated or enforced.
+    #[must_use]
     pub fn editable_regions(&self) -> &[crate::EditableRegion<'_>] {
         &self.editable_regions
     }
 
     /// Replace the XML namespace table after full validation.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_xml_namespaces(
         &mut self,
         namespaces: Vec<crate::XmlNamespace<'a>>,
@@ -2199,6 +2325,9 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Append one inert XML namespace entry, creating the table if absent.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_xml_namespace(&mut self, namespace: crate::XmlNamespace<'a>) -> RtfResult<()> {
         namespace.validate()?;
         let was_present = self.xml_namespaces.is_some();
@@ -2219,11 +2348,15 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return inert range-protection usernames in their source order.
+    #[must_use]
     pub fn protection_user_table(&self) -> Option<&crate::ProtectionUserTable<'_>> {
         self.protection_user_table.as_ref()
     }
 
     /// Replace the inert range-protection username table after full validation.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_protection_user_table(
         &mut self,
         table: crate::ProtectionUserTable<'a>,
@@ -2239,11 +2372,15 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return explicit document-level hyphenation properties.
+    #[must_use]
     pub fn hyphenation(&self) -> &crate::DocumentHyphenation {
         &self.hyphenation
     }
 
     /// Replace document-level hyphenation properties after bounds validation.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_hyphenation(&mut self, hyphenation: crate::DocumentHyphenation) -> RtfResult<()> {
         hyphenation.validate()?;
         self.hyphenation = hyphenation;
@@ -2256,11 +2393,15 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return inert external document/template names without resolving them.
+    #[must_use]
     pub fn external_references(&self) -> &crate::DocumentExternalReferences<'_> {
         &self.external_references
     }
 
     /// Replace inert external document/template names after full validation.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_external_references(
         &mut self,
         references: crate::DocumentExternalReferences<'a>,
@@ -2276,11 +2417,15 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return explicit passive document view and zoom settings.
+    #[must_use]
     pub fn document_view(&self) -> &crate::DocumentView {
         &self.document_view
     }
 
     /// Replace passive document view and zoom settings after validation.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_document_view(&mut self, view: crate::DocumentView) -> RtfResult<()> {
         view.validate()?;
         self.document_view = view;
@@ -2293,6 +2438,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return passive review-display preferences.
+    #[must_use]
     pub fn review_display(&self) -> &crate::DocumentReviewDisplay {
         &self.review_display
     }
@@ -2308,6 +2454,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return passive document-window caption metadata.
+    #[must_use]
     pub fn window_caption(&self) -> Option<&crate::DocumentWindowCaption<'a>> {
         self.window_caption.as_ref()
     }
@@ -2316,11 +2463,15 @@ impl<'a> RtfDocument<'a> {
     ///
     /// The sets are inert typography metadata: no line-breaking rule is ever
     /// evaluated or applied.
+    #[must_use]
     pub fn kinsoku(&self) -> &crate::DocumentKinsoku<'_> {
         &self.kinsoku
     }
 
     /// Replace passive document-window caption metadata.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_window_caption(
         &mut self,
         caption: crate::DocumentWindowCaption<'a>,
@@ -2336,11 +2487,15 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the inert custom XSL transform location.
+    #[must_use]
     pub fn xsl_transform(&self) -> Option<&crate::DocumentXslTransform<'a>> {
         self.xsl_transform.as_ref()
     }
 
     /// Replace the inert custom XSL transform location.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_xsl_transform(
         &mut self,
         transform: crate::DocumentXslTransform<'a>,
@@ -2356,6 +2511,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the passive requested transform-usage intent.
+    #[must_use]
     pub fn xsl_transform_usage(&self) -> crate::DocumentXslTransformUsage {
         self.xsl_transform_usage
     }
@@ -2371,11 +2527,15 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return passive style-list filter suggestions.
+    #[must_use]
     pub fn style_list_filter(&self) -> Option<crate::DocumentStyleListFilter> {
         self.style_list_filter
     }
 
     /// Replace passive style-list filter suggestions.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_style_list_filter(
         &mut self,
         filter: crate::DocumentStyleListFilter,
@@ -2391,11 +2551,13 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return an explicitly stored style-list sorting suggestion.
+    #[must_use]
     pub fn style_sort_method(&self) -> Option<crate::DocumentStyleSortMethod> {
         self.style_sort_method
     }
 
     /// Return the stored suggestion or the specification default when omitted.
+    #[must_use]
     pub fn effective_style_sort_method(&self) -> crate::DocumentStyleSortMethod {
         self.style_sort_method.unwrap_or_default()
     }
@@ -2411,6 +2573,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return passive save-related document preferences.
+    #[must_use]
     pub fn save_preferences(&self) -> &crate::DocumentSavePreferences {
         &self.save_preferences
     }
@@ -2426,11 +2589,15 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return opaque write-reservation metadata without authenticating it.
+    #[must_use]
     pub fn write_reservations(&self) -> &crate::DocumentWriteReservations<'a> {
         &self.write_reservations
     }
 
     /// Replace opaque write-reservation metadata without authenticating it.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_write_reservations(
         &mut self,
         reservations: crate::DocumentWriteReservations<'a>,
@@ -2445,6 +2612,7 @@ impl<'a> RtfDocument<'a> {
         self.write_reservations = crate::DocumentWriteReservations::default();
     }
 
+    #[must_use]
     pub fn origin_metadata(&self) -> &crate::DocumentOriginMetadata {
         &self.origin_metadata
     }
@@ -2458,6 +2626,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return passive file and template settings.
+    #[must_use]
     pub fn file_settings(&self) -> &crate::DocumentFileSettings {
         &self.file_settings
     }
@@ -2473,6 +2642,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return passive compatibility and output-request flags.
+    #[must_use]
     pub fn output_settings(&self) -> &crate::DocumentOutputSettings {
         &self.output_settings
     }
@@ -2488,6 +2658,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return passive document rendering flags.
+    #[must_use]
     pub fn rendering_settings(&self) -> &crate::DocumentRenderingSettings {
         &self.rendering_settings
     }
@@ -2503,6 +2674,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return passive printing, cleanup, and event-mask properties.
+    #[must_use]
     pub fn processing_settings(&self) -> &crate::DocumentProcessingSettings {
         &self.processing_settings
     }
@@ -2518,6 +2690,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return passive document-level drawing-grid properties.
+    #[must_use]
     pub fn drawing_grid(&self) -> &crate::DocumentDrawingGrid {
         &self.drawing_grid
     }
@@ -2533,11 +2706,15 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return passive print-layout settings.
+    #[must_use]
     pub fn print_layout_settings(&self) -> &crate::DocumentPrintLayoutSettings {
         &self.print_layout_settings
     }
 
     /// Atomically replace passive print-layout settings.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_print_layout_settings(
         &mut self,
         settings: crate::DocumentPrintLayoutSettings,
@@ -2548,6 +2725,9 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Atomically replace the document-wide gutter width in twips.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_document_gutter_twips(&mut self, value: Option<u32>) -> RtfResult<()> {
         let mut candidate = self.print_layout_settings;
         candidate.set_document_gutter_twips(value)?;
@@ -2561,6 +2741,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return passive theme font-resolution language identifiers.
+    #[must_use]
     pub fn theme_languages(&self) -> &crate::DocumentThemeLanguages {
         &self.theme_languages
     }
@@ -2576,6 +2757,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return passive web-save and custom-XML policies.
+    #[must_use]
     pub fn xml_policies(&self) -> &crate::DocumentXmlPolicies {
         &self.xml_policies
     }
@@ -2591,6 +2773,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return passive system-font and linguistic-data embedding policies.
+    #[must_use]
     pub fn embedding_policies(&self) -> &crate::DocumentEmbeddingPolicies {
         &self.embedding_policies
     }
@@ -2606,6 +2789,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return passive move and formatting revision policies.
+    #[must_use]
     pub fn revision_policies(&self) -> &crate::DocumentRevisionPolicies {
         &self.revision_policies
     }
@@ -2621,6 +2805,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return passive theme and style-application policies.
+    #[must_use]
     pub fn style_policies(&self) -> &crate::DocumentStylePolicies {
         &self.style_policies
     }
@@ -2636,6 +2821,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return passive legacy style and formatting restriction declarations.
+    #[must_use]
     pub fn style_restrictions(&self) -> &crate::DocumentStyleRestrictions {
         &self.style_restrictions
     }
@@ -2651,6 +2837,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return passive booklet-printing metadata.
+    #[must_use]
     pub fn booklet_printing(&self) -> &crate::DocumentBookletPrinting {
         &self.booklet_printing
     }
@@ -2666,6 +2853,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return passive privacy-removal requests.
+    #[must_use]
     pub fn privacy_policies(&self) -> &crate::DocumentPrivacyPolicies {
         &self.privacy_policies
     }
@@ -2681,6 +2869,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return passive legacy extra-line-spacing compatibility requests.
+    #[must_use]
     pub fn line_spacing_compatibility(&self) -> &crate::DocumentLineSpacingCompatibility {
         &self.line_spacing_compatibility
     }
@@ -2699,6 +2888,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return passive Word 6-era East Asian typography compatibility requests.
+    #[must_use]
     pub fn east_asian_compatibility(&self) -> &crate::DocumentEastAsianCompatibility {
         &self.east_asian_compatibility
     }
@@ -2717,6 +2907,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return passive legacy table-layout compatibility requests.
+    #[must_use]
     pub fn table_layout_compatibility(&self) -> &crate::DocumentTableLayoutCompatibility {
         &self.table_layout_compatibility
     }
@@ -2735,6 +2926,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return passive legacy automatic-layout compatibility requests.
+    #[must_use]
     pub fn legacy_layout_compatibility(&self) -> &crate::DocumentLegacyLayoutCompatibility {
         &self.legacy_layout_compatibility
     }
@@ -2753,6 +2945,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return passive Asian character-grid and line-breaking requests.
+    #[must_use]
     pub fn asian_grid_compatibility(&self) -> &crate::DocumentAsianGridCompatibility {
         &self.asian_grid_compatibility
     }
@@ -2771,6 +2964,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return passive compatibility reset, UI-throttling, and upgrade requests.
+    #[must_use]
     pub fn compatibility_policy(&self) -> &crate::DocumentCompatibilityPolicy {
         &self.compatibility_policy
     }
@@ -2786,6 +2980,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return passive Word 2003-era compatibility requests.
+    #[must_use]
     pub fn word_2003_compatibility(&self) -> &crate::DocumentWord2003Compatibility {
         &self.word_2003_compatibility
     }
@@ -2804,11 +2999,15 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return inert Office theme bytes without interpreting their contents.
+    #[must_use]
     pub fn theme(&self) -> Option<&crate::DocumentTheme<'_>> {
         self.theme.as_ref()
     }
 
     /// Replace inert Office theme bytes after bounds validation.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_theme(&mut self, theme: crate::DocumentTheme<'a>) -> RtfResult<()> {
         theme.validate()?;
         self.theme = Some(theme);
@@ -2821,11 +3020,15 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return inert latent-style defaults and ordered exceptions.
+    #[must_use]
     pub fn latent_styles(&self) -> Option<&crate::LatentStyles<'_>> {
         self.latent_styles.as_ref()
     }
 
     /// Replace latent-style metadata after full validation.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_latent_styles(&mut self, styles: crate::LatentStyles<'a>) -> RtfResult<()> {
         styles.validate()?;
         self.latent_styles = Some(styles);
@@ -2838,11 +3041,15 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return inert custom XML data-store bytes without interpreting them.
+    #[must_use]
     pub fn data_store(&self) -> Option<&crate::DocumentDataStore<'_>> {
         self.data_store.as_ref()
     }
 
     /// Replace inert data-store bytes after bounds validation.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_data_store(&mut self, data_store: crate::DocumentDataStore<'a>) -> RtfResult<()> {
         data_store.validate()?;
         self.data_store = Some(data_store);
@@ -2855,11 +3062,15 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return inert mail-merge metadata without opening sources or evaluating queries.
+    #[must_use]
     pub fn mail_merge(&self) -> Option<&crate::MailMerge<'_>> {
         self.mail_merge.as_ref()
     }
 
     /// Replace inert mail-merge metadata after complete bounds validation.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_mail_merge(&mut self, mail_merge: crate::MailMerge<'a>) -> RtfResult<()> {
         mail_merge.validate()?;
         self.mail_merge = Some(mail_merge);
@@ -2872,11 +3083,15 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return document-level mathematical layout defaults.
+    #[must_use]
     pub fn math_properties(&self) -> Option<&crate::DocumentMathProperties> {
         self.math_properties.as_ref()
     }
 
     /// Replace document-level mathematical layout defaults after validation.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_math_properties(
         &mut self,
         properties: crate::DocumentMathProperties,
@@ -2892,13 +3107,18 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return language defaults declared by the RTF header.
+    #[must_use]
     pub fn language_defaults(&self) -> &crate::DocumentLanguageDefaults {
         &self.language_defaults
     }
 
+    #[must_use]
     pub fn default_formatting(&self) -> &crate::DocumentDefaultFormatting {
         &self.default_formatting
     }
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_default_formatting(
         &mut self,
         value: crate::DocumentDefaultFormatting,
@@ -2912,6 +3132,9 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Replace document language defaults.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_language_defaults(
         &mut self,
         defaults: crate::DocumentLanguageDefaults,
@@ -2929,17 +3152,22 @@ impl<'a> RtfDocument<'a> {
     /// Return the explicitly declared `deftab` width in twips.
     ///
     /// `None` means the source omitted `deftab`; it does not mean zero.
+    #[must_use]
     pub fn default_tab_width_twips(&self) -> Option<u32> {
         self.default_tab_width_twips
     }
 
     /// Return the explicit width or the RTF 1.9.1 default of 720 twips.
+    #[must_use]
     pub fn effective_default_tab_width_twips(&self) -> u32 {
         self.default_tab_width_twips
             .unwrap_or(crate::DEFAULT_TAB_WIDTH_TWIPS)
     }
 
     /// Set an explicit default tab width without creating paragraph tab stops.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_default_tab_width_twips(&mut self, width: u32) -> RtfResult<()> {
         if width > crate::MAX_DEFAULT_TAB_WIDTH_TWIPS {
             return Err(RtfError::MalformedDocument(format!(
@@ -2957,6 +3185,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the explicit document-wide bidirectional precedence.
+    #[must_use]
     pub fn document_direction(&self) -> Option<crate::TextDirection> {
         self.document_direction
     }
@@ -2972,6 +3201,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return whether the document gutter is positioned on the right.
+    #[must_use]
     pub fn gutter_on_right(&self) -> bool {
         self.gutter_on_right
     }
@@ -2989,9 +3219,9 @@ impl<'a> RtfDocument<'a> {
         }
         let mut ids = HashSet::new();
         ids.try_reserve(namespaces.len())
-            .map_err(|_| RtfError::AllocationFailed {
+            .map_err(|_err| RtfError::AllocationFailed {
                 resource: "XML namespace IDs",
-                requested: namespaces.len().saturating_mul(std::mem::size_of::<u32>()),
+                requested: namespaces.len().saturating_mul(size_of::<u32>()),
             })?;
         let mut total = 0usize;
         for namespace in namespaces {
@@ -3018,6 +3248,9 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Append inert form-field metadata at a valid visible body range.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_form_field(
         &mut self,
         field: super::super::form_field::FormField<'a>,
@@ -3084,11 +3317,13 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return embedded and linked object records without activating their content.
+    #[must_use]
     pub fn objects(&self) -> &[super::super::object::EmbeddedObject<'_>] {
         &self.objects
     }
 
     /// Resolve one object result-picture reference without cloning picture bytes.
+    #[must_use]
     pub fn picture_for_object_result(
         &self,
         object: &super::super::object::EmbeddedObject<'_>,
@@ -3101,6 +3336,9 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Append a validated inert object destination at its body position.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_object(
         &mut self,
         object: super::super::object::EmbeddedObject<'a>,
@@ -3135,11 +3373,15 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return ordered inert RTF document-variable name/value pairs.
+    #[must_use]
     pub fn document_variables(&self) -> &[super::super::document_variable::DocumentVariable<'_>] {
         &self.document_variables
     }
 
     /// Append a document variable without evaluating or resolving it.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_document_variable(
         &mut self,
         variable: super::super::document_variable::DocumentVariable<'a>,
@@ -3175,11 +3417,15 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return ordered, inert RTF user-defined document properties.
+    #[must_use]
     pub fn user_properties(&self) -> &[super::super::user_property::UserProperty<'_>] {
         &self.user_properties
     }
 
     /// Append a unique user-defined property without evaluating its value or link.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_user_property(
         &mut self,
         property: super::super::user_property::UserProperty<'a>,
@@ -3224,16 +3470,21 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return ordered, inert index and table-of-contents source marks.
+    #[must_use]
     pub fn navigation_entries(&self) -> &[super::super::navigation_entry::NavigationEntry<'_>] {
         &self.navigation_entries
     }
 
     /// Return ordered inert generated list markers.
+    #[must_use]
     pub fn generated_list_markers(&self) -> &[crate::GeneratedListMarker<'_>] {
         &self.generated_list_markers
     }
 
     /// Append a generated list marker at a valid UTF-8 body position.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_generated_list_marker(
         &mut self,
         marker: crate::GeneratedListMarker<'a>,
@@ -3289,6 +3540,9 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Append an inert source mark at a valid UTF-8 body position.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_navigation_entry(
         &mut self,
         entry: super::super::navigation_entry::NavigationEntry<'a>,
@@ -3327,6 +3581,9 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Append navigation metadata for ownership by a table-cell story.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_cell_navigation_entry_metadata(
         &mut self,
         entry: super::super::navigation_entry::NavigationEntry<'a>,
@@ -3357,6 +3614,9 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Atomically append navigation metadata and attach it to one cell story.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_navigation_entry_for_cell(
         &mut self,
         path: &crate::TableCellPath,
@@ -3397,11 +3657,13 @@ impl<'a> RtfDocument<'a> {
     /// Get the list table.
     ///
     /// Returns all list definitions (for bulleted and numbered lists) in the document.
+    #[must_use]
     pub fn list_table(&self) -> &super::super::list::ListTable<'_> {
         &self.list_table
     }
 
     /// Resolve ordered list-picture records without cloning their image payloads.
+    #[must_use]
     pub fn list_picture_bullets(
         &self,
     ) -> impl ExactSizeIterator<Item = Option<&super::super::picture::Picture<'_>>> {
@@ -3416,6 +3678,9 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Replace list-picture records with validated references into `pictures()`.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_list_picture_bullet_indices(
         &mut self,
         indices: Vec<Option<usize>>,
@@ -3444,6 +3709,9 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Clear list-picture references without deleting shared picture payloads.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn clear_list_picture_bullets(&mut self) -> RtfResult<()> {
         self.set_list_picture_bullet_indices(Vec::new())
     }
@@ -3451,21 +3719,25 @@ impl<'a> RtfDocument<'a> {
     /// Get the list override table.
     ///
     /// Returns list instances that override base list definitions.
+    #[must_use]
     pub fn list_override_table(&self) -> &super::super::list::ListOverrideTable {
         &self.list_override_table
     }
 
     /// Return ordered legacy `pnseclvl` section-numbering defaults.
+    #[must_use]
     pub fn legacy_section_numbering(&self) -> &crate::LegacySectionNumbering<'_> {
         &self.legacy_section_numbering
     }
 
     /// Return legacy `pn` records in exact source order.
+    #[must_use]
     pub fn legacy_paragraph_numbering_records(&self) -> &[crate::LegacyParagraphNumbering<'_>] {
         &self.legacy_paragraph_numbering
     }
 
     /// Resolve the inert `pn` record owned by a paragraph snapshot.
+    #[must_use]
     pub fn legacy_paragraph_numbering(
         &self,
         paragraph: &crate::Paragraph,
@@ -3475,11 +3747,15 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return the inert paragraph-group property table.
+    #[must_use]
     pub fn paragraph_group_table(&self) -> Option<&crate::ParagraphGroupPropertyTable> {
         self.paragraph_group_table.as_ref()
     }
 
     /// Replace the paragraph-group property table after validation.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_paragraph_group_table(
         &mut self,
         table: crate::ParagraphGroupPropertyTable,
@@ -3495,6 +3771,9 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Replace legacy section-numbering defaults after full validation.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_legacy_section_numbering(
         &mut self,
         numbering: crate::LegacySectionNumbering<'a>,
@@ -3513,6 +3792,7 @@ impl<'a> RtfDocument<'a> {
     ///
     /// The returned start value is the per-level override when present, followed
     /// by the legacy first-level override used by older producers.
+    #[must_use]
     pub fn resolve_paragraph_list<'s>(
         &'s self,
         paragraph: &crate::Paragraph,
@@ -3546,6 +3826,7 @@ impl<'a> RtfDocument<'a> {
     /// Get all sections in the document.
     ///
     /// Returns section information including page layout, headers, and footers.
+    #[must_use]
     pub fn sections(&self) -> &[super::super::section::Section<'_>] {
         &self.sections
     }
@@ -3553,6 +3834,7 @@ impl<'a> RtfDocument<'a> {
     /// Get the bookmark table.
     ///
     /// Returns all bookmarks defined in the document.
+    #[must_use]
     pub fn bookmarks(&self) -> &super::super::bookmark::BookmarkTable<'_> {
         &self.bookmarks
     }
@@ -3560,11 +3842,13 @@ impl<'a> RtfDocument<'a> {
     /// Get all shapes in the document.
     ///
     /// Returns drawing objects, text boxes, and other shapes.
+    #[must_use]
     pub fn shapes(&self) -> &[super::super::shape::Shape<'_>] {
         &self.shapes
     }
 
     /// Recursively find a body, background, grouped, or text-story shape by name.
+    #[must_use]
     pub fn find_shape_by_name(&self, name: &str) -> Option<&super::super::shape::Shape<'_>> {
         self.shapes
             .iter()
@@ -3577,6 +3861,7 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Recursively find a body, background, grouped, or text-story shape by `shplid`.
+    #[must_use]
     pub fn find_shape_by_id(&self, id: i32) -> Option<&super::super::shape::Shape<'_>> {
         self.shapes
             .iter()
@@ -3589,10 +3874,12 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Exact source order of root shapes and shape groups in the body story.
+    #[must_use]
     pub fn drawing_order(&self) -> &[crate::StoryDrawing] {
         &self.drawing_order
     }
 
+    #[must_use]
     pub fn body_story_events(&self) -> &[crate::BodyStoryEvent] {
         &self.body_story_events
     }
@@ -3601,6 +3888,10 @@ impl<'a> RtfDocument<'a> {
         &self.body_boundaries
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub fn page_breaks(&self) -> impl Iterator<Item = &crate::PageBreak> {
         self.body_story_events
             .iter()
@@ -3614,6 +3905,10 @@ impl<'a> RtfDocument<'a> {
     ///
     /// The markers are passive Galley-view layout metadata; no pagination is
     /// computed from them.
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub fn soft_breaks(&self) -> impl Iterator<Item = &crate::SoftBreak> {
         self.body_story_events
             .iter()
@@ -3627,6 +3922,10 @@ impl<'a> RtfDocument<'a> {
     ///
     /// A boundary with `next_section == None` starts an inherited section that
     /// has no separately retained section definition.
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub fn section_breaks(&self) -> impl Iterator<Item = &crate::SectionBreak> {
         self.body_story_events
             .iter()
@@ -3635,7 +3934,9 @@ impl<'a> RtfDocument<'a> {
                 _ => None,
             })
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_page_break(&mut self, position: usize) -> RtfResult<()> {
         let body = self.text();
         if body.get(position..position).is_none() {
@@ -3653,6 +3954,10 @@ impl<'a> RtfDocument<'a> {
             .retain(|event| !matches!(event, crate::BodyStoryEvent::PageBreak(_)));
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub fn column_breaks(&self) -> impl Iterator<Item = &crate::ColumnBreak> {
         self.body_story_events
             .iter()
@@ -3661,7 +3966,9 @@ impl<'a> RtfDocument<'a> {
                 _ => None,
             })
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_column_break(&mut self, position: usize) -> RtfResult<()> {
         let body = self.text();
         if body.get(position..position).is_none() {
@@ -3680,6 +3987,9 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Append a validated standalone shape at its UTF-8 body position.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_shape(&mut self, shape: super::super::shape::Shape<'a>) -> RtfResult<()> {
         if shape.is_background {
             return Err(RtfError::MalformedDocument(
@@ -3738,6 +4048,9 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Ergonomic alias for appending a validated body shape.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn add_shape(&mut self, shape: super::super::shape::Shape<'a>) -> RtfResult<usize> {
         let index = self.shapes.len();
         self.push_shape(shape)?;
@@ -3745,6 +4058,9 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Atomically replace a non-background root shape without relocating its body anchor.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn replace_shape(
         &mut self,
         index: usize,
@@ -3775,6 +4091,9 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Atomically remove one non-background root shape and repair every stored index.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn remove_shape(&mut self, index: usize) -> RtfResult<super::super::shape::Shape<'a>> {
         if index >= self.shapes.len() {
             return Err(RtfError::MalformedDocument(format!(
@@ -3840,6 +4159,9 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Set the unique document-background destination shape.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_background_shape(
         &mut self,
         mut shape: super::super::shape::Shape<'a>,
@@ -3933,10 +4255,13 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return inert positional legacy drawing text boxes.
+    #[must_use]
     pub fn legacy_text_boxes(&self) -> &[crate::LegacyTextBox<'_>] {
         &self.legacy_text_boxes
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_legacy_text_box(&mut self, text_box: crate::LegacyTextBox<'a>) -> RtfResult<()> {
         text_box.validate()?;
         if self.legacy_text_boxes.len() >= crate::legacy_text_box::MAX_LEGACY_TEXT_BOXES {
@@ -3986,10 +4311,13 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return inert positional legacy drawing primitives other than top-level text boxes.
+    #[must_use]
     pub fn legacy_drawings(&self) -> &[crate::LegacyDrawing<'_>] {
         &self.legacy_drawings
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_legacy_drawing(&mut self, drawing: crate::LegacyDrawing<'a>) -> RtfResult<()> {
         drawing.validate()?;
         if self.legacy_drawings.len() >= crate::MAX_LEGACY_DRAWINGS {
@@ -4027,11 +4355,15 @@ impl<'a> RtfDocument<'a> {
     /// Get all shape groups in the document.
     ///
     /// Returns grouped shapes.
+    #[must_use]
     pub fn shape_groups(&self) -> &[super::super::shape::ShapeGroup<'_>] {
         &self.shape_groups
     }
 
     /// Append a validated root shape group.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_shape_group(
         &mut self,
         group: super::super::shape::ShapeGroup<'a>,
@@ -4082,6 +4414,9 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Ergonomic alias for appending a validated root shape group.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn add_shape_group(
         &mut self,
         group: super::super::shape::ShapeGroup<'a>,
@@ -4092,6 +4427,9 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Atomically replace a root group without relocating its body anchor.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn replace_shape_group(
         &mut self,
         index: usize,
@@ -4119,6 +4457,9 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Atomically remove one root group and repair every stored index.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn remove_shape_group(
         &mut self,
         index: usize,
@@ -4151,6 +4492,9 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Reorder root drawings at the same body anchor without moving unrelated story content.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn move_drawing(&mut self, from: usize, to: usize) -> RtfResult<()> {
         if from >= self.drawing_order.len() || to >= self.drawing_order.len() {
             return Err(RtfError::MalformedDocument(
@@ -4296,9 +4640,9 @@ impl<'a> RtfDocument<'a> {
             },
             crate::BodyStoryEvent::FormFieldStart(index) => self.form_fields.get(index)?.position,
             crate::BodyStoryEvent::FormFieldEnd(index) => self.form_fields.get(index)?.range_end,
-            crate::BodyStoryEvent::RevisionStart(index) => self.revisions.get(index)?.position,
+            crate::BodyStoryEvent::RevisionStart(index)
+            | crate::BodyStoryEvent::RevisionDeletion(index) => self.revisions.get(index)?.position,
             crate::BodyStoryEvent::RevisionEnd(index) => self.revisions.get(index)?.range_end,
-            crate::BodyStoryEvent::RevisionDeletion(index) => self.revisions.get(index)?.position,
             crate::BodyStoryEvent::GeneratedListMarker(index) => {
                 self.generated_list_markers.get(index)?.position
             },
@@ -4382,6 +4726,7 @@ impl<'a> RtfDocument<'a> {
     /// Get the stylesheet.
     ///
     /// Returns style definitions for paragraphs and characters.
+    #[must_use]
     pub fn stylesheet(&self) -> &super::super::stylesheet::StyleSheet<'_> {
         &self.stylesheet
     }
@@ -4389,16 +4734,21 @@ impl<'a> RtfDocument<'a> {
     /// Get document information/metadata.
     ///
     /// Returns document properties like title, author, subject, etc.
+    #[must_use]
     pub fn info(&self) -> &super::super::info::DocumentInfo<'_> {
         &self.info
     }
 
     /// Return inert document and revision-protection metadata.
+    #[must_use]
     pub fn protection(&self) -> &crate::DocumentProtection<'_> {
         &self.info.protection
     }
 
     /// Replace inert document-protection metadata.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_protection(&mut self, protection: crate::DocumentProtection<'a>) -> RtfResult<()> {
         protection.validate()?;
         self.info.protection = protection;
@@ -4413,11 +4763,15 @@ impl<'a> RtfDocument<'a> {
     /// Get all annotations (comments) in the document.
     ///
     /// Returns document annotations and revisions.
+    #[must_use]
     pub fn annotations(&self) -> &[super::super::annotation::Annotation<'_>] {
         &self.annotations
     }
 
     /// Append an inert comment annotation after validating its body range.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_annotation(
         &mut self,
         annotation: super::super::annotation::Annotation<'a>,
@@ -4485,7 +4839,7 @@ impl<'a> RtfDocument<'a> {
 
     /// Convert list table to owned
     fn convert_list_table_to_owned(
-        table: super::super::list::ListTable<'_>,
+        table: &super::super::list::ListTable<'_>,
     ) -> RtfResult<super::super::list::ListTable<'static>> {
         let mut owned = super::super::list::ListTable::new();
         for list in table.lists() {
@@ -4570,7 +4924,7 @@ impl<'a> RtfDocument<'a> {
 
     /// Convert bookmarks to owned
     fn convert_bookmarks_to_owned(
-        bookmarks: super::super::bookmark::BookmarkTable<'_>,
+        bookmarks: &super::super::bookmark::BookmarkTable<'_>,
     ) -> super::super::bookmark::BookmarkTable<'static> {
         let mut owned = super::super::bookmark::BookmarkTable::new();
         for bookmark in bookmarks.bookmarks() {
@@ -4685,7 +5039,7 @@ impl<'a> RtfDocument<'a> {
 
     /// Convert stylesheet to owned
     fn convert_stylesheet_to_owned(
-        stylesheet: super::super::stylesheet::StyleSheet<'_>,
+        stylesheet: &super::super::stylesheet::StyleSheet<'_>,
     ) -> super::super::stylesheet::StyleSheet<'static> {
         let mut owned = super::super::stylesheet::StyleSheet::new();
         for style in stylesheet.styles() {
@@ -4829,11 +5183,15 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Get all footnotes and endnotes in the document.
+    #[must_use]
     pub fn notes(&self) -> &[super::super::section::Note<'_>] {
         &self.notes
     }
 
     /// Append a validated footnote or endnote at a UTF-8 main-story boundary.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_note(&mut self, note: super::super::section::Note<'a>) -> RtfResult<()> {
         note.validate()?;
         if self.text().get(note.position..note.position).is_none()
@@ -4875,11 +5233,15 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return explicit document-level footnote and endnote configuration.
+    #[must_use]
     pub fn note_options(&self) -> &crate::NoteOptions {
         &self.note_options
     }
 
     /// Replace document-level footnote and endnote configuration after validation.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_note_options(&mut self, options: crate::NoteOptions) -> RtfResult<()> {
         options.validate()?;
         self.note_options = options;
@@ -4887,11 +5249,15 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Return ordered footnote and endnote separator destinations.
+    #[must_use]
     pub fn note_separators(&self) -> &crate::NoteSeparatorTable<'_> {
         &self.note_separators
     }
 
     /// Replace note-separator destinations after validation.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_note_separators(
         &mut self,
         separators: crate::NoteSeparatorTable<'a>,
@@ -4907,26 +5273,33 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Get all footnotes in the document.
+    #[must_use]
     pub fn footnotes(&self) -> Vec<&super::super::section::Note<'_>> {
         self.notes.iter().filter(|n| n.is_footnote).collect()
     }
 
     /// Get all endnotes in the document.
+    #[must_use]
     pub fn endnotes(&self) -> Vec<&super::super::section::Note<'_>> {
         self.notes.iter().filter(|n| !n.is_footnote).collect()
     }
 
     /// Get all track changes/revisions in the document.
+    #[must_use]
     pub fn revisions(&self) -> &[super::super::annotation::Revision<'_>] {
         &self.revisions
     }
 
     /// Get the ordered revision-author table.
+    #[must_use]
     pub fn revision_authors(&self) -> &[super::super::annotation::RevisionAuthor<'_>] {
         &self.revision_authors
     }
 
     /// Append an entry to the ordered revision-author table.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_revision_author(
         &mut self,
         author: super::super::annotation::RevisionAuthor<'a>,
@@ -4958,6 +5331,9 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Remove the revision-author table when no revision still references it.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn clear_revision_authors(&mut self) -> RtfResult<()> {
         if !self.revisions.is_empty() {
             return Err(RtfError::MalformedDocument(
@@ -4970,6 +5346,9 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Append a validated tracked change.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_revision(
         &mut self,
         revision: super::super::annotation::Revision<'a>,
@@ -4980,7 +5359,7 @@ impl<'a> RtfDocument<'a> {
                 "RTF revision count exceeds the safety limit".to_string(),
             ));
         }
-        let author_index = usize::try_from(revision.id).map_err(|_| {
+        let author_index = usize::try_from(revision.id).map_err(|_err| {
             RtfError::MalformedDocument("RTF revision author index cannot be negative".to_string())
         })?;
         let author = self.revision_authors.get(author_index).ok_or_else(|| {
@@ -5026,7 +5405,9 @@ impl<'a> RtfDocument<'a> {
                     ));
                 }
             },
-            _ => {
+            super::super::annotation::RevisionType::FormatChange
+            | super::super::annotation::RevisionType::MovedFrom
+            | super::super::annotation::RevisionType::MovedTo => {
                 return Err(RtfError::MalformedDocument(
                     "this RTF revision kind has no lossless scoped-run representation".to_string(),
                 ));
@@ -5057,7 +5438,9 @@ impl<'a> RtfDocument<'a> {
             super::super::annotation::RevisionType::Deletion => {
                 self.insert_body_story_event(crate::BodyStoryEvent::RevisionDeletion(index))?;
             },
-            _ => {
+            super::super::annotation::RevisionType::FormatChange
+            | super::super::annotation::RevisionType::MovedFrom
+            | super::super::annotation::RevisionType::MovedTo => {
                 self.revisions.pop();
                 return Err(RtfError::MalformedDocument(
                     "this RTF revision kind has no lossless scoped-run representation".to_string(),
@@ -5068,6 +5451,9 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Append tracked-change metadata for ownership by a table-cell story.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_cell_revision_metadata(
         &mut self,
         revision: super::super::annotation::Revision<'a>,
@@ -5078,7 +5464,7 @@ impl<'a> RtfDocument<'a> {
                 "RTF revision count exceeds the safety limit".to_string(),
             ));
         }
-        let author_index = usize::try_from(revision.id).map_err(|_| {
+        let author_index = usize::try_from(revision.id).map_err(|_err| {
             RtfError::MalformedDocument("RTF revision author index cannot be negative".to_string())
         })?;
         if self
@@ -5108,6 +5494,9 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Atomically append tracked-change metadata and attach its event(s) to one cell story.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_revision_for_cell(
         &mut self,
         path: &crate::TableCellPath,
@@ -5132,7 +5521,9 @@ impl<'a> RtfDocument<'a> {
                     "RTF deletion revision is outside its table-cell story".to_string(),
                 ));
             },
-            _ => {
+            super::super::annotation::RevisionType::FormatChange
+            | super::super::annotation::RevisionType::MovedFrom
+            | super::super::annotation::RevisionType::MovedTo => {
                 return Err(RtfError::MalformedDocument(
                     "this RTF revision kind has no lossless scoped-run representation".to_string(),
                 ));
@@ -5146,7 +5537,9 @@ impl<'a> RtfDocument<'a> {
             super::super::annotation::RevisionType::Deletion => self
                 .table_cell_mut(path)?
                 .push_deletion_revision_reference(index, position),
-            _ => {
+            super::super::annotation::RevisionType::FormatChange
+            | super::super::annotation::RevisionType::MovedFrom
+            | super::super::annotation::RevisionType::MovedTo => {
                 self.revisions.pop();
                 return Err(RtfError::MalformedDocument(
                     "this RTF revision kind has no lossless scoped-run representation".to_string(),

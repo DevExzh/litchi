@@ -1,6 +1,6 @@
 //! Image container format detection and serialization metadata.
 
-/// Image formats that PresentationML can embed without transcoding.
+/// Image formats that `PresentationML` can embed without transcoding.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ImageFormat {
     Png,
@@ -13,6 +13,7 @@ pub enum ImageFormat {
 impl ImageFormat {
     /// Return the MIME type stored in the image relationship.
     #[inline]
+    #[must_use]
     pub const fn mime_type(self) -> &'static str {
         match self {
             Self::Png => "image/png",
@@ -25,6 +26,7 @@ impl ImageFormat {
 
     /// Return the canonical package extension for this format.
     #[inline]
+    #[must_use]
     pub const fn extension(self) -> &'static str {
         match self {
             Self::Png => "png",
@@ -36,6 +38,7 @@ impl ImageFormat {
     }
 
     /// Detect a supported image from its bounded magic-number prefix.
+    #[must_use]
     pub fn detect_from_bytes(bytes: &[u8]) -> Option<Self> {
         if bytes.starts_with(&[0x89, 0x50, 0x4e, 0x47]) {
             return Some(Self::Png);
@@ -59,6 +62,11 @@ impl ImageFormat {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::ImageFormat;
 

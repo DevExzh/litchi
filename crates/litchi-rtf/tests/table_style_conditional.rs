@@ -1,4 +1,19 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{RtfDocument, RtfWriter, StyleType};
+
+const TABLE_STYLE_SOURCE: &str = concat!(
+    r#"{\rtf1\ansi{\stylesheet{\ql Normal;}"#,
+    r#"{\*\ts16\tsrowd\b \tscfirstrow\tsclastrow\tscfirstcol\tsclastcol"#,
+    r#"\tscbandhorzodd\tscbandverteven\tscbandsh2\tscbandsv3 Table List;}}Body}"#,
+);
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
     let mut output = Vec::new();
@@ -7,12 +22,6 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
         .unwrap();
     output
 }
-
-const TABLE_STYLE_SOURCE: &str = concat!(
-    r#"{\rtf1\ansi{\stylesheet{\ql Normal;}"#,
-    r#"{\*\ts16\tsrowd\b \tscfirstrow\tsclastrow\tscfirstcol\tsclastcol"#,
-    r#"\tscbandhorzodd\tscbandverteven\tscbandsh2\tscbandsv3 Table List;}}Body}"#,
-);
 
 #[test]
 fn parses_table_style_conditional_formatting_and_round_trips() {
@@ -69,7 +78,7 @@ fn parses_table_style_conditional_formatting_and_round_trips() {
 #[test]
 fn table_style_without_conditional_metadata_stays_empty() {
     let document =
-        RtfDocument::parse(r#"{\rtf1\ansi{\stylesheet{\ql Normal;}{\*\ts16\b Table List;}}Body}"#)
+        RtfDocument::parse(r"{\rtf1\ansi{\stylesheet{\ql Normal;}{\*\ts16\b Table List;}}Body}")
             .unwrap();
     let style = document
         .stylesheet()
@@ -91,22 +100,22 @@ fn table_style_without_conditional_metadata_stays_empty() {
 fn rejects_misplaced_or_duplicate_table_style_controls() {
     let cases = [
         // Conditional controls in a paragraph style.
-        r#"{\rtf1{\stylesheet{\s1\tscfirstrow Para;}}}"#,
-        r#"{\rtf1{\stylesheet{\s1\tsrowd Para;}}}"#,
-        r#"{\rtf1{\stylesheet{\s1\tscbandsh2 Para;}}}"#,
+        r"{\rtf1{\stylesheet{\s1\tscfirstrow Para;}}}",
+        r"{\rtf1{\stylesheet{\s1\tsrowd Para;}}}",
+        r"{\rtf1{\stylesheet{\s1\tscbandsh2 Para;}}}",
         // Conditional controls in a character style.
-        r#"{\rtf1{\stylesheet{\*\cs1\tscfirstcol Char;}}}"#,
+        r"{\rtf1{\stylesheet{\*\cs1\tscfirstcol Char;}}}",
         // Duplicate controls.
-        r#"{\rtf1{\stylesheet{\*\ts16\tscfirstrow\tscfirstrow T;}}}"#,
-        r#"{\rtf1{\stylesheet{\*\ts16\tsrowd\tsrowd T;}}}"#,
-        r#"{\rtf1{\stylesheet{\*\ts16\tscbandsh2\tscbandsh3 T;}}}"#,
+        r"{\rtf1{\stylesheet{\*\ts16\tscfirstrow\tscfirstrow T;}}}",
+        r"{\rtf1{\stylesheet{\*\ts16\tsrowd\tsrowd T;}}}",
+        r"{\rtf1{\stylesheet{\*\ts16\tscbandsh2\tscbandsh3 T;}}}",
         // Parameterized flag controls.
-        r#"{\rtf1{\stylesheet{\*\ts16\tscfirstrow1 T;}}}"#,
-        r#"{\rtf1{\stylesheet{\*\ts16\tsrowd0 T;}}}"#,
+        r"{\rtf1{\stylesheet{\*\ts16\tscfirstrow1 T;}}}",
+        r"{\rtf1{\stylesheet{\*\ts16\tsrowd0 T;}}}",
         // Missing band-size parameter.
-        r#"{\rtf1{\stylesheet{\*\ts16\tscbandsh T;}}}"#,
+        r"{\rtf1{\stylesheet{\*\ts16\tscbandsh T;}}}",
         // Out-of-range band size.
-        r#"{\rtf1{\stylesheet{\*\ts16\tscbandsv65536 T;}}}"#,
+        r"{\rtf1{\stylesheet{\*\ts16\tscbandsv65536 T;}}}",
     ];
     for rtf in cases {
         assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");

@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use std::borrow::Cow;
 
 use litchi_rtf::{PictureShapeProperties, RtfDocument, RtfWriter, ShapeProperty};
@@ -44,10 +53,9 @@ fn parses_and_round_trips_real_libreoffice_picture_properties() {
 
 #[test]
 fn typed_mutation_moves_metadata_without_cloning_picture_payload() {
-    let mut document = RtfDocument::parse(
-        r#"{\rtf1{\*\shppict{\pict\pngblip\picw1\pich1 89504e470d0a1a0a}}Body}"#,
-    )
-    .unwrap();
+    let mut document =
+        RtfDocument::parse(r"{\rtf1{\*\shppict{\pict\pngblip\picw1\pich1 89504e470d0a1a0a}}Body}")
+            .unwrap();
     let data_ptr = document.pictures()[0].data().as_ptr();
     let properties = PictureShapeProperties {
         shape_id: Some(-7),
@@ -87,20 +95,20 @@ fn typed_mutation_moves_metadata_without_cloning_picture_payload() {
 
 #[test]
 fn rejects_hostile_picture_property_grammar() {
-    let suffix = r#"\pngblip 89504e470d0a1a0a}"#;
+    let suffix = r"\pngblip 89504e470d0a1a0a}";
     for prefix in [
-        r#"{\rtf1{\pict{\picprop{\sp{\sn x}{\sv 1}}}"#,
-        r#"{\rtf1{\pict{\*\picprop1{\sp{\sn x}{\sv 1}}}"#,
-        r#"{\rtf1{\pict{\*\picprop}"#,
-        r#"{\rtf1{\pict{\*\picprop\shplid{\sp{\sn x}{\sv 1}}}"#,
-        r#"{\rtf1{\pict{\*\picprop\shplid1\shplid2{\sp{\sn x}{\sv 1}}}"#,
-        r#"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv 1}}\shplid2}"#,
-        r#"{\rtf1{\pict{\*\picprop{\sp{\sv 1}{\sn x}}}"#,
-        r#"{\rtf1{\pict{\*\picprop{\sp{\sn x}}}"#,
-        r#"{\rtf1{\pict{\*\picprop{\sp1{\sn x}{\sv 1}}}"#,
-        r#"{\rtf1{\pict{\*\picprop{\sp{\sn1 x}{\sv 1}}}"#,
-        r#"{\rtf1{\pict{\*\picprop{\sp{\sn x{\object}}{\sv 1}}}"#,
-        r#"{\rtf1{\pict\pngblip 8950{\*\picprop{\sp{\sn x}{\sv 1}}}"#,
+        r"{\rtf1{\pict{\picprop{\sp{\sn x}{\sv 1}}}",
+        r"{\rtf1{\pict{\*\picprop1{\sp{\sn x}{\sv 1}}}",
+        r"{\rtf1{\pict{\*\picprop}",
+        r"{\rtf1{\pict{\*\picprop\shplid{\sp{\sn x}{\sv 1}}}",
+        r"{\rtf1{\pict{\*\picprop\shplid1\shplid2{\sp{\sn x}{\sv 1}}}",
+        r"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv 1}}\shplid2}",
+        r"{\rtf1{\pict{\*\picprop{\sp{\sv 1}{\sn x}}}",
+        r"{\rtf1{\pict{\*\picprop{\sp{\sn x}}}",
+        r"{\rtf1{\pict{\*\picprop{\sp1{\sn x}{\sv 1}}}",
+        r"{\rtf1{\pict{\*\picprop{\sp{\sn1 x}{\sv 1}}}",
+        r"{\rtf1{\pict{\*\picprop{\sp{\sn x{\object}}{\sv 1}}}",
+        r"{\rtf1{\pict\pngblip 8950{\*\picprop{\sp{\sn x}{\sv 1}}}",
     ] {
         let source = format!("{prefix}{suffix}");
         assert!(
@@ -110,10 +118,10 @@ fn rejects_hostile_picture_property_grammar() {
     }
 
     for source in [
-        r#"{\rtf1{\*\picprop{\sp{\sn x}{\sv 1}}}}"#,
-        r#"{\rtf1{\picprop{\sp{\sn x}{\sv 1}}}}"#,
-        r#"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv 1}}}{\*\picprop{\sp{\sn y}{\sv 2}}}\pngblip 89504e470d0a1a0a}}"#,
-        r#"{\rtf1{\pict{{\*\picprop{\sp{\sn x}{\sv 1}}}}\pngblip 89504e470d0a1a0a}}"#,
+        r"{\rtf1{\*\picprop{\sp{\sn x}{\sv 1}}}}",
+        r"{\rtf1{\picprop{\sp{\sn x}{\sv 1}}}}",
+        r"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv 1}}}{\*\picprop{\sp{\sn y}{\sv 2}}}\pngblip 89504e470d0a1a0a}}",
+        r"{\rtf1{\pict{{\*\picprop{\sp{\sn x}{\sv 1}}}}\pngblip 89504e470d0a1a0a}}",
     ] {
         assert!(
             RtfDocument::parse(source).is_err(),
@@ -125,7 +133,7 @@ fn rejects_hostile_picture_property_grammar() {
 #[test]
 fn enforces_typed_property_bounds() {
     let mut document =
-        RtfDocument::parse(r#"{\rtf1{\*\shppict{\pict\pngblip 89504e470d0a1a0a}}}"#).unwrap();
+        RtfDocument::parse(r"{\rtf1{\*\shppict{\pict\pngblip 89504e470d0a1a0a}}}").unwrap();
     assert!(
         document
             .set_picture_shape_properties(0, Some(PictureShapeProperties::default()))

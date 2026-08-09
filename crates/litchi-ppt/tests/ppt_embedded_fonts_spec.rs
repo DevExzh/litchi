@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 //! Independent vectors for the embedded-font structures in MS-PPT 2.9.8-2.9.12
 //! and 2.11.5.
 //!
@@ -22,7 +28,7 @@ fn record(version: u16, instance: u16, record_type: u16, payload: &[u8]) -> Vec<
     let mut bytes = Vec::with_capacity(8 + payload.len());
     bytes.extend_from_slice(&((instance << 4) | version).to_le_bytes());
     bytes.extend_from_slice(&record_type.to_le_bytes());
-    bytes.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+    bytes.extend_from_slice(&u32::try_from(payload.len()).unwrap().to_le_bytes());
     bytes.extend_from_slice(payload);
     bytes
 }
@@ -83,8 +89,14 @@ fn base_collection_uses_ordinal_refs_and_accepts_all_four_facets() {
             .collect::<Vec<_>>(),
         [0, 1, 2, 3]
     );
-    assert!(std::ptr::eq(fonts.get(0).unwrap(), &fonts.fonts[0]));
-    assert!(std::ptr::eq(fonts.get(1).unwrap(), &fonts.fonts[1]));
+    assert!(std::ptr::eq(
+        fonts.get(0).unwrap(),
+        &raw const fonts.fonts[0]
+    ));
+    assert!(std::ptr::eq(
+        fonts.get(1).unwrap(),
+        &raw const fonts.fonts[1]
+    ));
     assert!(fonts.get(2).is_none());
 
     #[cfg(feature = "fonts")]
@@ -135,11 +147,13 @@ fn malformed_font_names_and_entity_lengths_are_rejected() {
 #[test]
 fn record_limits_reject_oversize_font_records_before_materialization() {
     let bytes = collection(RT_FONT_COLLECTION, &[0; 128]);
-    let mut limits = RecordLimits::default();
-    limits.max_input_bytes = bytes.len();
-    limits.max_record_bytes = 64;
-    limits.max_record_payload_bytes = 56;
-    limits.max_copied_payload_bytes = 56;
+    let limits = RecordLimits {
+        max_input_bytes: bytes.len(),
+        max_record_bytes: 64,
+        max_record_payload_bytes: 56,
+        max_copied_payload_bytes: 56,
+        ..RecordLimits::default()
+    };
     assert!(Record::parse_with_limits(&bytes, 0, limits).is_err());
 }
 
@@ -160,8 +174,10 @@ fn eot_parser_rejects_malformed_utf16_sizes_and_explicit_limit_overflow() {
     malformed_name[84..86].copy_from_slice(&0xd800_u16.to_le_bytes());
     assert!(View::parse(&malformed_name).is_err());
 
-    let mut limits = Limits::default();
-    limits.max_input_bytes = eot.len() - 1;
+    let limits = Limits {
+        max_input_bytes: eot.len() - 1,
+        ..Limits::default()
+    };
     assert!(View::parse_with(&eot, limits).is_err());
 }
 
@@ -385,8 +401,8 @@ fn valid_eot() -> Vec<u8> {
         + 3;
     let size = 82 + names_bytes + font.len();
     let mut eot = vec![0_u8; 82];
-    set_le_u32(&mut eot, 0, size as u32);
-    set_le_u32(&mut eot, 4, font.len() as u32);
+    set_le_u32(&mut eot, 0, u32::try_from(size).unwrap());
+    set_le_u32(&mut eot, 4, u32::try_from(font.len()).unwrap());
     set_le_u32(&mut eot, 8, 0x0001_0000);
     eot[16..26].copy_from_slice(&[2, 11, 6, 4, 2, 2, 2, 2, 2, 4]);
     set_le_u32(&mut eot, 28, 400);
@@ -394,7 +410,7 @@ fn valid_eot() -> Vec<u8> {
     set_le_u16(&mut eot, 34, 0x504c);
     for (index, name) in names.iter().enumerate() {
         let units = name.encode_utf16().collect::<Vec<_>>();
-        eot.extend_from_slice(&((units.len() * 2) as u16).to_le_bytes());
+        eot.extend_from_slice(&u16::try_from(units.len() * 2).unwrap().to_le_bytes());
         for unit in units {
             eot.extend_from_slice(&unit.to_le_bytes());
         }
@@ -414,8 +430,8 @@ fn minimal_sfnt() -> Vec<u8> {
     set_be_u32(&mut font, 0, 0x0001_0000);
     set_be_u16(&mut font, 4, 1);
     font[12..16].copy_from_slice(b"OS/2");
-    set_be_u32(&mut font, 20, TABLE_OFFSET as u32);
-    set_be_u32(&mut font, 24, OS2_LEN as u32);
+    set_be_u32(&mut font, 20, u32::try_from(TABLE_OFFSET).unwrap());
+    set_be_u32(&mut font, 24, u32::try_from(OS2_LEN).unwrap());
     set_be_u16(&mut font, TABLE_OFFSET, 2);
     set_be_u16(&mut font, TABLE_OFFSET + 4, 400);
     set_be_u16(&mut font, TABLE_OFFSET + 6, 5);

@@ -1,5 +1,9 @@
 //! RTF document type definitions.
 
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items stay grouped by RTF feature area rather than by item kind"
+)]
 use super::border::{Borders, CharacterBorder, CharacterShading, Shading};
 use crate::{RtfError, RtfResult};
 use litchi_codepage::Mbcs;
@@ -26,18 +30,21 @@ pub struct Color {
 impl Color {
     /// Create a new color.
     #[inline]
+    #[must_use]
     pub const fn new(red: u8, green: u8, blue: u8) -> Self {
         Self { red, green, blue }
     }
 
     /// Black color.
     #[inline]
+    #[must_use]
     pub const fn black() -> Self {
         Self::new(0, 0, 0)
     }
 
     /// White color.
     #[inline]
+    #[must_use]
     pub const fn white() -> Self {
         Self::new(255, 255, 255)
     }
@@ -53,6 +60,7 @@ pub struct ColorTable {
 impl ColorTable {
     /// Create a new color table.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             colors: Vec::new(),
@@ -62,6 +70,10 @@ impl ColorTable {
 
     /// Add a color to the table and return its index.
     #[inline]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "color-table indices wrap to 16 bits by design"
+    )]
     pub fn add(&mut self, color: Color) -> ColorRef {
         let index = self.colors.len() as ColorRef;
         self.colors.push(color);
@@ -71,6 +83,10 @@ impl ColorTable {
 
     /// Add the automatic/default color entry and return its index.
     #[inline]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "color-table indices wrap to 16 bits by design"
+    )]
     pub fn add_automatic(&mut self) -> ColorRef {
         let index = self.colors.len() as ColorRef;
         self.colors.push(Color::default());
@@ -80,12 +96,14 @@ impl ColorTable {
 
     /// Get a color by reference.
     #[inline]
+    #[must_use]
     pub fn get(&self, color_ref: ColorRef) -> Option<&Color> {
         self.colors.get(color_ref as usize)
     }
 
     /// Whether a reference denotes the automatic/default color.
     #[inline]
+    #[must_use]
     pub fn is_automatic(&self, color_ref: ColorRef) -> bool {
         self.is_automatic_at(usize::from(color_ref))
     }
@@ -96,6 +114,7 @@ impl ColorTable {
 
     /// Get all colors in the table.
     #[inline]
+    #[must_use]
     pub fn colors(&self) -> &[Color] {
         &self.colors
     }
@@ -181,11 +200,15 @@ impl FontPage {
     }
 
     /// Validates an identifier and retains an unsupported value in the error.
+    ///
+    /// # Errors
+    /// Returns an error when the code page is unknown or unsupported.
     pub fn require(page: u32) -> Result<Self, litchi_codepage::Error> {
         Self::new(page).ok_or(litchi_codepage::Error::Unsupported(page))
     }
 
     /// Numeric RTF code-page identifier.
+    #[must_use]
     pub const fn id(self) -> u16 {
         match self {
             Self::Mbcs(page) => page.id16(),
@@ -263,6 +286,7 @@ pub enum FontCharset {
 
 impl FontCharset {
     /// Validates a numeric RTF charset identifier.
+    #[must_use]
     pub fn new(charset: u8) -> Option<Self> {
         Some(match charset {
             0 => Self::Ansi,
@@ -305,32 +329,18 @@ impl FontCharset {
     }
 
     /// Numeric RTF charset identifier.
+    #[must_use]
     pub const fn id(self) -> u8 {
         self as u8
     }
 
     /// Exact supported page implied by this charset.
+    #[must_use]
     pub fn page(self) -> Option<FontPage> {
         let page = match self {
             Self::Ansi => return Some(FontPage::WINDOWS_1252),
-            Self::Default => return None,
-            Self::MacRoman => return Some(FontPage::MACINTOSH),
-            Self::ShiftJis => return Some(FontPage::SHIFT_JIS),
-            Self::Hangul => 949,
-            Self::Gb2312 => 936,
-            Self::Big5 => 950,
-            Self::Greek => 1253,
-            Self::Turkish => 1254,
-            Self::Vietnamese => 1258,
-            Self::Hebrew => 1255,
-            Self::Arabic => 1256,
-            Self::Baltic => 1257,
-            Self::Russian => 1251,
-            Self::Thai => 874,
-            Self::EastEurope => 1250,
-            Self::Pc437 => return Some(FontPage::Cp437),
-            Self::Oem => return Some(FontPage::Cp850),
-            Self::Symbol
+            Self::Default
+            | Self::Symbol
             | Self::MacShiftJis
             | Self::MacHangul
             | Self::MacGb2312
@@ -347,6 +357,22 @@ impl FontCharset {
             | Self::ArabicTraditional
             | Self::ArabicUser
             | Self::HebrewUser => return None,
+            Self::MacRoman => return Some(FontPage::MACINTOSH),
+            Self::ShiftJis => return Some(FontPage::SHIFT_JIS),
+            Self::Hangul => 949,
+            Self::Gb2312 => 936,
+            Self::Big5 => 950,
+            Self::Greek => 1253,
+            Self::Turkish => 1254,
+            Self::Vietnamese => 1258,
+            Self::Hebrew => 1255,
+            Self::Arabic => 1256,
+            Self::Baltic => 1257,
+            Self::Russian => 1251,
+            Self::Thai => 874,
+            Self::EastEurope => 1250,
+            Self::Pc437 => return Some(FontPage::Cp437),
+            Self::Oem => return Some(FontPage::Cp850),
         };
         FontPage::new(page)
     }
@@ -374,7 +400,9 @@ impl EmbeddedFont<'_> {
     pub const MAX_DATA_BYTES: usize = 32 * 1_048_576;
     /// Maximum accepted `fontfile` name length in bytes.
     pub const MAX_FILE_NAME_BYTES: usize = 4_096;
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if self
             .file_name
@@ -430,6 +458,7 @@ pub enum FontTheme {
 
 impl FontTheme {
     /// The RTF control word selecting this role.
+    #[must_use]
     pub fn control_word(self) -> &'static str {
         match self {
             Self::MajorLatin => "flomajor",
@@ -444,6 +473,7 @@ impl FontTheme {
     }
 
     /// The role for a control word, or `None` for an unknown selector.
+    #[must_use]
     pub fn from_control_word(word: &str) -> Option<Self> {
         Some(match word {
             "flomajor" => Self::MajorLatin,
@@ -489,6 +519,7 @@ pub struct Font<'a> {
 impl<'a> Font<'a> {
     /// Create a new font.
     #[inline]
+    #[must_use]
     pub fn new(name: Cow<'a, str>, family: FontFamily) -> Self {
         Self {
             name,
@@ -504,7 +535,9 @@ impl<'a> Font<'a> {
             bidi: false,
         }
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         const MAX_FONT_NAME_BYTES: usize = 4_096;
         if self.name.is_empty()
@@ -559,6 +592,7 @@ pub struct FontTable<'a> {
 impl<'a> FontTable<'a> {
     /// Create a new font table.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             fonts: Vec::new(),
@@ -571,6 +605,9 @@ impl<'a> FontTable<'a> {
     /// The previous definition is returned when the index was already in use.
     /// Validation and allocation complete before the table's logical contents
     /// change.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn insert(&mut self, index: FontRef, font: Font<'a>) -> RtfResult<Option<Font<'a>>> {
         font.validate()?;
         if self.fonts.len() != self.defined.len() {
@@ -579,8 +616,8 @@ impl<'a> FontTable<'a> {
             ));
         }
 
-        let index = usize::from(index);
-        let required_len = index.checked_add(1).ok_or_else(|| {
+        let slot = usize::from(index);
+        let required_len = slot.checked_add(1).ok_or_else(|| {
             RtfError::MalformedDocument("RTF font-table index overflow".to_string())
         })?;
         if required_len > self.fonts.len() {
@@ -601,10 +638,10 @@ impl<'a> FontTable<'a> {
         }
 
         let (fonts, defined) = (&mut self.fonts, &mut self.defined);
-        let font_slot = fonts.get_mut(index).ok_or_else(|| {
+        let font_slot = fonts.get_mut(slot).ok_or_else(|| {
             RtfError::MalformedDocument("invalid RTF font-table index".to_string())
         })?;
-        let defined_slot = defined.get_mut(index).ok_or_else(|| {
+        let defined_slot = defined.get_mut(slot).ok_or_else(|| {
             RtfError::MalformedDocument("invalid RTF font-table index".to_string())
         })?;
         let was_defined = *defined_slot;
@@ -615,6 +652,7 @@ impl<'a> FontTable<'a> {
 
     /// Get a font by reference.
     #[inline]
+    #[must_use]
     pub fn get(&self, font_ref: FontRef) -> Option<&Font<'a>> {
         let index = usize::from(font_ref);
         if !self.defined.get(index).copied().unwrap_or(false) {
@@ -625,24 +663,28 @@ impl<'a> FontTable<'a> {
 
     /// Get all fonts in the table.
     #[inline]
+    #[must_use]
     pub fn fonts(&self) -> &[Font<'a>] {
         &self.fonts
     }
 
+    #[must_use]
     pub fn is_defined(&self, font_ref: FontRef) -> bool {
         self.defined
             .get(font_ref as usize)
             .copied()
             .unwrap_or(false)
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
+        const MAX_AGGREGATE_EMBEDDED_BYTES: usize = 256 * 1_048_576;
         if self.fonts.len() > 65_536 || self.defined.len() != self.fonts.len() {
             return Err(RtfError::MalformedDocument(
                 "invalid RTF font-table size".to_string(),
             ));
         }
-        const MAX_AGGREGATE_EMBEDDED_BYTES: usize = 256 * 1_048_576;
         let mut aggregate = 0usize;
         let mut embedded_aggregate = 0usize;
         for (font, defined) in self.fonts.iter().zip(&self.defined) {
@@ -662,9 +704,11 @@ impl<'a> FontTable<'a> {
                     RtfError::MalformedDocument("RTF font-table text size overflow".to_string())
                 })?;
             embedded_aggregate = embedded_aggregate
-                .checked_add(font.embedded.as_ref().map_or(0, |embedded| {
-                    embedded.data.as_ref().map_or(0, |data| data.len())
-                }))
+                .checked_add(
+                    font.embedded
+                        .as_ref()
+                        .map_or(0, |embedded| embedded.data.as_ref().map_or(0, Vec::len)),
+                )
                 .ok_or_else(|| {
                     RtfError::MalformedDocument("RTF font-table embedded size overflow".to_string())
                 })?;
@@ -690,7 +734,7 @@ impl<'a> FontTable<'a> {
     }
 }
 
-impl<'a> Default for FontTable<'a> {
+impl Default for FontTable<'_> {
     fn default() -> Self {
         Self::new()
     }
@@ -723,6 +767,10 @@ pub struct Spacing {
     pub line_multiple: bool,
 }
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent RTF feature flags stay flat for direct access"
+)]
 /// Paragraph spacing policy layered over raw twip spacing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ParagraphSpacingPolicy {
@@ -795,6 +843,10 @@ pub enum ParagraphFontAlignment {
     Fixed,
 }
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent RTF feature flags stay flat for direct access"
+)]
 /// Effective paragraph line-breaking and automatic-spacing policy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ParagraphLineBreaking {
@@ -826,6 +878,7 @@ pub enum ParagraphDropCapKind {
 
 impl ParagraphDropCapKind {
     /// Return the canonical RTF numeric value.
+    #[must_use]
     pub const fn as_rtf_value(self) -> i32 {
         match self {
             Self::InText => 1,
@@ -840,12 +893,18 @@ pub struct ParagraphDropCap {
     kind: ParagraphDropCapKind,
     line_count: u8,
 }
-
 impl ParagraphDropCap {
     /// Construct a complete drop cap.
-    pub fn new(kind: ParagraphDropCapKind, line_count: u16) -> crate::RtfResult<Self> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the range check above bounds the line count to the u8 range"
+    )]
+    pub fn new(kind: ParagraphDropCapKind, line_count: u16) -> RtfResult<Self> {
         if !(1..=MAX_PARAGRAPH_DROP_CAP_LINES).contains(&line_count) {
-            return Err(crate::RtfError::InvalidStructure(format!(
+            return Err(RtfError::InvalidStructure(format!(
                 "RTF drop-cap line count must be in 1..={MAX_PARAGRAPH_DROP_CAP_LINES}"
             )));
         }
@@ -856,19 +915,24 @@ impl ParagraphDropCap {
     }
 
     /// Drop-cap placement.
+    #[must_use]
     pub const fn kind(self) -> ParagraphDropCapKind {
         self.kind
     }
 
     /// Number of text lines occupied by the drop cap.
+    #[must_use]
     pub const fn line_count(self) -> u8 {
         self.line_count
     }
 
     /// Validate the model before serialization.
-    pub fn validate(self) -> crate::RtfResult<()> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
+    pub fn validate(self) -> RtfResult<()> {
         if self.line_count == 0 {
-            return Err(crate::RtfError::InvalidStructure(
+            return Err(RtfError::InvalidStructure(
                 "RTF drop-cap line count must be nonzero".to_string(),
             ));
         }
@@ -888,14 +952,18 @@ pub struct RevisionMetadata {
 
 impl RevisionMetadata {
     /// Whether neither an author nor a date was authored.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.author.is_none() && self.date.is_none()
     }
 
     /// Validate the author index against the RTF domain.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
+    pub fn validate(&self) -> RtfResult<()> {
         if self.author.is_some_and(|author| author < 0) {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(RtfError::MalformedDocument(
                 "RTF revision author index cannot be negative".to_string(),
             ));
         }
@@ -903,6 +971,10 @@ impl RevisionMetadata {
     }
 }
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent RTF feature flags stay flat for direct access"
+)]
 /// Paragraph properties.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Paragraph {
@@ -971,7 +1043,10 @@ impl Paragraph {
     }
 
     /// Replace the paragraph shading after validating its RTF domain.
-    pub fn set_shading(&mut self, shading: Shading) -> crate::RtfResult<()> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
+    pub fn set_shading(&mut self, shading: Shading) -> RtfResult<()> {
         shading.validate()?;
         self.shading = shading;
         Ok(())
@@ -1056,6 +1131,7 @@ impl AnimatedTextEffect {
 
     /// Convert a raw RTF `\animtextN` parameter to a typed effect.
     #[inline]
+    #[must_use]
     pub fn from_rtf(value: i32) -> Option<Self> {
         Some(match value {
             0 => Self::None,
@@ -1071,6 +1147,7 @@ impl AnimatedTextEffect {
 
     /// Return the raw RTF `\animtextN` parameter for this effect.
     #[inline]
+    #[must_use]
     pub fn rtf_value(self) -> i32 {
         match self {
             Self::None => 0,
@@ -1108,10 +1185,11 @@ impl FitText {
 
     /// Convert a raw RTF `\fittextN` parameter to a typed value.
     #[inline]
+    #[must_use]
     pub fn from_rtf(value: i32) -> Option<Self> {
         Some(match value {
             -1 => Self::Continue,
-            0..=Self::MAX_TWIPS => Self::Fixed(value as u32),
+            0..=Self::MAX_TWIPS => Self::Fixed(value.cast_unsigned()),
             _ => return None,
         })
     }
@@ -1119,11 +1197,12 @@ impl FitText {
     /// Return the raw RTF `\fittextN` parameter for this value, or `None`
     /// when no fit-text property is active.
     #[inline]
+    #[must_use]
     pub fn rtf_value(self) -> Option<i32> {
         match self {
             Self::None => None,
             Self::Continue => Some(-1),
-            Self::Fixed(twips) => Some(twips as i32),
+            Self::Fixed(twips) => Some(twips.cast_signed()),
         }
     }
 }
@@ -1150,6 +1229,7 @@ pub enum EmphasisMark {
 impl EmphasisMark {
     /// Return the RTF control word selecting this mark, without the backslash.
     #[inline]
+    #[must_use]
     pub const fn control_word(self) -> &'static str {
         match self {
             Self::None => "accnone",
@@ -1254,18 +1334,18 @@ impl AssociatedCharacterFormatting {
     }
 
     /// Set or clear the associated baseline after validating the RTF domain.
-    pub fn set_baseline(
-        &mut self,
-        value: Option<AssociatedCharacterBaseline>,
-    ) -> crate::RtfResult<()> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
+    pub fn set_baseline(&mut self, value: Option<AssociatedCharacterBaseline>) -> RtfResult<()> {
         if matches!(
             value,
             Some(
-                AssociatedCharacterBaseline::RaisedHalfPoints(value)
-                    | AssociatedCharacterBaseline::LoweredHalfPoints(value)
-            ) if i32::from(value) > crate::MAX_CHARACTER_BASELINE_HALF_POINTS
+                AssociatedCharacterBaseline::RaisedHalfPoints(points)
+                    | AssociatedCharacterBaseline::LoweredHalfPoints(points)
+            ) if i32::from(points) > crate::MAX_CHARACTER_BASELINE_HALF_POINTS
         ) {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(RtfError::MalformedDocument(
                 "RTF associated character baseline is out of range".to_string(),
             ));
         }
@@ -1274,17 +1354,24 @@ impl AssociatedCharacterFormatting {
     }
 
     /// Set or clear associated quarter-point expansion.
-    pub fn set_expansion_quarter_points(&mut self, value: Option<i32>) -> crate::RtfResult<()> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "adjacent range checks bound each narrowing conversion to the target type's range"
+    )]
+    pub fn set_expansion_quarter_points(&mut self, value: Option<i32>) -> RtfResult<()> {
         self.expansion_quarter_points = match value {
             None => None,
-            Some(value)
+            Some(points)
                 if (-crate::MAX_CHARACTER_EXPANSION..=crate::MAX_CHARACTER_EXPANSION)
-                    .contains(&value) =>
+                    .contains(&points) =>
             {
-                Some(value as i16)
+                Some(points as i16)
             },
             Some(_) => {
-                return Err(crate::RtfError::MalformedDocument(
+                return Err(RtfError::MalformedDocument(
                     "RTF associated character expansion is out of range".to_string(),
                 ));
             },
@@ -1293,14 +1380,17 @@ impl AssociatedCharacterFormatting {
     }
 
     /// Validate metadata before canonical serialization.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
+    pub fn validate(&self) -> RtfResult<()> {
         if let Some(baseline) = self.baseline {
             let value = match baseline {
                 AssociatedCharacterBaseline::RaisedHalfPoints(value)
                 | AssociatedCharacterBaseline::LoweredHalfPoints(value) => value,
             };
             if i32::from(value) > crate::MAX_CHARACTER_BASELINE_HALF_POINTS {
-                return Err(crate::RtfError::MalformedDocument(
+                return Err(RtfError::MalformedDocument(
                     "RTF associated character baseline is out of range".to_string(),
                 ));
             }
@@ -1308,7 +1398,7 @@ impl AssociatedCharacterFormatting {
         if self.expansion_quarter_points.is_some_and(|value| {
             i32::from(value).unsigned_abs() > crate::MAX_CHARACTER_EXPANSION as u32
         }) {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(RtfError::MalformedDocument(
                 "RTF associated character expansion is out of range".to_string(),
             ));
         }
@@ -1316,6 +1406,10 @@ impl AssociatedCharacterFormatting {
     }
 }
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent RTF feature flags stay flat for direct access"
+)]
 /// Character formatting properties.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Formatting {
@@ -1514,42 +1608,49 @@ pub struct Run<'a> {
 impl<'a> Run<'a> {
     /// Create a new run.
     #[inline]
+    #[must_use]
     pub fn new(text: Cow<'a, str>, formatting: Formatting) -> Self {
         Self { text, formatting }
     }
 
     /// Get the text content.
     #[inline]
+    #[must_use]
     pub fn text(&self) -> &str {
         &self.text
     }
 
     /// Check if this run is bold.
     #[inline]
+    #[must_use]
     pub fn bold(&self) -> Option<bool> {
         Some(self.formatting.bold)
     }
 
     /// Check if this run is italic.
     #[inline]
+    #[must_use]
     pub fn italic(&self) -> Option<bool> {
         Some(self.formatting.italic)
     }
 
     /// Check if this run has strikethrough.
     #[inline]
+    #[must_use]
     pub fn strikethrough(&self) -> Option<bool> {
         Some(self.formatting.strike || self.formatting.double_strike)
     }
 
     /// Check if this run has underline.
     #[inline]
+    #[must_use]
     pub fn underline(&self) -> bool {
         !matches!(self.formatting.underline, UnderlineStyle::None)
     }
 
     /// Get the vertical position of this run (superscript/subscript).
     #[inline]
+    #[must_use]
     pub fn vertical_position(&self) -> Option<litchi_core::style::text::pos::VerticalPosition> {
         if self.formatting.superscript {
             Some(litchi_core::style::text::pos::VerticalPosition::Superscript)
@@ -1575,16 +1676,18 @@ pub struct StyleBlock<'a> {
 impl<'a> StyleBlock<'a> {
     /// Create a new style block.
     #[inline]
+    #[must_use]
     pub fn new(text: Cow<'a, str>, formatting: Formatting, paragraph: Paragraph) -> Self {
         Self {
-            text,
-            formatting,
             paragraph,
+            formatting,
+            text,
         }
     }
 
     /// Get the text content.
     #[inline]
+    #[must_use]
     pub fn text(&self) -> &str {
         &self.text
     }
@@ -1607,7 +1710,10 @@ pub struct ParagraphContent<'a> {
 /// This enum is used by the `elements()` method to represent
 /// the mixed content of an RTF document in sequential order.
 #[derive(Debug, Clone)]
-#[allow(clippy::large_enum_variant)] // public content enum; boxing would break the API
+#[allow(
+    clippy::large_enum_variant,
+    reason = "public content enum; boxing would break the API"
+)]
 pub enum DocumentElement<'a> {
     /// A paragraph with formatted runs
     Paragraph(ParagraphContent<'a>),
@@ -1618,18 +1724,21 @@ pub enum DocumentElement<'a> {
 impl<'a> ParagraphContent<'a> {
     /// Create a new paragraph with content.
     #[inline]
+    #[must_use]
     pub fn new(properties: Paragraph, runs: Vec<Run<'a>>) -> Self {
         Self { properties, runs }
     }
 
     /// Get the text content of the paragraph.
     #[inline]
+    #[must_use]
     pub fn text(&self) -> String {
         self.runs.iter().map(|r| r.text.as_ref()).collect()
     }
 
     /// Get the runs in this paragraph.
     #[inline]
+    #[must_use]
     pub fn runs(&self) -> &[Run<'a>] {
         &self.runs
     }
@@ -1637,6 +1746,11 @@ impl<'a> ParagraphContent<'a> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::*;
 
     #[test]
@@ -1675,7 +1789,7 @@ mod tests {
     #[test]
     fn test_color_debug() {
         let color = Color::new(255, 0, 0);
-        let debug = format!("{:?}", color);
+        let debug = format!("{color:?}");
         assert!(debug.contains("Color"));
         assert!(debug.contains("255"));
     }
@@ -1688,7 +1802,7 @@ mod tests {
 
     #[test]
     fn test_color_table_default() {
-        let table: ColorTable = Default::default();
+        let table: ColorTable = ColorTable::default();
         assert!(table.colors().is_empty());
     }
 
@@ -1740,8 +1854,8 @@ mod tests {
 
     #[test]
     fn font_charset_is_compact_and_maps_pc_pages_exactly() {
-        assert_eq!(std::mem::size_of::<FontCharset>(), 1);
-        assert_eq!(std::mem::size_of::<Option<FontCharset>>(), 1);
+        assert_eq!(size_of::<FontCharset>(), 1);
+        assert_eq!(size_of::<Option<FontCharset>>(), 1);
         assert_eq!(FontCharset::new(254), Some(FontCharset::Pc437));
         assert_eq!(FontCharset::Pc437.page(), Some(FontPage::Cp437));
         assert_eq!(FontCharset::new(255), Some(FontCharset::Oem));
@@ -1752,13 +1866,13 @@ mod tests {
 
     #[test]
     fn test_font_table_new() {
-        let table: FontTable = FontTable::new();
+        let table: FontTable<'_> = FontTable::new();
         assert!(table.fonts().is_empty());
     }
 
     #[test]
     fn test_font_table_insert() {
-        let mut table: FontTable = FontTable::new();
+        let mut table: FontTable<'_> = FontTable::new();
         assert!(
             table
                 .insert(0, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss))
@@ -1776,7 +1890,7 @@ mod tests {
 
     #[test]
     fn test_font_table_get() {
-        let mut table: FontTable = FontTable::new();
+        let mut table: FontTable<'_> = FontTable::new();
         assert!(
             table
                 .insert(0, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss))
@@ -1789,7 +1903,7 @@ mod tests {
 
     #[test]
     fn test_font_table_sparse() {
-        let mut table: FontTable = FontTable::new();
+        let mut table: FontTable<'_> = FontTable::new();
         assert!(
             table
                 .insert(5, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss))
@@ -1801,7 +1915,7 @@ mod tests {
 
     #[test]
     fn font_table_insert_returns_replaced_definition() {
-        let mut table: FontTable = FontTable::new();
+        let mut table: FontTable<'_> = FontTable::new();
         assert!(
             table
                 .insert(2, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss))
@@ -1821,7 +1935,7 @@ mod tests {
 
     #[test]
     fn font_table_insert_rejects_invalid_fonts_atomically() {
-        let mut table: FontTable = FontTable::new();
+        let mut table: FontTable<'_> = FontTable::new();
         let invalid = Font::new(Cow::Borrowed(""), FontFamily::Nil);
         assert!(table.insert(4, invalid).is_err());
         assert!(table.fonts().is_empty());
@@ -1830,7 +1944,7 @@ mod tests {
 
     #[test]
     fn font_table_lookup_is_total_for_inconsistent_private_storage() {
-        let mut table: FontTable = FontTable::new();
+        let mut table: FontTable<'_> = FontTable::new();
         assert!(
             table
                 .insert(0, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss))

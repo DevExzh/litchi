@@ -1,4 +1,4 @@
-//! PowerPoint 10 slide flags and creation-time atoms (MS-PPT 2.5.30-2.5.31).
+//! `PowerPoint` 10 slide flags and creation-time atoms (MS-PPT 2.5.30-2.5.31).
 
 use super::types::{Flags, SlideAnimationExtension};
 use crate::consts::RecordType;
@@ -10,7 +10,7 @@ const FLAGS_PAYLOAD_LEN: usize = 4;
 const TIME_PAYLOAD_LEN: usize = 8;
 const DEFINED_FLAGS_MASK: u32 = 0x0000_0003;
 
-/// Resource bounds for parsing PowerPoint 10 slide metadata atoms.
+/// Resource bounds for parsing `PowerPoint` 10 slide metadata atoms.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SlideMetadataLimits {
     /// Maximum accepted size of one complete record, including its header.
@@ -27,6 +27,7 @@ impl Default for SlideMetadataLimits {
 
 impl Flags {
     /// Creates flags with all undefined bits cleared.
+    #[must_use]
     pub fn new(preserve_master: bool, override_master_animation: bool) -> Self {
         let raw = u32::from(preserve_master) | (u32::from(override_master_animation) << 1);
         Self {
@@ -37,6 +38,7 @@ impl Flags {
     }
 
     /// Decodes the two defined flags while retaining the ignored bits losslessly.
+    #[must_use]
     pub fn from_raw(raw: u32) -> Self {
         Self {
             raw,
@@ -47,6 +49,7 @@ impl Flags {
 
     /// Returns the serialized word. Undefined bits are preserved; defined bits
     /// are normalized from the corresponding semantic fields.
+    #[must_use]
     pub fn raw_value(&self) -> u32 {
         (self.raw & !DEFINED_FLAGS_MASK)
             | u32::from(self.preserve_master)
@@ -54,16 +57,25 @@ impl Flags {
     }
 
     /// Returns bits 2-31, which MS-PPT requires readers to ignore.
+    #[must_use]
     pub fn ignored_bits(&self) -> u32 {
         self.raw & !DEFINED_FLAGS_MASK
     }
 
     /// Parses a generic record using the default resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_record(record: &Record) -> Result<Self> {
         Self::parse_record_with_limits(record, SlideMetadataLimits::default())
     }
 
     /// Parses a generic record using explicit resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_record_with_limits(record: &Record, limits: SlideMetadataLimits) -> Result<Self> {
         let payload = validate_record(
             record,
@@ -73,18 +85,26 @@ impl Flags {
             "SlideFlags10Atom",
         )?;
         Ok(Self::from_raw(u32::from_le_bytes(
-            payload.try_into().map_err(|_| {
+            payload.try_into().map_err(|_err| {
                 Error::Corrupted("SlideFlags10Atom payload is truncated".to_string())
             })?,
         )))
     }
 
     /// Parses exactly one serialized record using the default resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_bytes(bytes: &[u8]) -> Result<Self> {
         Self::parse_bytes_with_limits(bytes, SlideMetadataLimits::default())
     }
 
     /// Parses exactly one serialized record using explicit resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_bytes_with_limits(bytes: &[u8], limits: SlideMetadataLimits) -> Result<Self> {
         let payload = validate_bytes(
             bytes,
@@ -94,23 +114,30 @@ impl Flags {
             "SlideFlags10Atom",
         )?;
         Ok(Self::from_raw(u32::from_le_bytes(
-            payload.try_into().map_err(|_| {
+            payload.try_into().map_err(|_err| {
                 Error::Corrupted("SlideFlags10Atom payload is truncated".to_string())
             })?,
         )))
     }
 
     /// Serializes the fixed four-byte payload.
+    #[must_use]
     pub fn to_payload(&self) -> [u8; FLAGS_PAYLOAD_LEN] {
         self.raw_value().to_le_bytes()
     }
 
     /// Serializes the complete atom, including its record header.
+    #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         serialize_atom(RecordType::SlideFlags10Atom, &self.to_payload())
     }
 
     /// Converts the atom into the generic record representation.
+    #[must_use]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "`FLAGS_PAYLOAD_LEN` is a compile-time 4-byte constant, so it always fits in `u32`"
+    )]
     pub fn to_record(&self) -> Record {
         let data = self.to_payload().to_vec();
         Record {
@@ -133,21 +160,31 @@ pub struct SlideTime {
 
 impl SlideTime {
     /// Creates an atom from 100-nanosecond ticks since 1601-01-01 UTC.
+    #[must_use]
     pub const fn new(file_time: u64) -> Self {
         Self { file_time }
     }
 
     /// Returns the raw FILETIME value.
+    #[must_use]
     pub const fn file_time(self) -> u64 {
         self.file_time
     }
 
     /// Parses a generic record using the default resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_record(record: &Record) -> Result<Self> {
         Self::parse_record_with_limits(record, SlideMetadataLimits::default())
     }
 
     /// Parses a generic record using explicit resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_record_with_limits(record: &Record, limits: SlideMetadataLimits) -> Result<Self> {
         let payload = validate_record(
             record,
@@ -157,16 +194,24 @@ impl SlideTime {
             "SlideTime10Atom",
         )?;
         Ok(Self::new(u64::from_le_bytes(payload.try_into().map_err(
-            |_| Error::Corrupted("SlideTime10Atom payload is truncated".to_string()),
+            |_err| Error::Corrupted("SlideTime10Atom payload is truncated".to_string()),
         )?)))
     }
 
     /// Parses exactly one serialized record using the default resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_bytes(bytes: &[u8]) -> Result<Self> {
         Self::parse_bytes_with_limits(bytes, SlideMetadataLimits::default())
     }
 
     /// Parses exactly one serialized record using explicit resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_bytes_with_limits(bytes: &[u8], limits: SlideMetadataLimits) -> Result<Self> {
         let payload = validate_bytes(
             bytes,
@@ -176,21 +221,28 @@ impl SlideTime {
             "SlideTime10Atom",
         )?;
         Ok(Self::new(u64::from_le_bytes(payload.try_into().map_err(
-            |_| Error::Corrupted("SlideTime10Atom payload is truncated".to_string()),
+            |_err| Error::Corrupted("SlideTime10Atom payload is truncated".to_string()),
         )?)))
     }
 
     /// Serializes the fixed eight-byte FILETIME payload.
+    #[must_use]
     pub fn to_payload(self) -> [u8; TIME_PAYLOAD_LEN] {
         self.file_time.to_le_bytes()
     }
 
     /// Serializes the complete atom, including its record header.
+    #[must_use]
     pub fn to_bytes(self) -> Vec<u8> {
         serialize_atom(RecordType::SlideTime10Atom, &self.to_payload())
     }
 
     /// Converts the atom into the generic record representation.
+    #[must_use]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "`TIME_PAYLOAD_LEN` is a compile-time 8-byte constant, so it always fits in `u32`"
+    )]
     pub fn to_record(self) -> Record {
         let data = self.to_payload().to_vec();
         Record {
@@ -207,6 +259,7 @@ impl SlideTime {
 
 impl SlideAnimationExtension {
     /// Returns the typed `SlideFlags10Atom`, if present.
+    #[must_use]
     pub fn slide_flags_atom(&self) -> Option<Flags> {
         self.slide_flags
     }
@@ -227,6 +280,10 @@ impl SlideAnimationExtension {
     }
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "callers pass only the fixed 4- or 8-byte payload constants, so `payload_len` always fits in `u32`"
+)]
 fn validate_record<'a>(
     record: &'a Record,
     expected_type: RecordType,
@@ -261,6 +318,10 @@ fn validate_record<'a>(
     Ok(&record.data)
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "callers pass only the fixed 4- or 8-byte payload constants, so `payload_len` always fits in `u32`"
+)]
 fn validate_bytes<'a>(
     bytes: &'a [u8],
     expected_type: RecordType,
@@ -311,6 +372,10 @@ fn validate_bytes<'a>(
     Ok(&bytes[HEADER_LEN..expected_len])
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "callers pass only the fixed 4- or 8-byte atom payloads, so the payload length always fits in `u32`"
+)]
 fn serialize_atom(record_type: RecordType, payload: &[u8]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(HEADER_LEN + payload.len());
     bytes.extend_from_slice(&0u16.to_le_bytes());
@@ -321,6 +386,11 @@ fn serialize_atom(record_type: RecordType, payload: &[u8]) -> Vec<u8> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -383,21 +453,23 @@ mod tests {
                 }
             };
 
-            let mut bad = valid.clone();
-            bad[0] = 1;
-            assert!(parse(&bad).is_err());
-            let mut bad = valid.clone();
-            bad[1] = 0x10;
-            assert!(parse(&bad).is_err());
-            let mut bad = valid.clone();
-            bad[2..4].copy_from_slice(&0xffffu16.to_le_bytes());
-            assert!(parse(&bad).is_err());
-            let mut bad = valid.clone();
-            bad[4..8].copy_from_slice(&((payload_len - 1) as u32).to_le_bytes());
-            assert!(parse(&bad).is_err());
-            let mut bad = valid.clone();
-            bad[4..8].copy_from_slice(&((payload_len + 1) as u32).to_le_bytes());
-            assert!(parse(&bad).is_err());
+            let mut bad_version = valid.clone();
+            bad_version[0] = 1;
+            assert!(parse(&bad_version).is_err());
+            let mut bad_instance = valid.clone();
+            bad_instance[1] = 0x10;
+            assert!(parse(&bad_instance).is_err());
+            let mut bad_type = valid.clone();
+            bad_type[2..4].copy_from_slice(&0xffffu16.to_le_bytes());
+            assert!(parse(&bad_type).is_err());
+            let mut bad_short_len = valid.clone();
+            bad_short_len[4..8]
+                .copy_from_slice(&u32::try_from(payload_len - 1).unwrap().to_le_bytes());
+            assert!(parse(&bad_short_len).is_err());
+            let mut bad_long_len = valid.clone();
+            bad_long_len[4..8]
+                .copy_from_slice(&u32::try_from(payload_len + 1).unwrap().to_le_bytes());
+            assert!(parse(&bad_long_len).is_err());
         }
     }
 
@@ -424,9 +496,9 @@ mod tests {
         for end in 0..time.len() {
             assert!(SlideTime::parse_bytes(&time[..end]).is_err());
         }
-        let mut trailing = time.clone();
-        trailing.push(0);
-        assert!(SlideTime::parse_bytes(&trailing).is_err());
+        let mut time_trailing = time.clone();
+        time_trailing.push(0);
+        assert!(SlideTime::parse_bytes(&time_trailing).is_err());
         assert!(
             SlideTime::parse_bytes_with_limits(
                 &time,
@@ -444,16 +516,18 @@ mod tests {
         flags.record_type_raw = RecordType::SlideTime10Atom.as_u16();
         assert!(Flags::parse_record(&flags).is_err());
 
-        let mut time = SlideTime::new(0).to_record();
-        time.data_length = 7;
-        assert!(SlideTime::parse_record(&time).is_err());
+        let mut time_wrong_length = SlideTime::new(0).to_record();
+        time_wrong_length.data_length = 7;
+        assert!(SlideTime::parse_record(&time_wrong_length).is_err());
 
-        let mut time = SlideTime::new(0).to_record();
-        time.children.push(Flags::new(false, false).to_record());
-        assert!(SlideTime::parse_record(&time).is_err());
+        let mut time_extra_child = SlideTime::new(0).to_record();
+        time_extra_child
+            .children
+            .push(Flags::new(false, false).to_record());
+        assert!(SlideTime::parse_record(&time_extra_child).is_err());
 
-        let mut flags = Flags::new(false, false).to_record();
-        flags.record_type = RecordType::SlideTime10Atom;
-        assert!(Flags::parse_record(&flags).is_err());
+        let mut flags_wrong_type = Flags::new(false, false).to_record();
+        flags_wrong_type.record_type = RecordType::SlideTime10Atom;
+        assert!(Flags::parse_record(&flags_wrong_type).is_err());
     }
 }

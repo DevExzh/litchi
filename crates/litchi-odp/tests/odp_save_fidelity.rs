@@ -17,7 +17,7 @@ fn deck_text(bytes: Vec<u8>) -> String {
         .slides()
         .unwrap()
         .iter()
-        .map(|slide| slide.all_text())
+        .map(litchi_odp::Slide::all_text)
         .collect::<Vec<_>>()
         .join("\n")
 }

@@ -14,7 +14,7 @@ pub const MAX_XML_BYTES: usize = 512 * 1024;
 const EMPTY_STYLES: &[u8] =
     br#"<p:txStyles xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#;
 
-/// A validated embedded OPC package containing the PresentationML
+/// A validated embedded OPC package containing the `PresentationML`
 /// `txStyles` part used by a notes master.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Styles {
@@ -23,28 +23,42 @@ pub struct Styles {
 
 impl Styles {
     /// Create a canonical empty `txStyles` package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn empty() -> Result<Self> {
         Self::from_xml(EMPTY_STYLES)
     }
 
     /// Build a deterministic package around one validated `txStyles` XML
     /// document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn from_xml(xml: impl AsRef<[u8]>) -> Result<Self> {
         super::package::from_xml(xml.as_ref())
     }
 
     /// Parse and validate an existing embedded package without normalizing its
     /// bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn from_package(data: impl Into<Vec<u8>>) -> Result<Self> {
         super::package::from_bytes(data.into())
     }
 
     /// Borrow the validated package descriptor.
+    #[must_use]
     pub const fn package(&self) -> &Package {
         &self.package
     }
 
     /// Borrow the exact package bytes represented by this value.
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         self.package.bytes()
     }
@@ -72,16 +86,19 @@ impl Package {
     }
 
     /// Borrow the exact serialized OPC package.
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.data
     }
 
     /// Number of parts in the embedded package.
+    #[must_use]
     pub const fn part_count(&self) -> usize {
         self.part_count
     }
 
-    /// Name of the one PresentationML part containing `txStyles`.
+    /// Name of the one `PresentationML` part containing `txStyles`.
+    #[must_use]
     pub fn xml_part_name(&self) -> &str {
         &self.xml_part_name
     }

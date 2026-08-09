@@ -1,11 +1,20 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{FileLocation, RtfDocument, RtfWriter};
 
-const SYNTHETIC: &str = r#"{\rtf1\ansi\ansicpg1250\uc1
+const SYNTHETIC: &str = r"{\rtf1\ansi\ansicpg1250\uc1
 {\*\filetbl
 {\file\fid1\frelative2\fosnum1\fvaliddos\fvalidntfs C:\\dir\\\'8a\u20320?.txt;}
 {\file\fid7\fvalidmac\fnetwork \\server\\share\\remote.doc;}
 {\file\fid9\fnonfilesys Printer Queue;}}
-Body}"#;
+Body}";
 
 #[test]
 fn parses_decodes_and_round_trips_file_table() {
@@ -44,25 +53,25 @@ fn parses_decodes_and_round_trips_file_table() {
 #[test]
 fn rejects_malformed_file_tables_and_active_content() {
     let malformed = [
-        r#"{\rtf1{\filetbl{\file\fid1 x;}}}"#,
-        r#"{\rtf1{\*\filetbl}}"#,
-        r#"{\rtf1{\*\filetbl{\file\fid1 x;}}{\*\filetbl{\file\fid2 y;}}}"#,
-        r#"{\rtf1 Body{\*\filetbl{\file\fid1 x;}}}"#,
-        r#"{\rtf1{\file\fid1 x;}}"#,
-        r#"{\rtf1{\*\filetbl{\file\fid1 x;}{\file\fid1 y;}}}"#,
-        r#"{\rtf1{\*\filetbl{\file\fid2 x;}{\file\fid1 y;}}}"#,
-        r#"{\rtf1{\*\filetbl{\file\fid-1 x;}}}"#,
-        r#"{\rtf1{\*\filetbl{\file x;}}}"#,
-        r#"{\rtf1{\*\filetbl{\file\fid1 ;}}}"#,
-        r#"{\rtf1{\*\filetbl{\file\fid1 x}}}"#,
-        r#"{\rtf1{\*\filetbl{\file\fid1\frelative-1 x;}}}"#,
-        r#"{\rtf1{\*\filetbl{\file\fid1\frelative256 x;}}}"#,
-        r#"{\rtf1{\*\filetbl{\file\fid1\fosnum256 x;}}}"#,
-        r#"{\rtf1{\*\filetbl{\file\fid1\fnetwork\fnonfilesys x;}}}"#,
-        r#"{\rtf1{\*\filetbl{\file\fid1\fvaliddos\fvaliddos x;}}}"#,
-        r#"{\rtf1{\*\filetbl{\file\fid1{\field X}x;}}}"#,
-        r#"{\rtf1{\*\filetbl{\file\fid1{\object X}x;}}}"#,
-        r#"{\rtf1{\*\filetbl{\file\fid1\bin2 ABx;}}}"#,
+        r"{\rtf1{\filetbl{\file\fid1 x;}}}",
+        r"{\rtf1{\*\filetbl}}",
+        r"{\rtf1{\*\filetbl{\file\fid1 x;}}{\*\filetbl{\file\fid2 y;}}}",
+        r"{\rtf1 Body{\*\filetbl{\file\fid1 x;}}}",
+        r"{\rtf1{\file\fid1 x;}}",
+        r"{\rtf1{\*\filetbl{\file\fid1 x;}{\file\fid1 y;}}}",
+        r"{\rtf1{\*\filetbl{\file\fid2 x;}{\file\fid1 y;}}}",
+        r"{\rtf1{\*\filetbl{\file\fid-1 x;}}}",
+        r"{\rtf1{\*\filetbl{\file x;}}}",
+        r"{\rtf1{\*\filetbl{\file\fid1 ;}}}",
+        r"{\rtf1{\*\filetbl{\file\fid1 x}}}",
+        r"{\rtf1{\*\filetbl{\file\fid1\frelative-1 x;}}}",
+        r"{\rtf1{\*\filetbl{\file\fid1\frelative256 x;}}}",
+        r"{\rtf1{\*\filetbl{\file\fid1\fosnum256 x;}}}",
+        r"{\rtf1{\*\filetbl{\file\fid1\fnetwork\fnonfilesys x;}}}",
+        r"{\rtf1{\*\filetbl{\file\fid1\fvaliddos\fvaliddos x;}}}",
+        r"{\rtf1{\*\filetbl{\file\fid1{\field X}x;}}}",
+        r"{\rtf1{\*\filetbl{\file\fid1{\object X}x;}}}",
+        r"{\rtf1{\*\filetbl{\file\fid1\bin2 ABx;}}}",
     ];
     for source in malformed {
         assert!(
@@ -75,6 +84,6 @@ fn rejects_malformed_file_tables_and_active_content() {
 #[test]
 fn rejects_overlong_file_name() {
     let name = "x".repeat(4097);
-    let source = format!(r#"{{\rtf1{{\*\filetbl{{\file\fid1 {name};}}}}}}"#);
+    let source = format!(r"{{\rtf1{{\*\filetbl{{\file\fid1 {name};}}}}}}");
     assert!(RtfDocument::parse(&source).is_err());
 }

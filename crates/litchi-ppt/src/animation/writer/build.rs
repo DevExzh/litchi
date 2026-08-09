@@ -1,4 +1,4 @@
-//! PowerPoint 2002 build-list records and legacy effect mapping.
+//! `PowerPoint` 2002 build-list records and legacy effect mapping.
 
 use super::support::{create_record_header, wrap_record};
 use super::time_node::write_extended_time_node;
@@ -10,10 +10,35 @@ use crate::consts::RecordType;
 use crate::package::{Error, Result};
 
 /// Map a high-level animation effect to PPT97 fly method and direction codes.
-/// Based on LibreOffice ppt97animations.cxx mapping.
+/// Based on `LibreOffice` ppt97animations.cxx mapping.
+#[allow(
+    clippy::match_same_arms,
+    clippy::wildcard_enum_match_arm,
+    reason = "the arms mirror the effect categories of the ppt97animations.cxx mapping; identical codes are deliberate per-category defaults and each wildcard arm encodes the documented fallback direction for that effect"
+)]
 pub(super) fn map_effect_to_ppt97(effect: AnimationEffect, direction: EffectDirection) -> (u8, u8) {
-    use AnimationEffect::*;
-    use EffectDirection::*;
+    use AnimationEffect::{
+        Appear, Ascend, Blinds, BlindsOut, BoldFlash, Bounce, Box, BoxOut, ChangeFillColor,
+        ChangeFontColor, ChangeFontSize, ChangeLineColor, Checkerboard, CheckerboardOut, Collapse,
+        ColorPulse, ComplementaryColor, ComplementaryColor2, Compress, ContrastingColor, CrawlIn,
+        CrawlOut, Custom, Darken, Descend, DescendOut, Diamond, DiamondOut, Disappear, Dissolve,
+        Expand, FadeIn, FadeOut, Flicker, FloatIn, FlyIn, FlyOut, GrowAndTurn, GrowShrink, Lighten,
+        MotionPath, MotionPathArcDown, MotionPathArcUp, MotionPathCircle, MotionPathCurvedX,
+        MotionPathCurves, MotionPathDiagonalDownRight, MotionPathDiagonalUpRight,
+        MotionPathDiamond, MotionPathDown, MotionPathHeart, MotionPathHexagon, MotionPathLeft,
+        MotionPathLines, MotionPathLoopDeLoop, MotionPathOctagon, MotionPathPentagon,
+        MotionPathRight, MotionPathSCurve1, MotionPathSCurve2, MotionPathShapes,
+        MotionPathSineWave, MotionPathSpiralLeft, MotionPathSpiralRight, MotionPathSpring,
+        MotionPathSquare, MotionPathStar4, MotionPathStar5, MotionPathStar6, MotionPathStar8,
+        MotionPathTriangle, MotionPathUp, MotionPathZigzag, ObjectColor, PeekIn, PeekOut, Plus,
+        PlusOut, Pulse, Random, RandomBars, RandomBarsOut, RiseUp, SinkDown, Spin, SpiralIn,
+        SpiralOut, Split, SplitOut, Stretch, Strips, StripsOut, Swivel, Teeter, Transparency,
+        Underline, VerticalHighlight, Wave, Wedge, Wheel, Wipe, WipeOut, Zoom,
+    };
+    use EffectDirection::{
+        FromBottom, FromBottomLeft, FromBottomRight, FromLeft, FromRight, FromTop, FromTopLeft,
+        FromTopRight, Horizontal, In, Out, Vertical,
+    };
 
     match effect {
         // Entrance effects
@@ -141,15 +166,20 @@ pub(super) fn map_effect_to_ppt97(effect: AnimationEffect, direction: EffectDire
     }
 }
 
-/// Write BuildList container record.
+/// Write `BuildList` container record.
+///
+/// # Errors
+///
+/// Returns an error if two builds share a build identity, a build entry fails
+/// validation or serialization, or the record exceeds the 4 GiB limit.
 pub fn write_build_list(build_info: &BuildList) -> Result<Vec<u8>> {
     let mut identities = std::collections::HashSet::with_capacity(build_info.builds.len());
     let mut children = Vec::new();
     for build in &build_info.builds {
         let atom = match build {
-            BuildListEntry::Paragraph(build) => &build.atom,
-            BuildListEntry::Chart(build) => &build.atom,
-            BuildListEntry::Diagram(build) => &build.atom,
+            BuildListEntry::Paragraph(paragraph_build) => &paragraph_build.atom,
+            BuildListEntry::Chart(chart_build) => &chart_build.atom,
+            BuildListEntry::Diagram(diagram_build) => &diagram_build.atom,
         };
         if !identities.insert((atom.build_id, atom.shape_id_ref)) {
             return Err(Error::InvalidFormat(format!(
@@ -158,9 +188,9 @@ pub fn write_build_list(build_info: &BuildList) -> Result<Vec<u8>> {
             )));
         }
         children.extend(match build {
-            BuildListEntry::Paragraph(build) => write_paragraph_build(build)?,
-            BuildListEntry::Chart(build) => write_chart_build(build)?,
-            BuildListEntry::Diagram(build) => write_diagram_build(build)?,
+            BuildListEntry::Paragraph(paragraph_build) => write_paragraph_build(paragraph_build)?,
+            BuildListEntry::Chart(chart_build) => write_chart_build(chart_build)?,
+            BuildListEntry::Diagram(diagram_build) => write_diagram_build(diagram_build)?,
         });
     }
     wrap_record(RecordType::BuildList, 0x0F, 0, children)
@@ -218,6 +248,10 @@ fn write_diagram_build(build: &DiagramBuild) -> Result<Vec<u8>> {
     wrap_record(RecordType::DiagramBuild, 0x0F, 0, children)
 }
 
+#[allow(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "callers validate a borrowed field of the build struct; taking the build type by reference keeps the validator consistent with the other reference-taking validators in this module"
+)]
 pub(super) fn validate_paragraph_levels(
     build_type: &crate::animation::types::ParagraphBuildType,
     levels: &[ParagraphBuildLevel],

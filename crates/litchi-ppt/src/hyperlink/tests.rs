@@ -3,6 +3,11 @@ use crate::consts::RecordType;
 use crate::records::Record;
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod interaction_protocol_tests {
     use super::*;
 
@@ -169,14 +174,19 @@ mod interaction_protocol_tests {
 }
 
 #[cfg(test)]
-mod tests {
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+mod hyperlink_tests {
     use super::*;
 
     fn record_bytes(version: u16, instance: u16, kind: u16, payload: &[u8]) -> Vec<u8> {
         let mut data = Vec::new();
         data.extend_from_slice(&((instance << 4) | version).to_le_bytes());
         data.extend_from_slice(&kind.to_le_bytes());
-        data.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+        data.extend_from_slice(&u32::try_from(payload.len()).unwrap().to_le_bytes());
         data.extend_from_slice(payload);
         data
     }
@@ -203,7 +213,7 @@ mod tests {
             record_type_raw: 1033,
             version: 0x0f,
             instance: 0,
-            data_length: payload.len() as u32,
+            data_length: u32::try_from(payload.len()).unwrap(),
             data: payload,
             children: Vec::new(),
         }
@@ -211,8 +221,8 @@ mod tests {
 
     fn hyperlink9(id: u32, screen_tip: Option<&str>, flags: u32) -> Vec<u8> {
         let mut payload = record_bytes(0, 0, 4051, &id.to_le_bytes());
-        if let Some(screen_tip) = screen_tip {
-            payload.extend_from_slice(&record_bytes(0, 0, 4026, &unicode(screen_tip)));
+        if let Some(tip) = screen_tip {
+            payload.extend_from_slice(&record_bytes(0, 0, 4026, &unicode(tip)));
         }
         payload.extend_from_slice(&record_bytes(0, 0, 4120, &flags.to_le_bytes()));
         record_bytes(0x0f, 0, 4068, &payload)
@@ -233,7 +243,7 @@ mod tests {
             record_type_raw: 0x1388,
             version: 0x0f,
             instance: 0,
-            data_length: tag.len() as u32,
+            data_length: u32::try_from(tag.len()).unwrap(),
             data: tag,
             children: Vec::new(),
         }
@@ -253,8 +263,8 @@ mod tests {
 
     fn root(list: Option<Record>, extensions: &[Vec<u8>]) -> Record {
         let mut children = Vec::new();
-        if let Some(list) = list {
-            children.push(list);
+        if let Some(object_list) = list {
+            children.push(object_list);
         }
         if !extensions.is_empty() {
             let blob: Vec<u8> = extensions.iter().flatten().copied().collect();

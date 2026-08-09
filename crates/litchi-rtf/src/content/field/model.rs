@@ -1,8 +1,25 @@
 use std::borrow::Cow;
 
-use super::codec::*;
+use super::MAX_INSTRUCTION_LEN;
+use super::codec::{
+    advance_field_adjustments, auto_number_field_parts, auto_text_field_parts,
+    auto_text_list_field_parts, barcode_display_field_parts, barcode_field_instructions,
+    bibliography_parts, bidi_outline_field_instructions, citation_parts, compare_field_comparison,
+    database_field_instructions, dde_field_parts, document_context_field_parts,
+    document_information_field_parts, document_property_field_parts, document_variable_field_parts,
+    embed_field_instructions, equation_expression, external_include_parts, formula_field_formula,
+    go_to_button_parts, if_field_expression, index_entry_parts, index_parts, info_field_parts,
+    is_formula_field_instruction, is_mail_merge_next_instruction, legacy_form_field_instructions,
+    link_field_parts, list_number_field_parts, macro_button_parts,
+    mail_merge_conditional_control_parts, mail_merge_counter_kind, mail_merge_data_field_parts,
+    mail_merge_recipient_field_parts, merge_field_parts, parse_field_code,
+    print_field_instructions, private_field_instructions, prompt_field_parts, quote_field_parts,
+    referenced_document_field_parts, sequence_field_parts, set_field_parts,
+    shape_field_instructions, style_reference_field_parts, symbol_field_parts,
+    table_of_authorities_entry_parts, table_of_authorities_parts, table_of_contents_entry_parts,
+    table_of_contents_parts, user_identity_field_parts,
+};
 use super::validation::{push_story_page_break, validate_story_events};
-use super::{MAX_GENERIC_FIELDS, MAX_INSTRUCTION_LEN};
 
 /// Field type in RTF documents.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -105,6 +122,7 @@ pub struct PageBreak {
 }
 
 impl PageBreak {
+    #[must_use]
     pub const fn new(position: usize) -> Self {
         Self { position }
     }
@@ -117,6 +135,7 @@ pub struct ColumnBreak {
 }
 
 impl ColumnBreak {
+    #[must_use]
     pub const fn new(position: usize) -> Self {
         Self { position }
     }
@@ -150,6 +169,7 @@ pub struct SoftBreak {
 }
 
 impl SoftBreak {
+    #[must_use]
     pub const fn new(kind: SoftBreakKind, position: usize) -> Self {
         Self { kind, position }
     }
@@ -167,6 +187,7 @@ pub struct SectionBreak {
 }
 
 impl SectionBreak {
+    #[must_use]
     pub const fn new(position: usize, next_section: Option<usize>) -> Self {
         Self {
             position,
@@ -285,6 +306,10 @@ pub enum ParsedFieldCode<'a> {
     Malformed(FieldCodeError),
 }
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent RTF feature flags stay flat for direct access"
+)]
 /// Presence-only state carried by a generic RTF field.
 ///
 /// Each `false` value means the corresponding control word was omitted.
@@ -737,9 +762,9 @@ pub enum LinkFormatting {
     Source,
     /// `2`: match formatting in the destination document.
     Destination,
-    /// `4`: preserve source formatting for a SpreadsheetML workbook source.
+    /// `4`: preserve source formatting for a `SpreadsheetML` workbook source.
     SpreadsheetSource,
-    /// `5`: match destination formatting for a SpreadsheetML workbook source.
+    /// `5`: match destination formatting for a `SpreadsheetML` workbook source.
     SpreadsheetDestination,
     /// An ECMA-376-unsupported or otherwise unrecognized integral mode.
     Unsupported(i64),
@@ -794,7 +819,7 @@ pub enum ExternalIncludeOption<'a> {
     NamespaceMapping(Cow<'a, str>),
     /// An XSLT location from the INCLUDETEXT t switch.
     Xslt(Cow<'a, str>),
-    /// An XPath expression from the INCLUDETEXT x switch.
+    /// An `XPath` expression from the INCLUDETEXT x switch.
     XPath(Cow<'a, str>),
 }
 
@@ -1253,6 +1278,7 @@ pub enum DocumentInformationFieldKind {
 
 impl DocumentInformationFieldKind {
     /// The uppercase field keyword stored in a Word field instruction.
+    #[must_use]
     pub const fn field_keyword(self) -> &'static str {
         match self {
             Self::Title => "TITLE",
@@ -1332,6 +1358,7 @@ pub enum DocumentContextFieldKind {
 
 impl DocumentContextFieldKind {
     /// The uppercase field keyword stored in a Word field instruction.
+    #[must_use]
     pub const fn field_keyword(self) -> &'static str {
         match self {
             Self::FileName => "FILENAME",
@@ -1628,6 +1655,7 @@ pub enum AutoNumberFieldKind {
 
 impl AutoNumberFieldKind {
     /// The uppercase field keyword stored in a Word field instruction.
+    #[must_use]
     pub const fn field_keyword(self) -> &'static str {
         match self {
             Self::AutoNum => "AUTONUM",
@@ -2025,41 +2053,49 @@ pub(super) struct LinkFieldParts<'a> {
 
 impl<'a> HyperlinkField<'a> {
     /// Return the complete stored `HYPERLINK` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return the external target, if one was stored.
+    #[must_use]
     pub fn external_target(&self) -> Option<&str> {
         self.external_target.as_deref()
     }
 
     /// Return the local bookmark target, if one was stored.
+    #[must_use]
     pub fn bookmark(&self) -> Option<&str> {
         self.bookmark.as_deref()
     }
 
     /// Return the stored screen-tip text, if any.
+    #[must_use]
     pub fn screen_tip(&self) -> Option<&str> {
         self.screen_tip.as_deref()
     }
 
     /// Return the stored target frame, if any.
+    #[must_use]
     pub fn target_frame(&self) -> Option<&str> {
         self.target_frame.as_deref()
     }
 
     /// Return the stored image-map coordinates, if any.
+    #[must_use]
     pub fn coordinates(&self) -> Option<&str> {
         self.coordinates.as_deref()
     }
 
     /// Whether the instruction requests a new window.
+    #[must_use]
     pub const fn opens_in_new_window(&self) -> bool {
         self.new_window
     }
 
     /// Return switches not recognized by this API in source order.
+    #[must_use]
     pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
         &self.unknown_switches
     }
@@ -2067,31 +2103,37 @@ impl<'a> HyperlinkField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated or activated.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -2099,36 +2141,43 @@ impl<'a> HyperlinkField<'a> {
 
 impl<'a> ReferenceField<'a> {
     /// Return the complete stored cross-reference field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return the stored cross-reference field kind.
+    #[must_use]
     pub const fn kind(&self) -> ReferenceFieldKind {
         self.kind
     }
 
     /// Return the stored bookmark name.
+    #[must_use]
     pub fn bookmark(&self) -> &str {
         &self.bookmark
     }
 
     /// Whether the instruction requests a hyperlink result.
+    #[must_use]
     pub const fn has_hyperlink(&self) -> bool {
         self.hyperlink
     }
 
     /// Whether the instruction requests a relative-position result.
+    #[must_use]
     pub const fn includes_relative_position(&self) -> bool {
         self.position
     }
 
     /// Whether the instruction requests a footnote-mark result.
+    #[must_use]
     pub const fn includes_footnote_mark(&self) -> bool {
         self.footnote_mark
     }
 
     /// Return switches not recognized by this API in source order.
+    #[must_use]
     pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
         &self.unknown_switches
     }
@@ -2136,31 +2185,37 @@ impl<'a> ReferenceField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position_in_story
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -2168,11 +2223,13 @@ impl<'a> ReferenceField<'a> {
 
 impl<'a> EquationField<'a> {
     /// Return the complete stored `EQ` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return the opaque equation expression after the `EQ` keyword.
+    #[must_use]
     pub fn expression(&self) -> &'a str {
         self.expression
     }
@@ -2182,6 +2239,9 @@ impl<'a> EquationField<'a> {
     /// The model is purely syntactic: switch kinds, spacing values, bracket
     /// characters, and element text exactly as stored. Malformed expressions
     /// are reported as errors; nothing is evaluated or rendered.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn model(&self) -> crate::RtfResult<crate::EquationModel<'a>> {
         crate::EquationModel::parse(self.expression)
     }
@@ -2190,31 +2250,37 @@ impl<'a> EquationField<'a> {
     ///
     /// RTF 1.9.1 examples normally use an empty result for `EQ` fields. This
     /// value is metadata only and is never recalculated.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -2222,11 +2288,13 @@ impl<'a> EquationField<'a> {
 
 impl<'a> MacroButtonField<'a> {
     /// Return the complete stored `MACROBUTTON` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return the stored macro name without resolving or invoking it.
+    #[must_use]
     pub fn macro_name(&self) -> &str {
         &self.macro_name
     }
@@ -2234,36 +2302,43 @@ impl<'a> MacroButtonField<'a> {
     /// Return the optional text stored after the macro name.
     ///
     /// This is the field's button/display text, not a generated value.
+    #[must_use]
     pub fn display_text(&self) -> Option<&str> {
         self.display_text.as_deref()
     }
 
     /// Return the stored field result when a producer supplied one.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -2271,6 +2346,7 @@ impl<'a> MacroButtonField<'a> {
 
 impl<'a> GoToButtonField<'a> {
     /// Return the complete stored `GOTOBUTTON` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
@@ -2279,6 +2355,7 @@ impl<'a> GoToButtonField<'a> {
     ///
     /// A destination can be a bookmark, page reference, annotation, footnote,
     /// line, page, or section expression.
+    #[must_use]
     pub fn target(&self) -> &str {
         &self.target
     }
@@ -2286,6 +2363,7 @@ impl<'a> GoToButtonField<'a> {
     /// Return the stored text or graphic-label expression for the button.
     ///
     /// This is source metadata, not an activated control.
+    #[must_use]
     pub fn button_text(&self) -> &str {
         &self.button_text
     }
@@ -2293,31 +2371,37 @@ impl<'a> GoToButtonField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated from the destination.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -2327,11 +2411,13 @@ impl<'a> ActiveContentField<'a> {
     /// Return the complete stored active-content field instruction.
     ///
     /// This string remains opaque metadata and is never interpreted.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return whether this stores add-in, OCX-control, or HTML-control metadata.
+    #[must_use]
     pub const fn kind(&self) -> ActiveContentFieldKind {
         self.kind
     }
@@ -2340,31 +2426,37 @@ impl<'a> ActiveContentField<'a> {
     ///
     /// This is cached text only and is never regenerated by loading or running
     /// content.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -2375,6 +2467,7 @@ impl<'a> PrintField<'a> {
     ///
     /// This string remains opaque metadata and is never interpreted or sent to
     /// a printer.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
@@ -2383,6 +2476,7 @@ impl<'a> PrintField<'a> {
     ///
     /// This can include printer-control or PostScript text. It is never parsed,
     /// interpreted, or sent to a printer.
+    #[must_use]
     pub fn printer_instructions(&self) -> &'a str {
         self.printer_instructions
     }
@@ -2390,31 +2484,37 @@ impl<'a> PrintField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated by printing.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -2425,6 +2525,7 @@ impl<'a> EmbedField<'a> {
     ///
     /// This string remains opaque metadata and is never used to load or
     /// activate an object.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
@@ -2433,6 +2534,7 @@ impl<'a> EmbedField<'a> {
     ///
     /// It is never parsed, used to locate an object, or used to load, inspect,
     /// deserialize, activate, render, or execute object content.
+    #[must_use]
     pub fn object_instructions(&self) -> &'a str {
         self.object_instructions
     }
@@ -2440,31 +2542,37 @@ impl<'a> EmbedField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated from an object.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -2475,6 +2583,7 @@ impl<'a> BarcodeField<'a> {
     ///
     /// This string remains opaque metadata and is never used to generate or
     /// render a barcode.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
@@ -2483,6 +2592,7 @@ impl<'a> BarcodeField<'a> {
     ///
     /// It is never parsed, validated, interpreted, or used to generate or
     /// render barcode content.
+    #[must_use]
     pub fn barcode_instructions(&self) -> &'a str {
         self.barcode_instructions
     }
@@ -2490,31 +2600,37 @@ impl<'a> BarcodeField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated from barcode data.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -2522,11 +2638,13 @@ impl<'a> BarcodeField<'a> {
 
 impl<'a> BarcodeDisplayField<'a> {
     /// Return the complete stored barcode display field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return whether this stores `DISPLAYBARCODE` or `MERGEBARCODE` metadata.
+    #[must_use]
     pub const fn kind(&self) -> BarcodeDisplayFieldKind {
         self.kind
     }
@@ -2536,6 +2654,7 @@ impl<'a> BarcodeDisplayField<'a> {
     /// For `DISPLAYBARCODE`, this is direct barcode data. For `MERGEBARCODE`, it
     /// is the stored mail-merge data-field name. Neither form is validated,
     /// resolved, or used to generate a barcode.
+    #[must_use]
     pub fn data_argument(&self) -> &str {
         &self.data_argument
     }
@@ -2543,6 +2662,7 @@ impl<'a> BarcodeDisplayField<'a> {
     /// Return the stored barcode-type argument.
     ///
     /// This value is not validated or used to select a barcode implementation.
+    #[must_use]
     pub fn barcode_type(&self) -> &str {
         &self.barcode_type
     }
@@ -2550,6 +2670,7 @@ impl<'a> BarcodeDisplayField<'a> {
     /// Return stored field-specific and formatting switches in source order.
     ///
     /// Switch values are retained without validation or interpretation.
+    #[must_use]
     pub fn switches(&self) -> &[FieldSwitch<'a>] {
         &self.switches
     }
@@ -2557,31 +2678,37 @@ impl<'a> BarcodeDisplayField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated as a barcode.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -2592,6 +2719,7 @@ impl<'a> BidiOutlineField<'a> {
     ///
     /// This string remains opaque metadata and is never used to calculate an
     /// outline number.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
@@ -2600,6 +2728,7 @@ impl<'a> BidiOutlineField<'a> {
     ///
     /// It is never parsed, interpreted, or used to resolve language, outline,
     /// numbering, or layout state.
+    #[must_use]
     pub fn opaque_instructions(&self) -> &'a str {
         self.opaque_instructions
     }
@@ -2607,31 +2736,37 @@ impl<'a> BidiOutlineField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated from document state.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -2642,6 +2777,7 @@ impl<'a> ShapeField<'a> {
     ///
     /// This string remains opaque metadata and is never used to locate or
     /// position a drawing canvas.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
@@ -2650,6 +2786,7 @@ impl<'a> ShapeField<'a> {
     ///
     /// It is never parsed, interpreted, or used to link a field to a drawing,
     /// resolve an anchor, or calculate layout.
+    #[must_use]
     pub fn opaque_instructions(&self) -> &'a str {
         self.opaque_instructions
     }
@@ -2658,31 +2795,37 @@ impl<'a> ShapeField<'a> {
     ///
     /// This is cached metadata only and is never regenerated from a drawing
     /// canvas.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -2690,16 +2833,19 @@ impl<'a> ShapeField<'a> {
 
 impl<'a> AutoTextField<'a> {
     /// Return the complete stored field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return whether this stores `GLOSSARY` or `AUTOTEXT` metadata.
+    #[must_use]
     pub const fn kind(&self) -> AutoTextFieldKind {
         self.kind
     }
 
     /// Return the stored building-block entry name without resolving it.
+    #[must_use]
     pub fn entry_name(&self) -> &str {
         &self.entry_name
     }
@@ -2707,6 +2853,7 @@ impl<'a> AutoTextField<'a> {
     /// Return unrecognized stored switches in source order.
     ///
     /// They are retained without interpretation or execution.
+    #[must_use]
     pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
         &self.unknown_switches
     }
@@ -2715,31 +2862,37 @@ impl<'a> AutoTextField<'a> {
     ///
     /// This is cached text only and is never regenerated by looking up or
     /// inserting content.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -2747,6 +2900,7 @@ impl<'a> AutoTextField<'a> {
 
 impl<'a> AutoTextListField<'a> {
     /// Return the complete stored `AUTOTEXTLIST` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
@@ -2754,6 +2908,7 @@ impl<'a> AutoTextListField<'a> {
     /// Return the optional stored display text.
     ///
     /// This text is metadata only and never triggers a selection UI.
+    #[must_use]
     pub fn display_text(&self) -> Option<&str> {
         self.display_text.as_deref()
     }
@@ -2762,6 +2917,7 @@ impl<'a> AutoTextListField<'a> {
     ///
     /// This metadata is never used to query, select, or insert a building
     /// block.
+    #[must_use]
     pub fn options(&self) -> &[AutoTextListOption<'a>] {
         &self.options
     }
@@ -2769,6 +2925,7 @@ impl<'a> AutoTextListField<'a> {
     /// Return unrecognized stored switches in source order.
     ///
     /// They are retained without interpretation or execution.
+    #[must_use]
     pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
         &self.unknown_switches
     }
@@ -2777,31 +2934,37 @@ impl<'a> AutoTextListField<'a> {
     ///
     /// This is cached text only and is never regenerated by selection or
     /// content insertion.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -2809,26 +2972,31 @@ impl<'a> AutoTextListField<'a> {
 
 impl<'a> DdeField<'a> {
     /// Return the complete stored DDE field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return whether this is a `DDE` or `DDEAUTO` field.
+    #[must_use]
     pub const fn kind(&self) -> DdeFieldKind {
         self.kind
     }
 
     /// Return the stored DDE application name without launching it.
+    #[must_use]
     pub fn application(&self) -> &str {
         &self.application
     }
 
     /// Return the stored source identifier without opening or resolving it.
+    #[must_use]
     pub fn source(&self) -> &str {
         &self.source
     }
 
     /// Return the optional stored source item, such as a cell range or bookmark.
+    #[must_use]
     pub fn item(&self) -> Option<&str> {
         self.item.as_deref()
     }
@@ -2836,6 +3004,7 @@ impl<'a> DdeField<'a> {
     /// Whether the stored instruction requests automatic DDE updates.
     ///
     /// This is metadata only. The crate never performs an update.
+    #[must_use]
     pub const fn requests_automatic_updates(&self) -> bool {
         self.automatic_updates
     }
@@ -2843,6 +3012,7 @@ impl<'a> DdeField<'a> {
     /// Return the requested stored result representation, if present.
     ///
     /// This is metadata only and never triggers source access or conversion.
+    #[must_use]
     pub const fn representation(&self) -> Option<DdeRepresentation> {
         self.representation
     }
@@ -2851,41 +3021,49 @@ impl<'a> DdeField<'a> {
     ///
     /// This is stored metadata only. The crate never reads the source to obtain
     /// omitted data.
+    #[must_use]
     pub const fn omits_graphic_data(&self) -> bool {
         self.omit_graphic_data
     }
 
     /// Return unrecognized stored field switches in source order.
+    #[must_use]
     pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
         &self.unknown_switches
     }
 
     /// Return the stored field result when a producer supplied one.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -2893,6 +3071,7 @@ impl<'a> DdeField<'a> {
 
 impl<'a> LinkField<'a> {
     /// Return the complete stored `LINK` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
@@ -2901,16 +3080,19 @@ impl<'a> LinkField<'a> {
     ///
     /// Word commonly stores an OLE Programmatic Identifier here. This method
     /// returns it as metadata only and never looks up or activates the class.
+    #[must_use]
     pub fn application_type(&self) -> &str {
         &self.application_type
     }
 
     /// Return the stored linked source identifier without opening or resolving it.
+    #[must_use]
     pub fn source(&self) -> &str {
         &self.source
     }
 
     /// Return the optional stored source item, such as a cell range or bookmark.
+    #[must_use]
     pub fn item(&self) -> Option<&str> {
         self.item.as_deref()
     }
@@ -2918,6 +3100,7 @@ impl<'a> LinkField<'a> {
     /// Whether the stored instruction requests automatic updates.
     ///
     /// This is metadata only. The crate never performs an update.
+    #[must_use]
     pub const fn requests_automatic_updates(&self) -> bool {
         self.automatic_updates
     }
@@ -2927,6 +3110,7 @@ impl<'a> LinkField<'a> {
     /// These values never trigger source access, conversion, or display. When
     /// several are present, [`Self::effective_result_option`] reflects Word's
     /// documented last-switch behavior.
+    #[must_use]
     pub fn result_options(&self) -> &[LinkResultOption] {
         &self.result_options
     }
@@ -2935,6 +3119,7 @@ impl<'a> LinkField<'a> {
     /// last-switch behavior, if one was stored.
     ///
     /// This reports metadata only and never contacts the linked source.
+    #[must_use]
     pub fn effective_result_option(&self) -> Option<LinkResultOption> {
         self.result_options.last().copied()
     }
@@ -2942,41 +3127,49 @@ impl<'a> LinkField<'a> {
     /// Return integral `\\f` formatting modes in stored source order.
     ///
     /// This crate never updates or formats linked content.
+    #[must_use]
     pub fn formatting_modes(&self) -> &[LinkFormatting] {
         &self.formatting_modes
     }
 
     /// Return unrecognized stored field switches in source order.
+    #[must_use]
     pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
         &self.unknown_switches
     }
 
     /// Return the stored field result when a producer supplied one.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -2984,6 +3177,7 @@ impl<'a> LinkField<'a> {
 
 impl<'a> ExternalIncludeField<'a> {
     /// Return the complete stored include-field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
@@ -2992,11 +3186,13 @@ impl<'a> ExternalIncludeField<'a> {
     ///
     /// Text includes are `INCLUDETEXT` or historical `INCLUDE` fields; picture
     /// includes are `INCLUDEPICTURE` or historical `IMPORT` fields.
+    #[must_use]
     pub const fn kind(&self) -> IncludeFieldKind {
         self.kind
     }
 
     /// Return the stored source path or URL without resolving it.
+    #[must_use]
     pub fn source(&self) -> &str {
         &self.source
     }
@@ -3005,6 +3201,7 @@ impl<'a> ExternalIncludeField<'a> {
     ///
     /// `INCLUDEPICTURE` and `IMPORT` fields do not define a bookmark operand,
     /// so they always return `None` here.
+    #[must_use]
     pub fn bookmark(&self) -> Option<&str> {
         self.bookmark.as_deref()
     }
@@ -3012,17 +3209,23 @@ impl<'a> ExternalIncludeField<'a> {
     /// Return the optional stored `\\c` converter name.
     ///
     /// The converter is never looked up or invoked.
+    #[must_use]
     pub fn converter(&self) -> Option<&str> {
         self.options.iter().find_map(|option| match option {
             ExternalIncludeOption::Converter(value) => Some(value.as_ref()),
-            _ => None,
+            ExternalIncludeOption::Encoding(_)
+            | ExternalIncludeOption::MimeType(_)
+            | ExternalIncludeOption::NamespaceMapping(_)
+            | ExternalIncludeOption::Xslt(_)
+            | ExternalIncludeOption::XPath(_) => None,
         })
     }
 
     /// Return recognized converter and XML options in stored source order.
     ///
     /// All options are inert metadata. This method never resolves a converter,
-    /// opens a source, runs XSLT, or evaluates XPath.
+    /// opens a source, runs XSLT, or evaluates `XPath`.
+    #[must_use]
     pub fn options(&self) -> &[ExternalIncludeOption<'a>] {
         &self.options
     }
@@ -3030,6 +3233,7 @@ impl<'a> ExternalIncludeField<'a> {
     /// Whether a text-include `\\!` switch suppresses nested field updates.
     ///
     /// This is stored metadata only; this crate never updates fields.
+    #[must_use]
     pub const fn suppresses_nested_field_updates(&self) -> bool {
         self.suppress_nested_field_updates
     }
@@ -3037,41 +3241,49 @@ impl<'a> ExternalIncludeField<'a> {
     /// Whether a picture-include `\\d` switch omits picture data.
     ///
     /// This is stored metadata only; this crate never retrieves a picture.
+    #[must_use]
     pub const fn omits_picture_data(&self) -> bool {
         self.omit_picture_data
     }
 
     /// Return unrecognized stored field switches in source order.
+    #[must_use]
     pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
         &self.unknown_switches
     }
 
     /// Return the stored field result when a producer supplied one.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -3079,11 +3291,13 @@ impl<'a> ExternalIncludeField<'a> {
 
 impl<'a> ReferencedDocumentField<'a> {
     /// Return the complete stored `RD` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return the stored referenced-document path without opening it.
+    #[must_use]
     pub fn source(&self) -> &str {
         &self.source
     }
@@ -3092,6 +3306,7 @@ impl<'a> ReferencedDocumentField<'a> {
     /// to this document.
     ///
     /// This is metadata only. The path is never resolved.
+    #[must_use]
     pub const fn uses_relative_path(&self) -> bool {
         self.relative_path
     }
@@ -3099,6 +3314,7 @@ impl<'a> ReferencedDocumentField<'a> {
     /// Return all stored field switches in source order.
     ///
     /// Switches are retained without interpretation or execution.
+    #[must_use]
     pub fn switches(&self) -> &[FieldSwitch<'a>] {
         &self.switches
     }
@@ -3106,31 +3322,37 @@ impl<'a> ReferencedDocumentField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This value is never regenerated by opening or updating a source.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -3138,6 +3360,7 @@ impl<'a> ReferencedDocumentField<'a> {
 
 impl<'a> TableOfContentsField<'a> {
     /// Return the complete stored TOC field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
@@ -3146,11 +3369,13 @@ impl<'a> TableOfContentsField<'a> {
     ///
     /// These options are configuration metadata only. This method never scans
     /// entries, regenerates a table, follows links, or calculates page numbers.
+    #[must_use]
     pub fn options(&self) -> &[TableOfContentsOption<'a>] {
         &self.options
     }
 
     /// Return unrecognized stored field switches in source order.
+    #[must_use]
     pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
         &self.unknown_switches
     }
@@ -3158,31 +3383,37 @@ impl<'a> TableOfContentsField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -3190,11 +3421,13 @@ impl<'a> TableOfContentsField<'a> {
 
 impl<'a> TableOfContentsEntryField<'a> {
     /// Return the complete stored TC field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return the stored entry text without generating a table of contents.
+    #[must_use]
     pub fn entry(&self) -> &str {
         &self.entry
     }
@@ -3203,41 +3436,49 @@ impl<'a> TableOfContentsEntryField<'a> {
     ///
     /// These options are configuration metadata only. This method never
     /// calculates page numbers, changes hidden text, or updates a TOC.
+    #[must_use]
     pub fn options(&self) -> &[TableOfContentsEntryOption<'a>] {
         &self.options
     }
 
     /// Return unrecognized stored field switches in source order.
+    #[must_use]
     pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
         &self.unknown_switches
     }
 
     /// Return the stored field result when a producer supplied one.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -3245,6 +3486,7 @@ impl<'a> TableOfContentsEntryField<'a> {
 
 impl<'a> TableOfAuthoritiesEntryField<'a> {
     /// Return the complete stored TA field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
@@ -3253,41 +3495,49 @@ impl<'a> TableOfAuthoritiesEntryField<'a> {
     ///
     /// These options are configuration metadata only. This method never finds
     /// citations, follows bookmarks, calculates pages, or generates a table.
+    #[must_use]
     pub fn options(&self) -> &[TableOfAuthoritiesEntryOption<'a>] {
         &self.options
     }
 
     /// Return unrecognized stored field switches in source order.
+    #[must_use]
     pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
         &self.unknown_switches
     }
 
     /// Return the stored field result when a producer supplied one.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -3295,6 +3545,7 @@ impl<'a> TableOfAuthoritiesEntryField<'a> {
 
 impl<'a> TableOfAuthoritiesField<'a> {
     /// Return the complete stored TOA field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
@@ -3303,11 +3554,13 @@ impl<'a> TableOfAuthoritiesField<'a> {
     ///
     /// These options are configuration metadata only. This method never finds
     /// citations, follows bookmarks, calculates pages, or generates a table.
+    #[must_use]
     pub fn options(&self) -> &[TableOfAuthoritiesOption<'a>] {
         &self.options
     }
 
     /// Return unrecognized stored field switches in source order.
+    #[must_use]
     pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
         &self.unknown_switches
     }
@@ -3315,31 +3568,37 @@ impl<'a> TableOfAuthoritiesField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -3347,6 +3606,7 @@ impl<'a> TableOfAuthoritiesField<'a> {
 
 impl<'a> IndexField<'a> {
     /// Return the complete stored INDEX field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
@@ -3356,11 +3616,13 @@ impl<'a> IndexField<'a> {
     /// These options are configuration metadata only. This method never scans
     /// XE markers, reads bookmarks, calculates page numbers, or generates an
     /// index.
+    #[must_use]
     pub fn options(&self) -> &[IndexOption<'a>] {
         &self.options
     }
 
     /// Return unrecognized stored field switches in source order.
+    #[must_use]
     pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
         &self.unknown_switches
     }
@@ -3368,31 +3630,37 @@ impl<'a> IndexField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -3400,11 +3668,13 @@ impl<'a> IndexField<'a> {
 
 impl<'a> IndexEntryField<'a> {
     /// Return the complete stored XE field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return the stored index-entry text without generating an index.
+    #[must_use]
     pub fn entry(&self) -> &str {
         &self.entry
     }
@@ -3414,41 +3684,49 @@ impl<'a> IndexEntryField<'a> {
     /// These options are marker metadata only. This method never changes
     /// hidden text, follows bookmarks, calculates pages, or generates an
     /// index.
+    #[must_use]
     pub fn options(&self) -> &[IndexEntryOption<'a>] {
         &self.options
     }
 
     /// Return unrecognized stored field switches in source order.
+    #[must_use]
     pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
         &self.unknown_switches
     }
 
     /// Return the stored field result when a producer supplied one.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -3456,11 +3734,13 @@ impl<'a> IndexEntryField<'a> {
 
 impl<'a> CitationField<'a> {
     /// Return the complete stored CITATION field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return the primary bibliography source tag without resolving it.
+    #[must_use]
     pub fn source_tag(&self) -> &str {
         &self.source_tag
     }
@@ -3469,11 +3749,13 @@ impl<'a> CitationField<'a> {
     ///
     /// These options are metadata only. This method never loads sources,
     /// applies a bibliography style, or formats a citation.
+    #[must_use]
     pub fn options(&self) -> &[CitationOption<'a>] {
         &self.options
     }
 
     /// Return unrecognized stored field switches in source order.
+    #[must_use]
     pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
         &self.unknown_switches
     }
@@ -3481,31 +3763,37 @@ impl<'a> CitationField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -3513,6 +3801,7 @@ impl<'a> CitationField<'a> {
 
 impl<'a> BibliographyField<'a> {
     /// Return the complete stored BIBLIOGRAPHY field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
@@ -3521,11 +3810,13 @@ impl<'a> BibliographyField<'a> {
     ///
     /// These options are metadata only. This method never loads sources,
     /// filters records, applies a style, sorts entries, or generates content.
+    #[must_use]
     pub fn options(&self) -> &[BibliographyOption<'a>] {
         &self.options
     }
 
     /// Return unrecognized stored field switches in source order.
+    #[must_use]
     pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
         &self.unknown_switches
     }
@@ -3533,31 +3824,37 @@ impl<'a> BibliographyField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -3565,11 +3862,13 @@ impl<'a> BibliographyField<'a> {
 
 impl<'a> DocumentVariableField<'a> {
     /// Return the complete stored DOCVARIABLE field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return the stored document-variable name without resolving it.
+    #[must_use]
     pub fn variable_name(&self) -> &str {
         &self.variable_name
     }
@@ -3578,6 +3877,7 @@ impl<'a> DocumentVariableField<'a> {
     ///
     /// DOCVARIABLE has no field-specific switches. These values are retained
     /// as inert source metadata and are never interpreted.
+    #[must_use]
     pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
         &self.unknown_switches
     }
@@ -3585,31 +3885,37 @@ impl<'a> DocumentVariableField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated from a variable.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -3617,16 +3923,19 @@ impl<'a> DocumentVariableField<'a> {
 
 impl<'a> DocumentPropertyField<'a> {
     /// Return the complete stored `DOCPROPERTY` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return the stored document-property name without resolving it.
+    #[must_use]
     pub fn property_name(&self) -> &str {
         &self.property_name
     }
 
     /// Return stored field switches in source order without interpreting them.
+    #[must_use]
     pub fn switches(&self) -> &[FieldSwitch<'a>] {
         &self.switches
     }
@@ -3634,31 +3943,37 @@ impl<'a> DocumentPropertyField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated from a property.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -3666,6 +3981,7 @@ impl<'a> DocumentPropertyField<'a> {
 
 impl<'a> InfoField<'a> {
     /// Return the complete stored `INFO` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
@@ -3673,6 +3989,7 @@ impl<'a> InfoField<'a> {
     /// Return the stored document or template property selector.
     ///
     /// The selector is preserved as metadata and is never looked up.
+    #[must_use]
     pub fn information_type(&self) -> &str {
         &self.information_type
     }
@@ -3680,11 +3997,13 @@ impl<'a> InfoField<'a> {
     /// Return the stored optional replacement value.
     ///
     /// This value is never applied to a document or template property.
+    #[must_use]
     pub fn new_value(&self) -> Option<&str> {
         self.new_value.as_deref()
     }
 
     /// Return stored field switches in source order without interpreting them.
+    #[must_use]
     pub fn switches(&self) -> &[FieldSwitch<'a>] {
         &self.switches
     }
@@ -3692,31 +4011,37 @@ impl<'a> InfoField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated from a property.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -3724,16 +4049,19 @@ impl<'a> InfoField<'a> {
 
 impl<'a> DocumentInformationField<'a> {
     /// Return the complete stored document-information field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return the recognized built-in document-information category.
+    #[must_use]
     pub const fn kind(&self) -> DocumentInformationFieldKind {
         self.kind
     }
 
     /// Return stored field switches in source order without interpreting them.
+    #[must_use]
     pub fn switches(&self) -> &[FieldSwitch<'a>] {
         &self.switches
     }
@@ -3742,31 +4070,37 @@ impl<'a> DocumentInformationField<'a> {
     ///
     /// This is cached text only and is never regenerated from document
     /// metadata or a host user profile.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -3774,16 +4108,19 @@ impl<'a> DocumentInformationField<'a> {
 
 impl<'a> DocumentContextField<'a> {
     /// Return the complete stored document-context or runtime field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return the recognized built-in document-context or runtime category.
+    #[must_use]
     pub const fn kind(&self) -> DocumentContextFieldKind {
         self.kind
     }
 
     /// Return stored field switches in source order without interpreting them.
+    #[must_use]
     pub fn switches(&self) -> &[FieldSwitch<'a>] {
         &self.switches
     }
@@ -3793,31 +4130,37 @@ impl<'a> DocumentContextField<'a> {
     /// This is cached text only and is never regenerated from a document path,
     /// attached template, host filesystem state or file size, current clock,
     /// or page and section layout.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -3825,16 +4168,19 @@ impl<'a> DocumentContextField<'a> {
 
 impl<'a> MergeField<'a> {
     /// Return the complete stored `MERGEFIELD` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return the stored data-column name without resolving a data source.
+    #[must_use]
     pub fn field_name(&self) -> &str {
         &self.field_name
     }
 
     /// Return stored field switches in source order without interpreting them.
+    #[must_use]
     pub fn switches(&self) -> &[FieldSwitch<'a>] {
         &self.switches
     }
@@ -3842,31 +4188,37 @@ impl<'a> MergeField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated by a merge.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -3877,6 +4229,7 @@ impl<'a> DatabaseField<'a> {
     ///
     /// This string remains opaque metadata and is never used to open a data
     /// source, database, or connection.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
@@ -3885,6 +4238,7 @@ impl<'a> DatabaseField<'a> {
     ///
     /// It is never parsed, interpreted, or used to connect, execute SQL,
     /// generate a table, or calculate layout.
+    #[must_use]
     pub fn opaque_instructions(&self) -> &'a str {
         self.opaque_instructions
     }
@@ -3893,31 +4247,37 @@ impl<'a> DatabaseField<'a> {
     ///
     /// This is cached metadata only and is never regenerated from a database
     /// query.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -3925,11 +4285,13 @@ impl<'a> DatabaseField<'a> {
 
 impl<'a> MailMergeDataField<'a> {
     /// Return the complete stored `DATA` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return the stored mail-merge data-source identifier without opening it.
+    #[must_use]
     pub fn data_source(&self) -> &str {
         &self.data_source
     }
@@ -3937,11 +4299,13 @@ impl<'a> MailMergeDataField<'a> {
     /// Return the optional stored mail-merge header-source identifier.
     ///
     /// This value is never opened or resolved.
+    #[must_use]
     pub fn header_source(&self) -> Option<&str> {
         self.header_source.as_deref()
     }
 
     /// Return stored field switches in source order without interpreting them.
+    #[must_use]
     pub fn switches(&self) -> &[FieldSwitch<'a>] {
         &self.switches
     }
@@ -3949,31 +4313,37 @@ impl<'a> MailMergeDataField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated by a merge.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -3981,11 +4351,13 @@ impl<'a> MailMergeDataField<'a> {
 
 impl<'a> MailMergeCounterField<'a> {
     /// Return the complete stored `MERGEREC` or `MERGESEQ` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return whether this is a `MERGEREC` or `MERGESEQ` field.
+    #[must_use]
     pub const fn kind(&self) -> MailMergeCounterKind {
         self.kind
     }
@@ -3993,31 +4365,37 @@ impl<'a> MailMergeCounterField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated by a merge.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -4025,6 +4403,7 @@ impl<'a> MailMergeCounterField<'a> {
 
 impl<'a> MailMergeNextField<'a> {
     /// Return the complete stored `NEXT` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
@@ -4032,31 +4411,37 @@ impl<'a> MailMergeNextField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated by a merge.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -4064,16 +4449,19 @@ impl<'a> MailMergeNextField<'a> {
 
 impl<'a> MailMergeConditionalControlField<'a> {
     /// Return the complete stored `NEXTIF` or `SKIPIF` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return whether this is a `NEXTIF` or `SKIPIF` control.
+    #[must_use]
     pub const fn kind(&self) -> MailMergeConditionalControlKind {
         self.kind
     }
 
     /// Return the stored comparison without parsing or evaluating it.
+    #[must_use]
     pub fn comparison(&self) -> &'a str {
         self.comparison
     }
@@ -4081,31 +4469,37 @@ impl<'a> MailMergeConditionalControlField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated by a merge.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -4113,11 +4507,13 @@ impl<'a> MailMergeConditionalControlField<'a> {
 
 impl<'a> IfField<'a> {
     /// Return the complete stored `IF` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return the stored expression without parsing or evaluating it.
+    #[must_use]
     pub fn expression(&self) -> &'a str {
         self.expression
     }
@@ -4125,31 +4521,37 @@ impl<'a> IfField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated by field evaluation.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -4157,11 +4559,13 @@ impl<'a> IfField<'a> {
 
 impl<'a> CompareField<'a> {
     /// Return the complete stored `COMPARE` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return the stored comparison without parsing or evaluating it.
+    #[must_use]
     pub fn comparison(&self) -> &'a str {
         self.comparison
     }
@@ -4169,31 +4573,37 @@ impl<'a> CompareField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated by field evaluation.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -4201,16 +4611,19 @@ impl<'a> CompareField<'a> {
 
 impl<'a> SetField<'a> {
     /// Return the complete stored `SET` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return the stored target name without looking up or changing it.
+    #[must_use]
     pub fn target_name(&self) -> &str {
         &self.target_name
     }
 
     /// Return the stored expression without parsing or evaluating it.
+    #[must_use]
     pub fn expression(&self) -> &'a str {
         self.expression
     }
@@ -4218,31 +4631,37 @@ impl<'a> SetField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated by field evaluation.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -4250,16 +4669,19 @@ impl<'a> SetField<'a> {
 
 impl<'a> SequenceField<'a> {
     /// Return the complete stored `SEQ` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return the stored sequence identifier without calculating its value.
+    #[must_use]
     pub fn identifier(&self) -> &str {
         &self.identifier
     }
 
     /// Return the optional stored bookmark name without looking it up.
+    #[must_use]
     pub fn bookmark(&self) -> Option<&str> {
         self.bookmark.as_deref()
     }
@@ -4267,6 +4689,7 @@ impl<'a> SequenceField<'a> {
     /// Return opaque stored text after the identifier and optional bookmark.
     ///
     /// This text is never parsed to change or calculate a sequence.
+    #[must_use]
     pub fn tail(&self) -> &'a str {
         self.tail
     }
@@ -4275,31 +4698,37 @@ impl<'a> SequenceField<'a> {
     ///
     /// This is cached text only and is never regenerated by calculating a
     /// sequence number.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -4307,11 +4736,13 @@ impl<'a> SequenceField<'a> {
 
 impl<'a> FormulaField<'a> {
     /// Return the complete stored formula field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return the opaque stored formula text without parsing or evaluating it.
+    #[must_use]
     pub fn formula(&self) -> &'a str {
         self.formula
     }
@@ -4319,31 +4750,37 @@ impl<'a> FormulaField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated by formula evaluation.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -4351,16 +4788,19 @@ impl<'a> FormulaField<'a> {
 
 impl<'a> QuoteField<'a> {
     /// Return the complete stored `QUOTE` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return the stored text argument without inserting or transforming it.
+    #[must_use]
     pub fn text(&self) -> &str {
         &self.text
     }
 
     /// Return stored field switches in source order without interpreting them.
+    #[must_use]
     pub fn switches(&self) -> &[FieldSwitch<'a>] {
         &self.switches
     }
@@ -4368,31 +4808,37 @@ impl<'a> QuoteField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated by inserting text.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -4400,16 +4846,19 @@ impl<'a> QuoteField<'a> {
 
 impl<'a> SymbolField<'a> {
     /// Return the complete stored `SYMBOL` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return the stored character argument without converting it to a glyph.
+    #[must_use]
     pub fn character_argument(&self) -> &str {
         &self.character_argument
     }
 
     /// Return stored field switches in source order without interpreting them.
+    #[must_use]
     pub fn switches(&self) -> &[FieldSwitch<'a>] {
         &self.switches
     }
@@ -4418,31 +4867,37 @@ impl<'a> SymbolField<'a> {
     ///
     /// This is cached text only and is never regenerated by mapping a character
     /// code or inserting a glyph.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -4450,16 +4905,19 @@ impl<'a> SymbolField<'a> {
 
 impl<'a> AutoNumberField<'a> {
     /// Return the complete stored automatic-numbering field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return the recognized automatic-numbering category.
+    #[must_use]
     pub const fn kind(&self) -> AutoNumberFieldKind {
         self.kind
     }
 
     /// Return stored field switches in source order without interpreting them.
+    #[must_use]
     pub fn switches(&self) -> &[FieldSwitch<'a>] {
         &self.switches
     }
@@ -4468,31 +4926,37 @@ impl<'a> AutoNumberField<'a> {
     ///
     /// This is cached text only and is never regenerated by calculating a
     /// paragraph number.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -4500,16 +4964,19 @@ impl<'a> AutoNumberField<'a> {
 
 impl<'a> ListNumberField<'a> {
     /// Return the complete stored `LISTNUM` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return the stored optional list name without looking it up.
+    #[must_use]
     pub fn list_name(&self) -> Option<&str> {
         self.list_name.as_deref()
     }
 
     /// Return stored field switches in source order without interpreting them.
+    #[must_use]
     pub fn switches(&self) -> &[FieldSwitch<'a>] {
         &self.switches
     }
@@ -4518,31 +4985,37 @@ impl<'a> ListNumberField<'a> {
     ///
     /// This is cached text only and is never regenerated by calculating a list
     /// number.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -4550,11 +5023,13 @@ impl<'a> ListNumberField<'a> {
 
 impl<'a> StyleReferenceField<'a> {
     /// Return the complete stored `STYLEREF` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return the stored style name without looking up text that uses it.
+    #[must_use]
     pub fn style_name(&self) -> &str {
         &self.style_name
     }
@@ -4563,6 +5038,7 @@ impl<'a> StyleReferenceField<'a> {
     ///
     /// This metadata is never used to search text, calculate a number, or
     /// resolve layout.
+    #[must_use]
     pub fn options(&self) -> &[StyleReferenceFieldOption] {
         &self.options
     }
@@ -4570,6 +5046,7 @@ impl<'a> StyleReferenceField<'a> {
     /// Return unrecognized stored switches in source order.
     ///
     /// They are retained without interpretation or execution.
+    #[must_use]
     pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
         &self.unknown_switches
     }
@@ -4578,31 +5055,37 @@ impl<'a> StyleReferenceField<'a> {
     ///
     /// This is cached text only and is never regenerated by searching styled
     /// text or resolving layout.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -4610,11 +5093,13 @@ impl<'a> StyleReferenceField<'a> {
 
 impl<'a> PromptField<'a> {
     /// Return the complete stored `ASK` or `FILLIN` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return whether this is an `ASK` or `FILLIN` field.
+    #[must_use]
     pub const fn kind(&self) -> PromptFieldKind {
         self.kind
     }
@@ -4622,6 +5107,7 @@ impl<'a> PromptField<'a> {
     /// Return the bookmark name stored by an `ASK` field, if any.
     ///
     /// This is stored metadata only. It is never resolved, created, or updated.
+    #[must_use]
     pub fn bookmark(&self) -> Option<&str> {
         self.bookmark.as_deref()
     }
@@ -4629,6 +5115,7 @@ impl<'a> PromptField<'a> {
     /// Return the stored prompt text, if any.
     ///
     /// This method returns metadata only and never displays a prompt.
+    #[must_use]
     pub fn prompt(&self) -> Option<&str> {
         self.prompt.as_deref()
     }
@@ -4638,6 +5125,7 @@ impl<'a> PromptField<'a> {
     /// `Some("")` represents an explicitly supplied blank default response. This
     /// is metadata only and is never selected, captured, or written into the
     /// document.
+    #[must_use]
     pub fn default_response(&self) -> Option<&str> {
         self.default_response.as_deref()
     }
@@ -4646,6 +5134,7 @@ impl<'a> PromptField<'a> {
     ///
     /// This request is never acted on: no merge is performed and no data source
     /// is opened.
+    #[must_use]
     pub const fn prompts_once_per_mail_merge(&self) -> bool {
         self.prompts_once_per_mail_merge
     }
@@ -4653,31 +5142,37 @@ impl<'a> PromptField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated by field evaluation.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -4688,11 +5183,13 @@ impl<'a> LegacyFormField<'a> {
     ///
     /// This string remains opaque metadata and is never used to change a form
     /// field.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return whether this is a text, checkbox, or drop-down form-code field.
+    #[must_use]
     pub const fn kind(&self) -> LegacyFormFieldKind {
         self.kind
     }
@@ -4701,6 +5198,7 @@ impl<'a> LegacyFormField<'a> {
     ///
     /// It is never parsed, interpreted, or used to fill a form, change a
     /// checkbox or selection, or invoke a macro.
+    #[must_use]
     pub fn opaque_instructions(&self) -> &'a str {
         self.opaque_instructions
     }
@@ -4708,31 +5206,37 @@ impl<'a> LegacyFormField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached metadata only and is never regenerated from form state.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -4743,6 +5247,7 @@ impl<'a> PrivateField<'a> {
     ///
     /// This string remains opaque metadata and is never used to convert a
     /// document or reveal hidden content.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
@@ -4751,6 +5256,7 @@ impl<'a> PrivateField<'a> {
     ///
     /// It is never parsed, interpreted, or used to convert a document, reveal
     /// hidden content, or calculate layout.
+    #[must_use]
     pub fn opaque_instructions(&self) -> &'a str {
         self.opaque_instructions
     }
@@ -4759,31 +5265,37 @@ impl<'a> PrivateField<'a> {
     ///
     /// This is cached metadata only and is never regenerated by conversion or
     /// used to reveal hidden content.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -4791,11 +5303,13 @@ impl<'a> PrivateField<'a> {
 
 impl<'a> UserIdentityField<'a> {
     /// Return the complete stored user-identity field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return whether this is an address, initials, or name field.
+    #[must_use]
     pub const fn kind(&self) -> UserIdentityFieldKind {
         self.kind
     }
@@ -4805,6 +5319,7 @@ impl<'a> UserIdentityField<'a> {
     /// `Some("")` represents an explicitly supplied blank override. This
     /// stored text is never written to, read from, or compared with a host
     /// identity.
+    #[must_use]
     pub fn override_value(&self) -> Option<&str> {
         self.override_value.as_deref()
     }
@@ -4812,6 +5327,7 @@ impl<'a> UserIdentityField<'a> {
     /// Return the stored general-formatting request, if any.
     ///
     /// This request is metadata only and is never applied to an identity value.
+    #[must_use]
     pub const fn formatting(&self) -> Option<UserIdentityFormatting> {
         self.formatting
     }
@@ -4819,31 +5335,37 @@ impl<'a> UserIdentityField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated from a host identity.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -4851,11 +5373,13 @@ impl<'a> UserIdentityField<'a> {
 
 impl AdvanceFieldAdjustment {
     /// Return the requested placement operation.
+    #[must_use]
     pub const fn operation(&self) -> AdvanceFieldOperation {
         self.operation
     }
 
     /// Return the stored signed integral number of points.
+    #[must_use]
     pub const fn points(&self) -> i64 {
         self.points
     }
@@ -4863,6 +5387,7 @@ impl AdvanceFieldAdjustment {
 
 impl<'a> AdvanceField<'a> {
     /// Return the complete stored `ADVANCE` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
@@ -4871,6 +5396,7 @@ impl<'a> AdvanceField<'a> {
     ///
     /// Repeated operations are preserved; this library does not resolve or
     /// apply them.
+    #[must_use]
     pub fn adjustments(&self) -> &[AdvanceFieldAdjustment] {
         &self.adjustments
     }
@@ -4879,31 +5405,37 @@ impl<'a> AdvanceField<'a> {
     ///
     /// `ADVANCE` has no regenerated value here; any returned text is stored
     /// source content only.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -4911,11 +5443,13 @@ impl<'a> AdvanceField<'a> {
 
 impl<'a> MailMergeRecipientField<'a> {
     /// Return the complete stored `ADDRESSBLOCK` or `GREETINGLINE` instruction.
+    #[must_use]
     pub fn instruction(&self) -> &'a str {
         self.instruction
     }
 
     /// Return whether this is an `ADDRESSBLOCK` or `GREETINGLINE` field.
+    #[must_use]
     pub const fn kind(&self) -> MailMergeRecipientFieldKind {
         self.kind
     }
@@ -4925,6 +5459,7 @@ impl<'a> MailMergeRecipientField<'a> {
     /// This is `None` when the instruction has no `\\c` switch or when the
     /// field is a `GREETINGLINE`. The stored request is never used to render
     /// an address.
+    #[must_use]
     pub const fn country_inclusion(&self) -> Option<AddressBlockCountryInclusion> {
         self.country_inclusion
     }
@@ -4934,6 +5469,7 @@ impl<'a> MailMergeRecipientField<'a> {
     ///
     /// This request is metadata only and never causes a record or country
     /// format to be resolved.
+    #[must_use]
     pub const fn formats_using_recipient_country(&self) -> bool {
         self.formats_using_recipient_country
     }
@@ -4942,6 +5478,7 @@ impl<'a> MailMergeRecipientField<'a> {
     ///
     /// ECMA-376 permits repeated `\\e` switches; values are retained in source
     /// order. They are never matched against a recipient record.
+    #[must_use]
     pub fn excluded_countries(&self) -> &[Cow<'a, str>] {
         &self.excluded_countries
     }
@@ -4952,6 +5489,7 @@ impl<'a> MailMergeRecipientField<'a> {
     /// template. For `GREETINGLINE`, this accepts Word's documented
     /// compatibility form. Placeholder text remains opaque metadata and is
     /// never expanded.
+    #[must_use]
     pub fn format_template(&self) -> Option<&str> {
         self.format_template.as_deref()
     }
@@ -4959,6 +5497,7 @@ impl<'a> MailMergeRecipientField<'a> {
     /// Return the stored `\\l` language identifier, if any.
     ///
     /// The identifier is not used to choose locale-specific formatting.
+    #[must_use]
     pub fn language(&self) -> Option<&str> {
         self.language.as_deref()
     }
@@ -4968,6 +5507,7 @@ impl<'a> MailMergeRecipientField<'a> {
     /// ECMA-376 names `\\c` as this switch; Word-compatible fields can use
     /// `\\e`. Both forms are accepted as stored metadata, but neither is ever
     /// selected or displayed by this API.
+    #[must_use]
     pub fn greeting_fallback_text(&self) -> Option<&str> {
         self.greeting_fallback_text.as_deref()
     }
@@ -4976,6 +5516,7 @@ impl<'a> MailMergeRecipientField<'a> {
     ///
     /// This includes formatting or producer-specific switches, retained in
     /// source order as inert metadata.
+    #[must_use]
     pub fn unknown_switches(&self) -> &[FieldSwitch<'a>] {
         &self.unknown_switches
     }
@@ -4983,31 +5524,37 @@ impl<'a> MailMergeRecipientField<'a> {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This is cached text only and is never regenerated by a merge.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&'a str> {
         self.cached_result
     }
 
     /// Return the stored field state flags.
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
 
     /// Return the story that owns this field.
+    #[must_use]
     pub const fn owner(&self) -> FieldOwner {
         self.owner
     }
 
     /// Return this field's zero-width position in its owning story.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Whether a producer marked the stored field result stale.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.status.dirty
     }
 
     /// Whether a producer locked the field against refresh.
+    #[must_use]
     pub const fn is_locked(&self) -> bool {
         self.status.locked
     }
@@ -5015,6 +5562,7 @@ impl<'a> MailMergeRecipientField<'a> {
 
 impl<'a> Field<'a> {
     #[inline]
+    #[must_use]
     pub fn new(field_type: FieldType, instruction: Cow<'a, str>, result: Cow<'a, str>) -> Self {
         Self {
             field_type,
@@ -5032,6 +5580,7 @@ impl<'a> Field<'a> {
     }
 
     /// Parse the instruction keyword with an exact, case-insensitive boundary.
+    #[must_use]
     pub fn parse_instruction(instruction: &'a str) -> Self {
         let parsed = parse_field_code(instruction);
         let field_type = match parsed {
@@ -5341,7 +5890,7 @@ impl<'a> Field<'a> {
             {
                 FieldType::GreetingLine
             },
-            _ => FieldType::Unknown,
+            ParsedFieldCode::Other { .. } | ParsedFieldCode::Malformed(_) => FieldType::Unknown,
         };
         Self {
             field_type,
@@ -5363,12 +5912,15 @@ impl<'a> Field<'a> {
     /// The expression is serialized as field text with RTF escaping. The
     /// library parses it only on request (see [`EquationField::model`]) and
     /// never calculates, formats, or renders that syntax.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new_equation(expression: impl Into<String>) -> crate::RtfResult<Field<'static>> {
-        let expression = expression.into();
-        let instruction = if expression.is_empty() {
+        let expression_text = expression.into();
+        let instruction = if expression_text.is_empty() {
             "EQ".to_string()
         } else {
-            format!("EQ {expression}")
+            format!("EQ {expression_text}")
         };
         if instruction.len() > MAX_INSTRUCTION_LEN {
             return Err(crate::RtfError::MalformedDocument(
@@ -5383,6 +5935,7 @@ impl<'a> Field<'a> {
     }
 
     /// Return typed inert metadata when this is an `EQ` field.
+    #[must_use]
     pub fn equation(&self) -> Option<EquationField<'_>> {
         if self.field_type != FieldType::Equation {
             return None;
@@ -5402,6 +5955,7 @@ impl<'a> Field<'a> {
     ///
     /// The metadata is never treated as executable. Malformed macro-button
     /// instructions remain generic fields and return `None` here.
+    #[must_use]
     pub fn macro_button(&self) -> Option<MacroButtonField<'_>> {
         if self.field_type != FieldType::MacroButton {
             return None;
@@ -5424,6 +5978,7 @@ impl<'a> Field<'a> {
     /// never resolves a bookmark, page, annotation, footnote, or other target,
     /// changes the insertion point, or activates a jump. Malformed navigation
     /// instructions remain generic fields and return `None` here.
+    #[must_use]
     pub fn go_to_button(&self) -> Option<GoToButtonField<'_>> {
         if self.field_type != FieldType::GoToButton {
             return None;
@@ -5446,6 +6001,7 @@ impl<'a> Field<'a> {
     /// opaque metadata only. This method never interprets printer-control
     /// codes, opens a printer, sends output, changes print settings, or
     /// refreshes a field.
+    #[must_use]
     pub fn print_field(&self) -> Option<PrintField<'_>> {
         if self.field_type != FieldType::Print {
             return None;
@@ -5467,6 +6023,7 @@ impl<'a> Field<'a> {
     /// metadata only. This method never loads, inspects, deserializes,
     /// activates, renders, or executes an embedded object, accesses an external
     /// resource, or refreshes a field.
+    #[must_use]
     pub fn embed_field(&self) -> Option<EmbedField<'_>> {
         if self.field_type != FieldType::Embed {
             return None;
@@ -5488,6 +6045,7 @@ impl<'a> Field<'a> {
     /// remain metadata only. This method never parses or validates barcode data
     /// or symbology, generates or renders a barcode, accesses an external
     /// resource, or refreshes a field.
+    #[must_use]
     pub fn barcode_field(&self) -> Option<BarcodeField<'_>> {
         if self.field_type != FieldType::Barcode {
             return None;
@@ -5511,6 +6069,11 @@ impl<'a> Field<'a> {
     /// symbology; resolves a mail-merge data field; generates or renders a
     /// barcode; or refreshes a field. Malformed instructions remain generic
     /// fields and return `None` here.
+    #[must_use]
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub fn barcode_display_field(&self) -> Option<BarcodeDisplayField<'_>> {
         let expected_kind = match self.field_type {
             FieldType::DisplayBarcode => BarcodeDisplayFieldKind::DisplayBarcode,
@@ -5541,6 +6104,7 @@ impl<'a> Field<'a> {
     /// metadata only. This method never reads right-to-left language, paragraph
     /// outline, or layout state; chooses a numbering system; calculates a
     /// result; or refreshes a field.
+    #[must_use]
     pub fn bidi_outline_field(&self) -> Option<BidiOutlineField<'_>> {
         if self.field_type != FieldType::BidiOutline {
             return None;
@@ -5561,6 +6125,7 @@ impl<'a> Field<'a> {
     /// Stored opaque instructions, cached results, and field state remain
     /// metadata only. This method never locates, links, loads, positions, lays
     /// out, or renders a drawing or canvas, or refreshes a field.
+    #[must_use]
     pub fn shape_field(&self) -> Option<ShapeField<'_>> {
         if self.field_type != FieldType::Shape {
             return None;
@@ -5582,6 +6147,11 @@ impl<'a> Field<'a> {
     /// metadata only. This method does not read or reconcile the separate RTF
     /// `\formfield` destination. It never fills a form, changes a selection or
     /// checkbox state, invokes entry or exit macros, or refreshes a field.
+    #[must_use]
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub fn legacy_form_field(&self) -> Option<LegacyFormField<'_>> {
         let (kind, keyword) = match self.field_type {
             FieldType::FormText => (LegacyFormFieldKind::Text, "FORMTEXT"),
@@ -5608,6 +6178,7 @@ impl<'a> Field<'a> {
     /// metadata only. This method never converts a document, interprets or
     /// reveals hidden content, changes layout, or refreshes a field.
     /// `PRIVATE` does not provide confidentiality semantics.
+    #[must_use]
     pub fn private_field(&self) -> Option<PrivateField<'_>> {
         if self.field_type != FieldType::Private {
             return None;
@@ -5629,6 +6200,11 @@ impl<'a> Field<'a> {
     /// This method never loads an add-in, instantiates a control, invokes code,
     /// executes script, renders content, accesses an external resource, or
     /// refreshes a field.
+    #[must_use]
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub fn active_content_field(&self) -> Option<ActiveContentField<'_>> {
         let kind = match self.field_type {
             FieldType::AddIn => ActiveContentFieldKind::AddIn,
@@ -5652,6 +6228,11 @@ impl<'a> Field<'a> {
     /// up a building block, read a template, insert content, change bookmarks,
     /// access an external resource, or refresh a field. Malformed instructions
     /// remain generic fields and return `None` here.
+    #[must_use]
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub fn auto_text_field(&self) -> Option<AutoTextField<'_>> {
         let expected_kind = match self.field_type {
             FieldType::Glossary => AutoTextFieldKind::Glossary,
@@ -5682,6 +6263,7 @@ impl<'a> Field<'a> {
     /// insert content, change bookmarks, access an external resource, or
     /// refresh a field. Malformed instructions remain generic fields and
     /// return `None` here.
+    #[must_use]
     pub fn auto_text_list_field(&self) -> Option<AutoTextListField<'_>> {
         if self.field_type != FieldType::AutoTextList {
             return None;
@@ -5705,6 +6287,7 @@ impl<'a> Field<'a> {
     /// The application, source, and item are never opened, contacted,
     /// refreshed, converted, evaluated, or executed. Malformed DDE
     /// instructions remain generic fields and return `None` here.
+    #[must_use]
     pub fn dde_link(&self) -> Option<DdeField<'_>> {
         if !matches!(self.field_type, FieldType::Dde | FieldType::DdeAuto) {
             return None;
@@ -5732,6 +6315,7 @@ impl<'a> Field<'a> {
     /// The application type, source, and item are never activated, opened,
     /// contacted, refreshed, converted, evaluated, or executed. Malformed
     /// link instructions remain generic fields and return `None` here.
+    #[must_use]
     pub fn link_field(&self) -> Option<LinkField<'_>> {
         if self.field_type != FieldType::Link {
             return None;
@@ -5758,6 +6342,11 @@ impl<'a> Field<'a> {
     /// Sources are never resolved, opened, fetched, converted, updated, or
     /// written back. Malformed include instructions remain generic fields and
     /// return `None` here.
+    #[must_use]
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub fn external_include(&self) -> Option<ExternalIncludeField<'_>> {
         let expected_kind = match self.field_type {
             FieldType::Include | FieldType::IncludeText => IncludeFieldKind::Text,
@@ -5791,6 +6380,7 @@ impl<'a> Field<'a> {
     /// resolves, reads, imports, refreshes, evaluates, or executes a referenced
     /// document. Malformed `RD` instructions remain generic fields and return `None`
     /// here.
+    #[must_use]
     pub fn referenced_document(&self) -> Option<ReferencedDocumentField<'_>> {
         if self.field_type != FieldType::ReferencedDocument {
             return None;
@@ -5814,6 +6404,7 @@ impl<'a> Field<'a> {
     /// entries, read bookmarks, resolve links, calculate page numbers, or
     /// regenerate a table. Malformed TOC instructions remain generic fields
     /// and return None here.
+    #[must_use]
     pub fn table_of_contents(&self) -> Option<TableOfContentsField<'_>> {
         if self.field_type != FieldType::Toc {
             return None;
@@ -5835,6 +6426,7 @@ impl<'a> Field<'a> {
     /// The stored entry and cached result are never used to change hidden text,
     /// calculate a page number, or generate a table of contents. Malformed TC
     /// instructions remain generic fields and return None here.
+    #[must_use]
     pub fn table_of_contents_entry(&self) -> Option<TableOfContentsEntryField<'_>> {
         if self.field_type != FieldType::TocEntry {
             return None;
@@ -5858,6 +6450,7 @@ impl<'a> Field<'a> {
     /// text, follow bookmarks, change hidden text, calculate pages, or generate
     /// a table of authorities. Malformed TA instructions remain generic fields
     /// and return None here.
+    #[must_use]
     pub fn table_of_authorities_entry(&self) -> Option<TableOfAuthoritiesEntryField<'_>> {
         if self.field_type != FieldType::TableOfAuthoritiesEntry {
             return None;
@@ -5880,6 +6473,7 @@ impl<'a> Field<'a> {
     /// citations, follow bookmarks, calculate page numbers, paginate the
     /// document, or generate a table of authorities. Malformed TOA
     /// instructions remain generic fields and return None here.
+    #[must_use]
     pub fn table_of_authorities(&self) -> Option<TableOfAuthoritiesField<'_>> {
         if self.field_type != FieldType::TableOfAuthorities {
             return None;
@@ -5902,6 +6496,7 @@ impl<'a> Field<'a> {
     /// markers, follow bookmarks, calculate page numbers, paginate the
     /// document, or generate an index. Malformed INDEX instructions remain
     /// generic fields and return None here.
+    #[must_use]
     pub fn index(&self) -> Option<IndexField<'_>> {
         if self.field_type != FieldType::Index {
             return None;
@@ -5923,6 +6518,7 @@ impl<'a> Field<'a> {
     /// The stored entry and cached result are never used to change hidden text,
     /// resolve bookmarks, calculate page numbers, or generate an index.
     /// Malformed XE instructions remain generic fields and return None here.
+    #[must_use]
     pub fn index_entry(&self) -> Option<IndexEntryField<'_>> {
         if self.field_type != FieldType::IndexEntry {
             return None;
@@ -5945,6 +6541,7 @@ impl<'a> Field<'a> {
     /// Stored source tags and options are never resolved, loaded, styled, or
     /// formatted. Malformed CITATION instructions remain generic fields and
     /// return None here.
+    #[must_use]
     pub fn citation(&self) -> Option<CitationField<'_>> {
         if self.field_type != FieldType::Citation {
             return None;
@@ -5967,6 +6564,7 @@ impl<'a> Field<'a> {
     /// Stored options are never used to load source records, apply a style,
     /// sort entries, or generate bibliography content. Malformed BIBLIOGRAPHY
     /// instructions remain generic fields and return None here.
+    #[must_use]
     pub fn bibliography(&self) -> Option<BibliographyField<'_>> {
         if self.field_type != FieldType::Bibliography {
             return None;
@@ -5988,6 +6586,7 @@ impl<'a> Field<'a> {
     /// The stored variable name is never resolved against document variables,
     /// and the cached result is never refreshed. Malformed DOCVARIABLE
     /// instructions remain generic fields and return None here.
+    #[must_use]
     pub fn document_variable(&self) -> Option<DocumentVariableField<'_>> {
         if self.field_type != FieldType::DocumentVariable {
             return None;
@@ -6010,6 +6609,7 @@ impl<'a> Field<'a> {
     /// custom document properties, and the cached result is never refreshed.
     /// Malformed `DOCPROPERTY` instructions remain generic fields and return
     /// `None` here.
+    #[must_use]
     pub fn document_property(&self) -> Option<DocumentPropertyField<'_>> {
         if self.field_type != FieldType::DocumentProperty {
             return None;
@@ -6033,6 +6633,7 @@ impl<'a> Field<'a> {
     /// resolves, modifies, or writes document or template properties, or
     /// refreshes a field. Malformed `INFO` instructions remain generic
     /// fields and return `None` here.
+    #[must_use]
     pub fn info_field(&self) -> Option<InfoField<'_>> {
         if self.field_type != FieldType::Info {
             return None;
@@ -6058,6 +6659,7 @@ impl<'a> Field<'a> {
     /// properties or host identity data, calculates dates, revisions, or
     /// statistics, resolves a value, or refreshes a field. Malformed
     /// instructions remain generic fields and return `None` here.
+    #[must_use]
     pub fn document_information(&self) -> Option<DocumentInformationField<'_>> {
         if self.field_type != FieldType::DocumentInformation {
             return None;
@@ -6083,6 +6685,7 @@ impl<'a> Field<'a> {
     /// filesystem state or file size, current clock, or page and section layout,
     /// resolves a value, or refreshes a field. Malformed instructions remain
     /// generic fields and return `None` here.
+    #[must_use]
     pub fn document_context(&self) -> Option<DocumentContextField<'_>> {
         let parts = document_context_field_parts(self.instruction.as_ref())?;
         if !matches!(
@@ -6118,6 +6721,7 @@ impl<'a> Field<'a> {
     /// against a data source, merged into the document, or refreshed.
     /// Malformed `MERGEFIELD` instructions remain generic fields and return
     /// `None` here.
+    #[must_use]
     pub fn merge_field(&self) -> Option<MergeField<'_>> {
         if self.field_type != FieldType::MergeField {
             return None;
@@ -6140,6 +6744,7 @@ impl<'a> Field<'a> {
     /// metadata only. This method never opens a data source or database, uses
     /// connection information, executes SQL, generates or inserts a table,
     /// changes layout, or refreshes a field.
+    #[must_use]
     pub fn database_field(&self) -> Option<DatabaseField<'_>> {
         if self.field_type != FieldType::Database {
             return None;
@@ -6162,6 +6767,7 @@ impl<'a> Field<'a> {
     /// cached result are never opened, read, connected to, resolved, modified,
     /// or merged. Malformed `DATA` instructions remain generic fields and return
     /// `None` here.
+    #[must_use]
     pub fn mail_merge_data(&self) -> Option<MailMergeDataField<'_>> {
         if self.field_type != FieldType::MailMergeData {
             return None;
@@ -6185,6 +6791,11 @@ impl<'a> Field<'a> {
     /// records, open a data source, perform a merge, or refresh a field
     /// result. Malformed `MERGEREC` and `MERGESEQ` instructions remain generic
     /// fields and return `None` here.
+    #[must_use]
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub fn mail_merge_counter(&self) -> Option<MailMergeCounterField<'_>> {
         let kind = match self.field_type {
             FieldType::MergeRecord => MailMergeCounterKind::Record,
@@ -6209,6 +6820,7 @@ impl<'a> Field<'a> {
     /// Cached text and field state are never used to advance a record, open a
     /// data source, perform a merge, or refresh a field result. Malformed
     /// `NEXT` instructions remain generic fields and return `None` here.
+    #[must_use]
     pub fn mail_merge_next(&self) -> Option<MailMergeNextField<'_>> {
         if self.field_type != FieldType::MailMergeNext
             || !is_mail_merge_next_instruction(self.instruction.as_ref())
@@ -6230,6 +6842,11 @@ impl<'a> Field<'a> {
     /// This method never changes record selection, opens a data source,
     /// performs a merge, or refreshes a field result. Instructions without a
     /// comparison remain generic fields and return `None` here.
+    #[must_use]
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub fn mail_merge_conditional_control(&self) -> Option<MailMergeConditionalControlField<'_>> {
         let expected_kind = match self.field_type {
             FieldType::MailMergeNextIf => MailMergeConditionalControlKind::NextIf,
@@ -6257,6 +6874,7 @@ impl<'a> Field<'a> {
     /// This method never resolves field values or refreshes a field result.
     /// Instructions without an expression remain generic fields and return
     /// `None` here.
+    #[must_use]
     pub fn if_field(&self) -> Option<IfField<'_>> {
         if self.field_type != FieldType::If {
             return None;
@@ -6278,6 +6896,7 @@ impl<'a> Field<'a> {
     /// This method never resolves nested field values or refreshes a field
     /// result. Instructions without a comparison remain generic fields and
     /// return `None` here.
+    #[must_use]
     pub fn compare_field(&self) -> Option<CompareField<'_>> {
         if self.field_type != FieldType::Compare {
             return None;
@@ -6299,6 +6918,7 @@ impl<'a> Field<'a> {
     /// This method never looks up or changes a bookmark, changes document
     /// state, or refreshes a field result. Instructions without both a target
     /// and expression remain generic fields and return `None` here.
+    #[must_use]
     pub fn set_field(&self) -> Option<SetField<'_>> {
         if self.field_type != FieldType::Set {
             return None;
@@ -6321,6 +6941,7 @@ impl<'a> Field<'a> {
     /// to look up a bookmark, increment or reset a sequence, calculate a
     /// number, or refresh a field. Instructions without an identifier remain
     /// generic fields and return `None` here.
+    #[must_use]
     pub fn sequence_field(&self) -> Option<SequenceField<'_>> {
         if self.field_type != FieldType::Sequence {
             return None;
@@ -6344,6 +6965,7 @@ impl<'a> Field<'a> {
     /// method never reads table cells or bookmarks, resolves field values, or
     /// refreshes a field result. Instructions without a formula remain generic
     /// fields and return `None` here.
+    #[must_use]
     pub fn formula_field(&self) -> Option<FormulaField<'_>> {
         if self.field_type != FieldType::Formula {
             return None;
@@ -6365,6 +6987,7 @@ impl<'a> Field<'a> {
     /// character codes, expand nested fields, insert text, or refresh a field.
     /// Instructions without a text argument or with malformed switches remain
     /// generic fields and return `None` here.
+    #[must_use]
     pub fn quote_field(&self) -> Option<QuoteField<'_>> {
         if self.field_type != FieldType::Quote {
             return None;
@@ -6389,6 +7012,7 @@ impl<'a> Field<'a> {
     /// formatting or layout, or refresh a field. Instructions without a
     /// character argument or with malformed switches remain generic fields and
     /// return `None` here.
+    #[must_use]
     pub fn symbol_field(&self) -> Option<SymbolField<'_>> {
         if self.field_type != FieldType::Symbol {
             return None;
@@ -6411,6 +7035,7 @@ impl<'a> Field<'a> {
     /// to calculate paragraph numbers, read heading or style state, change
     /// paragraphs or layout, or refresh a field. Malformed instructions remain
     /// generic fields and return `None` here.
+    #[must_use]
     pub fn auto_number_field(&self) -> Option<AutoNumberField<'_>> {
         if self.field_type != FieldType::AutoNumber {
             return None;
@@ -6433,6 +7058,7 @@ impl<'a> Field<'a> {
     /// are never used to look up a list, determine a level or start value,
     /// calculate a number, change layout, or refresh a field. Malformed
     /// instructions remain generic fields and return `None` here.
+    #[must_use]
     pub fn list_number_field(&self) -> Option<ListNumberField<'_>> {
         if self.field_type != FieldType::ListNumber {
             return None;
@@ -6456,6 +7082,7 @@ impl<'a> Field<'a> {
     /// numbers or relative positions, resolve page layout, or refresh a field.
     /// Instructions without a style name or with malformed switches remain
     /// generic fields and return `None` here.
+    #[must_use]
     pub fn style_reference_field(&self) -> Option<StyleReferenceField<'_>> {
         if self.field_type != FieldType::StyleReference {
             return None;
@@ -6480,6 +7107,11 @@ impl<'a> Field<'a> {
     /// never used to display a prompt, capture a response, create or update a
     /// bookmark, perform a merge, or refresh a field. Malformed instructions
     /// remain generic fields and return `None` here.
+    #[must_use]
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub fn prompt_field(&self) -> Option<PromptField<'_>> {
         let expected_kind = match self.field_type {
             FieldType::Ask => PromptFieldKind::Ask,
@@ -6510,6 +7142,11 @@ impl<'a> Field<'a> {
     /// read or modify a host user's identity, apply formatting, or refresh a
     /// field. Malformed instructions remain generic fields and return `None`
     /// here.
+    #[must_use]
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub fn user_identity_field(&self) -> Option<UserIdentityField<'_>> {
         let expected_kind = match self.field_type {
             FieldType::UserAddress => UserIdentityFieldKind::Address,
@@ -6538,6 +7175,7 @@ impl<'a> Field<'a> {
     /// Stored point adjustments and cached-result data are never used to move
     /// text, change layout, reflow content, or refresh a field. Malformed
     /// instructions remain generic fields and return `None` here.
+    #[must_use]
     pub fn advance_field(&self) -> Option<AdvanceField<'_>> {
         if self.field_type != FieldType::Advance {
             return None;
@@ -6560,6 +7198,11 @@ impl<'a> Field<'a> {
     /// never used to open a data source, select a record, perform a merge,
     /// expand placeholders, generate text, or refresh a field. Malformed
     /// instructions remain generic fields and return `None` here.
+    #[must_use]
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub fn mail_merge_recipient_field(&self) -> Option<MailMergeRecipientField<'_>> {
         let expected_kind = match self.field_type {
             FieldType::AddressBlock => MailMergeRecipientFieldKind::AddressBlock,
@@ -6587,6 +7230,7 @@ impl<'a> Field<'a> {
         })
     }
 
+    #[must_use]
     pub const fn status(&self) -> FieldStatus {
         self.status
     }
@@ -6595,6 +7239,9 @@ impl<'a> Field<'a> {
         self.status = status;
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::RtfResult<()> {
         if self.position > self.range_end {
             return Err(crate::RtfError::MalformedDocument(
@@ -6616,6 +7263,9 @@ impl<'a> Field<'a> {
         )
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_shape(&mut self, shape: crate::Shape<'a>) -> crate::RtfResult<()> {
         let mut shapes = self.shapes.clone();
         let mut order = self.drawing_order.clone();
@@ -6637,6 +7287,9 @@ impl<'a> Field<'a> {
         Ok(())
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'a>) -> crate::RtfResult<()> {
         let mut groups = self.shape_groups.clone();
         let mut order = self.drawing_order.clone();
@@ -6669,10 +7322,13 @@ impl<'a> Field<'a> {
     pub fn page_breaks(&self) -> impl Iterator<Item = PageBreak> + '_ {
         self.result_events.iter().filter_map(|event| match event {
             StoryEvent::PageBreak(value) => Some(*value),
-            _ => None,
+            StoryEvent::Drawing(_) | StoryEvent::Field(_) => None,
         })
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_page_break(&mut self, position: usize) -> crate::RtfResult<()> {
         push_story_page_break(
             &mut self.result_events,
@@ -6694,6 +7350,7 @@ impl<'a> Field<'a> {
     /// validates, or activates a target; changes the insertion point; or
     /// refreshes a field. Malformed `HYPERLINK` instructions remain generic fields
     /// and return `None` here.
+    #[must_use]
     pub fn hyperlink(&self) -> Option<HyperlinkField<'_>> {
         if self.field_type != FieldType::Hyperlink {
             return None;
@@ -6724,6 +7381,7 @@ impl<'a> Field<'a> {
     /// only. This method never looks up a bookmark, calculates a page or note
     /// number, inserts text, changes layout, or refreshes a field. Malformed
     /// instructions remain generic fields and return `None` here.
+    #[must_use]
     pub fn reference_field(&self) -> Option<ReferenceField<'_>> {
         let (kind, code) = match (self.field_type, self.parsed_code()) {
             (FieldType::Reference, ParsedFieldCode::Reference(code)) => {
@@ -6753,6 +7411,7 @@ impl<'a> Field<'a> {
     }
 
     /// Parse this field's instruction into bounded, typed semantics.
+    #[must_use]
     pub fn parsed_code(&self) -> ParsedFieldCode<'_> {
         parse_field_code(self.instruction.as_ref())
     }
@@ -6774,16 +7433,17 @@ impl<'a> Field<'a> {
             ParsedFieldCode::Reference(code)
             | ParsedFieldCode::PageReference(code)
             | ParsedFieldCode::NoteReference(code) => Some(code.bookmark.into_owned()),
-            _ => None,
+            ParsedFieldCode::Other { .. } | ParsedFieldCode::Malformed(_) => None,
         }
     }
 
     #[inline]
+    #[must_use]
     pub fn display_text(&self) -> &str {
-        if !self.result.is_empty() {
-            &self.result
-        } else {
+        if self.result.is_empty() {
             &self.instruction
+        } else {
+            &self.result
         }
     }
 }

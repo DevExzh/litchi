@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{RtfDocument, RtfWriter, StyleType};
 use std::fs;
 
@@ -74,20 +83,20 @@ fn parses_implicit_normal_all_types_list_metadata_and_round_trips() {
 #[test]
 fn rejects_malformed_scope_order_duplicates_cycles_and_bounds() {
     for source in [
-        r#"{\rtf1{\stylesheet{\s0 A;}}{\stylesheet{\s1 B;}}}"#,
-        r#"{\rtf1{\b{\stylesheet{\s0 A;}}}}"#,
-        r#"{\rtf1 Body{\stylesheet{\s0 A;}}}"#,
-        r#"{\rtf1{\stylesheet{\cs1 Character;}}}"#,
-        r#"{\rtf1{\stylesheet{\b\s1 Late;}}}"#,
-        r#"{\rtf1{\stylesheet{\s1\s2 Duplicate;}}}"#,
-        r#"{\rtf1{\stylesheet{\s1 No terminator}}}"#,
-        r#"{\rtf1{\stylesheet{\s1 A;}{\s1 B;}}}"#,
-        r#"{\rtf1{\stylesheet{\s1\sbasedon2 A;}{\s2\sbasedon1 B;}}}"#,
-        r#"{\rtf1{\stylesheet{\s1\sbasedon0\sbasedon0 A;}}}"#,
-        r#"{\rtf1{\stylesheet{\s1\shidden\shidden0 A;}}}"#,
-        r#"{\rtf1{\stylesheet{\s1\spriority1\spriority2 A;}}}"#,
-        r#"{\rtf1{\stylesheet{\s1\spriority100 A;}}}"#,
-        r#"{\rtf1{\stylesheet{\s1\styrsid-1 A;}}}"#,
+        r"{\rtf1{\stylesheet{\s0 A;}}{\stylesheet{\s1 B;}}}",
+        r"{\rtf1{\b{\stylesheet{\s0 A;}}}}",
+        r"{\rtf1 Body{\stylesheet{\s0 A;}}}",
+        r"{\rtf1{\stylesheet{\cs1 Character;}}}",
+        r"{\rtf1{\stylesheet{\b\s1 Late;}}}",
+        r"{\rtf1{\stylesheet{\s1\s2 Duplicate;}}}",
+        r"{\rtf1{\stylesheet{\s1 No terminator}}}",
+        r"{\rtf1{\stylesheet{\s1 A;}{\s1 B;}}}",
+        r"{\rtf1{\stylesheet{\s1\sbasedon2 A;}{\s2\sbasedon1 B;}}}",
+        r"{\rtf1{\stylesheet{\s1\sbasedon0\sbasedon0 A;}}}",
+        r"{\rtf1{\stylesheet{\s1\shidden\shidden0 A;}}}",
+        r"{\rtf1{\stylesheet{\s1\spriority1\spriority2 A;}}}",
+        r"{\rtf1{\stylesheet{\s1\spriority100 A;}}}",
+        r"{\rtf1{\stylesheet{\s1\styrsid-1 A;}}}",
     ] {
         assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
     }

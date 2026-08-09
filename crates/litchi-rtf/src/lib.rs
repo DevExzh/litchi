@@ -13,7 +13,14 @@
         clippy::unwrap_used
     )
 )]
-#![allow(missing_docs)]
+#![allow(
+    missing_docs,
+    reason = "the retained model vocabulary mirrors self-explanatory RTF specification names"
+)]
+#![allow(
+    non_ascii_idents,
+    reason = "zerocopy's wire-layout derives emit compiler-generated identifiers"
+)]
 
 //! Typed Rich Text Format documents.
 //!
@@ -53,6 +60,10 @@
 //! # }
 //! ```
 
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items stay grouped by RTF feature area rather than by item kind"
+)]
 mod api;
 mod codec;
 mod content;
@@ -171,7 +182,26 @@ pub use codec::error::{RtfError as Error, RtfResult as Result};
 // Canonical native RTF vocabulary used by the retained model and writer. The
 // ordinary facade selects a smaller contextual subset from this module.
 mod native {
-    use super::*;
+    use super::{
+        annotation, bookmark, border, character_positioning, compressed, custom_xml, data_store,
+        document, document_asian_grid_compatibility, document_booklet_printing,
+        document_compatibility_policy, document_default_formatting, document_drawing_grid,
+        document_east_asian_compatibility, document_embedding_policies, document_file_settings,
+        document_legacy_layout_compatibility, document_line_spacing_compatibility, document_origin,
+        document_output_settings, document_print_layout_settings, document_privacy_policies,
+        document_processing_settings, document_rendering_settings, document_revision_policies,
+        document_save_preferences, document_style_policies, document_style_restrictions,
+        document_table_layout_compatibility, document_theme_languages, document_variable,
+        document_view, document_word_2003_compatibility, document_xml_policies, editable_region,
+        equation, error, external_reference, field, file_table, form_field, generated_list_marker,
+        generator, hyphenation, info, kinsoku, language, latent_style, legacy_drawing,
+        legacy_numbering, legacy_paragraph_numbering, legacy_text_box, limits, list, mail_merge,
+        math, math_properties, navigation_entry, note_options, note_separator, object, page_border,
+        paragraph_group, picture, picture_compatibility, protection_range, protection_user,
+        review_display, revision_save, section, shape, style_list_filter, stylesheet, table, theme,
+        types, user_property, window_caption, write_reservation, writer, xml_namespace,
+        xsl_transform,
+    };
 
     pub use annotation::{Annotation, AnnotationType, Revision, RevisionAuthor, RevisionType};
     pub use bookmark::{Bookmark, BookmarkTable};
@@ -308,7 +338,6 @@ mod native {
     pub use legacy_text_box::{
         LegacyHorizontalAnchor, LegacyTextBox, LegacyTextDirection, LegacyVerticalAnchor,
     };
-    pub use lexer::CharacterSet;
     pub use limits::ParseLimits;
     pub use list::{
         List, ListFollow, ListJustification, ListLevel, ListLevelType, ListOverride,

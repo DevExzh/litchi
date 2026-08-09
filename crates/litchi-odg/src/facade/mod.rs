@@ -4,84 +4,80 @@ use litchi_core::{Metadata, Result};
 use std::path::Path;
 
 pub use crate::authoring::Builder;
+pub use crate::package::{Commit, Patch, Snapshot, TextChange, Transaction};
 
-/// Immutable document snapshot.
+/// Immutable source-owning drawing facade.
 pub struct Drawing {
-    package: crate::package::Snapshot,
+    package: Snapshot,
 }
 
 impl Drawing {
     /// Opens a drawing package from a file path.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the file cannot be read or is not a valid package.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        crate::package::Snapshot::open(path).map(|package| Self { package })
+        Snapshot::open(path).map(|package| Self { package })
     }
 
     /// Opens a drawing package from in-memory bytes.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the bytes are not a valid package.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        crate::package::Snapshot::from_bytes(bytes).map(|package| Self { package })
+        Snapshot::from_bytes(bytes).map(|package| Self { package })
     }
 
-    /// Returns the `content.xml` document.
+    /// Returns the exact `content.xml` document.
     #[must_use]
     pub fn content_xml(&self) -> &str {
         self.package.content_xml()
     }
 
-    /// Returns the `styles.xml` document, if present.
+    /// Returns exact `styles.xml`, if present.
     #[must_use]
     pub fn styles_xml(&self) -> Option<&str> {
         self.package.styles_xml()
     }
 
-    /// Returns the document metadata, if present.
+    /// Returns document metadata, if present.
     #[must_use]
     pub fn metadata(&self) -> Option<&Metadata> {
         self.package.metadata()
     }
 
-    /// Returns the raw package bytes.
+    /// Returns bounded semantic pages in source order.
+    #[must_use]
+    pub fn pages(&self) -> &[crate::page::Page] {
+        self.package.pages()
+    }
+
+    /// Returns declared drawing layers in source order.
+    #[must_use]
+    pub fn layers(&self) -> &[crate::layer::Layer] {
+        self.package.layers()
+    }
+
+    /// Returns original package bytes exactly.
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         self.package.as_bytes()
     }
 
-    /// Lists the file entries stored in the package.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the package entries cannot be enumerated.
+    /// Lists safe package member names.
     pub fn files(&self) -> Result<Vec<String>> {
         self.package.files()
     }
 
-    /// Consumes the snapshot and returns the raw package bytes.
+    /// Starts a source-bound package semantic transaction.
+    #[must_use]
+    pub fn edit(&self) -> Transaction {
+        self.package.edit()
+    }
+
+    /// Returns the source-owning package snapshot.
+    #[must_use]
+    pub fn snapshot(&self) -> &Snapshot {
+        &self.package
+    }
+
+    /// Consumes the facade and returns source bytes.
     #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
         self.package.into_bytes()
-    }
-}
-
-#[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "test code panics on failure; unwrap keeps assertions concise"
-)]
-mod tests {
-    use super::{Builder, Drawing};
-
-    #[test]
-    fn builder_opens_as_validated_snapshot() {
-        let bytes = Builder::new().build().unwrap();
-        let document = Drawing::from_bytes(bytes).unwrap();
-        assert!(document.content_xml().contains("<office:drawing"));
-        assert!(!document.as_bytes().is_empty());
     }
 }

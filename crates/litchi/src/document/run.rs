@@ -9,7 +9,10 @@ use litchi_doc as doc;
 
 /// A text run in a paragraph.
 #[derive(Debug, Clone)]
-#[allow(clippy::large_enum_variant)] // public facade enum; boxing would break the API
+#[allow(
+    clippy::large_enum_variant,
+    reason = "public facade enum; boxing the large variant would break the API"
+)]
 pub enum Run {
     #[cfg(feature = "doc")]
     Doc(doc::Run),

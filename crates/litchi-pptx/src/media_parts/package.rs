@@ -1,5 +1,14 @@
-use super::*;
+use super::{
+    BTreeMap, BlobPart, Conformance, Data, Error, Event, Extension, HashSet, Kind, List,
+    MAX_BOOKMARKS, MAX_DEPTH, MAX_MEDIA, MAX_PAYLOAD_BYTES, MAX_TOTAL_PAYLOAD_BYTES, MAX_XML_BYTES,
+    Namespace, NsReader, Offset, OpcPackage, PackURI, Part, ResolveResult, Resource, Result,
+    STRICT_AUDIO_REL, STRICT_VIDEO_REL, TimeParseError, bounded, ct, document_conformance, invalid,
+    limit, parse, rt, validate_id, write_pictures, xml_error,
+};
 
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load(package: &OpcPackage, slide_name: &PackURI) -> Result<List> {
     if package
         .rels()
@@ -126,6 +135,10 @@ fn load_resource(
 }
 
 /// Adds a new set of media pictures and their inert internal resources to a Slide part.
+///
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn store(
     package: &mut OpcPackage,
     slide_name: &PackURI,
@@ -217,7 +230,7 @@ fn insert_pictures(xml: &[u8], fragment: &[u8], conformance: Conformance) -> Res
     let mut position = None;
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("slide XML offset overflow"))?;
+            .map_err(|_err| invalid("slide XML offset overflow"))?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(element) => {

@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::codec::encode_record;
 use super::*;
 use crate::consts::RecordType;
@@ -14,8 +20,8 @@ fn string_tag(name: &str, value: Option<&str>) -> Vec<u8> {
             .collect::<Vec<_>>()
     };
     let mut data = record(0, 0, RecordType::CString.as_u16(), &units(name));
-    if let Some(value) = value {
-        data.extend_from_slice(&record(0, 1, RecordType::CString.as_u16(), &units(value)));
+    if let Some(text) = value {
+        data.extend_from_slice(&record(0, 1, RecordType::CString.as_u16(), &units(text)));
     }
     record(0x0f, 0, RecordType::ProgStringTag.as_u16(), &data)
 }
@@ -23,9 +29,10 @@ fn string_tag(name: &str, value: Option<&str>) -> Vec<u8> {
 fn binary_tag(name: &str, style_type: Option<RecordType>, payload: &[u8]) -> Vec<u8> {
     let name_data: Vec<u8> = name.encode_utf16().flat_map(u16::to_le_bytes).collect();
     let mut data = record(0, 0, RecordType::CString.as_u16(), &name_data);
-    let blob_data = style_type
-        .map(|kind| record(0, 0, kind.as_u16(), payload))
-        .unwrap_or_else(|| payload.to_vec());
+    let blob_data = style_type.map_or_else(
+        || payload.to_vec(),
+        |kind| record(0, 0, kind.as_u16(), payload),
+    );
     data.extend_from_slice(&record(
         0,
         0,
@@ -73,8 +80,8 @@ fn parses_all_defined_variants_and_round_trips_exactly() {
     assert_eq!(parsed.powerpoint11().unwrap().runs.len(), 1);
     assert_eq!(
         parsed.tags.iter().find_map(|tag| match tag {
-            ShapeProgrammableTag::String(tag) => tag.value.as_deref(),
-            _ => None,
+            ShapeProgrammableTag::String(string_tag_data) => string_tag_data.value.as_deref(),
+            ShapeProgrammableTag::Binary(_) => None,
         }),
         Some("Ada")
     );
@@ -124,8 +131,13 @@ fn rejects_malformed_strings_headers_truncation_and_every_limit() {
     truncated.pop();
     assert!(ShapeProgrammableTags::parse_payload(&truncated, 0, defaults).is_err());
 
-    let invalid_utf16 = record(0, 0, RecordType::CString.as_u16(), &[0x00, 0xd8]);
-    let invalid_utf16 = record(0x0f, 0, RecordType::ProgStringTag.as_u16(), &invalid_utf16);
+    let invalid_utf16_cstring = record(0, 0, RecordType::CString.as_u16(), &[0x00, 0xd8]);
+    let invalid_utf16 = record(
+        0x0f,
+        0,
+        RecordType::ProgStringTag.as_u16(),
+        &invalid_utf16_cstring,
+    );
     assert!(ShapeProgrammableTags::parse_payload(&invalid_utf16, 0, defaults).is_err());
 
     let control_name = string_tag("bad\nname", None);

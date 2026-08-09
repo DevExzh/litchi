@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{GeneratedListMarkerKind, RtfDocument, RtfWriter};
 
 const SYNTHETIC: &str = concat!(
@@ -40,20 +49,20 @@ fn parses_inert_markers_and_round_trips_without_visible_duplication() {
 #[test]
 fn rejects_malformed_placement_duplicates_active_content_and_bounds() {
     let malformed = [
-        r#"{\rtf1\listtext x}"#,
-        r#"{\rtf1{\*\listtext x}}"#,
-        r#"{\rtf1{\header{\listtext x}}Body}"#,
-        r#"{\rtf1{\listtext}}"#,
-        r#"{\rtf1{\listtext x}{\listtext y}Body}"#,
-        r#"{\rtf1{\listtext\bin2 xx}Body}"#,
-        r#"{\rtf1{\listtext{\*\unknown danger}}Body}"#,
-        r#"{\rtf1{\listtext{\field danger}}Body}"#,
-        r#"{\rtf1{\listtext{\object danger}}Body}"#,
-        r#"{\rtf1{\listtext{\pict 00}}Body}"#,
-        r#"{\rtf1{\listtext{\shp danger}}Body}"#,
-        r#"{\rtf1{\listtext{\formfield danger}}Body}"#,
-        r#"{\rtf1{\listtext x\par}Body}"#,
-        r#"{\rtf1{\pntext x\line}Body}"#,
+        r"{\rtf1\listtext x}",
+        r"{\rtf1{\*\listtext x}}",
+        r"{\rtf1{\header{\listtext x}}Body}",
+        r"{\rtf1{\listtext}}",
+        r"{\rtf1{\listtext x}{\listtext y}Body}",
+        r"{\rtf1{\listtext\bin2 xx}Body}",
+        r"{\rtf1{\listtext{\*\unknown danger}}Body}",
+        r"{\rtf1{\listtext{\field danger}}Body}",
+        r"{\rtf1{\listtext{\object danger}}Body}",
+        r"{\rtf1{\listtext{\pict 00}}Body}",
+        r"{\rtf1{\listtext{\shp danger}}Body}",
+        r"{\rtf1{\listtext{\formfield danger}}Body}",
+        r"{\rtf1{\listtext x\par}Body}",
+        r"{\rtf1{\pntext x\line}Body}",
     ];
     for source in malformed {
         assert!(
@@ -62,7 +71,7 @@ fn rejects_malformed_placement_duplicates_active_content_and_bounds() {
         );
     }
 
-    let oversized = format!(r#"{{\rtf1{{\listtext {}}}}}"#, "x".repeat(4097));
+    let oversized = format!(r"{{\rtf1{{\listtext {}}}}}", "x".repeat(4097));
     assert!(RtfDocument::parse(&oversized).is_err());
 }
 

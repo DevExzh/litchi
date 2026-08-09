@@ -29,6 +29,7 @@ impl Default for MutablePresentation {
 
 impl MutablePresentation {
     /// Create an empty 4:3 presentation model.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             slides: Vec::new(),
@@ -50,6 +51,10 @@ impl MutablePresentation {
     }
 
     /// Append an empty slide.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add_slide(&mut self) -> Result<&mut MutableSlide> {
         let id = self.allocate_slide_id()?;
         self.slides.push(MutableSlide::new(id));
@@ -58,6 +63,10 @@ impl MutablePresentation {
     }
 
     /// Insert an empty slide at an ordered position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn insert_slide(&mut self, index: usize) -> Result<&mut MutableSlide> {
         if index > self.slides.len() {
             return Err(Error::SlideIndexOutOfBounds {
@@ -73,6 +82,7 @@ impl MutablePresentation {
 
     /// Number of authored slides.
     #[inline]
+    #[must_use]
     pub fn slide_count(&self) -> usize {
         self.slides.len()
     }
@@ -83,11 +93,16 @@ impl MutablePresentation {
     }
 
     /// Borrow all authored slides.
+    #[must_use]
     pub fn slides(&self) -> &[MutableSlide] {
         &self.slides
     }
 
     /// Delete one slide by index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn delete_slide(&mut self, index: usize) -> Result<()> {
         if index >= self.slides.len() {
             return Err(Error::SlideIndexOutOfBounds {
@@ -101,6 +116,10 @@ impl MutablePresentation {
     }
 
     /// Duplicate a slide and append it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn duplicate_slide(&mut self, index: usize) -> Result<usize> {
         if index >= self.slides.len() {
             return Err(Error::SlideIndexOutOfBounds {
@@ -116,6 +135,10 @@ impl MutablePresentation {
     }
 
     /// Duplicate a slide at an ordered position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn insert_duplicate_slide(&mut self, index: usize, position: usize) -> Result<usize> {
         if index >= self.slides.len() {
             return Err(Error::SlideIndexOutOfBounds {
@@ -137,6 +160,10 @@ impl MutablePresentation {
     }
 
     /// Move one slide within the ordered list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn move_slide(&mut self, from_index: usize, to_index: usize) -> Result<()> {
         if from_index >= self.slides.len() {
             return Err(Error::SlideIndexOutOfBounds {
@@ -157,11 +184,13 @@ impl MutablePresentation {
     }
 
     /// Current slide width in EMUs.
+    #[must_use]
     pub fn slide_width(&self) -> i64 {
         self.slide_width
     }
 
     /// Current slide height in EMUs.
+    #[must_use]
     pub fn slide_height(&self) -> i64 {
         self.slide_height
     }
@@ -196,6 +225,10 @@ impl MutablePresentation {
     }
 
     /// Generate presentation XML using conventional `rId2..` slide links.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn generate_presentation_xml(&self) -> Result<String> {
         let relationship_ids: Vec<_> = (0..self.slides.len())
             .map(|index| format!("rId{}", index.saturating_add(2)))

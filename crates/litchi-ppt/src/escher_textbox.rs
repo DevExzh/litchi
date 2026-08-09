@@ -1,9 +1,9 @@
 use super::TextRuler;
 use super::package::{Error, Result};
-/// EscherTextboxWrapper implementation.
+/// `EscherTextboxWrapper` implementation.
 ///
-/// Based on Apache POI's EscherTextboxWrapper, this wraps an Escher textbox record
-/// and provides access to its child PPT records (TextCharsAtom, TextBytesAtom, StyleTextPropAtom).
+/// Based on Apache POI's `EscherTextboxWrapper`, this wraps an Escher textbox record
+/// and provides access to its child PPT records (`TextCharsAtom`, `TextBytesAtom`, `StyleTextPropAtom`).
 use super::records::Record;
 use super::text_interaction::{TextInteraction, TextInteractionLimits, text_units_from_records};
 use super::text_run::{ParagraphRun, TextRun, TextRunExtractor};
@@ -11,8 +11,12 @@ use crate::consts::RecordType;
 
 /// Wrapper around Escher textbox data.
 ///
-/// Based on POI's EscherTextboxWrapper. Parses child records from the textbox data.
+/// Based on POI's `EscherTextboxWrapper`. Parses child records from the textbox data.
 #[derive(Debug, Clone)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`EscherTextboxWrapper` mirrors the Apache POI class name and is the established public API name"
+)]
 pub struct EscherTextboxWrapper {
     /// The raw Escher textbox data
     data: Vec<u8>,
@@ -37,13 +41,21 @@ pub struct EscherTextboxWrapper {
 impl EscherTextboxWrapper {
     /// Create a new wrapper from Escher textbox data.
     ///
-    /// Based on POI's EscherTextboxWrapper constructor which calls
+    /// Based on POI's `EscherTextboxWrapper` constructor which calls
     /// Record.findChildRecords(data, 0, data.length).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(data: Vec<u8>) -> Result<Self> {
         Self::new_with_interaction_limits(data, TextInteractionLimits::default())
     }
 
     /// Create a wrapper with explicit text-interaction resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new_with_interaction_limits(
         data: Vec<u8>,
         limits: TextInteractionLimits,
@@ -91,7 +103,7 @@ impl EscherTextboxWrapper {
 
     /// Find child PPT records in the Escher textbox data.
     ///
-    /// Based on POI's Record.findChildRecords().
+    /// Based on POI's `Record.findChildRecords()`.
     fn find_child_records(data: &[u8]) -> Result<Vec<Record>> {
         let mut records = Vec::new();
         let mut offset = 0;
@@ -112,9 +124,10 @@ impl EscherTextboxWrapper {
                 data[offset + 6],
                 data[offset + 7],
             ]);
-            let payload_length = usize::try_from(payload_length)
-                .map_err(|_| Error::Corrupted("ClientTextbox record size overflow".to_string()))?;
-            let record_end = header_end.checked_add(payload_length).ok_or_else(|| {
+            let payload_len = usize::try_from(payload_length).map_err(|_err| {
+                Error::Corrupted("ClientTextbox record size overflow".to_string())
+            })?;
+            let record_end = header_end.checked_add(payload_len).ok_or_else(|| {
                 Error::Corrupted("ClientTextbox record size overflow".to_string())
             })?;
             if record_end > data.len() {
@@ -137,6 +150,10 @@ impl EscherTextboxWrapper {
     }
 
     /// Parse only text-range actions without retaining or decoding the textbox.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_text_interactions_with_limits(
         data: &[u8],
         limits: TextInteractionLimits,
@@ -173,7 +190,7 @@ impl EscherTextboxWrapper {
                 "Interactive ClientTextbox has an invalid TextHeaderAtom".to_string(),
             ));
         }
-        let text_type = header.data.as_slice().try_into().map_err(|_| {
+        let text_type = header.data.as_slice().try_into().map_err(|_err| {
             Error::Corrupted(
                 "Interactive ClientTextbox TextHeaderAtom is not four bytes".to_string(),
             )
@@ -184,31 +201,37 @@ impl EscherTextboxWrapper {
     }
 
     /// Get the extracted text.
+    #[must_use]
     pub fn text(&self) -> &str {
         &self.text
     }
 
     /// Get child records.
+    #[must_use]
     pub fn child_records(&self) -> &[Record] {
         &self.child_records
     }
 
     /// Get the character-formatting runs extracted from `StyleTextPropAtom`.
+    #[must_use]
     pub fn runs(&self) -> &[TextRun] {
         &self.runs
     }
 
     /// Get paragraph-formatting runs extracted from `StyleTextPropAtom`.
+    #[must_use]
     pub fn paragraph_runs(&self) -> &[ParagraphRun] {
         &self.paragraph_runs
     }
 
     /// Get the textbox-specific ruler, when present.
+    #[must_use]
     pub fn text_ruler(&self) -> Option<&TextRuler> {
         self.text_ruler.as_ref()
     }
 
     /// Strictly paired text-range interactions in record order.
+    #[must_use]
     pub fn text_interactions(&self) -> &[TextInteraction] {
         &self.text_interactions
     }
@@ -216,17 +239,20 @@ impl EscherTextboxWrapper {
     /// Header/footer metacharacter placeholders in this textbox, in record
     /// order (MS-PPT 2.9.47-2.9.52). Placeholders are never substituted,
     /// formatted, or laid out.
+    #[must_use]
     pub fn metachars(&self) -> &[super::text_metachar::TextMetachar] {
         &self.metachars
     }
 
     /// Outline text references (`OutlineTextRefAtom`, MS-PPT 2.9.78) tying
     /// this textbox to outline text bodies.
+    #[must_use]
     pub fn outline_text_refs(&self) -> &[super::text_si_exception::OutlineTextRef] {
         &self.outline_text_refs
     }
 
-    /// Find a StyleTextPropAtom record.
+    /// Find a `StyleTextPropAtom` record.
+    #[must_use]
     pub fn find_style_text_prop_atom(&self) -> Option<&Record> {
         self.child_records
             .iter()
@@ -234,12 +260,18 @@ impl EscherTextboxWrapper {
     }
 
     /// Get the raw data.
+    #[must_use]
     pub fn data(&self) -> &[u8] {
         &self.data
     }
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

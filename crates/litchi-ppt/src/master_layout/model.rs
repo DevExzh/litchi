@@ -1,4 +1,4 @@
-//! Immutable semantic views for one legacy PowerPoint master layout.
+//! Immutable semantic views for one legacy `PowerPoint` master layout.
 
 use crate::consts::RecordType;
 use crate::package::Result;
@@ -13,9 +13,9 @@ use super::{codec, transaction, validation};
 /// callers do not need redundant MainMaster/NotesMaster type prefixes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Context {
-    /// A MainMaster container.
+    /// A `MainMaster` container.
     Main,
-    /// A Slide container whose SlideAtom.geom is SL_MasterTitle.
+    /// A Slide container whose SlideAtom.geom is `SL_MasterTitle`.
     Title,
     /// A Notes container whose NotesAtom.slideIdRef is zero.
     Notes,
@@ -34,6 +34,7 @@ impl Context {
     }
 
     /// Stable semantic label useful for diagnostics and logging.
+    #[must_use]
     pub const fn name(self) -> &'static str {
         match self {
             Self::Main => "main",
@@ -84,11 +85,13 @@ pub struct Path(Vec<usize>);
 
 impl Path {
     /// Return the root path.
+    #[must_use]
     pub const fn root() -> Self {
         Self(Vec::new())
     }
 
     /// Return a path containing one more child index.
+    #[must_use]
     pub fn child(&self, index: usize) -> Self {
         let mut path = self.0.clone();
         path.push(index);
@@ -96,11 +99,13 @@ impl Path {
     }
 
     /// Return the path segments without allocation.
+    #[must_use]
     pub fn as_slice(&self) -> &[usize] {
         &self.0
     }
 
     /// Whether this path identifies the layout root.
+    #[must_use]
     pub const fn is_root(&self) -> bool {
         self.0.is_empty()
     }
@@ -143,11 +148,13 @@ impl Entry {
     }
 
     /// Location of this master in the supplied record tree.
+    #[must_use]
     pub const fn path(&self) -> &Path {
         &self.path
     }
 
     /// Contextual kind of this master.
+    #[must_use]
     pub const fn context(&self) -> Context {
         self.context
     }
@@ -165,16 +172,19 @@ impl Inventory {
     }
 
     /// All masters in depth-first record order.
+    #[must_use]
     pub fn entries(&self) -> &[Entry] {
         &self.entries
     }
 
     /// Number of discovered masters.
+    #[must_use]
     pub const fn len(&self) -> usize {
         self.entries.len()
     }
 
     /// Whether no contextual masters were found.
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
@@ -198,35 +208,56 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Validate and capture a record supplied by a parent presentation editor.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn from_record(context: Context, root: Record) -> Result<Self> {
         Self::from_record_with_limits(context, root, Limits::default())
     }
 
     /// Validate and capture a record under explicit resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "callers hand over ownership of the parsed record tree; taking it by \
+                  reference would churn the established public API and its callers"
+    )]
     pub fn from_record_with_limits(context: Context, root: Record, limits: Limits) -> Result<Self> {
-        let limits = limits.validate()?;
-        let bytes = codec::encode(&root, limits)?;
-        let reparsed = codec::parse(&bytes, limits)?;
-        validation::validate(context, &reparsed, limits)?;
+        let validated_limits = limits.validate()?;
+        let bytes = codec::encode(&root, validated_limits)?;
+        let reparsed = codec::parse(&bytes, validated_limits)?;
+        validation::validate(context, &reparsed, validated_limits)?;
         Ok(Self {
             context,
             root: reparsed,
             bytes,
-            limits,
+            limits: validated_limits,
         })
     }
 
     /// Parse one complete PPT record and capture it as an immutable snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(context: Context, bytes: &[u8]) -> Result<Self> {
         Self::parse_with_limits(context, bytes, Limits::default())
     }
 
     /// Parse one complete PPT record under explicit resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_with_limits(context: Context, bytes: &[u8], limits: Limits) -> Result<Self> {
-        let limits = limits.validate()?;
-        let root = codec::parse(bytes, limits)?;
-        validation::validate(context, &root, limits)?;
-        let encoded = codec::encode(&root, limits)?;
+        let validated_limits = limits.validate()?;
+        let root = codec::parse(bytes, validated_limits)?;
+        validation::validate(context, &root, validated_limits)?;
+        let encoded = codec::encode(&root, validated_limits)?;
         if encoded != bytes {
             return Err(crate::package::Error::Corrupted(
                 "master-layout record is not losslessly representable".into(),
@@ -236,26 +267,30 @@ impl Snapshot {
             context,
             root,
             bytes: bytes.to_vec(),
-            limits,
+            limits: validated_limits,
         })
     }
 
     /// Context of this layout.
+    #[must_use]
     pub const fn context(&self) -> Context {
         self.context
     }
 
     /// Borrow the validated record tree.
+    #[must_use]
     pub const fn record(&self) -> &Record {
         &self.root
     }
 
     /// Borrow the exact encoded record bytes represented by this snapshot.
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
     /// Resource limits attached to this snapshot.
+    #[must_use]
     pub const fn limits(&self) -> Limits {
         self.limits
     }
@@ -267,6 +302,7 @@ impl Snapshot {
     }
 
     /// Start an isolated transactional edit from this immutable state.
+    #[must_use]
     pub fn edit(&self) -> transaction::Transaction {
         transaction::Transaction::open(self.clone())
     }
@@ -278,6 +314,10 @@ impl Snapshot {
     }
 
     /// Inventory contextual masters in this snapshot's record tree.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn inventory(&self) -> Result<Inventory> {
         scan(&self.root)
     }

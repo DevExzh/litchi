@@ -65,6 +65,7 @@ impl SlideTiming {
     /// // Auto-advance after 5 seconds, also allow click
     /// let timing = SlideTiming::auto_advance(5000);
     /// ```
+    #[must_use]
     pub fn auto_advance(ms: u32) -> Self {
         Self {
             advance_time_ms: ms,
@@ -74,11 +75,13 @@ impl SlideTiming {
     }
 
     /// Create a timing that only advances on click (no auto-advance).
+    #[must_use]
     pub fn on_click_only() -> Self {
         Self::default()
     }
 
     /// Create a timing for a hidden slide.
+    #[must_use]
     pub fn hidden() -> Self {
         Self {
             advance_time_ms: 0,
@@ -88,17 +91,26 @@ impl SlideTiming {
     }
 
     /// Set whether clicking advances the slide.
+    #[must_use]
     pub fn with_click_advance(mut self, enabled: bool) -> Self {
         self.advance_on_click = enabled;
         self
     }
 }
 
-/// Build an SSSlideInfoAtom record for per-slide timing.
+/// Build an `SSSlideInfoAtom` record for per-slide timing.
 ///
 /// This is used when the slide has timing but no transition effect.
 /// If the slide also has a transition, the transition writer handles
-/// the SSSlideInfoAtom instead (since it shares the same record).
+/// the `SSSlideInfoAtom` instead (since it shares the same record).
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`build_slide_timing` is the established public API name; renaming it would break downstream crates"
+)]
 pub fn build_slide_timing(timing: &SlideTiming) -> Result<Vec<u8>, Error> {
     let mut data = Vec::with_capacity(16);
 
@@ -139,6 +151,11 @@ pub fn build_slide_timing(timing: &SlideTiming) -> Result<Vec<u8>, Error> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{Revision, RevisionAuthor, RevisionType, RtfDocument, RtfWriter};
 use std::borrow::Cow;
 use std::fs;
@@ -64,7 +73,7 @@ fn mixed_unicode_revisions_preserve_visible_and_deleted_semantics() {
 
 #[test]
 fn mutation_uses_utf8_boundaries_and_explicit_author_table() {
-    let mut document = RtfDocument::parse(r#"{\rtf1\ansi A\u20320?B}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1\ansi A\u20320?B}").unwrap();
     document
         .push_revision_author(RevisionAuthor::new(Cow::Borrowed("Ada")).unwrap())
         .unwrap();
@@ -114,15 +123,15 @@ fn mutation_uses_utf8_boundaries_and_explicit_author_table() {
 #[test]
 fn malformed_revision_grammar_is_rejected() {
     let cases = [
-        r#"{\rtf1{\*\revtbl{A;}}{\*\revtbl{B;}}}"#,
-        r#"{\rtf1{\*\revtbl{A{\field x};}}}"#,
-        r#"{\rtf1{\*\revtbl{A;}}{\revised\deleted\revauth0\revdttm1 x}}"#,
-        r#"{\rtf1{\*\revtbl{A;}}\revauth0 x}"#,
-        r#"{\rtf1{\*\revtbl{A;}}{\revised\revauthdel0\revdttm1 x}}"#,
-        r#"{\rtf1{\*\revtbl{A;}}{\revised\revauth0\revdttm1}}"#,
-        r#"{\rtf1{\*\revtbl{A;}}{\revised\revauth0\revdttm1{\field x}}}"#,
-        r#"{\rtf1{\*\revtbl{A;}}{\deleted\revauthdel0\revdttmdel1\bin3 abc}}"#,
-        r#"{\rtf1{\revised\revauth0\revdttm1 x}}"#,
+        r"{\rtf1{\*\revtbl{A;}}{\*\revtbl{B;}}}",
+        r"{\rtf1{\*\revtbl{A{\field x};}}}",
+        r"{\rtf1{\*\revtbl{A;}}{\revised\deleted\revauth0\revdttm1 x}}",
+        r"{\rtf1{\*\revtbl{A;}}\revauth0 x}",
+        r"{\rtf1{\*\revtbl{A;}}{\revised\revauthdel0\revdttm1 x}}",
+        r"{\rtf1{\*\revtbl{A;}}{\revised\revauth0\revdttm1}}",
+        r"{\rtf1{\*\revtbl{A;}}{\revised\revauth0\revdttm1{\field x}}}",
+        r"{\rtf1{\*\revtbl{A;}}{\deleted\revauthdel0\revdttmdel1\bin3 abc}}",
+        r"{\rtf1{\revised\revauth0\revdttm1 x}}",
     ];
     for rtf in cases {
         assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");

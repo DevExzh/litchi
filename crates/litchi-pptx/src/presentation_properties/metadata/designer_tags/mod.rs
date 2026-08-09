@@ -1,6 +1,6 @@
-//! Slide-ID-owned PowerPoint Designer tags.
+//! Slide-ID-owned `PowerPoint` Designer tags.
 //!
-//! [MS-PPTX] 2.2.20 attaches the inert PowerPoint 2020 tag list to a
+//! [MS-PPTX] 2.2.20 attaches the inert `PowerPoint` 2020 tag list to a
 //! presentation-level `p:sldId`, not to the related slide part. This owner
 //! retains duplicate extension entries for inventory, but singular mutation
 //! deliberately refuses that ambiguous producer state.

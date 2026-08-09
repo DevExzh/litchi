@@ -1,4 +1,4 @@
-//! OfficeArt ClientData child-record assembly.
+//! `OfficeArt` `ClientData` child-record assembly.
 
 use super::super::{Error, header_version, ppt_record_type};
 use super::wire::EscherBuilder;
@@ -94,7 +94,7 @@ pub(super) fn append_client_data_payload(
     Ok(())
 }
 
-/// Builds ClientData with the legacy PPT hyperlink interaction atom.
+/// Builds `ClientData` with the legacy PPT hyperlink interaction atom.
 #[cfg(test)]
 pub(crate) fn build_client_data_with_hyperlink(
     hyperlink_id: u32,
@@ -113,7 +113,7 @@ pub(crate) fn build_client_data_with_hyperlink(
     client_data.ok_or_else(|| std::io::Error::other("missing ClientData record"))
 }
 
-/// Builds ClientData containing one animation-information container.
+/// Builds `ClientData` containing one animation-information container.
 pub(super) fn build_client_data_with_animation(
     animation_info: &crate::animation::AnimationInfo,
 ) -> Result<Vec<u8>, Error> {
@@ -129,7 +129,7 @@ pub(super) fn build_client_data_with_animation(
     client_data.build()
 }
 
-/// Builds ClientData with an `OEPlaceholderAtom` for a placeholder shape.
+/// Builds `ClientData` with an `OEPlaceholderAtom` for a placeholder shape.
 pub(crate) fn build_client_data_with_placeholder(placeholder_type: u8) -> Result<Vec<u8>, Error> {
     use crate::writer::records::RecordBuilder;
 

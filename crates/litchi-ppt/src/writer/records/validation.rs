@@ -13,7 +13,7 @@ pub(super) fn validate_complete_record(
     let length = usize::try_from(u32::from_le_bytes([
         header[4], header[5], header[6], header[7],
     ]))
-    .map_err(|_| std::io::Error::other("programmable tag length overflows usize"))?;
+    .map_err(|_err| std::io::Error::other("programmable tag length overflows usize"))?;
     if version_instance & 0x000f != u16::from(expected_version)
         || record_type != expected_type
         || length.checked_add(8) != Some(data.len())

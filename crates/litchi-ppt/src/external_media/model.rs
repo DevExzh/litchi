@@ -1,8 +1,8 @@
-//! Contextual PowerPoint external-media values.
+//! Contextual `PowerPoint` external-media values.
 
 use crate::records::Record;
 
-/// Resource ceilings for one complete legacy PowerPoint record tree.
+/// Resource ceilings for one complete legacy `PowerPoint` record tree.
 ///
 /// The limits apply before any record payload is decoded. External paths are
 /// also bounded by the format-level ceiling in the codec.
@@ -41,6 +41,7 @@ pub struct Playback {
 }
 
 impl Playback {
+    #[must_use]
     pub const fn new(loop_playback: bool, rewind_after_playing: bool, narration: bool) -> Self {
         Self {
             loop_playback,
@@ -162,6 +163,7 @@ impl Collection {
 
 impl Object {
     /// Return the playback flags carried by this media definition.
+    #[must_use]
     pub fn playback(&self) -> Playback {
         let media = match self {
             Self::Movie(value) => value.video.media,

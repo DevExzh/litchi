@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 //! Integration tests for legacy PPT slide transitions, slide timings,
 //! comments, and custom slide shows using Apache POI test fixtures.
 

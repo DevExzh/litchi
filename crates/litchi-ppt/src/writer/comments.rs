@@ -78,6 +78,7 @@ impl SlideComment {
     /// use litchi_ppt::writer::comments::SlideComment;
     /// let comment = SlideComment::new("John Doe", "Great slide!", 100, 50);
     /// ```
+    #[must_use]
     pub fn new(author: &str, text: &str, x: i32, y: i32) -> Self {
         // Derive initials from author name (first letter of each word)
         let initials: String = author
@@ -96,12 +97,14 @@ impl SlideComment {
     }
 
     /// Set the comment date/time.
+    #[must_use]
     pub fn with_date(mut self, date: CommentDateTime) -> Self {
         self.date = date;
         self
     }
 
     /// Set the author initials explicitly.
+    #[must_use]
     pub fn with_initials(mut self, initials: &str) -> Self {
         self.initials = initials.to_string();
         self
@@ -109,11 +112,15 @@ impl SlideComment {
 }
 
 /// Convert points to PPT master units (576 units per inch, 72 points per inch).
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "comment offsets in points are small layout values, so `pt * 576 / 72` (i.e. `pt * 8`) always fits i32"
+)]
 fn pt_to_master(pt: i32) -> i32 {
-    (pt as i64 * 576 / 72) as i32
+    (i64::from(pt) * 576 / 72) as i32
 }
 
-/// Write a CString record with the given instance and UTF-16LE text.
+/// Write a `CString` record with the given instance and UTF-16LE text.
 fn write_cstring(instance: u16, text: &str) -> Result<Vec<u8>, Error> {
     let utf16: Vec<u16> = text.encode_utf16().collect();
     let (max_len, allow_tab_cr_lf) = match instance {
@@ -200,8 +207,16 @@ fn build_comment_container(comment: &SlideComment, index: i32) -> Result<Vec<u8>
 
 /// Build all Comment2000 records for a slide's comments.
 ///
-/// Returns the raw bytes to be embedded inside the slide's BinaryTagData.
+/// Returns the raw bytes to be embedded inside the slide's `BinaryTagData`.
 /// If there are no comments, returns an empty Vec.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`build_slide_comments` is the established public API name; renaming it would break downstream crates"
+)]
 pub fn build_slide_comments(comments: &[SlideComment]) -> Result<Vec<u8>, Error> {
     if comments.is_empty() {
         return Ok(Vec::new());
@@ -209,12 +224,23 @@ pub fn build_slide_comments(comments: &[SlideComment]) -> Result<Vec<u8>, Error>
 
     let mut data = Vec::new();
     for (i, comment) in comments.iter().enumerate() {
-        data.extend(build_comment_container(comment, (i + 1) as i32)?);
+        let ordinal = i32::try_from(i + 1).map_err(|_err| {
+            Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "comment index exceeds i32",
+            )
+        })?;
+        data.extend(build_comment_container(comment, ordinal)?);
     }
     Ok(data)
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -287,7 +313,7 @@ mod tests {
     #[test]
     fn test_slide_comment_debug() {
         let comment = SlideComment::new("Test", "Text", 100, 200);
-        let debug = format!("{:?}", comment);
+        let debug = format!("{comment:?}");
         assert!(debug.contains("SlideComment"));
         assert!(debug.contains("Test"));
     }

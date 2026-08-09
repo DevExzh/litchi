@@ -1,6 +1,10 @@
-//! Bounded PresentationML presentation-properties XML codec.
+//! Bounded `PresentationML` presentation-properties XML codec.
 
-use super::model::*;
+use super::model::{
+    BrowserSupport, Color, ColorKind, Extension, HtmlPublish, HtmlTarget, OpaqueExtension, Print,
+    PrintColorMode, PrintOutput, Properties, Show, ShowExtension, ShowMode, SlideSelection, Web,
+    WebColor, WebScreenSize,
+};
 use super::{
     A_NS, A_STRICT, A14_NS, BROWSE_MODE_URI, CHART_TRACKING_REF_BASED_URI, DEFAULT_IMAGE_DPI_URI,
     DISCARD_IMAGE_EDIT_DATA_URI, LASER_COLOR_URI, MATH_URI, MAX_BYTES, MAX_DEPTH, MAX_EXTENSIONS,
@@ -14,6 +18,9 @@ use quick_xml::{
 };
 
 impl Properties {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(xml: &[u8]) -> Result<Self> {
         if xml.len() > MAX_BYTES {
             return Err(invalid("presentation properties exceed 8 MiB"));
@@ -25,6 +32,9 @@ impl Properties {
         let root = parse_dom(processed.as_ref())?;
         project(&root)
     }
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
     pub fn to_xml(&self, strict: bool) -> Result<Vec<u8>> {
         validate(self)?;
         let p = if strict { P_STRICT } else { P_NS };
@@ -127,7 +137,7 @@ fn parse_dom(xml: &[u8]) -> Result<Node> {
             Ok(Event::Text(t)) => {
                 let text = t.decode().map_err(xml_error)?.into_owned();
                 if let Some(n) = stack.last_mut() {
-                    n.content.push(Content::Text(text))
+                    n.content.push(Content::Text(text));
                 } else if !text.trim().is_empty() {
                     return Err(invalid("text outside presentationPr"));
                 }
@@ -135,7 +145,7 @@ fn parse_dom(xml: &[u8]) -> Result<Node> {
             Ok(Event::CData(t)) => {
                 let text = t.decode().map_err(xml_error)?.into_owned();
                 if let Some(n) = stack.last_mut() {
-                    n.content.push(Content::CData(text))
+                    n.content.push(Content::CData(text));
                 } else {
                     return Err(invalid("CDATA outside presentationPr"));
                 }
@@ -143,7 +153,7 @@ fn parse_dom(xml: &[u8]) -> Result<Node> {
             Ok(Event::GeneralRef(r)) => {
                 let text = litchi_ooxml_common::xml::decode_xml_reference(&r)?;
                 if let Some(n) = stack.last_mut() {
-                    n.content.push(Content::Text(text))
+                    n.content.push(Content::Text(text));
                 } else {
                     return Err(invalid("entity outside presentationPr"));
                 }
@@ -152,7 +162,7 @@ fn parse_dom(xml: &[u8]) -> Result<Node> {
                 if let Some(n) = stack.last_mut() {
                     n.content.push(Content::Comment(
                         c.decode().map_err(xml_error)?.into_owned(),
-                    ))
+                    ));
                 }
             },
             Ok(Event::DocType(_) | Event::PI(_)) => {
@@ -189,9 +199,9 @@ fn make_node(e: &BytesStart<'_>, d: Decoder, stack: &[Node]) -> Result<Node> {
         if k == "xmlns" || k.starts_with("xmlns:") {
             let key = k.strip_prefix("xmlns:").unwrap_or("").to_string();
             if let Some(old) = bindings.iter_mut().find(|x| x.0 == key) {
-                old.1 = v.clone()
+                old.1 = v.clone();
             } else {
-                bindings.push((key, v.clone()))
+                bindings.push((key, v.clone()));
             }
         }
     }
@@ -325,19 +335,16 @@ fn parse_html(n: &Node) -> Result<HtmlPublish> {
     let mut ext = None;
     for c in children(n)? {
         expect_p(c)?;
-        match c.local.as_str() {
-            "extLst" => {
-                if ext.is_some() {
-                    return Err(invalid("duplicate htmlPubPr extLst"));
-                }
-                ext = Some(node_xml(c, false)?);
-            },
-            _ => {
-                if slides.is_some() || ext.is_some() {
-                    return Err(invalid("invalid HTML slide selection order"));
-                }
-                slides = Some(parse_selection(c)?);
-            },
+        if c.local.as_str() == "extLst" {
+            if ext.is_some() {
+                return Err(invalid("duplicate htmlPubPr extLst"));
+            }
+            ext = Some(node_xml(c, false)?);
+        } else {
+            if slides.is_some() || ext.is_some() {
+                return Err(invalid("invalid HTML slide selection order"));
+            }
+            slides = Some(parse_selection(c)?);
         }
     }
     Ok(HtmlPublish {
@@ -723,7 +730,7 @@ fn write_web(x: &mut String, v: &Web, s: bool) -> Result<()> {
         ("organizeInFolders", v.organize_in_folders),
         ("useLongFilenames", v.use_long_filenames),
     ] {
-        bool_opt_write(x, n, b)
+        bool_opt_write(x, n, b);
     }
     if let Some(z) = v.image_size {
         attr_write(x, "imgSz", screen_str(z));
@@ -756,7 +763,7 @@ fn write_print(x: &mut String, v: &Print, s: bool) -> Result<()> {
         ("scaleToFitPaper", v.scale_to_fit_paper),
         ("frameSlides", v.frame_slides),
     ] {
-        bool_opt_write(x, n, b)
+        bool_opt_write(x, n, b);
     }
     if let Some(e) = &v.extension_xml {
         x.push('>');
@@ -775,7 +782,7 @@ fn write_show(x: &mut String, v: &Show, s: bool) -> Result<()> {
         ("showAnimation", v.show_animation),
         ("useTimings", v.use_timings),
     ] {
-        bool_opt_write(x, n, b)
+        bool_opt_write(x, n, b);
     }
     x.push('>');
     if let Some(m) = &v.mode {
@@ -811,7 +818,7 @@ fn write_selection(x: &mut String, v: &SlideSelection) {
     match v {
         SlideSelection::All => x.push_str("<p:sldAll/>"),
         SlideSelection::Range { start, end } => {
-            x.push_str(&format!("<p:sldRg st=\"{start}\" end=\"{end}\"/>"))
+            x.push_str(&format!("<p:sldRg st=\"{start}\" end=\"{end}\"/>"));
         },
         SlideSelection::CustomShow(id) => x.push_str(&format!("<p:custShow id=\"{id}\"/>")),
     }
@@ -885,7 +892,7 @@ fn write_show_extensions(x: &mut String, v: &[ShowExtension], strict: bool) -> R
                 x.push_str("</p14:laserClr></p:ext>");
             },
             ShowExtension::ShowMediaControls(value) => {
-                write_bool_extension(x, SHOW_MEDIA_CONTROLS_URI, "p14", "showMediaCtrls", *value)
+                write_bool_extension(x, SHOW_MEDIA_CONTROLS_URI, "p14", "showMediaCtrls", *value);
             },
             ShowExtension::Unknown(value) => write_unknown_extension(x, value, strict)?,
         }
@@ -941,12 +948,12 @@ fn write_opaque(x: &mut String, v: &[u8], strict: bool) -> Result<()> {
         text = text
             .replace(P_NS, P_STRICT)
             .replace(A_NS, A_STRICT)
-            .replace(R_NS, R_STRICT)
+            .replace(R_NS, R_STRICT);
     } else {
         text = text
             .replace(P_STRICT, P_NS)
             .replace(A_STRICT, A_NS)
-            .replace(R_STRICT, R_NS)
+            .replace(R_STRICT, R_NS);
     }
     x.push_str(&text);
     Ok(())
@@ -1179,7 +1186,7 @@ fn u32_opt(n: &Node, l: &str) -> Result<Option<u32>> {
     attr_opt(n, "", l)?
         .map(|v| {
             v.parse()
-                .map_err(|_| invalid(format!("invalid integer '{l}'")))
+                .map_err(|_err| invalid(format!("invalid integer '{l}'")))
         })
         .transpose()
 }
@@ -1234,11 +1241,11 @@ fn attr_write(x: &mut String, n: &str, v: &str) {
     x.push_str(n);
     x.push_str("=\"");
     esc_attr(x, v);
-    x.push('"')
+    x.push('"');
 }
 fn bool_opt_write(x: &mut String, n: &str, v: Option<bool>) {
     if let Some(v) = v {
-        attr_write(x, n, if v { "1" } else { "0" })
+        attr_write(x, n, if v { "1" } else { "0" });
     }
 }
 fn esc_attr(x: &mut String, v: &str) {
@@ -1278,6 +1285,11 @@ fn xml_error(e: impl std::fmt::Display) -> Error {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

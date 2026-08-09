@@ -1,6 +1,12 @@
-//! Chart-space formatting and chart validation concerns for the ChartEx graph.
+//! Chart-space formatting and chart validation concerns for the `ChartEx` graph.
 
-use super::*;
+use super::{
+    CX, Chart, ChartSpaceFormatting, ChartTitle, FormatOverride, HeaderFooter, Legend,
+    MAX_FORMAT_OVERRIDES, MAX_PRINT_TEXT_BYTES, MiniNode, Offset, PageMargins, PageOrientation,
+    PageSetup, PositionAlignment, PrintSettings, Result, SidePosition, invalid, limit, one_child,
+    optional, parse_bool, parse_drawing_payload, parse_i32, parse_shared_text, parse_u32,
+    reject_unknown, require_empty_content, required, valid_xml_double,
+};
 use std::collections::HashSet;
 
 pub(super) fn parse_chart_space_formatting(root: &MiniNode) -> Result<ChartSpaceFormatting> {

@@ -160,6 +160,9 @@ impl ContentSource {
     /// Returns `Ok(None)` when the stream does not have the expected
     /// presentation shape, letting the caller fall back to full regeneration
     /// rather than failing a save.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn parse(xml: &str) -> Result<Option<Self>> {
         if xml.len() > MAX_XML_BYTES {
             return Err(invalid(format!(
@@ -204,6 +207,9 @@ impl ContentSource {
     /// Fails when synthesised markup is present and the source binds one of the
     /// prefixes this crate emits to a different namespace, because reusing that
     /// prefix would silently change the meaning of the generated elements.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn root_start_tag(&self, extra_attributes: &str, synthesised: bool) -> Result<String> {
         let base = self.slice(self.root_open);
         let mut output = String::with_capacity(base.len() + extra_attributes.len() + 64);
@@ -339,6 +345,11 @@ fn invalid(message: impl Into<String>) -> Error {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

@@ -1,11 +1,20 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{BorderStyle, RtfDocument, RtfWriter};
 
-const SYNTHETIC: &str = r#"{\rtf1\ansi\ansicpg1250
+const SYNTHETIC: &str = r"{\rtf1\ansi\ansicpg1250
 {\*\pgptbl
 {\pgp\ipgp0\itap0\li0\ri0\sb0\sa0}
 {\pgp\ipgp1\itap1\li-300\ri120\sb40\sa80\brdrt\brdrs\brdrw15\brsp20\brdrcf3}
 {\pgp\ipgp2\itap2\li360\ri0\sb0\sa120}}
-Body}"#;
+Body}";
 
 #[test]
 fn parses_resolves_and_round_trips_paragraph_group_table() {
@@ -41,16 +50,16 @@ fn parses_resolves_and_round_trips_paragraph_group_table() {
 #[test]
 fn rejects_malformed_paragraph_group_tables() {
     let malformed = [
-        r#"{\rtf1{\pgptbl{\pgp\ipgp0\itap0\li0\ri0\sb0\sa0}}}"#,
-        r#"{\rtf1{\*\pgptbl}}"#,
-        r#"{\rtf1{\*\pgptbl{\pgp\ipgp0\itap0\li0\ri0\sb0\sa0}}{\*\pgptbl{\pgp\ipgp0\itap0\li0\ri0\sb0\sa0}}}"#,
-        r#"{\rtf1 Body{\*\pgptbl{\pgp\ipgp0\itap0\li0\ri0\sb0\sa0}}}"#,
-        r#"{\rtf1{\*\pgptbl{\pgp\ipgp0\itap0\li0\ri0\sb0}}}"#,
-        r#"{\rtf1{\*\pgptbl{\pgp\ipgp2\itap0\li0\ri0\sb0\sa0}}}"#,
-        r#"{\rtf1{\*\pgptbl{\pgp\ipgp2\itap0\li0\ri0\sb0\sa0}{\pgp\ipgp1\itap0\li0\ri0\sb0\sa0}}}"#,
-        r#"{\rtf1{\*\pgptbl{\pgp\ipgp0\itap-1\li0\ri0\sb0\sa0}}}"#,
-        r#"{\rtf1{\*\pgptbl{\pgp\ipgp0\itap0\li0\ri0\sb0\sa0{\field X}}}}"#,
-        r#"{\rtf1{\*\pgptbl{\pgp\ipgp0\itap0\li0\ri0\sb0\sa0\u20320?}}}"#,
+        r"{\rtf1{\pgptbl{\pgp\ipgp0\itap0\li0\ri0\sb0\sa0}}}",
+        r"{\rtf1{\*\pgptbl}}",
+        r"{\rtf1{\*\pgptbl{\pgp\ipgp0\itap0\li0\ri0\sb0\sa0}}{\*\pgptbl{\pgp\ipgp0\itap0\li0\ri0\sb0\sa0}}}",
+        r"{\rtf1 Body{\*\pgptbl{\pgp\ipgp0\itap0\li0\ri0\sb0\sa0}}}",
+        r"{\rtf1{\*\pgptbl{\pgp\ipgp0\itap0\li0\ri0\sb0}}}",
+        r"{\rtf1{\*\pgptbl{\pgp\ipgp2\itap0\li0\ri0\sb0\sa0}}}",
+        r"{\rtf1{\*\pgptbl{\pgp\ipgp2\itap0\li0\ri0\sb0\sa0}{\pgp\ipgp1\itap0\li0\ri0\sb0\sa0}}}",
+        r"{\rtf1{\*\pgptbl{\pgp\ipgp0\itap-1\li0\ri0\sb0\sa0}}}",
+        r"{\rtf1{\*\pgptbl{\pgp\ipgp0\itap0\li0\ri0\sb0\sa0{\field X}}}}",
+        r"{\rtf1{\*\pgptbl{\pgp\ipgp0\itap0\li0\ri0\sb0\sa0\u20320?}}}",
     ];
     for source in malformed {
         assert!(

@@ -1,4 +1,4 @@
-//! Semantic presentation owner for the binary PowerPoint document stream.
+//! Semantic presentation owner for the binary `PowerPoint` document stream.
 //!
 //! The facade keeps the established `crate::presentation` paths stable while
 //! separating the typed presentation model, package loading, OfficeArt-derived

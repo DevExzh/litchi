@@ -1,8 +1,14 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 //! Fixture-level integration tests for typed document/slide programmable tags
 //! (MS-PPT 2.4.23 and 2.5.19-2.5.22) reachable through `Presentation`, `Slide`,
 //! `SpeakerNotes`, and the main-master accessor.
 
-use litchi_ppt::{Package, ProgBinaryTagVersion, ProgTagScope, ProgTags};
+use litchi_ppt::{Package, ProgBinaryTagVersion, ProgTagLimits, ProgTagScope, ProgTags};
 use std::path::PathBuf;
 
 fn fixture(name: &str) -> PathBuf {
@@ -30,17 +36,17 @@ fn presentation_exposes_document_prog_tags_with_typed_extensions() {
 
     // Every binary tag payload decodes as a strict record sequence, and the
     // container serializes back byte-for-byte.
-    let limits = Default::default();
+    let limits = ProgTagLimits::default();
     let reparsed = ProgTags::parse(&tags.to_record(limits).unwrap(), tags.scope, limits).unwrap();
     assert_eq!(reparsed, tags);
 
     let extensions = tags.document_extensions().unwrap();
     let pp9 = tags.binary_tag(ProgBinaryTagVersion::PowerPoint9);
-    if let Some(pp9) = pp9 {
+    if let Some(pp9_tag) = pp9 {
         let extension = extensions.powerpoint9.as_ref().unwrap();
         assert!(!extension.text_master_styles.is_empty());
         // Extension-level serialization reproduces the retained blob exactly.
-        assert_eq!(extension.to_payload().unwrap(), pp9.payload,);
+        assert_eq!(extension.to_payload().unwrap(), pp9_tag.payload,);
     }
 
     // Slide, notes, and main-master scopes parse without corruption.

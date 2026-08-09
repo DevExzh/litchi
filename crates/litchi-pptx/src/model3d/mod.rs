@@ -1,4 +1,4 @@
-//! Contextual PresentationML 3D-model ownership.
+//! Contextual `PresentationML` 3D-model ownership.
 //!
 //! The shared [`litchi_drawingml::model3d`] grammar owns the `am3d:model3d`
 //! sequence and its bounded inert children.  This module adds the PPTX
@@ -16,7 +16,7 @@ mod tests;
 
 pub use model::{Asset, Data, Link, Model, Preview, Scene, Shape, Unknown};
 
-/// The `a:graphicData/@uri` value used by a PresentationML 3D model frame.
+/// The `a:graphicData/@uri` value used by a `PresentationML` 3D model frame.
 pub const GRAPHIC_URI: &str = litchi_drawingml::model3d::NAMESPACE;
 
 /// Relationship type used by Office for a model3d binary asset.

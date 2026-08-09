@@ -40,6 +40,10 @@ pub struct License {
 
 impl License {
     /// Validate the defined embedding bits and reject contradictory modes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_fs_type(fs_type: u16) -> Result<Self> {
         const DEFINED: u16 = 0x0002 | 0x0004 | 0x0008 | 0x0100 | 0x0200;
         if fs_type & !DEFINED != 0 {
@@ -74,21 +78,25 @@ impl License {
     }
 
     /// Return the original validated `fsType` bits.
+    #[must_use]
     pub fn fs_type(self) -> u16 {
         self.fs_type
     }
 
     /// Return the mutually exclusive embedding permission.
+    #[must_use]
     pub fn permission(self) -> Permission {
         self.permission
     }
 
     /// Return compact independent restrictions.
+    #[must_use]
     pub fn restrictions(self) -> Restrictions {
         self.restrictions
     }
 
     /// Report installable embedding permission.
+    #[must_use]
     pub fn installable(self) -> bool {
         self.permission == Permission::Installable
     }
@@ -157,7 +165,7 @@ impl Style {
     }
 }
 
-/// Font-pitch component of DrawingML `ST_PitchFamily`.
+/// Font-pitch component of `DrawingML` `ST_PitchFamily`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Pitch {
     Default,
@@ -175,7 +183,7 @@ impl Pitch {
     }
 }
 
-/// Font-family component of DrawingML `ST_PitchFamily`.
+/// Font-family component of `DrawingML` `ST_PitchFamily`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Family {
     None,
@@ -199,7 +207,7 @@ impl Family {
     }
 }
 
-/// The closed 18-value DrawingML pitch/family domain.
+/// The closed 18-value `DrawingML` pitch/family domain.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PitchFamily {
     pitch: Pitch,
@@ -208,16 +216,19 @@ pub struct PitchFamily {
 
 impl PitchFamily {
     /// Combine typed pitch and family values; every combination is valid.
+    #[must_use]
     pub const fn new(pitch: Pitch, family: Family) -> Self {
         Self { pitch, family }
     }
 
     /// Return the typed pitch component.
+    #[must_use]
     pub const fn pitch(self) -> Pitch {
         self.pitch
     }
 
     /// Return the typed family component.
+    #[must_use]
     pub const fn family(self) -> Family {
         self.family
     }
@@ -253,16 +264,19 @@ pub struct Panose([u8; 10]);
 
 impl Panose {
     /// Construct a PANOSE value from its fixed-size classification bytes.
+    #[must_use]
     pub const fn new(bytes: [u8; 10]) -> Self {
         Self(bytes)
     }
 
     /// Borrow the ten classification bytes.
+    #[must_use]
     pub const fn bytes(&self) -> &[u8; 10] {
         &self.0
     }
 
     /// Move out the ten classification bytes.
+    #[must_use]
     pub const fn into_bytes(self) -> [u8; 10] {
         self.0
     }
@@ -274,7 +288,7 @@ impl From<[u8; 10]> for Panose {
     }
 }
 
-/// A Windows font charset code with private PresentationML wire conversion.
+/// A Windows font charset code with private `PresentationML` wire conversion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct Charset(u8);
@@ -301,11 +315,13 @@ impl Charset {
     pub const OEM: Self = Self(255);
 
     /// Preserve any Windows charset byte, including producer-defined values.
+    #[must_use]
     pub const fn new(code: u8) -> Self {
         Self(code)
     }
 
     /// Return the Windows charset code without a string conversion.
+    #[must_use]
     pub const fn code(self) -> u8 {
         self.0
     }
@@ -319,7 +335,7 @@ impl Charset {
     }
 }
 
-/// Physical font representation permitted by PresentationML.
+/// Physical font representation permitted by `PresentationML`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Format {
     /// PowerPoint-compatible storage (`application/x-fontdata`).
@@ -359,11 +375,19 @@ pub struct Data {
 
 impl Data {
     /// Adopt and validate an owned font container.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(bytes: Vec<u8>, format: Format) -> Result<Self> {
         Self::shared(Arc::new(bytes), format)
     }
 
     /// Validate and share an existing immutable allocation without copying it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn shared(bytes: Arc<Vec<u8>>, format: Format) -> Result<Self> {
         codec::validate_font_bytes(&bytes)?;
         match format {
@@ -374,11 +398,19 @@ impl Data {
     }
 
     /// Adopt a PowerPoint-compatible EOT/MTX container.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn powerpoint(bytes: Vec<u8>) -> Result<Self> {
         Self::new(bytes, Format::PowerPoint)
     }
 
     /// Preserve standards-only `application/x-font-ttf` storage explicitly.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn standard(bytes: Vec<u8>) -> Result<Self> {
         Self::new(bytes, Format::Standard)
     }
@@ -390,16 +422,19 @@ impl Data {
     }
 
     /// Return the physical representation.
+    #[must_use]
     pub fn format(&self) -> Format {
         self.format
     }
 
     /// Borrow the inert bytes.
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         self.bytes.as_slice()
     }
 
     /// Move out the shared allocation without copying it.
+    #[must_use]
     pub fn into_shared(self) -> Arc<Vec<u8>> {
         self.bytes
     }
@@ -430,6 +465,7 @@ pub struct Face {
 
 impl Face {
     /// Pair a typed face style with an owned or shared font program.
+    #[must_use]
     pub fn new(style: Style, data: Data) -> Self {
         Self {
             style,
@@ -439,11 +475,13 @@ impl Face {
     }
 
     /// Return the schema-level style.
+    #[must_use]
     pub fn style(&self) -> Style {
         self.style
     }
 
     /// Borrow the inert font program.
+    #[must_use]
     pub fn data(&self) -> &Data {
         &self.data
     }
@@ -477,6 +515,10 @@ pub struct Font {
 impl Font {
     /// Construct a typeface. The schema permits a descriptor with no faces;
     /// add one concisely with [`Font::with`] or [`Font::put`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(typeface: impl Into<String>) -> Result<Self> {
         let typeface = typeface.into();
         codec::validate_typeface(&typeface)?;
@@ -491,6 +533,10 @@ impl Font {
     }
 
     /// Construct a typeface with one face in a single expression.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_face(typeface: impl Into<String>, face: Face) -> Result<Self> {
         let mut font = Self::new(typeface)?;
         font.put(face)?;
@@ -498,32 +544,41 @@ impl Font {
     }
 
     /// Add a face with builder-style chaining.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn with(mut self, face: Face) -> Result<Self> {
         self.put(face)?;
         Ok(self)
     }
 
     /// Return the producer spelling of the typeface.
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.typeface
     }
 
     /// Return the optional ten-byte PANOSE classification.
+    #[must_use]
     pub fn panose(&self) -> Option<Panose> {
         self.panose
     }
 
     /// Return the optional combined pitch/family byte.
+    #[must_use]
     pub fn pitch_family(&self) -> Option<PitchFamily> {
         self.pitch_family
     }
 
     /// Return the optional Windows character-set byte.
+    #[must_use]
     pub fn charset(&self) -> Option<Charset> {
         self.charset
     }
 
     /// Return faces in the schema-defined style order.
+    #[must_use]
     pub fn faces(&self) -> &[Face] {
         &self.faces
     }
@@ -535,11 +590,16 @@ impl Font {
     }
 
     /// Replace or clear the PANOSE classification.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_panose(&mut self, value: Option<Panose>) -> Option<Panose> {
         std::mem::replace(&mut self.panose, value)
     }
 
     /// Set the combined pitch/family byte.
+    #[must_use]
     pub fn with_pitch_family(mut self, value: PitchFamily) -> Self {
         self.pitch_family = Some(value);
         self
@@ -551,6 +611,7 @@ impl Font {
     }
 
     /// Set the Windows character-set byte.
+    #[must_use]
     pub fn with_charset(mut self, value: Charset) -> Self {
         self.charset = Some(value);
         self
@@ -562,6 +623,10 @@ impl Font {
     }
 
     /// Add or replace one typed style face, returning the previous face.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn put(&mut self, mut face: Face) -> Result<Option<Face>> {
         face.source = None;
         if let Some(index) = self.faces.iter().position(|item| item.style == face.style) {
@@ -589,11 +654,20 @@ impl Font {
     }
 
     /// Select one face by its typed style.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    #[must_use]
     pub fn get(&self, style: Style) -> Option<&Face> {
         self.faces.iter().find(|face| face.style == style)
     }
 
     /// Remove and return one face. Face-less descriptors remain schema-valid.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove(&mut self, style: Style) -> Result<Face> {
         let index = self
             .faces
@@ -605,6 +679,10 @@ impl Font {
 
     /// Rename a detached font. A containing [`Fonts`] rechecks uniqueness when
     /// the value is inserted or replaced.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn rename(&mut self, typeface: impl Into<String>) -> Result<String> {
         let typeface = typeface.into();
         codec::validate_typeface(&typeface)?;
@@ -651,6 +729,11 @@ pub struct Fonts {
 
 impl Fonts {
     /// Construct an empty collection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             fonts: Vec::new(),
@@ -659,21 +742,32 @@ impl Fonts {
     }
 
     /// Return the number of typefaces.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.fonts.len()
     }
 
     /// Report whether no fonts are embedded.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.fonts.is_empty()
     }
 
     /// Iterate in source order.
+    #[must_use]
     pub fn iter(&self) -> impl ExactSizeIterator<Item = &Font> {
         self.fonts.iter()
     }
 
     /// Select by semantic typeface or checked numeric position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn get<'a, 'k>(&'a self, key: impl Into<Key<'k>>) -> Result<&'a Font> {
         let index = self.offset(key.into())?;
         self.fonts.get(index).ok_or(Error::FontIndexOutOfBounds {
@@ -683,6 +777,10 @@ impl Fonts {
     }
 
     /// Append an owned typeface without copying its programs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add(&mut self, font: Font) -> Result<()> {
         self.ensure_unique(&font, None)?;
         if self.fonts.len() == MAX_FONTS {
@@ -707,6 +805,10 @@ impl Fonts {
     }
 
     /// Replace a selected typeface and return the previous owned value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace<'k>(&mut self, key: impl Into<Key<'k>>, font: Font) -> Result<Font> {
         let index = self.offset(key.into())?;
         self.ensure_unique(&font, Some(index))?;
@@ -728,6 +830,10 @@ impl Fonts {
     }
 
     /// Remove and return a selected typeface.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove<'k>(&mut self, key: impl Into<Key<'k>>) -> Result<Font> {
         let index = self.offset(key.into())?;
         let next_index = build_name_index(
@@ -745,6 +851,10 @@ impl Fonts {
     }
 
     /// Apply a complete checked permutation without cloning font programs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn reorder<'k, K>(&mut self, order: &'k [K]) -> Result<()>
     where
         K: Copy + Into<Key<'k>>,
@@ -793,6 +903,7 @@ impl Fonts {
     }
 
     /// Move all fonts out in source order.
+    #[must_use]
     pub fn into_fonts(self) -> Vec<Font> {
         self.fonts
     }

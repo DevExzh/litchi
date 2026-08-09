@@ -27,36 +27,43 @@ pub struct NormalViewSetInfo {
 
 impl NormalViewSetInfo {
     /// Width of the side content pane as a fraction of the view width.
+    #[must_use]
     pub const fn left_portion(&self) -> Ratio {
         self.left_portion
     }
 
     /// Height of the slide pane as a fraction of the view height.
+    #[must_use]
     pub const fn top_portion(&self) -> Ratio {
         self.top_portion
     }
 
     /// State of the vertical splitter bar.
+    #[must_use]
     pub const fn vert_bar_state(&self) -> ViewBarState {
         self.vert_bar_state
     }
 
     /// State of the horizontal splitter bar.
+    #[must_use]
     pub const fn horiz_bar_state(&self) -> ViewBarState {
         self.horiz_bar_state
     }
 
     /// Whether the view consists of only the slide pane.
+    #[must_use]
     pub const fn prefer_single_set(&self) -> bool {
         self.prefer_single_set
     }
 
     /// Whether the side content pane shows comments instead of thumbnails.
+    #[must_use]
     pub const fn hide_thumbnails(&self) -> bool {
         self.hide_thumbnails
     }
 
     /// Whether the vertical bar snaps to specific positions when resized.
+    #[must_use]
     pub const fn bar_snapped(&self) -> bool {
         self.bar_snapped
     }
@@ -81,11 +88,13 @@ pub struct NormalViewSet {
 
 impl NormalViewSet {
     /// The pane-layout payload.
+    #[must_use]
     pub const fn payload(&self) -> &NormalViewSetPayload {
         &self.payload
     }
 
     /// The pane layout, when the atom carries the specification payload.
+    #[must_use]
     pub const fn layout(&self) -> Option<&NormalViewSetInfo> {
         match &self.payload {
             NormalViewSetPayload::Layout(layout) => Some(layout),
@@ -103,6 +112,7 @@ pub struct NotesTextViewInfo {
 
 impl NotesTextViewInfo {
     /// The notes-text view scaling and origin.
+    #[must_use]
     pub const fn view_info(&self) -> &NoZoomViewInfo {
         &self.view_info
     }

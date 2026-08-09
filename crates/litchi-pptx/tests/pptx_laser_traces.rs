@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_pptx::laser::{self, LASER_TRACE_EXTENSION_URI};
 use litchi_pptx::time::Offset;

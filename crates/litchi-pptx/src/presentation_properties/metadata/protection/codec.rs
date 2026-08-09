@@ -65,6 +65,9 @@ pub(crate) fn generate_verifier(password: &str) -> Result<Verifier> {
 }
 
 impl Settings {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_xml(xml: &str) -> Result<Self> {
         let processed = litchi_ooxml_common::mce::process_str(xml)?;
         let mut reader = Reader::from_str(processed.as_ref());
@@ -96,6 +99,7 @@ impl Settings {
         Ok(settings)
     }
 
+    #[must_use]
     pub fn to_xml(&self) -> String {
         let Some(verifier) = &self.modify else {
             return String::new();
@@ -109,6 +113,7 @@ impl Settings {
         )
     }
 
+    #[must_use]
     pub fn to_pres_props_xml(&self) -> String {
         if self.read_only_recommended {
             r#"<p:extLst><p:ext uri="{E76CE94A-603C-4142-B9EB-6D1370010A27}"><p14:discardImageEditData xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" val="0"/></p:ext></p:extLst>"#.to_owned()
@@ -138,7 +143,7 @@ fn parse_verifier(
             b"spinCount" | b"spinValue" => {
                 let value = value
                     .parse::<u32>()
-                    .map_err(|_| Error::Invalid("protection spin count is not a u32".into()))?;
+                    .map_err(|_err| Error::Invalid("protection spin count is not a u32".into()))?;
                 if !(1..=10_000_000).contains(&value) {
                     return Err(Error::Invalid(
                         "protection spin count must be between 1 and 10000000".into(),
@@ -147,12 +152,12 @@ fn parse_verifier(
                 set_once(&mut spins, value, "spin count")?;
             },
             b"algorithmName" => {
-                set_once(&mut algorithm, Algorithm::from_uri(&value)?, "algorithm")?
+                set_once(&mut algorithm, Algorithm::from_uri(&value)?, "algorithm")?;
             },
             b"cryptAlgorithmSid" => {
-                let sid = value
-                    .parse::<u32>()
-                    .map_err(|_| Error::Invalid("protection algorithm SID is not a u32".into()))?;
+                let sid = value.parse::<u32>().map_err(|_err| {
+                    Error::Invalid("protection algorithm SID is not a u32".into())
+                })?;
                 set_once(&mut algorithm, Algorithm::from_sid(sid)?, "algorithm")?;
             },
             b"algIdExt" => {
@@ -205,7 +210,7 @@ fn set_once<T>(slot: &mut Option<T>, value: T, field: &str) -> Result<()> {
 
 fn decode_base64(value: &str) -> Result<Vec<u8>> {
     let bytes = value.as_bytes();
-    if bytes.is_empty() || bytes.len() % 4 != 0 {
+    if bytes.is_empty() || !bytes.len().is_multiple_of(4) {
         return Err(Error::Invalid(
             "protection field is not valid Base64".into(),
         ));
@@ -252,6 +257,11 @@ fn sextet(value: u8) -> Result<u8> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

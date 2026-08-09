@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{RtfDocument, RtfWriter, XmlNamespace};
 use std::borrow::Cow;
 use std::fs;
@@ -31,7 +40,7 @@ fn parses_ordered_unicode_namespaces_as_inert_metadata_and_round_trips() {
 
 #[test]
 fn mutation_and_empty_table_presence_round_trip() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     document.set_xml_namespaces(Vec::new()).unwrap();
     assert_eq!(document.xml_namespaces(), Some([].as_slice()));
     let empty = RtfDocument::parse_bytes(&write(&document)).unwrap();
@@ -58,17 +67,17 @@ fn mutation_and_empty_table_presence_round_trip() {
 #[test]
 fn rejects_malformed_or_active_namespace_tables() {
     let cases = [
-        r#"{\rtf1{\xmlnstbl {\xmlns1 urn:x}}}"#,
-        r#"{\rtf1{\*\xmlnstbl}{\*\xmlnstbl}}"#,
-        r#"{\rtf1{\*\xmlnstbl {\xmlns1 urn:x}{\xmlns1 urn:y}}}"#,
-        r#"{\rtf1{\*\xmlnstbl {\xmlns0 urn:x}}}"#,
-        r#"{\rtf1{\*\xmlnstbl {urn:x}}}"#,
-        r#"{\rtf1{\*\xmlnstbl {\xmlns1 }}}"#,
-        r#"{\rtf1{\*\xmlnstbl \xmlns1 urn:x}}"#,
-        r#"{\rtf1{\*\xmlnstbl {\xmlns1 urn:{nested}}}}"#,
-        r#"{\rtf1{\*\xmlnstbl {\xmlns1 urn:\b x}}}"#,
-        r#"{\rtf1{\*\xmlnstbl {\xmlns1\bin2 xx}}}"#,
-        r#"{\rtf1\xmlns1 Body}"#,
+        r"{\rtf1{\xmlnstbl {\xmlns1 urn:x}}}",
+        r"{\rtf1{\*\xmlnstbl}{\*\xmlnstbl}}",
+        r"{\rtf1{\*\xmlnstbl {\xmlns1 urn:x}{\xmlns1 urn:y}}}",
+        r"{\rtf1{\*\xmlnstbl {\xmlns0 urn:x}}}",
+        r"{\rtf1{\*\xmlnstbl {urn:x}}}",
+        r"{\rtf1{\*\xmlnstbl {\xmlns1 }}}",
+        r"{\rtf1{\*\xmlnstbl \xmlns1 urn:x}}",
+        r"{\rtf1{\*\xmlnstbl {\xmlns1 urn:{nested}}}}",
+        r"{\rtf1{\*\xmlnstbl {\xmlns1 urn:\b x}}}",
+        r"{\rtf1{\*\xmlnstbl {\xmlns1\bin2 xx}}}",
+        r"{\rtf1\xmlns1 Body}",
     ];
     for rtf in cases {
         assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");

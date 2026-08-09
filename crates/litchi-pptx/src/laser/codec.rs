@@ -1,10 +1,10 @@
-//! Bounded PresentationML laser-trace XML codec.
+//! Bounded `PresentationML` laser-trace XML codec.
 //!
 //! Laser traces are retained as persisted presentation data only. This module
 //! never replays, renders, interpolates, modifies, or executes slide-show
 //! events.
 
-use super::model::*;
+use super::model::{Conformance, Limits, Trace, TracePoint};
 use crate::time::{Offset, ParseError as TimeParseError};
 use crate::{Error, Result};
 use litchi_drawingml::coordinate::{Coordinate, ParseError as CoordinateParseError};
@@ -16,7 +16,7 @@ use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::fmt::Write as _;
 
-/// The PowerPoint extension URI that contains persisted laser-pointer traces.
+/// The `PowerPoint` extension URI that contains persisted laser-pointer traces.
 pub const LASER_TRACE_EXTENSION_URI: &str = "{3A86A75C-4F4B-4683-9AE1-C65F6400EC91}";
 
 const PRESENTATIONML_NAMESPACE_BYTES: &[u8] =
@@ -52,12 +52,20 @@ impl ElementKind {
     }
 }
 
-/// Read bounded, inert laser-pointer traces from one PresentationML slide.
+/// Read bounded, inert laser-pointer traces from one `PresentationML` slide.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn read(slide_index: usize, xml_bytes: &[u8]) -> Result<Vec<Trace>> {
     read_with(slide_index, xml_bytes, &mut Limits::default())
 }
 
 /// Read one slide while accumulating resource use in limits.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn read_with(slide_index: usize, xml_bytes: &[u8], limits: &mut Limits) -> Result<Vec<Trace>> {
     limits.add_slide_xml(xml_bytes.len())?;
     scan_slide_laser_traces(slide_index, xml_bytes, limits)
@@ -245,7 +253,10 @@ fn scan_slide_laser_traces(
     Ok(traces)
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "element classifier threads one slot per laser-element field"
+)]
 fn classify_element(
     namespace: &ResolveResult<'_>,
     element: &BytesStart<'_>,
@@ -468,11 +479,18 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 fn limit(resource: &'static str, limit: usize) -> Error {
     Error::Limit { resource, limit }
 }
 
 /// Check the bounded authoring domain for a laser trace.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn validate(points: &[TracePoint]) -> Result<()> {
     if points.is_empty() {
         return Err(invalid("laser trace requires at least one point"));
@@ -484,6 +502,10 @@ pub fn validate(points: &[TracePoint]) -> Result<()> {
 }
 
 /// Serialize one laser-pointer trace extension fragment.
+///
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn write(points: &[TracePoint], conformance: Conformance) -> Result<String> {
     let mut xml = String::new();
     write_to(points, conformance, &mut xml)?;
@@ -491,6 +513,10 @@ pub fn write(points: &[TracePoint], conformance: Conformance) -> Result<String> 
 }
 
 /// Append one laser-pointer trace extension fragment to an existing buffer.
+///
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn write_to(points: &[TracePoint], conformance: Conformance, xml: &mut String) -> Result<()> {
     validate(points)?;
     let capacity = points
@@ -515,9 +541,9 @@ pub fn write_to(points: &[TracePoint], conformance: Conformance, xml: &mut Strin
         xml.push_str("<p14:tracePt t=\"");
         xml.push_str(point.time.as_str());
         xml.push_str("\" x=\"");
-        write!(xml, "{}", point.x).map_err(|_| Error::Write)?;
+        write!(xml, "{}", point.x).map_err(|_err| Error::Write)?;
         xml.push_str("\" y=\"");
-        write!(xml, "{}", point.y).map_err(|_| Error::Write)?;
+        write!(xml, "{}", point.y).map_err(|_err| Error::Write)?;
         xml.push_str("\"/>");
     }
     xml.push_str("</p14:tracePtLst></p14:laserTraceLst></p:ext>");
@@ -525,6 +551,11 @@ pub fn write_to(points: &[TracePoint], conformance: Conformance, xml: &mut Strin
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -579,7 +610,9 @@ mod tests {
         let transitional = write(std::slice::from_ref(&point), Conformance::Transitional).unwrap();
         let strict = write(&[point], Conformance::Strict).unwrap();
 
-        assert!(transitional.contains(PRESENTATIONML_NAMESPACE));
-        assert!(strict.contains(STRICT_PRESENTATIONML_NAMESPACE));
+        assert!(
+            transitional.contains("http://schemas.openxmlformats.org/presentationml/2006/main")
+        );
+        assert!(strict.contains("http://purl.oclc.org/ooxml/presentationml/main"));
     }
 }

@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{
     DocumentMathProperties, MathBinaryOperatorBreak, MathBinarySubtractionBreak, MathFlag,
     MathJustification, MathLimitPlacement, RtfDocument, RtfWriter,
@@ -45,7 +54,7 @@ fn parses_libreoffice_defaults_as_inert_metadata_and_round_trips() {
 #[test]
 fn accepts_unstarred_math_properties_destination() {
     let document =
-        RtfDocument::parse(r#"{\rtf1{\mmathPr\mmathFont34\mdefJc1\mwrapIndent1440}Body}"#).unwrap();
+        RtfDocument::parse(r"{\rtf1{\mmathPr\mmathFont34\mdefJc1\mwrapIndent1440}Body}").unwrap();
     let properties = document.math_properties().unwrap();
     assert_eq!(properties.math_font, Some(34));
     assert_eq!(
@@ -91,9 +100,9 @@ fn preserves_complete_group_and_unknown_finite_values() {
 
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
-    assert!(serialized.contains(r#"\mbrkBin17"#));
-    assert!(serialized.contains(r#"\mbrkBinSub-3"#));
-    assert!(serialized.contains(r#"\mwrapRight9"#));
+    assert!(serialized.contains(r"\mbrkBin17"));
+    assert!(serialized.contains(r"\mbrkBinSub-3"));
+    assert!(serialized.contains(r"\mwrapRight9"));
     let reparsed = RtfDocument::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.math_properties(), Some(properties));
 }
@@ -110,7 +119,7 @@ fn mutation_and_clear_preserve_body() {
     properties.small_fractions = Some(MathFlag::Off);
     properties.wrap_right = Some(MathFlag::On);
 
-    let mut document = RtfDocument::parse(r#"{\rtf1 Text}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Text}").unwrap();
     document.set_math_properties(properties.clone()).unwrap();
     let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.math_properties(), Some(&properties));
@@ -128,14 +137,14 @@ fn mutation_and_clear_preserve_body() {
 #[test]
 fn rejects_malformed_or_active_math_properties() {
     let cases = [
-        r#"{\rtf1{\*\mmathPr}{\*\mmathPr}}"#,
-        r#"{\rtf1{\*\mmathPr\mbrkBin0\mbrkBin1}}"#,
-        r#"{\rtf1{\*\mmathPr text}}"#,
-        r#"{\rtf1{\*\mmathPr{\mbrkBin0}}}"#,
-        r#"{\rtf1{\*\mmathPr\bin2 xx}}"#,
-        r#"{\rtf1{\*\mmathPr\b}}"#,
-        r#"{\rtf1\mbrkBin0}"#,
-        r#"{\rtf1{\*\mmathPr\mmathFont-1}}"#,
+        r"{\rtf1{\*\mmathPr}{\*\mmathPr}}",
+        r"{\rtf1{\*\mmathPr\mbrkBin0\mbrkBin1}}",
+        r"{\rtf1{\*\mmathPr text}}",
+        r"{\rtf1{\*\mmathPr{\mbrkBin0}}}",
+        r"{\rtf1{\*\mmathPr\bin2 xx}}",
+        r"{\rtf1{\*\mmathPr\b}}",
+        r"{\rtf1\mbrkBin0}",
+        r"{\rtf1{\*\mmathPr\mmathFont-1}}",
     ];
     for rtf in cases {
         assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");

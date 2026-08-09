@@ -1,3 +1,8 @@
+#![allow(
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::{Child, ChildKind, Master};
 
 #[test]

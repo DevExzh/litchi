@@ -1,4 +1,4 @@
-//! Semantic layered owner for PresentationML legacy comments.
+//! Semantic layered owner for `PresentationML` legacy comments.
 //!
 //! \`model.rs\` contains contextual values, \`codec.rs\` handles bounded XML,
 //! and \`package.rs\` owns OPC relationships and transactional CRUD.

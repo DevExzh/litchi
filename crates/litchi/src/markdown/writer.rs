@@ -510,9 +510,12 @@ impl MarkdownWriter {
         feature = "rtf",
         feature = "pages"
     ))]
-    #[allow(irrefutable_let_patterns)]
+    #[allow(
+        irrefutable_let_patterns,
+        reason = "the facade enum collapses to a single variant when only one format feature is enabled"
+    )]
     pub fn write_paragraph(&mut self, para: &Paragraph) -> Result<()> {
-        self.write_paragraph_with_list(para, None)
+        self.write_paragraph_with_list(para, None, None)
     }
 
     #[cfg(any(
@@ -522,16 +525,20 @@ impl MarkdownWriter {
         feature = "rtf",
         feature = "pages"
     ))]
-    #[allow(irrefutable_let_patterns)]
+    #[allow(
+        irrefutable_let_patterns,
+        reason = "the facade enum collapses to a single variant when only one format feature is enabled"
+    )]
     pub(crate) fn write_paragraph_with_list(
         &mut self,
         para: &Paragraph,
         resolved_list: Option<&ListItemInfo>,
+        explicit_heading_level: Option<u8>,
     ) -> Result<()> {
         if resolved_list.is_none() {
             self.reject_unresolved_list(para)?;
         }
-        if let Some(level) = self.heading_level(para)? {
+        if let Some(level) = explicit_heading_level.or(self.heading_level(para)?) {
             self.buffer
                 .extend(std::iter::repeat_n('#', usize::from(level)));
             self.buffer.push(' ');
@@ -542,6 +549,16 @@ impl MarkdownWriter {
         {
             use crate::document::Paragraph;
             if let Paragraph::Docx(docx_para) = para {
+                if !docx_para
+                    .images()
+                    .map_err(crate::map_ooxml_error)?
+                    .is_empty()
+                {
+                    return Err(Error::Unsupported(
+                        "Markdown export cannot preserve DOCX inline images without an image destination policy"
+                            .to_owned(),
+                    ));
+                }
                 let display_formulas = docx_para
                     .paragraph_level_formulas()
                     .map_err(crate::map_ooxml_error)?;
@@ -732,6 +749,67 @@ impl MarkdownWriter {
         }
     }
 
+    /// Emit a direct underline as self-contained inline HTML. CommonMark has
+    /// no underline syntax, while HTML keeps the semantics without carrying
+    /// state across unrelated runs.
+    fn write_underlined(&mut self, text: &str, bold: bool, italic: bool, strikethrough: bool) {
+        self.close_formatting();
+        self.buffer.push_str("<u>");
+        if strikethrough {
+            match self.options.strikethrough_style {
+                litchi_markdown::StrikethroughStyle::Markdown => self.buffer.push_str("~~"),
+                litchi_markdown::StrikethroughStyle::Html => self.buffer.push_str("<del>"),
+            }
+        }
+        if bold {
+            self.buffer.push_str("**");
+        }
+        if italic {
+            self.buffer.push('*');
+        }
+        self.write_html_literal(text);
+        if italic {
+            self.buffer.push('*');
+        }
+        if bold {
+            self.buffer.push_str("**");
+        }
+        if strikethrough {
+            match self.options.strikethrough_style {
+                litchi_markdown::StrikethroughStyle::Markdown => self.buffer.push_str("~~"),
+                litchi_markdown::StrikethroughStyle::Html => self.buffer.push_str("</del>"),
+            }
+        }
+        self.buffer.push_str("</u>");
+    }
+
+    #[cfg(any(
+        feature = "doc",
+        feature = "docx",
+        feature = "odt",
+        feature = "rtf",
+        feature = "pages"
+    ))]
+    fn run_has_direct_underline(run: &Run) -> Result<bool> {
+        match run {
+            #[cfg(feature = "doc")]
+            Run::Doc(run) => Ok(run.underline().unwrap_or(false)),
+            #[cfg(feature = "docx")]
+            Run::Docx(run) => Ok(run
+                .underline()
+                .map_err(crate::map_ooxml_error)?
+                .unwrap_or(false)),
+            #[cfg(feature = "pages")]
+            Run::Pages(_) => Ok(false),
+            #[cfg(feature = "rtf")]
+            Run::Rtf(run) => Ok(run.underline()),
+            #[cfg(feature = "odt")]
+            // ODT spans do not resolve named-style formatting, so claiming an
+            // underline here would be a guess.
+            Run::Odt(_) => Ok(false),
+        }
+    }
+
     /// Write a run with formatting.
     ///
     /// **Note**: This method requires the `doc` or `ooxml` feature to be enabled.
@@ -745,8 +823,21 @@ impl MarkdownWriter {
         feature = "rtf",
         feature = "pages"
     ))]
-    #[allow(irrefutable_let_patterns)]
+    #[allow(
+        irrefutable_let_patterns,
+        reason = "the facade enum collapses to a single variant when only one format feature is enabled"
+    )]
     pub fn write_run(&mut self, run: &Run) -> Result<()> {
+        #[cfg(feature = "doc")]
+        if let Run::Doc(doc_run) = run
+            && doc_run.has_image()
+        {
+            return Err(Error::Unsupported(
+                "Markdown export cannot preserve DOC inline images without an image destination policy"
+                    .to_owned(),
+            ));
+        }
+
         // First check if this run contains a formula
         if let Some(formula_markdown) = self.extract_formula_from_run(run)? {
             self.close_formatting();
@@ -820,6 +911,8 @@ impl MarkdownWriter {
             )
         };
 
+        let underline = Self::run_has_direct_underline(run)?;
+
         // Handle vertical position (superscript/subscript)
         // Note: vertical_position() is available when doc or ooxml features are enabled
         #[cfg(any(feature = "doc", feature = "docx"))]
@@ -846,6 +939,9 @@ impl MarkdownWriter {
             // For superscript/subscript, we apply them directly and skip other formatting
             if let Some(pos) = vertical_pos {
                 self.close_formatting();
+                if underline {
+                    self.buffer.push_str("<u>");
+                }
                 match self.options.script_style {
                     litchi_markdown::ScriptStyle::Html => match pos {
                         VerticalPosition::Superscript => {
@@ -898,6 +994,9 @@ impl MarkdownWriter {
                         }
                     },
                 }
+                if underline {
+                    self.buffer.push_str("</u>");
+                }
                 return Ok(());
             }
         }
@@ -915,6 +1014,11 @@ impl MarkdownWriter {
                 needed_capacity += 4; // ** or *
             }
             self.buffer.reserve(needed_capacity);
+        }
+
+        if underline {
+            self.write_underlined(&text, bold, italic, strikethrough);
+            return Ok(());
         }
 
         // Apply formatting changes (only add/remove markers when formatting changes)
@@ -1398,21 +1502,6 @@ impl MarkdownWriter {
         self.buffer
     }
 
-    /// Append a single character to the buffer.
-    #[allow(dead_code)]
-    pub fn push(&mut self, ch: char) {
-        self.buffer.push(ch);
-    }
-
-    /// Write a formatted string to the buffer.
-    #[allow(dead_code)]
-    pub fn write_fmt(&mut self, args: std::fmt::Arguments) -> Result<()> {
-        use std::fmt::Write as FmtWrite;
-        self.buffer
-            .write_fmt(args)
-            .map_err(|e| Error::Other(e.to_string()))
-    }
-
     /// Reserve additional capacity in the buffer.
     pub fn reserve(&mut self, additional: usize) {
         self.buffer.reserve(additional);
@@ -1536,11 +1625,7 @@ impl MarkdownWriter {
     /// Calculate the indentation level based on leading spaces/tabs.
     fn calculate_indent_level(&self, text: &str) -> usize {
         let leading = text.len() - text.trim_start().len();
-        if self.options.list_indent == 0 {
-            0
-        } else {
-            leading / self.options.list_indent
-        }
+        leading.checked_div(self.options.list_indent).unwrap_or(0)
     }
 
     /// Extract formula content from a run and convert to markdown.
@@ -1553,7 +1638,10 @@ impl MarkdownWriter {
         feature = "rtf",
         feature = "pages"
     ))]
-    #[allow(irrefutable_let_patterns)]
+    #[allow(
+        irrefutable_let_patterns,
+        reason = "the facade enum collapses to a single variant when only one format feature is enabled"
+    )]
     fn extract_formula_from_run(&self, _run: &Run) -> Result<Option<String>> {
         // Try OOXML OMML formulas first
         #[cfg(feature = "docx")]
@@ -1583,7 +1671,10 @@ impl MarkdownWriter {
             // pattern is refutable in most builds and irrefutable in an
             // `doc`-only build; `if let` covers both without a wildcard arm that
             // would be unreachable in the latter.
-            #[allow(irrefutable_let_patterns)]
+            #[allow(
+                irrefutable_let_patterns,
+                reason = "the facade enum collapses to a single variant when only one format feature is enabled"
+            )]
             if let crate::document::Run::Doc(ole_run) = _run
                 && ole_run.has_mtef_formula()
             {
@@ -1616,38 +1707,6 @@ impl MarkdownWriter {
                 litchi_markdown::FormulaStyle::Dollar => format!("$${}$$", formula),
             }
         }
-    }
-
-    /// Format a formula placeholder with the appropriate delimiters.
-    #[allow(dead_code)]
-    fn format_formula_placeholder(&self, placeholder: &str) -> String {
-        self.format_formula(placeholder, true)
-    }
-
-    /// Write a list item with proper formatting.
-    #[allow(dead_code)] // Used in fallback paths
-    #[cfg(any(
-        feature = "doc",
-        feature = "docx",
-        feature = "odt",
-        feature = "rtf",
-        feature = "pages"
-    ))]
-    fn write_list_item(&mut self, _para: &Paragraph, list_info: &ListItemInfo) -> Result<()> {
-        self.write_list_prefix(list_info)?;
-
-        // Write the content with styles if enabled
-        if self.options.include_styles && !list_info.content.trim().is_empty() {
-            // For styled content, we need to skip the marker part and write the remaining runs
-            // This is a simplified approach - in practice, we'd need more sophisticated
-            // parsing to handle cases where the marker spans multiple runs
-            self.write_literal(&list_info.content);
-        } else {
-            // Write the content directly
-            self.write_literal(&list_info.content);
-        }
-
-        Ok(())
     }
 
     /// Extract text from runs without re-parsing paragraph XML.
@@ -1734,7 +1793,7 @@ impl MarkdownWriter {
 #[cfg(all(test, feature = "docx"))]
 mod tests {
     use super::{ListItemInfo, ListOrigin, ListType, MarkdownWriter};
-    use crate::document::Paragraph;
+    use crate::document::{Paragraph, Run};
     use litchi_markdown::{MarkdownOptions, ToMarkdown};
 
     fn paragraph(properties: &str, text: &str) -> Paragraph {
@@ -1827,6 +1886,16 @@ mod tests {
         let mut writer = MarkdownWriter::new(MarkdownOptions::new());
         writer.write_html_literal("<&> *");
         assert_eq!(writer.finish(), "&lt;&amp;&gt; \\*");
+    }
+
+    #[test]
+    fn direct_docx_underline_uses_escaped_inline_html() -> litchi_core::Result<()> {
+        let run = Run::Docx(crate::docx::Run::new(
+            br#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:u w:val="single"/></w:rPr><w:t>A &amp; *literal*</w:t></w:r>"#
+                .to_vec(),
+        ));
+        assert_eq!(run.to_markdown()?, "<u>A &amp; \\*literal\\*</u>");
+        Ok(())
     }
 
     #[test]

@@ -1,4 +1,4 @@
-//! PresentationML transition writer.
+//! `PresentationML` transition writer.
 
 use std::fmt::Write as _;
 
@@ -10,6 +10,10 @@ use super::reader::P14;
 const MCE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 
 /// Serializes a transition into a newly allocated XML fragment.
+///
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn write(value: &Transition) -> Result<String> {
     let mut xml = String::new();
     write_to(value, &mut xml)?;
@@ -20,6 +24,10 @@ pub fn write(value: &Transition) -> Result<String> {
 ///
 /// This is the preferred package-writer seam because it avoids an
 /// intermediate allocation and copy.
+///
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn write_to(value: &Transition, xml: &mut String) -> Result<()> {
     validate_raw(value)?;
 
@@ -67,13 +75,13 @@ fn write_transition(
     xml.push_str(speed(value.speed));
     xml.push('"');
     if let Some(duration) = duration {
-        write!(xml, " p14:dur=\"{}\"", duration.get()).map_err(|_| Error::Write)?;
+        write!(xml, " p14:dur=\"{}\"", duration.get()).map_err(|_err| Error::Write)?;
     }
     if !value.click {
         xml.push_str(" advClick=\"0\"");
     }
     if let Some(after) = value.after {
-        write!(xml, " advTm=\"{}\"", after.get()).map_err(|_| Error::Write)?;
+        write!(xml, " advTm=\"{}\"", after.get()).map_err(|_err| Error::Write)?;
     }
     xml.push('>');
 
@@ -135,7 +143,7 @@ fn write_effect(value: &Transition, xml: &mut String) -> Result<()> {
         },
         Kind::Random => xml.push_str("<p:random/>"),
         Kind::Wheel(spokes) => {
-            write!(xml, "<p:wheel spokes=\"{}\"/>", spokes.get()).map_err(|_| Error::Write)?;
+            write!(xml, "<p:wheel spokes=\"{}\"/>", spokes.get()).map_err(|_err| Error::Write)?;
         },
         Kind::Newsflash => xml.push_str("<p:newsflash/>"),
         Kind::Ripple(direction) => {

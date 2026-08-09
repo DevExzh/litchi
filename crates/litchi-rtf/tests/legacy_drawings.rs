@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{
     LegacyCalloutType, LegacyDrawingFillPattern, LegacyDrawingLineStyle, LegacyDrawingPrimitive,
     RtfDocument, RtfWriter,
@@ -170,15 +179,15 @@ fn parses_named_libreoffice_primitive_fixtures() {
 #[test]
 fn rejects_malformed_order_duplicates_cardinality_and_caps() {
     let malformed = [
-        r#"{\rtf1{\*\do\dobypara\dodhgt1\dprect\dpx0\dpy0\dpxsize1\dpysize1}}"#,
-        r#"{\rtf1{\*\do\dobxpage\dobxmargin\dobypara\dodhgt1\dprect\dpx0\dpy0\dpxsize1\dpysize1}}"#,
-        r#"{\rtf1{\*\do\dobxpage\dobypara\dodhgt1\dprect\dpy0\dpx0\dpxsize1\dpysize1}}"#,
-        r#"{\rtf1{\*\do\dobxpage\dobypara\dodhgt1\dppolyline\dppolycount2\dpptx0\dppty0\dpx0\dpy0\dpxsize1\dpysize1}}"#,
-        r#"{\rtf1{\*\do\dobxpage\dobypara\dodhgt1\dpgroup\dpcount9\dpx0\dpy0\dpxsize1\dpysize1\dprect\dpx0\dpy0\dpxsize1\dpysize1\dpendgroup\dpx0\dpy0\dpxsize0\dpysize0}}"#,
-        r#"{\rtf1{\*\do\dobxpage\dobypara\dodhgt1\dprect\dpx0\dpy0\dpxsize1\dpysize1\dpfillfgcr256\dpfillfgcg0\dpfillfgcb0\dpfillbggray0\dpfillpat1}}"#,
-        r#"{\rtf1{\*\do\dobxpage\dobypara\dodhgt1\dpline\dpptx0\dppty0\dpptx1\dppty1\dpx0\dpy0\dpxsize1\dpysize1\dpastartsol\dpastartl4\dpastartw1}}"#,
-        r#"{\rtf1{\*\do\dobxpage\dobypara\dodhgt1\dprect\dpx0\dpy0\dpxsize1\dpysize1\dpshadow\dpshadx1}}"#,
-        r#"{\rtf1{\*\do\dobxpage\dobypara\dodhgt1\dppolyline\dppolycount65537}}"#,
+        r"{\rtf1{\*\do\dobypara\dodhgt1\dprect\dpx0\dpy0\dpxsize1\dpysize1}}",
+        r"{\rtf1{\*\do\dobxpage\dobxmargin\dobypara\dodhgt1\dprect\dpx0\dpy0\dpxsize1\dpysize1}}",
+        r"{\rtf1{\*\do\dobxpage\dobypara\dodhgt1\dprect\dpy0\dpx0\dpxsize1\dpysize1}}",
+        r"{\rtf1{\*\do\dobxpage\dobypara\dodhgt1\dppolyline\dppolycount2\dpptx0\dppty0\dpx0\dpy0\dpxsize1\dpysize1}}",
+        r"{\rtf1{\*\do\dobxpage\dobypara\dodhgt1\dpgroup\dpcount9\dpx0\dpy0\dpxsize1\dpysize1\dprect\dpx0\dpy0\dpxsize1\dpysize1\dpendgroup\dpx0\dpy0\dpxsize0\dpysize0}}",
+        r"{\rtf1{\*\do\dobxpage\dobypara\dodhgt1\dprect\dpx0\dpy0\dpxsize1\dpysize1\dpfillfgcr256\dpfillfgcg0\dpfillfgcb0\dpfillbggray0\dpfillpat1}}",
+        r"{\rtf1{\*\do\dobxpage\dobypara\dodhgt1\dpline\dpptx0\dppty0\dpptx1\dppty1\dpx0\dpy0\dpxsize1\dpysize1\dpastartsol\dpastartl4\dpastartw1}}",
+        r"{\rtf1{\*\do\dobxpage\dobypara\dodhgt1\dprect\dpx0\dpy0\dpxsize1\dpysize1\dpshadow\dpshadx1}}",
+        r"{\rtf1{\*\do\dobxpage\dobypara\dodhgt1\dppolyline\dppolycount65537}}",
     ];
     for source in malformed {
         assert!(

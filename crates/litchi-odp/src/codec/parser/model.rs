@@ -87,7 +87,11 @@ pub(super) enum Element {
 }
 
 /// Internal structure for building shapes during parsing
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    clippy::struct_excessive_bools,
+    reason = "parser-internal builder accumulates independent XML parse flags and fields consumed by later pipeline stages; splitting them would complicate the parser without changing behavior"
+)]
 pub(super) struct ShapeBuilder {
     pub(super) shape_type: ShapeType,
     pub(super) drawing_kind: Option<DrawingShapeKind>,
@@ -157,7 +161,10 @@ impl ParagraphText {
     }
 }
 
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "parser-internal builder; not every helper is exercised on all code paths"
+)]
 impl ShapeBuilder {
     pub(super) fn new() -> Self {
         Self {

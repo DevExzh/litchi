@@ -1,4 +1,4 @@
-//! PowerPoint record codecs for timing-node containers and atoms.
+//! `PowerPoint` record codecs for timing-node containers and atoms.
 
 use super::super::behavior::{
     write_time_animate_behavior, write_time_color_behavior, write_time_effect_behavior,
@@ -20,11 +20,14 @@ use crate::animation::types::{
 use crate::consts::RecordType;
 use crate::package::Result;
 
-/// Serialize a canonically ordered PowerPoint 2002 extended time node.
+/// Serialize a canonically ordered `PowerPoint` 2002 extended time node.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
 pub fn write_extended_time_node(node: &ExtendedTimeNode) -> Result<Vec<u8>> {
     let view = NodeView::new(node);
     validate_extended_time_node(&view)?;
-    let node = view.source();
     let mut children = write_time_node_atom(&node.atom);
     if let Some(properties) = &node.properties {
         children.extend(write_time_node_property_list(
@@ -75,10 +78,13 @@ pub fn write_extended_time_node(node: &ExtendedTimeNode) -> Result<Vec<u8>> {
 }
 
 /// Serialize a canonically ordered subordinate time-node effect.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
 pub fn write_time_sub_effect(sub_effect: &TimeSubEffect) -> Result<Vec<u8>> {
     let view = SubEffectView::new(sub_effect);
     validate_sub_effect(&view)?;
-    let sub_effect = view.source();
     let mut children = write_time_node_atom(&sub_effect.atom);
     if let Some(properties) = &sub_effect.properties {
         children.extend(write_time_node_property_list(
@@ -109,16 +115,25 @@ pub fn write_time_sub_effect(sub_effect: &TimeSubEffect) -> Result<Vec<u8>> {
 }
 
 /// Serialize an exact 32-byte `TimeNodeAtom` payload.
+#[must_use]
 pub fn write_time_node_atom(atom: &TimeNodeAtom) -> Vec<u8> {
     let mut data = Vec::with_capacity(32);
     data.extend(0u32.to_le_bytes());
-    data.extend(atom.restart.map_or(0, |value| value.as_u32()).to_le_bytes());
     data.extend(
-        atom.node_type
-            .map_or(0, |value| value.as_u32())
+        atom.restart
+            .map_or(0, crate::animation::types::TimeNodeRestart::as_u32)
             .to_le_bytes(),
     );
-    data.extend(atom.fill.map_or(0, |value| value.as_u32()).to_le_bytes());
+    data.extend(
+        atom.node_type
+            .map_or(0, crate::animation::types::TimeNodeKind::as_u32)
+            .to_le_bytes(),
+    );
+    data.extend(
+        atom.fill
+            .map_or(0, crate::animation::types::TimeNodeFill::as_u32)
+            .to_le_bytes(),
+    );
     data.extend(0u32.to_le_bytes());
     data.extend(0u32.to_le_bytes());
     data.extend(atom.duration_ms.unwrap_or(0).to_le_bytes());

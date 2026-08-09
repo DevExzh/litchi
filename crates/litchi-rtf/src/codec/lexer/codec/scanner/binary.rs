@@ -7,8 +7,8 @@ use std::borrow::Cow;
 
 impl<'a> Lexer<'a> {
     /// Consume and arena-copy the exact byte payload declared by `\\binN`.
-    pub(super) fn parse_binary_payload(&mut self, size: i32) -> RtfResult<Token<'a>> {
-        let size = usize::try_from(size).map_err(|_| {
+    pub(super) fn parse_binary_payload(&mut self, declared_size: i32) -> RtfResult<Token<'a>> {
+        let size = usize::try_from(declared_size).map_err(|_err| {
             RtfError::MalformedDocument("RTF binary length cannot be negative".to_string())
         })?;
         if size > self.limits.max_binary_bytes() {
@@ -45,7 +45,7 @@ impl<'a> Lexer<'a> {
                 .get(payload_end..)
                 .and_then(|remaining| remaining.chars().next())
                 .ok_or(RtfError::UnexpectedEof)?;
-            u8::try_from(u32::from(ch)).map_err(|_| {
+            u8::try_from(u32::from(ch)).map_err(|_err| {
                 RtfError::MalformedDocument("RTF binary payload is not byte-preserving".to_string())
             })?;
             payload_end += ch.len_utf8();
@@ -54,7 +54,7 @@ impl<'a> Lexer<'a> {
         let payload = self.source_range(payload_start, payload_end)?;
         let allocated = self.arena.alloc_slice_fill_copy(size, 0u8);
         for (slot, ch) in allocated.iter_mut().zip(payload.chars()) {
-            *slot = u8::try_from(u32::from(ch)).map_err(|_| {
+            *slot = u8::try_from(u32::from(ch)).map_err(|_err| {
                 RtfError::MalformedDocument("RTF binary payload is not byte-preserving".to_string())
             })?;
         }

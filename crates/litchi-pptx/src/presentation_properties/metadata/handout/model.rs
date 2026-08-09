@@ -17,6 +17,7 @@ pub enum Layout {
 
 impl Layout {
     /// Get the layout type string for handout-master XML.
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::OneSlide => "handout1",
@@ -30,6 +31,7 @@ impl Layout {
     }
 
     /// Get the `ST_PrintWhat` value for `presProps.xml`.
+    #[must_use]
     pub fn print_what(&self) -> &'static str {
         match self {
             Self::OneSlide => "handouts1",
@@ -95,17 +97,20 @@ impl Default for Master {
 
 impl Master {
     /// Create a new handout master with default settings.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Set the handout layout.
+    #[must_use]
     pub fn with_layout(mut self, layout: Layout) -> Self {
         self.layout = layout;
         self
     }
 
     /// Set the header text.
+    #[must_use]
     pub fn with_header(mut self, text: impl Into<String>) -> Self {
         self.header_footer.show_header = true;
         self.header_footer.header_text = Some(text.into());
@@ -113,6 +118,7 @@ impl Master {
     }
 
     /// Set the footer text.
+    #[must_use]
     pub fn with_footer(mut self, text: impl Into<String>) -> Self {
         self.header_footer.show_footer = true;
         self.header_footer.footer_text = Some(text.into());
@@ -120,12 +126,14 @@ impl Master {
     }
 
     /// Enable slide numbers.
+    #[must_use]
     pub fn with_slide_numbers(mut self) -> Self {
         self.header_footer.show_slide_number = true;
         self
     }
 
     /// Enable automatic date/time display.
+    #[must_use]
     pub fn with_date_time(mut self) -> Self {
         self.header_footer.show_date_time = true;
         self.header_footer.auto_date = true;
@@ -133,6 +141,7 @@ impl Master {
     }
 
     /// Set a fixed date text and disable automatic date.
+    #[must_use]
     pub fn with_fixed_date(mut self, date_text: impl Into<String>) -> Self {
         self.header_footer.show_date_time = true;
         self.header_footer.auto_date = false;
@@ -141,6 +150,7 @@ impl Master {
     }
 
     /// Set the background color as an RGB lexical value without `#`.
+    #[must_use]
     pub fn with_background_color(mut self, color: impl Into<String>) -> Self {
         self.background_color = Some(color.into());
         self

@@ -15,7 +15,7 @@ pub struct Author {
     pub comment_index_seed: Option<i32>,
 }
 
-/// PowerPoint 10 presentation-comment authors.
+/// `PowerPoint` 10 presentation-comment authors.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Authors {
     pub authors: Vec<Author>,
@@ -28,16 +28,19 @@ impl Authors {
     }
 
     /// Number of document-level comment authors.
+    #[must_use]
     pub const fn len(&self) -> usize {
         self.authors.len()
     }
 
     /// Whether the document declares no comment authors.
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.authors.is_empty()
     }
 
     /// Find the first author with the specified display name.
+    #[must_use]
     pub fn find(&self, name: &str) -> Option<&Author> {
         self.authors
             .iter()
@@ -45,6 +48,10 @@ impl Authors {
     }
 
     /// Validate author index seeds against a collection of parsed slide comments.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn validate_comments(&self, comments: &[ParsedComment]) -> Result<()> {
         for author in &self.authors {
             let (Some(name), Some(seed)) = (&author.name, author.comment_index_seed) else {
@@ -65,7 +72,7 @@ impl Authors {
 
 /// Validated presentation-comment inventory.
 ///
-/// PowerPoint stores author indexes in the document stream and comment atoms
+/// `PowerPoint` stores author indexes in the document stream and comment atoms
 /// in each slide's `___PPT10` extension. This owner joins those two scopes so
 /// callers can validate the cross-record seed rule once and then traverse the
 /// inert comments without rebuilding the binary record tree.
@@ -78,6 +85,10 @@ pub struct Catalog {
 impl Catalog {
     /// Build a catalog after checking every comment index against its author
     /// seed. No comment text, link, or external payload is activated.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn from_parts(authors: Authors, slides: Vec<ParsedSlideComments>) -> Result<Self> {
         for author in &authors.authors {
             let (Some(name), Some(seed)) = (&author.name, author.comment_index_seed) else {
@@ -98,11 +109,13 @@ impl Catalog {
     }
 
     /// Document-level comment authors in source order.
+    #[must_use]
     pub const fn authors(&self) -> &Authors {
         &self.authors
     }
 
     /// Per-slide comment groups in presentation order.
+    #[must_use]
     pub fn slides(&self) -> &[ParsedSlideComments] {
         &self.slides
     }
@@ -113,6 +126,7 @@ impl Catalog {
     }
 
     /// Find the comment group for a one-based slide number.
+    #[must_use]
     pub fn slide(&self, slide_number: usize) -> Option<&ParsedSlideComments> {
         self.slides
             .iter()

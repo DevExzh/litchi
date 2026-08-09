@@ -1,4 +1,4 @@
-//! Bounded PresentationML transition reader.
+//! Bounded `PresentationML` transition reader.
 
 use std::sync::Arc;
 
@@ -47,6 +47,7 @@ impl Limits {
     /// Creates a finite, nonzero limit set.
     ///
     /// Returns `None` when any limit is zero.
+    #[must_use]
     pub const fn new(
         input_bytes: usize,
         depth: usize,
@@ -66,21 +67,25 @@ impl Limits {
     }
 
     /// Maximum input and post-MCE output size.
+    #[must_use]
     pub const fn input_bytes(self) -> usize {
         self.input_bytes
     }
 
     /// Maximum XML nesting depth.
+    #[must_use]
     pub const fn depth(self) -> usize {
         self.depth
     }
 
     /// Maximum number of start or empty elements.
+    #[must_use]
     pub const fn nodes(self) -> usize {
         self.nodes
     }
 
     /// Maximum total bytes retained for opaque child subtrees.
+    #[must_use]
     pub const fn retained_bytes(self) -> usize {
         self.retained_bytes
     }
@@ -93,11 +98,19 @@ impl Default for Limits {
 }
 
 /// Reads the first slide transition using bounded default resources.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn read(xml: &[u8]) -> Result<Option<Transition>> {
     read_with(xml, Limits::DEFAULT)
 }
 
 /// Reads the first slide transition using explicit finite resource limits.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn read_with(xml: &[u8], limits: Limits) -> Result<Option<Transition>> {
     if xml.len() > limits.input_bytes {
         return Err(Error::Limit {
@@ -490,9 +503,9 @@ fn parse_advance_ms(value: &str) -> Result<Ms> {
 fn parse_bounded_ms(value: &str, field: &str) -> Result<Ms> {
     let parsed = value
         .parse::<u64>()
-        .map_err(|_| Error::Invalid(format!("invalid {field} '{value}'")))?;
+        .map_err(|_err| Error::Invalid(format!("invalid {field} '{value}'")))?;
     let parsed = u32::try_from(parsed)
-        .map_err(|_| Error::Invalid(format!("{field} '{value}' is outside its domain")))?;
+        .map_err(|_err| Error::Invalid(format!("{field} '{value}' is outside its domain")))?;
     Ms::new(parsed).map_err(|error| Error::Invalid(format!("invalid {field}: {error}")))
 }
 
@@ -669,7 +682,7 @@ fn enter_depth(depth: usize, limit: usize) -> Result<usize> {
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| Error::Invalid("transition XML position does not fit usize".into()))
+        .map_err(|_err| Error::Invalid("transition XML position does not fit usize".into()))
 }
 
 fn is_auxiliary(namespace: &ResolveResult<'_>, name: QName<'_>) -> bool {

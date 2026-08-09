@@ -11,7 +11,10 @@ type Result<T> = std::result::Result<T, Error>;
 /// This enum wraps format-specific workbook types, providing
 /// a unified API. Users typically don't interact with this enum directly,
 /// but instead use the methods on `UnifiedWorkbook`.
-#[allow(clippy::large_enum_variant)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "crate-internal facade enum; boxing the large variant would complicate every match for no measurable gain"
+)]
 pub(super) enum WorkbookImpl {
     #[cfg(feature = "numbers")]
     Numbers(litchi_numbers::Package),
@@ -24,7 +27,10 @@ pub(super) enum WorkbookImpl {
 
     // Legacy OLE-based Excel
     #[cfg(feature = "xls")]
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "the payload is only read by feature-gated match arms"
+    )]
     XlsFile(crate::xls::Workbook<std::io::BufReader<std::fs::File>>),
     #[cfg(feature = "xls")]
     XlsMem(crate::xls::Workbook<std::io::Cursor<Vec<u8>>>),
@@ -36,13 +42,16 @@ pub(super) enum WorkbookImpl {
 
     // For other formats, we just indicate they're not yet fully unified
     #[cfg(any(feature = "xls", any(feature = "xlsx", feature = "xlsb")))]
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "placeholder for formats not yet fully unified")]
     Other,
 }
 
 /// Format of the workbook file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(unused)] // Since the library is feature-gated, this enum may not be used
+#[allow(
+    unused,
+    reason = "the enum is only constructed when the corresponding format feature is enabled"
+)]
 pub(super) enum WorkbookFormat {
     /// Legacy Excel Binary Format (.xls)
     Xls,
@@ -57,7 +66,10 @@ pub(super) enum WorkbookFormat {
 }
 
 /// Detect workbook format from file signature.
-#[allow(dead_code)] // For format detection, it is better to use the smart detection function, but the function is still useful for other purposes
+#[allow(
+    dead_code,
+    reason = "kept as a public detection helper; callers are expected to prefer smart detection"
+)]
 pub fn detect_workbook_format_from_signature<R: Read + Seek>(
     reader: &mut R,
 ) -> Result<WorkbookFormat> {
@@ -100,8 +112,10 @@ pub fn detect_workbook_format_from_signature<R: Read + Seek>(
 }
 
 /// Refine ZIP-based workbook format detection (XLSX vs XLSB vs Numbers)
-#[allow(dead_code)]
-// For format detection, it is better to use the smart detection function, but the function is still useful for other purposes
+#[allow(
+    dead_code,
+    reason = "kept as a detection helper; callers are expected to prefer smart detection"
+)]
 #[cfg(any(
     feature = "numbers",
     any(feature = "xlsx", feature = "xlsb"),

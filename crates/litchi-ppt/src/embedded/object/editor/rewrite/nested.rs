@@ -59,7 +59,9 @@ fn replace_nested_record_at_depth(
     }
 
     let mut output = record[..4].to_vec();
-    output.extend_from_slice(&(data.len() as u32).to_le_bytes());
+    let data_len = u32::try_from(data.len())
+        .map_err(|_err| Error::Corrupted("PPT record payload exceeds u32".into()))?;
+    output.extend_from_slice(&data_len.to_le_bytes());
     output.extend_from_slice(&data);
     Ok(Some(output))
 }

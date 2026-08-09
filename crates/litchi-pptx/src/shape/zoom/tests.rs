@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::*;
 
 const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
@@ -17,7 +23,7 @@ fn blip_fill(relationship: Option<&str>) -> String {
     let blip = relationship
         .map(|id| format!(" r:embed=\"{id}\""))
         .unwrap_or_default();
-    format!(r#"<p166:blipFill><a:blip{blip}/><a:stretch><a:fillRect/></a:stretch></p166:blipFill>"#)
+    format!(r"<p166:blipFill><a:blip{blip}/><a:stretch><a:fillRect/></a:stretch></p166:blipFill>")
 }
 
 fn shape_properties() -> &'static str {
@@ -125,7 +131,7 @@ fn reads_typed_zoom_shapes_and_preserves_fallback_and_unknown_choices() {
     assert_eq!(summary.items().len(), 1);
     assert_eq!(summary.items()[0].title(), "Agenda");
     assert_eq!(summary.items()[0].offset_x(), Percentage::new(-2500));
-    assert_eq!(summary.items()[0].scale_x(), Percentage::new(125000));
+    assert_eq!(summary.items()[0].scale_x(), Percentage::new(125_000));
 }
 
 #[test]

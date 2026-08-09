@@ -1,4 +1,4 @@
-//! Typed ChartEx graph conversion and semantic validation.
+//! Typed `ChartEx` graph conversion and semantic validation.
 
 mod model;
 mod validation;

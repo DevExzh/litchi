@@ -3,6 +3,15 @@
 - Status: Accepted
 - Date: 2026-08-04
 
+## Identifier continuity
+
+This is the canonical ADR 0023.  A later IWA object-index record was
+temporarily assigned the same number during the migration; its canonical,
+current identifier is ADR 0029.  Historical discussions or links that call
+the IWA record "ADR 0023" refer to
+[`0029-iwa-index-foundation.md`](0029-iwa-index-foundation.md) and do not
+create a second ADR 0023.
+
 ## Context
 
 `litchi-odf` currently contains every OpenDocument family: text, spreadsheet,

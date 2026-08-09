@@ -1,4 +1,4 @@
-//! Bounded, lossless-or-refuse PowerPoint font record I/O.
+//! Bounded, lossless-or-refuse `PowerPoint` font record I/O.
 
 use super::model::{
     EmbeddedFont, Font, FontCollection, FontCollections, FontEmbeddingFlags, Limits, Scope,
@@ -10,16 +10,32 @@ use crate::records::Record;
 use crate::records::RecordParseSession;
 
 impl FontCollections {
+    /// Validate every owned collection and embedding flag against `limits`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the limits are invalid or any collection violates
+    /// them.
     pub fn validate_with_limits(&self, limits: Limits) -> Result<()> {
         validation::validate_collections(self, limits)
     }
 
+    /// Parse font semantics from a live `DocumentContainer` with default limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record tree is not a valid live document font
+    /// owner or contains malformed or unsupported font records.
     pub fn parse(root: &Record) -> Result<Self> {
         Self::parse_with_limits(root, Limits::default())
     }
 
     /// Parse only the live document's direct `Environment` and document-level
     /// `___PPT10` owners. Slide/master programmable tags are not searched.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_with_limits(root: &Record, limits: Limits) -> Result<Self> {
         validation::validate_limits(limits)?;
         let mut session = RecordParseSession::new(limits.records, root.data.len())?;
@@ -77,6 +93,10 @@ impl FontCollections {
         let mut international = None;
         let mut embedding_flags = None;
         for record in records.unwrap_or_default() {
+            #[allow(
+                clippy::wildcard_enum_match_arm,
+                reason = "`RecordType` has hundreds of variants; every record other than `FontCollection10` and `FontEmbedFlags10Atom` is intentionally ignored here"
+            )]
             match record.record_type {
                 RecordType::FontCollection10 if international.is_some() => {
                     return Err(Error::Corrupted(
@@ -113,6 +133,14 @@ impl FontCollections {
         Ok(value)
     }
 
+    /// Apply these font semantics to a live `DocumentContainer`, verifying the
+    /// rewrite by reparsing the edited tree.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the collections violate `limits`, the document
+    /// cannot be edited losslessly, or the rewrite fails its reparse
+    /// verification.
     pub fn apply_to_document(&self, root: &mut Record, limits: Limits) -> Result<()> {
         validation::validate_collections(self, limits)?;
         let current = Self::parse_with_limits(root, limits)?;
@@ -126,6 +154,13 @@ impl FontCollections {
         Ok(())
     }
 
+    /// Apply these font semantics to a live document whose current font state
+    /// is already known as `current`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either collection violates `limits` or the edit
+    /// cannot be applied losslessly.
     pub fn apply_to_document_from(
         &self,
         current: &Self,
@@ -135,25 +170,29 @@ impl FontCollections {
         validation::validate_collections(current, limits)?;
         validation::validate_collections(self, limits)?;
         apply_base(root, current.base.as_ref(), self.base.as_ref(), limits)?;
-        apply_ppt10(root, &current, self, limits)?;
+        apply_ppt10(root, current, self, limits)?;
         Ok(())
     }
 
     /// Restore every font-owned record into a normalized document tree whose
     /// large facet payloads were drained into [`SharedFontData`](super::SharedFontData).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the collections violate `limits` or a font owner
+    /// cannot be materialized losslessly.
     pub fn materialize_to_document(&self, root: &mut Record, limits: Limits) -> Result<()> {
         validation::validate_collections(self, limits)?;
-        let environments: Vec<_> = root
+        let mut environments: Vec<_> = root
             .children
             .iter_mut()
             .filter(|record| record.record_type == RecordType::Environment)
             .collect();
-        if environments.len() != 1 {
+        let [environment] = environments.as_mut_slice() else {
             return Err(Error::Corrupted(
                 "font materialization requires exactly one Environment".into(),
             ));
-        }
-        let environment = environments.into_iter().next().expect("length checked");
+        };
         let positions: Vec<_> = environment
             .children
             .iter()
@@ -219,6 +258,10 @@ impl FontCollections {
 
     /// Drain large embedded payload vectors out of a parsed live Document tree
     /// into shared semantic owners, then discard redundant container payloads.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn take_from_document(root: &mut Record, limits: Limits) -> Result<Self> {
         validation::validate_limits(limits)?;
         if root.record_type != RecordType::Document || root.version != 0x0f || root.instance != 0 {
@@ -255,8 +298,8 @@ impl FontCollections {
                 })
                 .collect();
             match positions.as_slice() {
-                [position] => Some(FontCollection::take_with_limits(
-                    &mut environment.children[*position],
+                [collection_position] => Some(FontCollection::take_with_limits(
+                    &mut environment.children[*collection_position],
                     limits,
                 )?),
                 [] => None,
@@ -324,6 +367,10 @@ impl FontCollections {
     }
 
     /// Canonical full base collection record for fresh writers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn base_record_bytes(&self) -> Result<Option<Vec<u8>>> {
         self.base
             .as_ref()
@@ -332,6 +379,10 @@ impl FontCollections {
     }
 
     /// Canonical full PP10 records in grammar order: collection, then flags.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn powerpoint10_records(&self) -> Result<Vec<Vec<u8>>> {
         validation::validate_collections(self, Limits::default())?;
         let mut records = Vec::with_capacity(2);
@@ -349,6 +400,12 @@ impl FontCollections {
 }
 
 impl FontEmbeddingFlags {
+    /// Parse a `FontEmbedFlags10Atom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record is not a `FontEmbedFlags10Atom` with a
+    /// four-byte payload.
     pub fn parse(record: &Record) -> Result<Self> {
         if record.record_type != RecordType::FontEmbedFlags10Atom
             || record.version != 0
@@ -359,7 +416,12 @@ impl FontEmbeddingFlags {
                 "FontEmbedFlags10Atom has an invalid header or size".into(),
             ));
         }
-        let raw = u32::from_le_bytes(record.data[..4].try_into().expect("fixed slice"));
+        let raw = u32::from_le_bytes([
+            record.data[0],
+            record.data[1],
+            record.data[2],
+            record.data[3],
+        ]);
         Ok(Self {
             raw,
             subset: raw & 1 != 0,
@@ -367,6 +429,12 @@ impl FontEmbeddingFlags {
         })
     }
 
+    /// Serialize back to a `FontEmbedFlags10Atom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the projected flag bits disagree with the retained
+    /// raw bits.
     pub fn to_record(self) -> Result<Record> {
         if self.subset != (self.raw & 1 != 0) || self.subset_option_confirmed != (self.raw & 2 != 0)
         {
@@ -383,10 +451,22 @@ impl FontEmbeddingFlags {
 }
 
 impl FontCollection {
+    /// Parse a font collection record with default limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record is malformed or violates the default
+    /// limits.
     pub fn parse(record: &Record) -> Result<Self> {
         Self::parse_with_limits(record, Limits::default())
     }
 
+    /// Parse a font collection record, enforcing `limits`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the limits are invalid, the record is malformed, or
+    /// it violates `limits`.
     pub fn parse_with_limits(record: &Record, limits: Limits) -> Result<Self> {
         validation::validate_limits(limits)?;
         let mut session = RecordParseSession::new(limits.records, record.data.len())?;
@@ -404,6 +484,10 @@ impl FontCollection {
         if !owner_already_accounted {
             session.account_existing(logical_depth)?;
         }
+        #[allow(
+            clippy::wildcard_enum_match_arm,
+            reason = "`RecordType` has hundreds of variants; every record other than `FontCollection` and `FontCollection10` is rejected here"
+        )]
         let scope = match record.record_type {
             RecordType::FontCollection => Scope::Base,
             RecordType::FontCollection10 => Scope::International,
@@ -440,7 +524,7 @@ impl FontCollection {
         collection
             .fonts
             .try_reserve(children.len().min(limits.max_fonts_per_collection))
-            .map_err(|_| Error::AllocationFailed("font collection"))?;
+            .map_err(|_err| Error::AllocationFailed("font collection"))?;
         let mut current: Option<Font> = None;
         let mut facets = 0usize;
         let mut embedded_bytes = 0usize;
@@ -456,6 +540,10 @@ impl FontCollection {
                     "font child exceeds its record byte limit".into(),
                 ));
             }
+            #[allow(
+                clippy::wildcard_enum_match_arm,
+                reason = "`RecordType` has hundreds of variants; every record other than `FontEntityAtom` and `FontEmbeddedData` is intentionally rejected here"
+            )]
             match child.record_type {
                 RecordType::FontEntityAtom => {
                     if let Some(font) = current.take() {
@@ -464,7 +552,7 @@ impl FontCollection {
                     if collection.fonts.len() >= limits.max_fonts_per_collection {
                         return Err(Error::Corrupted("font collection exceeds its limit".into()));
                     }
-                    current = Some(parse_font_entity(&child, collection.fonts.len())?);
+                    current = Some(parse_font_entity(child, collection.fonts.len())?);
                 },
                 RecordType::FontEmbeddedData => {
                     let font = current.as_mut().ok_or_else(|| {
@@ -475,6 +563,10 @@ impl FontCollection {
                             "embedded font has an invalid header".into(),
                         ));
                     }
+                    #[allow(
+                        clippy::cast_possible_truncation,
+                        reason = "`child.instance` is checked to be at most 3 immediately above"
+                    )]
                     let style = child.instance as u8;
                     if font
                         .embedded_fonts
@@ -522,6 +614,13 @@ impl FontCollection {
         Ok(collection)
     }
 
+    /// Drain embedded facet payloads out of an owned font collection record,
+    /// returning the semantic collection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record is malformed, violates `limits`, or the
+    /// drained payloads lose alignment with the parsed facets.
     pub fn take_with_limits(record: &mut Record, limits: Limits) -> Result<Self> {
         let mut session = RecordParseSession::new(limits.records, record.data.len())?;
         session.account_existing(0)?;
@@ -535,7 +634,7 @@ impl FontCollection {
         let mut payloads = Vec::new();
         payloads
             .try_reserve(record.children.len().min(limits.max_facets))
-            .map_err(|_| Error::AllocationFailed("owned embedded font facets"))?;
+            .map_err(|_err| Error::AllocationFailed("owned embedded font facets"))?;
         for child in &mut record.children {
             if child.record_type == RecordType::FontEmbeddedData {
                 payloads.push(std::mem::take(&mut child.data));
@@ -545,19 +644,18 @@ impl FontCollection {
         record.data.clear();
         record.data_length = 0;
         let mut collection = Self::parse_with_session(record, limits, &mut session, 0, true, true)?;
-        let mut payloads = payloads.into_iter();
+        let mut payload_queue = payloads.into_iter();
         for facet in collection
             .fonts
             .iter_mut()
             .flat_map(|font| font.embedded_fonts.iter_mut())
         {
-            facet.data = super::SharedFontData::from(
-                payloads
-                    .next()
-                    .expect("facet record and semantic facet counts agree"),
-            );
+            let payload = payload_queue.next().ok_or_else(|| {
+                Error::Corrupted("owned font facet extraction lost semantic alignment".into())
+            })?;
+            facet.data = super::SharedFontData::from(payload);
         }
-        if payloads.next().is_some() {
+        if payload_queue.next().is_some() {
             return Err(Error::Corrupted(
                 "owned font facet extraction lost semantic alignment".into(),
             ));
@@ -567,19 +665,39 @@ impl FontCollection {
     }
 
     /// Lossless checked serialization, retaining ignored bits and source name padding.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_record(&self) -> Result<Record> {
         self.to_record_with_limits(Limits::default(), false)
     }
 
     /// Canonical checked serialization for newly authored content.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_record_canonical(&self) -> Result<Record> {
         self.to_record_with_limits(Limits::default(), true)
     }
 
+    /// Lossless checked serialization to bytes with default limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the collection fails validation or serialization
+    /// exceeds the default record limits.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         self.to_record_bytes_with_limits(Limits::default())
     }
 
+    /// Canonical checked serialization to bytes, enforcing `limits`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the collection fails validation or serialization
+    /// exceeds `limits`.
     pub fn to_record_bytes_with_limits(&self, limits: Limits) -> Result<Vec<u8>> {
         encode_record(&self.to_record_with_limits(limits, true)?, limits.records)
     }
@@ -604,7 +722,7 @@ impl FontCollection {
         let mut payload = Vec::new();
         payload
             .try_reserve(estimated)
-            .map_err(|_| Error::AllocationFailed("font collection serialization"))?;
+            .map_err(|_err| Error::AllocationFailed("font collection serialization"))?;
         for font in &self.fonts {
             payload.extend_from_slice(&encode_record(
                 &font_entity(font, canonical)?,
@@ -633,7 +751,7 @@ impl FontCollection {
             version: 0x0f,
             instance: 0,
             data_length: u32::try_from(payload.len())
-                .map_err(|_| Error::Corrupted("font collection exceeds u32".into()))?,
+                .map_err(|_err| Error::Corrupted("font collection exceeds u32".into()))?,
             data: payload,
             children: Vec::new(),
         })
@@ -657,12 +775,12 @@ fn parse_font_entity(record: &Record, ordinal: usize) -> Result<Font> {
         .position(|unit| *unit == 0)
         .unwrap_or(units.len());
     let name = String::from_utf16(&units[..end])
-        .map_err(|_| Error::Corrupted("FontEntityAtom name is invalid UTF-16".into()))?;
+        .map_err(|_err| Error::Corrupted("FontEntityAtom name is invalid UTF-16".into()))?;
     let font_flags = record.data[65];
     let font_type_flags = record.data[66];
     Ok(Font {
         index: u16::try_from(ordinal)
-            .map_err(|_| Error::Corrupted("font ordinal exceeds u16".into()))?,
+            .map_err(|_err| Error::Corrupted("font ordinal exceeds u16".into()))?,
         raw_instance: record.instance,
         name,
         charset: record.data[64],
@@ -682,12 +800,11 @@ fn parse_font_entity(record: &Record, ordinal: usize) -> Result<Font> {
 fn font_entity(font: &Font, canonical: bool) -> Result<Record> {
     validation::validate_font(font)?;
     let mut data = vec![0u8; 68];
-    let source_matches = font
-        .source_name
-        .as_ref()
-        .is_some_and(|source| decode_name(source).ok().as_deref() == Some(font.name.as_str()));
-    if !canonical && source_matches {
-        data[..64].copy_from_slice(font.source_name.as_ref().expect("checked"));
+    if !canonical
+        && let Some(source) = &font.source_name
+        && decode_name(source).ok().as_deref() == Some(font.name.as_str())
+    {
+        data[..64].copy_from_slice(source);
     } else {
         let units: Vec<u16> = font.name.encode_utf16().collect();
         for (index, unit) in units.into_iter().enumerate() {
@@ -719,7 +836,7 @@ fn decode_name(bytes: &[u8; 64]) -> Result<String> {
         .position(|unit| *unit == 0)
         .unwrap_or(units.len());
     String::from_utf16(&units[..end])
-        .map_err(|_| Error::Corrupted("font name is invalid UTF-16".into()))
+        .map_err(|_err| Error::Corrupted("font name is invalid UTF-16".into()))
 }
 
 fn apply_base(
@@ -731,17 +848,16 @@ fn apply_base(
     if before == after {
         return Ok(());
     }
-    let environments: Vec<_> = root
+    let mut environments: Vec<_> = root
         .children
         .iter_mut()
         .filter(|r| r.record_type == RecordType::Environment)
         .collect();
-    if environments.len() != 1 {
+    let [environment] = environments.as_mut_slice() else {
         return Err(Error::Corrupted(
             "font edit requires exactly one live Environment".into(),
         ));
-    }
-    let environment = environments.into_iter().next().expect("length checked");
+    };
     let positions: Vec<_> = environment
         .children
         .iter()
@@ -750,7 +866,7 @@ fn apply_base(
         .collect();
     match (positions.as_slice(), after) {
         ([position], Some(collection)) => {
-            environment.children[*position] = collection.to_record_with_limits(limits, false)?
+            environment.children[*position] = collection.to_record_with_limits(limits, false)?;
         },
         ([], Some(_)) => {
             return Err(Error::InvalidFormat(
@@ -1010,7 +1126,7 @@ fn edit_ppt10_records_optional(
             "DocProgTags has an invalid owner header".into(),
         ));
     }
-    let mut edit = Some(edit);
+    let mut pending_edit = Some(edit);
     let mut found = false;
     let mut tags = session.parse_sequence(&prog_tags.data, "document ProgTags", 3)?;
     let mut changed = false;
@@ -1040,21 +1156,24 @@ fn edit_ppt10_records_optional(
             ));
         }
         let mut records = session.parse_sequence(&blob.data, "___PPT10 BinaryTagData", 5)?;
-        edit.take().expect("single owner")(&mut records)?;
+        let apply_edit = pending_edit
+            .take()
+            .ok_or_else(|| Error::Corrupted("___PPT10 edit closure was already consumed".into()))?;
+        apply_edit(&mut records)?;
         blob.data = encode_sequence(&records, limits.records)?;
         blob.data_length = u32::try_from(blob.data.len())
-            .map_err(|_| Error::Corrupted("PPT10 blob exceeds u32".into()))?;
+            .map_err(|_err| Error::Corrupted("PPT10 blob exceeds u32".into()))?;
         blob.children.clear();
         tag.data = encode_sequence(&pair, limits.records)?;
         tag.data_length = u32::try_from(tag.data.len())
-            .map_err(|_| Error::Corrupted("PPT10 tag exceeds u32".into()))?;
+            .map_err(|_err| Error::Corrupted("PPT10 tag exceeds u32".into()))?;
         tag.children.clear();
         changed = true;
     }
     if changed {
         prog_tags.data = encode_sequence(&tags, limits.records)?;
         prog_tags.data_length = u32::try_from(prog_tags.data.len())
-            .map_err(|_| Error::Corrupted("ProgTags exceeds u32".into()))?;
+            .map_err(|_err| Error::Corrupted("ProgTags exceeds u32".into()))?;
         prog_tags.children.clear();
     }
     Ok(found)
@@ -1130,7 +1249,7 @@ pub(crate) fn encode_sequence(
     let mut output = Vec::new();
     output
         .try_reserve(capacity)
-        .map_err(|_| Error::AllocationFailed("record sequence serialization"))?;
+        .map_err(|_err| Error::AllocationFailed("record sequence serialization"))?;
     for record in records {
         output.extend_from_slice(&encode_record(record, limits)?);
     }
@@ -1158,15 +1277,15 @@ pub(crate) fn encode_record(
         ));
     }
     let length = u32::try_from(payload.len())
-        .map_err(|_| Error::Corrupted("record payload exceeds u32".into()))?;
+        .map_err(|_err| Error::Corrupted("record payload exceeds u32".into()))?;
     let mut bytes = Vec::new();
     bytes
         .try_reserve(total)
-        .map_err(|_| Error::AllocationFailed("record serialization"))?;
+        .map_err(|_err| Error::AllocationFailed("record serialization"))?;
     bytes.extend_from_slice(&((record.instance << 4) | (record.version & 0x0f)).to_le_bytes());
     bytes.extend_from_slice(&record.record_type_raw.to_le_bytes());
     bytes.extend_from_slice(&length.to_le_bytes());
-    bytes.extend_from_slice(&payload);
+    bytes.extend_from_slice(payload);
     Ok(bytes)
 }
 
@@ -1188,10 +1307,10 @@ fn append_leaf_record(
         ));
     }
     let length = u32::try_from(payload.len())
-        .map_err(|_| Error::Corrupted("record payload exceeds u32".into()))?;
+        .map_err(|_err| Error::Corrupted("record payload exceeds u32".into()))?;
     output
         .try_reserve(total)
-        .map_err(|_| Error::AllocationFailed("font record serialization"))?;
+        .map_err(|_err| Error::AllocationFailed("font record serialization"))?;
     output.extend_from_slice(&((instance << 4) | (version & 0x0f)).to_le_bytes());
     output.extend_from_slice(&record_type.to_le_bytes());
     output.extend_from_slice(&length.to_le_bytes());
@@ -1199,6 +1318,10 @@ fn append_leaf_record(
     Ok(())
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "`atom` callers pass fixed tiny payloads (4 or 68 bytes), far below the u32 length field range"
+)]
 fn atom(kind: RecordType, instance: u16, data: Vec<u8>) -> Record {
     Record {
         record_type: kind,

@@ -76,6 +76,10 @@ impl ChangeSet {
     }
 
     /// Apply the inverse operations to the exact committed target snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision() != self.target {
             return invalid("cannot undo against a different master-layout revision");
@@ -99,6 +103,10 @@ impl ChangeSet {
     }
 
     /// Reapply the operations to the exact committed source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision() != self.base {
             return invalid("cannot redo against a different master-layout revision");
@@ -141,6 +149,7 @@ impl Commit {
         &self.changes
     }
 
+    #[must_use]
     pub fn into_parts(self) -> (Snapshot, ChangeSet) {
         (self.snapshot, self.changes)
     }
@@ -178,6 +187,12 @@ impl<'a> View<'a> {
         self.revision
     }
 
+    /// Find master records in the transaction-local tree in deterministic
+    /// depth-first order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record tree is malformed.
     pub fn inventory(self) -> Result<Inventory> {
         super::inventory::inventory(self.record)
     }
@@ -242,18 +257,26 @@ impl Transaction {
     }
 
     /// Capture the current validated candidate as an immutable snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn snapshot(&self) -> Result<Snapshot> {
         snapshot_from_root(self.context(), self.root.clone(), self.source.limits)
     }
 
     /// Insert one child at a checked position under `parent`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add(&mut self, parent: impl Into<Path>, index: usize, record: Record) -> Result<()> {
-        let parent = parent.into();
+        let parent_path = parent.into();
         let limits = self.source.limits;
         let _ = codec::encode(&record, limits)?;
         let mut candidate = self.root.clone();
         let child_count = {
-            let target = locate_mut(&mut candidate, parent.as_slice(), limits)?;
+            let target = locate_mut(&mut candidate, parent_path.as_slice(), limits)?;
             codec::materialize(target, limits)?;
             target.children.len()
         };
@@ -261,12 +284,12 @@ impl Transaction {
         if index > child_count {
             return invalid("master-layout insertion index is out of range");
         }
-        let target = locate_mut(&mut candidate, parent.as_slice(), limits)?;
+        let target = locate_mut(&mut candidate, parent_path.as_slice(), limits)?;
         target.children.insert(index, record.clone());
         codec::sync(&mut candidate, limits)?;
         self.root = candidate;
         self.changes.push(Change::Add {
-            parent,
+            parent: parent_path,
             index,
             record,
         });
@@ -274,39 +297,56 @@ impl Transaction {
     }
 
     /// Append one child to a container.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn append(&mut self, parent: impl Into<Path>, record: Record) -> Result<()> {
-        let parent = parent.into();
-        let index = child_count(&mut self.root, parent.as_slice(), self.source.limits)?;
-        self.add(parent, index, record)
+        let parent_path = parent.into();
+        let index = child_count(&mut self.root, parent_path.as_slice(), self.source.limits)?;
+        self.add(parent_path, index, record)
     }
 
     /// Remove one child. The source snapshot remains unchanged even if the
     /// resulting candidate later fails validation at commit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove(&mut self, path: impl Into<Path>) -> Result<Record> {
-        let path = path.into();
+        let removal_path = path.into();
         let limits = self.source.limits;
         let mut candidate = self.root.clone();
-        let removed = remove_at(&mut candidate, path.as_slice(), limits)?;
+        let removed = remove_at(&mut candidate, removal_path.as_slice(), limits)?;
         codec::sync(&mut candidate, limits)?;
         self.root = candidate;
         self.changes.push(Change::Remove {
-            path,
+            path: removal_path,
             record: removed.clone(),
         });
         Ok(removed)
     }
 
     /// Replace one record in place, including the root when `path` is empty.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace(&mut self, path: impl Into<Path>, record: Record) -> Result<Record> {
-        let path = path.into();
+        let target_path = path.into();
         let limits = self.source.limits;
         let _ = codec::encode(&record, limits)?;
         let mut candidate = self.root.clone();
-        let before = replace_at(&mut candidate, path.as_slice(), record.clone(), limits)?;
+        let before = replace_at(
+            &mut candidate,
+            target_path.as_slice(),
+            record.clone(),
+            limits,
+        )?;
         codec::sync(&mut candidate, limits)?;
         self.root = candidate;
         self.changes.push(Change::Replace {
-            path,
+            path: target_path,
             before: before.clone(),
             after: record,
         });
@@ -314,6 +354,10 @@ impl Transaction {
     }
 
     /// Validate and publish a new immutable snapshot atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn commit(self) -> Result<Commit> {
         let limits = self.source.limits;
         let bytes = codec::encode(&self.root, limits)?;
@@ -337,11 +381,16 @@ impl Transaction {
     }
 
     /// Alias for callers using move-owned writer terminology.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn finish(self) -> Result<Commit> {
         self.commit()
     }
 
     /// Discard the private candidate and recover the source snapshot.
+    #[must_use]
     pub fn rollback(self) -> Snapshot {
         self.source
     }
@@ -438,11 +487,11 @@ fn snapshot_from_root(
 ) -> Result<Snapshot> {
     codec::sync(&mut root, limits)?;
     let bytes = codec::encode(&root, limits)?;
-    let root = codec::parse(&bytes, limits)?;
-    validation::validate(context, &root, limits)?;
+    let reparsed = codec::parse(&bytes, limits)?;
+    validation::validate(context, &reparsed, limits)?;
     Ok(Snapshot {
         context,
-        root,
+        root: reparsed,
         bytes,
         limits,
     })

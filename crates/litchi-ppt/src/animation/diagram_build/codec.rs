@@ -13,6 +13,10 @@ impl Build {
     pub const RECORD_LEN: usize = HEADER_LEN + BUILD_PAYLOAD_LEN;
 
     /// Parse a shared `BuildAtom` child.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_record(record: &Record) -> Result<Self> {
         validate_atom(
             record,
@@ -32,6 +36,10 @@ impl Build {
     }
 
     /// Parse one exact serialized `BuildAtom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() != Self::RECORD_LEN {
             return Err(Error::Corrupted(format!(
@@ -48,6 +56,7 @@ impl Build {
     }
 
     /// Serialize the fixed `BuildAtom` payload.
+    #[must_use]
     pub const fn to_payload(self) -> [u8; BUILD_PAYLOAD_LEN] {
         let kind = self.kind().raw().to_le_bytes();
         let build_id = self.build_id.to_le_bytes();
@@ -73,6 +82,11 @@ impl Build {
     }
 
     /// Convert to the generic PPT record representation.
+    #[must_use]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "`BUILD_PAYLOAD_LEN` is a compile-time 16-byte constant, so it always fits in `u32`"
+    )]
     pub fn to_record(self) -> Record {
         let data = self.to_payload().to_vec();
         Record {
@@ -87,6 +101,7 @@ impl Build {
     }
 
     /// Serialize the complete `BuildAtom` record.
+    #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(Self::RECORD_LEN);
         bytes.extend_from_slice(&encode_header(
@@ -104,6 +119,10 @@ impl Atom {
     pub const RECORD_LEN: usize = HEADER_LEN + ATOM_PAYLOAD_LEN;
 
     /// Parse a `DiagramBuildAtom` child.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_record(record: &Record) -> Result<Self> {
         validate_atom(
             record,
@@ -115,6 +134,10 @@ impl Atom {
     }
 
     /// Parse one exact serialized `DiagramBuildAtom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() != Self::RECORD_LEN {
             return Err(Error::Corrupted(format!(
@@ -133,11 +156,17 @@ impl Atom {
     }
 
     /// Serialize the fixed `DiagramBuildAtom` payload.
+    #[must_use]
     pub const fn to_payload(self) -> [u8; ATOM_PAYLOAD_LEN] {
         self.build_type.raw().to_le_bytes()
     }
 
     /// Convert to the generic PPT record representation.
+    #[must_use]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "`ATOM_PAYLOAD_LEN` is a compile-time 4-byte constant, so it always fits in `u32`"
+    )]
     pub fn to_record(self) -> Record {
         let data = self.to_payload().to_vec();
         Record {
@@ -152,6 +181,7 @@ impl Atom {
     }
 
     /// Serialize the complete `DiagramBuildAtom` record.
+    #[must_use]
     pub fn to_bytes(self) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(Self::RECORD_LEN);
         bytes.extend_from_slice(&encode_header(
@@ -169,6 +199,10 @@ impl Container {
     pub const RECORD_LEN: usize = HEADER_LEN + CONTAINER_PAYLOAD_LEN;
 
     /// Parse one typed diagram-build container from a generic record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_record(record: &Record) -> Result<Self> {
         validate_container(record)?;
         let build = Build::parse_record(&record.children[0])?;
@@ -177,11 +211,19 @@ impl Container {
     }
 
     /// Parse one exact serialized diagram-build container.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_bytes(bytes: &[u8]) -> Result<Self> {
         Self::parse_bytes_with_limits(bytes, Limits::default())
     }
 
     /// Parse one exact container subject to an explicit allocation/size bound.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_bytes_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
         if bytes.len() > limits.max_record_bytes {
             return Err(Error::InvalidFormat(
@@ -205,6 +247,7 @@ impl Container {
     }
 
     /// Serialize the complete container, including both fixed child records.
+    #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         let build = self.build().to_bytes();
         let atom = self.atom().to_bytes();
@@ -221,6 +264,11 @@ impl Container {
     }
 
     /// Convert to the generic PPT record representation.
+    #[must_use]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "`CONTAINER_PAYLOAD_LEN` is a compile-time 36-byte constant, so it always fits in `u32`"
+    )]
     pub fn to_record(self) -> Record {
         let build = self.build().to_record();
         let atom = self.atom().to_record();
@@ -240,19 +288,28 @@ impl Container {
 }
 
 /// Parse the typed diagram-build container from a generic PPT record.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_record(record: &Record) -> Result<Container> {
     Container::parse_record(record)
 }
 
 /// Parse one exact serialized diagram-build container.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_bytes(bytes: &[u8]) -> Result<Container> {
     Container::parse_bytes(bytes)
 }
 
 fn read_u32(data: &[u8], offset: usize) -> u32 {
-    u32::from_le_bytes(
-        data[offset..offset + 4]
-            .try_into()
-            .expect("validated length"),
-    )
+    u32::from_le_bytes([
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+    ])
 }

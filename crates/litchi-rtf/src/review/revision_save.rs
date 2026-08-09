@@ -12,20 +12,27 @@ pub struct RevisionSaveMetadata {
 }
 
 impl RevisionSaveMetadata {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(ids: Vec<u32>, root: Option<u32>) -> RtfResult<Self> {
         let metadata = Self { ids, root };
         metadata.validate()?;
         Ok(metadata)
     }
 
+    #[must_use]
     pub fn ids(&self) -> &[u32] {
         &self.ids
     }
 
+    #[must_use]
     pub fn root(&self) -> Option<u32> {
         self.root
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_id(&mut self, id: u32) -> RtfResult<()> {
         validate_id(id)?;
         if self.ids.len() >= MAX_REVISION_SAVE_IDS {
@@ -41,11 +48,13 @@ impl RevisionSaveMetadata {
         self.ids.push(id);
         Ok(())
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_root(&mut self, root: Option<u32>) -> RtfResult<()> {
-        if let Some(root) = root {
-            validate_id(root)?;
-            if !self.ids.is_empty() && !self.ids.contains(&root) {
+        if let Some(root_id) = root {
+            validate_id(root_id)?;
+            if !self.ids.is_empty() && !self.ids.contains(&root_id) {
                 return Err(RtfError::MalformedDocument(
                     "RTF revision root must occur in the revision-save table".to_string(),
                 ));

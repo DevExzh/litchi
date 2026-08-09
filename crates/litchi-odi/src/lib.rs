@@ -9,5 +9,5 @@ mod model;
 mod package;
 
 pub use facade::{Builder, Image};
-pub use flat::FlatImage;
+pub use flat::{FlatImage, FlatImageCommit, FlatImagePatch, FlatImageTransaction, FrameChange};
 pub use model::{frame, source};

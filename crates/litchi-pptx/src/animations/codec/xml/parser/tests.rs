@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::{parse_processed_timing, parse_recursive_timing_tree};
 
 const PRESENTATIONML_NS: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";

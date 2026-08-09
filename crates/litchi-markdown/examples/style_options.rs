@@ -1,3 +1,8 @@
+#![allow(
+    clippy::print_stdout,
+    reason = "this command-line example intentionally prints its results"
+)]
+
 //! Compare `MarkdownOptions` style variants on a single input.
 //!
 //! Renders a tiny `MathSnippet` (a subscript fragment + a superscript fragment +
@@ -14,8 +19,6 @@
 //! ```bash
 //! cargo run -p litchi-markdown --example style_options
 //! ```
-use std::fmt::Write as _;
-
 use litchi_core::Result;
 use litchi_markdown::{
     FormulaStyle, MarkdownOptions, ScriptStyle, StrikethroughStyle, TableStyle, ToMarkdown,
@@ -46,52 +49,74 @@ impl ToMarkdown for MathSnippet {
         // back to original chars where no Unicode equivalent exists.
         match options.script_style {
             ScriptStyle::Html => {
-                writeln!(out, "x<sub>{}</sub>", self.subscript).unwrap();
-                writeln!(out, "x<sup>{}</sup>", self.superscript).unwrap();
+                out.push_str("x<sub>");
+                out.push_str(&self.subscript);
+                out.push_str("</sub>\nx<sup>");
+                out.push_str(&self.superscript);
+                out.push_str("</sup>\n");
             },
             ScriptStyle::Unicode => {
-                writeln!(out, "x{}", convert_to_subscript(&self.subscript)).unwrap();
-                writeln!(out, "x{}", convert_to_superscript(&self.superscript)).unwrap();
+                out.push('x');
+                out.push_str(&convert_to_subscript(&self.subscript));
+                out.push('\n');
+                out.push('x');
+                out.push_str(&convert_to_superscript(&self.superscript));
+                out.push('\n');
             },
         }
 
         // --- Formula rendering ------------------------------------------------
         match options.formula_style {
-            FormulaStyle::LaTeX => writeln!(out, "Inline: \\({}\\)", self.formula).unwrap(),
-            FormulaStyle::Dollar => writeln!(out, "Inline: ${}$", self.formula).unwrap(),
+            FormulaStyle::LaTeX => {
+                out.push_str("Inline: \\(");
+                out.push_str(&self.formula);
+                out.push_str(")\n");
+            },
+            FormulaStyle::Dollar => {
+                out.push_str("Inline: $");
+                out.push_str(&self.formula);
+                out.push_str("$\n");
+            },
         }
 
         // --- Strikethrough sample (so the option isn't silent) ---------------
         match options.strikethrough_style {
-            StrikethroughStyle::Markdown => writeln!(out, "~~old~~").unwrap(),
-            StrikethroughStyle::Html => writeln!(out, "<del>old</del>").unwrap(),
+            StrikethroughStyle::Markdown => out.push_str("~~old~~\n"),
+            StrikethroughStyle::Html => out.push_str("<del>old</del>\n"),
         }
 
         // --- Single-cell table ----------------------------------------------
         match options.table_style {
             TableStyle::Markdown => {
-                writeln!(out, "| Header |").unwrap();
-                writeln!(out, "|--------|").unwrap();
-                writeln!(out, "| {} |", self.cell).unwrap();
+                out.push_str("| Header |\n|--------|\n| ");
+                out.push_str(&self.cell);
+                out.push_str(" |\n");
             },
             TableStyle::MinimalHtml => {
-                writeln!(
-                    out,
-                    "<table><tr><th>Header</th></tr><tr><td>{}</td></tr></table>",
-                    self.cell
-                )
-                .unwrap();
+                out.push_str("<table><tr><th>Header</th></tr><tr><td>");
+                out.push_str(&self.cell);
+                out.push_str("</td></tr></table>\n");
             },
             TableStyle::StyledHtml => {
                 let pad = " ".repeat(options.html_table_indent);
-                writeln!(out, "<table>").unwrap();
-                writeln!(out, "{pad}<tr>").unwrap();
-                writeln!(out, "{pad}{pad}<th>Header</th>").unwrap();
-                writeln!(out, "{pad}</tr>").unwrap();
-                writeln!(out, "{pad}<tr>").unwrap();
-                writeln!(out, "{pad}{pad}<td>{}</td>", self.cell).unwrap();
-                writeln!(out, "{pad}</tr>").unwrap();
-                writeln!(out, "</table>").unwrap();
+                out.push_str("<table>\n");
+                out.push_str(&pad);
+                out.push_str("<tr>\n");
+                out.push_str(&pad);
+                out.push_str(&pad);
+                out.push_str("<th>Header</th>\n");
+                out.push_str(&pad);
+                out.push_str("</tr>\n");
+                out.push_str(&pad);
+                out.push_str("<tr>\n");
+                out.push_str(&pad);
+                out.push_str(&pad);
+                out.push_str("<td>");
+                out.push_str(&self.cell);
+                out.push_str("</td>\n");
+                out.push_str(&pad);
+                out.push_str("</tr>\n");
+                out.push_str("</table>\n");
             },
         }
 

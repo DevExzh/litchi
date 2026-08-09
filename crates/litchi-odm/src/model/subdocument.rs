@@ -1,9 +1,117 @@
-//! Referenced subdocument semantics.
+//! Inert referenced-subdocument semantics.
+
+/// A classified, inert subdocument target.
+///
+/// The library never opens, resolves, fetches, or executes either variant.
+/// `Package` is restricted to a relative package path; all other URI-like or
+/// unsafe paths stay explicitly external.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Target {
+    /// A safe relative path in the master document's package namespace.
+    Package(String),
+    /// An external, absolute, URI-like, or otherwise unsafe target.
+    External(String),
+}
+
+impl Target {
+    /// Returns the original reference text without resolving it.
+    #[must_use]
+    pub fn href(&self) -> &str {
+        match self {
+            Self::Package(href) | Self::External(href) => href,
+        }
+    }
+
+    /// Returns whether this target is deliberately classified as external.
+    #[must_use]
+    pub const fn is_external(&self) -> bool {
+        matches!(self, Self::External(_))
+    }
+}
+
+/// An ordered subdocument reference bound to its containing section.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Reference {
+    section: String,
+    target: Target,
+}
+
+impl Reference {
+    pub(crate) fn new(section: String, href: String) -> Self {
+        Self {
+            section,
+            target: classify_target(href),
+        }
+    }
+
+    /// Returns the containing `text:section` name.
+    #[must_use]
+    pub fn section(&self) -> &str {
+        &self.section
+    }
+
+    /// Returns the classified inert target.
+    #[must_use]
+    pub const fn target(&self) -> &Target {
+        &self.target
+    }
+
+    /// Returns the original target text without resolving it.
+    #[must_use]
+    pub fn href(&self) -> &str {
+        self.target.href()
+    }
+}
 
 /// A referenced master-document subdocument.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Subdocument {
     href: String,
+}
+
+fn classify_target(href: String) -> Target {
+    if is_safe_package_path(&href) {
+        Target::Package(href)
+    } else {
+        Target::External(href)
+    }
+}
+
+fn is_safe_package_path(href: &str) -> bool {
+    !href.is_empty()
+        && !href.starts_with('/')
+        && !href.starts_with('\\')
+        && !href.starts_with("//")
+        && !href.contains('\\')
+        && !href.contains(':')
+        && href
+            .split('/')
+            .all(|segment| !segment.is_empty() && segment != "." && segment != "..")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Reference, Target};
+
+    #[test]
+    fn classifies_only_safe_relative_paths_as_package_targets() {
+        assert!(matches!(
+            Reference::new("A".to_string(), "Chapters/a.odt".to_string()).target(),
+            Target::Package(_)
+        ));
+        for href in [
+            "../a.odt",
+            "/a.odt",
+            "https://example.test/a.odt",
+            "file:a.odt",
+        ] {
+            assert!(matches!(
+                Reference::new("A".to_string(), href.to_string()).target(),
+                Target::External(_)
+            ));
+        }
+    }
 }
 
 impl Subdocument {

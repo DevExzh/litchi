@@ -4,7 +4,7 @@ use super::{Builder, validation};
 use crate::core::{PackageWriter, Structure};
 use litchi_core::Result;
 
-pub(super) fn build(builder: Builder) -> Result<Vec<u8>> {
+pub(super) fn build(builder: &Builder) -> Result<Vec<u8>> {
     validation::validate(builder.snapshot())?;
 
     let mut writer = PackageWriter::new();

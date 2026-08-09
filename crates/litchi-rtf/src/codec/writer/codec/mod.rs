@@ -5,7 +5,64 @@
 //! This module provides functionality to write RTF documents from structured data.
 //! It supports all RTF features including formatting, tables, pictures, fields, lists, and more.
 
-use super::super::*;
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items stay grouped by RTF feature area rather than by item kind"
+)]
+use super::super::{
+    AbstractNumberingCleanupStatus, Alignment, AnimatedTextEffect, Annotation, AnnotationType,
+    AssociatedCharacterBaseline, AssociatedUnderlineStyle, BodyStoryEvent, Bookmark, BookmarkTable,
+    Border, BorderStyle, Borders, Cell, CellStoryEvent, CharacterBaseline, CharacterExpansion,
+    CharacterGrid, CharacterType, ColorTable, CustomXmlTag, DefaultFormattingDestination,
+    DocumentAsianGridCompatibility, DocumentAutoFormatType, DocumentBookletPrinting,
+    DocumentCompatibilityPolicy, DocumentDataStore, DocumentDefaultFonts,
+    DocumentDefaultFormatting, DocumentDrawingGrid, DocumentEastAsianCompatibility,
+    DocumentEmbeddingPolicies, DocumentExternalReferences, DocumentFileSettings, DocumentGenerator,
+    DocumentHyphenation, DocumentInfo, DocumentJustificationMode, DocumentKinsoku,
+    DocumentLanguageDefaults, DocumentLegacyLayoutCompatibility, DocumentLineSpacingCompatibility,
+    DocumentMathProperties, DocumentOrigin, DocumentOutputSettings, DocumentPrintLayoutSettings,
+    DocumentPrivacyPolicies, DocumentProcessingSettings, DocumentProtection,
+    DocumentReadOnlyRecommendation, DocumentRenderingOrientation, DocumentRenderingSettings,
+    DocumentReviewDisplay, DocumentRevisionPolicies, DocumentSavePreferences,
+    DocumentStyleListFilter, DocumentStylePolicies, DocumentStyleRestrictions,
+    DocumentStyleSortMethod, DocumentTableLayoutCompatibility, DocumentTheme,
+    DocumentThemeLanguages, DocumentThumbnailPreference, DocumentVariable, DocumentView,
+    DocumentWindowCaption, DocumentWord2003Compatibility, DocumentWriteReservations,
+    DocumentXmlPolicies, DocumentXslTransform, DocumentXslTransformUsage, EditableRegion,
+    EmbeddedFont, EmbeddedFontFormat, EmbeddedObject, EmphasisMark, EndnoteRestart, Field,
+    FieldOwner, FieldType, FileLocation, FileTable, FloatingTablePosition, Font, FontFamily,
+    FontPitch, FontTable, FootnoteRestart, FormField, FormFieldType, Formatting,
+    GeneratedListMarker, GeneratedListMarkerKind, HeaderFooter, HeaderFooterType, HtmlEmailVersion,
+    ImageType, IndexPageReference, LatentStyles, LegacyCalloutAttachment, LegacyCalloutType,
+    LegacyDrawing, LegacyDrawingArrow, LegacyDrawingArrowFill, LegacyDrawingColor,
+    LegacyDrawingGeometry, LegacyDrawingLineStyle, LegacyDrawingPoint, LegacyDrawingPrimitive,
+    LegacyDrawingProperties, LegacyHorizontalAnchor, LegacyNumberingAlignment,
+    LegacyNumberingFormat, LegacyParagraphNumbering, LegacyParagraphNumberingAlignment,
+    LegacyParagraphNumberingBidi, LegacyParagraphNumberingFormat, LegacyParagraphNumberingLevel,
+    LegacyParagraphNumberingUnderline, LegacySectionNumbering, LegacyTextBox, LegacyTextDirection,
+    LegacyVerticalAnchor, List, ListFollow, ListJustification, ListLevel, ListLevelType,
+    ListOverrideTable, ListTable, MAX_EMBEDDED_OBJECTS, MAX_LEGACY_DRAWINGS,
+    MAX_PICTURE_COMPATIBILITY_RECORDS, MAX_TABLE_CELLS_PER_ROW, MAX_TABLE_NESTING_DEPTH, MailMerge,
+    MathElement, MathElementRole, MathObject, MathProperties, MathPropertyName, MathRun,
+    MathStructure, MathStructureChild, MathStructureKind, MathZone, MathZoneKind, NavigationEntry,
+    Note, NoteNumberingStyle, NoteOptions, NotePlacement, NoteSeparatorElement, NoteSeparatorKind,
+    NoteSeparatorTable, ObjectKind, ObjectResultKind, PageBorders, PageOrientation, Paragraph,
+    ParagraphFontAlignment, ParagraphGroupPropertyTable, ParagraphWrapping, Picture,
+    PictureCompatibilityKind, PictureCompatibilityRecord, PictureShapeProperties, PresentNoteKinds,
+    ProtectionRange, ProtectionUserTable, Revision, RevisionAuthor, RevisionMetadata,
+    RevisionSaveMetadata, RevisionType, Row, RtfDocument, RtfTimestamp, Section, SectionBreakType,
+    SectionFootnotePlacement, SectionLineNumberRestart, SectionNoteOptions, SectionRendering,
+    Shading, ShadingPattern, Shape, ShapeGroup, ShapeGroupChild, ShapeGroupInfo, ShapeProperty,
+    ShapeResult, ShapeThemeColor, ShapeType, SoftBreak, SoftBreakKind, StoryDrawing, StoryEvent,
+    StoryField, Style, StyleBlock, StyleSheet, StyleType, TabAlignment, TabLeader, TabStop, Table,
+    TableAutoformatFlag, TableCellBorders, TableCellMergeRole, TableCellTextFlow,
+    TableCellVerticalAlignment, TableDistanceUnit, TableEdgeDistances, TableHorizontalPosition,
+    TableHorizontalReference, TableIndentUnit, TablePreferredWidth, TablePreferredWidthUnit,
+    TableRowAlignment, TableRowBandIndex, TableRowBorders, TableRowCellDefaults, TableRowGeometry,
+    TableRowHeight, TableShading, TableVerticalPosition, TableVerticalReference, TextDirection,
+    UnderlineStyle, UserProperty, VerticalAlignment, XmlNamespace, annotation, document_variable,
+    field, form_field, navigation_entry, section, user_property,
+};
 use litchi_codepage::Mbcs;
 use std::collections::HashSet;
 use std::io::{self, Write};
@@ -62,7 +119,10 @@ impl Charset {
     pub const WINDOWS_1252: Self = Self::Ansi(Mbcs::WINDOWS_1252);
 
     /// Validate a raw byte-stream page for an ANSI declaration.
-    pub fn ansi(page: u32) -> std::result::Result<Self, litchi_codepage::Error> {
+    ///
+    /// # Errors
+    /// Returns an error when the code page is unknown or unsupported.
+    pub fn ansi(page: u32) -> Result<Self, litchi_codepage::Error> {
         Mbcs::require(page).map(Self::Ansi)
     }
 }
@@ -88,47 +148,44 @@ pub struct RtfWriter<W: Write> {
     /// Writer options
     options: WriterOptions,
     /// Current indentation level (reserved for formatted output)
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "reserved for formatted output")]
     indent_level: usize,
     /// Font table
     font_table: FontTable<'static>,
     /// Color table
     color_table: ColorTable,
-    legacy_paragraph_numbering: Vec<crate::LegacyParagraphNumbering<'static>>,
+    legacy_paragraph_numbering: Vec<LegacyParagraphNumbering<'static>>,
 }
 
 #[derive(Clone, Copy)]
 enum BodyEventKind<'b, 'a> {
-    Shape(&'b crate::Shape<'a>),
-    ShapeGroup(&'b crate::ShapeGroup<'a>),
-    Object(&'b crate::EmbeddedObject<'a>, &'b [crate::Picture<'a>]),
-    PictureCompatibility(
-        &'b crate::PictureCompatibilityRecord,
-        &'b crate::Picture<'a>,
-    ),
-    GeneratedListMarker(&'b crate::GeneratedListMarker<'a>),
-    LegacyTextBox(&'b crate::LegacyTextBox<'a>),
-    LegacyDrawing(&'b crate::LegacyDrawing<'a>),
-    NavigationEntry(&'b crate::NavigationEntry<'a>),
+    Shape(&'b Shape<'a>),
+    ShapeGroup(&'b ShapeGroup<'a>),
+    Object(&'b EmbeddedObject<'a>, &'b [Picture<'a>]),
+    PictureCompatibility(&'b PictureCompatibilityRecord, &'b Picture<'a>),
+    GeneratedListMarker(&'b GeneratedListMarker<'a>),
+    LegacyTextBox(&'b LegacyTextBox<'a>),
+    LegacyDrawing(&'b LegacyDrawing<'a>),
+    NavigationEntry(&'b NavigationEntry<'a>),
     BookmarkStart(&'b Bookmark<'a>),
     BookmarkEnd(&'b Bookmark<'a>),
-    CustomXmlOpen(&'b crate::CustomXmlTag<'a>),
-    CustomXmlClose(&'b crate::CustomXmlTag<'a>),
-    MathZone(&'b crate::MathZone<'a>),
-    ProtectionRangeStart(&'b crate::ProtectionRange<'a>),
-    ProtectionRangeEnd(&'b crate::ProtectionRange<'a>),
-    EditableRegionStart(&'b crate::EditableRegion<'a>),
-    EditableRegionEnd(&'b crate::EditableRegion<'a>),
-    SoftBreak(crate::SoftBreak),
+    CustomXmlOpen(&'b CustomXmlTag<'a>),
+    CustomXmlClose(&'b CustomXmlTag<'a>),
+    MathZone(&'b MathZone<'a>),
+    ProtectionRangeStart(&'b ProtectionRange<'a>),
+    ProtectionRangeEnd(&'b ProtectionRange<'a>),
+    EditableRegionStart(&'b EditableRegion<'a>),
+    EditableRegionEnd(&'b EditableRegion<'a>),
+    SoftBreak(SoftBreak),
     AnnotationStart(&'b Annotation<'a>),
     AnnotationEnd(&'b Annotation<'a>),
     Note(&'b Note<'a>),
     RevisionStart(&'b Revision<'a>),
     RevisionEnd,
     RevisionDeletion(&'b Revision<'a>),
-    FormFieldStart(&'b crate::FormField<'a>),
+    FormFieldStart(&'b FormField<'a>),
     FormFieldEnd,
-    GenericField(&'b crate::Field<'a>),
+    GenericField(&'b Field<'a>),
     PageBreak,
     ColumnBreak,
     SectionBreak(Option<&'b Section<'a>>),
@@ -159,8 +216,8 @@ fn invalid_story_reference() -> io::Error {
 /// Resolve and claim an indexed story resource without trusting parallel-vector invariants.
 fn take_story_item<'a, T>(items: &'a [T], seen: &mut [bool], index: usize) -> io::Result<&'a T> {
     let item = items.get(index).ok_or_else(invalid_story_reference)?;
-    let seen = seen.get_mut(index).ok_or_else(invalid_story_reference)?;
-    if std::mem::replace(seen, true) {
+    let seen_slot = seen.get_mut(index).ok_or_else(invalid_story_reference)?;
+    if std::mem::replace(seen_slot, true) {
         return Err(invalid_story_reference());
     }
     Ok(item)
@@ -185,6 +242,9 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Serialize an immutable document snapshot.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write(&mut self, document: &crate::Document) -> io::Result<()> {
         if self.options == WriterOptions::default()
             && let Some(source) = document.model().preserved_source()
@@ -195,7 +255,10 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write a complete RTF document
-    pub fn write_document<'a>(&mut self, doc: &RtfDocument<'a>) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
+    pub fn write_document(&mut self, doc: &RtfDocument<'_>) -> io::Result<()> {
         if doc
             .opaque_nodes()
             .iter()
@@ -234,7 +297,7 @@ impl<W: Write> RtfWriter<W> {
                     panose: f.panose,
                     pitch: f.pitch,
                     code_page: f.code_page,
-                    embedded: f.embedded.clone().map(crate::EmbeddedFont::into_owned),
+                    embedded: f.embedded.clone().map(EmbeddedFont::into_owned),
                     bidi: f.bidi,
                 })
                 .collect(),
@@ -248,7 +311,7 @@ impl<W: Write> RtfWriter<W> {
             .legacy_paragraph_numbering_records()
             .iter()
             .cloned()
-            .map(crate::LegacyParagraphNumbering::into_owned)
+            .map(LegacyParagraphNumbering::into_owned)
             .collect();
 
         // Write document header
@@ -388,7 +451,7 @@ impl<W: Write> RtfWriter<W> {
         let first_section_is_boundary_scoped = doc.body_story_events().iter().any(|event| {
             matches!(
                 event,
-                crate::BodyStoryEvent::SectionBreak(section_break)
+                BodyStoryEvent::SectionBreak(section_break)
                     if section_break.next_section == Some(0)
             )
         });

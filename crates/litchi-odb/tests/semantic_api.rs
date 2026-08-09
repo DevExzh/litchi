@@ -8,8 +8,9 @@ use litchi_odb::{Builder, Database, connection::Connection, query::Query};
 const COMPACT_CONTENT: &str = concat!(
     r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
     r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+    r#"xmlns:db="urn:oasis:names:tc:opendocument:xmlns:database:1.0" "#,
     r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.3">"#,
-    r#"<office:body><office:database><text:p>compact</text:p></office:database></office:body>"#,
+    r#"<office:body><office:database><db:data-source/><text:p>compact</text:p></office:database></office:body>"#,
     r#"</office:document-content>"#,
 );
 
@@ -22,8 +23,9 @@ const NONCOMPACT_CONTENT: &str = concat!(
 const SEMANTIC_WHITESPACE_CONTENT: &str = concat!(
     r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
     r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+    r#"xmlns:db="urn:oasis:names:tc:opendocument:xmlns:database:1.0" "#,
     r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.3">"#,
-    "<office:body><office:database><text:p>line one\n  line two</text:p></office:database>",
+    "<office:body><office:database><db:data-source/><text:p>line one\n  line two</text:p></office:database>",
     "</office:body></office:document-content>",
 );
 

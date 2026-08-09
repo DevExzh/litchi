@@ -1,4 +1,4 @@
-//! MS-PPT §2.8.3 PowerPoint 2002 animation hash atom.
+//! MS-PPT §2.8.3 `PowerPoint` 2002 animation hash atom.
 
 use crate::consts::RecordType;
 use crate::package::{Error, Result};
@@ -8,8 +8,12 @@ const HEADER_LEN: usize = 8;
 const PAYLOAD_LEN: usize = 4;
 const RECORD_LEN: usize = HEADER_LEN + PAYLOAD_LEN;
 
-/// Resource limit for parsing a HashCode10Atom record.
+/// Resource limit for parsing a `HashCode10Atom` record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`Hash10Limits` is the established public API name for the `HashCode10Atom` limits; renaming it would break downstream crates"
+)]
 pub struct Hash10Limits {
     /// Maximum accepted complete record size.
     pub max_record_bytes: usize,
@@ -23,24 +27,39 @@ impl Default for Hash10Limits {
     }
 }
 
-/// Exact MS-PPT §2.8.3 HashCode10Atom value.
+/// Exact MS-PPT §2.8.3 `HashCode10Atom` value.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`Hash10` is the established public API name for the `HashCode10Atom` value; renaming it would break downstream crates"
+)]
 pub struct Hash10 {
     hash: u32,
 }
 
 impl Hash10 {
     /// Construct an inert animation hash value.
+    #[must_use]
     pub const fn new(hash: u32) -> Self {
         Self { hash }
     }
 
     /// Raw hash value stored by the producing application.
+    #[must_use]
     pub const fn hash(self) -> u32 {
         self.hash
     }
 
-    /// Parse from the generic PowerPoint record model.
+    /// Parse from the generic `PowerPoint` record model.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record type, header fields, or payload length
+    /// do not match the fixed `HashCode10Atom` layout.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "`PAYLOAD_LEN` is a compile-time 4-byte constant, so it always fits in `u32`"
+    )]
     pub fn parse_record(record: &Record) -> Result<Self> {
         if record.record_type != RecordType::HashCode10Atom
             || record.record_type_raw != RecordType::HashCode10Atom.as_u16()
@@ -59,17 +78,28 @@ impl Hash10 {
         if !record.children.is_empty() {
             return corrupted("HashCode10Atom must not contain child records");
         }
-        Ok(Self::new(u32::from_le_bytes(
-            record.data[..4].try_into().expect("length checked"),
-        )))
+        Ok(Self::new(u32::from_le_bytes([
+            record.data[0],
+            record.data[1],
+            record.data[2],
+            record.data[3],
+        ])))
     }
 
     /// Parse one exact complete record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_bytes(bytes: &[u8]) -> Result<Self> {
         Self::parse_bytes_with_limits(bytes, Hash10Limits::default())
     }
 
     /// Parse one exact complete record with a caller-supplied input bound.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_bytes_with_limits(bytes: &[u8], limits: Hash10Limits) -> Result<Self> {
         if bytes.len() > limits.max_record_bytes {
             return corrupted("HashCode10Atom exceeds the configured record size limit");
@@ -88,11 +118,17 @@ impl Hash10 {
     }
 
     /// Exact four-byte payload.
+    #[must_use]
     pub const fn to_payload(self) -> [u8; PAYLOAD_LEN] {
         self.hash.to_le_bytes()
     }
 
     /// Serialize the complete normative record.
+    #[must_use]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "`PAYLOAD_LEN` is a compile-time 4-byte constant, so it always fits in `u32`"
+    )]
     pub fn to_bytes(self) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(RECORD_LEN);
         bytes.extend_from_slice(&0u16.to_le_bytes());
@@ -102,7 +138,12 @@ impl Hash10 {
         bytes
     }
 
-    /// Convert to the generic PowerPoint record representation.
+    /// Convert to the generic `PowerPoint` record representation.
+    #[must_use]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "`PAYLOAD_LEN` is a compile-time 4-byte constant, so it always fits in `u32`"
+    )]
     pub fn to_record(self) -> Record {
         Record {
             record_type: RecordType::HashCode10Atom,
@@ -121,6 +162,11 @@ fn corrupted<T>(message: impl Into<String>) -> Result<T> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use crate::animation::SlideAnimationExtension;
@@ -179,16 +225,16 @@ mod tests {
 
     #[test]
     fn generic_record_validation_rejects_type_length_and_children() {
-        let mut record = Hash10::new(9).to_record();
-        record.record_type_raw ^= 1;
-        assert!(Hash10::parse_record(&record).is_err());
+        let mut wrong_type = Hash10::new(9).to_record();
+        wrong_type.record_type_raw ^= 1;
+        assert!(Hash10::parse_record(&wrong_type).is_err());
 
-        let mut record = Hash10::new(9).to_record();
-        record.data_length = 3;
-        assert!(Hash10::parse_record(&record).is_err());
+        let mut wrong_length = Hash10::new(9).to_record();
+        wrong_length.data_length = 3;
+        assert!(Hash10::parse_record(&wrong_length).is_err());
 
-        let mut record = Hash10::new(9).to_record();
-        record.children.push(Hash10::new(1).to_record());
-        assert!(Hash10::parse_record(&record).is_err());
+        let mut extra_child = Hash10::new(9).to_record();
+        extra_child.children.push(Hash10::new(1).to_record());
+        assert!(Hash10::parse_record(&extra_child).is_err());
     }
 }

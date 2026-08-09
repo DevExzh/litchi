@@ -10,17 +10,6 @@ use std::path::Path;
 
 const POWERPOINT_DOCUMENT_STREAM: &[&str] = &["PowerPoint Document"];
 
-fn validate_powerpoint_document_stream<R: Read + Seek>(ole: &OleFile<R>) -> Result<()> {
-    if ole.exists(POWERPOINT_DOCUMENT_STREAM) && !ole.directory_exists(POWERPOINT_DOCUMENT_STREAM) {
-        return Ok(());
-    }
-
-    Err(Error::InvalidFormat(
-        "Not a valid PowerPoint document: PowerPoint Document stream not found or is not a stream"
-            .to_string(),
-    ))
-}
-
 impl Package<File> {
     /// Open a .ppt package from a file path.
     ///
@@ -36,11 +25,19 @@ impl Package<File> {
     /// let mut pkg = Package::open("presentation.ppt")?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         Self::open_with_limits(path, RecordLimits::default())
     }
 
     /// Open a `.ppt` package with explicit finite presentation-record limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: RecordLimits) -> Result<Self> {
         let file = File::open(path)?;
         Package::from_reader_with_limits(file, limits)
@@ -64,16 +61,24 @@ impl<R: Read + Seek> Package<R> {
     /// let pkg = Package::from_reader(file)?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_reader(reader: R) -> Result<Self> {
         Self::from_reader_with_limits(reader, RecordLimits::default())
     }
 
     /// Create a package whose presentation reads inherit explicit record limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_reader_with_limits(mut reader: R, record_limits: RecordLimits) -> Result<Self> {
         let original_position = reader.stream_position()?;
-        let input_bytes = reader.seek(SeekFrom::End(0))?;
+        let input_len = reader.seek(SeekFrom::End(0))?;
         reader.seek(SeekFrom::Start(original_position))?;
-        let input_bytes = usize::try_from(input_bytes).map_err(|_| {
+        let input_bytes = usize::try_from(input_len).map_err(|_err| {
             Error::ResourceLimit("PPT package size exceeds this platform".to_string())
         })?;
         if input_bytes > record_limits.max_package_bytes {
@@ -110,11 +115,19 @@ impl<R: Read + Seek> Package<R> {
     /// let pkg = Package::from_ole_file(ole)?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn from_ole_file(ole: OleFile<R>) -> Result<Self> {
         Self::from_ole_file_with_limits(ole, RecordLimits::default())
     }
 
     /// Wrap an already-parsed OLE file with explicit presentation-record limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn from_ole_file_with_limits(ole: OleFile<R>, record_limits: RecordLimits) -> Result<Self> {
         validate_powerpoint_document_stream(&ole)?;
 
@@ -135,6 +148,10 @@ impl<R: Read + Seek> Package<R> {
     /// let pres = pkg.presentation()?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn presentation(&mut self) -> Result<Presentation> {
         Presentation::from_ole_with_options(
             &mut self.ole,
@@ -144,11 +161,19 @@ impl<R: Read + Seek> Package<R> {
     }
 
     /// Get the main presentation using explicit password-to-open options.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn presentation_with_options(&mut self, options: OpenOptions<'_>) -> Result<Presentation> {
         Presentation::from_ole_with_options(&mut self.ole, options, self.record_limits)
     }
 
     /// Open the presentation with explicit record limits and no password.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn presentation_with_limits(&mut self, limits: RecordLimits) -> Result<Presentation> {
         Presentation::from_ole_with_options(
             &mut self.ole,
@@ -158,6 +183,10 @@ impl<R: Read + Seek> Package<R> {
     }
 
     /// Open the presentation with password options and explicit record limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn presentation_with_options_and_limits(
         &mut self,
         options: OpenOptions<'_>,
@@ -176,6 +205,10 @@ impl<R: Read + Seek> Package<R> {
     }
 
     /// Read the live document-comparison snapshot from the presentation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn document_comparison(&mut self) -> Result<crate::document_comparison::Snapshot> {
         self.presentation()?.document_comparison()
     }
@@ -189,12 +222,23 @@ impl<R: Read + Seek> Package<R> {
     }
 
     /// Read the legacy Custom XML Data Storage without resolving schema URIs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn custom_xml_data_store(
         &mut self,
     ) -> litchi_ole_common::custom_xml::Result<Option<litchi_ole_common::custom_xml::Store>> {
         litchi_ole_common::custom_xml::inspect(&mut self.ole)
     }
 
+    /// Read the legacy Summary Information property set stream.
+    ///
+    /// Returns `None` when the document does not contain the stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying OLE container cannot be read.
     pub fn summary_information(&mut self) -> Result<Option<Stream>> {
         match self
             .ole
@@ -208,12 +252,20 @@ impl<R: Read + Seek> Package<R> {
 
     /// Verify presentation XML signatures with the safe strict policy, without
     /// evaluating certificate trust or opening any VBA project stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     #[cfg(feature = "sign")]
     pub fn signatures(&mut self) -> litchi_sign::Result<Vec<litchi_sign::cfb::Report>> {
         self.signatures_with(&litchi_sign::Policy::strict())
     }
 
     /// Verify presentation XML signatures with an explicit trust-neutral policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     #[cfg(feature = "sign")]
     pub fn signatures_with(
         &mut self,
@@ -222,6 +274,13 @@ impl<R: Read + Seek> Package<R> {
         litchi_sign::cfb::verify(&mut self.ole, litchi_sign::cfb::Format::Ppt, policy)
     }
 
+    /// Read the legacy Document Summary Information property set stream.
+    ///
+    /// Returns `None` when the document does not contain the stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying OLE container cannot be read.
     pub fn document_summary_information(&mut self) -> Result<Option<Stream>> {
         match self
             .ole
@@ -233,9 +292,29 @@ impl<R: Read + Seek> Package<R> {
         }
     }
 
+    /// Read the user-defined properties section of the Document Summary
+    /// Information property set.
+    ///
+    /// Returns `None` when the document has no Document Summary Information
+    /// stream or no user-defined properties section.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying OLE container cannot be read.
     pub fn user_defined_properties(&mut self) -> Result<Option<Section>> {
         Ok(self
             .document_summary_information()?
             .and_then(|stream| stream.section(USER_DEFINED_PROPERTIES_FMTID).cloned()))
     }
+}
+
+fn validate_powerpoint_document_stream<R: Read + Seek>(ole: &OleFile<R>) -> Result<()> {
+    if ole.exists(POWERPOINT_DOCUMENT_STREAM) && !ole.directory_exists(POWERPOINT_DOCUMENT_STREAM) {
+        return Ok(());
+    }
+
+    Err(Error::InvalidFormat(
+        "Not a valid PowerPoint document: PowerPoint Document stream not found or is not a stream"
+            .to_string(),
+    ))
 }

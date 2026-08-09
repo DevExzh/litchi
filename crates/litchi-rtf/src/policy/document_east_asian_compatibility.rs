@@ -1,3 +1,7 @@
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent RTF feature flags stay flat for direct access"
+)]
 /// Passive Word 6-era East Asian typography compatibility requests.
 ///
 /// These flags are retained for round trips only. This crate does not apply
@@ -21,6 +25,7 @@ pub struct DocumentEastAsianCompatibility {
 
 impl DocumentEastAsianCompatibility {
     /// Return whether every compatibility request was omitted.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         !self.do_not_balance_sbcs_dbcs
             && !self.expand_spacing_at_shift_return

@@ -1,4 +1,4 @@
-//! WebVTT parts and contextual media-track OPC ownership.
+//! `WebVTT` parts and contextual media-track OPC ownership.
 
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{OpcPackage, PackURI, Part};
@@ -11,6 +11,10 @@ use super::validation::{parse_boolean, validate_relationship_id};
 use crate::{Error, Result};
 
 /// Discover one media picture's typed TracksInfo/narration metadata.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load_media(package: &OpcPackage, key: &MediaKey) -> Result<Option<Snapshot>> {
     let source_name = PackURI::new(&key.slide_part_name).map_err(Error::Uri)?;
     let source = package.get_part(&source_name)?;
@@ -34,6 +38,10 @@ pub fn load_media(package: &OpcPackage, key: &MediaKey) -> Result<Option<Snapsho
 }
 
 /// Publish a source-checked patch atomically to the owning slide part.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn apply_media_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
     let source_name = PackURI::new(&patch.source_part_name).map_err(Error::Uri)?;
     let source = package.get_part(&source_name)?;
@@ -59,6 +67,10 @@ pub fn apply_media_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snap
 }
 
 /// Publish a commit and return the validated post-publication snapshot.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn apply_media_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
     apply_media_patch(package, &commit.into_patch())
 }
@@ -174,8 +186,7 @@ fn resolve_caption_relationship(
     }
     if !part.rels().is_empty() {
         return Err(invalid(format!(
-            "caption track part '{}' has outbound relationships",
-            target
+            "caption track part '{target}' has outbound relationships"
         )));
     }
     Ok(CaptionTarget::Internal {
@@ -194,10 +205,10 @@ fn effective<'a>(
 }
 
 fn fingerprint(bytes: &[u8]) -> u64 {
-    let mut hash = 0xcbf29ce484222325u64;
+    let mut hash = 0xcbf2_9ce4_8422_2325u64;
     for byte in bytes {
         hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(0x100000001b3);
+        hash = hash.wrapping_mul(0x100_0000_01b3);
     }
     hash
 }

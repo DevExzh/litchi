@@ -22,16 +22,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Created animations:");
     println!(
         "  Shape 1: {:?}, duration={:?}",
-        &fade_in.effect, fade_in.duration
+        fade_in.effect, fade_in.duration
     );
     println!(
         "  Shape 2: {:?}, duration={:?}, delay={}ms",
-        &fly_in.effect, fly_in.duration, fly_in.delay
+        fly_in.effect, fly_in.duration, fly_in.delay
     );
-    println!(
-        "  Shape 3: {:?}, duration={:?}",
-        &zoom.effect, zoom.duration
-    );
+    println!("  Shape 3: {:?}, duration={:?}", zoom.effect, zoom.duration);
 
     // Build and serialize an OOXML timing sequence.
     let mut sequence = Sequence::new();

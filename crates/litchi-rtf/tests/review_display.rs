@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{DocumentReviewDisplay, RtfDocument, RtfWriter};
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
@@ -11,7 +20,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 #[test]
 fn parses_all_passive_review_display_flags_and_round_trips_in_stable_order() {
     let document =
-        RtfDocument::parse(r#"{\rtf1\donotshowinsdel\donotshowcomments\donotshowmarkup Body}"#)
+        RtfDocument::parse(r"{\rtf1\donotshowinsdel\donotshowcomments\donotshowmarkup Body}")
             .unwrap();
     assert_eq!(
         *document.review_display(),
@@ -40,7 +49,7 @@ fn parses_all_passive_review_display_flags_and_round_trips_in_stable_order() {
 
 #[test]
 fn typed_api_mutates_and_clears_fixed_size_metadata() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     assert!(document.review_display().is_empty());
     document.set_review_display(DocumentReviewDisplay {
         hide_markup: false,
@@ -56,16 +65,16 @@ fn typed_api_mutates_and_clears_fixed_size_metadata() {
 #[test]
 fn rejects_parameters_duplicates_starred_nested_and_late_flags() {
     for source in [
-        r#"{\rtf1\donotshowmarkup0 Body}"#,
-        r#"{\rtf1\donotshowcomments1 Body}"#,
-        r#"{\rtf1\donotshowinsdel-1 Body}"#,
-        r#"{\rtf1\donotshowmarkup\donotshowmarkup Body}"#,
-        r#"{\rtf1\donotshowcomments\donotshowcomments Body}"#,
-        r#"{\rtf1\donotshowinsdel\donotshowinsdel Body}"#,
-        r#"{\rtf1{\*\donotshowmarkup}Body}"#,
-        r#"{\rtf1{\*\donotshowcomments}Body}"#,
-        r#"{\rtf1{\donotshowinsdel nested}Body}"#,
-        r#"{\rtf1 Body\donotshowmarkup}"#,
+        r"{\rtf1\donotshowmarkup0 Body}",
+        r"{\rtf1\donotshowcomments1 Body}",
+        r"{\rtf1\donotshowinsdel-1 Body}",
+        r"{\rtf1\donotshowmarkup\donotshowmarkup Body}",
+        r"{\rtf1\donotshowcomments\donotshowcomments Body}",
+        r"{\rtf1\donotshowinsdel\donotshowinsdel Body}",
+        r"{\rtf1{\*\donotshowmarkup}Body}",
+        r"{\rtf1{\*\donotshowcomments}Body}",
+        r"{\rtf1{\donotshowinsdel nested}Body}",
+        r"{\rtf1 Body\donotshowmarkup}",
     ] {
         assert!(
             RtfDocument::parse(source).is_err(),

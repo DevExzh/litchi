@@ -58,11 +58,11 @@ fn flat_odp_malformed_inputs_are_typed_errors() {
         r#"<style:style style:name="dp1" style:family="drawing-page"><style:drawing-page-properties presentation:transition-type="manual"><presentation:sound/></style:drawing-page-properties></style:style>"#,
         r#"<draw:page draw:name="s" draw:style-name="dp1"/>"#,
     ));
-    assert_typed(document("", r#"<draw:page><draw:g></draw:page></draw:g>"#));
-    assert_typed(document("", r#"</office:presentation><draw:page/>"#));
-    assert_typed(document("", r#"<draw:page>&undefined;</draw:page>"#));
+    assert_typed(document("", r"<draw:page><draw:g></draw:page></draw:g>"));
+    assert_typed(document("", r"</office:presentation><draw:page/>"));
+    assert_typed(document("", r"<draw:page>&undefined;</draw:page>"));
     assert_typed(
-        document("", r#"<draw:page/>"#)
+        document("", r"<draw:page/>")
             .into_iter()
             .chain([0xff])
             .collect(),

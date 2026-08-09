@@ -704,7 +704,7 @@ fn apply_replacements(source: &[u8], mut replacements: Vec<Replacement>) -> Resu
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("ActiveX XML source offset overflow"))
+        .map_err(|_err| invalid("ActiveX XML source offset overflow"))
 }
 
 fn opening_insert(element: &BytesStart<'_>, start: usize) -> Result<usize> {

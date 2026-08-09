@@ -10,12 +10,16 @@ use litchi_odraw::Container;
 use litchi_odraw::image::File as ImageFile;
 use litchi_odraw::image::Id as ImageId;
 
-/// Semantic kind of a PowerPoint picture frame.
+/// Semantic kind of a `PowerPoint` picture frame.
 ///
-/// Binary PowerPoint uses the same OfficeArt frame shape for ordinary images,
+/// Binary `PowerPoint` uses the same `OfficeArt` frame shape for ordinary images,
 /// embedded OLE objects, and media previews. The client-data records distinguish
 /// the three cases.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`PictureFrameKind` is the established public API name; renaming it would break downstream crates"
+)]
 pub enum PictureFrameKind {
     /// An ordinary embedded or linked image.
     #[default]
@@ -28,7 +32,7 @@ pub enum PictureFrameKind {
 
 /// Picture shape containing an embedded image
 ///
-/// Represents an image embedded in a PowerPoint slide, with methods
+/// Represents an image embedded in a `PowerPoint` slide, with methods
 /// to extract the underlying BLIP data.
 ///
 /// # Example
@@ -53,6 +57,10 @@ pub enum PictureFrameKind {
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Debug, Clone)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`PictureShape` is the established public API name; renaming it would break downstream crates"
+)]
 pub struct PictureShape {
     /// Shape properties
     pub(crate) properties: ShapeProperties,
@@ -71,6 +79,7 @@ pub struct PictureShape {
 
 impl PictureShape {
     /// Create a new picture shape
+    #[must_use]
     pub fn new(id: u32) -> Self {
         let properties = ShapeProperties {
             id,
@@ -90,11 +99,20 @@ impl PictureShape {
     }
 
     /// Create from shape properties
+    #[must_use]
     pub fn from_properties(properties: ShapeProperties) -> Self {
         let frame_kind = match properties.shape_type {
             ShapeType::Object => PictureFrameKind::OleObject,
             ShapeType::Media => PictureFrameKind::Media,
-            _ => PictureFrameKind::Picture,
+            ShapeType::TextBox
+            | ShapeType::Placeholder
+            | ShapeType::AutoShape
+            | ShapeType::Picture
+            | ShapeType::Group
+            | ShapeType::Line
+            | ShapeType::Connector
+            | ShapeType::Table
+            | ShapeType::Unknown(_) => PictureFrameKind::Picture,
         };
         Self {
             properties,
@@ -108,6 +126,10 @@ impl PictureShape {
     }
 
     /// Set BLIP ID reference
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_blip_id(
         &mut self,
         id: ImageId,
@@ -118,18 +140,26 @@ impl PictureShape {
     }
 
     /// Set a BLIP ID from a raw host property after validating its range.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_blip_index(
         &mut self,
         index: u32,
     ) -> std::result::Result<(), super::shape::MutationError> {
         self.ensure_mutable(super::shape::Mutation::Picture)?;
         let id = ImageId::new(index)
-            .map_err(|_| super::shape::MutationError::InvalidPictureIndex { index })?;
+            .map_err(|_err| super::shape::MutationError::InvalidPictureIndex { index })?;
         self.blip_id = Some(id);
         Ok(())
     }
 
     /// Set picture name
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_name<S: Into<String>>(
         &mut self,
         name: S,
@@ -140,6 +170,10 @@ impl PictureShape {
     }
 
     /// Set the semantic frame kind and keep the common shape type in sync.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_frame_kind(
         &mut self,
         frame_kind: PictureFrameKind,
@@ -159,6 +193,10 @@ impl PictureShape {
     }
 
     /// Set the external OLE or media object reference.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_external_object_id(
         &mut self,
         external_object_id: u32,
@@ -173,6 +211,10 @@ impl PictureShape {
     }
 
     /// Set picture bounds (position and size)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_bounds(
         &mut self,
         left: i32,
@@ -193,6 +235,10 @@ impl PictureShape {
     }
 
     /// Set Escher container data for BLIP extraction
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_escher_data(
         &mut self,
         data: Vec<u8>,
@@ -203,26 +249,31 @@ impl PictureShape {
     }
 
     /// Get BLIP ID
+    #[must_use]
     pub const fn blip_id(&self) -> Option<ImageId> {
         self.blip_id
     }
 
     /// Get picture name
+    #[must_use]
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
     }
 
     /// Get the semantic frame kind.
+    #[must_use]
     pub const fn frame_kind(&self) -> PictureFrameKind {
         self.frame_kind
     }
 
     /// Get the external OLE or media object reference.
+    #[must_use]
     pub const fn external_object_id(&self) -> Option<u32> {
         self.external_object_id
     }
 
     /// Return the immutable common shape properties.
+    #[must_use]
     pub const fn properties(&self) -> &ShapeProperties {
         &self.properties
     }
@@ -265,6 +316,10 @@ impl PictureShape {
     ///
     /// # Returns
     /// The extracted image, or None if no image data is found
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn extract_image<'data>(
         &'data self,
         presentation: &'data crate::Presentation,
@@ -282,8 +337,7 @@ impl PictureShape {
         if let Some(blip_id) = self.blip_id {
             return presentation.image(blip_id).map_err(|e| {
                 litchi_core::error::Error::ParseError(format!(
-                    "Failed to extract image by BLIP ID: {}",
-                    e
+                    "Failed to extract image by BLIP ID: {e}"
                 ))
             });
         }
@@ -292,13 +346,14 @@ impl PictureShape {
     }
 
     /// Get the suggested filename for this picture
+    #[must_use]
     pub fn suggested_filename(&self) -> String {
         if let Some(name) = &self.name {
             if name.contains('.') {
                 return name.clone();
             }
             // If name doesn't have extension, add one based on type
-            format!("{}.png", name)
+            format!("{name}.png")
         } else {
             format!("picture_{}.png", self.properties.id)
         }
@@ -341,24 +396,29 @@ impl Shape for PictureShape {
 
 /// Helper function to extract BLIP ID from Escher properties
 ///
-/// Searches for the BlipToDisplay property (0x0104) which contains
-/// the reference to the BLIP in the BStoreContainer.
+/// Searches for the `BlipToDisplay` property (0x0104) which contains
+/// the reference to the BLIP in the `BStoreContainer`.
 ///
-/// Uses zero-copy OfficeArt property parsing.
+/// Uses zero-copy `OfficeArt` property parsing.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn extract_blip_id(container: &Container<'_>) -> litchi_odraw::Result<Option<ImageId>> {
     use litchi_odraw::RecordKind;
     use litchi_odraw::prop::{Id, Props};
 
     // Look for shape options (Opt record)
     for child in container.children() {
-        let child = child?;
-        if child.kind() == RecordKind::Opt
-            && let Some(raw) = Props::parse(&child)?.get_int(Id::BlipToDisplay)
+        let record = child?;
+        if record.kind() == RecordKind::Opt
+            && let Some(raw) = Props::parse(&record)?.get_int(Id::BlipToDisplay)
         {
-            let raw = u32::try_from(raw).map_err(|_| litchi_odraw::Error::MalformedProperties {
-                reason: "BlipToDisplay must be a positive one-based image identifier",
-            })?;
-            return ImageId::new(raw).map(Some);
+            let blip_index =
+                u32::try_from(raw).map_err(|_err| litchi_odraw::Error::MalformedProperties {
+                    reason: "BlipToDisplay must be a positive one-based image identifier",
+                })?;
+            return ImageId::new(blip_index).map(Some);
         }
     }
 
@@ -366,6 +426,11 @@ pub fn extract_blip_id(container: &Container<'_>) -> litchi_odraw::Result<Option
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -427,9 +492,9 @@ mod tests {
     #[test]
     fn source_bound_picture_setters_are_atomic() {
         let mut picture = PictureShape::new(1);
-        let blip_id = ImageId::new(7);
-        assert!(blip_id.is_ok());
-        let Ok(blip_id) = blip_id else {
+        let blip_id_result = ImageId::new(7);
+        assert!(blip_id_result.is_ok());
+        let Ok(blip_id) = blip_id_result else {
             return;
         };
         let before_properties = picture.properties.clone();

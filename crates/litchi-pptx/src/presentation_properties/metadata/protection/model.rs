@@ -17,6 +17,7 @@ pub enum Algorithm {
 }
 
 impl Algorithm {
+    #[must_use]
     pub const fn uri(self) -> &'static str {
         match self {
             Self::Sha1 => "http://www.w3.org/2000/09/xmldsig#sha1",
@@ -26,6 +27,9 @@ impl Algorithm {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_uri(value: &str) -> crate::Result<Self> {
         match value {
             "http://www.w3.org/2000/09/xmldsig#sha1" | "SHA-1" => Ok(Self::Sha1),
@@ -78,18 +82,22 @@ pub struct Verifier {
 }
 
 impl Verifier {
+    #[must_use]
     pub const fn algorithm(&self) -> Algorithm {
         self.algorithm
     }
 
+    #[must_use]
     pub const fn spins(&self) -> u32 {
         self.spin_count
     }
 
+    #[must_use]
     pub fn hash(&self) -> &str {
         &self.hash
     }
 
+    #[must_use]
     pub fn salt(&self) -> &str {
         &self.salt
     }
@@ -116,25 +124,30 @@ pub struct Settings {
 }
 
 impl Settings {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use]
     pub fn with_read_only_recommended(mut self, value: bool) -> Self {
         self.read_only_recommended = value;
         self
     }
 
+    #[must_use]
     pub fn with_structure_protection(mut self, value: bool) -> Self {
         self.protect_structure = value;
         self
     }
 
+    #[must_use]
     pub fn with_window_protection(mut self, value: bool) -> Self {
         self.protect_windows = value;
         self
     }
 
+    #[must_use]
     pub fn is_protected(&self) -> bool {
         self.read_only_recommended
             || self.modify.is_some()
@@ -142,6 +155,7 @@ impl Settings {
             || self.protect_windows
     }
 
+    #[must_use]
     pub fn protection_type(&self) -> Type {
         if self.modify.is_some() {
             Type::ModifyPassword
@@ -152,10 +166,14 @@ impl Settings {
         }
     }
 
+    #[must_use]
     pub fn modify(&self) -> Option<&Verifier> {
         self.modify.as_ref()
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_modify_password(&mut self, password: &str) -> crate::Result<()> {
         self.modify = Some(super::codec::generate_verifier(password)?);
         Ok(())
@@ -177,10 +195,12 @@ pub struct Slide {
 }
 
 impl Slide {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use]
     pub fn protect_all(mut self) -> Self {
         self.no_select = true;
         self.no_move = true;
@@ -191,6 +211,7 @@ impl Slide {
         self
     }
 
+    #[must_use]
     pub fn is_protected(&self) -> bool {
         self.no_select
             || self.no_move

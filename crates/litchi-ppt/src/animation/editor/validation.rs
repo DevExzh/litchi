@@ -82,7 +82,7 @@ pub(super) fn validate_node(
         validate_target(target, shapes)?;
     }
     for modifier in &node.modifiers {
-        validate_modifier(modifier)?;
+        validate_modifier(modifier);
     }
     for effect in &node.sub_effects {
         if let Some(target) = &effect.visual_target {
@@ -97,7 +97,7 @@ pub(super) fn validate_node(
             validate_target(target, shapes)?;
         }
         for modifier in &effect.modifiers {
-            validate_modifier(modifier)?;
+            validate_modifier(modifier);
         }
     }
     for child in &node.children {
@@ -124,14 +124,14 @@ pub(super) fn validate_target(target: &TimeVisualElement, shapes: &BTreeSet<u32>
         TimeVisualElement::Chart { shape_id_ref, .. } if !shapes.contains(shape_id_ref) => {
             return invalid("chart behavior references a missing shape");
         },
-        _ => {},
+        TimeVisualElement::Page
+        | TimeVisualElement::Sound { .. }
+        | TimeVisualElement::Chart { .. } => {},
     }
     Ok(())
 }
 
-pub(super) fn validate_modifier(_value: &TimeModifier) -> Result<()> {
-    Ok(())
-}
+pub(super) fn validate_modifier(_value: &TimeModifier) {}
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(Error::InvalidFormat(message.into()))

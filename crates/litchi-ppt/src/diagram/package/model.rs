@@ -43,6 +43,7 @@ impl SlideRevision {
     }
 
     /// Returns the compact source fingerprint.
+    #[must_use]
     pub const fn value(self) -> u64 {
         self.0
     }
@@ -61,21 +62,37 @@ pub struct SlideSnapshot {
 
 impl SlideSnapshot {
     /// Parse one complete `SlideContainer` with default resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(bytes: impl AsRef<[u8]>) -> Result<Self> {
         Self::from_bytes_with_limits(bytes.as_ref().to_vec(), SlideLimits::default())
     }
 
     /// Capture one complete slide without requiring a caller-side copy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         Self::from_bytes_with_limits(bytes, SlideLimits::default())
     }
 
     /// Parse one complete `SlideContainer` under explicit resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: SlideLimits) -> Result<Self> {
         Self::from_bytes_with_limits(bytes.as_ref().to_vec(), limits)
     }
 
     /// Capture one complete slide under explicit resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: SlideLimits) -> Result<Self> {
         super::validation::validate_limits(limits)?;
         if bytes.len() > limits.max_slide_bytes {
@@ -91,10 +108,10 @@ impl SlideSnapshot {
             crate::package::Error::Corrupted("BuildList range is out of bounds".into())
         })?;
         let diagram = DiagramSnapshot::parse_with_limits(build_list, drawing, limits.diagram)?;
-        let bytes: Arc<[u8]> = Arc::from(bytes.into_boxed_slice());
+        let shared_bytes: Arc<[u8]> = Arc::from(bytes.into_boxed_slice());
         Ok(Self {
-            revision: SlideRevision::from_bytes(&bytes),
-            bytes,
+            revision: SlideRevision::from_bytes(&shared_bytes),
+            bytes: shared_bytes,
             build_range: parts.build_list,
             drawing_range: parts.drawing,
             diagram,
@@ -103,56 +120,70 @@ impl SlideSnapshot {
     }
 
     /// Exact serialized `SlideContainer` bytes.
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
     /// Exact sibling `PPDrawing` payload bytes.
+    #[must_use]
     pub fn drawing(&self) -> &[u8] {
         &self.bytes[self.drawing_range.clone()]
     }
 
     /// Exact `BuildList` record bytes inside the slide's `___PPT10` payload.
+    #[must_use]
     pub fn build_list(&self) -> &[u8] {
         &self.bytes[self.build_range.clone()]
     }
 
     /// Source fingerprint of the complete owning slide payload.
+    #[must_use]
     pub const fn revision(&self) -> SlideRevision {
         self.revision
     }
 
     /// Resource ceilings retained by this snapshot.
+    #[must_use]
     pub const fn limits(&self) -> SlideLimits {
         self.limits
     }
 
     /// Number of typed diagram builds in the owning slide.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.diagram.len()
     }
 
     /// Whether the owning slide has no typed diagram builds.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.diagram.is_empty()
     }
 
-    /// Iterate typed diagram builds in BuildList source order.
+    /// Iterate typed diagram builds in `BuildList` source order.
+    #[must_use]
     pub fn builds(&self) -> impl ExactSizeIterator<Item = Build> + '_ {
         self.diagram.builds()
     }
 
     /// Find one typed diagram build by its contextual identity.
+    #[must_use]
     pub fn get(&self, id: Id) -> Option<Build> {
         self.diagram.get(id)
     }
 
     /// Recreate the borrowed diagram inventory over the slide-owned bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn inventory(&self) -> Result<Inventory<'_>> {
         self.diagram.inventory()
     }
 
     /// Start an isolated edit over this exact slide source.
+    #[must_use]
     pub fn edit(&self) -> super::transaction::SlideEditor {
         super::transaction::SlideEditor::open(self.clone())
     }

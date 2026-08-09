@@ -3,6 +3,10 @@
 //! This module provides support for document sections, headers, footers,
 //! page breaks, and section formatting in RTF documents.
 
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items stay grouped by RTF feature area rather than by item kind"
+)]
 use super::types::{Formatting, Paragraph, TextDirection};
 use std::borrow::Cow;
 
@@ -27,6 +31,10 @@ pub const MAX_PAGE_NUMBER_HEADING_LEVEL: i32 = 9;
 /// Maximum accepted section line-grid pitch, in twips.
 pub const MAX_SECTION_LINE_GRID_TWIPS: i32 = 31_680;
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// One explicitly sized section column.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SectionColumn {
@@ -38,13 +46,18 @@ pub struct SectionColumn {
 
 impl SectionColumn {
     /// Construct an explicitly sized column.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(width: i32, space_after: Option<i32>) -> crate::RtfResult<Self> {
         let column = Self { width, space_after };
         column.validate()?;
         Ok(column)
     }
-
     /// Validate this column against the implementation safety bounds.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::RtfResult<()> {
         if !(1..=MAX_SECTION_COLUMN_TWIPS).contains(&self.width) {
             return Err(crate::RtfError::MalformedDocument(
@@ -63,6 +76,10 @@ impl SectionColumn {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Equal- or variable-width column layout for an RTF section.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SectionColumns {
@@ -75,9 +92,11 @@ pub struct SectionColumns {
     /// Ordered explicit column geometry. Empty means equal-width columns.
     pub explicit: Vec<SectionColumn>,
 }
-
 impl SectionColumns {
     /// Construct an equal-width column layout.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn equal(count: u16, spacing: i32, separator: bool) -> crate::RtfResult<Self> {
         let columns = Self {
             count,
@@ -90,12 +109,15 @@ impl SectionColumns {
     }
 
     /// Construct a variable-width column layout.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn variable(
         columns: Vec<SectionColumn>,
         default_spacing: i32,
         separator: bool,
     ) -> crate::RtfResult<Self> {
-        let count = u16::try_from(columns.len()).map_err(|_| {
+        let count = u16::try_from(columns.len()).map_err(|_err| {
             crate::RtfError::MalformedDocument(
                 "RTF section-column count exceeds the safety limit".to_string(),
             )
@@ -111,11 +133,15 @@ impl SectionColumns {
     }
 
     /// Whether the layout contains explicit variable-width geometry.
+    #[must_use]
     pub fn is_variable(&self) -> bool {
         !self.explicit.is_empty()
     }
 
     /// Validate cardinality and numeric safety bounds.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::RtfResult<()> {
         if !(1..=MAX_SECTION_COLUMNS).contains(&self.count) {
             return Err(crate::RtfError::MalformedDocument(format!(
@@ -150,6 +176,10 @@ impl Default for SectionColumns {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Section break type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SectionBreakType {
@@ -244,6 +274,7 @@ pub enum PageNumberFormat {
 
 impl PageNumberFormat {
     /// The RTF control word that selects this page-number format.
+    #[must_use]
     pub const fn control_word(self) -> &'static str {
         match self {
             Self::Decimal => "pgndec",
@@ -292,6 +323,7 @@ pub enum PageNumberRestart {
 
 impl PageNumberRestart {
     /// The RTF control word that selects this restart behavior.
+    #[must_use]
     pub const fn control_word(self) -> &'static str {
         match self {
             Self::Restart => "pgnrestart",
@@ -314,6 +346,10 @@ pub enum VerticalAlignment {
     Bottom,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Restart behavior for section line numbering.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SectionLineNumberRestart {
@@ -325,6 +361,10 @@ pub enum SectionLineNumberRestart {
     Continuous,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Complete explicit section line-numbering state.
 ///
 /// `increment == None` means numbering is disabled. Other fields retain
@@ -343,6 +383,9 @@ pub struct SectionLineNumbering {
 
 impl SectionLineNumbering {
     /// Construct enabled line numbering with the given increment.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(increment: u16) -> crate::RtfResult<Self> {
         let value = Self {
             increment: Some(increment),
@@ -353,16 +396,21 @@ impl SectionLineNumbering {
     }
 
     /// Whether this section explicitly enables line numbering.
+    #[must_use]
     pub fn is_enabled(&self) -> bool {
         self.increment.is_some()
     }
 
     /// Whether no line-numbering controls were authored.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         *self == Self::default()
     }
 
     /// Validate line-numbering values against implementation safety bounds.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::RtfResult<()> {
         if self.increment == Some(0) {
             return Err(crate::RtfError::MalformedDocument(
@@ -389,6 +437,10 @@ impl SectionLineNumbering {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Section-level footnote placement override.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SectionFootnotePlacement {
@@ -396,6 +448,10 @@ pub enum SectionFootnotePlacement {
     BottomOfPage,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Explicit section-level footnote and endnote overrides.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct SectionNoteOptions {
@@ -412,6 +468,9 @@ pub struct SectionNoteOptions {
 }
 
 impl SectionNoteOptions {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::RtfResult<()> {
         if self.footnote_start.is_some_and(|value| value <= 0)
             || self.endnote_start.is_some_and(|value| value <= 0)
@@ -423,6 +482,7 @@ impl SectionNoteOptions {
         Ok(())
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         *self == Self::default()
     }
@@ -445,6 +505,7 @@ pub enum PageNumberHeadingSeparator {
 
 impl PageNumberHeadingSeparator {
     /// The canonical RTF control word for this separator.
+    #[must_use]
     pub fn control_word(&self) -> &'static str {
         match self {
             Self::Hyphen => "pgnhnsh",
@@ -456,6 +517,10 @@ impl PageNumberHeadingSeparator {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Heading-number prefix applied to section page numbers (`pgnhn` family).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct SectionPageNumberHeading {
@@ -466,14 +531,17 @@ pub struct SectionPageNumberHeading {
     /// Separator drawn between the heading number and the page number.
     pub separator: Option<PageNumberHeadingSeparator>,
 }
-
 impl SectionPageNumberHeading {
     /// Whether no heading-number controls were authored.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         *self == Self::default()
     }
 
     /// Validate heading-number values against implementation safety bounds.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::RtfResult<()> {
         if self
             .level
@@ -487,6 +555,10 @@ impl SectionPageNumberHeading {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Document grid used to lay out a section.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SectionDocumentGridType {
@@ -501,6 +573,7 @@ pub enum SectionDocumentGridType {
 
 impl SectionDocumentGridType {
     /// The canonical RTF control word for this grid type.
+    #[must_use]
     pub fn control_word(&self) -> &'static str {
         match self {
             Self::LinesAndCharacters => "sectspecifyl",
@@ -510,6 +583,10 @@ impl SectionDocumentGridType {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Explicit section document-grid settings.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct SectionDocumentGrid {
@@ -522,11 +599,15 @@ pub struct SectionDocumentGrid {
 
 impl SectionDocumentGrid {
     /// Whether no document-grid controls were authored.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         *self == Self::default()
     }
 
     /// Validate grid values against implementation safety bounds.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::RtfResult<()> {
         if self
             .line_grid
@@ -543,6 +624,10 @@ impl SectionDocumentGrid {
 /// Maximum printer paper-bin index accepted for `\binfsxnN` / `\binsxnN`.
 pub const MAX_SECTION_PAPER_BIN: i32 = u16::MAX as i32;
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Printer paper-source bins selected for a section.
 ///
 /// `\binfsxnN` picks the bin feeding the section's first page and `\binsxnN`
@@ -558,11 +643,16 @@ pub struct SectionPaperSource {
 
 impl SectionPaperSource {
     /// Whether no paper-source bins were authored.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         *self == Self::default()
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Section rendering direction from `\vertsect` and `\horzsect`.
 ///
 /// Vertical rendering is used for East Asian vertical-writing sections. The
@@ -575,6 +665,10 @@ pub enum SectionRendering {
     Vertical,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Section properties
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SectionProperties {
@@ -734,6 +828,7 @@ pub struct HeaderFooter<'a> {
 impl<'a> HeaderFooter<'a> {
     /// Create a new header/footer
     #[inline]
+    #[must_use]
     pub fn new(header_type: HeaderFooterType) -> Self {
         Self {
             header_type,
@@ -752,6 +847,7 @@ impl<'a> HeaderFooter<'a> {
     }
 
     /// Get the text content
+    #[must_use]
     pub fn text(&self) -> String {
         self.paragraphs
             .iter()
@@ -761,6 +857,9 @@ impl<'a> HeaderFooter<'a> {
     }
 
     /// Append a validated positional shape to this story.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_shape(&mut self, shape: crate::Shape<'a>) -> crate::RtfResult<()> {
         let mut shapes = self.shapes.clone();
         shapes.push(shape);
@@ -784,6 +883,9 @@ impl<'a> HeaderFooter<'a> {
     }
 
     /// Append a validated positional root shape group to this story.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'a>) -> crate::RtfResult<()> {
         let mut groups = self.shape_groups.clone();
         groups.push(group);
@@ -818,10 +920,13 @@ impl<'a> HeaderFooter<'a> {
     pub fn page_breaks(&self) -> impl Iterator<Item = &crate::PageBreak> {
         self.story_events.iter().filter_map(|event| match event {
             crate::StoryEvent::PageBreak(page_break) => Some(page_break),
-            _ => None,
+            crate::StoryEvent::Drawing(_) | crate::StoryEvent::Field(_) => None,
         })
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_page_break(&mut self, position: usize) -> crate::RtfResult<()> {
         let text = self.text();
         crate::field::push_story_page_break(
@@ -852,6 +957,7 @@ pub struct HeaderFooterParagraph<'a> {
 impl<'a> HeaderFooterParagraph<'a> {
     /// Create a new header/footer paragraph
     #[inline]
+    #[must_use]
     pub fn new(text: Cow<'a, str>, formatting: Formatting, paragraph: Paragraph) -> Self {
         Self {
             text,
@@ -873,6 +979,7 @@ pub struct Section<'a> {
 impl<'a> Section<'a> {
     /// Create a new section
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             properties: SectionProperties::default(),
@@ -887,12 +994,13 @@ impl<'a> Section<'a> {
     }
 
     /// Get header by type
+    #[must_use]
     pub fn get_header(&self, htype: HeaderFooterType) -> Option<&HeaderFooter<'a>> {
         self.headers_footers.iter().find(|h| h.header_type == htype)
     }
 }
 
-impl<'a> Default for Section<'a> {
+impl Default for Section<'_> {
     fn default() -> Self {
         Self::new()
     }
@@ -928,6 +1036,7 @@ pub(crate) const MAX_NOTE_TEXT_TOTAL_BYTES: usize = 16 * 1_048_576;
 impl<'a> Note<'a> {
     /// Create a new footnote
     #[inline]
+    #[must_use]
     pub fn footnote(reference: Cow<'a, str>, content: Cow<'a, str>) -> Self {
         Self {
             position: 0,
@@ -944,6 +1053,7 @@ impl<'a> Note<'a> {
 
     /// Create a new endnote
     #[inline]
+    #[must_use]
     pub fn endnote(reference: Cow<'a, str>, content: Cow<'a, str>) -> Self {
         Self {
             position: 0,
@@ -959,6 +1069,9 @@ impl<'a> Note<'a> {
     }
 
     /// Validate this note story independently of its main-story anchor.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::RtfResult<()> {
         if self.content.len() > MAX_NOTE_BODY_BYTES || self.reference.len() > 65_536 {
             return Err(crate::RtfError::MalformedDocument(
@@ -980,6 +1093,9 @@ impl<'a> Note<'a> {
     }
 
     /// Append a validated positional root shape to this note story.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_shape(&mut self, shape: crate::Shape<'a>) -> crate::RtfResult<()> {
         let mut shapes = self.shapes.clone();
         shapes.push(shape);
@@ -1002,6 +1118,9 @@ impl<'a> Note<'a> {
     }
 
     /// Append a validated positional root shape group to this note story.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'a>) -> crate::RtfResult<()> {
         let mut groups = self.shape_groups.clone();
         groups.push(group);
@@ -1035,10 +1154,13 @@ impl<'a> Note<'a> {
     pub fn page_breaks(&self) -> impl Iterator<Item = &crate::PageBreak> {
         self.story_events.iter().filter_map(|event| match event {
             crate::StoryEvent::PageBreak(page_break) => Some(page_break),
-            _ => None,
+            crate::StoryEvent::Drawing(_) | crate::StoryEvent::Field(_) => None,
         })
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_page_break(&mut self, position: usize) -> crate::RtfResult<()> {
         crate::field::push_story_page_break(
             &mut self.story_events,

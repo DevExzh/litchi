@@ -1,4 +1,4 @@
-//! Round-trip tests for the BIFF8 RealTimeData record (RTD topics).
+//! Round-trip tests for the BIFF8 `RealTimeData` record (RTD topics).
 
 use litchi_xls::Workbook;
 use litchi_xls::real_time_data::{Cell, Record, Value};
@@ -8,7 +8,7 @@ use std::io::Cursor;
 fn rtd_topic(segments: &[&str], value: Value, cells: Vec<Cell>) -> Record {
     Record {
         common_prefix_len: 0,
-        topic_segments: segments.iter().map(|segment| segment.to_string()).collect(),
+        topic_segments: segments.iter().map(ToString::to_string).collect(),
         topic: segments.concat(),
         value,
         cells,

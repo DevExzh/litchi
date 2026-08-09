@@ -17,6 +17,7 @@ pub enum DocumentXslTransformUsage {
 }
 
 impl DocumentXslTransformUsage {
+    #[must_use]
     pub fn is_requested(self) -> bool {
         matches!(self, Self::Requested)
     }
@@ -32,12 +33,17 @@ pub struct DocumentXslTransform<'a> {
 }
 
 impl<'a> DocumentXslTransform<'a> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(location: Cow<'a, str>) -> RtfResult<Self> {
         let transform = Self { location };
         transform.validate()?;
         Ok(transform)
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if self.location.is_empty() {
             return Err(RtfError::MalformedDocument(

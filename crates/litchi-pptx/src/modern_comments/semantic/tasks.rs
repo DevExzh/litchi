@@ -42,6 +42,9 @@ pub struct User {
 }
 
 impl User {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn validate(&self) -> Result<()> {
         guid(&self.author_id, "task author")
     }
@@ -55,12 +58,15 @@ pub struct Anchor {
 }
 
 impl Anchor {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn validate(&self) -> Result<()> {
         guid(&self.comment_id, "task anchor")?;
-        if let Some(value) = &self.extension_xml {
-            if value.xml.len() > super::super::MAX_BYTES {
-                return Err(invalid("task anchor extension is too large"));
-            }
+        if let Some(value) = &self.extension_xml
+            && value.xml.len() > super::super::MAX_BYTES
+        {
+            return Err(invalid("task anchor extension is too large"));
         }
         Ok(())
     }
@@ -72,6 +78,9 @@ pub struct Assign {
 }
 
 impl Assign {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn validate(&self) -> Result<()> {
         guid(&self.author_id, "assigned task author")
     }
@@ -83,6 +92,9 @@ pub struct Title {
 }
 
 impl Title {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn validate(&self) -> Result<()> {
         bounded(&self.value, "task title")
     }
@@ -95,6 +107,9 @@ pub struct Schedule {
 }
 
 impl Schedule {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn validate(&self) -> Result<()> {
         if let Some(value) = &self.start_date {
             date_time(value, "task start date")?;
@@ -112,6 +127,9 @@ pub struct Undo {
 }
 
 impl Undo {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn validate(&self) -> Result<()> {
         guid(&self.event_id, "undone task event")
     }
@@ -132,6 +150,9 @@ pub enum Action {
 }
 
 impl Action {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn validate(&self) -> Result<()> {
         match self {
             Self::Assign(value) => value.validate(),
@@ -158,6 +179,9 @@ pub struct Event {
 }
 
 impl Event {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn validate(&self) -> Result<()> {
         date_time(&self.time, "task history event")?;
         guid(&self.id, "task history event")?;
@@ -168,10 +192,10 @@ impl Event {
         if let Some(value) = &self.action {
             value.validate()?;
         }
-        if let Some(value) = &self.extension_xml {
-            if value.xml.len() > super::super::MAX_BYTES {
-                return Err(invalid("task history event extension is too large"));
-            }
+        if let Some(value) = &self.extension_xml
+            && value.xml.len() > super::super::MAX_BYTES
+        {
+            return Err(invalid("task history event extension is too large"));
         }
         Ok(())
     }
@@ -183,6 +207,9 @@ pub struct History {
 }
 
 impl History {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn validate(&self) -> Result<()> {
         if self.events.len() > MAX_EVENTS {
             return Err(invalid("task history events exceed implementation limit"));
@@ -202,12 +229,15 @@ pub struct Details {
 }
 
 impl Details {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn validate(&self) -> Result<()> {
         self.history.validate()?;
-        if let Some(value) = &self.extension_xml {
-            if value.xml.len() > super::super::MAX_BYTES {
-                return Err(invalid("task details extension is too large"));
-            }
+        if let Some(value) = &self.extension_xml
+            && value.xml.len() > super::super::MAX_BYTES
+        {
+            return Err(invalid("task details extension is too large"));
         }
         Ok(())
     }

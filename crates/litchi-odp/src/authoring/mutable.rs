@@ -19,20 +19,23 @@ use std::collections::{BTreeMap, BTreeSet};
 ///
 /// # Examples
 ///
-/// ```no_run
-/// use litchi_odp::Presentation;
+/// ```
+/// use litchi_odp::{Builder, edit};
 ///
 /// # fn main() -> litchi_core::Result<()> {
-/// // Open an existing presentation
-/// let presentation = Presentation::open("input.odp")?;
-/// let mut mutable = MutablePresentation::from_presentation(presentation)?;
+/// // Build a presentation and take an immutable editing snapshot
+/// let mut builder = Builder::new();
+/// builder.add_slide_with_title("Welcome", "First draft")?;
+/// let source = edit::Snapshot::from_bytes(builder.build()?)?;
 ///
-/// // Modify the presentation
-/// mutable.add_slide("New Slide", "Slide content")?;
-/// mutable.remove_slide(0)?;
+/// // Stage edits in an isolated transaction
+/// let mut transaction = source.transaction()?;
+/// transaction.add("New Slide", "Slide content")?;
+/// transaction.remove(0)?;
 ///
-/// // Save the modified presentation
-/// mutable.save("output.odp")?;
+/// // Publish atomically; the source snapshot is never mutated
+/// let commit = transaction.commit()?;
+/// assert_eq!(commit.snapshot().slides().len(), 1);
 /// # Ok(())
 /// # }
 /// ```
@@ -78,12 +81,14 @@ impl MutablePresentation {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// use litchi_odp::Presentation;
+    /// ```
+    /// use litchi_odp::{Builder, Presentation};
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let presentation = Presentation::open("slides.odp")?;
-    /// let mut mutable = MutablePresentation::from_presentation(presentation)?;
+    /// let presentation = Presentation::from_bytes(Builder::new().build()?)?;
+    /// let snapshot = presentation.snapshot()?;
+    /// let transaction = snapshot.transaction()?;
+    /// assert!(transaction.slides().is_empty());
     /// # Ok(())
     /// # }
     /// ```
@@ -216,14 +221,18 @@ impl MutablePresentation {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// The public equivalent starts from `Presentation::snapshot()`.
+    /// The public equivalent starts from [`crate::edit::Snapshot::transaction`].
+    ///
+    /// ```
+    /// use litchi_odp::{Builder, edit};
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut presentation = MutablePresentation::new();
-    /// presentation.add_slide("First", "Content 1")?;
-    /// presentation.add_slide("Third", "Content 3")?;
-    /// presentation.insert_slide(1, "Second", "Content 2")?;
+    /// let source = edit::Snapshot::from_bytes(Builder::new().build()?)?;
+    /// let mut transaction = source.transaction()?;
+    /// transaction.add("First", "Content 1")?;
+    /// transaction.add("Third", "Content 3")?;
+    /// transaction.add_before(1, "Second", "Content 2")?;
+    /// assert_eq!(transaction.slides()[1].title.as_deref(), Some("Second"));
     /// # Ok(())
     /// # }
     /// ```
@@ -279,14 +288,19 @@ impl MutablePresentation {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// The public equivalent starts from `Presentation::snapshot()`.
+    /// The public equivalent starts from [`crate::edit::Snapshot::transaction`].
+    ///
+    /// ```
+    /// use litchi_odp::{Builder, edit};
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut presentation = MutablePresentation::new();
-    /// presentation.add_slide("Slide 1", "Content 1")?;
-    /// presentation.add_slide("Slide 2", "Content 2")?;
-    /// presentation.remove_slide(0)?; // Remove first slide
+    /// let source = edit::Snapshot::from_bytes(Builder::new().build()?)?;
+    /// let mut transaction = source.transaction()?;
+    /// transaction.add("Slide 1", "Content 1")?;
+    /// transaction.add("Slide 2", "Content 2")?;
+    /// let removed = transaction.remove(0)?; // Remove first slide
+    /// assert_eq!(removed.and_then(|slide| slide.title).as_deref(), Some("Slide 1"));
+    /// assert_eq!(transaction.slides().len(), 1);
     /// # Ok(())
     /// # }
     /// ```
@@ -345,13 +359,18 @@ impl MutablePresentation {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// The public equivalent starts from `Presentation::snapshot()`.
+    /// The public equivalent starts from [`crate::edit::Snapshot::transaction`].
+    ///
+    /// ```
+    /// use litchi_odp::{Builder, edit};
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut presentation = MutablePresentation::new();
-    /// presentation.add_slide("Old Title", "Old content")?;
-    /// presentation.update_slide(0, "New Title", "New content")?;
+    /// let source = edit::Snapshot::from_bytes(Builder::new().build()?)?;
+    /// let mut transaction = source.transaction()?;
+    /// transaction.add("Old Title", "Old content")?;
+    /// transaction.replace(0, "New Title", "New content")?;
+    /// assert_eq!(transaction.slides()[0].title.as_deref(), Some("New Title"));
+    /// assert_eq!(transaction.slides()[0].text, "New content");
     /// # Ok(())
     /// # }
     /// ```
@@ -378,15 +397,17 @@ impl MutablePresentation {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// use litchi_odp::Shape;
+    /// ```
+    /// use litchi_odp::{Builder, Shape, edit};
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut presentation = MutablePresentation::new();
-    /// presentation.add_slide("Slide 1", "Content")?;
+    /// let source = edit::Snapshot::from_bytes(Builder::new().build()?)?;
+    /// let mut transaction = source.transaction()?;
+    /// transaction.add("Slide 1", "Content")?;
     /// let mut shape = Shape::new();
     /// shape.text = "Shape text".to_string();
-    /// presentation.add_shape(0, shape)?;
+    /// transaction.add_shape(0, shape)?;
+    /// assert_eq!(transaction.slides()[0].shapes.len(), 1);
     /// # Ok(())
     /// # }
     /// ```
@@ -410,14 +431,20 @@ impl MutablePresentation {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// The public equivalent starts from `Presentation::snapshot()`.
+    /// The public equivalent starts from [`crate::edit::Snapshot::transaction`].
+    ///
+    /// ```
+    /// use litchi_odp::{Builder, Shape, edit};
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut presentation = MutablePresentation::new();
-    /// presentation.add_slide("Slide 1", "Content")?;
+    /// let source = edit::Snapshot::from_bytes(Builder::new().build()?)?;
+    /// let mut transaction = source.transaction()?;
+    /// transaction.add("Slide 1", "Content")?;
     /// // Add shape first, then remove it
-    /// presentation.remove_shape(0, 0)?;
+    /// transaction.add_shape(0, Shape::new())?;
+    /// let removed = transaction.remove_shape(0, 0)?;
+    /// assert!(removed.is_some());
+    /// assert!(transaction.slides()[0].shapes.is_empty());
     /// # Ok(())
     /// # }
     /// ```
@@ -442,13 +469,18 @@ impl MutablePresentation {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// The public equivalent starts from `Presentation::snapshot()`.
+    /// The public equivalent starts from [`crate::edit::Snapshot::transaction`].
+    ///
+    /// ```
+    /// use litchi_odp::{Builder, edit};
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut presentation = MutablePresentation::new();
-    /// presentation.add_slide("Slide 1", "Content")?;
-    /// presentation.clear_slide(0)?;
+    /// let source = edit::Snapshot::from_bytes(Builder::new().build()?)?;
+    /// let mut transaction = source.transaction()?;
+    /// transaction.add("Slide 1", "Content")?;
+    /// transaction.clear(0)?;
+    /// assert!(transaction.slides()[0].title.is_none());
+    /// assert!(transaction.slides()[0].text.is_empty());
     /// # Ok(())
     /// # }
     /// ```
@@ -702,13 +734,18 @@ impl MutablePresentation {
     ///
     /// # Examples
     ///
-    /// ```no_run
-    /// The public equivalent starts from `Presentation::snapshot()`.
+    /// The public equivalent starts from [`crate::edit::Snapshot::transaction`].
+    ///
+    /// ```
+    /// use litchi_odp::{Builder, edit};
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let mut presentation = MutablePresentation::new();
-    /// presentation.add_slide("Slide 1", "Content")?;
-    /// let bytes = presentation.to_bytes()?;
+    /// let source = edit::Snapshot::from_bytes(Builder::new().build()?)?;
+    /// let mut transaction = source.transaction()?;
+    /// transaction.add("Slide 1", "Content")?;
+    /// let commit = transaction.commit()?;
+    /// let bytes = commit.snapshot().bytes();
+    /// assert!(!bytes.is_empty());
     /// # Ok(())
     /// # }
     /// ```

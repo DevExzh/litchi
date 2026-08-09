@@ -38,7 +38,7 @@ fn obj_record(parts: &[Vec<u8>]) -> Vec<u8> {
     subrecord(OBJ, &body)
 }
 
-/// A compressed XLUnicodeString fixture.
+/// A compressed `XLUnicodeString` fixture.
 fn xl_string(text: &str) -> Vec<u8> {
     let mut value = (text.len() as u16).to_le_bytes().to_vec();
     value.push(0);
@@ -233,10 +233,7 @@ fn parses_list_box_data_with_items_and_selection() {
     assert_eq!(data.behavior_class(), ListBehaviorClass::Regular);
     assert!(data.drop_down.is_none());
     assert_eq!(
-        data.items()
-            .iter()
-            .map(|item| item.text())
-            .collect::<Vec<_>>(),
+        data.items().iter().map(LbsItem::text).collect::<Vec<_>>(),
         vec!["one", "two", "three"]
     );
     assert_eq!(data.multi_selection, vec![true, false, true]);
@@ -281,10 +278,7 @@ fn parses_dropdown_data() {
     assert_eq!(drop_down.text(), "abcd");
     assert_eq!(drop_down.padding, Some(0));
     assert_eq!(
-        data.items()
-            .iter()
-            .map(|item| item.text())
-            .collect::<Vec<_>>(),
+        data.items().iter().map(LbsItem::text).collect::<Vec<_>>(),
         vec!["x", "yz"]
     );
     assert_eq!(data.multi_selection, vec![true, false]);
@@ -401,10 +395,7 @@ fn lbs_data_with_continued_items_preserves_tail() {
     let control = form_control(&record);
     let data = control.list_box_data().unwrap();
     assert_eq!(
-        data.items()
-            .iter()
-            .map(|item| item.text())
-            .collect::<Vec<_>>(),
+        data.items().iter().map(LbsItem::text).collect::<Vec<_>>(),
         vec!["ab"]
     );
     assert!(data.trailing.is_empty());
@@ -429,10 +420,7 @@ fn lbs_data_with_defective_item_preserves_tail_bytes() {
     let control = form_control(&record);
     let data = control.list_box_data().unwrap();
     assert_eq!(
-        data.items()
-            .iter()
-            .map(|item| item.text())
-            .collect::<Vec<_>>(),
+        data.items().iter().map(LbsItem::text).collect::<Vec<_>>(),
         vec!["ab"]
     );
     assert_eq!(data.trailing, [10, 0, 0, b'x', b'y']);

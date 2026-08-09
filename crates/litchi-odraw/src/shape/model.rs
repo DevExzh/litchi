@@ -220,6 +220,11 @@ impl<'data> Shape<'data> {
     /// Decodes this shape's custom geometry without copying its property
     /// arrays.  Preset shapes simply return `None` when no geometry property
     /// family was encoded.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::MalformedProperties` if an encoded geometry property
+    /// array is truncated or internally inconsistent.
     pub fn geometry(&self) -> Result<Option<Geometry<'data>>> {
         self.props.geometry()
     }
@@ -278,6 +283,10 @@ impl<'data> Shape<'data> {
         self.client_anchor.as_ref()
     }
 
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "constructor mirrors the Shape fields one-to-one so the crate-internal builder stays a plain aggregate"
+    )]
     pub(crate) fn from_parts(
         kind: Kind,
         id: u32,

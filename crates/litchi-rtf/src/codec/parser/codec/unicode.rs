@@ -1,12 +1,20 @@
-use super::*;
+use super::{
+    ControlWord, Cow, Destination, Parser, RtfError, RtfResult, SmallVec, StyleBlock, Token,
+    append_transport_bytes,
+};
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     /// Parse Unicode character sequence with fallback handling.
     ///
     /// RTF Unicode format: `\uN` where N is a signed 16-bit decimal value
     /// Followed by `\ucN` fallback characters (usually ANSI representation)
     ///
     /// Handles compound Unicode characters (surrogate pairs for emoji, etc.)
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "RTF \\uN parameters are signed 16-bit; the wrapping conversions implement the specified negative-value and fallback-skip behavior"
+    )]
     pub(super) fn parse_unicode_sequence(&mut self, first_code: i32) -> RtfResult<()> {
         let skip_count = self.current_state()?.unicode_skip as usize;
 
@@ -54,7 +62,7 @@ impl<'a> Parser<'a> {
                     // Next unicode, don't skip
                     break;
                 },
-                _ => {
+                Token::OpenBrace | Token::CloseBrace | Token::Control(_) | Token::Binary(_) => {
                     // Treat other tokens as single character
                     fallback_skip = fallback_skip.saturating_sub(1);
                     self.pos += 1;
@@ -64,7 +72,7 @@ impl<'a> Parser<'a> {
 
         // Convert Unicode values to UTF-8 string
         let unicode_str = String::from_utf16(&unicode_values)
-            .map_err(|e| RtfError::InvalidUnicode(format!("Invalid Unicode sequence: {}", e)))?;
+            .map_err(|e| RtfError::InvalidUnicode(format!("Invalid Unicode sequence: {e}")))?;
 
         let state = self.current_state()?.clone();
         if state.destination == Destination::DocumentBody

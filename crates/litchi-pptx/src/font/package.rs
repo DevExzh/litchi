@@ -1,7 +1,13 @@
-//! Atomic OPC graph services for PresentationML embedded fonts.
+//! Atomic OPC graph services for `PresentationML` embedded fonts.
 
-use super::codec::*;
-use super::model::*;
+use super::codec::{
+    RawFace, RawFont, RawFonts, RawResource, is_font_content_type, is_font_relationship,
+    parse_presentation, presentation_child_rank, validate_typeface, validate_value, write_raw,
+    xml_error,
+};
+use super::model::{
+    Conformance, Data, Face, Font, Fonts, Format, Source, name_key, validate_fonts,
+};
 use super::{
     MAX_DEPTH, MAX_FONT_BYTES, MAX_MCE_MARKED_BYTES, MAX_NODES, MAX_TOTAL_FONT_BYTES,
     MAX_XML_BYTES, MCE_NS, PML, STRICT_PML, invalid, limit,
@@ -104,7 +110,7 @@ pub(super) fn load_raw(package: &OpcPackage) -> Result<Option<RawFonts>> {
 
 /// Atomically stores the complete embedded-font graph.
 ///
-/// Existing font relationships are replaced. RawFont parts still referenced by
+/// Existing font relationships are replaced. `RawFont` parts still referenced by
 /// another relationship are retained, and unrelated presentation XML is copied
 /// byte-for-byte.
 pub(super) fn put_raw(
@@ -293,6 +299,10 @@ pub(super) fn put_raw(
 ///
 /// Relationship IDs and part names remain private provenance. Font programs
 /// that share one physical part share the same allocation in memory.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load(package: &OpcPackage) -> Result<Option<Fonts>> {
     load_raw(package)?.map(fonts_from_raw).transpose()
 }
@@ -302,6 +312,10 @@ pub fn load(package: &OpcPackage) -> Result<Option<Fonts>> {
 /// Returns `false` for an exact semantic and physical no-op, preserving any
 /// valid package signatures. A real mutation invalidates signatures only after
 /// every bounded validation and staging operation succeeds.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn put(package: &mut OpcPackage, fonts: Fonts) -> Result<bool> {
     validate_fonts(&fonts, true)?;
     let current = load_raw(package)?;
@@ -317,6 +331,10 @@ pub fn put(package: &mut OpcPackage, fonts: Fonts) -> Result<bool> {
 
 /// Remove the complete embedded-font graph and return its previous semantic
 /// value. Absence is an exact no-op.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn remove(package: &mut OpcPackage) -> Result<Option<Fonts>> {
     let Some(current) = load_raw(package)? else {
         return Ok(None);
@@ -329,6 +347,10 @@ pub fn remove(package: &mut OpcPackage) -> Result<Option<Fonts>> {
 }
 
 /// Detect the presentation namespace profile without exposing XML details.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn conformance(package: &OpcPackage) -> Result<Conformance> {
     let presentation = package.main_document_part()?;
     require_presentation(presentation)?;
@@ -602,7 +624,7 @@ pub(super) fn presentation_start_tag(xml: &[u8]) -> Result<(usize, usize)> {
     let mut reader = NsReader::from_reader(xml);
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("presentation XML offset overflow"))?;
+            .map_err(|_err| invalid("presentation XML offset overflow"))?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
@@ -612,7 +634,7 @@ pub(super) fn presentation_start_tag(xml: &[u8]) -> Result<(usize, usize)> {
                     return Err(invalid("expected a PresentationML presentation root"));
                 }
                 let end = usize::try_from(reader.buffer_position())
-                    .map_err(|_| invalid("presentation XML offset overflow"))?;
+                    .map_err(|_err| invalid("presentation XML offset overflow"))?;
                 return Ok((start, end));
             },
             Event::Decl(_) | Event::Comment(_) => {},
@@ -776,7 +798,7 @@ pub(super) fn active_direct_elements(xml: &[u8], conformance: Conformance) -> Re
     let mut nodes = 0usize;
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("presentation XML offset overflow"))?;
+            .map_err(|_err| invalid("presentation XML offset overflow"))?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(element) => {
@@ -820,7 +842,7 @@ pub(super) fn active_direct_elements(xml: &[u8], conformance: Conformance) -> Re
                     });
                     offsets.push(
                         u32::try_from(start)
-                            .map_err(|_| invalid("presentation XML offset overflow"))?,
+                            .map_err(|_err| invalid("presentation XML offset overflow"))?,
                     );
                     Some(index)
                 } else {
@@ -859,12 +881,12 @@ pub(super) fn active_direct_elements(xml: &[u8], conformance: Conformance) -> Re
                     elements.push(DirectElement {
                         start,
                         end: usize::try_from(reader.buffer_position())
-                            .map_err(|_| invalid("presentation XML offset overflow"))?,
+                            .map_err(|_err| invalid("presentation XML offset overflow"))?,
                         rank,
                     });
                     offsets.push(
                         u32::try_from(start)
-                            .map_err(|_| invalid("presentation XML offset overflow"))?,
+                            .map_err(|_err| invalid("presentation XML offset overflow"))?,
                     );
                 }
             },
@@ -874,7 +896,7 @@ pub(super) fn active_direct_elements(xml: &[u8], conformance: Conformance) -> Re
                     .ok_or_else(|| invalid("unexpected presentation closing element"))?;
                 if let Some(index) = frame.element {
                     let end = usize::try_from(reader.buffer_position())
-                        .map_err(|_| invalid("presentation XML offset overflow"))?;
+                        .map_err(|_err| invalid("presentation XML offset overflow"))?;
                     let len = elements.len();
                     elements
                         .get_mut(index)

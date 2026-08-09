@@ -119,7 +119,7 @@ pub enum ShapeProgrammableTag {
     Binary(ShapeBinaryTag),
 }
 
-/// Typed shape programmable tags retained from one OfficeArt `ClientData`.
+/// Typed shape programmable tags retained from one `OfficeArt` `ClientData`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShapeProgrammableTags {
     /// Original `ShapeProgTagsContainer` record instance. Section 2.7.14 says
@@ -132,7 +132,7 @@ pub struct ShapeProgrammableTags {
 /// Shape-level result returned by [`crate::slide::Slide`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShapeProgrammableTagsEntry {
-    /// OfficeArt shape identifier.
+    /// `OfficeArt` shape identifier.
     pub shape_id: u32,
     /// Programmable tags owned by that shape.
     pub programmable_tags: ShapeProgrammableTags,
@@ -143,43 +143,46 @@ pub struct ShapeProgrammableTagsEntry {
 pub struct PresentationShapeProgrammableTagsEntry {
     /// One-based slide number.
     pub slide_number: usize,
-    /// OfficeArt shape identifier.
+    /// `OfficeArt` shape identifier.
     pub shape_id: u32,
     /// Programmable tags owned by that shape.
     pub programmable_tags: ShapeProgrammableTags,
 }
 
 impl ShapeProgrammableTags {
-    /// Return the decoded PowerPoint 9 style payload, when present.
+    /// Return the decoded `PowerPoint` 9 style payload, when present.
+    #[must_use]
     pub fn powerpoint9(&self) -> Option<&TextStyleExtension9> {
         self.tags.iter().find_map(|tag| match tag {
             ShapeProgrammableTag::Binary(ShapeBinaryTag {
                 payload: ShapeBinaryTagPayload::PowerPoint9 { style, .. },
                 ..
             }) => Some(style),
-            _ => None,
+            ShapeProgrammableTag::String(_) | ShapeProgrammableTag::Binary(_) => None,
         })
     }
 
-    /// Return the decoded PowerPoint 10 style payload, when present.
+    /// Return the decoded `PowerPoint` 10 style payload, when present.
+    #[must_use]
     pub fn powerpoint10(&self) -> Option<&TextStyleExtension10> {
         self.tags.iter().find_map(|tag| match tag {
             ShapeProgrammableTag::Binary(ShapeBinaryTag {
                 payload: ShapeBinaryTagPayload::PowerPoint10 { style, .. },
                 ..
             }) => Some(style),
-            _ => None,
+            ShapeProgrammableTag::String(_) | ShapeProgrammableTag::Binary(_) => None,
         })
     }
 
-    /// Return the decoded PowerPoint 11 style payload, when present.
+    /// Return the decoded `PowerPoint` 11 style payload, when present.
+    #[must_use]
     pub fn powerpoint11(&self) -> Option<&TextStyleExtension11> {
         self.tags.iter().find_map(|tag| match tag {
             ShapeProgrammableTag::Binary(ShapeBinaryTag {
                 payload: ShapeBinaryTagPayload::PowerPoint11 { style, .. },
                 ..
             }) => Some(style),
-            _ => None,
+            ShapeProgrammableTag::String(_) | ShapeProgrammableTag::Binary(_) => None,
         })
     }
 }

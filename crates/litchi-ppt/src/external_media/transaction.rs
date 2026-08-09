@@ -25,6 +25,7 @@ impl Revision {
     }
 
     /// Compact source fingerprint suitable for owner conflict checks.
+    #[must_use]
     pub const fn value(self) -> u64 {
         self.0
     }
@@ -100,27 +101,43 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parse one complete root record with default limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(bytes: impl AsRef<[u8]>) -> Result<Self> {
         Self::parse_with_limits(bytes, Limits::default())
     }
 
     /// Parse one complete root record under explicit resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
         Self::from_bytes_with_limits(bytes.as_ref().to_vec(), limits)
     }
 
     /// Capture an owned root record without another caller-side copy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         Self::from_bytes_with_limits(bytes, Limits::default())
     }
 
     /// Capture an owned root record under explicit resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         let validated = validation::parse_source(&bytes, limits)?;
-        let bytes: Arc<[u8]> = Arc::from(bytes.into_boxed_slice());
-        let revision = Revision::from_bytes(&bytes);
+        let shared_bytes: Arc<[u8]> = Arc::from(bytes.into_boxed_slice());
+        let revision = Revision::from_bytes(&shared_bytes);
         Ok(Self {
-            bytes,
+            bytes: shared_bytes,
             collection: validated.collection,
             location: validated.location,
             root_type: validated.root_type,
@@ -132,36 +149,43 @@ impl Snapshot {
     }
 
     /// Exact source or committed root-record bytes.
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
     /// Compact identity of the exact serialized source.
+    #[must_use]
     pub const fn revision(&self) -> Revision {
         self.revision
     }
 
     /// Resource limits retained for subsequent edits.
+    #[must_use]
     pub const fn limits(&self) -> Limits {
         self.limits
     }
 
     /// Typed external-media list, if the root owns one.
+    #[must_use]
     pub fn collection(&self) -> Option<&Collection> {
         self.collection.as_ref()
     }
 
     /// IDs referenced by parsed `ExObjRefAtom` owners in this root tree.
+    #[must_use]
     pub fn owner_ids(&self) -> &[u32] {
         &self.owner_ids
     }
 
     /// Number of parsed owners for one media ID.
+    #[must_use]
     pub fn owner_count(&self, id: u32) -> usize {
         self.owner_ids.iter().filter(|owner| **owner == id).count()
     }
 
     /// Begin an isolated semantic edit.
+    #[must_use]
     pub fn edit(&self) -> Transaction {
         Transaction {
             source: self.clone(),
@@ -181,34 +205,42 @@ pub struct Transaction {
 
 impl Transaction {
     /// Immutable source snapshot used for stale-source checks.
+    #[must_use]
     pub const fn source(&self) -> &Snapshot {
         &self.source
     }
 
     /// Current typed media collection, if present.
+    #[must_use]
     pub fn collection(&self) -> Option<&Collection> {
         self.candidate.as_ref()
     }
 
     /// Current typed media objects, or an empty slice when no list exists.
+    #[must_use]
     pub fn objects(&self) -> &[Object] {
         self.candidate
             .as_ref()
-            .map(|collection| collection.objects.as_slice())
-            .unwrap_or(&[])
+            .map_or(&[], |collection| collection.objects.as_slice())
     }
 
     /// Whether staged semantics differ from the source collection.
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.candidate != self.source.collection
     }
 
     /// Staged semantic operations in source order.
+    #[must_use]
     pub fn changes(&self) -> &[Change] {
         &self.changes
     }
 
     /// Change or clear an inert movie/audio path without resolving it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_path(&mut self, id: u32, path: Option<String>) -> Result<()> {
         let mut candidate = self.require_collection()?.clone();
         let object = candidate
@@ -216,9 +248,7 @@ impl Transaction {
             .iter_mut()
             .find(|object| object.id() == id)
             .ok_or_else(|| Error::InvalidFormat(format!("external media ID {id} was not found")))?;
-        let before = path_of(object).ok_or_else(|| {
-            Error::InvalidFormat("CD and embedded WAV media do not carry external paths".into())
-        })?;
+        let before = path_of(object)?;
         if before == path {
             return Ok(());
         }
@@ -234,6 +264,10 @@ impl Transaction {
     }
 
     /// Change the inert playback flags of one media object.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_playback(&mut self, id: u32, playback: Playback) -> Result<()> {
         let mut candidate = self.require_collection()?.clone();
         let object = candidate
@@ -257,6 +291,10 @@ impl Transaction {
     }
 
     /// Insert a typed media definition, allocating no external content.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn insert(&mut self, object: Object) -> Result<()> {
         let id = object.id();
         if id == 0 {
@@ -288,6 +326,10 @@ impl Transaction {
     }
 
     /// Replace a definition while retaining the same owner ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace(&mut self, id: u32, replacement: Object) -> Result<Object> {
         if replacement.id() != id {
             return Err(Error::InvalidFormat(
@@ -316,6 +358,10 @@ impl Transaction {
     }
 
     /// Remove a media definition only when no parsed owner still points at it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove(&mut self, id: u32) -> Result<Object> {
         let current = self.require_collection()?;
         validation::can_remove(current, &self.source.owner_ids, id)?;
@@ -340,6 +386,10 @@ impl Transaction {
     }
 
     /// Capture the current candidate without publishing it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn snapshot(&self) -> Result<Snapshot> {
         if !self.is_changed() {
             return Ok(self.source.clone());
@@ -348,6 +398,10 @@ impl Transaction {
     }
 
     /// Publish the candidate atomically with a reversible source-checked patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn commit(self) -> Result<Commit> {
         if !self.is_changed() {
             let patch = Patch {
@@ -379,11 +433,16 @@ impl Transaction {
     }
 
     /// Alias for move-owned writer terminology.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn finish(self) -> Result<Commit> {
         self.commit()
     }
 
     /// Discard all staged edits and recover the exact source snapshot.
+    #[must_use]
     pub fn rollback(self) -> Snapshot {
         self.source
     }
@@ -422,26 +481,37 @@ pub struct Commit {
 
 impl Commit {
     /// Published target snapshot.
+    #[must_use]
     pub const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Reversible patch from source to target.
+    #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Undo this commit against its exact target snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.patch.undo(current)
     }
 
     /// Redo this commit against its exact source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.patch.redo(current)
     }
 
     /// Split the commit into its target and patch.
+    #[must_use]
     pub fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
@@ -460,36 +530,46 @@ pub struct Patch {
 
 impl Patch {
     /// Source revision required for forward application.
+    #[must_use]
     pub const fn base(&self) -> Revision {
         self.base
     }
 
     /// Target revision produced by forward application.
+    #[must_use]
     pub const fn target(&self) -> Revision {
         self.target
     }
 
     /// Typed operations represented by this patch.
+    #[must_use]
     pub fn changes(&self) -> &[Change] {
         &self.changes
     }
 
     /// Exact source bytes bound to this patch.
+    #[must_use]
     pub fn before(&self) -> &[u8] {
         &self.before
     }
 
     /// Exact target bytes produced by this patch.
+    #[must_use]
     pub fn after(&self) -> &[u8] {
         &self.after
     }
 
     /// Whether the patch is an exact byte-for-byte no-op.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.before.as_ref() == self.after.as_ref()
     }
 
     /// Apply only to the exact source snapshot used to create this patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn apply(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision != self.base || current.bytes.as_ref() != self.before.as_ref() {
             return Err(Error::InvalidFormat(
@@ -503,16 +583,25 @@ impl Patch {
     }
 
     /// Apply the inverse to the exact committed target.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.inverse().apply(current)
     }
 
     /// Reapply this patch to its exact source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.apply(current)
     }
 
     /// Build a source-checked inverse patch.
+    #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
             base: self.target,
@@ -525,11 +614,13 @@ impl Patch {
     }
 }
 
-fn path_of(object: &Object) -> Option<Option<String>> {
+fn path_of(object: &Object) -> Result<Option<String>> {
     match object {
-        Object::Movie(Movie { video, .. }) => Some(video.path.clone()),
-        Object::LinkedAudio(LinkedAudio { path, .. }) => Some(path.clone()),
-        Object::CdAudio(_) | Object::EmbeddedWav(_) => None,
+        Object::Movie(Movie { video, .. }) => Ok(video.path.clone()),
+        Object::LinkedAudio(LinkedAudio { path, .. }) => Ok(path.clone()),
+        Object::CdAudio(_) | Object::EmbeddedWav(_) => Err(Error::InvalidFormat(
+            "CD and embedded WAV media do not carry external paths".into(),
+        )),
     }
 }
 

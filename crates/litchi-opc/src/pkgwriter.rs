@@ -57,6 +57,10 @@ impl PackageWriter {
     /// # Arguments
     /// * `path` - Path where the package should be written
     /// * `package` - The OPC package to write
+    ///
+    /// # Errors
+    /// Returns an error if the package cannot be serialized (for example an
+    /// invalid content type or partname) or if writing to the filesystem fails.
     pub fn write<P: AsRef<Path>>(path: P, package: &OpcPackage) -> Result<()> {
         crate::atomic::replace(path.as_ref(), |writer| {
             Self::write_to_stream(writer, package)
@@ -71,6 +75,12 @@ impl PackageWriter {
     /// # Arguments
     /// * `writer` - A writer that implements Write
     /// * `package` - The OPC package to write
+    ///
+    /// # Errors
+    /// Returns an error if the package cannot be serialized (for example an
+    /// invalid content type or partname) or if the sink rejects a write. When
+    /// the sink has already accepted bytes, the error is wrapped in
+    /// [`crate::OpcError::IncompleteOutput`] with the accepted byte count.
     pub fn write_to_stream<W: Write>(writer: W, package: &OpcPackage) -> Result<()> {
         let mut written = 0_u64;
         let result = Self::write_counted(
@@ -85,15 +95,15 @@ impl PackageWriter {
                 written,
                 source: Box::new(source),
             }),
-            result => result,
+            other => other,
         }
     }
 
     fn write_counted<W: Write>(writer: W, package: &OpcPackage) -> Result<()> {
         let mut physical = PhysPkgWriter::with_writer(writer);
         Self::write_package(&mut physical, package)?;
-        let mut writer = physical.finish_into_inner()?;
-        writer.flush()?;
+        let mut finished = physical.finish_into_inner()?;
+        finished.flush()?;
         Ok(())
     }
 
@@ -104,6 +114,10 @@ impl PackageWriter {
     ///
     /// # Returns
     /// The serialized package as a byte vector
+    ///
+    /// # Errors
+    /// Returns an error if the package cannot be serialized (for example an
+    /// invalid content type or partname) or if the in-memory zip writer fails.
     pub fn to_bytes(package: &OpcPackage) -> Result<Vec<u8>> {
         let mut physical = PhysPkgWriter::new();
         Self::write_package(&mut physical, package)?;
@@ -226,13 +240,14 @@ impl ContentTypesItem {
     /// otherwise uses an override for the specific partname.
     fn add_content_type(&mut self, partname: &PackURI, content_type: &str) -> Result<()> {
         let ext = partname.ext().to_ascii_lowercase();
-        let content_type = ContentType::new(content_type)?;
+        let parsed_content_type = ContentType::new(content_type)?;
 
         // Check if this is a standard default mapping
-        if Self::is_default_content_type(&ext, content_type.as_str()) {
-            self.defaults.insert(ext, content_type);
+        if Self::is_default_content_type(&ext, parsed_content_type.as_str()) {
+            self.defaults.insert(ext, parsed_content_type);
         } else {
-            self.overrides.insert(partname.to_string(), content_type);
+            self.overrides
+                .insert(partname.to_string(), parsed_content_type);
         }
         Ok(())
     }
@@ -245,8 +260,7 @@ impl ContentTypesItem {
                 | ("xml", ct::XML)
                 | ("bin", ct::XLSB_BIN)
                 | ("png", "image/png")
-                | ("jpg", "image/jpeg")
-                | ("jpeg", "image/jpeg")
+                | ("jpg" | "jpeg", "image/jpeg")
                 | ("gif", "image/gif")
                 | ("emf", "image/x-emf")
                 | ("wmf", "image/x-wmf")

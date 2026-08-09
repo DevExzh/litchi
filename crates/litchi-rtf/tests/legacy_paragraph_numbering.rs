@@ -1,11 +1,20 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{
     LegacyParagraphNumberingAlignment, LegacyParagraphNumberingFormat,
     LegacyParagraphNumberingLevel, LegacyParagraphNumberingUnderline, RtfDocument, RtfWriter,
 };
 
-const PRODUCER: &str = r#"{\rtf1\ansi\ansicpg1252
+const PRODUCER: &str = r"{\rtf1\ansi\ansicpg1252
 {\pn\pnlvl3\pndec\pnqc\pnstart7\pnindent720\pnsp120\pnacross\pnnumonce\pnprev\pnrestart\pnhang\pnbidia\pnf2\pnfs24\pncf3\pnb\pni0\pncaps\pnscaps0\pnstrike\pnuldashd\pnrauth4\pnrdate5\pnrnfc6\pnrnot\pnrpnbr7\pnrrgb255\pnrstart8\pnrstop9\pnrxst10{\pntxtb (}{\pntxta )\u20320?}}Alpha\par
-\pard{\pn\pnlvlblt\pngblip\pnqr{\pntxtb \'b7}}Beta\par}"#;
+\pard{\pn\pnlvlblt\pngblip\pnqr{\pntxtb \'b7}}Beta\par}";
 
 #[test]
 fn parses_owns_and_canonically_round_trips_pn_metadata() {
@@ -59,7 +68,7 @@ fn parses_owns_and_canonically_round_trips_pn_metadata() {
 #[test]
 fn pn_is_inert_and_paragraph_scoped() {
     let document =
-        RtfDocument::parse(r#"{\rtf1{\pn\pnlvlbody\pndec{\pntxtb NOT-BODY}}One\par\pard Two}"#)
+        RtfDocument::parse(r"{\rtf1{\pn\pnlvlbody\pndec{\pntxtb NOT-BODY}}One\par\pard Two}")
             .unwrap();
     assert_eq!(document.text(), "One\nTwo");
     let one = document
@@ -87,23 +96,23 @@ fn pn_is_inert_and_paragraph_scoped() {
 #[test]
 fn rejects_adversarial_pn_destinations() {
     let malformed = [
-        r#"{\rtf1\pn\pnlvlbody\pndec X}"#,
-        r#"{\rtf1{\*\pn\pnlvlbody\pndec}X}"#,
-        r#"{\rtf1{\pn2\pnlvlbody\pndec}X}"#,
-        r#"{\rtf1{\pn\pndec}X}"#,
-        r#"{\rtf1{\pn\pnlvl0\pndec}X}"#,
-        r#"{\rtf1{\pn\pnlvlbody}X}"#,
-        r#"{\rtf1{\pn\pnlvlbody\pndec\pnucrm}X}"#,
-        r#"{\rtf1{\pn\pnlvlbody\pndec\pnstart}X}"#,
-        r#"{\rtf1{\pn\pnlvlbody\pndec\pnstart32768}X}"#,
-        r#"{\rtf1{\pn\pnlvlbody\pndec\pnfs0}X}"#,
-        r#"{\rtf1{\pn\pnlvlbody\pndec\pnb2}X}"#,
-        r#"{\rtf1{\pn\pnlvlbody\pndec\pnql\pnqr}X}"#,
-        r#"{\rtf1{\pn\pnlvlbody\pndec{\pntxta A}{\pntxta B}}X}"#,
-        r#"{\rtf1{\pn\pnlvlbody\pndec{\pntxta {\field X}}}X}"#,
-        r#"{\rtf1 X{\pn\pnlvlbody\pndec}}"#,
-        r#"{\rtf1{\pn\pnlvlbody\pndec}{\pn\pnlvlbody\pndec}X}"#,
-        r#"{\rtf1\trowd\intbl{\pn\pnlvlbody\pndec}X\cell\row}"#,
+        r"{\rtf1\pn\pnlvlbody\pndec X}",
+        r"{\rtf1{\*\pn\pnlvlbody\pndec}X}",
+        r"{\rtf1{\pn2\pnlvlbody\pndec}X}",
+        r"{\rtf1{\pn\pndec}X}",
+        r"{\rtf1{\pn\pnlvl0\pndec}X}",
+        r"{\rtf1{\pn\pnlvlbody}X}",
+        r"{\rtf1{\pn\pnlvlbody\pndec\pnucrm}X}",
+        r"{\rtf1{\pn\pnlvlbody\pndec\pnstart}X}",
+        r"{\rtf1{\pn\pnlvlbody\pndec\pnstart32768}X}",
+        r"{\rtf1{\pn\pnlvlbody\pndec\pnfs0}X}",
+        r"{\rtf1{\pn\pnlvlbody\pndec\pnb2}X}",
+        r"{\rtf1{\pn\pnlvlbody\pndec\pnql\pnqr}X}",
+        r"{\rtf1{\pn\pnlvlbody\pndec{\pntxta A}{\pntxta B}}X}",
+        r"{\rtf1{\pn\pnlvlbody\pndec{\pntxta {\field X}}}X}",
+        r"{\rtf1 X{\pn\pnlvlbody\pndec}}",
+        r"{\rtf1{\pn\pnlvlbody\pndec}{\pn\pnlvlbody\pndec}X}",
+        r"{\rtf1\trowd\intbl{\pn\pnlvlbody\pndec}X\cell\row}",
     ];
     for source in malformed {
         assert!(

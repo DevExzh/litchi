@@ -1,4 +1,4 @@
-//! Package-independent values for PresentationML sections.
+//! Package-independent values for `PresentationML` sections.
 
 use std::collections::{HashMap, HashSet};
 
@@ -27,6 +27,7 @@ impl Section {
     }
 
     /// Add a presentation slide identifier.
+    #[must_use]
     pub fn add_slide(&mut self, slide_id: u32) {
         self.slide_ids.push(slide_id);
     }
@@ -45,6 +46,7 @@ pub struct List {
 }
 
 impl List {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -53,6 +55,7 @@ impl List {
         self.sections.push(section);
     }
 
+    #[must_use]
     pub fn sections(&self) -> &[Section] {
         &self.sections
     }
@@ -63,6 +66,7 @@ impl List {
     }
 
     /// Find a section by its stable GUID.
+    #[must_use]
     pub fn get_by_id(&self, id: &str) -> Option<&Section> {
         self.sections
             .iter()
@@ -85,6 +89,10 @@ impl List {
     }
 
     /// Reorder sections by a complete stable-GUID permutation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn reorder(&mut self, ordered_ids: &[String]) -> crate::Result<()> {
         let expected = self
             .sections
@@ -125,10 +133,12 @@ impl List {
         }
     }
 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.sections.len()
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.sections.is_empty()
     }

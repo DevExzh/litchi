@@ -15,8 +15,11 @@ use quick_xml::{
 use std::collections::{BTreeMap, HashSet};
 use std::ops::Range;
 
+/// # Errors
+///
+/// Returns an error when the value cannot be serialized.
 #[cfg_attr(not(test), allow(dead_code))]
-pub(crate) fn rewrite_conditional_styles(
+pub fn rewrite_conditional_styles(
     fragment: Option<&PreservedXmlFragment>,
     styles: &[ConditionalStyle],
 ) -> Result<PreservedXmlFragment> {
@@ -66,7 +69,10 @@ pub(crate) fn rewrite_conditional_styles(
     })
 }
 
-pub(crate) fn rewrite_managed_cell_styles(
+/// # Errors
+///
+/// Returns an error when the value cannot be serialized.
+pub fn rewrite_managed_cell_styles(
     fragment: Option<&PreservedXmlFragment>,
     conditional_styles: &[ConditionalStyle],
     protection_styles: &[TableStyle],
@@ -536,11 +542,17 @@ fn write_conditional_styles(styles: &[ConditionalStyle]) -> String {
     out
 }
 
-pub(crate) fn extract_automatic_styles(xml: &str) -> Result<Option<PreservedXmlFragment>> {
+/// # Errors
+///
+/// Returns an error when the source XML is malformed.
+pub fn extract_automatic_styles(xml: &str) -> Result<Option<PreservedXmlFragment>> {
     extract_office_fragment(xml, b"automatic-styles")
 }
 
-pub(crate) fn extract_font_face_decls(xml: &str) -> Result<Option<PreservedXmlFragment>> {
+/// # Errors
+///
+/// Returns an error when the source XML is malformed.
+pub fn extract_font_face_decls(xml: &str) -> Result<Option<PreservedXmlFragment>> {
     extract_office_fragment(xml, b"font-face-decls")
 }
 

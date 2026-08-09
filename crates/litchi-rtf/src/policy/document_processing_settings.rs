@@ -33,6 +33,7 @@ impl DocumentEventMask {
     pub const ALL: Self = Self(0x7fff);
 
     /// Construct a mask when every set bit is documented by RTF 1.9.1.
+    #[must_use]
     pub const fn from_bits(bits: u16) -> Option<Self> {
         if bits & !Self::ALL.0 == 0 {
             Some(Self(bits))
@@ -42,11 +43,13 @@ impl DocumentEventMask {
     }
 
     /// Return the raw documented event bits.
+    #[must_use]
     pub const fn bits(self) -> u16 {
         self.0
     }
 
     /// Return whether this mask contains every bit in `other`.
+    #[must_use]
     pub const fn contains(self, other: Self) -> bool {
         self.0 & other.0 == other.0
     }
@@ -55,7 +58,7 @@ impl DocumentEventMask {
 /// Passive printing, cleanup, and event-mask document properties.
 ///
 /// These values are retained for round-tripping only. This crate does not
-/// print with QuickDraw, clean numbering definitions, instantiate VBA
+/// print with `QuickDraw`, clean numbering definitions, instantiate VBA
 /// projects, or execute document events.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct DocumentProcessingSettings {
@@ -69,6 +72,7 @@ pub struct DocumentProcessingSettings {
 
 impl DocumentProcessingSettings {
     /// Return whether all three properties were omitted.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         !self.fractional_character_widths_for_printing
             && self.abstract_numbering_cleanup.is_none()
@@ -76,6 +80,7 @@ impl DocumentProcessingSettings {
     }
 
     /// Return the explicit cleanup status or the RTF omission default.
+    #[must_use]
     pub fn effective_abstract_numbering_cleanup(&self) -> AbstractNumberingCleanupStatus {
         self.abstract_numbering_cleanup
             .unwrap_or(AbstractNumberingCleanupStatus::Reviewed)

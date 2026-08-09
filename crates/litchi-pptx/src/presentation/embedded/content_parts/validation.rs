@@ -136,16 +136,15 @@ pub(crate) fn validate_parts(parts: &[ContentPart]) -> Result<()> {
             ));
         }
         if let Some(payload) = part.payload() {
-            if !payload_names.insert(payload.part_name().clone()) {
-                if payloads.iter().any(|value: &Payload| {
-                    value.part_name() == payload.part_name() && value != payload
-                }) {
-                    return Err(invalid(
-                        "content-part payload declarations conflict for one part",
-                    ));
-                }
-            } else {
+            if payload_names.insert(payload.part_name().clone()) {
                 payloads.push(payload.clone());
+            } else if payloads
+                .iter()
+                .any(|value: &Payload| value.part_name() == payload.part_name() && value != payload)
+            {
+                return Err(invalid(
+                    "content-part payload declarations conflict for one part",
+                ));
             }
         }
     }

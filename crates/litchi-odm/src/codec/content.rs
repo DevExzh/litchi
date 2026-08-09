@@ -13,12 +13,32 @@ const BODY_MARKER: &str = "<office:text";
 const MAX_CONTENT_BYTES: usize = 256 * 1024 * 1024;
 const MAX_DEPTH: usize = 256;
 const MAX_IDENTITIES: usize = 1_000_000;
+const MAX_REFERENCES: usize = 1_000_000;
+const MAX_REFERENCE_BYTES: usize = 16 * 1024;
 const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TEXT: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const XML: &[u8] = b"http://www.w3.org/XML/1998/namespace";
+const XLINK: &[u8] = b"http://www.w3.org/1999/xlink";
+
+/// Bounded semantic projection retained by the package snapshot.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct Semantics {
+    references: Vec<crate::model::subdocument::Reference>,
+}
+
+impl Semantics {
+    pub(crate) fn references(&self) -> &[crate::model::subdocument::Reference] {
+        &self.references
+    }
+}
 
 /// Validate a UTF-8 content part before authoring it into a package.
 pub(crate) fn validate(xml: &str) -> Result<()> {
+    parse(xml).map(|_| ())
+}
+
+/// Validates content and projects ordered, inert subdocument references.
+pub(crate) fn parse(xml: &str) -> Result<Semantics> {
     if xml.len() > MAX_CONTENT_BYTES {
         return Err(Error::InvalidFormat(
             "content.xml exceeds the family limit".to_string(),
@@ -29,11 +49,10 @@ pub(crate) fn validate(xml: &str) -> Result<()> {
             "content.xml has no master body".to_string(),
         ));
     }
-    validate_structure(xml)?;
-    Ok(())
+    parse_structure(xml)
 }
 
-fn validate_structure(xml: &str) -> Result<()> {
+fn parse_structure(xml: &str) -> Result<Semantics> {
     let mut reader = NsReader::from_reader(xml.as_bytes());
     let mut depth = 0usize;
     let mut root_seen = false;
@@ -43,6 +62,8 @@ fn validate_structure(xml: &str) -> Result<()> {
     let mut master_depth = None;
     let mut section_names = HashSet::new();
     let mut xml_ids = HashSet::new();
+    let mut sections = Vec::new();
+    let mut references = Vec::new();
     loop {
         let (namespace, event) = reader
             .read_resolved_event()
@@ -64,6 +85,8 @@ fn validate_structure(xml: &str) -> Result<()> {
                     &mut master_depth,
                     &mut section_names,
                     &mut xml_ids,
+                    &mut sections,
+                    &mut references,
                 )?;
             },
             Event::Empty(element) => {
@@ -81,9 +104,20 @@ fn validate_structure(xml: &str) -> Result<()> {
                     &mut master_depth,
                     &mut section_names,
                     &mut xml_ids,
+                    &mut sections,
+                    &mut references,
                 )?;
             },
-            Event::End(_) => {
+            Event::End(element) => {
+                let local = element.local_name();
+                if namespace == NamespaceKind::Text && local.as_ref() == b"section" {
+                    let section = sections
+                        .pop()
+                        .ok_or_else(|| invalid("ODM text:section nesting underflow"))?;
+                    if section.0 != depth {
+                        return Err(invalid("ODM text:section nesting is malformed"));
+                    }
+                }
                 if master_depth == Some(depth) {
                     master_depth = None;
                 }
@@ -95,6 +129,9 @@ fn validate_structure(xml: &str) -> Result<()> {
                     .ok_or_else(|| invalid("ODM XML depth underflow"))?;
             },
             Event::DocType(_) => return Err(invalid("DOCTYPE is not allowed in ODM content")),
+            Event::GeneralRef(_) => {
+                return Err(invalid("named XML entities are not allowed in ODM content"));
+            },
             Event::Eof => break,
             _ => {},
         }
@@ -104,7 +141,10 @@ fn validate_structure(xml: &str) -> Result<()> {
             "ODM content has an incomplete master-document structure",
         ));
     }
-    Ok(())
+    if !sections.is_empty() {
+        return Err(invalid("ODM text:section nesting is incomplete"));
+    }
+    Ok(Semantics { references })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -121,6 +161,8 @@ fn observe(
     master_depth: &mut Option<usize>,
     section_names: &mut HashSet<String>,
     xml_ids: &mut HashSet<String>,
+    sections: &mut Vec<(usize, String)>,
+    references: &mut Vec<crate::model::subdocument::Reference>,
 ) -> Result<()> {
     let local = element.local_name();
     if depth == 1 {
@@ -154,9 +196,46 @@ fn observe(
         }
         let name = attribute(reader, element, TEXT, b"name")?
             .ok_or_else(|| invalid("ODM text:section has no text:name"))?;
+        ensure_short(&name, "ODM text:section name")?;
+        let section = name.clone();
         insert_identity(section_names, name, "duplicate ODM section name")?;
+        if !empty {
+            sections
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "ODM section nesting",
+                    source,
+                })?;
+            sections.push((depth, section));
+        }
+    } else if namespace == NamespaceKind::Text && local.as_ref() == b"section-source" {
+        let Some((section_depth, section)) = sections.last() else {
+            return Err(invalid("ODM text:section-source is outside a text:section"));
+        };
+        if depth != section_depth.saturating_add(1) {
+            return Err(invalid(
+                "ODM text:section-source is not a direct text:section child",
+            ));
+        }
+        let href = attribute(reader, element, XLINK, b"href")?
+            .ok_or_else(|| invalid("ODM text:section-source has no xlink:href"))?;
+        ensure_short(&href, "ODM xlink:href")?;
+        if references.len() >= MAX_REFERENCES {
+            return Err(invalid("ODM subdocument reference count exceeds the limit"));
+        }
+        references
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "ODM subdocument references",
+                source,
+            })?;
+        references.push(crate::model::subdocument::Reference::new(
+            section.clone(),
+            href,
+        ));
     }
     if let Some(xml_id) = attribute(reader, element, XML, b"id")? {
+        ensure_short(&xml_id, "ODM xml:id")?;
         insert_identity(xml_ids, xml_id, "duplicate ODM xml:id")?;
     }
     Ok(())
@@ -166,8 +245,21 @@ fn insert_identity(set: &mut HashSet<String>, value: String, message: &str) -> R
     if set.len() >= MAX_IDENTITIES {
         return Err(invalid("ODM identity count exceeds the limit"));
     }
+    set.try_reserve(1).map_err(|source| Error::Allocation {
+        resource: "ODM identities",
+        source,
+    })?;
     if !set.insert(value) {
         return Err(invalid(message));
+    }
+    Ok(())
+}
+
+fn ensure_short(value: &str, scope: &str) -> Result<()> {
+    if value.len() > MAX_REFERENCE_BYTES {
+        return Err(invalid(format!(
+            "{scope} exceeds the {MAX_REFERENCE_BYTES}-byte limit"
+        )));
     }
     Ok(())
 }

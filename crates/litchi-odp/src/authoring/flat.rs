@@ -1,4 +1,4 @@
-//! Bounded, source-bound flat OpenDocument presentation support.
+//! Bounded, source-bound flat `OpenDocument` presentation support.
 
 use crate::codec::Parser;
 use crate::model::{Settings, Slide, declaration, page_layout, page_metadata, settings};
@@ -22,7 +22,11 @@ const MAX_TEXT_BYTES: usize = 16 * 1024 * 1024;
 const MAX_DEPTH: usize = 512;
 const MAX_SLIDES: usize = 65_536;
 
-/// An immutable flat OpenDocument presentation (`.fodp`).
+/// An immutable flat `OpenDocument` presentation (`.fodp`).
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "FlatPresentation is the established public type name; renaming it would break the crate API"
+)]
 #[derive(Clone)]
 pub struct FlatPresentation {
     bytes: Arc<[u8]>,
@@ -33,6 +37,9 @@ pub struct FlatPresentation {
 
 impl FlatPresentation {
     /// Open bounded UTF-8 flat-presentation bytes.
+    ///
+    /// # Errors
+    /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         if bytes.len() > MAX_XML_BYTES {
             return invalid("flat ODP exceeds the 64 MiB input limit");
@@ -77,21 +84,33 @@ impl FlatPresentation {
     }
 
     /// Read inert presentation declarations.
+    ///
+    /// # Errors
+    /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
     pub fn declarations(&self) -> Result<declaration::Collection> {
         declaration::parse(&self.xml)
     }
 
     /// Read flat-document presentation page layouts.
+    ///
+    /// # Errors
+    /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
     pub fn layouts(&self) -> Result<page_layout::Collection> {
         page_layout::parse(&self.xml)
     }
 
     /// Read static page metadata.
+    ///
+    /// # Errors
+    /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
     pub fn pages(&self) -> Result<page_metadata::Collection> {
         page_metadata::parse(&self.xml)
     }
 
     /// Read inert slide-show settings.
+    ///
+    /// # Errors
+    /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
     pub fn settings(&self) -> Result<Option<Settings>> {
         settings::parse(&self.xml)
     }
@@ -113,6 +132,9 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parse owned source bytes as a flat editing snapshot.
+    ///
+    /// # Errors
+    /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         Ok(FlatPresentation::from_bytes(bytes)?.snapshot())
     }
@@ -185,6 +207,9 @@ impl Transaction {
     ///
     /// Page attributes and speaker notes are retained verbatim. Unsupported
     /// direct page children cause a typed refusal before staging.
+    ///
+    /// # Errors
+    /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
     pub fn replace<'a, S>(&mut self, selector: S, title: &str, text: &str) -> Result<Option<()>>
     where
         S: Into<Selector<'a>>,
@@ -202,7 +227,7 @@ impl Transaction {
         self.replacements.insert(index, replacement);
         let slide = &mut self.draft[index];
         slide.title = (!title.is_empty()).then(|| title.to_owned());
-        slide.text = text.to_owned();
+        text.clone_into(&mut slide.text);
         slide.shapes.clear();
         slide.animations.clear();
         slide.legacy_animation = None;
@@ -210,6 +235,9 @@ impl Transaction {
     }
 
     /// Validate, serialize, reparse, and atomically publish the staged bytes.
+    ///
+    /// # Errors
+    /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
     pub fn commit(self) -> Result<Commit> {
         if self.replacements.is_empty() {
             return Ok(Commit::unchanged(self.source));
@@ -309,6 +337,9 @@ pub struct Patch {
 
 impl Patch {
     /// Apply only to the exact source bytes from which this patch was made.
+    ///
+    /// # Errors
+    /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.bytes() != self.before.bytes() {
             return invalid("flat ODP patch source does not match");
@@ -347,7 +378,8 @@ fn scan_flat(xml: &str) -> Result<Vec<Range<usize>>> {
                 .map_err(|error| Error::InvalidFormat(format!("invalid flat ODP XML: {error}")))?;
             (namespace_of(&resolved), event)
         };
-        let end = reader.buffer_position() as usize;
+        let end = usize::try_from(reader.buffer_position())
+            .map_err(|_| invalid_error("flat ODP XML position exceeds platform limits"))?;
         match event {
             Event::Start(element) => {
                 let start = event_start(xml, end)?;
@@ -414,7 +446,11 @@ fn scan_flat(xml: &str) -> Result<Vec<Range<usize>>> {
                 return invalid("DOCTYPE and custom entities are not allowed in flat ODP");
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_) => {},
         }
     }
     if !stack.is_empty() || !root_seen || body_count != 1 || presentation_count != 1 {
@@ -440,7 +476,10 @@ fn validate_page_parent_and_limit(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the scanner threads root/body/presentation bookkeeping through one validation pass; splitting it would obscure the state machine"
+)]
 fn validate_open(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
@@ -459,15 +498,15 @@ fn validate_open(
         *root_seen = true;
         let mut mimetype = None;
         for attribute in element.attributes() {
-            let attribute = attribute.map_err(|error| {
+            let parsed_attribute = attribute.map_err(|error| {
                 Error::InvalidFormat(format!("invalid flat ODP attribute: {error}"))
             })?;
-            let (resolved, name) = reader.resolver().resolve_attribute(attribute.key);
+            let (resolved, name) = reader.resolver().resolve_attribute(parsed_attribute.key);
             if name.as_ref() == b"mimetype"
                 && matches!(resolved, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE)
             {
                 mimetype = Some(
-                    attribute
+                    parsed_attribute
                         .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
                         .map_err(|error| Error::InvalidFormat(error.to_string()))?
                         .into_owned(),
@@ -515,8 +554,8 @@ fn replace_page(page: &str, title: &str, text: &str) -> Result<String> {
         push_paragraphs(&mut output, text);
         output.push_str("</draw:text-box></draw:frame>");
     }
-    if let Some(notes) = notes {
-        output.push_str(notes);
+    if let Some(notes_fragment) = notes {
+        output.push_str(notes_fragment);
     }
     output.push_str(&page[close_start..]);
     Ok(output)
@@ -532,31 +571,32 @@ fn direct_notes(page: &str) -> Result<Option<&str>> {
             .read_resolved_event()
             .map_err(|error| Error::InvalidFormat(format!("invalid flat ODP page: {error}")))?;
         let namespace = namespace_of(&resolved);
-        let end = reader.buffer_position() as usize;
+        let end = usize::try_from(reader.buffer_position())
+            .map_err(|_| invalid_error("flat ODP XML position exceeds platform limits"))?;
         match event {
             Event::Start(element) => {
                 let start = event_start(page, end)?;
                 let local = element.local_name().as_ref().to_vec();
-                let namespace = inherited_fragment_namespace(namespace, element.name().as_ref());
-                if stack.len() == 1 && !is_modeled_direct_page_child(namespace.as_deref(), &local) {
+                let inherited = inherited_fragment_namespace(namespace, element.name().as_ref());
+                if stack.len() == 1 && !is_modeled_direct_page_child(inherited.as_deref(), &local) {
                     return Err(Error::Unsupported(
                         "flat ODP page has an unsupported direct child; replacement refused"
                             .to_string(),
                     ));
                 }
-                stack.push((namespace, local, start));
+                stack.push((inherited, local, start));
             },
             Event::Empty(element) => {
-                let namespace = inherited_fragment_namespace(namespace, element.name().as_ref());
+                let inherited = inherited_fragment_namespace(namespace, element.name().as_ref());
                 let local_name = element.local_name();
                 let local = local_name.as_ref();
-                if stack.len() == 1 && !is_modeled_direct_page_child(namespace.as_deref(), local) {
+                if stack.len() == 1 && !is_modeled_direct_page_child(inherited.as_deref(), local) {
                     return Err(Error::Unsupported(
                         "flat ODP page has an unsupported direct child; replacement refused"
                             .to_string(),
                     ));
                 }
-                if stack.len() == 1 && is(namespace.as_deref(), local, PRESENTATION, b"notes") {
+                if stack.len() == 1 && is(inherited.as_deref(), local, PRESENTATION, b"notes") {
                     if notes.is_some() {
                         return invalid("flat ODP page has duplicate speaker notes");
                     }
@@ -565,10 +605,12 @@ fn direct_notes(page: &str) -> Result<Option<&str>> {
                 }
             },
             Event::End(_) => {
-                let (namespace, local, start) = stack
+                let (popped_namespace, local, start) = stack
                     .pop()
                     .ok_or_else(|| invalid_error("flat ODP page depth underflow"))?;
-                if stack.len() == 1 && is(namespace.as_deref(), &local, PRESENTATION, b"notes") {
+                if stack.len() == 1
+                    && is(popped_namespace.as_deref(), &local, PRESENTATION, b"notes")
+                {
                     if notes.is_some() {
                         return invalid("flat ODP page has duplicate speaker notes");
                     }
@@ -579,7 +621,11 @@ fn direct_notes(page: &str) -> Result<Option<&str>> {
                 return invalid("DOCTYPE and custom entities are not allowed in flat ODP pages");
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_) => {},
         }
     }
     Ok(notes)
@@ -677,7 +723,7 @@ fn event_start(xml: &str, end: usize) -> Result<usize> {
 fn namespace_of(namespace: &ResolveResult<'_>) -> Option<Vec<u8>> {
     match namespace {
         ResolveResult::Bound(Namespace(uri)) => Some(uri.to_vec()),
-        _ => None,
+        ResolveResult::Unbound | ResolveResult::Unknown(_) => None,
     }
 }
 

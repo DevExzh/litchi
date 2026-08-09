@@ -23,6 +23,7 @@ pub enum Kind {
 
 impl Kind {
     /// MIME family used by the corresponding resource.
+    #[must_use]
     pub const fn mime_prefix(self) -> &'static str {
         match self {
             Self::Audio => "audio",
@@ -31,6 +32,7 @@ impl Kind {
     }
 
     /// OPC relationship type used for the media payload.
+    #[must_use]
     pub const fn relationship_type(self) -> &'static str {
         match self {
             Self::Audio => rt::AUDIO,
@@ -55,6 +57,7 @@ pub enum Format {
 
 impl Format {
     /// Detect a format from a file-name extension.
+    #[must_use]
     pub fn from_extension(extension: &str) -> Self {
         match extension
             .trim_start_matches('.')
@@ -74,6 +77,7 @@ impl Format {
     }
 
     /// Detect a format from bounded magic bytes.
+    #[must_use]
     pub fn detect_from_bytes(data: &[u8]) -> Self {
         if data.starts_with(b"ID3") {
             return Self::Mp3;
@@ -102,6 +106,7 @@ impl Format {
     }
 
     /// MIME type associated with this format.
+    #[must_use]
     pub const fn mime_type(self) -> &'static str {
         match self {
             Self::Mp3 => "audio/mpeg",
@@ -117,6 +122,7 @@ impl Format {
     }
 
     /// Conventional extension used for a generated media part.
+    #[must_use]
     pub const fn extension(self) -> &'static str {
         match self {
             Self::Mp3 => "mp3",
@@ -132,6 +138,7 @@ impl Format {
     }
 
     /// Infer the audio/video family represented by this format.
+    #[must_use]
     pub const fn kind(self) -> Kind {
         match self {
             Self::Mp3 | Self::Wav | Self::Wma | Self::M4a => Kind::Audio,
@@ -167,12 +174,14 @@ pub struct Item {
 
 impl Item {
     /// Construct an item with format detection and no optional playback flags.
+    #[must_use]
     pub fn new(data: Vec<u8>, x: i64, y: i64, width: i64, height: i64) -> Self {
         let format = Format::detect_from_bytes(&data);
         Self::with_format(data, format, x, y, width, height)
     }
 
     /// Construct an item with an explicit format.
+    #[must_use]
     pub fn with_format(
         data: Vec<u8>,
         format: Format,
@@ -196,6 +205,10 @@ impl Item {
     }
 
     /// Validate payload, name, and positive frame dimensions before storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn validate(&self) -> Result<()> {
         if self.data.len() > MAX_DATA_BYTES {
             return Err(Error::Limit {
@@ -208,12 +221,12 @@ impl Item {
                 "presentation media frame extents must be positive".to_string(),
             ));
         }
-        if let Some(name) = &self.name {
-            if name.is_empty() || name.len() > MAX_NAME_BYTES {
-                return Err(Error::Invalid(
-                    "presentation media name is empty or too long".to_string(),
-                ));
-            }
+        if let Some(name) = &self.name
+            && (name.is_empty() || name.len() > MAX_NAME_BYTES)
+        {
+            return Err(Error::Invalid(
+                "presentation media name is empty or too long".to_string(),
+            ));
         }
         Ok(())
     }
@@ -245,11 +258,16 @@ impl Item {
     }
 
     /// Return the audio/video family selected by the format.
+    #[must_use]
     pub const fn kind(&self) -> Kind {
         self.format.kind()
     }
 
     /// Serialize a bounded, namespace-self-contained media picture fragment.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_shape_xml(
         &self,
         shape_id: u32,
@@ -280,10 +298,10 @@ impl Item {
             a = String::from_utf8_lossy(super::embedded::DML),
             r = String::from_utf8_lossy(super::embedded::REL),
         )
-        .map_err(|_| Error::Write)?;
+        .map_err(|_err| Error::Write)?;
         if let Some(relationship_id) = poster_relationship_id {
             write!(xml, r#"<a:blip r:embed="{}"/>"#, escape(relationship_id))
-                .map_err(|_| Error::Write)?;
+                .map_err(|_err| Error::Write)?;
         } else {
             xml.push_str("<a:blip/>");
         }
@@ -292,7 +310,7 @@ impl Item {
             r#"<a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="{}" y="{}"/><a:ext cx="{}" cy="{}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>"#,
             self.x, self.y, self.width, self.height
         )
-        .map_err(|_| Error::Write)?;
+        .map_err(|_err| Error::Write)?;
         Ok(xml)
     }
 }
@@ -307,6 +325,11 @@ fn escape(value: &str) -> String {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

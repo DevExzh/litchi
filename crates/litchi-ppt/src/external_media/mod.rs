@@ -1,4 +1,4 @@
-//! Typed, inert PowerPoint external-media metadata.
+//! Typed, inert `PowerPoint` external-media metadata.
 //!
 //! The model is kept separate from the record codec so callers work with
 //! contextual media objects while the binary layer remains strict and

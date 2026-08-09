@@ -18,6 +18,10 @@ use crate::package::{Error, Result};
 use crate::records::Record;
 
 /// Parse an exact rotation behavior container.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_rotation_behavior(record: &Record) -> Result<TimeRotationBehavior> {
     require_container(
         record,
@@ -47,6 +51,10 @@ pub fn parse_time_rotation_behavior(record: &Record) -> Result<TimeRotationBehav
 }
 
 /// Parse an exact 20-byte `TimeRotationBehaviorAtom` payload.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_rotation_behavior_atom(record: &Record) -> Result<TimeRotationBehaviorAtom> {
     require_atom(
         record,
@@ -68,7 +76,7 @@ pub fn parse_time_rotation_behavior_atom(record: &Record) -> Result<TimeRotation
     };
     let to_degrees = if flags & 0x04 != 0 {
         Some(read_f32(&record.data, 12))
-    } else if read_f32(&record.data, 12) == 360.0 {
+    } else if read_f32(&record.data, 12).to_bits() == 360.0_f32.to_bits() {
         None
     } else {
         return Err(Error::InvalidFormat(
@@ -106,6 +114,10 @@ pub fn parse_time_rotation_behavior_atom(record: &Record) -> Result<TimeRotation
 }
 
 /// Parse an exact scale behavior container.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_scale_behavior(record: &Record) -> Result<TimeScaleBehavior> {
     require_container(
         record,
@@ -125,6 +137,10 @@ pub fn parse_time_scale_behavior(record: &Record) -> Result<TimeScaleBehavior> {
 }
 
 /// Parse an exact 32-byte `TimeScaleBehaviorAtom` payload.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_scale_behavior_atom(record: &Record) -> Result<TimeScaleBehaviorAtom> {
     require_atom(
         record,
@@ -147,7 +163,9 @@ pub fn parse_time_scale_behavior_atom(record: &Record) -> Result<TimeScaleBehavi
     };
     let to_percent = if flags & 0x04 != 0 {
         Some((read_f32(&record.data, 20), read_f32(&record.data, 24)))
-    } else if read_f32(&record.data, 20) == 100.0 && read_f32(&record.data, 24) == 100.0 {
+    } else if read_f32(&record.data, 20).to_bits() == 100.0_f32.to_bits()
+        && read_f32(&record.data, 24).to_bits() == 100.0_f32.to_bits()
+    {
         None
     } else {
         return Err(Error::InvalidFormat(
@@ -180,6 +198,10 @@ pub fn parse_time_scale_behavior_atom(record: &Record) -> Result<TimeScaleBehavi
 }
 
 /// Parse an exact set-property behavior container.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_set_behavior(record: &Record) -> Result<TimeSetBehavior> {
     require_container(
         record,
@@ -220,6 +242,10 @@ pub fn parse_time_set_behavior(record: &Record) -> Result<TimeSetBehavior> {
 }
 
 /// Parse an exact 8-byte `TimeSetBehaviorAtom` payload.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_set_behavior_atom(record: &Record) -> Result<TimeSetBehaviorAtom> {
     require_atom(
         record,
@@ -235,9 +261,9 @@ pub fn parse_time_set_behavior_atom(record: &Record) -> Result<TimeSetBehaviorAt
             0 => TimeAnimateValueType::String,
             1 => TimeAnimateValueType::Number,
             2 => TimeAnimateValueType::Color,
-            value => {
+            invalid => {
                 return Err(Error::InvalidFormat(format!(
-                    "invalid set behavior value type {value}"
+                    "invalid set behavior value type {invalid}"
                 )));
             },
         })
@@ -317,6 +343,10 @@ pub(super) fn validate_basic_behavior_properties(behavior: &TimeBehavior) -> Res
 }
 
 /// Parse an exact command behavior container.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_command_behavior(record: &Record) -> Result<TimeCommandBehavior> {
     require_container(
         record,
@@ -352,8 +382,8 @@ pub fn parse_time_command_behavior(record: &Record) -> Result<TimeCommandBehavio
         ));
     }
     validate_basic_behavior_properties(&behavior)?;
-    if let Some(command) = &command {
-        validate_time_command(atom.command_type, command)?;
+    if let Some(command_text) = &command {
+        validate_time_command(atom.command_type, command_text)?;
     }
     Ok(TimeCommandBehavior {
         atom,
@@ -363,6 +393,10 @@ pub fn parse_time_command_behavior(record: &Record) -> Result<TimeCommandBehavio
 }
 
 /// Parse an exact 8-byte `TimeCommandBehaviorAtom` payload.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_command_behavior_atom(record: &Record) -> Result<TimeCommandBehaviorAtom> {
     require_atom(
         record,
@@ -378,9 +412,9 @@ pub fn parse_time_command_behavior_atom(record: &Record) -> Result<TimeCommandBe
             0 => TimeCommandBehaviorType::Event,
             1 => TimeCommandBehaviorType::Call,
             2 => TimeCommandBehaviorType::OleVerb,
-            value => {
+            invalid => {
                 return Err(Error::InvalidFormat(format!(
-                    "invalid command behavior type {value}"
+                    "invalid command behavior type {invalid}"
                 )));
             },
         })
@@ -424,6 +458,10 @@ fn validate_time_command(
 }
 
 /// Parse an exact `TimeIterateDataAtom`.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_iterate_data(record: &Record) -> Result<TimeIterateData> {
     require_atom(
         record,
@@ -461,6 +499,10 @@ pub fn parse_time_iterate_data(record: &Record) -> Result<TimeIterateData> {
 }
 
 /// Parse an exact `TimeSequenceDataAtom`.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_sequence_data(record: &Record) -> Result<TimeSequenceData> {
     require_atom(
         record,
@@ -513,6 +555,10 @@ fn optional_u32<T>(
 }
 
 /// Parse an exact `TimeConditionContainer` and its optional visual target.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_condition(record: &Record) -> Result<TimeCondition> {
     require_container(
         record,
@@ -566,6 +612,10 @@ pub fn parse_time_condition(record: &Record) -> Result<TimeCondition> {
 }
 
 /// Parse an exact 16-byte `TimeConditionAtom` payload.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_condition_atom(record: &Record) -> Result<TimeConditionAtom> {
     require_atom(
         record,
@@ -616,6 +666,10 @@ pub fn parse_time_condition_atom(record: &Record) -> Result<TimeConditionAtom> {
 }
 
 /// Parse an exact `TimeModifierAtom`.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_modifier(record: &Record) -> Result<TimeModifier> {
     if record.record_type != RecordType::TimeModifier {
         return Err(Error::InvalidFormat(format!(

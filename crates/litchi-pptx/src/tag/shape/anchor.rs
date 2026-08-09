@@ -1,6 +1,6 @@
 //! Transaction-ready XML edits for a shape-owned `p:tags` anchor.
 //!
-//! This owner contains only the local PresentationML mutations around the
+//! This owner contains only the local `PresentationML` mutations around the
 //! anchor. Relationship graph validation and package staging remain in the
 //! parent codec, while shape discovery remains in the semantic scanner.
 

@@ -1,6 +1,24 @@
-use super::*;
+use super::{
+    Alignment, CharacterType, ColorRef, ControlWord, Cow, DeferredText, Destination, FontRef,
+    Formatting, LatentStyleExceptionBuilder, MAX_LIST_LEVELS, MAX_LIST_TABS, MAX_LIST_TEXT_BYTES,
+    MAX_LISTS, MAX_PARAGRAPH_DROP_CAP_LINES, MAX_REVISION_AUTHOR_BYTES, MAX_REVISION_AUTHORS,
+    MAX_STYLE_NAME_BYTES, MAX_STYLES, NonZeroU16, Paragraph, ParagraphBorderSide, ParagraphDropCap,
+    ParagraphDropCapKind, ParagraphFontAlignment, ParagraphWrapping, Parser, RtfError, RtfResult,
+    SmallVec, State, TextDirection, Token, UnderlineStyle, animated_text,
+    apply_associated_character_control, associated_font_ref, character_grid,
+    character_style_reference, character_type_selector, complex_script_selector,
+    control_symbol_text, emphasis_mark, fit_text, nonnegative_author_index,
+    paragraph_style_reference, parser_classification_error, require_parameterless,
+    required_list_spacing, required_paragraph_bool, required_paragraph_indent,
+    required_table_value, section_style_reference, strict_paragraph_selector,
+    strict_paragraph_toggle, table_style_reference,
+};
 
 impl<'a> Parser<'a> {
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn parse_latent_styles(&mut self) -> RtfResult<crate::LatentStyles<'a>> {
         self.pos += 1; // ignorable-destination marker
         if !matches!(
@@ -66,17 +84,17 @@ impl<'a> Parser<'a> {
                     }
                     match control {
                         ControlWord::LatentStyleMax(value) => {
-                            let value = u32::try_from(*value).map_err(|_| {
+                            let max_index = u32::try_from(*value).map_err(|_err| {
                                 RtfError::MalformedDocument(
                                     "RTF lsdstimax cannot be negative".to_string(),
                                 )
                             })?;
-                            if value > crate::latent_style::MAX_LATENT_STYLE_INDEX {
+                            if max_index > crate::latent_style::MAX_LATENT_STYLE_INDEX {
                                 return Err(RtfError::MalformedDocument(
                                     "RTF lsdstimax exceeds 65535".to_string(),
                                 ));
                             }
-                            set_once!(max_style_index, value, "lsdstimax");
+                            set_once!(max_style_index, max_index, "lsdstimax");
                         },
                         ControlWord::LatentStyleLockedDefault(value) => set_once!(
                             locked_default,
@@ -114,7 +132,7 @@ impl<'a> Parser<'a> {
                 Some(Token::Text(text)) if self.decode_transport_text(text)?.trim().is_empty() => {
                     self.pos += 1;
                 },
-                Some(Token::Binary(_)) | Some(Token::Text(_)) => {
+                Some(Token::Binary(_) | Token::Text(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF latentstyles contains orphan text or binary data".to_string(),
                     ));
@@ -124,10 +142,14 @@ impl<'a> Parser<'a> {
         }
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn parse_latent_style_exceptions(
         &mut self,
     ) -> RtfResult<Vec<crate::LatentStyleException<'a>>> {
-        self.expect_token(Token::OpenBrace)?;
+        self.expect_token(&Token::OpenBrace)?;
         if !matches!(
             self.tokens.get(self.pos),
             Some(Token::Control(ControlWord::LatentStyleExceptions))
@@ -232,8 +254,8 @@ impl<'a> Parser<'a> {
                             self.pos += 1;
                             continue;
                         },
-                        control if control_symbol_text(control).is_some() => {
-                            name.push_str(control_symbol_text(control).unwrap_or_default());
+                        symbol if control_symbol_text(symbol).is_some() => {
+                            name.push_str(control_symbol_text(symbol).unwrap_or_default());
                             self.pos += 1;
                             continue;
                         },
@@ -287,15 +309,15 @@ impl<'a> Parser<'a> {
                 "RTF latent-style parser found an invalid text boundary".to_string(),
             )
         })?;
-        let completed = completed.strip_suffix(';').ok_or_else(|| {
+        let completed_body = completed.strip_suffix(';').ok_or_else(|| {
             RtfError::MalformedDocument(
                 "RTF latent-style parser lost an exception delimiter".to_string(),
             )
         })?;
-        for entry_name in completed.split(';') {
-            let entry_name = entry_name.trim();
+        for entry_name in completed_body.split(';') {
+            let trimmed_name = entry_name.trim();
             let candidate = crate::LatentStyleException {
-                name: Cow::Borrowed(entry_name),
+                name: Cow::Borrowed(trimmed_name),
                 locked: builder.locked,
                 semi_hidden: builder.semi_hidden,
                 unhide_when_used: builder.unhide_when_used,
@@ -418,7 +440,7 @@ impl<'a> Parser<'a> {
                     }
                     self.pos += 1;
                 },
-                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Control(_)) => {
+                Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF theme payload cannot contain controls, nesting, or binary data"
                             .to_string(),
@@ -452,7 +474,7 @@ impl<'a> Parser<'a> {
                 Some(Token::Text(text)) if self.decode_transport_text(text)?.trim().is_empty() => {
                     self.pos += 1;
                 },
-                Some(Token::Binary(_)) | Some(Token::Control(_)) | Some(Token::Text(_)) => {
+                Some(Token::Binary(_) | Token::Control(_) | Token::Text(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF XML namespace table contains ungrouped, active, or binary data"
                             .to_string(),
@@ -482,8 +504,8 @@ impl<'a> Parser<'a> {
             match self.tokens.get(self.pos) {
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
-                    let value = self.arena.alloc_str(&value);
-                    return crate::DocumentWindowCaption::new(Cow::Borrowed(value));
+                    let stored = self.arena.alloc_str(&value);
+                    return crate::DocumentWindowCaption::new(Cow::Borrowed(stored));
                 },
                 Some(Token::Text(text)) => {
                     value.extend(
@@ -504,7 +526,7 @@ impl<'a> Parser<'a> {
                     value.push_str(control_symbol_text(control).unwrap_or_default());
                     self.pos += 1;
                 },
-                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Control(_)) => {
+                Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF window caption contains active, nested, or binary data".to_string(),
                     ));
@@ -535,8 +557,8 @@ impl<'a> Parser<'a> {
             match self.tokens.get(self.pos) {
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
-                    let location = self.arena.alloc_str(&location);
-                    return crate::DocumentXslTransform::new(Cow::Borrowed(location));
+                    let stored = self.arena.alloc_str(&location);
+                    return crate::DocumentXslTransform::new(Cow::Borrowed(stored));
                 },
                 Some(Token::Text(text)) => {
                     location.extend(
@@ -557,7 +579,7 @@ impl<'a> Parser<'a> {
                     location.push_str(control_symbol_text(control).unwrap_or_default());
                     self.pos += 1;
                 },
-                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Control(_)) => {
+                Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF XSL transform contains active, nested, or binary data".to_string(),
                     ));
@@ -603,7 +625,7 @@ impl<'a> Parser<'a> {
                                 .to_string(),
                         ));
                     }
-                    let bits = u16::from_str_radix(&value, 16).map_err(|_| {
+                    let bits = u16::from_str_radix(&value, 16).map_err(|_err| {
                         RtfError::MalformedDocument(
                             "invalid RTF style-list filter hexadecimal value".to_string(),
                         )
@@ -618,7 +640,7 @@ impl<'a> Parser<'a> {
                     );
                     self.pos += 1;
                 },
-                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Control(_)) => {
+                Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF style-list filter contains active, nested, or binary data".to_string(),
                     ));
@@ -657,8 +679,8 @@ impl<'a> Parser<'a> {
             match self.tokens.get(self.pos) {
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
-                    let data = self.arena.alloc_str(&data);
-                    return crate::LegacyWriteReservation::new(Cow::Borrowed(data));
+                    let stored = self.arena.alloc_str(&data);
+                    return crate::LegacyWriteReservation::new(Cow::Borrowed(stored));
                 },
                 Some(Token::Text(text)) => {
                     data.extend(
@@ -679,7 +701,7 @@ impl<'a> Parser<'a> {
                     data.push_str(control_symbol_text(control).unwrap_or_default());
                     self.pos += 1;
                 },
-                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Control(_)) => {
+                Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF legacy write reservation contains active, nested, or binary data"
                             .to_string(),
@@ -729,12 +751,12 @@ impl<'a> Parser<'a> {
                     }
                     let mut data = Vec::with_capacity(encoded.len() / 2);
                     for pair in encoded.as_bytes().chunks_exact(2) {
-                        let pair = std::str::from_utf8(pair).map_err(|_| {
+                        let pair_text = std::str::from_utf8(pair).map_err(|_err| {
                             RtfError::MalformedDocument(
                                 "invalid RTF write-reservation hash encoding".to_string(),
                             )
                         })?;
-                        data.push(u8::from_str_radix(pair, 16).map_err(|_| {
+                        data.push(u8::from_str_radix(pair_text, 16).map_err(|_err| {
                             RtfError::MalformedDocument(
                                 "invalid RTF write-reservation hash encoding".to_string(),
                             )
@@ -750,7 +772,7 @@ impl<'a> Parser<'a> {
                     );
                     self.pos += 1;
                 },
-                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Control(_)) => {
+                Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF write-reservation hash contains active, nested, or binary data"
                             .to_string(),
@@ -783,13 +805,13 @@ impl<'a> Parser<'a> {
             match self.tokens.get(self.pos) {
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
-                    let value = self.arena.alloc_str(value.trim());
-                    if value.is_empty() {
+                    let stored = self.arena.alloc_str(value.trim());
+                    if stored.is_empty() {
                         return Err(RtfError::MalformedDocument(
                             "RTF external document reference name cannot be empty".to_string(),
                         ));
                     }
-                    return Ok(Cow::Borrowed(value));
+                    return Ok(Cow::Borrowed(stored));
                 },
                 Some(Token::Text(text)) => {
                     value.extend(
@@ -810,7 +832,7 @@ impl<'a> Parser<'a> {
                     value.push_str(control_symbol_text(control).unwrap_or_default());
                     self.pos += 1;
                 },
-                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Control(_)) => {
+                Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF external document reference contains active, nested, or binary data"
                             .to_string(),
@@ -849,7 +871,7 @@ impl<'a> Parser<'a> {
                 Some(Token::Text(text)) if self.decode_transport_text(text)?.trim().is_empty() => {
                     self.pos += 1;
                 },
-                Some(Token::Binary(_)) | Some(Token::Control(_)) | Some(Token::Text(_)) => {
+                Some(Token::Binary(_) | Token::Control(_) | Token::Text(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF protection-user table contains ungrouped, active, or binary data"
                             .to_string(),
@@ -866,7 +888,7 @@ impl<'a> Parser<'a> {
                 "RTF protection-user count exceeds the safety limit".to_string(),
             ));
         }
-        self.expect_token(Token::OpenBrace)?;
+        self.expect_token(&Token::OpenBrace)?;
         let mut name = String::new();
         let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
         loop {
@@ -912,7 +934,7 @@ impl<'a> Parser<'a> {
                     name.push_str(control_symbol_text(control).unwrap_or_default());
                     self.pos += 1;
                 },
-                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Control(_)) => {
+                Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF protection-user entry contains active, nested, or binary data"
                             .to_string(),
@@ -934,20 +956,20 @@ impl<'a> Parser<'a> {
                 "RTF XML namespace count exceeds the safety limit".to_string(),
             ));
         }
-        self.expect_token(Token::OpenBrace)?;
+        self.expect_token(&Token::OpenBrace)?;
         let id = match self.tokens.get(self.pos) {
             Some(Token::Control(ControlWord::XmlNamespace(value))) => {
-                let value = u32::try_from(*value).map_err(|_| {
+                let namespace_id = u32::try_from(*value).map_err(|_err| {
                     RtfError::MalformedDocument(
                         "RTF XML namespace ID must be a positive signed integer".to_string(),
                     )
                 })?;
-                if value == 0 {
+                if namespace_id == 0 {
                     return Err(RtfError::MalformedDocument(
                         "RTF XML namespace ID must be a positive signed integer".to_string(),
                     ));
                 }
-                value
+                namespace_id
             },
             _ => {
                 return Err(RtfError::MalformedDocument(
@@ -967,10 +989,10 @@ impl<'a> Parser<'a> {
             match self.tokens.get(self.pos) {
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
-                    let namespace = namespace.trim();
+                    let trimmed_namespace = namespace.trim();
                     let entry = crate::XmlNamespace::new(
                         id,
-                        Cow::Borrowed(self.arena.alloc_str(namespace)),
+                        Cow::Borrowed(self.arena.alloc_str(trimmed_namespace)),
                     )?;
                     self.xml_namespace_text_bytes = self
                         .xml_namespace_text_bytes
@@ -1009,7 +1031,7 @@ impl<'a> Parser<'a> {
                     namespace.push_str(control_symbol_text(control).unwrap_or_default());
                     self.pos += 1;
                 },
-                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Control(_)) => {
+                Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF XML namespace entry contains active, nested, or binary data"
                             .to_string(),
@@ -1044,10 +1066,10 @@ impl<'a> Parser<'a> {
             match self.tokens.get(self.pos) {
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
-                    let value = value.trim();
-                    let value = value.strip_suffix(';').unwrap_or(value).trim_end();
-                    let value = self.arena.alloc_str(value);
-                    return crate::DocumentGenerator::new(Cow::Borrowed(value));
+                    let trimmed = value.trim();
+                    let stripped = trimmed.strip_suffix(';').unwrap_or(trimmed).trim_end();
+                    let stored = self.arena.alloc_str(stripped);
+                    return crate::DocumentGenerator::new(Cow::Borrowed(stored));
                 },
                 Some(Token::Text(text)) => {
                     value.push_str(&self.decode_transport_text(text)?);
@@ -1064,7 +1086,7 @@ impl<'a> Parser<'a> {
                     value.push_str(control_symbol_text(control).unwrap_or_default());
                     self.pos += 1;
                 },
-                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Control(_)) => {
+                Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF generator destination contains active, nested, or binary data"
                             .to_string(),
@@ -1112,7 +1134,7 @@ impl<'a> Parser<'a> {
                 Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
                     author.push_str(control_symbol_text(control).unwrap_or_default());
                 },
-                Some(Token::Control(_)) | Some(Token::Binary(_)) => {
+                Some(Token::Control(_) | Token::Binary(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF revision author contains a non-text control or binary data"
                             .to_string(),
@@ -1139,19 +1161,19 @@ impl<'a> Parser<'a> {
                 "RTF revision-author parser found an invalid text boundary".to_string(),
             )
         })?;
-        let completed = completed.strip_suffix(';').ok_or_else(|| {
+        let completed_body = completed.strip_suffix(';').ok_or_else(|| {
             RtfError::MalformedDocument(
                 "RTF revision-author parser lost an author delimiter".to_string(),
             )
         })?;
-        for author in completed.split(';') {
-            self.push_revision_author(author.trim().to_string())?;
+        for author in completed_body.split(';') {
+            self.push_revision_author(author.trim())?;
         }
         drop(text.drain(..=last_separator));
         Ok(())
     }
 
-    pub(super) fn push_revision_author(&mut self, author: String) -> RtfResult<()> {
+    pub(super) fn push_revision_author(&mut self, author: &str) -> RtfResult<()> {
         if self.revision_authors.len() >= MAX_REVISION_AUTHORS {
             return Err(RtfError::MalformedDocument(
                 "RTF revision author count exceeds the safety limit".to_string(),
@@ -1173,11 +1195,11 @@ impl<'a> Parser<'a> {
             ));
         }
         crate::error::try_reserve_one(&mut self.revision_authors, "revision authors")?;
-        let author = super::super::super::annotation::RevisionAuthor::new(Cow::Borrowed(
-            self.arena.alloc_str(&author),
+        let revision_author = super::super::super::annotation::RevisionAuthor::new(Cow::Borrowed(
+            self.arena.alloc_str(author),
         ))?;
-        author.validate()?;
-        self.revision_authors.push(author);
+        revision_author.validate()?;
+        self.revision_authors.push(revision_author);
         self.revision_author_text_bytes = revision_author_text_bytes;
         Ok(())
     }
@@ -1386,6 +1408,14 @@ impl<'a> Parser<'a> {
         Ok(index)
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the nine-level check above bounds the level count to the u8 range"
+    )]
     pub(super) fn parse_list_definition(&mut self) -> RtfResult<()> {
         self.pos += 2; // opening brace and `list`
         let mut list = super::super::super::list::List::new(0);
@@ -1485,6 +1515,10 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn parse_list_level(
         &mut self,
         level_index: u8,
@@ -1549,7 +1583,7 @@ impl<'a> Parser<'a> {
                         explicit_indent = true;
                     },
                     ControlWord::FontNumber(value) => {
-                        level.font_ref = u16::try_from(*value).map_err(|_| {
+                        level.font_ref = u16::try_from(*value).map_err(|_err| {
                             RtfError::MalformedDocument(
                                 "RTF list font reference is outside the supported range"
                                     .to_string(),
@@ -1564,7 +1598,7 @@ impl<'a> Parser<'a> {
                     },
                     ControlWord::FirstLineIndent(value) => level.first_line_indent = Some(*value),
                     ControlWord::TabPosition(value) => {
-                        let value = value.ok_or_else(|| {
+                        let tab_position = value.ok_or_else(|| {
                             RtfError::MalformedDocument(
                                 "RTF list-level tx control requires a numeric parameter"
                                     .to_string(),
@@ -1575,7 +1609,7 @@ impl<'a> Parser<'a> {
                                 "RTF list level has too many tabs".to_string(),
                             ));
                         }
-                        level.tabs.push(value);
+                        level.tabs.push(tab_position);
                     },
                     ControlWord::ListLevelTentative => level.tentative = true,
                     ControlWord::ListLevelLegal(value) => level.legal_format = *value,
@@ -1583,11 +1617,11 @@ impl<'a> Parser<'a> {
                     ControlWord::ListLevelOld(value) => level.legacy = *value,
                     ControlWord::ListLevelPrevious(value) => level.include_previous = *value,
                     ControlWord::ListLevelPreviousSpace(value) => {
-                        level.include_previous_space = *value
+                        level.include_previous_space = *value;
                     },
                     ControlWord::ListLevelTemplateId(value) => level.template_id = Some(*value),
                     ControlWord::ListLevelPicture(value) => {
-                        level.picture_index = Some(u32::try_from(*value).map_err(|_| {
+                        level.picture_index = Some(u32::try_from(*value).map_err(|_err| {
                             RtfError::MalformedDocument(
                                 "RTF list picture index cannot be negative".to_string(),
                             )
@@ -1623,12 +1657,12 @@ impl<'a> Parser<'a> {
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
                     let trimmed = value.trim_end_matches(['\r', '\n', ' ']);
-                    let trimmed = trimmed.strip_suffix(';').unwrap_or(trimmed);
+                    let stripped = trimmed.strip_suffix(';').unwrap_or(trimmed);
                     if is_name {
-                        return Ok(trimmed.trim().to_string());
+                        return Ok(stripped.trim().to_string());
                     }
                     if strip_length {
-                        let mut chars = trimmed.chars();
+                        let mut chars = stripped.chars();
                         if chars
                             .next()
                             .is_some_and(|ch| u32::from(ch) <= u8::MAX.into())
@@ -1636,7 +1670,7 @@ impl<'a> Parser<'a> {
                             return Ok(chars.collect());
                         }
                     }
-                    return Ok(trimmed.to_string());
+                    return Ok(stripped.to_string());
                 },
                 Some(Token::OpenBrace) => {
                     self.skip_group()?;
@@ -1653,8 +1687,8 @@ impl<'a> Parser<'a> {
                     }
                     continue;
                 },
-                Some(Token::Control(ControlWord::UnicodeSkip(value))) => {
-                    unicode_skip = (*value).max(0);
+                Some(Token::Control(ControlWord::UnicodeSkip(skip))) => {
+                    unicode_skip = (*skip).max(0);
                 },
                 Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
                     value.push_str(control_symbol_text(control).unwrap_or_default());
@@ -1750,7 +1784,7 @@ impl<'a> Parser<'a> {
                     let mut has_start_override = false;
                     let mut has_format_override = false;
                     let mut level_start_at = None;
-                    let override_index = u8::try_from(override_levels.len()).map_err(|_| {
+                    let override_index = u8::try_from(override_levels.len()).map_err(|_err| {
                         RtfError::MalformedDocument(
                             "RTF list override has too many levels".to_string(),
                         )
@@ -1806,7 +1840,7 @@ impl<'a> Parser<'a> {
                 Some(Token::Control(ControlWord::ListId(value))) => list_id = Some(*value),
                 Some(Token::Control(ControlWord::ListOverrideIndex(value))) => index = Some(*value),
                 Some(Token::Control(ControlWord::ListOverrideCount(value))) => {
-                    level_count = Some(u8::try_from(*value).map_err(|_| {
+                    level_count = Some(u8::try_from(*value).map_err(|_err| {
                         RtfError::MalformedDocument(
                             "RTF list override count is outside the supported range".to_string(),
                         )
@@ -1820,13 +1854,14 @@ impl<'a> Parser<'a> {
         if !closed {
             return Err(RtfError::UnexpectedEof);
         }
-        if let (Some(index), Some(list_id)) = (index, list_id) {
+        if let (Some(list_index), Some(override_list_id)) = (index, list_id) {
             if self.list_override_table.overrides().len() >= MAX_LISTS {
                 return Err(RtfError::MalformedDocument(
                     "RTF list override count exceeds the safety limit".to_string(),
                 ));
             }
-            let mut entry = super::super::super::list::ListOverride::new(index, list_id);
+            let mut entry =
+                super::super::super::list::ListOverride::new(list_index, override_list_id);
             entry.level_count_override = level_count;
             entry.start_at_override = start_at;
             entry.levels = override_levels;
@@ -1836,6 +1871,10 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse the standard RTF stylesheet destination.
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn default_character_property_key(
         control: &ControlWord<'_>,
     ) -> Option<&'static str> {
@@ -1909,6 +1948,10 @@ impl<'a> Parser<'a> {
         })
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn default_paragraph_property_key(
         control: &ControlWord<'_>,
     ) -> Option<&'static str> {
@@ -1968,6 +2011,10 @@ impl<'a> Parser<'a> {
         })
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn parse_default_formatting_destination(
         &mut self,
         kind: crate::DefaultFormattingDestination,
@@ -2078,7 +2125,7 @@ impl<'a> Parser<'a> {
                             .to_string(),
                     ));
                 },
-                Some(Token::Binary(_)) | Some(Token::Text(_)) => {
+                Some(Token::Binary(_) | Token::Text(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF default-formatting destination contains active content".to_string(),
                     ));
@@ -2131,7 +2178,7 @@ impl<'a> Parser<'a> {
                             }
                             match control {
                                 ControlWord::FontNumber(value) => {
-                                    u16::try_from(*value).map_err(|_| {
+                                    u16::try_from(*value).map_err(|_err| {
                                         RtfError::MalformedDocument(
                                             "RTF defchp font value must be in 0..=65535"
                                                 .to_string(),
@@ -2147,7 +2194,7 @@ impl<'a> Parser<'a> {
                                 },
                                 ControlWord::ColorForeground(value)
                                 | ControlWord::Highlight(value) => {
-                                    u16::try_from(*value).map_err(|_| {
+                                    u16::try_from(*value).map_err(|_err| {
                                         RtfError::MalformedDocument(
                                             "RTF defchp color value must be in 0..=65535"
                                                 .to_string(),
@@ -2165,7 +2212,7 @@ impl<'a> Parser<'a> {
                                 },
                                 _ => {},
                             }
-                            Self::apply_style_property(&mut state, control)?
+                            Self::apply_style_property(&mut state, control)?;
                         } else {
                             return Err(RtfError::MalformedDocument(
                                 "unsupported control in RTF defchp destination".to_string(),
@@ -2185,17 +2232,17 @@ impl<'a> Parser<'a> {
                                     "RTF defpap itap requires a numeric parameter".to_string(),
                                 )
                             })?;
-                            let value = u8::try_from(value).map_err(|_| {
+                            let nesting_depth = u8::try_from(value).map_err(|_err| {
                                 RtfError::MalformedDocument(
                                     "RTF defpap itap value must be in 0..=32".to_string(),
                                 )
                             })?;
-                            if value > 32 {
+                            if nesting_depth > 32 {
                                 return Err(RtfError::MalformedDocument(
                                     "RTF defpap itap value must be in 0..=32".to_string(),
                                 ));
                             }
-                            itap = Some(value);
+                            itap = Some(nesting_depth);
                         } else if let Some(key) = Self::default_paragraph_property_key(control) {
                             if !seen.insert(key) {
                                 return Err(RtfError::MalformedDocument(format!(
@@ -2211,7 +2258,7 @@ impl<'a> Parser<'a> {
                             match control {
                                 ControlWord::NoWidowControl(parameter) => {
                                     require_parameterless(*parameter, "nowidctlpar")?;
-                                    state.paragraph.widow_control = false
+                                    state.paragraph.widow_control = false;
                                 },
                                 _ => Self::apply_style_property(&mut state, control)?,
                             }
@@ -2224,7 +2271,7 @@ impl<'a> Parser<'a> {
                 },
                 None => return Err(RtfError::UnexpectedEof),
             }
-            self.pos += 1
+            self.pos += 1;
         }
     }
 
@@ -2261,6 +2308,10 @@ impl<'a> Parser<'a> {
         Err(RtfError::UnexpectedEof)
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn parse_style_entry(&mut self) -> RtfResult<()> {
         self.pos += 1; // opening brace
         let starred = matches!(
@@ -2347,10 +2398,12 @@ impl<'a> Parser<'a> {
                     continue;
                 },
                 Some(Token::Control(control)) => match control {
-                    control if !name_complete && control_symbol_text(control).is_some() => {
+                    name_control
+                        if !name_complete && control_symbol_text(name_control).is_some() =>
+                    {
                         Self::append_style_name(
                             &mut name,
-                            control_symbol_text(control).unwrap_or_default(),
+                            control_symbol_text(name_control).unwrap_or_default(),
                             &mut name_complete,
                         );
                     },
@@ -2393,7 +2446,7 @@ impl<'a> Parser<'a> {
                         style_type = Some(super::super::super::stylesheet::StyleType::Table);
                         id = Some(table_style_reference(*value)?);
                     },
-                    control @ (ControlWord::TableStyleRowDefaults(_)
+                    table_control @ (ControlWord::TableStyleRowDefaults(_)
                     | ControlWord::TableStyleFirstRow(_)
                     | ControlWord::TableStyleLastRow(_)
                     | ControlWord::TableStyleFirstColumn(_)
@@ -2410,7 +2463,7 @@ impl<'a> Parser<'a> {
                                     .to_string(),
                             ));
                         }
-                        match control {
+                        match table_control {
                             ControlWord::TableStyleRowDefaults(param) => {
                                 require_parameterless(*param, "tsrowd")?;
                                 set_style_once!(
@@ -2517,24 +2570,24 @@ impl<'a> Parser<'a> {
                         linked_style = Some(Self::style_id(*value, "linked style")?);
                     },
                     ControlWord::StyleAdditive(value) => {
-                        set_style_once!("additive", additive, *value)
+                        set_style_once!("additive", additive, *value);
                     },
                     ControlWord::StyleAutoUpdate(value) => {
-                        set_style_once!("sautoupd", auto_update, *value)
+                        set_style_once!("sautoupd", auto_update, *value);
                     },
                     ControlWord::StyleHidden(value) => set_style_once!("shidden", hidden, *value),
                     ControlWord::StyleLocked(value) => set_style_once!("slocked", locked, *value),
                     ControlWord::StyleSemiHidden(value) => {
-                        set_style_once!("ssemihidden", semi_hidden, *value)
+                        set_style_once!("ssemihidden", semi_hidden, *value);
                     },
                     ControlWord::StyleUnhideWhenUsed(value) => {
-                        set_style_once!("sunhideused", unhide_when_used, *value)
+                        set_style_once!("sunhideused", unhide_when_used, *value);
                     },
                     ControlWord::StyleQuickFormat(value) => {
-                        set_style_once!("sqformat", quick_format, *value)
+                        set_style_once!("sqformat", quick_format, *value);
                     },
                     ControlWord::StylePriority(value) => {
-                        set_style_once!("spriority", priority, Some(*value))
+                        set_style_once!("spriority", priority, Some(*value));
                     },
                     ControlWord::StyleRevisionId(value) => {
                         if !seen_metadata.insert("styrsid") {
@@ -2545,10 +2598,10 @@ impl<'a> Parser<'a> {
                         revision_id = Some(*value);
                     },
                     ControlWord::StylePersonal(value) => {
-                        set_style_once!("spersonal", personal, *value)
+                        set_style_once!("spersonal", personal, *value);
                     },
                     ControlWord::StyleCompose(value) => {
-                        set_style_once!("scompose", compose, *value)
+                        set_style_once!("scompose", compose, *value);
                     },
                     ControlWord::StyleReply(value) => set_style_once!("sreply", reply, *value),
                     ControlWord::UnicodeSkip(value) => state.unicode_skip = (*value).max(0),
@@ -2572,7 +2625,7 @@ impl<'a> Parser<'a> {
             style_type = Some(super::super::super::stylesheet::StyleType::Paragraph);
             id = Some(0);
         }
-        let (Some(style_type), Some(id)) = (style_type, id) else {
+        let (Some(resolved_type), Some(resolved_id)) = (style_type, id) else {
             // Unknown starred extension groups are permitted inside a stylesheet.
             return Ok(());
         };
@@ -2581,7 +2634,7 @@ impl<'a> Parser<'a> {
                 "RTF style name must end with a semicolon".to_string(),
             ));
         }
-        if style_type != super::super::super::stylesheet::StyleType::Paragraph && !starred {
+        if resolved_type != super::super::super::stylesheet::StyleType::Paragraph && !starred {
             return Err(RtfError::MalformedDocument(
                 "RTF non-paragraph style entries must be starred".to_string(),
             ));
@@ -2591,27 +2644,36 @@ impl<'a> Parser<'a> {
                 "RTF style count exceeds the safety limit".to_string(),
             ));
         }
-        let name = name.trim().to_string();
-        let allocated = self.arena.alloc_str(&name);
-        let mut style = match style_type {
+        let style_name = name.trim().to_string();
+        let allocated = self.arena.alloc_str(&style_name);
+        let mut style = match resolved_type {
             super::super::super::stylesheet::StyleType::Paragraph => {
-                super::super::super::stylesheet::Style::paragraph(id, Cow::Borrowed(allocated))
+                super::super::super::stylesheet::Style::paragraph(
+                    resolved_id,
+                    Cow::Borrowed(allocated),
+                )
             },
             super::super::super::stylesheet::StyleType::Character => {
-                super::super::super::stylesheet::Style::character(id, Cow::Borrowed(allocated))
+                super::super::super::stylesheet::Style::character(
+                    resolved_id,
+                    Cow::Borrowed(allocated),
+                )
             },
             super::super::super::stylesheet::StyleType::Section => {
-                super::super::super::stylesheet::Style::section(id, Cow::Borrowed(allocated))
+                super::super::super::stylesheet::Style::section(
+                    resolved_id,
+                    Cow::Borrowed(allocated),
+                )
             },
             super::super::super::stylesheet::StyleType::Table => {
-                super::super::super::stylesheet::Style::table(id, Cow::Borrowed(allocated))
+                super::super::super::stylesheet::Style::table(resolved_id, Cow::Borrowed(allocated))
             },
         };
         style.based_on = based_on;
         style.next_style = next_style;
         style.linked_style = linked_style;
         style.formatting = state.formatting;
-        if style_type == super::super::super::stylesheet::StyleType::Paragraph {
+        if resolved_type == super::super::super::stylesheet::StyleType::Paragraph {
             Self::validate_drop_cap_state(&state, "paragraph style")?;
             style.paragraph = Some(state.paragraph);
         }
@@ -2633,7 +2695,7 @@ impl<'a> Parser<'a> {
     }
 
     pub(super) fn style_id(value: i32, field: &str) -> RtfResult<u16> {
-        u16::try_from(value).map_err(|_| {
+        u16::try_from(value).map_err(|_err| {
             RtfError::MalformedDocument(format!("RTF {field} ID is outside the supported range"))
         })
     }
@@ -2647,6 +2709,11 @@ impl<'a> Parser<'a> {
         }
     }
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "RTF \\uN parameters are signed 16-bit; the u16 wrap implements the specified negative-value conversion"
+    )]
     pub(super) fn parse_unicode_with_remainder(
         &mut self,
         first_code: i32,
@@ -2660,7 +2727,8 @@ impl<'a> Parser<'a> {
             self.pos += 1;
         }
 
-        let mut fallback_skip = (unicode_skip.max(0) as usize).saturating_mul(utf16.len());
+        let mut fallback_skip =
+            (unicode_skip.max(0).cast_unsigned() as usize).saturating_mul(utf16.len());
         let mut remainder = String::new();
         while fallback_skip > 0 && self.pos < self.tokens.len() {
             match self.tokens.get(self.pos) {
@@ -2674,12 +2742,11 @@ impl<'a> Parser<'a> {
                     }
                     self.pos += 1;
                 },
-                Some(Token::Control(ControlWord::Unicode(_))) => break,
+                Some(Token::Control(ControlWord::Unicode(_))) | None => break,
                 Some(_) => {
                     fallback_skip -= 1;
                     self.pos += 1;
                 },
-                None => break,
             }
         }
         let decoded = String::from_utf16(&utf16)
@@ -2714,20 +2781,24 @@ impl<'a> Parser<'a> {
         control: &str,
         maximum: u16,
     ) -> RtfResult<u16> {
-        let value = value.ok_or_else(|| {
+        let parameter = value.ok_or_else(|| {
             RtfError::MalformedDocument(format!("RTF {control} requires a numeric parameter"))
         })?;
-        let value = u16::try_from(value).map_err(|_| {
+        let parsed = u16::try_from(parameter).map_err(|_err| {
             RtfError::MalformedDocument(format!("RTF {control} value must be in 0..={maximum}"))
         })?;
-        if value > maximum {
+        if parsed > maximum {
             return Err(RtfError::MalformedDocument(format!(
                 "RTF {control} value must be in 0..={maximum}"
             )));
         }
-        Ok(value)
+        Ok(parsed)
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn table_border_style(control: &ControlWord<'_>) -> Option<crate::BorderStyle> {
         use crate::BorderStyle as Style;
         Some(match control {
@@ -2762,6 +2833,14 @@ impl<'a> Parser<'a> {
         })
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the crate distance constant is defined within the u16 range"
+    )]
     pub(super) fn apply_table_decoration_control(
         state: &mut State,
         control: &ControlWord<'_>,
@@ -2841,11 +2920,11 @@ impl<'a> Parser<'a> {
             *seen |= bit;
             match control {
                 ControlWord::TableShadingAmount(_, value) => {
-                    shading.amount = Some(required_table_value(*value, "table shading", 10_000)?)
+                    shading.amount = Some(required_table_value(*value, "table shading", 10_000)?);
                 },
                 ControlWord::TableShadingRawAmount(_, value) => {
                     shading.raw_amount =
-                        Some(required_table_value(*value, "raw table shading", 10_000)?)
+                        Some(required_table_value(*value, "raw table shading", 10_000)?);
                 },
                 ControlWord::TableShadingRawNil(_, value) => {
                     require_parameterless(*value, "clshdrawnil")?;
@@ -2856,21 +2935,21 @@ impl<'a> Parser<'a> {
                         *value,
                         "table shading foreground color",
                         u16::MAX,
-                    )?)
+                    )?);
                 },
                 ControlWord::TableShadingBackground(_, value) => {
                     shading.background_color = Some(required_table_value(
                         *value,
                         "table shading background color",
                         u16::MAX,
-                    )?)
+                    )?);
                 },
                 ControlWord::TableShadingPattern(_, pattern, param) => {
                     require_parameterless(*param, "table shading pattern")?;
-                    shading.pattern = Some(*pattern)
+                    shading.pattern = Some(*pattern);
                 },
                 ControlWord::TableRowShadingPatternIndex(value) => {
-                    shading.pattern_index = Some(required_table_value(*value, "trpat", u16::MAX)?)
+                    shading.pattern_index = Some(required_table_value(*value, "trpat", u16::MAX)?);
                 },
                 _ => return Err(parser_classification_error()),
             }
@@ -2920,21 +2999,21 @@ impl<'a> Parser<'a> {
             RtfError::ParserError("RTF active table-border state is missing".to_string())
         })?;
         if let Some(style) = Self::table_border_style(control) {
-            border.style = style
+            border.style = style;
         } else {
             match control {
                 ControlWord::BorderWidth(value) => {
-                    border.width = i32::from(required_table_value(*value, "brdrw", 75)?)
+                    border.width = i32::from(required_table_value(*value, "brdrw", 75)?);
                 },
                 ControlWord::BorderColor(value) => {
-                    border.color_ref = required_table_value(*value, "brdrcf", u16::MAX)?
+                    border.color_ref = required_table_value(*value, "brdrcf", u16::MAX)?;
                 },
                 ControlWord::BorderSpace(value) => {
                     border.space = i32::from(required_table_value(
                         *value,
                         "brsp",
                         crate::MAX_TABLE_DISTANCE_TWIPS as u16,
-                    )?)
+                    )?);
                 },
                 ControlWord::BorderShadow => border.shadow = true,
                 ControlWord::BorderFrame => border.frame = true,
@@ -2944,6 +3023,10 @@ impl<'a> Parser<'a> {
         Ok(true)
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn character_border_style(
         control: &ControlWord<'_>,
     ) -> Option<crate::CharacterBorderStyle> {
@@ -2980,6 +3063,10 @@ impl<'a> Parser<'a> {
         })
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn apply_character_decoration_control(
         state: &mut State,
         control: &ControlWord<'_>,
@@ -3113,6 +3200,10 @@ impl<'a> Parser<'a> {
     /// color, spacing, shadow, and frame controls apply to (RTF 1.9.1
     /// paragraph borders). `\box` is normalized onto all four sides; the
     /// `\brdrbar` and `\brdrbtw` segments are retained separately.
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn apply_paragraph_border_control(
         state: &mut State,
         control: &ControlWord<'_>,
@@ -3127,24 +3218,24 @@ impl<'a> Parser<'a> {
             ControlWord::BorderBox => Some(ParagraphBorderSide::Box),
             _ => None,
         };
-        if let Some(segment) = segment {
-            let bit = segment.bit();
+        if let Some(border_segment) = segment {
+            let bit = border_segment.bit();
             if state.paragraph_border_seen & bit != 0 {
                 return Err(RtfError::MalformedDocument(
                     "duplicate RTF paragraph border segment".to_string(),
                 ));
             }
             state.paragraph_border_seen |= bit;
-            state.paragraph_border_side = Some(segment);
+            state.paragraph_border_side = Some(border_segment);
             return Ok(true);
         }
 
         let side = state.paragraph_border_side;
         if let Some(style) = Self::table_border_style(control) {
-            let side = side.ok_or_else(|| {
+            let border_side = side.ok_or_else(|| {
                 RtfError::MalformedDocument("RTF paragraph border style has no segment".to_string())
             })?;
-            Self::apply_paragraph_border_side(state, side, |border| {
+            Self::apply_paragraph_border_side(state, border_side, |border| {
                 if border.style != crate::BorderStyle::None && style != crate::BorderStyle::None {
                     return Err(RtfError::MalformedDocument(
                         "duplicate RTF paragraph border style".to_string(),
@@ -3155,8 +3246,8 @@ impl<'a> Parser<'a> {
             })?;
             return Ok(true);
         }
-        let require_side = |state: &State| {
-            state.paragraph_border_side.ok_or_else(|| {
+        let require_side = |border_state: &State| {
+            border_state.paragraph_border_side.ok_or_else(|| {
                 RtfError::MalformedDocument(
                     "RTF paragraph border component has no segment".to_string(),
                 )
@@ -3169,8 +3260,8 @@ impl<'a> Parser<'a> {
                         "RTF brdrw requires a numeric parameter".to_string(),
                     )
                 })?;
-                let side = require_side(state)?;
-                Self::apply_paragraph_border_side(state, side, |border| {
+                let border_side = require_side(state)?;
+                Self::apply_paragraph_border_side(state, border_side, |border| {
                     border.width = width;
                     Ok(())
                 })?;
@@ -3178,8 +3269,8 @@ impl<'a> Parser<'a> {
             },
             ControlWord::BorderColor(value) => {
                 let color = Self::required_character_value(*value, "brdrcf", u16::MAX)?;
-                let side = require_side(state)?;
-                Self::apply_paragraph_border_side(state, side, |border| {
+                let border_side = require_side(state)?;
+                Self::apply_paragraph_border_side(state, border_side, |border| {
                     border.color_ref = color;
                     Ok(())
                 })?;
@@ -3187,24 +3278,24 @@ impl<'a> Parser<'a> {
             },
             ControlWord::BorderSpace(value) => {
                 let space = Self::required_character_value(*value, "brsp", u16::MAX)?;
-                let side = require_side(state)?;
-                Self::apply_paragraph_border_side(state, side, |border| {
+                let border_side = require_side(state)?;
+                Self::apply_paragraph_border_side(state, border_side, |border| {
                     border.space = i32::from(space);
                     Ok(())
                 })?;
                 Ok(true)
             },
             ControlWord::BorderShadow => {
-                let side = require_side(state)?;
-                Self::apply_paragraph_border_side(state, side, |border| {
+                let border_side = require_side(state)?;
+                Self::apply_paragraph_border_side(state, border_side, |border| {
                     border.shadow = true;
                     Ok(())
                 })?;
                 Ok(true)
             },
             ControlWord::BorderFrame => {
-                let side = require_side(state)?;
-                Self::apply_paragraph_border_side(state, side, |border| {
+                let border_side = require_side(state)?;
+                Self::apply_paragraph_border_side(state, border_side, |border| {
                     border.frame = true;
                     Ok(())
                 })?;
@@ -3214,6 +3305,10 @@ impl<'a> Parser<'a> {
         }
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn apply_paragraph_shading_control(
         state: &mut State,
         control: &ControlWord<'_>,
@@ -3225,7 +3320,7 @@ impl<'a> Parser<'a> {
                     .shading
                     .set_amount(Some(Self::required_character_value(
                         *value, "shading", 10_000,
-                    )?))?
+                    )?))?;
             },
             ControlWord::ForegroundPattern(value) => {
                 state
@@ -3235,7 +3330,7 @@ impl<'a> Parser<'a> {
                         *value,
                         "cfpat",
                         u16::MAX,
-                    )?))
+                    )?));
             },
             ControlWord::BackgroundPattern(value) => {
                 state
@@ -3245,13 +3340,22 @@ impl<'a> Parser<'a> {
                         *value,
                         "cbpat",
                         u16::MAX,
-                    )?))
+                    )?));
             },
             _ => return Ok(false),
         }
         Ok(true)
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "raw font, color, and font-size parameters wrap to 16 bits by design"
+    )]
     pub(super) fn apply_style_property(
         state: &mut State,
         control: &ControlWord<'_>,
@@ -3319,29 +3423,29 @@ impl<'a> Parser<'a> {
             ControlWord::UnderlineWave => state.formatting.underline = UnderlineStyle::Wave,
             ControlWord::UnderlineHairline => state.formatting.underline = UnderlineStyle::Hairline,
             ControlWord::UnderlineThickDotted => {
-                state.formatting.underline = UnderlineStyle::ThickDotted
+                state.formatting.underline = UnderlineStyle::ThickDotted;
             },
             ControlWord::UnderlineThickDashed => {
-                state.formatting.underline = UnderlineStyle::ThickDashed
+                state.formatting.underline = UnderlineStyle::ThickDashed;
             },
             ControlWord::UnderlineThickDashDot => {
-                state.formatting.underline = UnderlineStyle::ThickDashDot
+                state.formatting.underline = UnderlineStyle::ThickDashDot;
             },
             ControlWord::UnderlineThickDashDotDot => {
-                state.formatting.underline = UnderlineStyle::ThickDashDotDot
+                state.formatting.underline = UnderlineStyle::ThickDashDotDot;
             },
             ControlWord::UnderlineThickLongDash => {
-                state.formatting.underline = UnderlineStyle::ThickLongDash
+                state.formatting.underline = UnderlineStyle::ThickLongDash;
             },
             ControlWord::UnderlineLongDash => state.formatting.underline = UnderlineStyle::LongDash,
             ControlWord::UnderlineHeavyWave => {
-                state.formatting.underline = UnderlineStyle::HeavyWave
+                state.formatting.underline = UnderlineStyle::HeavyWave;
             },
             ControlWord::UnderlineDoubleWave => {
-                state.formatting.underline = UnderlineStyle::DoubleWave
+                state.formatting.underline = UnderlineStyle::DoubleWave;
             },
             ControlWord::UnderlineColor(value) => {
-                state.formatting.underline_color = Some(u16::try_from(*value).map_err(|_| {
+                state.formatting.underline_color = Some(u16::try_from(*value).map_err(|_err| {
                     RtfError::MalformedDocument(
                         "RTF underline color is outside the supported range".to_string(),
                     )
@@ -3434,21 +3538,21 @@ impl<'a> Parser<'a> {
                 state.formatting.character_type = Some(character_type_selector(
                     *parameter,
                     "loch",
-                    crate::CharacterType::LowAnsi,
+                    CharacterType::LowAnsi,
                 )?);
             },
             ControlWord::HighAnsiCharacter(parameter) => {
                 state.formatting.character_type = Some(character_type_selector(
                     *parameter,
                     "hich",
-                    crate::CharacterType::HighAnsi,
+                    CharacterType::HighAnsi,
                 )?);
             },
             ControlWord::DoubleByteCharacter(parameter) => {
                 state.formatting.character_type = Some(character_type_selector(
                     *parameter,
                     "dbch",
-                    crate::CharacterType::DoubleByte,
+                    CharacterType::DoubleByte,
                 )?);
             },
             ControlWord::FontComplexScript(value) => {
@@ -3475,7 +3579,7 @@ impl<'a> Parser<'a> {
                 state.paragraph.paragraph_style = Some(paragraph_style_reference(*value)?);
             },
             ControlWord::ParagraphRsid(value) => {
-                state.paragraph.paragraph_rsid = Some(*value as u32);
+                state.paragraph.paragraph_rsid = Some((*value).cast_unsigned());
             },
             ControlWord::ParagraphRevisionAuthor(value) => {
                 state.paragraph.revision.author = Some(nonnegative_author_index(*value, "prauth")?);
@@ -3519,19 +3623,19 @@ impl<'a> Parser<'a> {
             ControlWord::LineMultiple(value) => state.paragraph.spacing.line_multiple = *value,
             ControlWord::SpaceBeforeAuto(value) => {
                 state.paragraph.spacing_policy.automatic_before =
-                    required_paragraph_bool(*value, "sbauto")?
+                    required_paragraph_bool(*value, "sbauto")?;
             },
             ControlWord::SpaceAfterAuto(value) => {
                 state.paragraph.spacing_policy.automatic_after =
-                    required_paragraph_bool(*value, "saauto")?
+                    required_paragraph_bool(*value, "saauto")?;
             },
             ControlWord::ListSpaceBefore(value) => {
                 state.paragraph.spacing_policy.list_before =
-                    Some(required_list_spacing(*value, "lisb")?)
+                    Some(required_list_spacing(*value, "lisb")?);
             },
             ControlWord::ListSpaceAfter(value) => {
                 state.paragraph.spacing_policy.list_after =
-                    Some(required_list_spacing(*value, "lisa")?)
+                    Some(required_list_spacing(*value, "lisa")?);
             },
             ControlWord::NoSnapLineGrid(value) => {
                 strict_paragraph_selector(*value, "nosnaplinegrid")?;
@@ -3548,25 +3652,25 @@ impl<'a> Parser<'a> {
             },
             ControlWord::LogicalLeftIndent(v) => {
                 state.paragraph.logical_indentation.start =
-                    Some(required_paragraph_indent(*v, "lin")?)
+                    Some(required_paragraph_indent(*v, "lin")?);
             },
             ControlWord::LogicalRightIndent(v) => {
                 state.paragraph.logical_indentation.end =
-                    Some(required_paragraph_indent(*v, "rin")?)
+                    Some(required_paragraph_indent(*v, "rin")?);
             },
             ControlWord::CharacterFirstLineIndent(v) => {
                 state
                     .paragraph
                     .logical_indentation
-                    .first_line_character_units = Some(required_paragraph_indent(*v, "cufi")?)
+                    .first_line_character_units = Some(required_paragraph_indent(*v, "cufi")?);
             },
             ControlWord::CharacterLeftIndent(v) => {
                 state.paragraph.logical_indentation.left_character_units =
-                    Some(required_paragraph_indent(*v, "culi")?)
+                    Some(required_paragraph_indent(*v, "culi")?);
             },
             ControlWord::CharacterRightIndent(v) => {
                 state.paragraph.logical_indentation.right_character_units =
-                    Some(required_paragraph_indent(*v, "curi")?)
+                    Some(required_paragraph_indent(*v, "curi")?);
             },
             ControlWord::MirrorIndents(v) => {
                 strict_paragraph_selector(*v, "indmirror")?;
@@ -3587,62 +3691,59 @@ impl<'a> Parser<'a> {
             },
             ControlWord::ParagraphHyphenation(value) => {
                 state.paragraph.line_breaking.automatic_hyphenation =
-                    strict_paragraph_toggle(*value, "hyphpar")?
+                    strict_paragraph_toggle(*value, "hyphpar")?;
             },
             ControlWord::AutoSpaceAlphabetic(value) => {
                 state.paragraph.line_breaking.auto_space_alphabetic =
-                    strict_paragraph_toggle(*value, "aspalpha")?
+                    strict_paragraph_toggle(*value, "aspalpha")?;
             },
             ControlWord::AutoSpaceNumbers(value) => {
                 state.paragraph.line_breaking.auto_space_numbers =
-                    strict_paragraph_toggle(*value, "aspnum")?
+                    strict_paragraph_toggle(*value, "aspnum")?;
             },
             ControlWord::AdjustRightIndent(value) => {
                 state.paragraph.line_breaking.adjust_right_indent =
-                    strict_paragraph_toggle(*value, "adjustright")?
+                    strict_paragraph_toggle(*value, "adjustright")?;
             },
             ControlWord::WrapDefault(value) => {
                 strict_paragraph_selector(*value, "wrapdefault")?;
-                state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::Default;
+                state.paragraph.line_breaking.wrapping = ParagraphWrapping::Default;
             },
             ControlWord::NoCharacterWrap(value) => {
                 strict_paragraph_selector(*value, "nocwrap")?;
-                state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::NoCharacterWrap;
+                state.paragraph.line_breaking.wrapping = ParagraphWrapping::NoCharacterWrap;
             },
             ControlWord::NoWordWrap(value) => {
                 strict_paragraph_selector(*value, "nowwrap")?;
-                state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::NoWordWrap;
+                state.paragraph.line_breaking.wrapping = ParagraphWrapping::NoWordWrap;
             },
             ControlWord::NoOverflow(value) => {
                 strict_paragraph_selector(*value, "nooverflow")?;
-                state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::NoOverflow;
+                state.paragraph.line_breaking.wrapping = ParagraphWrapping::NoOverflow;
             },
             ControlWord::FontAlignAuto(value) => {
                 strict_paragraph_selector(*value, "faauto")?;
-                state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Auto;
+                state.paragraph.line_breaking.font_alignment = ParagraphFontAlignment::Auto;
             },
             ControlWord::FontAlignHanging(value) => {
                 strict_paragraph_selector(*value, "fahang")?;
-                state.paragraph.line_breaking.font_alignment =
-                    crate::ParagraphFontAlignment::Hanging;
+                state.paragraph.line_breaking.font_alignment = ParagraphFontAlignment::Hanging;
             },
             ControlWord::FontAlignCenter(value) => {
                 strict_paragraph_selector(*value, "facenter")?;
-                state.paragraph.line_breaking.font_alignment =
-                    crate::ParagraphFontAlignment::Center;
+                state.paragraph.line_breaking.font_alignment = ParagraphFontAlignment::Center;
             },
             ControlWord::FontAlignRoman(value) => {
                 strict_paragraph_selector(*value, "faroman")?;
-                state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Roman;
+                state.paragraph.line_breaking.font_alignment = ParagraphFontAlignment::Roman;
             },
             ControlWord::FontAlignVariable(value) => {
                 strict_paragraph_selector(*value, "favar")?;
-                state.paragraph.line_breaking.font_alignment =
-                    crate::ParagraphFontAlignment::Variable;
+                state.paragraph.line_breaking.font_alignment = ParagraphFontAlignment::Variable;
             },
             ControlWord::FontAlignFixed(value) => {
                 strict_paragraph_selector(*value, "fafixed")?;
-                state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Fixed;
+                state.paragraph.line_breaking.font_alignment = ParagraphFontAlignment::Fixed;
             },
             ControlWord::ListOverrideIndex(value) => {
                 state.paragraph.list_override = Some(*value);
@@ -3657,35 +3758,42 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "the range check above bounds the value to the u8 range"
+    )]
     pub(super) fn apply_drop_cap_control(
         state: &mut State,
         control: &ControlWord<'_>,
     ) -> RtfResult<bool> {
         match control {
             ControlWord::DropCapLines(value) => {
-                let value = value.ok_or_else(|| {
+                let raw_lines = value.ok_or_else(|| {
                     RtfError::MalformedDocument(
                         "RTF dropcapli requires a numeric parameter".to_string(),
                     )
                 })?;
-                let lines = u16::try_from(value).map_err(|_| {
+                let lines = u16::try_from(raw_lines).map_err(|_err| {
                     RtfError::MalformedDocument(format!(
-                        "RTF dropcapli must be in 1..={}",
-                        crate::MAX_PARAGRAPH_DROP_CAP_LINES
+                        "RTF dropcapli must be in 1..={MAX_PARAGRAPH_DROP_CAP_LINES}"
                     ))
                 })?;
-                if !(1..=crate::MAX_PARAGRAPH_DROP_CAP_LINES).contains(&lines) {
+                if !(1..=MAX_PARAGRAPH_DROP_CAP_LINES).contains(&lines) {
                     return Err(RtfError::MalformedDocument(format!(
-                        "RTF dropcapli must be in 1..={}",
-                        crate::MAX_PARAGRAPH_DROP_CAP_LINES
+                        "RTF dropcapli must be in 1..={MAX_PARAGRAPH_DROP_CAP_LINES}"
                     )));
                 }
                 state.drop_cap_lines = Some(lines as u8);
             },
             ControlWord::DropCapType(value) => {
                 state.drop_cap_kind = Some(match value {
-                    Some(1) => crate::ParagraphDropCapKind::InText,
-                    Some(2) => crate::ParagraphDropCapKind::Margin,
+                    Some(1) => ParagraphDropCapKind::InText,
+                    Some(2) => ParagraphDropCapKind::Margin,
                     Some(_) => {
                         return Err(RtfError::MalformedDocument(
                             "RTF dropcapt accepts only 1 or 2".to_string(),
@@ -3701,7 +3809,7 @@ impl<'a> Parser<'a> {
             _ => return Ok(false),
         }
         if let (Some(kind), Some(lines)) = (state.drop_cap_kind, state.drop_cap_lines) {
-            state.paragraph.drop_cap = Some(crate::ParagraphDropCap::new(kind, u16::from(lines))?);
+            state.paragraph.drop_cap = Some(ParagraphDropCap::new(kind, u16::from(lines))?);
         }
         Ok(true)
     }
@@ -3718,6 +3826,10 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn apply_paragraph_tab_control(
         state: &mut State,
         control: &ControlWord<'_>,
@@ -3765,8 +3877,12 @@ impl<'a> Parser<'a> {
             Ok(())
         }
 
+        #[allow(
+            clippy::wildcard_enum_match_arm,
+            reason = "remaining variants share the same fallback by design"
+        )]
         fn append(state: &mut State, position: Option<i32>, bar: bool) -> RtfResult<()> {
-            let position = position.ok_or_else(|| {
+            let tab_position = position.ok_or_else(|| {
                 RtfError::MalformedDocument(format!(
                     "RTF {} control requires a numeric parameter",
                     if bar { "tb" } else { "tx" }
@@ -3778,7 +3894,7 @@ impl<'a> Parser<'a> {
                 ));
             }
             let tab = TabStop {
-                position,
+                position: tab_position,
                 alignment: if bar {
                     TabAlignment::Bar
                 } else {
@@ -3786,7 +3902,7 @@ impl<'a> Parser<'a> {
                 },
                 leader: state.pending_tab_leader.unwrap_or(TabLeader::None),
             };
-            state.paragraph.tab_stops.push(tab).map_err(|_| {
+            state.paragraph.tab_stops.push(tab).map_err(|_err| {
                 RtfError::MalformedDocument(
                     "RTF paragraph exceeds the 64-tab safety limit".to_string(),
                 )

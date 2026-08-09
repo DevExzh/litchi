@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::*;
 use crate::animation::diagram_build::{self, Atom, Build as BuildAtom, BuildType, Container};
 use crate::consts::RecordType;
@@ -7,7 +13,7 @@ fn record(version: u16, instance: u16, kind: u16, payload: &[u8]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(8 + payload.len());
     bytes.extend_from_slice(&((instance << 4) | version).to_le_bytes());
     bytes.extend_from_slice(&kind.to_le_bytes());
-    bytes.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+    bytes.extend_from_slice(&u32::try_from(payload.len()).unwrap().to_le_bytes());
     bytes.extend_from_slice(payload);
     bytes
 }
@@ -217,5 +223,5 @@ fn malformed_or_ambiguous_owning_envelopes_are_rejected() {
     assert!(SlideSnapshot::parse(no_slide).is_err());
 
     let malformed_build = record(0, 0, RecordType::BuildList.as_u16(), &[0; 3]);
-    let _ = diagram_build::parse_bytes(&malformed_build).is_err();
+    assert!(diagram_build::parse_bytes(&malformed_build).is_err());
 }

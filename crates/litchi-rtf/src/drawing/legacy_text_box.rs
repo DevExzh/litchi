@@ -55,6 +55,9 @@ pub struct LegacyTextBox<'a> {
 }
 
 impl LegacyTextBox<'_> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if self.text.is_empty() || self.text.len() > MAX_LEGACY_TEXT_BOX_BYTES {
             return Err(RtfError::MalformedDocument(
@@ -86,6 +89,9 @@ impl LegacyTextBox<'_> {
     }
 
     /// Append a validated positional root shape to this legacy text-box story.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_shape(&mut self, shape: crate::Shape<'_>) -> RtfResult<()> {
         let mut shapes = self.shapes.clone();
         shapes.push(shape.into_owned());
@@ -108,6 +114,9 @@ impl LegacyTextBox<'_> {
     }
 
     /// Append a validated positional root shape group to this legacy text-box story.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'_>) -> RtfResult<()> {
         let mut groups = self.shape_groups.clone();
         groups.push(group.into_owned());
@@ -141,10 +150,12 @@ impl LegacyTextBox<'_> {
     pub fn page_breaks(&self) -> impl Iterator<Item = &crate::PageBreak> {
         self.story_events.iter().filter_map(|event| match event {
             crate::StoryEvent::PageBreak(page_break) => Some(page_break),
-            _ => None,
+            crate::StoryEvent::Drawing(_) | crate::StoryEvent::Field(_) => None,
         })
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_page_break(&mut self, position: usize) -> RtfResult<()> {
         crate::field::push_story_page_break(
             &mut self.story_events,

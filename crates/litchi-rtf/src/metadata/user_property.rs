@@ -1,5 +1,10 @@
 //! Ordered, inert RTF user-defined document properties.
 
+#![allow(
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    reason = "builder-style helpers deliberately rebind a working value as it is refined"
+)]
 use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 
@@ -47,7 +52,7 @@ impl UserPropertyType {
 
 /// A validated custom-property date/time.
 ///
-/// LibreOffice emits the RTF dotted date form (`YYYY. MM. DD.`); ISO date and
+/// `LibreOffice` emits the RTF dotted date form (`YYYY. MM. DD.`); ISO date and
 /// date-time forms are accepted as well. The enclosing value retains the exact
 /// lexical spelling for lossless round-tripping.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -61,6 +66,9 @@ pub struct UserPropertyDateTime {
 }
 
 impl UserPropertyDateTime {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn parse(value: &str) -> RtfResult<Self> {
         let value = value.trim();
         let (date, time) = if let Some(parts) = value.split_once('T') {
@@ -121,7 +129,9 @@ impl UserPropertyDateTime {
         parsed.validate()?;
         Ok(parsed)
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if self.year == 0
             || !(1..=12).contains(&self.month)
@@ -185,11 +195,14 @@ pub enum UserPropertyValue<'a> {
 
 impl<'a> UserPropertyValue<'a> {
     /// Parse a value using the RTF 1.9.1 `\proptype` code.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn from_lexical(type_code: i32, lexical: impl Into<Cow<'a, str>>) -> RtfResult<Self> {
         let lexical = lexical.into();
         let value = match type_code {
             3 => Self::Integer {
-                value: lexical.parse().map_err(|_| {
+                value: lexical.parse().map_err(|_err| {
                     RtfError::MalformedDocument(
                         "RTF integer user property has an invalid value".to_string(),
                     )
@@ -197,7 +210,7 @@ impl<'a> UserPropertyValue<'a> {
                 lexical,
             },
             5 => {
-                let value: f64 = lexical.parse().map_err(|_| {
+                let value: f64 = lexical.parse().map_err(|_err| {
                     RtfError::MalformedDocument(
                         "RTF real user property has an invalid value".to_string(),
                     )
@@ -233,6 +246,7 @@ impl<'a> UserPropertyValue<'a> {
     }
 
     /// Return the RTF `\proptype` code.
+    #[must_use]
     pub fn type_code(&self) -> i32 {
         self.property_type().code()
     }
@@ -251,6 +265,7 @@ impl<'a> UserPropertyValue<'a> {
     }
 
     /// Return the preserved lexical value written in `\staticval`.
+    #[must_use]
     pub fn lexical(&self) -> &str {
         match self {
             Self::Integer { lexical, .. }
@@ -302,10 +317,16 @@ impl<'a> UserPropertyValue<'a> {
             } => Err(RtfError::MalformedDocument(
                 "known RTF user-property type cannot use Unknown".to_string(),
             )),
-            _ => Ok(()),
+            Self::Integer { .. }
+            | Self::Real { .. }
+            | Self::Boolean { .. }
+            | Self::Text { .. }
+            | Self::Date { .. }
+            | Self::Unknown { .. } => Ok(()),
         }
     }
 
+    #[must_use]
     pub fn into_owned(self) -> UserPropertyValue<'static> {
         match self {
             Self::Integer { value, lexical } => UserPropertyValue::Integer {
@@ -344,6 +365,9 @@ pub struct UserProperty<'a> {
 }
 
 impl<'a> UserProperty<'a> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(
         name: impl Into<Cow<'a, str>>,
         value: UserPropertyValue<'a>,
@@ -388,6 +412,7 @@ impl<'a> UserProperty<'a> {
             .checked_add(self.link_value.as_ref().map_or(0, |link| link.len()))
     }
 
+    #[must_use]
     pub fn into_owned(self) -> UserProperty<'static> {
         UserProperty {
             name: Cow::Owned(self.name.into_owned()),

@@ -2,8 +2,8 @@
 
 - Status: Accepted
 - Date: 2026-08-08
-- Amends: ADR 0002, ADR 0010, and the IWA record currently stored as
-  `0023-iwa-index-foundation.md`
+- Amends: ADR 0002, ADR 0010, and the IWA record now stored as
+  `0029-iwa-index-foundation.md`
 
 ## Context
 
@@ -74,8 +74,9 @@ fallback, so the concrete transaction was removed. Removing an example is not
 sufficient if its behavior regresses; exact-parity tools move first, while
 non-equivalent structured extraction stays in the host until its gates pass.
 
-The duplicated ADR number on `0023-iwa-index-foundation.md` remains historical
-file identity. This record amends its migration-host wording and makes concrete
+The duplicated ADR number on the IWA index record is now corrected: that
+record is stored as `0029-iwa-index-foundation.md`. This record amends its
+migration-host wording and makes concrete
 format adapters, rather than `litchi-iwa::object_index`, the destination.
 
 ## Verification

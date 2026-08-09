@@ -132,7 +132,10 @@ fn main() -> ExampleResult<()> {
     Ok(())
 }
 
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "helper retained for manual mention experiments; not exercised by the example"
+)]
 fn mention_for(person_id: &str) -> Mention {
     Mention {
         mention_person_id: person_id.to_string(),

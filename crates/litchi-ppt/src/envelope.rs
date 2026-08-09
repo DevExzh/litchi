@@ -1,4 +1,4 @@
-//! PowerPoint 9 envelope state from MS-PPT 2.11.3.
+//! `PowerPoint` 9 envelope state from MS-PPT 2.11.3.
 
 use crate::consts::RecordType;
 
@@ -13,6 +13,10 @@ const ENVELOPE_ALLOWED_FLAGS: u32 = 0x13;
 /// This is inert metadata. It does not send mail, invoke a mail client, or
 /// interpret an `EnvelopeData9Atom` payload.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`EnvelopeSettings` is the established public API name; renaming it would break downstream crates"
+)]
 pub struct EnvelopeSettings {
     pub has_envelope: bool,
     pub visible: bool,
@@ -21,6 +25,10 @@ pub struct EnvelopeSettings {
 
 impl EnvelopeSettings {
     /// Construct a representable envelope state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(has_envelope: bool, visible: bool, modified_since_last_send: bool) -> Result<Self> {
         let value = Self {
             has_envelope,
@@ -32,6 +40,11 @@ impl EnvelopeSettings {
     }
 
     /// Parse one strict `EnvelopeFlags9Atom`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record header or size is invalid, reserved bits
+    /// are set, or the flag combination violates the envelope dependency rule.
     pub fn parse(record: &Record) -> Result<Self> {
         if record.record_type_raw != ENVELOPE_FLAGS_RECORD_TYPE
             || record.version != 0
@@ -42,7 +55,12 @@ impl EnvelopeSettings {
                 "EnvelopeFlags9Atom has an invalid record header or size".to_string(),
             ));
         }
-        let flags = u32::from_le_bytes(record.data[0..4].try_into().unwrap());
+        let flags = u32::from_le_bytes([
+            record.data[0],
+            record.data[1],
+            record.data[2],
+            record.data[3],
+        ]);
         if flags & !ENVELOPE_ALLOWED_FLAGS != 0 {
             return Err(Error::Corrupted(
                 "EnvelopeFlags9Atom has nonzero reserved bits".to_string(),
@@ -74,6 +92,10 @@ impl EnvelopeSettings {
     }
 
     /// Encode the exact four-byte flag atom.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_record(self) -> Result<Record> {
         self.validate()?;
         let flags = u32::from(self.has_envelope)
@@ -101,6 +123,11 @@ impl EnvelopeSettings {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

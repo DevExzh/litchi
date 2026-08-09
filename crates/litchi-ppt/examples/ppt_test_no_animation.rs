@@ -1,3 +1,8 @@
+#![allow(
+    clippy::print_stdout,
+    reason = "this command-line example intentionally prints its results"
+)]
+
 //! Test PPT without any animations
 
 use litchi_ppt::Writer;

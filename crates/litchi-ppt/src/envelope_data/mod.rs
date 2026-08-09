@@ -1,4 +1,4 @@
-//! Strict, inert parsing of PowerPoint 9 `EnvelopeData9Atom` records.
+//! Strict, inert parsing of `PowerPoint` 9 `EnvelopeData9Atom` records.
 //!
 //! The known Office mail-envelope CLSID is decoded according to MS-OSHARED.
 //! Other CLSIDs remain bounded opaque payloads. Nothing in this module sends

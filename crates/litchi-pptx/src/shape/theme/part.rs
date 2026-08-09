@@ -1,5 +1,5 @@
 use crate::{Error, Result};
-/// Summary parts for PowerPoint presentations.
+/// Summary parts for `PowerPoint` presentations.
 ///
 /// This module provides types for working with themes in PPTX files.
 use litchi_ooxml_common::xml::{is_drawingml_name, unqualified_attribute_value};
@@ -53,6 +53,10 @@ pub struct Part<'a> {
 
 impl<'a> Part<'a> {
     /// Create a Part from an OPC Part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_part(part: &'a dyn OpcPart) -> Result<Self> {
         if part.content_type() != ct::OFC_THEME {
             return Err(Error::ContentType {
@@ -78,6 +82,10 @@ impl<'a> Part<'a> {
     /// let theme = theme_part.read()?;
     /// println!("Summary name: {}", theme.name);
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn read(&self) -> Result<Summary> {
         let xml = litchi_ooxml_common::mce::process_ooxml(self.xml_bytes())?;
         let mut reader = NsReader::from_reader(xml.as_ref());
@@ -144,6 +152,7 @@ impl<'a> Part<'a> {
     }
     /// Get the underlying OPC part.
     #[inline]
+    #[must_use]
     pub fn part(&self) -> &'a dyn OpcPart {
         self.part
     }
@@ -257,6 +266,11 @@ fn validate_rgb(rgb: &str) -> Result<()> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use litchi_opc::PackURI;

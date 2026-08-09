@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::{EXTENSION_URI, NAMESPACE, codec, model::Outcome, transaction};
 
 const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
@@ -17,7 +23,7 @@ fn reads_and_replaces_typed_classification_without_normalizing_the_shape() {
         source
             .snapshot
             .as_ref()
-            .and_then(|snapshot| snapshot.outcome()),
+            .and_then(super::model::Snapshot::outcome),
         Some(Outcome::Header)
     );
 
@@ -27,7 +33,7 @@ fn reads_and_replaces_typed_classification_without_normalizing_the_shape() {
         parsed
             .snapshot
             .as_ref()
-            .and_then(|snapshot| snapshot.outcome()),
+            .and_then(super::model::Snapshot::outcome),
         Some(Outcome::Watermark)
     );
     assert!(

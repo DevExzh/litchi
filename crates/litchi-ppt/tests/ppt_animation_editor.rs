@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use litchi_cfb::OleWriter;
 use litchi_ppt::animation::{
     Editor, EditorLimits, ExtendedTimeNode, Scope, TimeNodeAtom, TimeNodeKind,
@@ -8,7 +14,7 @@ use std::io::Cursor;
 fn record(version: u16, kind: u16, payload: &[u8]) -> Vec<u8> {
     let mut out = version.to_le_bytes().to_vec();
     out.extend_from_slice(&kind.to_le_bytes());
-    out.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+    out.extend_from_slice(&u32::try_from(payload.len()).unwrap().to_le_bytes());
     out.extend_from_slice(payload);
     out
 }
@@ -18,17 +24,17 @@ fn generated_ppt() -> Vec<u8> {
     let slide = record(0x0f, 1006, &[]);
     let master = record(0x0f, 1016, &[]);
     let mut stream = document.clone();
-    let slide_offset = stream.len() as u32;
+    let slide_offset = u32::try_from(stream.len()).unwrap();
     stream.extend(slide);
-    let master_offset = stream.len() as u32;
+    let master_offset = u32::try_from(stream.len()).unwrap();
     stream.extend(master);
     let mut ptr = PersistPtrBuilder::new();
     ptr.set_offset(1, 0);
     ptr.set_offset(2, slide_offset);
     ptr.set_offset(3, master_offset);
-    let dir_offset = stream.len() as u32;
+    let dir_offset = u32::try_from(stream.len()).unwrap();
     stream.extend(ptr.generate_full_record());
-    let edit_offset = stream.len() as u32;
+    let edit_offset = u32::try_from(stream.len()).unwrap();
     stream.extend(UserEditAtom::new_minimal(dir_offset, 1, 3, 0).generate_record());
     let mut current = vec![0; 28];
     current[12..16].copy_from_slice(&0xE391_C05Fu32.to_le_bytes());
@@ -115,8 +121,8 @@ fn poi_and_libreoffice_animation_fixtures_are_strictly_gated() {
         let original = std::fs::read(&path).unwrap();
         match Editor::open(original.clone(), EditorLimits::default()) {
             Ok(editor) => {
-                let _ = editor.timelines();
-                assert_eq!(std::fs::read(&path).unwrap(), original)
+                let _timelines = editor.timelines();
+                assert_eq!(std::fs::read(&path).unwrap(), original);
             },
             Err(_) => assert_eq!(std::fs::read(&path).unwrap(), original),
         }

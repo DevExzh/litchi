@@ -20,7 +20,7 @@ pub struct Data {
     pub version: Option<u32>,
     pub change_id: Option<String>,
     pub action_id: Option<i32>,
-    /// Optional complete DrawingML `a:extLst` fragment.
+    /// Optional complete `DrawingML` `a:extLst` fragment.
     pub extension_xml: Option<Vec<u8>>,
 }
 
@@ -53,7 +53,7 @@ pub struct Descriptor {
 pub struct List {
     pub author: Option<Data>,
     pub changes: Vec<Descriptor>,
-    /// Optional complete PresentationML `p:extLst` fragment.
+    /// Optional complete `PresentationML` `p:extLst` fragment.
     pub extension_xml: Option<Vec<u8>>,
 }
 
@@ -75,7 +75,7 @@ impl Default for Info {
     }
 }
 
-/// Changes Information bound to its PresentationML relationship.
+/// Changes Information bound to its `PresentationML` relationship.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Part {
     pub relationship_id: String,

@@ -1,4 +1,4 @@
-//! Semantic bounds for detached PresentationML notes transactions.
+//! Semantic bounds for detached `PresentationML` notes transactions.
 
 use std::collections::HashSet;
 

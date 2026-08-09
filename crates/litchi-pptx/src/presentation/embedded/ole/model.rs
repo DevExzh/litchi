@@ -29,6 +29,7 @@ pub enum Target {
 }
 
 impl Target {
+    #[must_use]
     pub fn relationship_type(&self) -> &str {
         match self {
             Self::Internal {
@@ -40,6 +41,7 @@ impl Target {
         }
     }
 
+    #[must_use]
     pub fn part_name(&self) -> Option<&PackURI> {
         match self {
             Self::Internal { part_name, .. } => Some(part_name),
@@ -47,6 +49,7 @@ impl Target {
         }
     }
 
+    #[must_use]
     pub fn content_type(&self) -> Option<&str> {
         match self {
             Self::Internal { content_type, .. } => Some(content_type),
@@ -54,6 +57,7 @@ impl Target {
         }
     }
 
+    #[must_use]
     pub fn external_target(&self) -> Option<&str> {
         match self {
             Self::Internal { .. } => None,
@@ -84,52 +88,68 @@ pub struct Object {
 }
 
 impl Object {
+    #[must_use]
     pub fn slide_index(&self) -> usize {
         self.slide_index
     }
+    #[must_use]
     pub fn index(&self) -> usize {
         self.index
     }
+    #[must_use]
     pub fn shape_id(&self) -> Option<u32> {
         self.shape_id
     }
+    #[must_use]
     pub fn shape_name(&self) -> Option<&str> {
         self.shape_name.as_deref()
     }
+    #[must_use]
     pub fn legacy_shape_id(&self) -> Option<&str> {
         self.legacy_shape_id.as_deref()
     }
+    #[must_use]
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
     }
+    #[must_use]
     pub fn program_id(&self) -> Option<&str> {
         self.program_id.as_deref()
     }
+    #[must_use]
     pub fn show_as_icon(&self) -> Option<bool> {
         self.show_as_icon
     }
+    #[must_use]
     pub fn preview_width(&self) -> Option<u32> {
         self.preview_width
     }
+    #[must_use]
     pub fn preview_height(&self) -> Option<u32> {
         self.preview_height
     }
-    /// DrawingML position and extent of the owning graphic frame, in EMUs.
+    /// `DrawingML` position and extent of the owning graphic frame, in EMUs.
+    #[must_use]
     pub fn anchor(&self) -> Option<Frame> {
         self.anchor
     }
+    #[must_use]
     pub fn mode(&self) -> Mode {
         self.mode
     }
+    #[must_use]
     pub fn relationship_id(&self) -> Option<&str> {
         self.relationship_id.as_deref()
     }
+    #[must_use]
     pub fn kind(&self) -> Option<Kind> {
         self.kind
     }
+    #[must_use]
     pub fn target(&self) -> Option<&Target> {
         self.target.as_ref()
     }
+    #[must_use]
     pub fn preview_relationship_id(&self) -> Option<&str> {
         self.preview_relationship_id.as_deref()
     }
@@ -145,6 +165,7 @@ pub struct Frame {
 }
 
 impl Frame {
+    #[must_use]
     pub const fn new(x: i64, y: i64, cx: i64, cy: i64) -> Self {
         Self { x, y, cx, cy }
     }

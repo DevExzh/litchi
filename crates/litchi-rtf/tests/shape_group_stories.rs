@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use std::borrow::Cow;
 
 use litchi_rtf::{
@@ -34,7 +43,7 @@ fn libreoffice_root_groups_keep_body_position_and_round_trip() {
 
 #[test]
 fn typed_body_group_round_trips_at_unicode_boundary() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 A\u20320?B}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 A\u20320?B}").unwrap();
     let mut group = ShapeGroup::new();
     group.position = "A你".len();
     group.properties.push(ShapeProperty::new(
@@ -50,7 +59,7 @@ fn typed_body_group_round_trips_at_unicode_boundary() {
 
 #[test]
 fn parser_and_writer_keep_header_drawings_in_the_header_story() {
-    let source = r#"{\rtf1{\header A{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 1}}}}{\shpgrp{\*\shpinst{\sp{\sn wzName}{\sv header group}}}}B}Body}"#;
+    let source = r"{\rtf1{\header A{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 1}}}}{\shpgrp{\*\shpinst{\sp{\sn wzName}{\sv header group}}}}B}Body}";
     let document = RtfDocument::parse(source).unwrap();
     assert!(document.shapes().is_empty());
     assert!(document.shape_groups().is_empty());

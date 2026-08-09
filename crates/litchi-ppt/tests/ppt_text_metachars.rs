@@ -1,5 +1,11 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 //! Tests for header/footer metacharacter atoms (MS-PPT 2.9.47-2.9.52)
-//! against real PowerPoint fixtures.
+//! against real `PowerPoint` fixtures.
 
 use litchi_ppt::{MetacharKind, Package};
 use std::path::PathBuf;
@@ -26,7 +32,10 @@ fn count(kinds: &[MetacharKind], kind: MetacharKind) -> usize {
 #[test]
 fn reads_slide_number_header_and_footer_metachars() {
     let values = metachars("headers_footers.ppt");
-    let kinds = values.iter().map(|value| value.kind()).collect::<Vec<_>>();
+    let kinds = values
+        .iter()
+        .map(litchi_ppt::TextMetachar::kind)
+        .collect::<Vec<_>>();
     assert_eq!(count(&kinds, MetacharKind::SlideNumber), 3);
     assert_eq!(count(&kinds, MetacharKind::Footer), 3);
     assert_eq!(count(&kinds, MetacharKind::Header), 2);
@@ -53,7 +62,10 @@ fn reads_datetime_metachars_with_format_ids() {
 #[test]
 fn single_placeholder_presentations_parse_cleanly() {
     let values = metachars("incorrect_slide_order.ppt");
-    let kinds = values.iter().map(|value| value.kind()).collect::<Vec<_>>();
+    let kinds = values
+        .iter()
+        .map(litchi_ppt::TextMetachar::kind)
+        .collect::<Vec<_>>();
     assert_eq!(count(&kinds, MetacharKind::SlideNumber), 1);
     assert_eq!(count(&kinds, MetacharKind::Footer), 1);
     assert_eq!(count(&kinds, MetacharKind::GenericDate), 1);

@@ -1,4 +1,4 @@
-//! Layered, inert PresentationML hyperlink values.
+//! Layered, inert `PresentationML` hyperlink values.
 //!
 //! [`model`] owns the contextual target variants and constructors.  [`codec`]
 //! parses the small target grammar with bounded strings; it never follows a

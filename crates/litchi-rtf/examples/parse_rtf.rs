@@ -1,3 +1,8 @@
+#![allow(
+    clippy::print_stdout,
+    reason = "this command-line example intentionally prints its results"
+)]
+
 //! Parse an RTF file and print summary information.
 //!
 //! Run from the workspace root:
@@ -12,10 +17,10 @@ use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Take the path from CLI args, or fall back to a small bundled sample.
-    let path: PathBuf = std::env::args()
-        .nth(1)
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("test-data/rtf/testStyles.rtf"));
+    let path: PathBuf = std::env::args().nth(1).map_or_else(
+        || PathBuf::from("test-data/rtf/testStyles.rtf"),
+        PathBuf::from,
+    );
 
     println!("Parsing RTF file: {}", path.display());
     println!("{}", "=".repeat(60));
@@ -42,25 +47,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\nDocument metadata");
     println!("{}", "-".repeat(60));
     if let Some(title) = info.title.as_ref() {
-        println!("Title    : {}", title);
+        println!("Title    : {title}");
     }
     if let Some(author) = info.author.as_ref() {
-        println!("Author   : {}", author);
+        println!("Author   : {author}");
     }
     if let Some(subject) = info.subject.as_ref() {
-        println!("Subject  : {}", subject);
+        println!("Subject  : {subject}");
     }
     if let Some(company) = info.company.as_ref() {
-        println!("Company  : {}", company);
+        println!("Company  : {company}");
     }
     if let Some(keywords) = info.keywords.as_ref() {
-        println!("Keywords : {}", keywords);
+        println!("Keywords : {keywords}");
     }
     if let Some(pages) = info.pages {
-        println!("Pages    : {}", pages);
+        println!("Pages    : {pages}");
     }
     if let Some(words) = info.words {
-        println!("Words    : {}", words);
+        println!("Words    : {words}");
     }
     if info.title.is_none()
         && info.author.is_none()
@@ -75,7 +80,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\nText preview");
     println!("{}", "-".repeat(60));
     let preview: String = text.chars().take(400).collect();
-    println!("{}", preview);
+    println!("{preview}");
     if text.chars().count() > 400 {
         println!("...");
     }

@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::{BuiltinId, Collection};
 use crate::consts::RecordType;
 use crate::records::Record;
@@ -6,7 +12,7 @@ fn record(version: u16, instance: u16, kind: RecordType, data: &[u8]) -> Vec<u8>
     let mut output = Vec::with_capacity(8 + data.len());
     output.extend_from_slice(&(version | (instance << 4)).to_le_bytes());
     output.extend_from_slice(&(kind as u16).to_le_bytes());
-    output.extend_from_slice(&(data.len() as u32).to_le_bytes());
+    output.extend_from_slice(&u32::try_from(data.len()).unwrap().to_le_bytes());
     output.extend_from_slice(data);
     output
 }

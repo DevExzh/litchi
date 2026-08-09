@@ -1,8 +1,8 @@
-//! PowerPoint `ExOleObjStg` storage and compression model.
+//! `PowerPoint` `ExOleObjStg` storage and compression model.
 //!
-//! This is the PowerPoint host layer for persisted OLE, VBA, and ActiveX
+//! This is the `PowerPoint` host layer for persisted OLE, VBA, and `ActiveX`
 //! payloads.  Generic CFB object discovery belongs to `litchi-ole-common`;
-//! this module owns only the PowerPoint record that points at those bytes.
+//! this module owns only the `PowerPoint` record that points at those bytes.
 
 mod codec;
 mod editor;
@@ -17,5 +17,8 @@ pub use model::{Compression, Kind, MAX_DECLARED_BYTES, MAX_STORED_BYTES, Storage
 pub use snapshot::{Metadata, Snapshot};
 
 #[cfg(any(test, feature = "vba-inspection"))]
-#[allow(unused_imports)]
+#[allow(
+    unused_imports,
+    reason = "re-export gated to tests and the vba-inspection feature"
+)]
 pub(crate) use model::Ref;

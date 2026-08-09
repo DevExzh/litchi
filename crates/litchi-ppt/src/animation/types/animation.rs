@@ -1,4 +1,4 @@
-//! High-level animation information and PowerPoint 97 animation atoms.
+//! High-level animation information and `PowerPoint` 97 animation atoms.
 
 use super::build::BuildInfo;
 use super::effects::{AfterEffect, TimeNodeContainer};
@@ -9,7 +9,7 @@ use crate::records::Record;
 /// Animation information for a slide or shape.
 #[derive(Debug, Clone)]
 pub struct AnimationInfo {
-    /// PowerPoint 97 shape animation atom, when present.
+    /// `PowerPoint` 97 shape animation atom, when present.
     pub legacy_atom: Option<LegacyAnimationAtom>,
     /// Build list (order of appearance animations)
     pub build_list: Option<BuildInfo>,
@@ -37,6 +37,7 @@ impl Default for AnimationInfo {
 
 impl AnimationInfo {
     /// Create a new empty animation info.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             legacy_atom: None,
@@ -52,6 +53,7 @@ impl AnimationInfo {
     }
 
     /// Check if this slide has any animations.
+    #[must_use]
     pub fn has_animations(&self) -> bool {
         self.legacy_atom
             .as_ref()
@@ -61,31 +63,28 @@ impl AnimationInfo {
     }
 
     /// Get the number of animated objects.
+    #[must_use]
     pub fn animation_count(&self) -> usize {
         let legacy_count = usize::from(
             self.legacy_atom
                 .as_ref()
                 .is_some_and(|atom| atom.build_type != LegacyAnimationBuild::NoBuild),
         );
-        let build_count = self
-            .build_list
-            .as_ref()
-            .map(|b| b.builds.len())
-            .unwrap_or(0);
+        let build_count = self.build_list.as_ref().map_or(0, |b| b.builds.len());
         legacy_count + build_count + self.time_nodes.len()
     }
 }
 
-/// Animation metadata associated with a legacy PowerPoint shape.
+/// Animation metadata associated with a legacy `PowerPoint` shape.
 #[derive(Debug, Clone)]
 pub struct ShapeAnimation {
-    /// OfficeArt shape identifier.
+    /// `OfficeArt` shape identifier.
     pub shape_id: u32,
     /// Parsed, inert animation metadata.
     pub animation: AnimationInfo,
 }
 
-/// PowerPoint 97 paragraph/chart build behavior stored in `AnimationInfoAtom`.
+/// `PowerPoint` 97 paragraph/chart build behavior stored in `AnimationInfoAtom`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum LegacyAnimationBuild {
     FollowMaster,
@@ -140,7 +139,7 @@ impl LegacyAnimationBuild {
     }
 }
 
-/// PowerPoint 97 animation effect code.
+/// `PowerPoint` 97 animation effect code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum LegacyAnimationEffect {
     #[default]
@@ -220,7 +219,7 @@ impl LegacyAnimationEffect {
 
     pub(crate) const fn accepts_direction(self, direction: u8) -> bool {
         match self {
-            Self::Cut => direction <= 2,
+            Self::Cut | Self::Flash => direction <= 2,
             Self::Random => true,
             Self::Blinds | Self::Checker | Self::RandomBars | Self::Zoom => direction <= 1,
             Self::Cover | Self::Pull => direction <= 7,
@@ -233,13 +232,12 @@ impl LegacyAnimationEffect {
             Self::Strips => direction >= 4 && direction <= 7,
             Self::Wipe | Self::Split => direction <= 3,
             Self::Fly => direction <= 0x1C,
-            Self::Flash => direction <= 2,
             Self::Wheel => matches!(direction, 1 | 2 | 3 | 4 | 8),
         }
     }
 }
 
-/// Text subdivision behavior in a PowerPoint 97 animation.
+/// Text subdivision behavior in a `PowerPoint` 97 animation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum LegacyTextBuildSubEffect {
     #[default]
@@ -269,6 +267,10 @@ impl LegacyTextBuildSubEffect {
 
 /// Exact 28-byte payload of an `[MS-PPT]` `AnimationInfoAtom`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "the bool fields mirror the independent flag bits of the fixed MS-PPT `AnimationInfoAtom` layout, so they cannot be merged into enums without losing the bit-level mapping"
+)]
 pub struct LegacyAnimationAtom {
     pub dim_color: u32,
     pub reverse: bool,

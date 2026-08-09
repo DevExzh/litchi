@@ -14,7 +14,7 @@ use litchi_opc::{OpcPackage, PackURI, Part};
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 
-/// Shared bounds for InkML discovery across slides.
+/// Shared bounds for `InkML` discovery across slides.
 #[derive(Debug, Default)]
 pub struct Limits {
     annotation_count: usize,
@@ -41,7 +41,11 @@ impl Limits {
     }
 }
 
-/// Load one slide's InkML content-part graph without copying payload bytes.
+/// Load one slide's `InkML` content-part graph without copying payload bytes.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load_slide(
     package: &OpcPackage,
     slide_index: usize,
@@ -83,7 +87,11 @@ pub fn load_slide(
     Ok(annotations)
 }
 
-/// Store one validated InkML payload on a slide as a custom XML content part.
+/// Store one validated `InkML` payload on a slide as a custom XML content part.
+///
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn store_slide(
     package: &mut OpcPackage,
     slide_name: &PackURI,
@@ -148,7 +156,7 @@ fn insert_into_shape_tree(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
     if xml
         .len()
         .checked_add(fragment.len())
-        .map_or(true, |size| size > super::codec::MAX_SLIDE_BYTES)
+        .is_none_or(|size| size > super::codec::MAX_SLIDE_BYTES)
     {
         return Err(limit(
             "updated slide XML bytes",
@@ -163,7 +171,7 @@ fn insert_into_shape_tree(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
     let mut insertion = None;
     loop {
         let before = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("slide XML offset overflow"))?;
+            .map_err(|_err| invalid("slide XML offset overflow"))?;
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
@@ -184,10 +192,10 @@ fn insert_into_shape_tree(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
                     )?;
                     root_seen = true;
                 }
-                if is_presentationml_name(&namespace, element.name(), b"spTree") {
-                    if tree_depth.replace(depth).is_some() {
-                        return Err(invalid("slide has multiple shape trees"));
-                    }
+                if is_presentationml_name(&namespace, element.name(), b"spTree")
+                    && tree_depth.replace(depth).is_some()
+                {
+                    return Err(invalid("slide has multiple shape trees"));
                 }
             },
             Event::Empty(element) => {

@@ -10,6 +10,7 @@ pub mod extensions;
 pub mod model;
 pub mod writer;
 
+pub use crate::chart::{ChartClass, ChartClassKind};
 pub use data::{CachedCell, CachedRow, CachedTable, CachedValue};
 pub use extensions::{ExtensionAttribute, ExtensionElement, Extensions};
 pub use model::{

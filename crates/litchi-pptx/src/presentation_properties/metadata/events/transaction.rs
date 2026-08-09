@@ -25,6 +25,10 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Load the slide's persisted show-event metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn load(
         package: &OpcPackage,
         slide_part_name: &litchi_opc::PackURI,
@@ -33,6 +37,10 @@ impl Snapshot {
     }
 
     /// Alias for [`Self::load`] emphasizing the source-bound result.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn read(
         package: &OpcPackage,
         slide_part_name: &litchi_opc::PackURI,
@@ -58,24 +66,28 @@ impl Snapshot {
 
     /// Return the owning slide part name.
     #[inline]
+    #[must_use]
     pub fn slide_part_name(&self) -> &str {
         &self.slide_part_name
     }
 
     /// Borrow the ordered typed event records.
     #[inline]
+    #[must_use]
     pub fn events(&self) -> &[Event] {
         &self.events
     }
 
     /// Return the source fingerprint used for stale-source checks.
     #[inline]
+    #[must_use]
     pub const fn revision(&self) -> Revision {
         self.revision
     }
 
     /// Borrow the exact owning slide XML captured by this snapshot.
     #[inline]
+    #[must_use]
     pub fn source_xml(&self) -> &[u8] {
         self.source_xml.as_slice()
     }
@@ -110,12 +122,14 @@ pub struct Transaction {
 impl Transaction {
     /// Borrow the projected typed draft sequence.
     #[inline]
+    #[must_use]
     pub fn events(&self) -> &[Draft] {
         &self.working
     }
 
     /// Alias for [`Self::events`].
     #[inline]
+    #[must_use]
     pub fn snapshot(&self) -> &[Draft] {
         self.events()
     }
@@ -133,6 +147,10 @@ impl Transaction {
     }
 
     /// Replace all typed records while retaining the owning extension bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace(&mut self, events: Vec<Draft>) -> Result<bool> {
         validate_events(&events)?;
         if self.working == events {
@@ -143,6 +161,10 @@ impl Transaction {
     }
 
     /// Apply a checked mutation to one event without partially staging failure.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn edit_event(
         &mut self,
         index: usize,
@@ -163,6 +185,10 @@ impl Transaction {
     }
 
     /// Set one event's complete typed kind.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_kind(&mut self, index: usize, kind: Kind) -> Result<()> {
         self.edit_event(index, |event| {
             event.set_kind(kind);
@@ -171,6 +197,10 @@ impl Transaction {
     }
 
     /// Set one event's timeline offset.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_time(&mut self, index: usize, time: Offset) -> Result<()> {
         self.edit_event(index, |event| {
             event.set_time(time);
@@ -178,7 +208,11 @@ impl Transaction {
         })
     }
 
-    /// Set one event's DrawingML object identifier.
+    /// Set one event's `DrawingML` object identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_object_id(&mut self, index: usize, object_id: u32) -> Result<()> {
         self.edit_event(index, |event| {
             event.set_object_id(object_id);
@@ -187,6 +221,10 @@ impl Transaction {
     }
 
     /// Append one event to the ordered list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn push(&mut self, event: Draft) -> Result<()> {
         let mut candidate = self.working.clone();
         candidate.push(event);
@@ -196,6 +234,10 @@ impl Transaction {
     }
 
     /// Insert one event before an existing source-order index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn insert(&mut self, index: usize, event: Draft) -> Result<()> {
         if index > self.working.len() {
             return Err(index_error(index, self.working.len()));
@@ -208,6 +250,10 @@ impl Transaction {
     }
 
     /// Remove one event, retaining the non-empty-list invariant.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove(&mut self, index: usize) -> Result<Draft> {
         if self.working.len() <= 1 {
             return Err(invalid(
@@ -225,6 +271,10 @@ impl Transaction {
     }
 
     /// Move one event to another source-order position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn move_event(&mut self, from: usize, to: usize) -> Result<bool> {
         if from >= self.working.len() || to >= self.working.len() {
             return Err(index_error(from.max(to), self.working.len()));
@@ -241,6 +291,10 @@ impl Transaction {
     }
 
     /// Consume the detached edit into a source-checked commit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn commit(self) -> Result<Commit> {
         if !self.is_changed() {
             let patch = Patch::new(self.original.clone(), self.original.clone());
@@ -291,29 +345,34 @@ pub struct Commit {
 impl Commit {
     /// Whether publication changes the exact slide bytes.
     #[inline]
+    #[must_use]
     pub const fn changed(&self) -> bool {
         self.changed
     }
 
     /// Alias for [`Self::changed`].
     #[inline]
+    #[must_use]
     pub const fn is_changed(&self) -> bool {
         self.changed
     }
 
     /// Borrow the projected post-edit snapshot.
     #[inline]
+    #[must_use]
     pub fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrow the reversible source-checked patch.
     #[inline]
+    #[must_use]
     pub fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Consume the commit into its patch.
+    #[must_use]
     pub fn into_patch(self) -> Patch {
         self.patch
     }
@@ -333,29 +392,34 @@ impl Patch {
 
     /// Source context required before publication.
     #[inline]
+    #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Source context produced by publication.
     #[inline]
+    #[must_use]
     pub fn after(&self) -> &Snapshot {
         &self.after
     }
 
     /// Whether this patch is an exact no-op.
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
     /// Alias for [`Self::is_empty`].
     #[inline]
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         !self.is_empty()
     }
 
     /// Return the exact inverse patch.
+    #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
@@ -365,21 +429,26 @@ impl Patch {
 
     /// Return the source fingerprint required for publication.
     #[inline]
+    #[must_use]
     pub const fn expected_revision(&self) -> Revision {
         self.before.revision
     }
 
     /// Apply this patch atomically after checking the complete slide source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn apply(&self, target: &mut OpcPackage) -> Result<Snapshot> {
         super::package::apply_patch(target, self)
     }
 }
 
 fn fingerprint(bytes: &[u8]) -> Revision {
-    let mut hash = 0xcbf29ce484222325u64;
+    let mut hash = 0xcbf2_9ce4_8422_2325u64;
     for byte in bytes {
         hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(0x100000001b3);
+        hash = hash.wrapping_mul(0x100_0000_01b3);
     }
     hash
 }

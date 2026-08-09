@@ -1,4 +1,4 @@
-//! Bounded, inert PowerPoint diagram-build metadata.
+//! Bounded, inert `PowerPoint` diagram-build metadata.
 //!
 //! This owner covers the fixed-shape records from MS-PPT §§2.8.13–2.8.14
 //! and the `DiagramBuildEnum` vocabulary from §2.13.7.  It only retains

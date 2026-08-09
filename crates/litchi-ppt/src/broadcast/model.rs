@@ -1,10 +1,16 @@
-//! Typed PowerPoint presentation-broadcast metadata.
+//! Typed `PowerPoint` presentation-broadcast metadata.
 
 use crate::records::Record;
 use crate::slide_sync::SystemTime;
 
 /// Fixed `BroadcastDocInfoAtom` values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "each bool maps one-to-one to an independent flag bit of the MS-PPT \
+              `BroadcastDocInfoAtom` bitfield; grouping them into enums would misrepresent \
+              the on-disk layout and churn the public API"
+)]
 pub struct BroadcastProperties {
     pub send_audio: bool,
     pub send_video: bool,
@@ -52,7 +58,7 @@ pub struct Broadcast {
     pub properties: BroadcastProperties,
 }
 
-/// All PowerPoint 9 broadcast descriptions in document order.
+/// All `PowerPoint` 9 broadcast descriptions in document order.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Broadcasts {
     pub broadcasts: Vec<Broadcast>,
@@ -72,26 +78,34 @@ pub struct UnknownRecord {
 
 impl UnknownRecord {
     /// Original raw record type value.
+    #[must_use]
     pub fn record_type(&self) -> u16 {
         self.record.record_type_raw
     }
 
     /// Original record version nibble.
+    #[must_use]
     pub fn version(&self) -> u16 {
         self.record.version
     }
 
     /// Original record instance.
+    #[must_use]
     pub fn instance(&self) -> u16 {
         self.record.instance
     }
 
     /// Borrow the opaque record payload.
+    #[must_use]
     pub fn data(&self) -> &[u8] {
         &self.record.data
     }
 
     /// Reconstruct the exact opaque record header and payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_record_bytes(&self) -> crate::package::Result<Vec<u8>> {
         super::codec::record_bytes(
             self.record.version,

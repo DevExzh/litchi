@@ -7,7 +7,7 @@
 /// # Features
 ///
 /// - **Format-agnostic**: Works with both .doc/.docx and .ppt/.pptx files
-/// - **Style preservation**: Converts bold, italic, and other text formatting
+/// - **Style preservation**: Converts direct bold, italic, underline, and other text formatting
 /// - **Table conversion**: Smart handling of tables (Markdown or HTML)
 /// - **High performance**: Memory-efficient with minimal allocations
 /// - **Configurable**: Extensive options for customizing output

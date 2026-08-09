@@ -6,6 +6,10 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 #[non_exhaustive]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "the error type is named for the OPC domain it covers; renaming the public `OpcError` type would break the crate's public API"
+)]
 pub enum OpcError {
     #[error("invalid OPC read limit for {resource}: {value}")]
     InvalidReadLimit {
@@ -155,13 +159,38 @@ impl From<OpcError> for litchi_core::Error {
     fn from(err: OpcError) -> Self {
         match err {
             OpcError::IoError(e) => litchi_core::Error::Io(e),
-            OpcError::ZipError(e) => litchi_core::Error::ZipError(e.to_string()),
+            OpcError::ZipError(e) => litchi_core::Error::ZipError(e),
             OpcError::XmlError(s) => litchi_core::Error::XmlError(s),
             OpcError::PartNotFound(s) => litchi_core::Error::ComponentNotFound(s),
             OpcError::Allocation { resource, source } => {
                 litchi_core::Error::Allocation { resource, source }
             },
-            _ => litchi_core::Error::Other(err.to_string()),
+            OpcError::InvalidReadLimit { .. }
+            | OpcError::ReadLimit { .. }
+            | OpcError::PackageNotFound(_)
+            | OpcError::InvalidPackUri(_)
+            | OpcError::DuplicatePartName(_)
+            | OpcError::EquivalentPartNames { .. }
+            | OpcError::DerivedPartNames { .. }
+            | OpcError::RelationshipNotFound(_)
+            | OpcError::ContentTypeNotFound(_)
+            | OpcError::InvalidContentType { .. }
+            | OpcError::InvalidContentTypesManifest(_)
+            | OpcError::DuplicateContentTypeDefault(_)
+            | OpcError::DuplicateContentTypeOverride { .. }
+            | OpcError::InvalidContentTypeExtension(_)
+            | OpcError::InvalidRelationship(_)
+            | OpcError::InvalidRelationshipsManifest(_)
+            | OpcError::DuplicateRelationshipId(_)
+            | OpcError::InvalidRelationshipTargetMode(_)
+            | OpcError::RelationshipPartCannotBeSource(_)
+            | OpcError::MultipleCorePropertiesRelationships
+            | OpcError::Committed { .. }
+            | OpcError::IncompleteOutput { .. }
+            | OpcError::QuickXmlError(_)
+            | OpcError::Utf8Error(_)
+            | OpcError::ParseIntError(_)
+            | OpcError::AttrError(_) => litchi_core::Error::Other(err.to_string()),
         }
     }
 }

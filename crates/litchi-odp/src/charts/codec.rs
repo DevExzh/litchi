@@ -128,16 +128,25 @@ pub(crate) fn inventory(source: &OwnedPackage, limits: Limits) -> Result<Vec<Cha
 
 impl Part {
     /// Parse an existing standalone chart content part.
+    ///
+    /// # Errors
+    /// Returns an error when the chart data is malformed or a configured limit is exceeded.
     pub fn from_xml(xml: impl Into<String>) -> Result<Self> {
         Self::from_xml_with_limit(xml.into(), Limits::default().max_part_bytes())
     }
 
     /// Serialize a checked common ODF chart definition into an ODP part.
+    ///
+    /// # Errors
+    /// Returns an error when the chart data is malformed or a configured limit is exceeded.
     pub fn from_definition(definition: &Definition) -> Result<Self> {
         Self::from_xml(serialize_content(definition)?)
     }
 
     /// Parse an inline `office:document` chart payload.
+    ///
+    /// # Errors
+    /// Returns an error when the chart data is malformed or a configured limit is exceeded.
     pub fn from_inline_xml(xml: impl Into<String>) -> Result<Self> {
         Self::from_inline_with_limit(xml.into(), Limits::default().max_part_bytes())
     }

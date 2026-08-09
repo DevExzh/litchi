@@ -82,6 +82,7 @@ pub struct Chart {
 }
 
 impl Chart {
+    #[must_use]
     pub fn new(kind: Kind, x: i64, y: i64, width: i64, height: i64) -> Self {
         Self {
             kind,
@@ -169,7 +170,7 @@ impl Chart {
                 .checked_add(series.values.len())
                 .and_then(|value| value.checked_add(series.x_values.len()))
                 .and_then(|value| value.checked_add(series.bubble_sizes.len()))
-                .ok_or_else(|| Error::Limit {
+                .ok_or(Error::Limit {
                     resource: "embedded workbook points",
                     limit: MAX_POINTS,
                 })?;
@@ -220,6 +221,10 @@ pub struct Workbook {
 
 impl Workbook {
     /// Generate a workbook from independent chart data.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_chart(chart: &Chart) -> Result<Self> {
         let bytes = super::package::generate(chart)?;
         if bytes.len() > MAX_WORKBOOK_BYTES {
@@ -232,11 +237,13 @@ impl Workbook {
     }
 
     /// Borrow the generated XLSX bytes without copying.
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         &self.bytes
     }
 
     /// Move the generated XLSX bytes out of the wrapper.
+    #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
         self.bytes
     }

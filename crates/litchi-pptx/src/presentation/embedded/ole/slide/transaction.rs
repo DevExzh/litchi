@@ -48,6 +48,10 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Load one slide's complete inert OLE graph by absolute slide part name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn load(
         package: &OpcPackage,
         slide_index: usize,
@@ -97,27 +101,36 @@ impl Snapshot {
         })
     }
 
+    #[must_use]
     pub fn slide_index(&self) -> usize {
         self.slide_index
     }
 
+    #[must_use]
     pub fn slide_part_name(&self) -> &PackURI {
         &self.slide_part_name
     }
 
+    #[must_use]
     pub fn source_xml(&self) -> &[u8] {
         self.source_xml.as_slice()
     }
 
+    #[must_use]
     pub fn objects(&self) -> &[Object] {
         self.objects.as_slice()
     }
 
+    #[must_use]
     pub fn revision(&self) -> Revision {
         self.revision
     }
 
     /// Return an exact inert payload for an embedded object, if it has one.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn payload(&self, index: usize) -> Result<Option<&[u8]>> {
         let object = self
             .objects
@@ -133,6 +146,7 @@ impl Snapshot {
             .map(|part| part.bytes.as_slice()))
     }
 
+    #[must_use]
     pub fn edit(&self) -> Transaction {
         let parts: HashMap<PackURI, &PartSource> = self
             .parts
@@ -185,6 +199,7 @@ pub struct Transaction {
 }
 
 impl Transaction {
+    #[must_use]
     pub fn source(&self) -> &Snapshot {
         &self.source
     }
@@ -193,6 +208,9 @@ impl Transaction {
         self.working.iter().map(|value| &value.object)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn object(&self, index: usize) -> Result<&Object> {
         self.working
             .get(index)
@@ -200,6 +218,7 @@ impl Transaction {
             .ok_or_else(|| index_error(index, self.working.len()))
     }
 
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         if self.working.len() != self.source.objects.len() {
             return true;
@@ -213,6 +232,10 @@ impl Transaction {
     }
 
     /// Add an inert embedded or linked OLE object and return its transaction index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add(&mut self, definition: Definition) -> Result<usize> {
         validate_definition(&definition)?;
         if self.working.len() >= MAX_OBJECTS {
@@ -252,6 +275,10 @@ impl Transaction {
     }
 
     /// Remove the selected graphic frame and collect any now-unreferenced payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove(&mut self, index: usize) -> Result<Object> {
         let value = self
             .working
@@ -266,11 +293,19 @@ impl Transaction {
     /// Detach the selected OLE graph from the slide.  This is intentionally
     /// distinct in the API from metadata edits, while publication has the same
     /// safe graph semantics as removal: no orphan payload is retained.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn detach(&mut self, index: usize) -> Result<Object> {
         self.remove(index)
     }
 
     /// Replace all typed metadata and the opaque payload/target in place.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace(&mut self, index: usize, definition: Definition) -> Result<()> {
         validate_definition(&definition)?;
         let value = self.working_mut(index)?;
@@ -297,6 +332,9 @@ impl Transaction {
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_anchor(&mut self, index: usize, anchor: Frame) -> Result<bool> {
         validate_anchor(anchor)?;
         let value = self.working_mut(index)?;
@@ -307,6 +345,9 @@ impl Transaction {
         Ok(true)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_name(&mut self, index: usize, name: Option<String>) -> Result<bool> {
         if let Some(value) = name.as_deref() {
             validate_name(value)?;
@@ -319,6 +360,9 @@ impl Transaction {
         Ok(true)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_program_id(&mut self, index: usize, program_id: Option<String>) -> Result<bool> {
         if let Some(value) = program_id.as_deref() {
             validate_program(value)?;
@@ -331,6 +375,9 @@ impl Transaction {
         Ok(true)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_show_as_icon(&mut self, index: usize, value: Option<bool>) -> Result<bool> {
         let object = self.working_mut(index)?;
         if object.object.show_as_icon == value {
@@ -340,6 +387,9 @@ impl Transaction {
         Ok(true)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_preview_size(&mut self, index: usize, value: Option<(u32, u32)>) -> Result<bool> {
         if let Some((width, height)) = value
             && (width == 0 || height == 0)
@@ -354,6 +404,10 @@ impl Transaction {
     }
 
     /// Replace an embedded payload without interpreting its OLE bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn replace_payload(&mut self, index: usize, payload: impl Into<Vec<u8>>) -> Result<()> {
         let payload = payload.into();
         validate_payload(&payload)?;
@@ -366,6 +420,10 @@ impl Transaction {
     }
 
     /// Change a linked target while retaining it as an inert external URI.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_link_target(&mut self, index: usize, target: impl Into<String>) -> Result<()> {
         let target = target.into();
         validate_text(&target, "OLE link target", false)?;
@@ -389,6 +447,10 @@ impl Transaction {
     }
 
     /// Validate and consume this edit into a reversible package patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn commit(self) -> Result<Commit> {
         if !self.is_changed() {
             let patch = Patch {
@@ -417,6 +479,7 @@ impl Transaction {
         Ok(Commit { snapshot, patch })
     }
 
+    #[must_use]
     pub fn rollback(self) -> Snapshot {
         self.source
     }
@@ -444,18 +507,22 @@ pub struct Commit {
 }
 
 impl Commit {
+    #[must_use]
     pub fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
+    #[must_use]
     pub fn patch(&self) -> &Patch {
         &self.patch
     }
 
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         !self.patch.is_empty()
     }
 
+    #[must_use]
     pub fn into_patch(self) -> Patch {
         self.patch
     }
@@ -469,26 +536,32 @@ pub struct Patch {
 }
 
 impl Patch {
+    #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
+    #[must_use]
     pub fn after(&self) -> &Snapshot {
         &self.after
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         !self.is_empty()
     }
 
+    #[must_use]
     pub fn expected_revision(&self) -> Revision {
         self.before.revision
     }
 
+    #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
@@ -496,10 +569,16 @@ impl Patch {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn apply(&self, package: &mut OpcPackage) -> Result<Snapshot> {
         super::package::apply_patch(package, self)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn undo(&self, package: &mut OpcPackage) -> Result<Snapshot> {
         self.inverse().apply(package)
     }
@@ -600,10 +679,10 @@ fn build_after(source: &Snapshot, working: &[Working]) -> Result<Build> {
                     .payload
                     .clone()
                     .ok_or_else(|| invalid("embedded OLE object has no payload"))?;
-                let relationships = source_part_map
-                    .get(&part_name)
-                    .map(|part| Arc::clone(&part.relationships))
-                    .unwrap_or_else(|| Arc::new(Vec::new()));
+                let relationships = source_part_map.get(&part_name).map_or_else(
+                    || Arc::new(Vec::new()),
+                    |part| Arc::clone(&part.relationships),
+                );
                 parts.insert(
                     part_name.clone(),
                     PartSource {
@@ -679,13 +758,13 @@ fn build_after(source: &Snapshot, working: &[Working]) -> Result<Build> {
             target_ref,
             target_mode,
         )?;
-        if let Some(part_name) = part_name {
-            if let Some(part) = parts.get_mut(&part_name) {
-                part.bytes = value
-                    .payload
-                    .clone()
-                    .ok_or_else(|| invalid("embedded OLE object has no payload"))?;
-            }
+        if let Some(part_name) = part_name
+            && let Some(part) = parts.get_mut(&part_name)
+        {
+            part.bytes = value
+                .payload
+                .clone()
+                .ok_or_else(|| invalid("embedded OLE object has no payload"))?;
         }
         resolved.push(object);
     }
@@ -775,27 +854,27 @@ fn add_object_edits(
     after: &Object,
     edits: &mut Vec<Edit>,
 ) -> Result<()> {
-    if before.name != after.name {
-        if let Some(edit) = codec::attribute_edit(
+    if before.name != after.name
+        && let Some(edit) = codec::attribute_edit(
             source,
             &located.object,
             b"name",
             false,
             after.name.as_deref(),
-        )? {
-            edits.push(edit);
-        }
+        )?
+    {
+        edits.push(edit);
     }
-    if before.program_id != after.program_id {
-        if let Some(edit) = codec::attribute_edit(
+    if before.program_id != after.program_id
+        && let Some(edit) = codec::attribute_edit(
             source,
             &located.object,
             b"progId",
             false,
             after.program_id.as_deref(),
-        )? {
-            edits.push(edit);
-        }
+        )?
+    {
+        edits.push(edit);
     }
     if before.show_as_icon != after.show_as_icon {
         let value = after
@@ -1059,7 +1138,7 @@ fn fingerprint(
 fn feed_bytes(hash: &mut u64, value: &[u8]) {
     for byte in value {
         *hash ^= u64::from(*byte);
-        *hash = hash.wrapping_mul(0x100000001b3);
+        *hash = hash.wrapping_mul(0x100_0000_01b3);
     }
 }
 

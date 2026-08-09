@@ -31,11 +31,19 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Load the Changes Information owner from an OPC package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn load(package: &OpcPackage) -> Result<Option<Self>> {
         package::load_snapshot(package)
     }
 
     /// Alias for `Self::load` emphasizing the source-bound result.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn read(package: &OpcPackage) -> Result<Option<Self>> {
         Self::load(package)
     }
@@ -66,60 +74,70 @@ impl Snapshot {
 
     /// Return the typed Changes Information document.
     #[inline]
+    #[must_use]
     pub fn info(&self) -> &Info {
         &self.info
     }
 
     /// Alias for [`Self::info`] for callers treating this as a semantic view.
     #[inline]
+    #[must_use]
     pub fn changes_information(&self) -> &Info {
         self.info()
     }
 
     /// Return the exact OPC part name owned by this snapshot.
     #[inline]
+    #[must_use]
     pub fn part_name(&self) -> &str {
         &self.part_name
     }
 
-    /// Return the PresentationML part that owns the relationship.
+    /// Return the `PresentationML` part that owns the relationship.
     #[inline]
+    #[must_use]
     pub fn presentation_part_name(&self) -> &str {
         &self.presentation_part_name
     }
 
     /// Return the source relationship ID.
     #[inline]
+    #[must_use]
     pub fn relationship_id(&self) -> &str {
         &self.relationship_id
     }
 
     /// Return the authored relationship target reference.
     #[inline]
+    #[must_use]
     pub fn relationship_target(&self) -> &str {
         &self.relationship_target
     }
 
-    /// Return the source PresentationML content type.
+    /// Return the source `PresentationML` content type.
     #[inline]
+    #[must_use]
     pub fn presentation_content_type(&self) -> &str {
         &self.presentation_content_type
     }
 
     /// Return the fingerprint used for stale-source checks.
     #[inline]
+    #[must_use]
     pub const fn revision(&self) -> Revision {
         self.revision
     }
 
     /// Borrow the exact source bytes captured by this snapshot.
     #[inline]
+    #[must_use]
     pub fn source_xml(&self) -> &[u8] {
         self.source_xml.as_slice()
     }
 
     /// Start a detached edit over the typed view.
     #[inline]
+    #[must_use]
     pub fn edit(&self) -> Transaction {
         Transaction {
             original: self.clone(),
@@ -152,17 +170,23 @@ pub struct Transaction {
 impl Transaction {
     /// Borrow the currently staged typed document.
     #[inline]
+    #[must_use]
     pub fn snapshot(&self) -> &Info {
         &self.working
     }
 
     /// Whether the staged typed document differs from the source semantics.
     #[inline]
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.original.info != self.working
     }
 
     /// Replace the complete typed document after validating the candidate.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace(&mut self, value: Info) -> Result<bool> {
         validate_candidate(&value)?;
         if self.working == value {
@@ -173,6 +197,10 @@ impl Transaction {
     }
 
     /// Apply a checked mutation to a cloned typed document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn edit(&mut self, edit: impl FnOnce(&mut Info) -> Result<()>) -> Result<()> {
         let mut candidate = self.working.clone();
         edit(&mut candidate)?;
@@ -182,6 +210,10 @@ impl Transaction {
     }
 
     /// Replace or remove one reviewer's metadata list entry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_author(&mut self, list_index: usize, value: Option<Data>) -> Result<bool> {
         let mut candidate = self.working.clone();
         let list_len = candidate.change_lists.len();
@@ -199,6 +231,10 @@ impl Transaction {
     }
 
     /// Apply an atomic typed mutation to one existing reviewer's metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn edit_author(
         &mut self,
         list_index: usize,
@@ -221,16 +257,28 @@ impl Transaction {
     }
 
     /// Set one reviewer's display name, preserving all other metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_author_name(&mut self, list_index: usize, value: Option<String>) -> Result<bool> {
         self.update_author(list_index, |author| author.name = value)
     }
 
     /// Set one reviewer's user identifier, preserving all other metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_author_user_id(&mut self, list_index: usize, value: Option<String>) -> Result<bool> {
         self.update_author(list_index, |author| author.user_id = value)
     }
 
     /// Set one reviewer's identity-provider identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_author_provider_id(
         &mut self,
         list_index: usize,
@@ -240,6 +288,10 @@ impl Transaction {
     }
 
     /// Set one reviewer's client/device identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_author_client_id(
         &mut self,
         list_index: usize,
@@ -249,11 +301,19 @@ impl Transaction {
     }
 
     /// Set one reviewer's e-mail address.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_author_email(&mut self, list_index: usize, value: Option<String>) -> Result<bool> {
         self.update_author(list_index, |author| author.email = value)
     }
 
     /// Set one reviewer's XML date-time.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_author_date_time(
         &mut self,
         list_index: usize,
@@ -263,11 +323,19 @@ impl Transaction {
     }
 
     /// Set one reviewer's application version.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_author_version(&mut self, list_index: usize, value: Option<u32>) -> Result<bool> {
         self.update_author(list_index, |author| author.version = value)
     }
 
     /// Set one reviewer's stable change GUID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_author_change_id(
         &mut self,
         list_index: usize,
@@ -277,12 +345,20 @@ impl Transaction {
     }
 
     /// Set one reviewer's user-action identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_author_action_id(&mut self, list_index: usize, value: Option<i32>) -> Result<bool> {
         self.update_author(list_index, |author| author.action_id = value)
     }
 
     /// Replace one document-change bit list while preserving its opaque
     /// command children and extension XML.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_change_kinds(
         &mut self,
         list_index: usize,
@@ -311,6 +387,10 @@ impl Transaction {
     }
 
     /// Append one reviewer/change list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn push_list(&mut self, value: List) -> Result<()> {
         let mut candidate = self.working.clone();
         candidate.change_lists.push(value);
@@ -320,6 +400,10 @@ impl Transaction {
     }
 
     /// Remove one reviewer/change list, returning its typed value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_list(&mut self, index: usize) -> Result<List> {
         let mut candidate = self.working.clone();
         if index >= candidate.change_lists.len() {
@@ -341,6 +425,10 @@ impl Transaction {
     }
 
     /// Validate and consume the edit into a source-checked commit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn commit(self) -> Result<Commit> {
         if !self.is_changed() {
             let patch = Patch::new(self.original.clone(), self.original.clone());
@@ -388,34 +476,40 @@ pub struct Commit {
 impl Commit {
     /// Whether publication changes the exact owner bytes.
     #[inline]
+    #[must_use]
     pub const fn changed(&self) -> bool {
         self.changed
     }
 
     /// Alias for [`Self::changed`].
     #[inline]
+    #[must_use]
     pub const fn is_changed(&self) -> bool {
         self.changed
     }
 
     /// Borrow the projected post-edit snapshot.
     #[inline]
+    #[must_use]
     pub fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrow the reversible source-checked patch.
     #[inline]
+    #[must_use]
     pub fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Consume the commit into its snapshot and patch.
+    #[must_use]
     pub fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
 
     /// Consume the commit into its patch.
+    #[must_use]
     pub fn into_patch(self) -> Patch {
         self.patch
     }
@@ -428,6 +522,8 @@ pub struct Patch {
     after: Snapshot,
 }
 
+const MAX_BYTES: usize = 16 * 1024 * 1024;
+
 impl Patch {
     fn new(before: Snapshot, after: Snapshot) -> Self {
         Self { before, after }
@@ -435,29 +531,34 @@ impl Patch {
 
     /// Source context required before publication.
     #[inline]
+    #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Source context produced by publication.
     #[inline]
+    #[must_use]
     pub fn after(&self) -> &Snapshot {
         &self.after
     }
 
     /// Whether this patch is an exact no-op.
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
     /// Alias for [`Self::is_empty`].
     #[inline]
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         !self.is_empty()
     }
 
     /// Return the exact inverse patch.
+    #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
@@ -467,11 +568,16 @@ impl Patch {
 
     /// Return the source fingerprint required for publication.
     #[inline]
+    #[must_use]
     pub const fn expected_revision(&self) -> Revision {
         self.before.revision
     }
 
     /// Apply this patch atomically after checking the complete owner source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn apply(&self, target: &mut OpcPackage) -> Result<Snapshot> {
         let current = package::load_snapshot(target)?
             .ok_or_else(|| invalid("Changes Information source is absent"))?;
@@ -487,8 +593,6 @@ impl Patch {
         Ok(snapshot)
     }
 }
-
-const MAX_BYTES: usize = 16 * 1024 * 1024;
 
 fn validate_candidate(value: &Info) -> Result<()> {
     let _ = encode_info(value)?;
@@ -607,10 +711,9 @@ fn opening_tag_end(source: &[u8]) -> Result<usize> {
     for (index, byte) in source.iter().copied().enumerate().skip(1) {
         match quote {
             Some(expected) if byte == expected => quote = None,
-            Some(_) => {},
             None if matches!(byte, b'"' | b'\'') => quote = Some(byte),
             None if byte == b'>' => return Ok(index),
-            None => {},
+            Some(_) | None => {},
         }
     }
     Err(invalid(
@@ -639,10 +742,10 @@ fn kind_token(kind: Kind) -> &'static str {
 }
 
 fn fingerprint(bytes: &[u8]) -> Revision {
-    let mut hash = 0xcbf29ce484222325u64;
+    let mut hash = 0xcbf2_9ce4_8422_2325u64;
     for byte in bytes {
         hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(0x100000001b3);
+        hash = hash.wrapping_mul(0x100_0000_01b3);
     }
     hash
 }

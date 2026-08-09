@@ -11,12 +11,17 @@ pub struct LegacyWriteReservation<'a> {
 }
 
 impl<'a> LegacyWriteReservation<'a> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(data: Cow<'a, str>) -> RtfResult<Self> {
         let value = Self { data };
         value.validate()?;
         Ok(value)
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if self.data.is_empty() {
             return Err(RtfError::MalformedDocument(
@@ -54,12 +59,17 @@ pub struct WriteReservationHash<'a> {
 }
 
 impl<'a> WriteReservationHash<'a> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(data: Cow<'a, [u8]>) -> RtfResult<Self> {
         let value = Self { data };
         value.validate()?;
         Ok(value)
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if self.data.is_empty() {
             return Err(RtfError::MalformedDocument(
@@ -88,7 +98,10 @@ pub struct DocumentWriteReservations<'a> {
     pub hash: Option<WriteReservationHash<'a>>,
 }
 
-impl<'a> DocumentWriteReservations<'a> {
+impl DocumentWriteReservations<'_> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if let Some(legacy) = &self.legacy {
             legacy.validate()?;
@@ -99,6 +112,7 @@ impl<'a> DocumentWriteReservations<'a> {
         Ok(())
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.legacy.is_none() && self.hash.is_none()
     }

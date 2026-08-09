@@ -9,12 +9,102 @@ use super::validation::{
     validate_container_header, validate_container_record, validate_meta,
 };
 
+impl<'data> TryFrom<Record<'data>> for Shape<'data> {
+    type Error = Error;
+
+    /// Builds one typed shape from an `SpContainer` or `SpgrContainer`.
+    fn try_from(record: Record<'data>) -> Result<Self> {
+        let kind = record.kind();
+        let container = Container::try_new(record)?;
+        let mut budget = Budget::new(Limits::default());
+        budget.visit()?;
+        match kind {
+            RecordKind::SpContainer => {
+                build_shape(container, Vec::new(), Role::Standalone, &mut budget)
+            },
+            RecordKind::SpgrContainer => build_group(container, 0, Role::Standalone, &mut budget),
+            RecordKind::DggContainer
+            | RecordKind::BStoreContainer
+            | RecordKind::DgContainer
+            | RecordKind::SolverContainer
+            | RecordKind::Dgg
+            | RecordKind::Bse
+            | RecordKind::Dg
+            | RecordKind::Spgr
+            | RecordKind::Sp
+            | RecordKind::Opt
+            | RecordKind::ClientTextbox
+            | RecordKind::ChildAnchor
+            | RecordKind::ClientAnchor
+            | RecordKind::ClientData
+            | RecordKind::ConnectorRule
+            | RecordKind::AlignRule
+            | RecordKind::ArcRule
+            | RecordKind::ClientRule
+            | RecordKind::CalloutRule
+            | RecordKind::BlipEmf
+            | RecordKind::BlipWmf
+            | RecordKind::BlipPict
+            | RecordKind::BlipJpeg
+            | RecordKind::BlipPng
+            | RecordKind::BlipDib
+            | RecordKind::BlipTiff
+            | RecordKind::ColorMru
+            | RecordKind::SplitMenuColors
+            | RecordKind::SecondaryOpt
+            | RecordKind::TertiaryOpt
+            | RecordKind::Unknown(_) => Err(Error::MalformedShape {
+                reason: "record is not a shape container",
+            }),
+        }
+    }
+}
+
+impl Bounds {
+    /// Decodes one exact `[MS-ODRAW]` `FSPGR` record without copying its
+    /// payload. The four fixed-width coordinates are decoded by value, while
+    /// the record and any neighboring unknown records remain borrowed by the
+    /// containing shape.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::MalformedShape` if `record` is not a version-1,
+    /// instance-0 `Spgr` atom with a 16-byte payload or a coordinate extends
+    /// past the payload, or `Error::ArithmeticOverflow` if the coordinate
+    /// offset arithmetic cannot be represented.
+    pub fn from_record(record: &Record<'_>) -> Result<Self> {
+        validate_atom(record, RecordKind::Spgr, 1, Some(0), 16)?;
+        Ok(Self::new(
+            coordinate(record.data(), 0)?,
+            coordinate(record.data(), 4)?,
+            coordinate(record.data(), 8)?,
+            coordinate(record.data(), 12)?,
+        ))
+    }
+}
+
 /// Parses the user-visible shapes in one `OfficeArt` drawing.
+///
+/// # Errors
+///
+/// Returns an error under the same conditions as [`parse_with`] with the
+/// default [`Limits`].
 pub fn parse(data: &[u8]) -> Result<Vec<Shape<'_>>> {
     parse_with(data, Limits::default())
 }
 
 /// Parses user-visible shapes within explicit depth and record ceilings.
+///
+/// # Errors
+///
+/// Returns `Error::InvalidLimit` if `limits.max_depth` exceeds the
+/// implementation's safe maximum, `Error::TruncatedHeader` or
+/// `Error::TruncatedPayload` if the wire data ends mid-record,
+/// `Error::TrailingData` if the top-level record does not consume all of
+/// `data`, `Error::NotContainer` if the root record is not a container,
+/// `Error::LimitExceeded` if a depth or record ceiling is reached, or
+/// `Error::MalformedShape` if the root is not a drawing or shape container
+/// or any nested record is structurally invalid.
 pub fn parse_with(data: &[u8], limits: Limits) -> Result<Vec<Shape<'_>>> {
     const MAX_SAFE_DEPTH: u16 = 64;
 
@@ -46,46 +136,38 @@ pub fn parse_with(data: &[u8], limits: Limits) -> Result<Vec<Shape<'_>>> {
             Role::Standalone,
             &mut budget,
         )?]),
-        _ => Err(Error::MalformedShape {
+        RecordKind::DggContainer
+        | RecordKind::BStoreContainer
+        | RecordKind::SolverContainer
+        | RecordKind::Dgg
+        | RecordKind::Bse
+        | RecordKind::Dg
+        | RecordKind::Spgr
+        | RecordKind::Sp
+        | RecordKind::Opt
+        | RecordKind::ClientTextbox
+        | RecordKind::ChildAnchor
+        | RecordKind::ClientAnchor
+        | RecordKind::ClientData
+        | RecordKind::ConnectorRule
+        | RecordKind::AlignRule
+        | RecordKind::ArcRule
+        | RecordKind::ClientRule
+        | RecordKind::CalloutRule
+        | RecordKind::BlipEmf
+        | RecordKind::BlipWmf
+        | RecordKind::BlipPict
+        | RecordKind::BlipJpeg
+        | RecordKind::BlipPng
+        | RecordKind::BlipDib
+        | RecordKind::BlipTiff
+        | RecordKind::ColorMru
+        | RecordKind::SplitMenuColors
+        | RecordKind::SecondaryOpt
+        | RecordKind::TertiaryOpt
+        | RecordKind::Unknown(_) => Err(Error::MalformedShape {
             reason: "root is not a drawing or shape container",
         }),
-    }
-}
-
-impl<'data> TryFrom<Record<'data>> for Shape<'data> {
-    type Error = Error;
-
-    /// Builds one typed shape from an `SpContainer` or `SpgrContainer`.
-    fn try_from(record: Record<'data>) -> Result<Self> {
-        let kind = record.kind();
-        let container = Container::try_new(record)?;
-        let mut budget = Budget::new(Limits::default());
-        budget.visit()?;
-        match kind {
-            RecordKind::SpContainer => {
-                build_shape(container, Vec::new(), Role::Standalone, &mut budget)
-            },
-            RecordKind::SpgrContainer => build_group(container, 0, Role::Standalone, &mut budget),
-            _ => Err(Error::MalformedShape {
-                reason: "record is not a shape container",
-            }),
-        }
-    }
-}
-
-impl Bounds {
-    /// Decodes one exact `[MS-ODRAW]` `FSPGR` record without copying its
-    /// payload. The four fixed-width coordinates are decoded by value, while
-    /// the record and any neighboring unknown records remain borrowed by the
-    /// containing shape.
-    pub fn from_record(record: &Record<'_>) -> Result<Self> {
-        validate_atom(record, RecordKind::Spgr, 1, Some(0), 16)?;
-        Ok(Self::new(
-            coordinate(record.data(), 0)?,
-            coordinate(record.data(), 4)?,
-            coordinate(record.data(), 8)?,
-            coordinate(record.data(), 12)?,
-        ))
     }
 }
 
@@ -100,8 +182,8 @@ fn drawing<'data>(
     let mut dg = false;
     let mut root_group_seen = false;
     let mut shapes = Vec::new();
-    for child in container.children() {
-        let child = child?;
+    for child_result in container.children() {
+        let child = child_result?;
         budget.visit()?;
         match child.kind() {
             RecordKind::Dg => {
@@ -137,7 +219,34 @@ fn drawing<'data>(
                 validate_container_record(&child, RecordKind::SolverContainer)?;
             },
             RecordKind::Unknown(_) => {},
-            _ => {
+            RecordKind::DggContainer
+            | RecordKind::BStoreContainer
+            | RecordKind::DgContainer
+            | RecordKind::Dgg
+            | RecordKind::Bse
+            | RecordKind::Spgr
+            | RecordKind::Sp
+            | RecordKind::Opt
+            | RecordKind::ClientTextbox
+            | RecordKind::ChildAnchor
+            | RecordKind::ClientAnchor
+            | RecordKind::ClientData
+            | RecordKind::ConnectorRule
+            | RecordKind::AlignRule
+            | RecordKind::ArcRule
+            | RecordKind::ClientRule
+            | RecordKind::CalloutRule
+            | RecordKind::BlipEmf
+            | RecordKind::BlipWmf
+            | RecordKind::BlipPict
+            | RecordKind::BlipJpeg
+            | RecordKind::BlipPng
+            | RecordKind::BlipDib
+            | RecordKind::BlipTiff
+            | RecordKind::ColorMru
+            | RecordKind::SplitMenuColors
+            | RecordKind::SecondaryOpt
+            | RecordKind::TertiaryOpt => {
                 return Err(Error::MalformedShape {
                     reason: "drawing contains an invalid direct child record",
                 });
@@ -169,13 +278,13 @@ fn root_group<'data>(
             reason: "shape-group container does not start with SpContainer",
         });
     }
-    let header = Container::try_new(header)?;
-    let meta = scan_meta(&header, budget)?;
+    let header_container = Container::try_new(header)?;
+    let meta = scan_meta(&header_container, budget)?;
     validate_meta(&meta, true, Role::Patriarch)?;
 
     let mut shapes = Vec::new();
-    for child in children {
-        let child = child?;
+    for child_result in children {
+        let child = child_result?;
         budget.visit()?;
         match child.kind() {
             RecordKind::SpContainer => {
@@ -191,7 +300,37 @@ fn root_group<'data>(
                 Role::Root,
                 budget,
             )?),
-            _ => {
+            RecordKind::DggContainer
+            | RecordKind::BStoreContainer
+            | RecordKind::DgContainer
+            | RecordKind::SolverContainer
+            | RecordKind::Dgg
+            | RecordKind::Bse
+            | RecordKind::Dg
+            | RecordKind::Spgr
+            | RecordKind::Sp
+            | RecordKind::Opt
+            | RecordKind::ClientTextbox
+            | RecordKind::ChildAnchor
+            | RecordKind::ClientAnchor
+            | RecordKind::ClientData
+            | RecordKind::ConnectorRule
+            | RecordKind::AlignRule
+            | RecordKind::ArcRule
+            | RecordKind::ClientRule
+            | RecordKind::CalloutRule
+            | RecordKind::BlipEmf
+            | RecordKind::BlipWmf
+            | RecordKind::BlipPict
+            | RecordKind::BlipJpeg
+            | RecordKind::BlipPng
+            | RecordKind::BlipDib
+            | RecordKind::BlipTiff
+            | RecordKind::ColorMru
+            | RecordKind::SplitMenuColors
+            | RecordKind::SecondaryOpt
+            | RecordKind::TertiaryOpt
+            | RecordKind::Unknown(_) => {
                 return Err(Error::MalformedShape {
                     reason: "shape-group container has a non-shape child",
                 });
@@ -222,8 +361,8 @@ fn build_group<'data>(
     let meta = Container::try_new(header)?;
 
     let mut children = Vec::new();
-    for child in records {
-        let child = child?;
+    for child_result in records {
+        let child = child_result?;
         budget.visit()?;
         match child.kind() {
             RecordKind::SpContainer => {
@@ -240,7 +379,37 @@ fn build_group<'data>(
                 Role::Member,
                 budget,
             )?),
-            _ => {
+            RecordKind::DggContainer
+            | RecordKind::BStoreContainer
+            | RecordKind::DgContainer
+            | RecordKind::SolverContainer
+            | RecordKind::Dgg
+            | RecordKind::Bse
+            | RecordKind::Dg
+            | RecordKind::Spgr
+            | RecordKind::Sp
+            | RecordKind::Opt
+            | RecordKind::ClientTextbox
+            | RecordKind::ChildAnchor
+            | RecordKind::ClientAnchor
+            | RecordKind::ClientData
+            | RecordKind::ConnectorRule
+            | RecordKind::AlignRule
+            | RecordKind::ArcRule
+            | RecordKind::ClientRule
+            | RecordKind::CalloutRule
+            | RecordKind::BlipEmf
+            | RecordKind::BlipWmf
+            | RecordKind::BlipPict
+            | RecordKind::BlipJpeg
+            | RecordKind::BlipPng
+            | RecordKind::BlipDib
+            | RecordKind::BlipTiff
+            | RecordKind::ColorMru
+            | RecordKind::SplitMenuColors
+            | RecordKind::SecondaryOpt
+            | RecordKind::TertiaryOpt
+            | RecordKind::Unknown(_) => {
                 return Err(Error::MalformedShape {
                     reason: "shape-group container has a non-shape child",
                 });
@@ -276,7 +445,7 @@ fn build<'data>(
         if records
             .tertiary
             .as_ref()
-            .and_then(|props| props.get_int(Id::GroupTableProperties))
+            .and_then(|tertiary| tertiary.get_int(Id::GroupTableProperties))
             .is_some_and(|value| value & 1 != 0)
         {
             Kind::Table

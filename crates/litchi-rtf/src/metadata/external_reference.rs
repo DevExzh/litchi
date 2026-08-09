@@ -20,15 +20,18 @@ pub struct DocumentExternalReferences<'a> {
     pub template: Option<Cow<'a, str>>,
 }
 
-impl<'a> DocumentExternalReferences<'a> {
+impl DocumentExternalReferences<'_> {
     /// Validate name and aggregate resource bounds.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         let mut total = 0usize;
-        for (kind, value) in [
+        for (kind, raw_value) in [
             ("next-file", self.next_file.as_deref()),
             ("template", self.template.as_deref()),
         ] {
-            let Some(value) = value else { continue };
+            let Some(value) = raw_value else { continue };
             if value.trim().is_empty() {
                 return Err(RtfError::MalformedDocument(format!(
                     "RTF {kind} name cannot be empty"
@@ -59,6 +62,7 @@ impl<'a> DocumentExternalReferences<'a> {
     }
 
     /// Return whether neither external-reference destination is present.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.next_file.is_none() && self.template.is_none()
     }

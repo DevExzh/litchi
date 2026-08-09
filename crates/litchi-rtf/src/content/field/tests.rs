@@ -1,3 +1,16 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+#![allow(
+    clippy::let_underscore_must_use,
+    reason = "totality smoke tests deliberately discard view results"
+)]
+
 use super::*;
 use std::borrow::Cow;
 
@@ -242,7 +255,7 @@ fn writer_operand_cannot_inject_switches_and_round_trips_specials() {
     assert_eq!(code.external_target.as_deref(), Some(target));
     assert!(code.bookmark.is_none());
 
-    let mut rtf = br#"{\rtf1\ansi "#.to_vec();
+    let mut rtf = br"{\rtf1\ansi ".to_vec();
     crate::RtfWriter::new(&mut rtf)
         .write_hyperlink(target, "safe link")
         .unwrap();
@@ -260,10 +273,10 @@ fn malformed_recognized_fields_are_non_actionable() {
     for instruction in [
         "HYPERLINK",
         r#"HYPERLINK "unterminated"#,
-        r#"HYPERLINK \l"#,
-        r#"HYPERLINK x \l a \l b"#,
+        r"HYPERLINK \l",
+        r"HYPERLINK x \l a \l b",
         "REF",
-        r#"REF a \h \h"#,
+        r"REF a \h \h",
     ] {
         assert!(matches!(
             parse_field_code(instruction),
@@ -370,7 +383,7 @@ fn go_to_button_fields_expose_stored_metadata_without_navigation() {
         "GOTOBUTTON Destination",
         r#"GOTOBUTTON Destination """#,
         "GOTOBUTTON Destination Button unexpected",
-        r#"GOTOBUTTON Destination Button \* MERGEFORMAT"#,
+        r"GOTOBUTTON Destination Button \* MERGEFORMAT",
     ] {
         assert!(
             Field::parse_instruction(instruction)
@@ -475,7 +488,7 @@ fn print_fields_preserve_opaque_metadata_without_sending_printer_commands() {
 
 #[test]
 fn embed_fields_preserve_opaque_metadata_without_loading_or_activating_objects() {
-    let mut embedded = Field::parse_instruction(r#"EMBED Excel.Sheet.12 \* MERGEFORMAT"#);
+    let mut embedded = Field::parse_instruction(r"EMBED Excel.Sheet.12 \* MERGEFORMAT");
     embedded.result = Cow::Borrowed("cached worksheet object");
     embedded.status = FieldStatus {
         dirty: true,
@@ -489,11 +502,11 @@ fn embed_fields_preserve_opaque_metadata_without_loading_or_activating_objects()
     let embedded = embedded.embed_field().unwrap();
     assert_eq!(
         embedded.instruction(),
-        r#"EMBED Excel.Sheet.12 \* MERGEFORMAT"#
+        r"EMBED Excel.Sheet.12 \* MERGEFORMAT"
     );
     assert_eq!(
         embedded.object_instructions(),
-        r#"Excel.Sheet.12 \* MERGEFORMAT"#
+        r"Excel.Sheet.12 \* MERGEFORMAT"
     );
     assert_eq!(embedded.cached_result(), Some("cached worksheet object"));
     assert!(embedded.is_dirty());
@@ -584,7 +597,7 @@ fn barcode_fields_preserve_opaque_metadata_without_decoding_or_rendering() {
 
 #[test]
 fn bidi_outline_fields_preserve_metadata_without_resolving_numbering_or_layout() {
-    let mut outline = Field::parse_instruction(r#"BIDIOUTLINE \* MERGEFORMAT"#);
+    let mut outline = Field::parse_instruction(r"BIDIOUTLINE \* MERGEFORMAT");
     outline.result = Cow::Borrowed("cached bidi outline number");
     outline.status = FieldStatus {
         dirty: true,
@@ -596,8 +609,8 @@ fn bidi_outline_fields_preserve_metadata_without_resolving_numbering_or_layout()
 
     assert_eq!(outline.field_type, FieldType::BidiOutline);
     let outline = outline.bidi_outline_field().unwrap();
-    assert_eq!(outline.instruction(), r#"BIDIOUTLINE \* MERGEFORMAT"#);
-    assert_eq!(outline.opaque_instructions(), r#"\* MERGEFORMAT"#);
+    assert_eq!(outline.instruction(), r"BIDIOUTLINE \* MERGEFORMAT");
+    assert_eq!(outline.opaque_instructions(), r"\* MERGEFORMAT");
     assert_eq!(outline.cached_result(), Some("cached bidi outline number"));
     assert!(outline.is_dirty());
     assert!(outline.is_locked());
@@ -626,7 +639,7 @@ fn bidi_outline_fields_preserve_metadata_without_resolving_numbering_or_layout()
 
 #[test]
 fn shape_fields_preserve_metadata_without_linking_or_rendering_drawings() {
-    let mut shape = Field::parse_instruction(r#"SHAPE \* MERGEFORMAT"#);
+    let mut shape = Field::parse_instruction(r"SHAPE \* MERGEFORMAT");
     shape.result = Cow::Borrowed("cached drawing anchor");
     shape.status = FieldStatus {
         dirty: true,
@@ -638,8 +651,8 @@ fn shape_fields_preserve_metadata_without_linking_or_rendering_drawings() {
 
     assert_eq!(shape.field_type, FieldType::Shape);
     let shape = shape.shape_field().unwrap();
-    assert_eq!(shape.instruction(), r#"SHAPE \* MERGEFORMAT"#);
-    assert_eq!(shape.opaque_instructions(), r#"\* MERGEFORMAT"#);
+    assert_eq!(shape.instruction(), r"SHAPE \* MERGEFORMAT");
+    assert_eq!(shape.opaque_instructions(), r"\* MERGEFORMAT");
     assert_eq!(shape.cached_result(), Some("cached drawing anchor"));
     assert!(shape.is_dirty());
     assert!(shape.is_locked());
@@ -664,7 +677,7 @@ fn shape_fields_preserve_metadata_without_linking_or_rendering_drawings() {
 
 #[test]
 fn legacy_form_fields_preserve_metadata_without_filling_or_executing() {
-    let mut text = Field::parse_instruction(r#"FORMTEXT \* MERGEFORMAT"#);
+    let mut text = Field::parse_instruction(r"FORMTEXT \* MERGEFORMAT");
     text.result = Cow::Borrowed("cached text field");
     text.status = FieldStatus {
         dirty: true,
@@ -677,8 +690,8 @@ fn legacy_form_fields_preserve_metadata_without_filling_or_executing() {
     assert_eq!(text.field_type, FieldType::FormText);
     let text_field = text.legacy_form_field().unwrap();
     assert_eq!(text_field.kind(), LegacyFormFieldKind::Text);
-    assert_eq!(text_field.instruction(), r#"FORMTEXT \* MERGEFORMAT"#);
-    assert_eq!(text_field.opaque_instructions(), r#"\* MERGEFORMAT"#);
+    assert_eq!(text_field.instruction(), r"FORMTEXT \* MERGEFORMAT");
+    assert_eq!(text_field.opaque_instructions(), r"\* MERGEFORMAT");
     assert_eq!(text_field.cached_result(), Some("cached text field"));
     assert!(text_field.is_dirty());
     assert!(text_field.is_locked());
@@ -691,13 +704,13 @@ fn legacy_form_fields_preserve_metadata_without_filling_or_executing() {
     assert_eq!(checkbox.kind(), LegacyFormFieldKind::CheckBox);
     assert_eq!(checkbox.opaque_instructions(), "");
 
-    let drop_down = Field::parse_instruction(r#"FORMDROPDOWN \* MERGEFORMAT"#);
+    let drop_down = Field::parse_instruction(r"FORMDROPDOWN \* MERGEFORMAT");
     assert_eq!(drop_down.field_type, FieldType::FormDropdown);
     let drop_down = drop_down.legacy_form_field().unwrap();
     assert_eq!(drop_down.kind(), LegacyFormFieldKind::DropDown);
-    assert_eq!(drop_down.opaque_instructions(), r#"\* MERGEFORMAT"#);
+    assert_eq!(drop_down.opaque_instructions(), r"\* MERGEFORMAT");
 
-    for instruction in [r#"FORMTEXTUAL"#, r#"FORMCHECKBOXLIST"#] {
+    for instruction in [r"FORMTEXTUAL", r"FORMCHECKBOXLIST"] {
         assert_eq!(
             Field::parse_instruction(instruction).field_type,
             FieldType::Unknown
@@ -726,7 +739,7 @@ fn legacy_form_fields_preserve_metadata_without_filling_or_executing() {
 
 #[test]
 fn private_fields_preserve_conversion_data_without_conversion_or_layout() {
-    let mut private = Field::parse_instruction(r#"PRIVATE \* MERGEFORMAT"#);
+    let mut private = Field::parse_instruction(r"PRIVATE \* MERGEFORMAT");
     private.result = Cow::Borrowed("opaque converter payload");
     private.status = FieldStatus {
         dirty: true,
@@ -738,8 +751,8 @@ fn private_fields_preserve_conversion_data_without_conversion_or_layout() {
 
     assert_eq!(private.field_type, FieldType::Private);
     let private_field = private.private_field().unwrap();
-    assert_eq!(private_field.instruction(), r#"PRIVATE \* MERGEFORMAT"#);
-    assert_eq!(private_field.opaque_instructions(), r#"\* MERGEFORMAT"#);
+    assert_eq!(private_field.instruction(), r"PRIVATE \* MERGEFORMAT");
+    assert_eq!(private_field.opaque_instructions(), r"\* MERGEFORMAT");
     assert_eq!(
         private_field.cached_result(),
         Some("opaque converter payload")
@@ -823,7 +836,7 @@ fn auto_text_fields_preserve_metadata_without_lookup_or_insertion() {
         "GLOSSARY",
         r#"GLOSSARY ""#,
         "GLOSSARY Entry unexpected",
-        r#"GLOSSARY Entry \"#,
+        r"GLOSSARY Entry \",
     ] {
         assert!(
             Field::parse_instruction(instruction)
@@ -885,7 +898,7 @@ fn auto_text_list_fields_preserve_metadata_without_selection_or_insertion() {
     assert_eq!(list.owner(), FieldOwner::Body);
     assert_eq!(list.position(), 4);
 
-    let style_only = Field::parse_instruction(r#"autotextlist \s NameStyle"#);
+    let style_only = Field::parse_instruction(r"autotextlist \s NameStyle");
     assert_eq!(style_only.field_type, FieldType::AutoTextList);
     let style_only = style_only.auto_text_list_field().unwrap();
     assert_eq!(style_only.display_text(), None);
@@ -904,11 +917,11 @@ fn auto_text_list_fields_preserve_metadata_without_selection_or_insertion() {
         FieldType::Unknown
     );
     for instruction in [
-        r#"AUTOTEXTLIST \s"#,
-        r#"AUTOTEXTLIST \t"#,
-        r#"AUTOTEXTLIST \s \"#,
+        r"AUTOTEXTLIST \s",
+        r"AUTOTEXTLIST \t",
+        r"AUTOTEXTLIST \s \",
         "AUTOTEXTLIST display unexpected",
-        r#"AUTOTEXTLIST \"#,
+        r"AUTOTEXTLIST \",
         r#"AUTOTEXTLIST "unterminated"#,
     ] {
         assert!(
@@ -973,7 +986,7 @@ fn dde_fields_expose_stored_metadata_without_contacting_sources() {
     assert_eq!(automatic.representation(), Some(DdeRepresentation::Text));
     assert!(!automatic.omits_graphic_data());
 
-    let omit_graphics = Field::parse_instruction(r#"DDE Excel source \a \d"#);
+    let omit_graphics = Field::parse_instruction(r"DDE Excel source \a \d");
     let omit_graphics = omit_graphics.dde_link().unwrap();
     assert!(omit_graphics.requests_automatic_updates());
     assert_eq!(omit_graphics.representation(), None);
@@ -1726,7 +1739,7 @@ fn citation_fields_preserve_stored_metadata_without_resolving_sources() {
 #[test]
 fn bibliography_fields_preserve_stored_metadata_without_generation() {
     let mut field =
-        Field::parse_instruction(r#"BIBLIOGRAPHY \l 1033 \f en-US \m Ecma01 \* MERGEFORMAT"#);
+        Field::parse_instruction(r"BIBLIOGRAPHY \l 1033 \f en-US \m Ecma01 \* MERGEFORMAT");
     field.result = Cow::Borrowed("cached bibliography");
     field.status = FieldStatus {
         dirty: true,
@@ -1866,12 +1879,12 @@ fn document_property_fields_preserve_names_without_resolution() {
             .is_none()
     );
     assert!(
-        Field::parse_instruction(r#"DOCPROPERTY \"#)
+        Field::parse_instruction(r"DOCPROPERTY \")
             .document_property()
             .is_none()
     );
     assert!(
-        Field::parse_instruction(r#"DOCPROPERTY \* MERGEFORMAT"#)
+        Field::parse_instruction(r"DOCPROPERTY \* MERGEFORMAT")
             .document_property()
             .is_none()
     );
@@ -1886,12 +1899,12 @@ fn document_property_fields_preserve_names_without_resolution() {
             .is_none()
     );
     assert!(
-        Field::parse_instruction(r#"DOCPROPERTY Project \"#)
+        Field::parse_instruction(r"DOCPROPERTY Project \")
             .document_property()
             .is_none()
     );
     assert!(
-        Field::parse_instruction(r#"DOCPROPERTY Project \* \"#)
+        Field::parse_instruction(r"DOCPROPERTY Project \* \")
             .document_property()
             .is_none()
     );
@@ -1956,7 +1969,7 @@ fn info_fields_preserve_stored_metadata_without_resolution_or_updates() {
         r#"INFO "" "#,
         r#"INFO TITLE "Stored title" unexpected"#,
         r#"INFO TITLE "unterminated"#,
-        r#"INFO TITLE \"#,
+        r"INFO TITLE \",
     ] {
         assert!(
             Field::parse_instruction(instruction).info_field().is_none(),
@@ -2265,7 +2278,7 @@ fn mail_merge_data_fields_preserve_sources_without_connecting_or_merging() {
     assert_eq!(data.switches()[1].name, "q");
     assert_eq!(data.switches()[1].value.as_deref(), Some("opaque"));
 
-    let without_header = Field::parse_instruction(r#"data recipients.csv \q opaque"#);
+    let without_header = Field::parse_instruction(r"data recipients.csv \q opaque");
     assert_eq!(without_header.field_type, FieldType::MailMergeData);
     let without_header = without_header.mail_merge_data().unwrap();
     assert_eq!(without_header.data_source(), "recipients.csv");
@@ -2278,7 +2291,7 @@ fn mail_merge_data_fields_preserve_sources_without_connecting_or_merging() {
 
     assert!(Field::parse_instruction("DATA").mail_merge_data().is_none());
     assert!(
-        Field::parse_instruction(r#"DATA \* MERGEFORMAT"#)
+        Field::parse_instruction(r"DATA \* MERGEFORMAT")
             .mail_merge_data()
             .is_none()
     );
@@ -2393,7 +2406,7 @@ fn referenced_document_fields_preserve_paths_without_opening_sources() {
 
     for instruction in [
         "RD",
-        r#"RD \f"#,
+        r"RD \f",
         r#"RD "chapter.doc" \f unexpected"#,
         r#"RD "chapter.doc" \f \F"#,
         r#"RD "chapter.doc" unexpected"#,
@@ -2671,7 +2684,7 @@ fn set_fields_preserve_cached_results_without_evaluation_or_state_changes() {
         r#"SET "" value"#,
         "SET Target",
         "SET Target   ",
-        r#"SET \* value"#,
+        r"SET \* value",
         r#"SET "Target"expression"#,
     ] {
         assert!(
@@ -2683,7 +2696,7 @@ fn set_fields_preserve_cached_results_without_evaluation_or_state_changes() {
 
 #[test]
 fn sequence_fields_preserve_metadata_without_bookmark_lookup_or_numbering() {
-    let mut sequence = Field::parse_instruction(r#"SEQ Figure FigureChapter \r 3 \* ARABIC"#);
+    let mut sequence = Field::parse_instruction(r"SEQ Figure FigureChapter \r 3 \* ARABIC");
     sequence.result = Cow::Borrowed("3");
     sequence.status = FieldStatus {
         dirty: true,
@@ -2705,7 +2718,7 @@ fn sequence_fields_preserve_metadata_without_bookmark_lookup_or_numbering() {
     assert_eq!(sequence_field.owner(), FieldOwner::Body);
     assert_eq!(sequence_field.position(), 4);
 
-    let table = Field::parse_instruction(r#"seq Table \s 1 \* ROMAN"#);
+    let table = Field::parse_instruction(r"seq Table \s 1 \* ROMAN");
     assert_eq!(table.field_type, FieldType::Sequence);
     let table = table.sequence_field().unwrap();
     assert_eq!(table.identifier(), "Table");
@@ -2739,7 +2752,7 @@ fn sequence_fields_preserve_metadata_without_bookmark_lookup_or_numbering() {
 
 #[test]
 fn formula_fields_preserve_cached_results_without_evaluation() {
-    let mut formula = Field::parse_instruction(r#"=SUM(ABOVE) \* MERGEFORMAT"#);
+    let mut formula = Field::parse_instruction(r"=SUM(ABOVE) \* MERGEFORMAT");
     formula.result = Cow::Borrowed("42");
     formula.status = FieldStatus {
         dirty: true,
@@ -2812,7 +2825,7 @@ fn quote_fields_preserve_cached_text_without_inserting_or_transforming_it() {
 
     for instruction in [
         "QUOTE",
-        r#"QUOTE \* MERGEFORMAT"#,
+        r"QUOTE \* MERGEFORMAT",
         r#"QUOTE "literal" unexpected"#,
         r#"QUOTE "unterminated"#,
     ] {
@@ -2958,8 +2971,7 @@ fn automatic_number_fields_preserve_cached_metadata_without_calculating_numbers_
 
 #[test]
 fn list_number_fields_preserve_cached_metadata_without_reading_lists_or_calculating_numbers() {
-    let mut numbered =
-        Field::parse_instruction(r#"LISTNUM NumberDefault \l 6 \s 3 \* MERGEFORMAT"#);
+    let mut numbered = Field::parse_instruction(r"LISTNUM NumberDefault \l 6 \s 3 \* MERGEFORMAT");
     numbered.result = Cow::Borrowed("(iii)");
     numbered.status = FieldStatus {
         dirty: true,
@@ -3072,7 +3084,7 @@ fn style_reference_fields_preserve_metadata_without_style_or_layout_resolution()
     assert_eq!(style_reference.owner(), FieldOwner::Body);
     assert_eq!(style_reference.position(), 4);
 
-    let title = Field::parse_instruction(r#"styleref Title \n"#);
+    let title = Field::parse_instruction(r"styleref Title \n");
     assert_eq!(title.field_type, FieldType::StyleReference);
     let title = title.style_reference_field().unwrap();
     assert_eq!(title.style_name(), "Title");
@@ -3090,9 +3102,9 @@ fn style_reference_fields_preserve_metadata_without_style_or_layout_resolution()
     for instruction in [
         "STYLEREF",
         r#"STYLEREF ""#,
-        r#"STYLEREF Heading \l unexpected"#,
+        r"STYLEREF Heading \l unexpected",
         "STYLEREF Heading unexpected",
-        r#"STYLEREF Heading \"#,
+        r"STYLEREF Heading \",
         r#"STYLEREF Heading "unterminated"#,
     ] {
         assert!(
@@ -3191,7 +3203,7 @@ fn user_identity_fields_preserve_metadata_without_reading_host_identity() {
     assert_eq!(address.owner(), FieldOwner::Body);
     assert_eq!(address.position(), 4);
 
-    let initials = Field::parse_instruction(r#"userinitials \* Lower"#);
+    let initials = Field::parse_instruction(r"userinitials \* Lower");
     assert_eq!(initials.field_type, FieldType::UserInitials);
     let initials = initials.user_identity_field().unwrap();
     assert_eq!(initials.kind(), UserIdentityFieldKind::Initials);
@@ -3282,12 +3294,12 @@ fn advance_fields_preserve_placement_metadata_without_changing_layout() {
     );
 
     for instruction in [
-        r#"ADVANCE \d"#,
-        r#"ADVANCE \z 10"#,
-        r#"ADVANCE \x 1.5"#,
-        r#"ADVANCE \u 9223372036854775808"#,
+        r"ADVANCE \d",
+        r"ADVANCE \z 10",
+        r"ADVANCE \x 1.5",
+        r"ADVANCE \u 9223372036854775808",
         "ADVANCE 12",
-        r#"ADVANCE \d 6 trailing"#,
+        r"ADVANCE \d 6 trailing",
     ] {
         assert!(
             Field::parse_instruction(instruction)
@@ -3297,7 +3309,7 @@ fn advance_fields_preserve_placement_metadata_without_changing_layout() {
         );
     }
     assert_eq!(
-        Field::parse_instruction(r#"ADVANCER \u 6"#).field_type,
+        Field::parse_instruction(r"ADVANCER \u 6").field_type,
         FieldType::Unknown
     );
 }
@@ -3388,7 +3400,7 @@ fn mail_merge_recipient_fields_preserve_layout_metadata_without_merging() {
 #[test]
 fn document_discovers_document_variable_fields_without_resolving_them() {
     let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst DOCVARIABLE CustomerName \\* MERGEFORMAT}{\fldrslt cached customer}}After}"#,
+        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst DOCVARIABLE CustomerName \\* MERGEFORMAT}{\fldrslt cached customer}}After}",
     )
     .unwrap();
 
@@ -3655,7 +3667,7 @@ fn document_discovers_embed_fields_without_loading_or_activating_objects() {
     assert_eq!(fields.len(), 2);
     assert_eq!(
         fields[0].object_instructions(),
-        r#"Excel.Sheet.12 \* MERGEFORMAT"#
+        r"Excel.Sheet.12 \* MERGEFORMAT"
     );
     assert_eq!(fields[0].cached_result(), Some("cached worksheet object"));
     assert!(fields[0].is_dirty());
@@ -3694,14 +3706,14 @@ fn document_discovers_barcode_fields_without_decoding_or_rendering() {
 #[test]
 fn document_discovers_bidi_outline_fields_without_resolving_numbering_or_layout() {
     let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst BIDIOUTLINE \\* MERGEFORMAT}{\fldrslt cached bidi outline number}}{\field\flddirty\fldlock{\*\fldinst bidioutline}{\fldrslt cached bare bidi outline}}After}"#,
+        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst BIDIOUTLINE \\* MERGEFORMAT}{\fldrslt cached bidi outline number}}{\field\flddirty\fldlock{\*\fldinst bidioutline}{\fldrslt cached bare bidi outline}}After}",
     )
     .unwrap();
 
     let fields = document.bidi_outline_fields();
     assert_eq!(document.bidi_outline_field_count(), 2);
     assert_eq!(fields.len(), 2);
-    assert_eq!(fields[0].opaque_instructions(), r#"\* MERGEFORMAT"#);
+    assert_eq!(fields[0].opaque_instructions(), r"\* MERGEFORMAT");
     assert_eq!(
         fields[0].cached_result(),
         Some("cached bidi outline number")
@@ -3718,14 +3730,14 @@ fn document_discovers_bidi_outline_fields_without_resolving_numbering_or_layout(
 #[test]
 fn document_discovers_shape_fields_without_linking_or_rendering_drawings() {
     let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst SHAPE \\* MERGEFORMAT}{\fldrslt cached drawing anchor}}{\field\flddirty\fldlock{\*\fldinst shape}{\fldrslt cached bare drawing anchor}}After}"#,
+        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst SHAPE \\* MERGEFORMAT}{\fldrslt cached drawing anchor}}{\field\flddirty\fldlock{\*\fldinst shape}{\fldrslt cached bare drawing anchor}}After}",
     )
     .unwrap();
 
     let fields = document.shape_fields();
     assert_eq!(document.shape_field_count(), 2);
     assert_eq!(fields.len(), 2);
-    assert_eq!(fields[0].opaque_instructions(), r#"\* MERGEFORMAT"#);
+    assert_eq!(fields[0].opaque_instructions(), r"\* MERGEFORMAT");
     assert_eq!(fields[0].cached_result(), Some("cached drawing anchor"));
     assert!(fields[0].is_dirty());
     assert!(fields[0].is_locked());
@@ -3742,7 +3754,7 @@ fn document_discovers_shape_fields_without_linking_or_rendering_drawings() {
 #[test]
 fn document_discovers_legacy_form_fields_without_filling_or_executing() {
     let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst FORMTEXT \\* MERGEFORMAT}{\fldrslt cached text field}}{\field\flddirty\fldlock{\*\fldinst formcheckbox}{\fldrslt cached checkbox}}{\field\flddirty\fldlock{\*\fldinst FORMDROPDOWN \\* MERGEFORMAT}{\fldrslt cached drop-down selection}}After}"#,
+        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst FORMTEXT \\* MERGEFORMAT}{\fldrslt cached text field}}{\field\flddirty\fldlock{\*\fldinst formcheckbox}{\fldrslt cached checkbox}}{\field\flddirty\fldlock{\*\fldinst FORMDROPDOWN \\* MERGEFORMAT}{\fldrslt cached drop-down selection}}After}",
     )
     .unwrap();
 
@@ -3750,7 +3762,7 @@ fn document_discovers_legacy_form_fields_without_filling_or_executing() {
     assert_eq!(document.legacy_form_field_count(), 3);
     assert_eq!(fields.len(), 3);
     assert_eq!(fields[0].kind(), LegacyFormFieldKind::Text);
-    assert_eq!(fields[0].opaque_instructions(), r#"\* MERGEFORMAT"#);
+    assert_eq!(fields[0].opaque_instructions(), r"\* MERGEFORMAT");
     assert_eq!(fields[0].cached_result(), Some("cached text field"));
     assert!(fields[0].is_dirty());
     assert!(fields[0].is_locked());
@@ -3760,7 +3772,7 @@ fn document_discovers_legacy_form_fields_without_filling_or_executing() {
     assert!(fields[1].is_dirty());
     assert!(fields[1].is_locked());
     assert_eq!(fields[2].kind(), LegacyFormFieldKind::DropDown);
-    assert_eq!(fields[2].opaque_instructions(), r#"\* MERGEFORMAT"#);
+    assert_eq!(fields[2].opaque_instructions(), r"\* MERGEFORMAT");
     assert_eq!(
         fields[2].cached_result(),
         Some("cached drop-down selection")
@@ -3773,14 +3785,14 @@ fn document_discovers_legacy_form_fields_without_filling_or_executing() {
 #[test]
 fn document_discovers_private_fields_without_conversion_or_layout() {
     let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst PRIVATE \\* MERGEFORMAT}{\fldrslt opaque converter payload}}{\field\flddirty\fldlock{\*\fldinst private}{\fldrslt cached bare private payload}}After}"#,
+        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst PRIVATE \\* MERGEFORMAT}{\fldrslt opaque converter payload}}{\field\flddirty\fldlock{\*\fldinst private}{\fldrslt cached bare private payload}}After}",
     )
     .unwrap();
 
     let fields = document.private_fields();
     assert_eq!(document.private_field_count(), 2);
     assert_eq!(fields.len(), 2);
-    assert_eq!(fields[0].opaque_instructions(), r#"\* MERGEFORMAT"#);
+    assert_eq!(fields[0].opaque_instructions(), r"\* MERGEFORMAT");
     assert_eq!(fields[0].cached_result(), Some("opaque converter payload"));
     assert!(fields[0].is_dirty());
     assert!(fields[0].is_locked());
@@ -4108,7 +4120,7 @@ fn document_discovers_user_identity_fields_without_reading_host_identity() {
 #[test]
 fn document_discovers_advance_fields_without_changing_layout() {
     let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst ADVANCE \\u 6 \\d 12 \\l 20 \\r -4 \\x 150 \\y 72}{\fldrslt cached placement}}After}"#,
+        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst ADVANCE \\u 6 \\d 12 \\l 20 \\r -4 \\x 150 \\y 72}{\fldrslt cached placement}}After}",
     )
     .unwrap();
 
@@ -4169,7 +4181,7 @@ fn document_discovers_recipient_fields_without_merging() {
 #[test]
 fn document_discovers_bibliography_fields_without_loading_sources() {
     let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst CITATION Ecma01 \\l 1033 \\n \\m Ecma02}{\fldrslt cached citation}}Middle {\field{\*\fldinst BIBLIOGRAPHY \\l 1033 \\f en-US \\m Ecma01}{\fldrslt cached bibliography}}After}"#,
+        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst CITATION Ecma01 \\l 1033 \\n \\m Ecma02}{\fldrslt cached citation}}Middle {\field{\*\fldinst BIBLIOGRAPHY \\l 1033 \\f en-US \\m Ecma01}{\fldrslt cached bibliography}}After}",
     )
     .unwrap();
 
@@ -4210,7 +4222,7 @@ fn document_discovers_bibliography_fields_without_loading_sources() {
 #[test]
 fn document_discovers_eq_fields_without_calculating_them() {
     let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field{\*\fldinst EQ \\f(1,2)}{\fldrslt }}After}"#,
+        r"{\rtf1\ansi Before {\field{\*\fldinst EQ \\f(1,2)}{\fldrslt }}After}",
     )
     .unwrap();
 
@@ -4387,7 +4399,7 @@ fn document_discovers_table_of_authorities_entries_without_generating_a_table() 
 #[test]
 fn document_discovers_table_of_authorities_without_generating_it() {
     let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst TOA \\b Authorities \\c 2 \\f \\h \\p}{\fldrslt cached authorities}}After}"#,
+        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst TOA \\b Authorities \\c 2 \\f \\h \\p}{\fldrslt cached authorities}}After}",
     )
     .unwrap();
 
@@ -4451,7 +4463,7 @@ fn document_discovers_index_fields_without_generating_an_index() {
 #[test]
 fn document_discovers_macro_buttons_without_invoking_them() {
     let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst MACROBUTTON NoMacro Click here}{\fldrslt Click here}}After}"#,
+        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst MACROBUTTON NoMacro Click here}{\fldrslt Click here}}After}",
     )
     .unwrap();
 
@@ -4487,7 +4499,7 @@ fn document_discovers_go_to_buttons_without_activating_them() {
 #[test]
 fn document_discovers_active_content_fields_without_activation() {
     let document = crate::RtfDocument::parse(
-        r#"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst ADDIN opaque-add-in-data}{\fldrslt cached add-in result}}{\field{\*\fldinst CONTROL opaque-ocx-metadata}{\fldrslt cached control result}}{\field{\*\fldinst HTMLCONTROL opaque-html-control-metadata}{\fldrslt cached html result}}After}"#,
+        r"{\rtf1\ansi Before {\field\flddirty\fldlock{\*\fldinst ADDIN opaque-add-in-data}{\fldrslt cached add-in result}}{\field{\*\fldinst CONTROL opaque-ocx-metadata}{\fldrslt cached control result}}{\field{\*\fldinst HTMLCONTROL opaque-html-control-metadata}{\fldrslt cached html result}}After}",
     )
     .unwrap();
 

@@ -1,4 +1,4 @@
-//! Strict, inert PowerPoint embedded sound-collection support.
+//! Strict, inert `PowerPoint` embedded sound-collection support.
 //!
 //! The semantic model is kept separate from the MS-PPT record codec. Sound
 //! bytes are borrowed from the presentation and are never decoded, played,

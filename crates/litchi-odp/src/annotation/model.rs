@@ -30,11 +30,17 @@ impl Anchor {
     }
 
     /// Construct an anchor at a uniquely named shape on a page.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn shape(page_index: usize, name: impl Into<String>) -> Result<Self> {
-        let name = name.into();
-        validate_shape_name(&name)?;
+        let shape_name = name.into();
+        validate_shape_name(&shape_name)?;
         Ok(Self {
-            position: Position::Shape { page_index, name },
+            position: Position::Shape {
+                page_index,
+                name: shape_name,
+            },
         })
     }
 

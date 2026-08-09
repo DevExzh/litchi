@@ -6,6 +6,7 @@ use once_cell::unsync::OnceCell;
 
 impl<'doc> Slide<'doc> {
     /// Create a slide from parsed slide data.
+    #[must_use]
     pub fn from_slide_data(data: SlideData<'doc>, slide_number: usize) -> Self {
         let doc_data_ref = data.doc_data();
         Self {

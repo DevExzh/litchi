@@ -2,7 +2,7 @@ use litchi_cfb::{OleError, OleFile};
 use std::fs::File;
 use std::io::{self, Read, Seek};
 
-/// Finite resource limits for legacy PowerPoint record ingestion.
+/// Finite resource limits for legacy `PowerPoint` record ingestion.
 ///
 /// Limits apply to the uncompressed `PowerPoint Document` stream and to every
 /// record tree materialized from it. Container payloads are retained for
@@ -45,6 +45,7 @@ impl Default for RecordLimits {
 
 impl RecordLimits {
     /// Return the component-wise stricter combination of two limit sets.
+    #[must_use]
     pub const fn constrained_by(self, other: Self) -> Self {
         Self {
             max_package_bytes: min_usize(self.max_package_bytes, other.max_package_bytes),
@@ -69,6 +70,11 @@ impl RecordLimits {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod limit_tests {
     use super::RecordLimits;
 
@@ -106,11 +112,7 @@ mod limit_tests {
     }
 }
 
-const fn min_usize(left: usize, right: usize) -> usize {
-    if left < right { left } else { right }
-}
-
-/// Options controlling how a legacy PowerPoint presentation is opened.
+/// Options controlling how a legacy `PowerPoint` presentation is opened.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct OpenOptions<'a> {
     /// Password used for password-to-open encryption.
@@ -120,7 +122,7 @@ pub struct OpenOptions<'a> {
 /// Password-to-open encryption schemes identified in a PPT file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EncryptionKind {
-    /// Office Binary Document RC4 CryptoAPI encryption.
+    /// Office Binary Document RC4 `CryptoAPI` encryption.
     CryptoApi,
     /// An encryption version not recognized by this implementation.
     Unknown { major: u16, minor: u16 },
@@ -133,7 +135,7 @@ pub enum Error {
     Io(io::Error),
     /// OLE file error
     Ole(OleError),
-    /// Checked OfficeArt parsing or validation error.
+    /// Checked `OfficeArt` parsing or validation error.
     OfficeArt(litchi_odraw::Error),
     /// Host-neutral Office Graph parsing or validation error.
     Graph(litchi_ograph::Error),
@@ -184,13 +186,13 @@ impl From<litchi_ograph::Error> for Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::Io(e) => write!(f, "IO error: {}", e),
-            Error::Ole(e) => write!(f, "OLE error: {}", e),
+            Error::Io(e) => write!(f, "IO error: {e}"),
+            Error::Ole(e) => write!(f, "OLE error: {e}"),
             Error::OfficeArt(e) => write!(f, "OfficeArt error: {e}"),
             Error::Graph(e) => write!(f, "Office Graph error: {e}"),
-            Error::InvalidFormat(s) => write!(f, "Invalid format: {}", s),
-            Error::StreamNotFound(s) => write!(f, "Stream not found: {}", s),
-            Error::Corrupted(s) => write!(f, "Corrupted file: {}", s),
+            Error::InvalidFormat(s) => write!(f, "Invalid format: {s}"),
+            Error::StreamNotFound(s) => write!(f, "Stream not found: {s}"),
+            Error::Corrupted(s) => write!(f, "Corrupted file: {s}"),
             Error::ResourceLimit(s) => write!(f, "Resource limit exceeded: {s}"),
             Error::AllocationFailed(context) => write!(f, "Allocation failed: {context}"),
             Error::PasswordRequired => {
@@ -230,9 +232,9 @@ impl std::error::Error for Error {
 /// Result type for PPT operations.
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// A PowerPoint (.ppt) package.
+/// A `PowerPoint` (.ppt) package.
 ///
-/// This is the main entry point for working with legacy PowerPoint presentations.
+/// This is the main entry point for working with legacy `PowerPoint` presentations.
 /// It wraps an OLE file and provides PowerPoint-specific functionality.
 ///
 /// # Examples
@@ -274,7 +276,9 @@ impl From<Error> for litchi_core::Error {
             },
             Error::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
             Error::StreamNotFound(s) => litchi_core::Error::ComponentNotFound(s),
-            Error::Corrupted(s) => litchi_core::Error::CorruptedFile(s),
+            Error::Corrupted(s) | Error::MalformedEncryptionHeader(s) => {
+                litchi_core::Error::CorruptedFile(s)
+            },
             Error::ResourceLimit(s) => {
                 litchi_core::Error::CorruptedFile(format!("PPT resource limit exceeded: {s}"))
             },
@@ -290,7 +294,10 @@ impl From<Error> for litchi_core::Error {
             Error::UnsupportedEncryption(kind) => {
                 litchi_core::Error::InvalidFormat(format!("unsupported PPT encryption: {kind:?}"))
             },
-            Error::MalformedEncryptionHeader(s) => litchi_core::Error::CorruptedFile(s),
         }
     }
+}
+
+const fn min_usize(left: usize, right: usize) -> usize {
+    if left < right { left } else { right }
 }

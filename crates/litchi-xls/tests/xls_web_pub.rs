@@ -1,4 +1,4 @@
-//! Round-trip tests for the BIFF8 WebPub record (published Web pages).
+//! Round-trip tests for the BIFF8 `WebPub` record (published Web pages).
 
 use litchi_xls::writer::Writer;
 use litchi_xls::{WebPageType, WebPub, WebPubRange, WebSourceType, Workbook};

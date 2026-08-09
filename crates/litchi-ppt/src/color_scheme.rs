@@ -1,4 +1,4 @@
-//! Typed legacy PowerPoint color-scheme atoms (MS-PPT 2.5.14, 2.5.15).
+//! Typed legacy `PowerPoint` color-scheme atoms (MS-PPT 2.5.14, 2.5.15).
 //!
 //! Parsing is limited to bytes already present in caller-supplied PPT
 //! records. The colors are inert display metadata: nothing is rendered,
@@ -20,10 +20,6 @@ const SLIDE_SCHEME_INSTANCE: u16 = 0x001;
 /// Record instance of a `SchemeListElementColorSchemeAtom`.
 const SCHEME_LIST_ELEMENT_INSTANCE: u16 = 0x006;
 
-fn corrupted<T>(message: impl Into<String>) -> Result<T> {
-    Err(Error::Corrupted(message.into()))
-}
-
 /// One sRGB color from a `ColorStruct` (MS-PPT 2.12.1).
 ///
 /// The fourth byte of a `ColorStruct` is undefined by the specification and
@@ -36,6 +32,7 @@ pub struct SchemeColor {
 }
 
 impl SchemeColor {
+    #[must_use]
     pub const fn new(red: u8, green: u8, blue: u8) -> Self {
         Self { red, green, blue }
     }
@@ -43,6 +40,10 @@ impl SchemeColor {
 
 /// Which role an `RT_ColorSchemeAtom` record plays in its container.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`ColorSchemeAtomKind` is the established public API name; renaming it would break downstream crates"
+)]
 pub enum ColorSchemeAtomKind {
     /// `SlideSchemeColorSchemeAtom`: the color scheme used by one slide
     /// (MS-PPT 2.5.14).
@@ -69,7 +70,7 @@ impl ColorSchemeAtomKind {
     }
 }
 
-/// The eight colors of a PowerPoint color scheme, in `rgSchemeColor` order
+/// The eight colors of a `PowerPoint` color scheme, in `rgSchemeColor` order
 /// (MS-PPT 2.5.14).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct ColorScheme {
@@ -114,12 +115,17 @@ impl ColorScheme {
 /// A validated `SlideSchemeColorSchemeAtom` or
 /// `SchemeListElementColorSchemeAtom` record.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`ColorSchemeAtom` is the established public API name; renaming it would break downstream crates"
+)]
 pub struct ColorSchemeAtom {
     pub kind: ColorSchemeAtomKind,
     pub scheme: ColorScheme,
 }
 
 impl ColorSchemeAtom {
+    #[must_use]
     pub fn new_slide_scheme(scheme: ColorScheme) -> Self {
         Self {
             kind: ColorSchemeAtomKind::SlideScheme,
@@ -127,6 +133,7 @@ impl ColorSchemeAtom {
         }
     }
 
+    #[must_use]
     pub fn new_scheme_list_element(scheme: ColorScheme) -> Self {
         Self {
             kind: ColorSchemeAtomKind::SchemeListElement,
@@ -135,6 +142,14 @@ impl ColorSchemeAtom {
     }
 
     /// Strictly parse one already-materialized `RT_ColorSchemeAtom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the color-scheme payload length is the fixed constant 32, always representable as u32"
+    )]
     pub fn parse(record: &Record) -> Result<Self> {
         if record.version != 0
             || record.record_type_raw != COLOR_SCHEME_ATOM_TYPE
@@ -164,6 +179,10 @@ impl ColorSchemeAtom {
     ///
     /// A container holds at most one `SlideSchemeColorSchemeAtom`; the main
     /// master may additionally hold any number of scheme list elements.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn collect(container: &Record) -> Result<Vec<Self>> {
         let mut atoms = Vec::new();
         for child in &container.children {
@@ -184,6 +203,10 @@ impl ColorSchemeAtom {
     }
 
     /// Serialize this atom as one canonical `RT_ColorSchemeAtom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_record(&self) -> Result<Record> {
         let bytes = self.to_record_bytes();
         let (record, end) = Record::parse(&bytes, 0)?;
@@ -194,6 +217,11 @@ impl ColorSchemeAtom {
     }
 
     /// Serialize this atom as canonical `RT_ColorSchemeAtom` record bytes.
+    #[must_use]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the color-scheme payload length is the fixed constant 32, always representable as u32"
+    )]
     pub fn to_record_bytes(&self) -> [u8; 8 + COLOR_SCHEME_PAYLOAD_LEN] {
         let mut bytes = [0u8; 8 + COLOR_SCHEME_PAYLOAD_LEN];
         bytes[0..2].copy_from_slice(&(self.kind.instance() << 4).to_le_bytes());
@@ -209,7 +237,16 @@ impl ColorSchemeAtom {
     }
 }
 
+fn corrupted<T>(message: impl Into<String>) -> Result<T> {
+    Err(Error::Corrupted(message.into()))
+}
+
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use crate::consts::RecordType;
@@ -247,13 +284,13 @@ mod tests {
         let atom = ColorSchemeAtom::new_slide_scheme(sample_scheme());
         let mut bad_instance = atom.to_record_bytes();
         bad_instance[1] = 0x20; // record instance 2
-        let record = Record::parse(&bad_instance, 0).unwrap().0;
-        assert!(ColorSchemeAtom::parse(&record).is_err());
+        let bad_instance_record = Record::parse(&bad_instance, 0).unwrap().0;
+        assert!(ColorSchemeAtom::parse(&bad_instance_record).is_err());
 
         let mut bad_version = atom.to_record_bytes();
         bad_version[0] = 0x0f;
-        let record = Record::parse(&bad_version, 0).unwrap().0;
-        assert!(ColorSchemeAtom::parse(&record).is_err());
+        let bad_version_record = Record::parse(&bad_version, 0).unwrap().0;
+        assert!(ColorSchemeAtom::parse(&bad_version_record).is_err());
 
         let short = Record {
             record_type: RecordType::Unknown,

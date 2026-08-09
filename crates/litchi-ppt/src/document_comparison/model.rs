@@ -1,11 +1,11 @@
-//! Typed semantic models for PowerPoint 10 document-comparison records.
+//! Typed semantic models for `PowerPoint` 10 document-comparison records.
 
 use crate::package::{Error, Result};
 use std::sync::Arc;
 
 use super::validation::{validate_count, validate_reviewer_name};
 
-/// Maximum supported nesting for PowerPoint 10 document-comparison records.
+/// Maximum supported nesting for `PowerPoint` 10 document-comparison records.
 pub const POWERPOINT_DIFF_MAX_DEPTH: usize = 32;
 /// Maximum number of diff records accepted in one comparison tree.
 pub const POWERPOINT_DIFF_MAX_RECORDS: usize = 65_536;
@@ -43,6 +43,7 @@ pub enum DiffType {
 }
 
 impl DiffType {
+    #[must_use]
     pub const fn as_u32(self) -> u32 {
         self as u32
     }
@@ -89,22 +90,9 @@ pub enum ElementType {
 }
 
 impl ElementType {
+    #[must_use]
     pub const fn as_u32(self) -> u32 {
         self as u32
-    }
-}
-
-impl TryFrom<u32> for ElementType {
-    type Error = Error;
-
-    fn try_from(value: u32) -> Result<Self> {
-        match value {
-            0x01 => Ok(Self::Shape),
-            0x02 => Ok(Self::Sound),
-            _ => Err(Error::Corrupted(format!(
-                "invalid ElementTypeEnum value {value:#010X}"
-            ))),
-        }
     }
 }
 
@@ -129,6 +117,20 @@ macro_rules! define_diff_flags {
             }
         }
     };
+}
+
+impl TryFrom<u32> for ElementType {
+    type Error = Error;
+
+    fn try_from(value: u32) -> Result<Self> {
+        match value {
+            0x01 => Ok(Self::Shape),
+            0x02 => Ok(Self::Sound),
+            _ => Err(Error::Corrupted(format!(
+                "invalid ElementTypeEnum value {value:#010X}"
+            ))),
+        }
+    }
 }
 
 define_diff_flags!(DocDiffFlags {
@@ -207,6 +209,7 @@ pub enum DiffFlags {
 }
 
 impl DiffFlags {
+    #[must_use]
     pub fn for_type(diff_type: DiffType) -> Self {
         Self::from_raw(diff_type, 0).0
     }
@@ -241,7 +244,17 @@ impl DiffFlags {
                 Self::Notes(TextDiffFlags::from_raw(raw)),
                 TextDiffFlags::mask(),
             ),
-            _ => (Self::None, 0),
+            DiffType::SlideList
+            | DiffType::MasterList
+            | DiffType::ShapeList
+            | DiffType::SlideShow
+            | DiffType::HeaderFooter
+            | DiffType::NamedShow
+            | DiffType::NamedShowList
+            | DiffType::RecolorInfo
+            | DiffType::ExternalObject
+            | DiffType::TableList
+            | DiffType::InteractiveInfo => (Self::None, 0),
         };
         (flags, raw & !mask)
     }
@@ -282,6 +295,7 @@ pub struct DiffRecordHeaders {
 }
 
 impl DiffRecordHeaders {
+    #[must_use]
     pub const fn new(index: bool, diff_type: DiffType) -> Self {
         Self {
             index,
@@ -291,18 +305,22 @@ impl DiffRecordHeaders {
         }
     }
 
+    #[must_use]
     pub const fn index(&self) -> bool {
         self.index
     }
 
+    #[must_use]
     pub const fn diff_type(&self) -> DiffType {
         self.diff_type
     }
 
+    #[must_use]
     pub const fn ignored_prefix(&self) -> [u8; 3] {
         self.ignored_prefix
     }
 
+    #[must_use]
     pub const fn ignored_tail(&self) -> u32 {
         self.ignored_tail
     }
@@ -318,6 +336,12 @@ pub struct DiffNode {
 }
 
 impl DiffNode {
+    /// Construct one diff node with typed display flags and child nodes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the flags do not match `diff_type` or the children
+    /// violate the structural grammar for `diff_type`.
     pub fn new(
         diff_type: DiffType,
         index: bool,
@@ -334,28 +358,37 @@ impl DiffNode {
         Ok(node)
     }
 
+    #[must_use]
     pub const fn headers(&self) -> &DiffRecordHeaders {
         &self.headers
     }
 
+    #[must_use]
     pub const fn diff_type(&self) -> DiffType {
         self.headers.diff_type
     }
 
+    #[must_use]
     pub const fn flags(&self) -> DiffFlags {
         self.flags
     }
 
+    #[must_use]
     pub const fn ignored_flag_bits(&self) -> u32 {
         self.ignored_flag_bits
     }
 
     /// Replace the typed display flags while retaining source-reserved bits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_flags(&mut self, flags: DiffFlags) -> Result<()> {
         self.flags = flags;
         self.validate_node()
     }
 
+    #[must_use]
     pub fn children(&self) -> &[Self] {
         &self.children
     }
@@ -375,6 +408,13 @@ pub struct DiffTree10 {
 }
 
 impl DiffTree10 {
+    /// Construct a reviewer tree from a reviewer name and its document diff.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the reviewer name is not a valid
+    /// `PrintableUnicodeString` or the root node is not a `DocDiff10`
+    /// container.
     pub fn new(reviewer_name: String, document_diff: DiffNode) -> Result<Self> {
         validate_reviewer_name(&reviewer_name)?;
         if document_diff.diff_type() != DiffType::Document {
@@ -386,15 +426,18 @@ impl DiffTree10 {
         })
     }
 
+    #[must_use]
     pub fn reviewer_name(&self) -> &str {
         &self.reviewer_name
     }
 
+    #[must_use]
     pub const fn document_diff(&self) -> &DiffNode {
         &self.document_diff
     }
 
     /// Return the document-level display flags for this reviewer tree.
+    #[must_use]
     pub const fn document_flags(&self) -> DiffFlags {
         self.document_diff.flags()
     }
@@ -408,6 +451,7 @@ pub struct SlideCreationEntry {
 }
 
 impl SlideCreationEntry {
+    #[must_use]
     pub const fn new(slide_id_ref: u32, file_time: u64) -> Self {
         Self {
             slide_id_ref,
@@ -415,11 +459,13 @@ impl SlideCreationEntry {
         }
     }
 
+    #[must_use]
     pub const fn slide_id_ref(self) -> u32 {
         self.slide_id_ref
     }
 
     /// Raw Windows `FILETIME` ticks retained without clock conversion.
+    #[must_use]
     pub const fn file_time(self) -> u64 {
         self.file_time
     }
@@ -432,15 +478,27 @@ pub struct SlideListTable10 {
 }
 
 impl SlideListTable10 {
+    /// Construct a slide-list table from creation-time entries.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the entry count exceeds the MS-PPT limit.
     pub fn new(entries: Vec<SlideCreationEntry>) -> Result<Self> {
         validate_count(entries.len())?;
         Ok(Self { entries })
     }
 
+    #[must_use]
     pub fn entries(&self) -> &[SlideCreationEntry] {
         &self.entries
     }
 
+    /// Append one creation-time entry to the table.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the resulting entry count would exceed the MS-PPT
+    /// limit.
     pub fn push(&mut self, entry: SlideCreationEntry) -> Result<()> {
         validate_count(self.entries.len().saturating_add(1))?;
         self.entries.push(entry);
@@ -498,18 +556,22 @@ impl Unknown {
     }
 
     /// Raw record type, including vendor-defined values.
+    #[must_use]
     pub const fn record_type(&self) -> u16 {
         self.record_type
     }
     /// Record version nibble as represented by the source record.
+    #[must_use]
     pub const fn version(&self) -> u16 {
         self.version
     }
     /// Record instance as represented by the source record.
+    #[must_use]
     pub const fn instance(&self) -> u16 {
         self.instance
     }
     /// Exact serialized record bytes.
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
@@ -536,11 +598,13 @@ pub struct Review {
 
 impl Review {
     /// Borrow ordered typed and opaque entries.
+    #[must_use]
     pub fn entries(&self) -> &[Entry] {
         &self.entries
     }
 
     /// Return the typed reviewing-toolbar state, if present.
+    #[must_use]
     pub fn toolbar(&self) -> Option<ReviewingToolbarStates> {
         self.entries.iter().find_map(|entry| match entry {
             Entry::Toolbar(value) => Some(*value),
@@ -549,6 +613,7 @@ impl Review {
     }
 
     /// Return the typed slide-list table, if present.
+    #[must_use]
     pub fn slide_list(&self) -> Option<&SlideListTable10> {
         self.entries.iter().find_map(|entry| match entry {
             Entry::SlideList(value) => Some(value),
@@ -565,16 +630,19 @@ impl Review {
     }
 
     /// Return the `index`th reviewer tree in source order.
+    #[must_use]
     pub fn diff_tree(&self, index: usize) -> Option<&DiffTree10> {
         self.diff_trees().nth(index)
     }
 
     /// Return the number of reviewer trees in this payload.
+    #[must_use]
     pub fn diff_tree_count(&self) -> usize {
         self.diff_trees().count()
     }
 
     /// Whether this PP10 payload has no records.
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }

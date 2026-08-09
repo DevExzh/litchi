@@ -1,3 +1,8 @@
+#![allow(
+    clippy::print_stdout,
+    reason = "this command-line example intentionally prints its results"
+)]
+
 // Minimal PPT writer example to verify structure
 // Generates a minimal PowerPoint 97-2003 file named "minimal.ppt"
 

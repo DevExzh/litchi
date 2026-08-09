@@ -2,7 +2,7 @@
 
 use super::{Duration, Fill, MotionFraction, Repeat, Restart, Speed, SyncBehavior, TimeFilter};
 
-/// EffectInstance effect type.
+/// `EffectInstance` effect type.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Effect {
     /// Appear effect
@@ -31,6 +31,7 @@ pub enum Effect {
 
 impl Effect {
     /// Parse from preset ID.
+    #[must_use]
     pub fn from_preset_id(id: u32) -> Self {
         match id {
             1 => Effect::Appear,
@@ -43,11 +44,12 @@ impl Effect {
             23 => Effect::Zoom,
             24 => Effect::Bounce,
             42 => Effect::FloatIn,
-            _ => Effect::Custom(format!("preset_{}", id)),
+            _ => Effect::Custom(format!("preset_{id}")),
         }
     }
 
     /// Parse from preset class string (for backwards compatibility).
+    #[must_use]
     pub fn from_preset(preset: &str) -> Self {
         match preset.to_lowercase().as_str() {
             "entr" | "appear" => Effect::Appear,
@@ -66,6 +68,7 @@ impl Effect {
 
     /// Get the preset ID for this effect.
     /// These are defined in ECMA-376 Part 1.
+    #[must_use]
     pub fn preset_id(&self) -> u32 {
         match self {
             Effect::Appear => 1,
@@ -87,6 +90,7 @@ impl Effect {
 
     /// Get the preset class for this effect.
     /// Valid values: "entr" (entrance), "exit", "emph" (emphasis), "path", "verb", "mediacall"
+    #[must_use]
     pub fn preset_class(&self) -> &str {
         match self {
             // Entrance effects
@@ -115,14 +119,15 @@ impl Effect {
         }
     }
 
-    /// Get the preset class string (deprecated, use preset_class instead).
+    /// Get the preset class string (deprecated, use `preset_class` instead).
     #[deprecated(note = "Use preset_class() and preset_id() instead")]
+    #[must_use]
     pub fn to_preset(&self) -> &str {
         self.preset_class()
     }
 }
 
-/// EffectInstance trigger type.
+/// `EffectInstance` trigger type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Trigger {
     /// Start on click
@@ -140,11 +145,13 @@ pub struct GroupId(u32);
 
 impl GroupId {
     /// Construct an OOXML timing group identifier.
+    #[must_use]
     pub const fn new(value: u32) -> Self {
         Self(value)
     }
 
     /// Return the encoded unsigned group identifier.
+    #[must_use]
     pub const fn value(self) -> u32 {
         self.0
     }
@@ -156,7 +163,7 @@ impl From<u32> for GroupId {
     }
 }
 
-/// Event filtering supported by PowerPoint for a triggered sequence.
+/// Event filtering supported by `PowerPoint` for a triggered sequence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EventFilter {
     /// Prevent the trigger event from bubbling beyond the interactive sequence.
@@ -173,12 +180,12 @@ pub enum SequenceContext {
     Interactive {
         /// Shape whose click activates or advances the sequence.
         trigger_shape_id: u32,
-        /// Optional PowerPoint event-bubbling filter on the `interactiveSeq` cTn.
+        /// Optional `PowerPoint` event-bubbling filter on the `interactiveSeq` cTn.
         event_filter: Option<EventFilter>,
     },
 }
 
-/// EffectInstance direction.
+/// `EffectInstance` direction.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Direction {
     Up,
@@ -216,7 +223,7 @@ pub enum Direction {
 pub struct EffectInstance {
     /// Target shape ID
     pub shape_id: u32,
-    /// EffectInstance effect
+    /// `EffectInstance` effect
     pub effect: Effect,
     /// Trigger type
     pub trigger: Trigger,
@@ -260,6 +267,7 @@ pub struct EffectInstance {
 
 impl EffectInstance {
     /// Create a new animation.
+    #[must_use]
     pub fn new(shape_id: u32, effect: Effect) -> Self {
         Self {
             shape_id,
@@ -287,108 +295,126 @@ impl EffectInstance {
     }
 
     /// Set the trigger type.
+    #[must_use]
     pub fn with_trigger(mut self, trigger: Trigger) -> Self {
         self.trigger = trigger;
         self
     }
 
     /// Set the duration.
+    #[must_use]
     pub fn with_duration(mut self, duration: impl Into<Duration>) -> Self {
         self.duration = duration.into();
         self
     }
 
     /// Set a finite duration in milliseconds.
+    #[must_use]
     pub fn with_duration_ms(mut self, duration: u32) -> Self {
         self.duration = Duration::Finite(duration);
         self
     }
 
     /// Set the delay.
+    #[must_use]
     pub fn with_delay(mut self, delay: u32) -> Self {
         self.delay = delay;
         self
     }
 
     /// Set the direction.
+    #[must_use]
     pub fn with_direction(mut self, direction: Direction) -> Self {
         self.direction = Some(direction);
         self
     }
 
     /// Set the fill behavior for the animation time node.
+    #[must_use]
     pub fn with_fill(mut self, fill: Fill) -> Self {
         self.fill = Some(fill);
         self
     }
 
     /// Set the restart behavior for the animation time node.
+    #[must_use]
     pub fn with_restart(mut self, restart: Restart) -> Self {
         self.restart = Some(restart);
         self
     }
 
     /// Enable or disable automatic reversal.
+    #[must_use]
     pub fn with_auto_reverse(mut self, auto_reverse: bool) -> Self {
         self.auto_reverse = auto_reverse;
         self
     }
 
     /// Set the repeat behavior for the animation time node.
+    #[must_use]
     pub fn with_repeat(mut self, repeat: Repeat) -> Self {
         self.repeat = Some(repeat);
         self
     }
 
     /// Set the nonzero playback speed.
+    #[must_use]
     pub fn with_speed(mut self, speed: Speed) -> Self {
         self.speed = Some(speed);
         self
     }
 
     /// Set the acceleration fraction.
+    #[must_use]
     pub fn with_acceleration(mut self, acceleration: MotionFraction) -> Self {
         self.acceleration = Some(acceleration);
         self
     }
 
     /// Set the deceleration fraction.
+    #[must_use]
     pub fn with_deceleration(mut self, deceleration: MotionFraction) -> Self {
         self.deceleration = Some(deceleration);
         self
     }
 
     /// Set whether this node is displayed in animation user interfaces.
+    #[must_use]
     pub fn with_display(mut self, display: bool) -> Self {
         self.display = Some(display);
         self
     }
 
     /// Set the total duration for repeated playback.
+    #[must_use]
     pub fn with_repeat_duration(mut self, duration: impl Into<Duration>) -> Self {
         self.repeat_duration = Some(duration.into());
         self
     }
 
     /// Set synchronization with the containing time group.
+    #[must_use]
     pub fn with_sync_behavior(mut self, behavior: SyncBehavior) -> Self {
         self.sync_behavior = Some(behavior);
         self
     }
 
     /// Mark or unmark this node as an after-effect.
+    #[must_use]
     pub fn with_after_effect(mut self, after_effect: bool) -> Self {
         self.after_effect = Some(after_effect);
         self
     }
 
     /// Set a normalized-time warp filter.
+    #[must_use]
     pub fn with_time_filter(mut self, filter: TimeFilter) -> Self {
         self.time_filter = Some(filter);
         self
     }
 
-    /// Put this effect in a shape-triggered sequence using PowerPoint's filter.
+    /// Put this effect in a shape-triggered sequence using `PowerPoint`'s filter.
+    #[must_use]
     pub fn with_interactive_trigger(mut self, trigger_shape_id: u32) -> Self {
         self.sequence_context = SequenceContext::Interactive {
             trigger_shape_id,
@@ -398,12 +424,14 @@ impl EffectInstance {
     }
 
     /// Set the structural sequence context explicitly.
+    #[must_use]
     pub fn with_sequence_context(mut self, context: SequenceContext) -> Self {
         self.sequence_context = context;
         self
     }
 
     /// Associate this effect cTn with a build-list timing group.
+    #[must_use]
     pub fn with_group_id(mut self, group_id: impl Into<GroupId>) -> Self {
         self.group_id = Some(group_id.into());
         self

@@ -1,4 +1,4 @@
-//! OPC graph operations for PresentationML themes.
+//! OPC graph operations for `PresentationML` themes.
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
@@ -12,7 +12,7 @@ const STRICT_THEME_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relati
 const STRICT_OVERRIDE_REL: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/themeOverride";
 
-/// Identity of a theme part added to a PresentationML package.
+/// Identity of a theme part added to a `PresentationML` package.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Authored {
     /// Package URI of the authored theme part.
@@ -20,6 +20,10 @@ pub struct Authored {
 }
 
 /// Add a validated theme part at the next free `/ppt/theme/themeN.xml` URI.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn add(
     package: &mut OpcPackage,
     name: &str,
@@ -41,6 +45,10 @@ pub fn add(
 }
 
 /// Attach one theme part to a slide master, replacing any previous theme link.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn attach(package: &mut OpcPackage, master_name: &str, theme_name: &str) -> Result<String> {
     let master_uri = uri(master_name, "theme master")?;
     let theme_uri = uri(theme_name, "theme part")?;
@@ -64,6 +72,10 @@ pub fn attach(package: &mut OpcPackage, master_name: &str, theme_name: &str) -> 
 }
 
 /// Read one theme part by URI.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load(package: &OpcPackage, theme_name: &str) -> Result<Theme> {
     let uri = uri(theme_name, "theme part")?;
     require_type(package, &uri, ct::OFC_THEME)?;
@@ -71,6 +83,10 @@ pub fn load(package: &OpcPackage, theme_name: &str) -> Result<Theme> {
 }
 
 /// Read the permissive summary view used by producer-facing theme inspection.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load_summary(package: &OpcPackage, theme_name: &str) -> Result<super::part::Summary> {
     let uri = uri(theme_name, "theme part")?;
     require_type(package, &uri, ct::OFC_THEME)?;
@@ -78,6 +94,10 @@ pub fn load_summary(package: &OpcPackage, theme_name: &str) -> Result<super::par
 }
 
 /// Replace only the color palette of an existing theme part.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn put_colors(package: &mut OpcPackage, theme_name: &str, colors: &Palette) -> Result<()> {
     let uri = uri(theme_name, "theme part")?;
     require_type(package, &uri, ct::OFC_THEME)?;
@@ -96,6 +116,10 @@ pub fn put_colors(package: &mut OpcPackage, theme_name: &str, colors: &Palette) 
 }
 
 /// Replace only the font set of an existing theme part.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn put_fonts(package: &mut OpcPackage, theme_name: &str, fonts: &FontSet) -> Result<()> {
     let uri = uri(theme_name, "theme part")?;
     require_type(package, &uri, ct::OFC_THEME)?;
@@ -114,6 +138,10 @@ pub fn put_fonts(package: &mut OpcPackage, theme_name: &str, fonts: &FontSet) ->
 }
 
 /// Create or replace a slide/layout theme override.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn put_override(
     package: &mut OpcPackage,
     parent_name: &str,
@@ -157,6 +185,10 @@ pub fn put_override(
 }
 
 /// Read an optional override attached to a slide or layout.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load_override(package: &OpcPackage, parent_name: &str) -> Result<Option<Override>> {
     let parent_uri = uri(parent_name, "theme override parent")?;
     let parent = package.get_part(&parent_uri)?;
@@ -175,6 +207,10 @@ pub fn load_override(package: &OpcPackage, parent_name: &str) -> Result<Option<O
 }
 
 /// Remove an override and delete its part when no other parent references it.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn remove_override(package: &mut OpcPackage, parent_name: &str) -> Result<bool> {
     let parent_uri = uri(parent_name, "theme override parent")?;
     let parent = package.get_part(&parent_uri)?;
@@ -203,6 +239,10 @@ pub fn remove_override(package: &mut OpcPackage, parent_name: &str) -> Result<bo
 }
 
 /// Validate theme relationships, theme parts, and slide/layout overrides.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn validate(package: &OpcPackage) -> Result<()> {
     for part in package.iter_parts() {
         if part.content_type() == ct::PML_SLIDE_MASTER {
@@ -241,6 +281,10 @@ pub fn validate(package: &OpcPackage) -> Result<()> {
 }
 
 /// Allocate a deterministic free part name for theme adapters.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn next_part_uri(package: &OpcPackage, prefix: &str, suffix: &str) -> Result<PackURI> {
     let mut index = 1u32;
     loop {
@@ -279,6 +323,11 @@ fn invalid(message: impl Into<String>) -> Error {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use crate::shape::theme::{Color, Face, FontSet, Palette, Slot};

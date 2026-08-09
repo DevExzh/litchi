@@ -151,7 +151,8 @@ fn parse(source: &[u8]) -> Result<Node> {
 }
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position()).map_err(|_| invalid("OLE slide XML offset overflow"))
+    usize::try_from(reader.buffer_position())
+        .map_err(|_err| invalid("OLE slide XML offset overflow"))
 }
 
 fn make_node(
@@ -307,8 +308,8 @@ fn find_object(frame: &Node) -> Result<Option<(Node, Option<(Node, Node)>)>> {
     let Some(data) = child(graphic, b"graphicData") else {
         return Ok(None);
     };
-    if !attribute(data, b"uri", false)
-        .is_some_and(|value| value.as_slice() == OLE_GRAPHIC_DATA_URI.as_bytes())
+    if attribute(data, b"uri", false)
+        .is_none_or(|value| value.as_slice() != OLE_GRAPHIC_DATA_URI.as_bytes())
     {
         return Ok(None);
     }
@@ -404,7 +405,7 @@ fn max_shape_id(root: &Node) -> Result<u32> {
             let value = String::from_utf8_lossy(&value);
             let parsed = value
                 .parse::<u32>()
-                .map_err(|_| invalid("invalid PresentationML shape ID"))?;
+                .map_err(|_err| invalid("invalid PresentationML shape ID"))?;
             maximum = maximum.max(parsed);
         }
         Ok(())

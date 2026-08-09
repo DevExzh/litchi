@@ -1,10 +1,10 @@
-//! PresentationML package-graph adapters for slides, layouts, and masters.
+//! `PresentationML` package-graph adapters for slides, layouts, and masters.
 //!
 //! Relationship cardinality, internal-target checks, content-type checks,
 //! strict/transitional relationship families, and XML-owned layout ordering
 //! remain enforced by the validated [`crate::parts::SlidePart`] family and
 //! shared part helpers. These adapters add only contextual companion-part
-//! resolution; they never materialize or reinterpret unknown DrawingML.
+//! resolution; they never materialize or reinterpret unknown `DrawingML`.
 
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -92,12 +92,10 @@ pub(crate) fn slide_designer_tags<'a>(
         let target = relationship.target_partname()?;
         let target_part = package.get_part(&target)?;
         crate::parts::validate_content_type(target_part, ct::PML_SLIDE)?;
-        if target == *part.part().partname() {
-            if selected.replace(reference.id()).is_some() {
-                return Err(Error::Invalid(
-                    "slide part is bound to multiple stable slide IDs".into(),
-                ));
-            }
+        if target == *part.part().partname() && selected.replace(reference.id()).is_some() {
+            return Err(Error::Invalid(
+                "slide part is bound to multiple stable slide IDs".into(),
+            ));
         }
     }
     let slide_id = selected
@@ -111,7 +109,7 @@ pub(crate) fn slide_tag_inventory<'a>(
     package: &'a OpcPackage,
     part: &SlidePart<'a>,
 ) -> Result<Vec<crate::tag::Source>> {
-    crate::tag::discover(part.part(), package).map_err(Into::into)
+    crate::tag::discover(part.part(), package)
 }
 
 pub(crate) fn slide_charts<'a>(

@@ -67,6 +67,10 @@ impl FormTextType {
     }
 }
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent RTF feature flags stay flat for direct access"
+)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FormField<'a> {
     pub field_type: FormFieldType,
@@ -99,6 +103,7 @@ pub struct FormField<'a> {
 }
 
 impl FormField<'_> {
+    #[must_use]
     pub fn checked(&self) -> Option<bool> {
         (self.field_type == FormFieldType::CheckBox)
             .then_some(self.result)
@@ -107,6 +112,7 @@ impl FormField<'_> {
             .map(|value| value != 0)
     }
 
+    #[must_use]
     pub fn default_checked(&self) -> Option<bool> {
         (self.field_type == FormFieldType::CheckBox)
             .then_some(self.default_result)
@@ -114,6 +120,7 @@ impl FormField<'_> {
             .map(|value| value != 0)
     }
 
+    #[must_use]
     pub fn selected_index(&self) -> Option<usize> {
         if self.field_type != FormFieldType::DropDown {
             return None;

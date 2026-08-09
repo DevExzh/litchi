@@ -1,3 +1,9 @@
+#![allow(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "this command-line example intentionally prints its results"
+)]
+
 // Small helper to inspect a generated minimal.ppt with litchi's PPT reader
 // This is for debugging the writer: it opens minimal.ppt and prints basic info
 

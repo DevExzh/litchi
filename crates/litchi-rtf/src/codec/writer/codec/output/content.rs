@@ -1,12 +1,28 @@
 //! RTF body-content output.
 
-use super::super::*;
+#![allow(
+    clippy::shadow_reuse,
+    reason = "serialization helpers deliberately rebind a working value as the output is assembled"
+)]
+use super::super::{
+    Alignment, AnimatedTextEffect, AssociatedCharacterBaseline, AssociatedUnderlineStyle, Border,
+    BorderStyle, Borders, CharacterBaseline, CharacterExpansion, CharacterGrid, CharacterType,
+    EmphasisMark, FormField, FormFieldType, Formatting, GeneratedListMarker,
+    GeneratedListMarkerKind, IndexPageReference, LegacyParagraphNumberingAlignment,
+    LegacyParagraphNumberingBidi, LegacyParagraphNumberingFormat, LegacyParagraphNumberingLevel,
+    LegacyParagraphNumberingUnderline, NavigationEntry, Paragraph, ParagraphFontAlignment,
+    ParagraphWrapping, RevisionMetadata, RtfWriter, Shading, ShadingPattern, StyleBlock,
+    TabAlignment, TabLeader, TabStop, TextDirection, UnderlineStyle, Write, io,
+};
 
 impl<W: Write> RtfWriter<W> {
     /// Write one inert generated list-marker destination.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_generated_list_marker(
         &mut self,
-        marker: &crate::GeneratedListMarker<'_>,
+        marker: &GeneratedListMarker<'_>,
     ) -> io::Result<()> {
         marker
             .validate()
@@ -14,8 +30,8 @@ impl<W: Write> RtfWriter<W> {
         self.write_str("{")?;
         self.write_control_word(
             match marker.kind {
-                crate::GeneratedListMarkerKind::Modern => "listtext",
-                crate::GeneratedListMarkerKind::Legacy => "pntext",
+                GeneratedListMarkerKind::Modern => "listtext",
+                GeneratedListMarkerKind::Legacy => "pntext",
             },
             None,
         )?;
@@ -32,16 +48,16 @@ impl<W: Write> RtfWriter<W> {
 
     pub(in super::super) fn write_form_field_start(
         &mut self,
-        field: &crate::FormField<'_>,
+        field: &FormField<'_>,
     ) -> io::Result<()> {
         field
             .validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
         self.write_str("{\\field{\\*\\fldinst ")?;
         self.write_str(match field.field_type {
-            crate::FormFieldType::Text => "FORMTEXT",
-            crate::FormFieldType::CheckBox => "FORMCHECKBOX",
-            crate::FormFieldType::DropDown => "FORMDROPDOWN",
+            FormFieldType::Text => "FORMTEXT",
+            FormFieldType::CheckBox => "FORMCHECKBOX",
+            FormFieldType::DropDown => "FORMDROPDOWN",
         })?;
         if !field.data.is_empty() {
             self.write_str("{\\*\\datafield ")?;
@@ -116,13 +132,16 @@ impl<W: Write> RtfWriter<W> {
 
     /// Write an inert source mark. Marks are canonicalized as hidden; any
     /// originally visible entry text remains in the ordinary body stream.
-    pub fn write_navigation_entry(&mut self, entry: &crate::NavigationEntry<'_>) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
+    pub fn write_navigation_entry(&mut self, entry: &NavigationEntry<'_>) -> io::Result<()> {
         entry
             .validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?;
         self.write_str("{")?;
         match entry {
-            crate::NavigationEntry::Index(entry) => {
+            NavigationEntry::Index(entry) => {
                 self.write_control_word("xe", None)?;
                 self.write_control_word("v", None)?;
                 if let Some(index_id) = entry.index_id {
@@ -137,15 +156,15 @@ impl<W: Write> RtfWriter<W> {
                 self.write_str(" ")?;
                 self.write_destination_text(entry.text.as_ref())?;
                 match &entry.page_reference {
-                    crate::IndexPageReference::CurrentPage => {},
-                    crate::IndexPageReference::ReplacementText(value) => {
+                    IndexPageReference::CurrentPage => {},
+                    IndexPageReference::ReplacementText(value) => {
                         self.write_str("{")?;
                         self.write_control_word("txe", None)?;
                         self.write_str(" ")?;
                         self.write_destination_text(value.as_ref())?;
                         self.write_str("}")?;
                     },
-                    crate::IndexPageReference::BookmarkRange(value) => {
+                    IndexPageReference::BookmarkRange(value) => {
                         self.write_str("{")?;
                         self.write_control_word("rxe", None)?;
                         self.write_str(" ")?;
@@ -163,7 +182,7 @@ impl<W: Write> RtfWriter<W> {
                     self.write_str("}}")?;
                 }
             },
-            crate::NavigationEntry::TableOfContents(entry) => {
+            NavigationEntry::TableOfContents(entry) => {
                 self.write_control_word(
                     if entry.suppress_page_number {
                         "tcn"
@@ -293,13 +312,13 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("cs", Some(i32::from(character_style)))?;
         }
         if let Some(insert_rsid) = fmt.insert_rsid {
-            self.write_control_word("insrsid", Some(insert_rsid as i32))?;
+            self.write_control_word("insrsid", Some(insert_rsid.cast_signed()))?;
         }
         if let Some(delete_rsid) = fmt.delete_rsid {
-            self.write_control_word("delrsid", Some(delete_rsid as i32))?;
+            self.write_control_word("delrsid", Some(delete_rsid.cast_signed()))?;
         }
         if let Some(char_style_rsid) = fmt.char_style_rsid {
-            self.write_control_word("charrsid", Some(char_style_rsid as i32))?;
+            self.write_control_word("charrsid", Some(char_style_rsid.cast_signed()))?;
         }
         if let Some(direction) = fmt.direction {
             self.write_control_word(
@@ -317,9 +336,9 @@ impl<W: Write> RtfWriter<W> {
         if let Some(character_type) = fmt.character_type {
             self.write_control_word(
                 match character_type {
-                    crate::CharacterType::LowAnsi => "loch",
-                    crate::CharacterType::HighAnsi => "hich",
-                    crate::CharacterType::DoubleByte => "dbch",
+                    CharacterType::LowAnsi => "loch",
+                    CharacterType::HighAnsi => "hich",
+                    CharacterType::DoubleByte => "dbch",
                 },
                 None,
             )?;
@@ -328,18 +347,18 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word(
                 "cgrid",
                 match character_grid {
-                    crate::CharacterGrid::Parameterless => None,
-                    crate::CharacterGrid::Value(value) => Some(i32::from(value)),
+                    CharacterGrid::Parameterless => None,
+                    CharacterGrid::Value(value) => Some(i32::from(value)),
                 },
             )?;
         }
-        if fmt.animated_text != crate::AnimatedTextEffect::None {
+        if fmt.animated_text != AnimatedTextEffect::None {
             self.write_control_word("animtext", Some(fmt.animated_text.rtf_value()))?;
         }
         if let Some(value) = fmt.fit_text.rtf_value() {
             self.write_control_word("fittext", Some(value))?;
         }
-        if fmt.emphasis_mark != crate::EmphasisMark::None {
+        if fmt.emphasis_mark != EmphasisMark::None {
             self.write_control_word(fmt.emphasis_mark.control_word(), None)?;
         }
 
@@ -371,8 +390,7 @@ impl<W: Write> RtfWriter<W> {
         if let Some(color_ref) = fmt.associated.color_ref {
             self.write_control_word("acf", Some(i32::from(color_ref)))?;
         }
-        if let Some(crate::AssociatedCharacterBaseline::LoweredHalfPoints(value)) =
-            fmt.associated.baseline
+        if let Some(AssociatedCharacterBaseline::LoweredHalfPoints(value)) = fmt.associated.baseline
         {
             self.write_control_word("adn", Some(i32::from(value)))?;
         }
@@ -406,32 +424,31 @@ impl<W: Write> RtfWriter<W> {
         if let Some(underline) = fmt.associated.underline {
             self.write_control_word(
                 match underline {
-                    crate::AssociatedUnderlineStyle::None => "aulnone",
-                    crate::AssociatedUnderlineStyle::Single => "aul",
-                    crate::AssociatedUnderlineStyle::Dotted => "auld",
-                    crate::AssociatedUnderlineStyle::Double => "auldb",
-                    crate::AssociatedUnderlineStyle::Words => "aulw",
+                    AssociatedUnderlineStyle::None => "aulnone",
+                    AssociatedUnderlineStyle::Single => "aul",
+                    AssociatedUnderlineStyle::Dotted => "auld",
+                    AssociatedUnderlineStyle::Double => "auldb",
+                    AssociatedUnderlineStyle::Words => "aulw",
                 },
                 None,
             )?;
         }
-        if let Some(crate::AssociatedCharacterBaseline::RaisedHalfPoints(value)) =
-            fmt.associated.baseline
+        if let Some(AssociatedCharacterBaseline::RaisedHalfPoints(value)) = fmt.associated.baseline
         {
             self.write_control_word("aup", Some(i32::from(value)))?;
         }
 
         // Font
         if fmt.font_ref != 0 {
-            self.write_control_word("f", Some(fmt.font_ref as i32))?;
+            self.write_control_word("f", Some(i32::from(fmt.font_ref)))?;
         }
 
         // Font size
-        self.write_control_word("fs", Some(fmt.font_size.get() as i32))?;
+        self.write_control_word("fs", Some(i32::from(fmt.font_size.get())))?;
 
         // Color
         if fmt.color_ref != 0 {
-            self.write_control_word("cf", Some(fmt.color_ref as i32))?;
+            self.write_control_word("cf", Some(i32::from(fmt.color_ref)))?;
         }
 
         // Exact character background color, independent of highlighting.
@@ -441,7 +458,7 @@ impl<W: Write> RtfWriter<W> {
 
         // Highlight
         if let Some(highlight) = fmt.highlight_color {
-            self.write_control_word("highlight", Some(highlight as i32))?;
+            self.write_control_word("highlight", Some(i32::from(highlight)))?;
         }
 
         if let Some(border) = fmt.character_border {
@@ -521,17 +538,17 @@ impl<W: Write> RtfWriter<W> {
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
         match fmt.character_positioning.baseline {
             CharacterBaseline::Normal if fmt.superscript => {
-                self.write_control_word("super", None)?
+                self.write_control_word("super", None)?;
             },
             CharacterBaseline::Normal if fmt.subscript => self.write_control_word("sub", None)?,
             CharacterBaseline::Normal => {},
             CharacterBaseline::Superscript => self.write_control_word("super", None)?,
             CharacterBaseline::Subscript => self.write_control_word("sub", None)?,
             CharacterBaseline::RaisedHalfPoints(value) => {
-                self.write_control_word("up", Some(i32::from(value)))?
+                self.write_control_word("up", Some(i32::from(value)))?;
             },
             CharacterBaseline::LoweredHalfPoints(value) => {
-                self.write_control_word("dn", Some(i32::from(value)))?
+                self.write_control_word("dn", Some(i32::from(value)))?;
             },
         }
 
@@ -572,20 +589,20 @@ impl<W: Write> RtfWriter<W> {
 
         match fmt.character_positioning.expansion {
             CharacterExpansion::None if fmt.char_spacing != 0 => {
-                self.write_control_word("expnd", Some(fmt.char_spacing))?
+                self.write_control_word("expnd", Some(fmt.char_spacing))?;
             },
             CharacterExpansion::None => {},
             CharacterExpansion::QuarterPoints(value) => {
-                self.write_control_word("expnd", Some(i32::from(value)))?
+                self.write_control_word("expnd", Some(i32::from(value)))?;
             },
             CharacterExpansion::Twips(value) => {
-                self.write_control_word("expndtw", Some(i32::from(value)))?
+                self.write_control_word("expndtw", Some(i32::from(value)))?;
             },
         }
-        let scale = if fmt.character_positioning.horizontal_scale_percent != 100 {
-            i32::from(fmt.character_positioning.horizontal_scale_percent)
-        } else {
+        let scale = if fmt.character_positioning.horizontal_scale_percent == 100 {
             fmt.char_scale
+        } else {
+            i32::from(fmt.character_positioning.horizontal_scale_percent)
         };
         if scale != 100 {
             self.write_control_word("charscalex", Some(scale))?;
@@ -625,53 +642,49 @@ impl<W: Write> RtfWriter<W> {
         self.write_str("{")?;
         self.write_control_word("pn", None)?;
         match record.level {
-            crate::LegacyParagraphNumberingLevel::Explicit(value) => {
-                self.write_control_word("pnlvl", Some(i32::from(value)))?
+            LegacyParagraphNumberingLevel::Explicit(value) => {
+                self.write_control_word("pnlvl", Some(i32::from(value)))?;
             },
-            crate::LegacyParagraphNumberingLevel::Bullet => {
-                self.write_control_word("pnlvlblt", None)?
-            },
-            crate::LegacyParagraphNumberingLevel::Body => {
-                self.write_control_word("pnlvlbody", None)?
-            },
-            crate::LegacyParagraphNumberingLevel::Continue => {
-                self.write_control_word("pnlvlcont", None)?
+            LegacyParagraphNumberingLevel::Bullet => self.write_control_word("pnlvlblt", None)?,
+            LegacyParagraphNumberingLevel::Body => self.write_control_word("pnlvlbody", None)?,
+            LegacyParagraphNumberingLevel::Continue => {
+                self.write_control_word("pnlvlcont", None)?;
             },
         }
         if let Some(format) = record.format {
             self.write_control_word(
                 match format {
-                    crate::LegacyParagraphNumberingFormat::Aiueo => "pnaiu",
-                    crate::LegacyParagraphNumberingFormat::AiueoDbChar => "pnaiud",
-                    crate::LegacyParagraphNumberingFormat::AiueoExtended => "pnaiueo",
-                    crate::LegacyParagraphNumberingFormat::AiueoExtendedDbChar => "pnaiueod",
-                    crate::LegacyParagraphNumberingFormat::Chosung => "pnchosung",
-                    crate::LegacyParagraphNumberingFormat::CardinalText => "pncard",
-                    crate::LegacyParagraphNumberingFormat::Decimal => "pndec",
-                    crate::LegacyParagraphNumberingFormat::DecimalWithPeriod => "pndecd",
-                    crate::LegacyParagraphNumberingFormat::UpperRoman => "pnucrm",
-                    crate::LegacyParagraphNumberingFormat::LowerRoman => "pnlcrm",
-                    crate::LegacyParagraphNumberingFormat::UpperLetter => "pnucltr",
-                    crate::LegacyParagraphNumberingFormat::LowerLetter => "pnlcltr",
-                    crate::LegacyParagraphNumberingFormat::Ordinal => "pnord",
-                    crate::LegacyParagraphNumberingFormat::OrdinalText => "pnordt",
-                    crate::LegacyParagraphNumberingFormat::ChineseCounting => "pncnum",
-                    crate::LegacyParagraphNumberingFormat::ChineseCountingDbChar => "pndbnum",
-                    crate::LegacyParagraphNumberingFormat::ChineseCountingKorean => "pndbnumd",
-                    crate::LegacyParagraphNumberingFormat::ChineseCountingLegal => "pndbnumk",
-                    crate::LegacyParagraphNumberingFormat::ChineseCountingThousand => "pndbnuml",
-                    crate::LegacyParagraphNumberingFormat::ChineseCountingTraditional => "pndbnumt",
-                    crate::LegacyParagraphNumberingFormat::Ganada => "pnganada",
-                    crate::LegacyParagraphNumberingFormat::GbCounting => "pngbnum",
-                    crate::LegacyParagraphNumberingFormat::GbCountingDbChar => "pngbnumd",
-                    crate::LegacyParagraphNumberingFormat::GbCountingKorean => "pngbnumk",
-                    crate::LegacyParagraphNumberingFormat::GbCountingLegal => "pngbnuml",
-                    crate::LegacyParagraphNumberingFormat::GbLip => "pngblip",
-                    crate::LegacyParagraphNumberingFormat::Iroha => "pniroha",
-                    crate::LegacyParagraphNumberingFormat::IrohaDbChar => "pnirohad",
-                    crate::LegacyParagraphNumberingFormat::Zodiac => "pnzodiac",
-                    crate::LegacyParagraphNumberingFormat::ZodiacDbChar => "pnzodiacd",
-                    crate::LegacyParagraphNumberingFormat::ZodiacLegal => "pnzodiacl",
+                    LegacyParagraphNumberingFormat::Aiueo => "pnaiu",
+                    LegacyParagraphNumberingFormat::AiueoDbChar => "pnaiud",
+                    LegacyParagraphNumberingFormat::AiueoExtended => "pnaiueo",
+                    LegacyParagraphNumberingFormat::AiueoExtendedDbChar => "pnaiueod",
+                    LegacyParagraphNumberingFormat::Chosung => "pnchosung",
+                    LegacyParagraphNumberingFormat::CardinalText => "pncard",
+                    LegacyParagraphNumberingFormat::Decimal => "pndec",
+                    LegacyParagraphNumberingFormat::DecimalWithPeriod => "pndecd",
+                    LegacyParagraphNumberingFormat::UpperRoman => "pnucrm",
+                    LegacyParagraphNumberingFormat::LowerRoman => "pnlcrm",
+                    LegacyParagraphNumberingFormat::UpperLetter => "pnucltr",
+                    LegacyParagraphNumberingFormat::LowerLetter => "pnlcltr",
+                    LegacyParagraphNumberingFormat::Ordinal => "pnord",
+                    LegacyParagraphNumberingFormat::OrdinalText => "pnordt",
+                    LegacyParagraphNumberingFormat::ChineseCounting => "pncnum",
+                    LegacyParagraphNumberingFormat::ChineseCountingDbChar => "pndbnum",
+                    LegacyParagraphNumberingFormat::ChineseCountingKorean => "pndbnumd",
+                    LegacyParagraphNumberingFormat::ChineseCountingLegal => "pndbnumk",
+                    LegacyParagraphNumberingFormat::ChineseCountingThousand => "pndbnuml",
+                    LegacyParagraphNumberingFormat::ChineseCountingTraditional => "pndbnumt",
+                    LegacyParagraphNumberingFormat::Ganada => "pnganada",
+                    LegacyParagraphNumberingFormat::GbCounting => "pngbnum",
+                    LegacyParagraphNumberingFormat::GbCountingDbChar => "pngbnumd",
+                    LegacyParagraphNumberingFormat::GbCountingKorean => "pngbnumk",
+                    LegacyParagraphNumberingFormat::GbCountingLegal => "pngbnuml",
+                    LegacyParagraphNumberingFormat::GbLip => "pngblip",
+                    LegacyParagraphNumberingFormat::Iroha => "pniroha",
+                    LegacyParagraphNumberingFormat::IrohaDbChar => "pnirohad",
+                    LegacyParagraphNumberingFormat::Zodiac => "pnzodiac",
+                    LegacyParagraphNumberingFormat::ZodiacDbChar => "pnzodiacd",
+                    LegacyParagraphNumberingFormat::ZodiacLegal => "pnzodiacl",
                 },
                 None,
             )?;
@@ -679,9 +692,9 @@ impl<W: Write> RtfWriter<W> {
         if let Some(value) = record.alignment {
             self.write_control_word(
                 match value {
-                    crate::LegacyParagraphNumberingAlignment::Left => "pnql",
-                    crate::LegacyParagraphNumberingAlignment::Center => "pnqc",
-                    crate::LegacyParagraphNumberingAlignment::Right => "pnqr",
+                    LegacyParagraphNumberingAlignment::Left => "pnql",
+                    LegacyParagraphNumberingAlignment::Center => "pnqc",
+                    LegacyParagraphNumberingAlignment::Right => "pnqr",
                 },
                 None,
             )?;
@@ -700,8 +713,8 @@ impl<W: Write> RtfWriter<W> {
         if let Some(value) = record.bidi {
             self.write_control_word(
                 match value {
-                    crate::LegacyParagraphNumberingBidi::A => "pnbidia",
-                    crate::LegacyParagraphNumberingBidi::B => "pnbidib",
+                    LegacyParagraphNumberingBidi::A => "pnbidia",
+                    LegacyParagraphNumberingBidi::B => "pnbidib",
                 },
                 None,
             )?;
@@ -738,17 +751,17 @@ impl<W: Write> RtfWriter<W> {
         if let Some(value) = record.underline {
             self.write_control_word(
                 match value {
-                    crate::LegacyParagraphNumberingUnderline::None => "pnulnone",
-                    crate::LegacyParagraphNumberingUnderline::Single => "pnul",
-                    crate::LegacyParagraphNumberingUnderline::Dotted => "pnuld",
-                    crate::LegacyParagraphNumberingUnderline::Dashed => "pnuldash",
-                    crate::LegacyParagraphNumberingUnderline::DashDot => "pnuldashd",
-                    crate::LegacyParagraphNumberingUnderline::DashDotDot => "pnuldashdd",
-                    crate::LegacyParagraphNumberingUnderline::Double => "pnuldb",
-                    crate::LegacyParagraphNumberingUnderline::Hairline => "pnulhair",
-                    crate::LegacyParagraphNumberingUnderline::Thick => "pnulth",
-                    crate::LegacyParagraphNumberingUnderline::Words => "pnulw",
-                    crate::LegacyParagraphNumberingUnderline::Wave => "pnulwave",
+                    LegacyParagraphNumberingUnderline::None => "pnulnone",
+                    LegacyParagraphNumberingUnderline::Single => "pnul",
+                    LegacyParagraphNumberingUnderline::Dotted => "pnuld",
+                    LegacyParagraphNumberingUnderline::Dashed => "pnuldash",
+                    LegacyParagraphNumberingUnderline::DashDot => "pnuldashd",
+                    LegacyParagraphNumberingUnderline::DashDotDot => "pnuldashdd",
+                    LegacyParagraphNumberingUnderline::Double => "pnuldb",
+                    LegacyParagraphNumberingUnderline::Hairline => "pnulhair",
+                    LegacyParagraphNumberingUnderline::Thick => "pnulth",
+                    LegacyParagraphNumberingUnderline::Words => "pnulw",
+                    LegacyParagraphNumberingUnderline::Wave => "pnulwave",
                 },
                 None,
             )?;
@@ -770,7 +783,7 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("pnrpnbr", Some(value))?;
         }
         if let Some(value) = revision.rgb {
-            self.write_control_word("pnrrgb", Some(value as i32))?;
+            self.write_control_word("pnrrgb", Some(value.cast_signed()))?;
         }
         if let Some(value) = revision.start {
             self.write_control_word("pnrstart", Some(value))?;
@@ -804,7 +817,7 @@ impl<W: Write> RtfWriter<W> {
         &mut self,
         author_control: &'static str,
         date_control: &'static str,
-        metadata: crate::RevisionMetadata,
+        metadata: RevisionMetadata,
     ) -> io::Result<()> {
         metadata
             .validate()
@@ -827,7 +840,7 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("s", Some(i32::from(paragraph_style)))?;
         }
         if let Some(paragraph_rsid) = para.paragraph_rsid {
-            self.write_control_word("pararsid", Some(paragraph_rsid as i32))?;
+            self.write_control_word("pararsid", Some(paragraph_rsid.cast_signed()))?;
         }
         if let Some(outline_level) = para.outline_level {
             self.write_control_word("outlinelevel", Some(i32::from(outline_level)))?;
@@ -862,7 +875,7 @@ impl<W: Write> RtfWriter<W> {
         if let Some(value) = para.spacing_policy.list_before {
             self.write_control_word(
                 "lisb",
-                Some(i32::try_from(value).map_err(|_| {
+                Some(i32::try_from(value).map_err(|_err| {
                     io::Error::new(io::ErrorKind::InvalidInput, "RTF lisb exceeds i32")
                 })?),
             )?;
@@ -870,7 +883,7 @@ impl<W: Write> RtfWriter<W> {
         if let Some(value) = para.spacing_policy.list_after {
             self.write_control_word(
                 "lisa",
-                Some(i32::try_from(value).map_err(|_| {
+                Some(i32::try_from(value).map_err(|_err| {
                     io::Error::new(io::ErrorKind::InvalidInput, "RTF lisa exceeds i32")
                 })?),
             )?;
@@ -932,7 +945,7 @@ impl<W: Write> RtfWriter<W> {
 
         // Custom tab stops, retained in declaration order.
         for tab in &para.tab_stops {
-            self.write_tab_stop(tab)?;
+            self.write_tab_stop(*tab)?;
         }
 
         if let Some(drop_cap) = para.drop_cap {
@@ -982,12 +995,10 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("hyphpar", None)?;
         }
         match breaking.wrapping {
-            crate::ParagraphWrapping::Default => {},
-            crate::ParagraphWrapping::NoCharacterWrap => {
-                self.write_control_word("nocwrap", None)?
-            },
-            crate::ParagraphWrapping::NoWordWrap => self.write_control_word("nowwrap", None)?,
-            crate::ParagraphWrapping::NoOverflow => self.write_control_word("nooverflow", None)?,
+            ParagraphWrapping::Default => {},
+            ParagraphWrapping::NoCharacterWrap => self.write_control_word("nocwrap", None)?,
+            ParagraphWrapping::NoWordWrap => self.write_control_word("nowwrap", None)?,
+            ParagraphWrapping::NoOverflow => self.write_control_word("nooverflow", None)?,
         }
         if breaking.auto_space_alphabetic {
             self.write_control_word("aspalpha", None)?;
@@ -996,12 +1007,12 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("aspnum", None)?;
         }
         match breaking.font_alignment {
-            crate::ParagraphFontAlignment::Auto => {},
-            crate::ParagraphFontAlignment::Hanging => self.write_control_word("fahang", None)?,
-            crate::ParagraphFontAlignment::Center => self.write_control_word("facenter", None)?,
-            crate::ParagraphFontAlignment::Roman => self.write_control_word("faroman", None)?,
-            crate::ParagraphFontAlignment::Variable => self.write_control_word("favar", None)?,
-            crate::ParagraphFontAlignment::Fixed => self.write_control_word("fafixed", None)?,
+            ParagraphFontAlignment::Auto => {},
+            ParagraphFontAlignment::Hanging => self.write_control_word("fahang", None)?,
+            ParagraphFontAlignment::Center => self.write_control_word("facenter", None)?,
+            ParagraphFontAlignment::Roman => self.write_control_word("faroman", None)?,
+            ParagraphFontAlignment::Variable => self.write_control_word("favar", None)?,
+            ParagraphFontAlignment::Fixed => self.write_control_word("fafixed", None)?,
         }
         if breaking.adjust_right_indent {
             self.write_control_word("adjustright", None)?;
@@ -1083,9 +1094,8 @@ impl<W: Write> RtfWriter<W> {
             BorderStyle::Double => "brdrdb",
             BorderStyle::Triple => "brdrtriple",
             BorderStyle::ThickThinSmall => "brdrtnthsg",
-            BorderStyle::ThinThickSmall => "brdrtnthmg",
+            BorderStyle::ThinThickSmall | BorderStyle::ThickThinMedium => "brdrtnthmg",
             BorderStyle::ThinThickThinSmall => "brdrtnthtnsg",
-            BorderStyle::ThickThinMedium => "brdrtnthmg",
             BorderStyle::ThinThickMedium => "brdrthtnmg",
             BorderStyle::ThinThickThinMedium => "brdrtnthtnmg",
             BorderStyle::ThickThinLarge => "brdrtnthlg",
@@ -1107,7 +1117,7 @@ impl<W: Write> RtfWriter<W> {
 
         // Border color
         if border.color_ref != 0 {
-            self.write_control_word("brdrcf", Some(border.color_ref as i32))?;
+            self.write_control_word("brdrcf", Some(i32::from(border.color_ref)))?;
         }
 
         // Border space
@@ -1191,7 +1201,7 @@ impl<W: Write> RtfWriter<W> {
 
     /// Write tab stop
     ///
-    pub(in super::super) fn write_tab_stop(&mut self, tab: &TabStop) -> io::Result<()> {
+    pub(in super::super) fn write_tab_stop(&mut self, tab: TabStop) -> io::Result<()> {
         // The left kind is implicit. A bar tab uses `tbN` as its terminator.
         match tab.alignment {
             TabAlignment::Left | TabAlignment::Bar => {},

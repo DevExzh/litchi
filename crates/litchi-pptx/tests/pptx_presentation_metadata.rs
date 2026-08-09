@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use std::collections::BTreeMap;
 
 use litchi_opc::{OpcPackage, PackURI};

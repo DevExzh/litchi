@@ -82,6 +82,96 @@ pub enum Kind {
     RepeatingItem,
 }
 
+/// Visual treatment requested for a structured document tag.
+///
+/// This is presentation metadata only.  Litchi neither renders controls nor
+/// activates any associated Office Web Extension.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Appearance {
+    /// Outline or shade the complete control region when needed.
+    BoundingBox,
+    /// Show the physical start and end tag characters.
+    Tags,
+    /// Do not show a visual indication for the control.
+    Hidden,
+}
+
+impl Appearance {
+    /// Return the schema token used by `w15:appearance`.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::BoundingBox => "boundingBox",
+            Self::Tags => "tags",
+            Self::Hidden => "hidden",
+        }
+    }
+
+    fn from_xml(value: &str) -> Result<Self> {
+        match value {
+            "boundingBox" => Ok(Self::BoundingBox),
+            "tags" => Ok(Self::Tags),
+            "hidden" => Ok(Self::Hidden),
+            _ => Err(Error::InvalidFormat(format!(
+                "invalid content-control appearance '{value}'"
+            ))),
+        }
+    }
+}
+
+/// RGB color used as the visual basis of a structured document tag.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SdtColor {
+    /// Let the consuming application choose the automatic color.
+    Auto,
+    /// A six-digit sRGB color.
+    Rgb([u8; 3]),
+}
+
+impl SdtColor {
+    /// Return the sRGB value when this is not the automatic color.
+    #[must_use]
+    pub const fn rgb(self) -> Option<[u8; 3]> {
+        match self {
+            Self::Auto => None,
+            Self::Rgb(value) => Some(value),
+        }
+    }
+
+    fn from_xml(value: &str) -> Result<Self> {
+        if value == "auto" {
+            return Ok(Self::Auto);
+        }
+        let bytes = value.as_bytes();
+        if bytes.len() != 6 {
+            return Err(Error::InvalidFormat(
+                "content-control color must be 'auto' or six hexadecimal digits".to_string(),
+            ));
+        }
+        let parse = |pair: &[u8]| {
+            std::str::from_utf8(pair)
+                .ok()
+                .and_then(|value| u8::from_str_radix(value, 16).ok())
+        };
+        match (parse(&bytes[..2]), parse(&bytes[2..4]), parse(&bytes[4..])) {
+            (Some(red), Some(green), Some(blue)) => Ok(Self::Rgb([red, green, blue])),
+            _ => Err(Error::InvalidFormat(
+                "content-control color must be 'auto' or six hexadecimal digits".to_string(),
+            )),
+        }
+    }
+}
+
+/// Effective inert Office Web Extension provenance of a content control.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum WebExtensionBinding {
+    /// The control was created by an Office Web Extension. This takes
+    /// precedence over `webExtensionLinked` when both markers are present.
+    Created(bool),
+    /// The control is linked to an Office Web Extension.
+    Linked(bool),
+}
+
 impl Kind {
     /// Return the exact OOXML marker name.
     #[must_use]
@@ -207,6 +297,14 @@ pub struct ContentControl {
     date_value: Option<String>,
     /// Title of a Word 2012 repeating section.
     repeating_section_title: Option<String>,
+    /// Word 2012 visual treatment.
+    appearance: Option<Appearance>,
+    /// Word 2012 visual base color.
+    color: Option<SdtColor>,
+    /// Inert Word 2012 web-extension linked marker.
+    web_extension_linked: Option<bool>,
+    /// Inert Word 2012 web-extension-created marker.
+    web_extension_created: Option<bool>,
 }
 
 impl ContentControl {
@@ -237,6 +335,10 @@ impl ContentControl {
             date_format: None,
             date_value: None,
             repeating_section_title: None,
+            appearance: None,
+            color: None,
+            web_extension_linked: None,
+            web_extension_created: None,
         }
     }
 
@@ -396,6 +498,45 @@ impl ContentControl {
     #[inline]
     pub fn repeating_section_title(&self) -> Option<&str> {
         self.repeating_section_title.as_deref()
+    }
+
+    /// Return the requested visual treatment of this control.
+    #[inline]
+    pub const fn appearance(&self) -> Option<Appearance> {
+        self.appearance
+    }
+
+    /// Return the requested visual base color of this control.
+    #[inline]
+    pub const fn color(&self) -> Option<SdtColor> {
+        self.color
+    }
+
+    /// Return the exact inert `webExtensionLinked` marker, preserving absence.
+    #[inline]
+    pub const fn web_extension_linked(&self) -> Option<bool> {
+        self.web_extension_linked
+    }
+
+    /// Return the exact inert `webExtensionCreated` marker, preserving absence.
+    #[inline]
+    pub const fn web_extension_created(&self) -> Option<bool> {
+        self.web_extension_created
+    }
+
+    /// Return the effective inert Web Extension provenance marker.
+    ///
+    /// Per [MS-DOCX] 2.5.1.12-13, `webExtensionCreated` takes precedence
+    /// when both markers are present. No relationship is resolved or run.
+    #[inline]
+    pub const fn web_extension_binding(&self) -> Option<WebExtensionBinding> {
+        if let Some(value) = self.web_extension_created {
+            Some(WebExtensionBinding::Created(value))
+        } else if let Some(value) = self.web_extension_linked {
+            Some(WebExtensionBinding::Linked(value))
+        } else {
+            None
+        }
     }
 
     fn metadata_bytes(&self) -> usize {
@@ -772,6 +913,10 @@ struct PendingContentControl {
     date_format: Option<String>,
     date_value: Option<String>,
     repeating_section_title: Option<String>,
+    appearance: Option<Appearance>,
+    color: Option<SdtColor>,
+    web_extension_linked: Option<bool>,
+    web_extension_created: Option<bool>,
     context: Option<(PropertyContext, usize)>,
 }
 
@@ -797,6 +942,10 @@ impl PendingContentControl {
             date_format: None,
             date_value: None,
             repeating_section_title: None,
+            appearance: None,
+            color: None,
+            web_extension_linked: None,
+            web_extension_created: None,
             context: None,
         }
     }
@@ -821,6 +970,10 @@ impl PendingContentControl {
             date_format: self.date_format,
             date_value: self.date_value,
             repeating_section_title: self.repeating_section_title,
+            appearance: self.appearance,
+            color: self.color,
+            web_extension_linked: self.web_extension_linked,
+            web_extension_created: self.web_extension_created,
         })
     }
 }
@@ -938,6 +1091,38 @@ fn parse_direct_property(
         }
     } else if is_extension_namespace(namespace, WORD_2012_NAMESPACE) {
         match name.as_ref() {
+            b"appearance" => {
+                let value = extension_attribute_value(
+                    element,
+                    b"val",
+                    WORD_2012_NAMESPACE,
+                    b"w15",
+                    decoder,
+                    resolver,
+                )?
+                .ok_or_else(|| {
+                    Error::InvalidFormat("content-control appearance has no value".to_string())
+                })?;
+                set_once(
+                    &mut control.appearance,
+                    Appearance::from_xml(&value)?,
+                    "content-control appearance",
+                )?;
+            },
+            b"color" => {
+                let value = required_word_attribute(
+                    element,
+                    b"val",
+                    decoder,
+                    resolver,
+                    "content-control color",
+                )?;
+                set_once(
+                    &mut control.color,
+                    SdtColor::from_xml(&value)?,
+                    "content-control color",
+                )?;
+            },
             b"dataBinding" => {
                 parse_data_binding(element, decoder, resolver, BindingFlavor::Word2012, control)?
             },
@@ -946,6 +1131,20 @@ fn parse_direct_property(
                 set_context(control, PropertyContext::RepeatingSection, depth, empty);
             },
             b"repeatingSectionItem" => set_kind(control, Kind::RepeatingItem)?,
+            b"webExtensionLinked" => {
+                set_once(
+                    &mut control.web_extension_linked,
+                    parse_on_off(element, decoder, resolver)?,
+                    "content-control web-extension linked marker",
+                )?;
+            },
+            b"webExtensionCreated" => {
+                set_once(
+                    &mut control.web_extension_created,
+                    parse_on_off(element, decoder, resolver)?,
+                    "content-control web-extension created marker",
+                )?;
+            },
             _ => {},
         }
     }

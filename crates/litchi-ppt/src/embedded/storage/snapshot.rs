@@ -1,10 +1,10 @@
-//! Borrowed, lossless projections of one PowerPoint persisted storage.
+//! Borrowed, lossless projections of one `PowerPoint` persisted storage.
 
 use super::model::{Compression, Kind, Ref, Storage};
 
 /// The payload-free metadata projection of one `ExOleObjStg` record.
 ///
-/// The projection retains every variable scalar from the PowerPoint storage
+/// The projection retains every variable scalar from the `PowerPoint` storage
 /// envelope. Use [`Snapshot::stored_bytes`] when the opaque OLE2 bytes are
 /// needed; no embedded content is opened or executed by this view.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -19,7 +19,7 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    /// The PowerPoint record context that owns the payload.
+    /// The `PowerPoint` record context that owns the payload.
     #[must_use]
     pub const fn kind(self) -> Kind {
         self.kind
@@ -93,7 +93,7 @@ impl<'a> Snapshot<'a> {
         }
     }
 
-    /// The PowerPoint record context that owns the payload.
+    /// The `PowerPoint` record context that owns the payload.
     #[must_use]
     pub const fn kind(self) -> Kind {
         self.kind
@@ -165,6 +165,10 @@ impl<'a> Snapshot<'a> {
     }
 
     /// Copy this bounded view into an owned storage snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_storage(self) -> crate::package::Result<Storage> {
         Storage::from_parts(
             self.kind,
@@ -195,7 +199,10 @@ impl Storage {
     }
 }
 
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "resolver retained for pending embedded-storage call sites"
+)]
 impl<'a> Ref<'a> {
     pub(crate) const fn snapshot(self) -> Snapshot<'a> {
         Snapshot::from_parts(

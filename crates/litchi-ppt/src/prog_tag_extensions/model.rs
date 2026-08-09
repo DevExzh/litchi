@@ -45,9 +45,9 @@ pub struct DocBinaryTagExtension10 {
     pub comment_indices: Vec<Record>,
     /// `fontEmbedFlagsAtom`: optional `FontEmbedFlags10Atom`.
     pub font_embed_flags: Option<Record>,
-    /// `copyrightAtom`: optional `CopyrightAtom` (CString instance 0x001).
+    /// `copyrightAtom`: optional `CopyrightAtom` (`CString` instance 0x001).
     pub copyright: Option<Record>,
-    /// `keywordsAtom`: optional `KeywordsAtom` (CString instance 0x002).
+    /// `keywordsAtom`: optional `KeywordsAtom` (`CString` instance 0x002).
     pub keywords: Option<Record>,
     /// `filterPrivacyFlagsAtom`: optional `FilterPrivacyFlags10Atom`.
     pub filter_privacy_flags: Option<Record>,
@@ -59,7 +59,7 @@ pub struct DocBinaryTagExtension10 {
     pub slide_list_table: Option<Record>,
     /// `rgDiffTree10Container`: `DiffTree10Container` records.
     pub diff_trees: Vec<Record>,
-    /// `modifyPasswordAtom`: optional `ModifyPasswordAtom` (CString instance 0x003).
+    /// `modifyPasswordAtom`: optional `ModifyPasswordAtom` (`CString` instance 0x003).
     pub modify_password: Option<Record>,
     /// `photoAlbumInfoAtom`: optional `PhotoAlbumInfo10Atom`.
     pub photo_album_info: Option<Record>,

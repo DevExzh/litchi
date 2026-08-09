@@ -1,4 +1,4 @@
-//! Semantic values for inert PresentationML content-part relationships.
+//! Semantic values for inert `PresentationML` content-part relationships.
 
 use litchi_opc::{PackURI, TargetMode};
 use std::sync::Arc;
@@ -20,48 +20,56 @@ pub struct ContentPart {
 impl ContentPart {
     /// Zero-based slide position containing this content-part anchor.
     #[inline]
+    #[must_use]
     pub const fn slide_index(&self) -> usize {
         self.slide_index
     }
 
     /// Absolute part name of the owning slide.
     #[inline]
+    #[must_use]
     pub fn slide_part_name(&self) -> &PackURI {
         &self.slide_part_name
     }
 
     /// Zero-based content-part position in the owning slide's active markup.
     #[inline]
+    #[must_use]
     pub const fn index(&self) -> usize {
         self.index
     }
 
     /// The selected, bounded `p:contentPart` anchor.
     #[inline]
+    #[must_use]
     pub fn anchor(&self) -> &Anchor {
         &self.anchor
     }
 
     /// The owning slide relationship resolved from the anchor's `r:id`.
     #[inline]
+    #[must_use]
     pub fn relationship(&self) -> &Relationship {
         &self.relationship
     }
 
     /// The relationship identifier written by the anchor.
     #[inline]
+    #[must_use]
     pub fn relationship_id(&self) -> &str {
         self.anchor.relationship_id()
     }
 
     /// The inert target of this content part.
     #[inline]
+    #[must_use]
     pub fn target(&self) -> &Target {
         self.relationship.target()
     }
 
     /// Internal payload bytes, or `None` for an external target.
     #[inline]
+    #[must_use]
     pub fn payload(&self) -> Option<&Payload> {
         self.relationship.payload()
     }
@@ -90,12 +98,14 @@ impl Anchor {
 
     /// The `r:id` value resolved against the owning slide relationship graph.
     #[inline]
+    #[must_use]
     pub fn relationship_id(&self) -> &str {
         &self.relationship_id
     }
 
     /// Exact selected anchor bytes after markup-compatibility branch choice.
     #[inline]
+    #[must_use]
     pub fn xml(&self) -> &[u8] {
         &self.xml
     }
@@ -132,36 +142,42 @@ impl Relationship {
 
     /// Relationship identifier in the owning slide `.rels` part.
     #[inline]
+    #[must_use]
     pub fn id(&self) -> &str {
         &self.id
     }
 
     /// Relationship type URI, retained without vocabulary interpretation.
     #[inline]
+    #[must_use]
     pub fn relationship_type(&self) -> &str {
         &self.relationship_type
     }
 
     /// Original target reference from the owning slide relationship XML.
     #[inline]
+    #[must_use]
     pub fn target_ref(&self) -> &str {
         &self.target_ref
     }
 
     /// OPC target mode; external targets are never contacted.
     #[inline]
+    #[must_use]
     pub const fn target_mode(&self) -> TargetMode {
         self.target_mode
     }
 
     /// Inert internal payload or external URI target.
     #[inline]
+    #[must_use]
     pub fn target(&self) -> &Target {
         &self.target
     }
 
     /// Borrow the payload when the relationship is internal.
     #[inline]
+    #[must_use]
     pub fn payload(&self) -> Option<&Payload> {
         match &self.target {
             Target::Internal(payload) => Some(payload),
@@ -185,6 +201,7 @@ pub enum Target {
 impl Target {
     /// Construct an inert internal target.
     #[inline]
+    #[must_use]
     pub fn internal(payload: Payload) -> Self {
         Self::Internal(payload)
     }
@@ -199,6 +216,7 @@ impl Target {
 
     /// Return the internal payload, when present.
     #[inline]
+    #[must_use]
     pub fn payload(&self) -> Option<&Payload> {
         match self {
             Self::Internal(payload) => Some(payload),
@@ -208,6 +226,7 @@ impl Target {
 
     /// Return the preserved external URI, when present.
     #[inline]
+    #[must_use]
     pub fn external_ref(&self) -> Option<&str> {
         match self {
             Self::Internal(_) => None,
@@ -242,6 +261,7 @@ impl Payload {
     }
 
     /// Attach opaque relationship metadata to a payload.
+    #[must_use]
     #[inline]
     pub fn with_relationships(
         mut self,
@@ -255,24 +275,28 @@ impl Payload {
 
     /// Absolute OPC part name of this target.
     #[inline]
+    #[must_use]
     pub fn part_name(&self) -> &PackURI {
         &self.part_name
     }
 
     /// Declared OPC content type, without format sniffing.
     #[inline]
+    #[must_use]
     pub fn content_type(&self) -> &str {
         &self.content_type
     }
 
     /// Exact target payload bytes.
     #[inline]
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
     /// Relationship metadata owned by the payload part.
     #[inline]
+    #[must_use]
     pub fn relationships(&self) -> &[RelationshipMetadata] {
         &self.relationships
     }
@@ -306,24 +330,28 @@ impl RelationshipMetadata {
 
     /// Relationship identifier in the payload part's `.rels` graph.
     #[inline]
+    #[must_use]
     pub fn id(&self) -> &str {
         &self.id
     }
 
     /// Relationship type URI.
     #[inline]
+    #[must_use]
     pub fn relationship_type(&self) -> &str {
         &self.relationship_type
     }
 
     /// Original relationship target reference.
     #[inline]
+    #[must_use]
     pub fn target_ref(&self) -> &str {
         &self.target_ref
     }
 
     /// OPC target mode, retained without following the target.
     #[inline]
+    #[must_use]
     pub const fn target_mode(&self) -> TargetMode {
         self.target_mode
     }

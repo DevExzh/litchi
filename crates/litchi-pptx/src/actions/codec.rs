@@ -1,4 +1,4 @@
-//! Bounded PresentationML XML scanning for action settings.
+//! Bounded `PresentationML` XML scanning for action settings.
 
 use super::model::Trigger;
 use super::{Limits, invalid, limit};
@@ -235,10 +235,10 @@ fn is_presentationml_name(
 }
 
 fn bounded_optional(value: Option<String>, what: &'static str) -> Result<Option<String>> {
-    if let Some(value) = &value {
-        if value.len() > MAX_ATTRIBUTE_BYTES {
-            return Err(limit(what, MAX_ATTRIBUTE_BYTES));
-        }
+    if let Some(value) = &value
+        && value.len() > MAX_ATTRIBUTE_BYTES
+    {
+        return Err(limit(what, MAX_ATTRIBUTE_BYTES));
     }
     Ok(value)
 }

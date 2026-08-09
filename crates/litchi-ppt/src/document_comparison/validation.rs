@@ -49,8 +49,21 @@ pub(super) fn validate_diff_children(parent: DiffType, children: &[DiffNode]) ->
                 (T::InteractiveInfo, Some(false)),
             ],
         ),
-        _ if children.is_empty() => Ok(()),
-        _ => corrupted("leaf Diff10 record contains child records"),
+        T::Text
+        | T::Notes
+        | T::SlideShow
+        | T::HeaderFooter
+        | T::NamedShow
+        | T::RecolorInfo
+        | T::ExternalObject
+        | T::Table
+        | T::InteractiveInfo => {
+            if children.is_empty() {
+                Ok(())
+            } else {
+                corrupted("leaf Diff10 record contains child records")
+            }
+        },
     }
 }
 
@@ -105,23 +118,6 @@ pub(super) fn validate_count(count: usize) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn validate_atom(
-    record: &crate::records::Record,
-    kind: crate::consts::RecordType,
-    payload_size: usize,
-) -> Result<()> {
-    if record.record_type != kind
-        || record.version != 0
-        || record.instance != 0
-        || record.data.len() != payload_size
-        || usize::try_from(record.data_length).ok() != Some(payload_size)
-        || !record.children.is_empty()
-    {
-        return corrupted("PowerPoint document-comparison atom has an invalid header or length");
-    }
-    Ok(())
-}
-
 impl DiffNode {
     pub(super) fn validate_node(&self) -> Result<()> {
         if self.headers.index
@@ -150,6 +146,23 @@ impl DiffNode {
         }
         validate_diff_children(self.headers.diff_type, &self.children)
     }
+}
+
+pub(super) fn validate_atom(
+    record: &crate::records::Record,
+    kind: crate::consts::RecordType,
+    payload_size: usize,
+) -> Result<()> {
+    if record.record_type != kind
+        || record.version != 0
+        || record.instance != 0
+        || record.data.len() != payload_size
+        || usize::try_from(record.data_length).ok() != Some(payload_size)
+        || !record.children.is_empty()
+    {
+        return corrupted("PowerPoint document-comparison atom has an invalid header or length");
+    }
+    Ok(())
 }
 
 pub(super) fn corrupted<T>(message: &str) -> Result<T> {

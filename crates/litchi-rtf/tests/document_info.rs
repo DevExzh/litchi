@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{DocumentInfo, RtfDocument, RtfTimestamp, RtfWriter};
 use std::borrow::Cow;
 use std::fs;
@@ -86,18 +95,18 @@ fn writer_accepts_typed_and_legacy_timestamps_and_rejects_unsafe_values() {
 #[test]
 fn rejects_ambiguous_or_malformed_known_info_metadata() {
     let cases = [
-        r#"{\rtf1{\info{\title A}{\title B}}}"#,
-        r#"{\rtf1{\info\nofpages-1}}"#,
-        r#"{\rtf1{\info\nofwords1\nofwords2}}"#,
-        r#"{\rtf1{\info active text}}"#,
-        r#"{\rtf1{\info}{\info}}"#,
+        r"{\rtf1{\info{\title A}{\title B}}}",
+        r"{\rtf1{\info\nofpages-1}}",
+        r"{\rtf1{\info\nofwords1\nofwords2}}",
+        r"{\rtf1{\info active text}}",
+        r"{\rtf1{\info}{\info}}",
     ];
     for rtf in cases {
         assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");
     }
 
     let invalid_calendar =
-        RtfDocument::parse(r#"{\rtf1{\info{\creatim\yr2023\mo2\dy29}{\revtim\hr24}}}"#).unwrap();
+        RtfDocument::parse(r"{\rtf1{\info{\creatim\yr2023\mo2\dy29}{\revtim\hr24}}}").unwrap();
     assert!(
         !invalid_calendar
             .info()

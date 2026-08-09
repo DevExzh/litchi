@@ -1,6 +1,7 @@
 //! Shared formatting types for XLSX (used in both reading and writing).
 
 use super::stylesheet::{Alignment, Scheme, Script, Underline, border::Border};
+use crate::color::{ParseRgbError, Rgb};
 
 /// Cell format information.
 #[derive(Debug, Clone, Default)]
@@ -21,9 +22,29 @@ pub struct CellFont {
     pub bold: bool,
     pub italic: bool,
     pub underline: Option<Underline>,
-    pub color: Option<String>,
+    /// Typed font color (ECMA-376 §18.8.3 `color` with an `ST_UnsignedIntHex`
+    /// ARGB value); use [`CellFont::set_color_hex`] to set it from a hex
+    /// string.
+    pub color: Option<Rgb>,
     pub scheme: Option<Scheme>,
     pub script: Option<Script>,
+}
+
+impl CellFont {
+    /// Set the font color from a hexadecimal string.
+    ///
+    /// Accepts the canonical eight-digit `AARRGGBB` form and the six-digit
+    /// `RRGGBB` shorthand (treated as opaque). A valid eight-digit input
+    /// serializes back byte-identically.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ParseRgbError`] unless `value` is exactly six or eight
+    /// hexadecimal digits.
+    pub fn set_color_hex(&mut self, value: &str) -> Result<(), ParseRgbError> {
+        self.color = Some(Rgb::from_hex(value)?);
+        Ok(())
+    }
 }
 
 /// Fill properties for a cell.
@@ -202,13 +223,28 @@ mod tests {
             bold: true,
             italic: false,
             underline: Some(Underline::Single),
-            color: Some("FF0000".to_string()),
+            color: Some(Rgb::new(0xFF, 0, 0)),
             scheme: Some(Scheme::Major),
             script: Some(Script::Superscript),
         };
         let font2 = font.clone();
         assert_eq!(font.name, font2.name);
         assert_eq!(font.bold, font2.bold);
+        assert_eq!(font.color, font2.color);
+    }
+
+    #[test]
+    fn test_cell_font_set_color_hex() {
+        let mut font = CellFont::default();
+        assert!(font.set_color_hex("FF0000").is_ok());
+        assert_eq!(font.color, Some(Rgb::new(0xFF, 0, 0)));
+
+        assert!(font.set_color_hex("80FF0000").is_ok());
+        assert_eq!(font.color, Some(Rgb::argb(0x80, 0xFF, 0, 0)));
+
+        for invalid in ["", "FF00", "#FF0000", "FF0000FF00", "GG0000"] {
+            assert!(font.set_color_hex(invalid).is_err(), "accepted {invalid:?}");
+        }
     }
 
     #[test]

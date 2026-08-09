@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use std::collections::BTreeMap;
 
 use litchi_opc::{OpcPackage, PackURI};
@@ -17,11 +23,11 @@ fn master_text_style_inventories_are_exposed_by_the_owner_part() {
 
     // The standalone master facade currently exposes graph, shape, and theme
     // semantics; txStyles remains a borrowed wire inventory at this boundary.
-    assert_eq!(styles["titleStyle"].0, false);
+    assert!(!styles["titleStyle"].0);
     assert_eq!(styles["titleStyle"].1, [1, 2]);
-    assert_eq!(styles["bodyStyle"].0, true);
+    assert!(styles["bodyStyle"].0);
     assert_eq!(styles["bodyStyle"].1, [1, 9]);
-    assert_eq!(styles["otherStyle"].0, false);
+    assert!(!styles["otherStyle"].0);
     assert!(styles["otherStyle"].1.is_empty());
 }
 
@@ -53,10 +59,10 @@ fn parse_text_styles(xml: &[u8]) -> BTreeMap<String, (bool, Vec<u8>)> {
                     if let Some(style) = current.as_ref() {
                         styles.get_mut(style).unwrap().0 = true;
                     }
-                } else if let Some(level) = level_number(name.as_ref()) {
-                    if let Some(style) = current.as_ref() {
-                        styles.get_mut(style).unwrap().1.push(level);
-                    }
+                } else if let Some(level) = level_number(name.as_ref())
+                    && let Some(style) = current.as_ref()
+                {
+                    styles.get_mut(style).unwrap().1.push(level);
                 }
             },
             Event::Empty(element) => {
@@ -68,10 +74,10 @@ fn parse_text_styles(xml: &[u8]) -> BTreeMap<String, (bool, Vec<u8>)> {
                     if let Some(style) = current.as_ref() {
                         styles.get_mut(style).unwrap().0 = true;
                     }
-                } else if let Some(level) = level_number(name.as_ref()) {
-                    if let Some(style) = current.as_ref() {
-                        styles.get_mut(style).unwrap().1.push(level);
-                    }
+                } else if let Some(level) = level_number(name.as_ref())
+                    && let Some(style) = current.as_ref()
+                {
+                    styles.get_mut(style).unwrap().1.push(level);
                 }
             },
             Event::End(element)

@@ -24,11 +24,13 @@ use std::io::Write;
 use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut err = std::io::stderr();
+
     let mut args = std::env::args().skip(1);
-    let pkg_path: PathBuf = args
-        .next()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("test-data/ooxml/docx/documentProperties.docx"));
+    let pkg_path: PathBuf = args.next().map_or_else(
+        || PathBuf::from("test-data/ooxml/docx/documentProperties.docx"),
+        PathBuf::from,
+    );
     let partname_str = args
         .next()
         .unwrap_or_else(|| "/word/document.xml".to_string());
@@ -38,45 +40,43 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let partname = PackURI::new(partname_str.clone())
         .map_err(|e| format!("invalid PackURI {partname_str:?}: {e}"))?;
 
-    eprintln!("PackURI parsing:");
-    eprintln!("  full:       {}", partname);
-    eprintln!("  base_uri:   {}", partname.base_uri());
-    eprintln!("  filename:   {}", partname.filename());
-    eprintln!("  ext:        {}", partname.ext());
-    eprintln!("  membername: {}", partname.membername());
+    writeln!(err, "PackURI parsing:")?;
+    writeln!(err, "  full:       {partname}")?;
+    writeln!(err, "  base_uri:   {}", partname.base_uri())?;
+    writeln!(err, "  filename:   {}", partname.filename())?;
+    writeln!(err, "  ext:        {}", partname.ext())?;
+    writeln!(err, "  membername: {}", partname.membername())?;
     if let Some(idx) = partname.idx() {
-        eprintln!("  idx:        {idx}");
+        writeln!(err, "  idx:        {idx}")?;
     }
-    eprintln!();
+    writeln!(err)?;
 
     let pkg = OpcPackage::open(&pkg_path)?;
-    eprintln!(
-        "Opened {} ({} parts). Looking up {}...",
+    writeln!(
+        err,
+        "Opened {} ({} parts). Looking up {partname}...",
         pkg_path.display(),
         pkg.part_count(),
-        partname,
-    );
+    )?;
 
     let part = pkg.get_part(&partname)?;
     let blob = part.blob();
-    eprintln!(
+    writeln!(
+        err,
         "Found part: content_type={}, size={} bytes",
         part.content_type(),
         blob.len()
-    );
+    )?;
 
-    match out_path {
-        Some(path) => {
-            std::fs::write(&path, blob)?;
-            eprintln!("Wrote {} bytes to {}", blob.len(), path.display());
-        },
-        None => {
-            // Stream the blob to stdout. Use a locked handle for efficiency.
-            let stdout = std::io::stdout();
-            let mut handle = stdout.lock();
-            handle.write_all(blob)?;
-            handle.flush()?;
-        },
+    if let Some(path) = out_path {
+        std::fs::write(&path, blob)?;
+        writeln!(err, "Wrote {} bytes to {}", blob.len(), path.display())?;
+    } else {
+        // Stream the blob to stdout. Use a locked handle for efficiency.
+        let stdout = std::io::stdout();
+        let mut handle = stdout.lock();
+        handle.write_all(blob)?;
+        handle.flush()?;
     }
 
     Ok(())

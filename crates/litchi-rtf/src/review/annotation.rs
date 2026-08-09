@@ -51,7 +51,7 @@ pub struct Annotation<'a> {
     /// Annotation ID
     pub id: i32,
     /// Whether the source contained `atnref` and corresponding range identity.
-    /// LibreOffice also emits valid point comments without a reference.
+    /// `LibreOffice` also emits valid point comments without a reference.
     pub has_reference: bool,
     /// Author name
     pub author: Cow<'a, str>,
@@ -84,6 +84,7 @@ pub struct Annotation<'a> {
 impl<'a> Annotation<'a> {
     /// Create a new comment
     #[inline]
+    #[must_use]
     pub fn comment(id: i32, author: Cow<'a, str>, text: Cow<'a, str>) -> Self {
         Self {
             annotation_type: AnnotationType::Comment,
@@ -107,6 +108,7 @@ impl<'a> Annotation<'a> {
 
     /// Create a new revision mark
     #[inline]
+    #[must_use]
     pub fn revision(id: i32, author: Cow<'a, str>) -> Self {
         Self {
             annotation_type: AnnotationType::Revision,
@@ -161,7 +163,7 @@ impl<'a> Annotation<'a> {
             ("icon", self.icon.as_deref()),
             ("time", self.time.as_deref()),
         ] {
-            if value.is_some_and(|value| value.len() > MAX_ANNOTATION_METADATA_BYTES) {
+            if value.is_some_and(|text| text.len() > MAX_ANNOTATION_METADATA_BYTES) {
                 return Err(RtfError::MalformedDocument(format!(
                     "RTF annotation {kind} exceeds the safety limit"
                 )));
@@ -171,6 +173,9 @@ impl<'a> Annotation<'a> {
     }
 
     /// Append a validated positional root shape to the comment story.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_shape(&mut self, shape: crate::Shape<'a>) -> RtfResult<()> {
         let mut shapes = self.shapes.clone();
         shapes.push(shape);
@@ -193,6 +198,9 @@ impl<'a> Annotation<'a> {
     }
 
     /// Append a validated positional root shape group to the comment story.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'a>) -> RtfResult<()> {
         let mut groups = self.shape_groups.clone();
         groups.push(group);
@@ -226,10 +234,12 @@ impl<'a> Annotation<'a> {
     pub fn page_breaks(&self) -> impl Iterator<Item = &crate::PageBreak> {
         self.story_events.iter().filter_map(|event| match event {
             crate::StoryEvent::PageBreak(page_break) => Some(page_break),
-            _ => None,
+            crate::StoryEvent::Drawing(_) | crate::StoryEvent::Field(_) => None,
         })
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_page_break(&mut self, position: usize) -> RtfResult<()> {
         crate::field::push_story_page_break(
             &mut self.story_events,
@@ -307,6 +317,7 @@ pub struct Revision<'a> {
 impl<'a> Revision<'a> {
     /// Create a new revision
     #[inline]
+    #[must_use]
     pub fn new(revision_type: RevisionType, author: Cow<'a, str>, content: Cow<'a, str>) -> Self {
         Self {
             revision_type,
@@ -321,12 +332,14 @@ impl<'a> Revision<'a> {
 
     /// Create an insertion revision
     #[inline]
+    #[must_use]
     pub fn insertion(author: Cow<'a, str>, content: Cow<'a, str>) -> Self {
         Self::new(RevisionType::Insertion, author, content)
     }
 
     /// Create a deletion revision
     #[inline]
+    #[must_use]
     pub fn deletion(author: Cow<'a, str>, content: Cow<'a, str>) -> Self {
         Self::new(RevisionType::Deletion, author, content)
     }
@@ -373,11 +386,12 @@ impl<'a> Revision<'a> {
                     "this RTF revision kind has no lossless scoped-run representation".to_string(),
                 ));
             },
-            _ => {},
+            RevisionType::Insertion | RevisionType::Deletion => {},
         }
         Ok(())
     }
 
+    #[must_use]
     pub fn into_owned(self) -> Revision<'static> {
         Revision {
             revision_type: self.revision_type,
@@ -398,6 +412,9 @@ pub struct RevisionAuthor<'a> {
 }
 
 impl<'a> RevisionAuthor<'a> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(name: impl Into<Cow<'a, str>>) -> RtfResult<Self> {
         let author = Self { name: name.into() };
         author.validate()?;
@@ -413,6 +430,7 @@ impl<'a> RevisionAuthor<'a> {
         Ok(())
     }
 
+    #[must_use]
     pub fn into_owned(self) -> RevisionAuthor<'static> {
         RevisionAuthor {
             name: Cow::Owned(self.name.into_owned()),

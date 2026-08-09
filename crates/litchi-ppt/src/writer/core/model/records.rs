@@ -49,10 +49,10 @@ impl Writer {
     ) -> Result<SerializedHeaderFooters, WriteError> {
         let serialize = |value: Option<&HeaderFooter>, scope| {
             value
-                .map(|value| {
-                    let mut value = value.clone();
-                    value.scope = scope;
-                    value
+                .map(|header_footer| {
+                    let mut scoped = header_footer.clone();
+                    scoped.scope = scope;
+                    scoped
                         .to_record_bytes()
                         .map_err(|error| WriteError::InvalidData(error.to_string()))
                 })

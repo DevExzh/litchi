@@ -225,7 +225,7 @@ fn emits_and_reopens_exact_numeric_date_and_discrete_grouping_records() {
         workbook
             .pivot_caches()
             .iter()
-            .map(|cache| cache.stream_id())
+            .map(litchi_xls::PivotCache::stream_id)
             .collect::<Vec<_>>(),
         vec![1, 2, 3]
     );
@@ -256,7 +256,7 @@ fn reads_libreoffice_number_and_date_grouping_fixtures() {
             workbook
                 .pivot_caches()
                 .iter()
-                .flat_map(|cache| cache.fields())
+                .flat_map(litchi_xls::PivotCache::fields)
                 .any(|field| field.grouping().is_some())
         );
     }

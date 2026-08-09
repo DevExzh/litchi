@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{DocumentLanguageDefaults, LanguageId, RtfDocument, RtfWriter};
 use std::fs;
 
@@ -82,7 +91,7 @@ fn plain_restores_document_languages_and_clears_no_proof() {
 
 #[test]
 fn mutation_writer_and_language_id_validation() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     let defaults = DocumentLanguageDefaults {
         primary: Some(language(1031)),
         east_asian: Some(language(1041)),
@@ -91,9 +100,9 @@ fn mutation_writer_and_language_id_validation() {
     document.set_language_defaults(defaults).unwrap();
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
-    assert!(serialized.contains(r#"\deflang1031"#));
-    assert!(serialized.contains(r#"\deflangfe1041"#));
-    assert!(serialized.contains(r#"\adeflang1025"#));
+    assert!(serialized.contains(r"\deflang1031"));
+    assert!(serialized.contains(r"\deflangfe1041"));
+    assert!(serialized.contains(r"\adeflang1025"));
     let reparsed = RtfDocument::parse_bytes(&output).unwrap();
     assert_eq!(*reparsed.language_defaults(), defaults);
     assert_eq!(reparsed.text(), "Body");
@@ -105,8 +114,8 @@ fn mutation_writer_and_language_id_validation() {
     );
     assert!(LanguageId::new(65_535).is_ok());
     assert!(LanguageId::new(65_536).is_err());
-    assert!(RtfDocument::parse(r#"{\rtf1\lang-1 bad}"#).is_err());
-    assert!(RtfDocument::parse(r#"{\rtf1\lang65536 bad}"#).is_err());
+    assert!(RtfDocument::parse(r"{\rtf1\lang-1 bad}").is_err());
+    assert!(RtfDocument::parse(r"{\rtf1\lang65536 bad}").is_err());
 }
 
 #[test]

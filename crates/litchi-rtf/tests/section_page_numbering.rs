@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 //! Round-trip tests for extended section page numbering: the full RTF 1.9.1
 //! `\pgn*` format family, `\pgnrestart`/`\pgncont`, and `\pgnxN`/`\pgnyN`.
 
@@ -10,7 +19,7 @@ fn write(document: &RtfDocument<'_>) -> String {
 }
 
 fn round_trip(format: PageNumberFormat) {
-    let source = format!(r#"{{\rtf1\ansi\sectd\{} Body\par}}"#, format.control_word());
+    let source = format!(r"{{\rtf1\ansi\sectd\{} Body\par}}", format.control_word());
     let document = RtfDocument::parse(&source).unwrap();
     assert_eq!(document.sections()[0].properties.page_number_format, format);
 
@@ -73,7 +82,7 @@ fn cjk_and_indic_page_number_formats_round_trip() {
 
 #[test]
 fn page_number_restart_and_offsets_round_trip() {
-    let source = r#"{\rtf1\ansi\sectd\pgnstarts7\pgnrestart\pgnx120\pgny-240 Body\par}"#;
+    let source = r"{\rtf1\ansi\sectd\pgnstarts7\pgnrestart\pgnx120\pgny-240 Body\par}";
     let document = RtfDocument::parse(source).unwrap();
     let properties = &document.sections()[0].properties;
     assert_eq!(properties.page_number_start, 7);
@@ -101,7 +110,7 @@ fn page_number_restart_and_offsets_round_trip() {
 
 #[test]
 fn page_number_continue_round_trips() {
-    let source = r#"{\rtf1\ansi\sectd\pgncont Body\par}"#;
+    let source = r"{\rtf1\ansi\sectd\pgncont Body\par}";
     let document = RtfDocument::parse(source).unwrap();
     assert_eq!(
         document.sections()[0].properties.page_number_restart,
@@ -119,7 +128,7 @@ fn page_number_continue_round_trips() {
 
 #[test]
 fn omitted_page_number_controls_stay_omitted() {
-    let source = r#"{\rtf1\ansi\sectd Body\par}"#;
+    let source = r"{\rtf1\ansi\sectd Body\par}";
     let document = RtfDocument::parse(source).unwrap();
     let properties = &document.sections()[0].properties;
     assert_eq!(properties.page_number_restart, None);

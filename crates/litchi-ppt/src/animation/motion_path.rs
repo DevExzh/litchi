@@ -24,6 +24,7 @@ impl Default for MotionPath {
 
 impl MotionPath {
     /// Create a new empty motion path.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             path_type: MotionPathType::Custom,
@@ -35,6 +36,7 @@ impl MotionPath {
     }
 
     /// Create a predefined motion path.
+    #[must_use]
     pub fn predefined(path_type: MotionPathType) -> Self {
         Self {
             path_type,
@@ -46,6 +48,7 @@ impl MotionPath {
     }
 
     /// Create a custom motion path from commands.
+    #[must_use]
     pub fn custom(commands: Vec<PathCommand>) -> Self {
         Self {
             path_type: MotionPathType::Custom,
@@ -68,6 +71,7 @@ impl MotionPath {
     }
 
     /// Check if this is a custom path.
+    #[must_use]
     pub fn is_custom(&self) -> bool {
         self.path_type == MotionPathType::Custom
     }
@@ -75,6 +79,10 @@ impl MotionPath {
 
 /// Motion path type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`MotionPathType` is the established public API name; renaming it would break downstream crates"
+)]
 pub enum MotionPathType {
     /// Custom path
     Custom,
@@ -173,10 +181,15 @@ pub enum PathEditMode {
 }
 
 /// Helper functions to create common motion paths.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`MotionPathBuilder` is the established public API name; renaming it would break downstream crates"
+)]
 pub struct MotionPathBuilder;
 
 impl MotionPathBuilder {
     /// Create a straight line path.
+    #[must_use]
     pub fn line(dx: f64, dy: f64) -> MotionPath {
         MotionPath::custom(vec![
             PathCommand::MoveTo { x: 0.0, y: 0.0 },
@@ -185,6 +198,7 @@ impl MotionPathBuilder {
     }
 
     /// Create a circular path.
+    #[must_use]
     pub fn circle(radius: f64) -> MotionPath {
         let mut path = MotionPath::predefined(MotionPathType::Circle);
         path.commands = vec![
@@ -212,6 +226,11 @@ impl MotionPathBuilder {
     }
 
     /// Create a zigzag path.
+    #[must_use]
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "segment indices are small path-element counts, far below the 2^53 `f64` mantissa limit"
+    )]
     pub fn zigzag(width: f64, height: f64, segments: usize) -> MotionPath {
         let mut commands = vec![PathCommand::MoveTo { x: 0.0, y: 0.0 }];
         let segment_width = width / (segments as f64);
@@ -226,6 +245,7 @@ impl MotionPathBuilder {
     }
 
     /// Create an S-curve path.
+    #[must_use]
     pub fn s_curve(width: f64, height: f64) -> MotionPath {
         MotionPath::custom(vec![
             PathCommand::MoveTo { x: 0.0, y: 0.0 },
@@ -249,6 +269,13 @@ impl MotionPathBuilder {
     }
 
     /// Create a spiral path.
+    #[must_use]
+    #[allow(
+        clippy::cast_precision_loss,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "step counts are `turns * 36` path-element counts: small, non-negative, and far below the 2^53 `f64` mantissa limit; float-to-int saturation matches the intended clamping"
+    )]
     pub fn spiral(radius: f64, turns: f64, clockwise: bool) -> MotionPath {
         let mut commands = vec![PathCommand::MoveTo { x: 0.0, y: 0.0 }];
         let steps = (turns * 36.0) as usize; // 36 steps per turn
@@ -272,6 +299,11 @@ impl MotionPathBuilder {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -313,8 +345,8 @@ mod tests {
     fn test_motion_path_set_origin() {
         let mut path = MotionPath::new();
         path.set_origin(10.0, 20.0);
-        assert_eq!(path.origin_x, 10.0);
-        assert_eq!(path.origin_y, 20.0);
+        assert!((path.origin_x - 10.0).abs() < f64::EPSILON);
+        assert!((path.origin_y - 20.0).abs() < f64::EPSILON);
     }
 
     #[test]

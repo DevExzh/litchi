@@ -1,7 +1,7 @@
 //! Auto shape implementation.
 //!
 //! Auto shapes are predefined shapes like rectangles, ovals, arrows, etc.
-//! that can be used as building blocks for more complex graphics in PowerPoint.
+//! that can be used as building blocks for more complex graphics in `PowerPoint`.
 
 use super::geometry::{
     GeometryRect, ShapePathType, extract_geometry_rect, extract_segment_info, extract_shape_path,
@@ -9,7 +9,7 @@ use super::geometry::{
 };
 use super::shape::{Shape, ShapeContainer, ShapeProperties};
 
-/// Types of auto shapes available in PowerPoint.
+/// Types of auto shapes available in `PowerPoint`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AutoShapeType {
     /// Rectangle shape
@@ -107,12 +107,12 @@ impl std::fmt::Display for AutoShapeType {
             AutoShapeType::Seal => write!(f, "Seal"),
             AutoShapeType::Arc => write!(f, "Arc"),
             AutoShapeType::Teardrop => write!(f, "Teardrop"),
-            AutoShapeType::Custom(id) => write!(f, "Custom({})", id),
+            AutoShapeType::Custom(id) => write!(f, "Custom({id})"),
         }
     }
 }
 
-/// An auto shape in a PowerPoint presentation.
+/// An auto shape in a `PowerPoint` presentation.
 ///
 /// Uses lifetime parameter `'a` to enable zero-copy parsing when the shape
 /// data can be borrowed from a larger buffer.
@@ -121,14 +121,14 @@ pub struct AutoShape<'a> {
     /// Shape container with properties and data
     container: ShapeContainer<'a>,
     /// The type of auto shape
-    auto_shape_type: AutoShapeType,
+    kind: AutoShapeType,
     /// Adjustment values for shape parameters (for complex shapes)
     adjustments: Vec<i32>,
     /// Explicit custom/freeform geometry, when present.
     geometry: Option<AutoShapeGeometry>,
 }
 
-/// Owned OfficeArt geometry for a custom or freeform shape.
+/// Owned `OfficeArt` geometry for a custom or freeform shape.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AutoShapeGeometry {
     coordinate_space: Option<GeometryRect>,
@@ -166,21 +166,25 @@ impl AutoShapeGeometry {
     }
 
     /// Return the shape's internal geometry coordinate space.
+    #[must_use]
     pub fn coordinate_space(&self) -> Option<GeometryRect> {
         self.coordinate_space
     }
 
     /// Return the high-level path connectivity mode.
+    #[must_use]
     pub fn path_type(&self) -> Option<ShapePathType> {
         self.path_type
     }
 
     /// Return the freeform vertices in geometry-space units.
+    #[must_use]
     pub fn vertices(&self) -> &[(i32, i32)] {
         &self.vertices
     }
 
     /// Return raw MSOPATHINFO words in document order.
+    #[must_use]
     pub fn segment_info(&self) -> &[u16] {
         &self.segment_info
     }
@@ -188,29 +192,34 @@ impl AutoShapeGeometry {
 
 impl<'a> AutoShape<'a> {
     /// Create a new auto shape with owned data.
+    #[must_use]
     pub fn new(properties: ShapeProperties, raw_data: Vec<u8>) -> Self {
         Self {
             container: ShapeContainer::new(properties, raw_data),
-            auto_shape_type: AutoShapeType::Rectangle, // Default
+            kind: AutoShapeType::Rectangle, // Default
             adjustments: Vec::new(),
             geometry: None,
         }
     }
 
-    /// Create an auto shape from already-parsed OfficeArt metadata.
+    /// Create an auto shape from already-parsed `OfficeArt` metadata.
     pub(crate) fn from_odraw(
         properties: ShapeProperties,
         native_shape_type: u16,
         odraw_properties: &litchi_odraw::prop::Props<'_>,
     ) -> Self {
         let mut shape = Self::new(properties, Vec::new());
-        shape.auto_shape_type = AutoShapeType::from(native_shape_type);
+        shape.kind = AutoShapeType::from(native_shape_type);
         shape.adjustments = Self::extract_adjustments_from_properties(odraw_properties);
         shape.geometry = AutoShapeGeometry::from_properties(odraw_properties);
         shape
     }
 
     /// Create an auto shape from an existing container.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn from_container(container: ShapeContainer<'a>) -> super::super::package::Result<Self> {
         // Extract auto shape type from raw data
         let auto_shape_type = Self::extract_shape_type(&container.raw_data)?;
@@ -221,7 +230,7 @@ impl<'a> AutoShape<'a> {
 
         Ok(Self {
             container,
-            auto_shape_type,
+            kind: auto_shape_type,
             adjustments,
             geometry,
         })
@@ -239,8 +248,9 @@ impl<'a> AutoShape<'a> {
     fn extract_shape_type(raw_data: &[u8]) -> super::super::package::Result<AutoShapeType> {
         Ok(
             Self::find_odraw_record(raw_data, litchi_odraw::RecordKind::Sp)?
-                .map(|sp| AutoShapeType::from(sp.instance()))
-                .unwrap_or(AutoShapeType::Rectangle),
+                .map_or(AutoShapeType::Rectangle, |sp| {
+                    AutoShapeType::from(sp.instance())
+                }),
         )
     }
 
@@ -276,10 +286,10 @@ impl<'a> AutoShape<'a> {
         Ok(AutoShapeGeometry::from_properties(&properties))
     }
 
-    fn find_odraw_record<'data>(
-        data: &'data [u8],
+    fn find_odraw_record(
+        data: &[u8],
         record_type: litchi_odraw::RecordKind,
-    ) -> super::super::package::Result<Option<litchi_odraw::Record<'data>>> {
+    ) -> super::super::package::Result<Option<litchi_odraw::Record<'_>>> {
         const MAX_SCANNED_RECORDS: usize = 4_096;
 
         let mut streams = vec![data];
@@ -315,7 +325,7 @@ impl<'a> AutoShape<'a> {
 
     /// Extract adjustment values from Escher properties.
     ///
-    /// This is the proper implementation using checked OfficeArt properties.
+    /// This is the proper implementation using checked `OfficeArt` properties.
     /// Adjustments are stored as simple integer properties.
     ///
     /// # Arguments
@@ -329,9 +339,10 @@ impl<'a> AutoShape<'a> {
     /// # Performance
     ///
     /// - Pre-allocated Vec with known max capacity (10)
-    /// - O(1) property lookups via HashMap
+    /// - O(1) property lookups via `HashMap`
     /// - Missing positions use the protocol-defined default of zero
     /// - Trailing absent positions are omitted
+    #[must_use]
     pub fn extract_adjustments_from_properties(props: &litchi_odraw::prop::Props<'_>) -> Vec<i32> {
         use litchi_odraw::prop::Id;
 
@@ -362,27 +373,39 @@ impl<'a> AutoShape<'a> {
     }
 
     /// Get the auto shape type.
+    #[must_use]
     pub fn auto_shape_type(&self) -> AutoShapeType {
-        self.auto_shape_type
+        self.kind
     }
 
     /// Set the auto shape type.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the shape is source-bound to an opened presentation
+    /// and the geometry mutation cannot be published in place.
     pub fn set_auto_shape_type(
         &mut self,
         auto_shape_type: AutoShapeType,
     ) -> Result<(), super::shape::MutationError> {
         self.container
             .ensure_mutable(super::shape::Mutation::Geometry)?;
-        self.auto_shape_type = auto_shape_type;
+        self.kind = auto_shape_type;
         Ok(())
     }
 
     /// Get the adjustment values.
+    #[must_use]
     pub fn adjustments(&self) -> &[i32] {
         &self.adjustments
     }
 
     /// Add an adjustment value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the shape is source-bound to an opened presentation
+    /// and the geometry mutation cannot be published in place.
     pub fn add_adjustment(&mut self, adjustment: i32) -> Result<(), super::shape::MutationError> {
         self.container
             .ensure_mutable(super::shape::Mutation::Geometry)?;
@@ -391,6 +414,11 @@ impl<'a> AutoShape<'a> {
     }
 
     /// Set all adjustment values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the shape is source-bound to an opened presentation
+    /// and the geometry mutation cannot be published in place.
     pub fn set_adjustments(
         &mut self,
         adjustments: Vec<i32>,
@@ -402,11 +430,17 @@ impl<'a> AutoShape<'a> {
     }
 
     /// Get the text contained by this shape.
+    #[must_use]
     pub fn text(&self) -> &str {
         self.container.text_content.as_deref().unwrap_or_default()
     }
 
     /// Set the text contained by this shape.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the shape is source-bound to an opened presentation
+    /// and the text mutation cannot be published in place.
     pub fn set_text(&mut self, text: String) -> Result<(), super::shape::MutationError> {
         self.container.set_text(text)
     }
@@ -420,14 +454,16 @@ impl<'a> AutoShape<'a> {
     }
 
     /// Return explicit custom/freeform geometry, when the shape defines it.
+    #[must_use]
     pub fn geometry(&self) -> Option<&AutoShapeGeometry> {
         self.geometry.as_ref()
     }
 
     /// Check if this is a basic geometric shape (rectangle, oval, etc.).
+    #[must_use]
     pub fn is_basic_shape(&self) -> bool {
         matches!(
-            self.auto_shape_type,
+            self.kind,
             AutoShapeType::Rectangle
                 | AutoShapeType::RoundRectangle
                 | AutoShapeType::Oval
@@ -438,9 +474,10 @@ impl<'a> AutoShape<'a> {
     }
 
     /// Check if this is a complex shape that may have adjustments.
+    #[must_use]
     pub fn is_complex_shape(&self) -> bool {
         matches!(
-            self.auto_shape_type,
+            self.kind,
             AutoShapeType::Star
                 | AutoShapeType::Arrow
                 | AutoShapeType::ThickArrow
@@ -482,6 +519,11 @@ where
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::super::shape::ShapeType;
     use super::*;
@@ -502,7 +544,10 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::field_reassign_with_default)]
+    #[allow(
+        clippy::field_reassign_with_default,
+        reason = "test builds ShapeProperties incrementally to mirror piecemeal construction"
+    )]
     fn test_autoshape_creation() {
         let mut props = ShapeProperties::default();
         props.id = 3001;
@@ -520,7 +565,10 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::field_reassign_with_default)]
+    #[allow(
+        clippy::field_reassign_with_default,
+        reason = "test builds ShapeProperties incrementally to mirror piecemeal construction"
+    )]
     fn test_autoshape_type_operations() {
         let mut props = ShapeProperties::default();
         props.shape_type = ShapeType::AutoShape;
@@ -537,7 +585,10 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::field_reassign_with_default)]
+    #[allow(
+        clippy::field_reassign_with_default,
+        reason = "test builds ShapeProperties incrementally to mirror piecemeal construction"
+    )]
     fn test_autoshape_shape_classification() {
         let mut props = ShapeProperties::default();
         props.shape_type = ShapeType::AutoShape;

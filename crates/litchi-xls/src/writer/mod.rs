@@ -28,7 +28,6 @@ pub use core::shape;
 pub mod row_blocks;
 
 // Re-export public types
-pub use crate::EncryptionProfile;
 pub use crate::{
     AutoFilter12Criterion, AutoFilter12Icon, AutoFilter12IconSet, AutoFilter12Operator,
     AutoFilter12Value, ExternalTableField, ExternalTableMetadata, ExternalTableVersion,
@@ -43,6 +42,7 @@ pub use crate::{
     ConsolidationRange, ConsolidationSource,
 };
 pub use crate::{DefinedNameFutureRecords, NameFnGrp12, NamePublish};
+pub use crate::{EncryptionProfile, WeakEncryptionPolicy};
 pub use biff::{AutoFilterConditionWrite, write_cfex12_marker, write_cfheader};
 pub use core::{
     AddInFunctionOptions, CalculationSettings, CellValue, CommentTextRunWrite, CommentWriteOptions,

@@ -1,4 +1,4 @@
-//! Bounded parsing for inert PresentationML hyperlink target strings.
+//! Bounded parsing for inert `PresentationML` hyperlink target strings.
 
 use super::model::Hyperlink;
 use crate::{Error, Result};

@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+    Cow, Destination, DrawingStoryCapture, MAX_LOGICAL_TABLE_ROWS, MAX_LOGICAL_TABLES,
+    NestedTableBuilder, Parser, RtfError, RtfResult, resolve_preferred_width, resolve_row_geometry,
+};
 
 impl<'a> Parser<'a> {
     /// Start a table if not already started.
@@ -11,6 +14,10 @@ impl<'a> Parser<'a> {
         }
     }
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the crate nesting-depth constant is defined within the u8 range"
+    )]
     pub(super) fn ensure_nested_builder(
         &mut self,
         level: u8,
@@ -48,7 +55,7 @@ impl<'a> Parser<'a> {
             self.ensure_nested_builder(level)?.cell_text.len()
         };
         if state.revision_type == Some(super::super::super::annotation::RevisionType::Deletion) {
-            let decoded = std::str::from_utf8(text).map_err(|_| {
+            let decoded = std::str::from_utf8(text).map_err(|_err| {
                 RtfError::MalformedDocument("invalid UTF-8 in table revision".to_string())
             })?;
             return self.append_revision_text(&state, decoded, start, start);
@@ -63,7 +70,7 @@ impl<'a> Parser<'a> {
         let end = start.checked_add(text.len()).ok_or_else(|| {
             RtfError::MalformedDocument("RTF table-cell text length overflow".to_string())
         })?;
-        let decoded = std::str::from_utf8(text).map_err(|_| {
+        let decoded = std::str::from_utf8(text).map_err(|_err| {
             RtfError::MalformedDocument("invalid UTF-8 in table revision".to_string())
         })?;
         self.append_revision_text(&state, decoded, start, end)
@@ -147,7 +154,7 @@ impl<'a> Parser<'a> {
                 "RTF table row exceeds 4096 cells".to_string(),
             ));
         }
-        let text = std::str::from_utf8(&builder.cell_text).map_err(|_| {
+        let text = std::str::from_utf8(&builder.cell_text).map_err(|_err| {
             RtfError::MalformedDocument("invalid UTF-8 in nested table cell".to_string())
         })?;
         let mut cell = crate::Cell::new(Cow::Borrowed(arena.alloc_str(text)));
@@ -266,7 +273,10 @@ impl<'a> Parser<'a> {
             || !self.current_cell_drawings.drawing_order.is_empty()
             || !self.current_cell_story_events.is_empty()
         {
-            if self.current_row.as_ref().map_or(0, |row| row.cell_count())
+            if self
+                .current_row
+                .as_ref()
+                .map_or(0, crate::content::table::Row::cell_count)
                 >= crate::MAX_TABLE_CELLS_PER_ROW
             {
                 return Err(RtfError::MalformedDocument(
@@ -276,7 +286,10 @@ impl<'a> Parser<'a> {
             // Convert cell text to string
             if let Ok(text_str) = std::str::from_utf8(&self.current_cell_text) {
                 let allocated = self.arena.alloc_str(text_str);
-                let index = self.current_row.as_ref().map_or(0, |row| row.cell_count());
+                let index = self
+                    .current_row
+                    .as_ref()
+                    .map_or(0, crate::content::table::Row::cell_count);
                 let (padding, spacing) = self
                     .current_state()
                     .ok()

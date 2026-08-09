@@ -16,6 +16,9 @@ pub struct OpaqueXml {
 }
 
 impl OpaqueXml {
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(xml: Vec<u8>) -> Result<Self> {
         if xml.len() > MAX_BYTES {
             return Err(invalid(
@@ -26,6 +29,7 @@ impl OpaqueXml {
     }
 
     #[inline]
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         &self.xml
     }
@@ -57,6 +61,9 @@ pub struct List {
 }
 
 impl List {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn validate(&self) -> Result<()> {
         if self.root_prefix.len() > MAX_STRING_BYTES {
             return Err(invalid("modern comment extension prefix is too long"));
@@ -93,6 +100,7 @@ impl List {
         Ok(())
     }
 
+    #[must_use]
     pub fn task_details(&self) -> Option<&super::tasks::Details> {
         self.entries.iter().find_map(|entry| match &entry.payload {
             Payload::TaskDetails(value) => Some(value),
@@ -100,6 +108,7 @@ impl List {
         })
     }
 
+    #[must_use]
     pub fn reactions(&self) -> Option<&super::reactions::List> {
         self.entries.iter().find_map(|entry| match &entry.payload {
             Payload::Reactions(value) => Some(value),
@@ -110,6 +119,10 @@ impl List {
     /// Replace or remove task details while retaining all opaque entries.
     /// `uri` is required only when inserting a new payload because the XML
     /// extension envelope has no safe universally applicable default URI.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace_task_details(
         &mut self,
         uri: Option<&str>,
@@ -119,6 +132,10 @@ impl List {
     }
 
     /// Replace or remove reactions while retaining all opaque entries.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace_reactions(
         &mut self,
         uri: Option<&str>,

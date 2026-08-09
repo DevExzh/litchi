@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{
     MAX_SECTION_LINE_INCREMENT, MAX_SECTION_LINE_START, RtfDocument, RtfWriter, Section,
     SectionLineNumberRestart, SectionLineNumbering,
@@ -13,7 +22,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_grouped_line_numbering_and_round_trips_in_canonical_order() {
-    let source = r#"{\rtf1\sectd\linemod5{\linex283}\linestarts2\linecont Body}"#;
+    let source = r"{\rtf1\sectd\linemod5{\linex283}\linestarts2\linecont Body}";
     let document = RtfDocument::parse(source).unwrap();
     let numbering = document.sections()[0].properties.line_numbering;
     assert_eq!(
@@ -27,7 +36,7 @@ fn parses_grouped_line_numbering_and_round_trips_in_canonical_order() {
     );
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
-    assert!(serialized.contains(r#"\linemod5\linex283\linestarts2\linecont"#));
+    assert!(serialized.contains(r"\linemod5\linex283\linestarts2\linecont"));
     let reparsed = RtfDocument::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.sections()[0].properties.line_numbering, numbering);
 }
@@ -63,7 +72,7 @@ fn parses_bundled_libreoffice_line_numbering_fixtures() {
 
 #[test]
 fn preserves_disabled_offset_defaults_restart_modes_and_sectd_reset() {
-    let offset_only = RtfDocument::parse(r#"{\rtf1\linex0 Body}"#).unwrap();
+    let offset_only = RtfDocument::parse(r"{\rtf1\linex0 Body}").unwrap();
     assert_eq!(
         offset_only.sections()[0].properties.line_numbering,
         SectionLineNumbering {
@@ -79,7 +88,7 @@ fn preserves_disabled_offset_defaults_restart_modes_and_sectd_reset() {
     );
 
     let defaults =
-        RtfDocument::parse(r#"{\rtf1\linemod\linex\linestarts\linerestart X\sectd Y}"#).unwrap();
+        RtfDocument::parse(r"{\rtf1\linemod\linex\linestarts\linerestart X\sectd Y}").unwrap();
     assert_eq!(
         defaults.sections()[0].properties.line_numbering,
         SectionLineNumbering::default()
@@ -90,7 +99,7 @@ fn preserves_disabled_offset_defaults_restart_modes_and_sectd_reset() {
         ("lineppage", SectionLineNumberRestart::Page),
         ("linecont", SectionLineNumberRestart::Continuous),
     ] {
-        let source = format!(r#"{{\rtf1\linemod1\{control} X}}"#);
+        let source = format!(r"{{\rtf1\linemod1\{control} X}}");
         assert_eq!(
             RtfDocument::parse(&source).unwrap().sections()[0]
                 .properties
@@ -104,12 +113,12 @@ fn preserves_disabled_offset_defaults_restart_modes_and_sectd_reset() {
 #[test]
 fn inert_destinations_do_not_change_section_line_numbering() {
     for source in [
-        r#"{\rtf1{\*\unknown\linemod9\linex900\linecont}Body}"#,
-        r#"{\rtf1{\header\linemod8\linex800 Header}Body}"#,
-        r#"{\rtf1{\footer\linemod8\linex800 Footer}Body}"#,
-        r#"{\rtf1{\field{\*\fldinst IF \linemod7 1 1}{\fldrslt visible}}Body}"#,
-        r#"{\rtf1 A{\footnote\linemod6\linex600 Note}Body}"#,
-        r#"{\rtf1{\object\linemod5\linex500}Body}"#,
+        r"{\rtf1{\*\unknown\linemod9\linex900\linecont}Body}",
+        r"{\rtf1{\header\linemod8\linex800 Header}Body}",
+        r"{\rtf1{\footer\linemod8\linex800 Footer}Body}",
+        r"{\rtf1{\field{\*\fldinst IF \linemod7 1 1}{\fldrslt visible}}Body}",
+        r"{\rtf1 A{\footnote\linemod6\linex600 Note}Body}",
+        r"{\rtf1{\object\linemod5\linex500}Body}",
     ] {
         let document = RtfDocument::parse(source).unwrap();
         assert!(
@@ -125,15 +134,15 @@ fn inert_destinations_do_not_change_section_line_numbering() {
 #[test]
 fn rejects_out_of_range_values_and_invalid_public_writer_state() {
     for source in [
-        r#"{\rtf1\linemod-1 X}"#.to_string(),
+        r"{\rtf1\linemod-1 X}".to_string(),
         format!(
-            r#"{{\rtf1\linemod{} X}}"#,
+            r"{{\rtf1\linemod{} X}}",
             u32::from(MAX_SECTION_LINE_INCREMENT) + 1
         ),
-        r#"{\rtf1\linex-1 X}"#.to_string(),
-        r#"{\rtf1\linex31681 X}"#.to_string(),
-        r#"{\rtf1\linestarts0 X}"#.to_string(),
-        format!(r#"{{\rtf1\linestarts{} X}}"#, MAX_SECTION_LINE_START + 1),
+        r"{\rtf1\linex-1 X}".to_string(),
+        r"{\rtf1\linex31681 X}".to_string(),
+        r"{\rtf1\linestarts0 X}".to_string(),
+        format!(r"{{\rtf1\linestarts{} X}}", MAX_SECTION_LINE_START + 1),
     ] {
         assert!(RtfDocument::parse(&source).is_err(), "accepted {source}");
     }

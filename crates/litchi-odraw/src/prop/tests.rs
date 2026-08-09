@@ -214,10 +214,10 @@ fn validates_imsoarray_header_and_exact_extent() {
     special.extend_from_slice(&3u16.to_le_bytes());
     special.extend_from_slice(&0xFFF0u16.to_le_bytes());
     special.extend_from_slice(&[0; 8]);
-    let special = Array::new(&special).expect("valid truncated-element array");
-    assert_eq!(special.raw_element_size(), 0xFFF0);
-    assert_eq!(special.element_size(), 4);
-    assert_eq!(special.elements().count(), 2);
+    let special_array = Array::new(&special).expect("valid truncated-element array");
+    assert_eq!(special_array.raw_element_size(), 0xFFF0);
+    assert_eq!(special_array.element_size(), 4);
+    assert_eq!(special_array.elements().count(), 2);
 
     let mut underallocated = Vec::new();
     underallocated.extend_from_slice(&2u16.to_le_bytes());

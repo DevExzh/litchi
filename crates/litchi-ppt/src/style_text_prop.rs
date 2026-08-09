@@ -21,25 +21,6 @@ const MAX_INDENT_LEVEL: u16 = 4;
 /// `leftMargin`, `indent`, `defaultTabSize`, and `tabStops`.
 const PF_RUN_FORBIDDEN_MASKS: u32 = 0x0000_0100 | 0x0000_0400 | 0x0000_8000 | 0x0010_0000;
 
-fn corrupted(message: impl Into<String>) -> Error {
-    Error::Corrupted(message.into())
-}
-
-fn read_u16(data: &[u8], offset: usize) -> u16 {
-    u16::from_le_bytes(data[offset..offset + 2].try_into().expect("length checked"))
-}
-
-fn read_u32(data: &[u8], offset: usize) -> u32 {
-    u32::from_le_bytes(data[offset..offset + 4].try_into().expect("length checked"))
-}
-
-fn require_bytes(data: &[u8], offset: usize, needed: usize, field: &str) -> Result<()> {
-    if data.len() < offset.saturating_add(needed) {
-        return Err(corrupted(format!("{field} is truncated")));
-    }
-    Ok(())
-}
-
 /// A `TextPFRun` paragraph-formatting run (MS-PPT 2.9.45).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TextPFRun {
@@ -50,14 +31,17 @@ pub struct TextPFRun {
 
 impl TextPFRun {
     /// Number of characters of the corresponding text this run covers.
+    #[must_use]
     pub const fn count(&self) -> u32 {
         self.count
     }
     /// Paragraph indentation level; within 0..=4 (MS-PPT 2.2.13).
+    #[must_use]
     pub const fn indent_level(&self) -> u16 {
         self.indent_level
     }
     /// The `TextPFException` paragraph formatting of the run.
+    #[must_use]
     pub const fn paragraph(&self) -> &TextPFException {
         &self.paragraph
     }
@@ -108,10 +92,12 @@ pub struct TextCFRun {
 
 impl TextCFRun {
     /// Number of characters of the corresponding text this run covers.
+    #[must_use]
     pub const fn count(&self) -> u32 {
         self.count
     }
     /// The `TextCFException` character formatting of the run.
+    #[must_use]
     pub const fn character(&self) -> &TextCFException {
         &self.character
     }
@@ -141,6 +127,10 @@ impl TextCFRun {
 /// A parsed `StyleTextPropAtom` record (MS-PPT 2.9.44) with the
 /// paragraph-level and character-level formatting runs of the corresponding
 /// text.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`StyleTextPropAtom` is the established public API name mirroring the MS-PPT record; renaming it would break downstream crates"
+)]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct StyleTextPropAtom {
     paragraph_runs: Vec<TextPFRun>,
@@ -149,10 +139,12 @@ pub struct StyleTextPropAtom {
 
 impl StyleTextPropAtom {
     /// The `TextPFRun` paragraph-formatting runs.
+    #[must_use]
     pub fn paragraph_runs(&self) -> &[TextPFRun] {
         &self.paragraph_runs
     }
     /// The `TextCFRun` character-formatting runs.
+    #[must_use]
     pub fn character_runs(&self) -> &[TextCFRun] {
         &self.character_runs
     }
@@ -160,6 +152,10 @@ impl StyleTextPropAtom {
     /// Parse a complete `StyleTextPropAtom` record (MS-PPT 2.9.44).
     ///
     /// See [`Self::parse`] for the meaning of `text_length`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_record(record: &Record, text_length: usize) -> Result<Self> {
         if record.record_type != RecordType::StyleTextPropAtom
             || record.record_type_raw != STYLE_TEXT_PROP_TYPE
@@ -180,6 +176,10 @@ impl StyleTextPropAtom {
     /// paragraph mark that terminates the text. Because neither run array is
     /// counted, the boundary between them is only well-defined when the
     /// paragraph runs exactly cover that length.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(data: &[u8], text_length: usize) -> Result<Self> {
         let style_length = u32::try_from(text_length)
             .ok()
@@ -221,6 +221,11 @@ impl StyleTextPropAtom {
     }
 
     /// Serialize the complete `StyleTextPropAtom`, including its header.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the runs are parsed from a PPT record payload whose length is a u32, so the re-serialized payload length always fits u32"
+    )]
+    #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut payload = Vec::new();
         for run in &self.paragraph_runs {
@@ -238,7 +243,36 @@ impl StyleTextPropAtom {
     }
 }
 
+fn corrupted(message: impl Into<String>) -> Error {
+    Error::Corrupted(message.into())
+}
+
+fn read_u16(data: &[u8], offset: usize) -> u16 {
+    u16::from_le_bytes([data[offset], data[offset + 1]])
+}
+
+fn read_u32(data: &[u8], offset: usize) -> u32 {
+    u32::from_le_bytes([
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+    ])
+}
+
+fn require_bytes(data: &[u8], offset: usize, needed: usize, field: &str) -> Result<()> {
+    if data.len() < offset.saturating_add(needed) {
+        return Err(corrupted(format!("{field} is truncated")));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use crate::slide_show_settings::ColorIndexKind;
@@ -250,7 +284,7 @@ mod tests {
             record_type_raw: STYLE_TEXT_PROP_TYPE,
             version: 0,
             instance: 0,
-            data_length: data.len() as u32,
+            data_length: u32::try_from(data.len()).unwrap(),
             data: data.to_vec(),
             children: Vec::new(),
         }
@@ -347,17 +381,17 @@ mod tests {
     fn rejects_malformed_style_text_prop() {
         let payload = sample_payload();
         // Wrong record type.
-        let mut wrong = record(&payload);
-        wrong.record_type = RecordType::TxCFStyleAtom;
-        assert!(StyleTextPropAtom::parse_record(&wrong, 9).is_err());
+        let mut wrong_type = record(&payload);
+        wrong_type.record_type = RecordType::TxCFStyleAtom;
+        assert!(StyleTextPropAtom::parse_record(&wrong_type, 9).is_err());
         // Nonzero version.
-        let mut wrong = record(&payload);
-        wrong.version = 0xF;
-        assert!(StyleTextPropAtom::parse_record(&wrong, 9).is_err());
+        let mut wrong_version = record(&payload);
+        wrong_version.version = 0xF;
+        assert!(StyleTextPropAtom::parse_record(&wrong_version, 9).is_err());
         // Nonzero instance.
-        let mut wrong = record(&payload);
-        wrong.instance = 1;
-        assert!(StyleTextPropAtom::parse_record(&wrong, 9).is_err());
+        let mut wrong_instance = record(&payload);
+        wrong_instance.instance = 1;
+        assert!(StyleTextPropAtom::parse_record(&wrong_instance, 9).is_err());
         // Every truncation is rejected.
         for length in 0..payload.len() {
             assert!(StyleTextPropAtom::parse(&payload[..length], 9).is_err());
@@ -376,50 +410,50 @@ mod tests {
     #[test]
     fn rejects_invalid_run_fields() {
         // Zero-length paragraph run.
-        let mut data = Vec::new();
-        data.extend_from_slice(&0u32.to_le_bytes());
-        data.extend_from_slice(&0u16.to_le_bytes());
-        data.extend_from_slice(&0u32.to_le_bytes());
-        assert!(StyleTextPropAtom::parse(&data, 1).is_err());
+        let mut zero_length_run = Vec::new();
+        zero_length_run.extend_from_slice(&0u32.to_le_bytes());
+        zero_length_run.extend_from_slice(&0u16.to_le_bytes());
+        zero_length_run.extend_from_slice(&0u32.to_le_bytes());
+        assert!(StyleTextPropAtom::parse(&zero_length_run, 1).is_err());
 
         // Indent level above the maximum.
-        let mut data = Vec::new();
-        data.extend_from_slice(&2u32.to_le_bytes());
-        data.extend_from_slice(&5u16.to_le_bytes());
-        data.extend_from_slice(&0u32.to_le_bytes());
-        data.extend_from_slice(&2u32.to_le_bytes());
-        data.extend_from_slice(&0u32.to_le_bytes());
-        assert!(StyleTextPropAtom::parse(&data, 1).is_err());
+        let mut excessive_indent_run = Vec::new();
+        excessive_indent_run.extend_from_slice(&2u32.to_le_bytes());
+        excessive_indent_run.extend_from_slice(&5u16.to_le_bytes());
+        excessive_indent_run.extend_from_slice(&0u32.to_le_bytes());
+        excessive_indent_run.extend_from_slice(&2u32.to_le_bytes());
+        excessive_indent_run.extend_from_slice(&0u32.to_le_bytes());
+        assert!(StyleTextPropAtom::parse(&excessive_indent_run, 1).is_err());
 
         // Forbidden leftMargin mask inside a TextPFRun.
-        let mut data = Vec::new();
-        data.extend_from_slice(&2u32.to_le_bytes());
-        data.extend_from_slice(&0u16.to_le_bytes());
-        data.extend_from_slice(&0x0000_0100u32.to_le_bytes());
-        data.extend_from_slice(&288i16.to_le_bytes());
-        data.extend_from_slice(&2u32.to_le_bytes());
-        data.extend_from_slice(&0u32.to_le_bytes());
-        assert!(StyleTextPropAtom::parse(&data, 1).is_err());
+        let mut left_margin_run = Vec::new();
+        left_margin_run.extend_from_slice(&2u32.to_le_bytes());
+        left_margin_run.extend_from_slice(&0u16.to_le_bytes());
+        left_margin_run.extend_from_slice(&0x0000_0100u32.to_le_bytes());
+        left_margin_run.extend_from_slice(&288i16.to_le_bytes());
+        left_margin_run.extend_from_slice(&2u32.to_le_bytes());
+        left_margin_run.extend_from_slice(&0u32.to_le_bytes());
+        assert!(StyleTextPropAtom::parse(&left_margin_run, 1).is_err());
 
         // Forbidden tabStops mask inside a TextPFRun.
-        let mut data = Vec::new();
-        data.extend_from_slice(&2u32.to_le_bytes());
-        data.extend_from_slice(&0u16.to_le_bytes());
-        data.extend_from_slice(&0x0010_0000u32.to_le_bytes());
-        data.extend_from_slice(&1u16.to_le_bytes());
-        data.extend_from_slice(&100i16.to_le_bytes());
-        data.extend_from_slice(&0u16.to_le_bytes());
-        data.extend_from_slice(&2u32.to_le_bytes());
-        data.extend_from_slice(&0u32.to_le_bytes());
-        assert!(StyleTextPropAtom::parse(&data, 1).is_err());
+        let mut tab_stops_run = Vec::new();
+        tab_stops_run.extend_from_slice(&2u32.to_le_bytes());
+        tab_stops_run.extend_from_slice(&0u16.to_le_bytes());
+        tab_stops_run.extend_from_slice(&0x0010_0000u32.to_le_bytes());
+        tab_stops_run.extend_from_slice(&1u16.to_le_bytes());
+        tab_stops_run.extend_from_slice(&100i16.to_le_bytes());
+        tab_stops_run.extend_from_slice(&0u16.to_le_bytes());
+        tab_stops_run.extend_from_slice(&2u32.to_le_bytes());
+        tab_stops_run.extend_from_slice(&0u32.to_le_bytes());
+        assert!(StyleTextPropAtom::parse(&tab_stops_run, 1).is_err());
 
         // Forbidden pp10ext mask inside a TextCFRun.
-        let mut data = Vec::new();
-        data.extend_from_slice(&2u32.to_le_bytes());
-        data.extend_from_slice(&0u16.to_le_bytes());
-        data.extend_from_slice(&0u32.to_le_bytes());
-        data.extend_from_slice(&2u32.to_le_bytes());
-        data.extend_from_slice(&0x0010_0000u32.to_le_bytes());
-        assert!(StyleTextPropAtom::parse(&data, 1).is_err());
+        let mut pp10ext_run = Vec::new();
+        pp10ext_run.extend_from_slice(&2u32.to_le_bytes());
+        pp10ext_run.extend_from_slice(&0u16.to_le_bytes());
+        pp10ext_run.extend_from_slice(&0u32.to_le_bytes());
+        pp10ext_run.extend_from_slice(&2u32.to_le_bytes());
+        pp10ext_run.extend_from_slice(&0x0010_0000u32.to_le_bytes());
+        assert!(StyleTextPropAtom::parse(&pp10ext_run, 1).is_err());
     }
 }

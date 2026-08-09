@@ -1,4 +1,4 @@
-//! Typed, bounded DrawingML table-style catalogs and transactional package CRUD.
+//! Typed, bounded `DrawingML` table-style catalogs and transactional package CRUD.
 
 mod codec;
 mod model;
@@ -52,6 +52,7 @@ fn allocation(resource: &'static str, source: std::collections::TryReserveError)
 }
 
 /// Return the deterministic Transitional default catalog used by new decks.
+#[must_use]
 pub fn default_xml() -> &'static str {
     DEFAULT_XML
 }

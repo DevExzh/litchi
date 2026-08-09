@@ -1,4 +1,4 @@
-//! Shared slide-XML patching helpers for PowerPoint extension storage
+//! Shared slide-XML patching helpers for `PowerPoint` extension storage
 //! (laser traces, slide-show events, and similar `p:ext` payloads).
 //!
 //! All mutation is byte-level and bounded: fragments are inserted into the
@@ -36,7 +36,7 @@ fn checked_output_size(size: Option<usize>) -> Result<usize> {
     Ok(size)
 }
 
-/// The slide's PresentationML namespace URI (transitional or Strict).
+/// The slide's `PresentationML` namespace URI (transitional or Strict).
 pub(crate) fn slide_dialect(xml: &[u8]) -> Result<&'static str> {
     let mut reader = NsReader::from_reader(xml);
     loop {
@@ -68,7 +68,7 @@ pub(crate) fn slide_dialect(xml: &[u8]) -> Result<&'static str> {
 ///
 /// The fragment is appended to an existing list, an empty `<p:extLst/>`
 /// element is expanded around it, or a new list is created directly before
-/// the slide end tag. The slide root must be a single PresentationML `sld`
+/// the slide end tag. The slide root must be a single `PresentationML` `sld`
 /// element; DTDs and processing instructions are rejected.
 pub(crate) fn insert_extension_fragment(xml: &[u8], fragment: &str) -> Result<Vec<u8>> {
     if xml.len() > MAX_SLIDE_XML_BYTES {
@@ -84,7 +84,7 @@ pub(crate) fn insert_extension_fragment(xml: &[u8], fragment: &str) -> Result<Ve
     let mut root_end = None;
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("slide XML offset overflow"))?;
+            .map_err(|_err| invalid("slide XML offset overflow"))?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(element) => {
@@ -138,7 +138,7 @@ pub(crate) fn insert_extension_fragment(xml: &[u8], fragment: &str) -> Result<Ve
                     empty_ext_lst = Some((
                         start,
                         usize::try_from(reader.buffer_position())
-                            .map_err(|_| invalid("slide XML offset overflow"))?,
+                            .map_err(|_err| invalid("slide XML offset overflow"))?,
                     ));
                 }
             },
@@ -227,6 +227,11 @@ pub(crate) fn insert_extension_fragment(xml: &[u8], fragment: &str) -> Result<Ve
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

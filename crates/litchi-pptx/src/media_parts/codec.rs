@@ -1,4 +1,11 @@
-use super::*;
+use super::{
+    Arc, BTreeMap, BTreeSet, Bookmark, BytesStart, Conformance, Coordinate, Error, Event,
+    Extension, ExtensionList, Extent, Fade, Kind, List, MAX_BOOKMARKS, MAX_DEPTH, MAX_MEDIA,
+    MAX_MEDIA_EXTENSION_XML_BYTES, MAX_NODES, MAX_STRING_BYTES, MAX_XML_BYTES, MEDIA_EXTENSION_URI,
+    Namespace, NsReader, P14, PML, Picture, Poster, PrefixDeclaration, REL, ResolveResult, Result,
+    STRICT_PML, Transform, Trim, XmlVersion, coordinate_error, invalid, limit, output_limit,
+    parse_time, validate_value,
+};
 use litchi_ooxml_common::mce::{
     Capabilities, Limits, NAMESPACE, Name, process_markup_compatibility,
 };
@@ -32,7 +39,11 @@ struct Node {
 }
 
 impl ExtensionList {
-    /// Parse one transitional PresentationML `p:extLst` fragment.
+    /// Parse one transitional `PresentationML` `p:extLst` fragment.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(xml: &[u8]) -> Result<Self> {
         if xml.len() > MAX_MEDIA_EXTENSION_XML_BYTES {
             return Err(limit("media extension-list XML bytes"));
@@ -51,7 +62,7 @@ impl ExtensionList {
         require_node(node, PML, "extLst")?;
         let xml = canonical_fragment(node)?;
         let xml = String::from_utf8(xml)
-            .map_err(|_| invalid("canonical media extension-list XML is not UTF-8"))?;
+            .map_err(|_err| invalid("canonical media extension-list XML is not UTF-8"))?;
         Ok(Self {
             xml: xml.into_boxed_str(),
         })
@@ -59,6 +70,10 @@ impl ExtensionList {
 }
 
 /// Parses all audio/video `p:pic` elements from a complete Slide part.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse(xml: &[u8]) -> Result<List> {
     let root = parse_document(xml)?;
     let conformance = conformance(&root)?;
@@ -114,7 +129,7 @@ fn parse_picture(node: &Node, conformance: Conformance) -> Result<Option<Picture
     let c_nv_pr = required_child(nv_pic, conformance.pml(), "cNvPr")?;
     let shape_id = required(c_nv_pr, "", "id")?
         .parse()
-        .map_err(|_| invalid("invalid media shape id"))?;
+        .map_err(|_err| invalid("invalid media shape id"))?;
     let name = optional(c_nv_pr, "", "name").unwrap_or_default().to_owned();
     let poster = parse_poster(node, conformance)?;
     let transform = parse_transform(node, conformance)?;
@@ -300,6 +315,10 @@ fn parse_fade(node: &Node) -> Result<Fade> {
 }
 
 /// Deterministically serializes self-contained `p:pic` fragments.
+///
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn write_pictures(value: &List, conformance: Conformance) -> Result<Vec<u8>> {
     validate_value(value, false)?;
     let mut output = BoundedXml::new();

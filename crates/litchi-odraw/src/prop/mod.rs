@@ -19,10 +19,6 @@
 //!
 //! The public property types remain available directly under `crate::prop`.
 
-const IS_BLIP: u16 = 0x4000;
-const IS_COMPLEX: u16 = 0x8000;
-const PROPERTY_ID_MASK: u16 = 0x3FFF;
-
 mod codec;
 pub mod geometry;
 pub mod gradient;
@@ -34,3 +30,7 @@ mod tests;
 
 pub use model::{Anchor, Array, ColorRef, Id, Prop, UnknownId, Value};
 pub use package::Props;
+
+const IS_BLIP: u16 = 0x4000;
+const IS_COMPLEX: u16 = 0x8000;
+const PROPERTY_ID_MASK: u16 = 0x3FFF;

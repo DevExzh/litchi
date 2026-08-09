@@ -28,17 +28,12 @@ fn assert_round_trip(profile: EncryptionProfile, password: &str) -> Vec<u8> {
     let mut package = Package::from_reader(Cursor::new(bytes.clone())).unwrap();
     assert!(matches!(package.document(), Err(Error::PasswordRequired)));
     assert!(matches!(
-        package.document_with_options(OpenOptions {
-            password: Some("wrong"),
-            ..Default::default()
-        }),
+        package
+            .document_with_options(OpenOptions::default().with_password("wrong".to_owned().into())),
         Err(Error::InvalidPassword)
     ));
     let document = package
-        .document_with_options(OpenOptions {
-            password: Some(password),
-            ..Default::default()
-        })
+        .document_with_options(OpenOptions::default().with_password(password.to_owned().into()))
         .unwrap();
     assert!(document.text().unwrap().contains("Main 文本"));
     assert_eq!(

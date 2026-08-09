@@ -12,6 +12,10 @@ use super::{
 use crate::{Error, Result};
 
 /// Validate the detached semantic owner before package publication.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn validate(model: &Model) -> Result<()> {
     drawing::validate(&model.scene.wire).map_err(|error| invalid(error.to_string()))?;
     validate_asset(&model.asset)?;
@@ -24,7 +28,7 @@ pub fn validate(model: &Model) -> Result<()> {
     let total = model
         .asset
         .embedded_data()
-        .map_or(0, |data| data.len())
+        .map_or(0, Data::len)
         .saturating_add(
             model
                 .preview
@@ -109,14 +113,14 @@ pub(crate) fn validate_model_relationship_inventory(
     let mut referenced = Vec::new();
     for model in models {
         collect_reference(&model.scene.wire.reference, &mut referenced);
-        if let Some(raster) = model.scene.wire.raster() {
-            if let Some(blip) = raster.children.iter().find_map(|child| match child {
+        if let Some(raster) = model.scene.wire.raster()
+            && let Some(blip) = raster.children.iter().find_map(|child| match child {
                 drawing::RasterChild::Blip(blip) => Some(blip),
                 drawing::RasterChild::Opaque(_) => None,
                 _ => None,
-            }) {
-                collect_reference(&blip.reference, &mut referenced);
-            }
+            })
+        {
+            collect_reference(&blip.reference, &mut referenced);
         }
     }
     for relationship in source.rels().iter() {
@@ -173,10 +177,10 @@ fn validate_preview(preview: &Preview) -> Result<()> {
             )));
         }
     }
-    if let Some(link) = preview.linked_target() {
-        if link.as_str().is_empty() || link.as_str().len() > MAX_LINK_BYTES {
-            return Err(invalid("external model3d preview target exceeds its bound"));
-        }
+    if let Some(link) = preview.linked_target()
+        && (link.as_str().is_empty() || link.as_str().len() > MAX_LINK_BYTES)
+    {
+        return Err(invalid("external model3d preview target exceeds its bound"));
     }
     Ok(())
 }
@@ -197,7 +201,7 @@ fn validate_reference(
     let relationship = source
         .rels()
         .get(id.as_str())
-        .ok_or_else(|| invalid(format!("{field} relationship '{}' is missing", id)))?;
+        .ok_or_else(|| invalid(format!("{field} relationship '{id}' is missing")))?;
     if relationship.reltype() != expected_type
         && !(is_image_relationship(expected_type) && is_image_relationship(relationship.reltype()))
     {
@@ -209,16 +213,14 @@ fn validate_reference(
     }
     if relationship.is_external() != external {
         return Err(invalid(format!(
-            "{field} relationship '{}' has an invalid target mode",
-            id
+            "{field} relationship '{id}' has an invalid target mode"
         )));
     }
     if external {
         if relationship.target_ref().is_empty() || relationship.target_ref().len() > MAX_LINK_BYTES
         {
             return Err(invalid(format!(
-                "{field} relationship '{}' has an invalid target",
-                id
+                "{field} relationship '{id}' has an invalid target"
             )));
         }
         return Ok(());
@@ -261,8 +263,7 @@ fn validate_reference(
     }
     if part.rels().iter().next().is_some() {
         return Err(invalid(format!(
-            "{field} part '{}' has outbound relationships",
-            target
+            "{field} part '{target}' has outbound relationships"
         )));
     }
     Ok(())
@@ -292,7 +293,7 @@ pub(crate) fn relation_from_part(source: &dyn Part, id: &drawing::Id) -> Result<
     let relationship = source
         .rels()
         .get(id.as_str())
-        .ok_or_else(|| invalid(format!("relationship '{}' is missing", id)))?;
+        .ok_or_else(|| invalid(format!("relationship '{id}' is missing")))?;
     Ok(Relation {
         id: id.as_str().to_owned(),
         target: relationship.target_ref().to_owned(),

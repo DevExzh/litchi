@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::*;
 use crate::consts::RecordType;
 use crate::master_layout::Context;
@@ -18,7 +24,7 @@ fn record(
         record_type_raw: record_type.as_u16(),
         version,
         instance,
-        data_length: data.len() as u32,
+        data_length: u32::try_from(data.len()).unwrap(),
         data,
         children,
     }
@@ -114,7 +120,7 @@ fn authors_notes_master_styles_atomically_and_preserves_unknown_tail() {
     assert_eq!(commit.snapshot().notes_styles().unwrap(), Some(styles));
     assert_eq!(commit.snapshot().record().children[2], opaque);
 
-    let undone = commit.undo(&commit.snapshot()).unwrap();
+    let undone = commit.undo(commit.snapshot()).unwrap();
     assert!(undone.notes_styles().unwrap().is_none());
     let redone = commit.redo(&undone).unwrap();
     assert_eq!(redone.bytes(), commit.snapshot().bytes());
@@ -138,13 +144,17 @@ fn clears_and_rejects_wrong_context_without_mutating_the_editor() {
         let snapshot =
             super::super::Snapshot::from_record(context, contextual_master(context)).unwrap();
         let original = snapshot.bytes().to_vec();
-        let mut edit = snapshot.edit();
+        let mut rejected_edit = snapshot.edit();
         assert!(
-            edit.set_notes_styles(Styles::from_xml(XML).unwrap())
+            rejected_edit
+                .set_notes_styles(Styles::from_xml(XML).unwrap())
                 .is_err()
         );
-        assert!(!edit.is_changed());
-        assert_eq!(edit.snapshot().unwrap().bytes(), original.as_slice());
+        assert!(!rejected_edit.is_changed());
+        assert_eq!(
+            rejected_edit.snapshot().unwrap().bytes(),
+            original.as_slice()
+        );
     }
 }
 
@@ -163,6 +173,6 @@ fn rejects_malformed_and_oversized_xml_before_authoring() {
         Vec::new(),
     ));
     malformed.data = malformed.children.iter().flat_map(wire).collect();
-    malformed.data_length = malformed.data.len() as u32;
+    malformed.data_length = u32::try_from(malformed.data.len()).unwrap();
     assert!(super::super::Snapshot::from_record(Context::Notes, malformed).is_err());
 }

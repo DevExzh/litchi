@@ -109,7 +109,7 @@ fn validate_text_atom(record: &Record, instance: u16, name: &str) -> Result<()> 
         || record.record_type_raw != RecordType::CString.as_u16()
         || record.version != 0
         || record.instance != instance
-        || record.data.len() % 2 != 0
+        || !record.data.len().is_multiple_of(2)
     {
         return Err(Error::Corrupted(format!(
             "{name} has an invalid record header or size"

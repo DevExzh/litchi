@@ -1,4 +1,4 @@
-//! Resolves the newest visible persisted-record offset from UserEdit atoms.
+//! Resolves the newest visible persisted-record offset from `UserEdit` atoms.
 
 use super::directory;
 use crate::embedded::object::editor::{Result, rewrite};

@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::*;
 use crate::consts::RecordType;
 use crate::records::Record;
@@ -14,7 +20,7 @@ fn record(
         record_type_raw: record_type.as_u16(),
         version,
         instance,
-        data_length: data.len() as u32,
+        data_length: u32::try_from(data.len()).unwrap(),
         data,
         children,
     }
@@ -123,7 +129,7 @@ fn rejects_duplicate_or_malformed_sync_records_before_mutation() {
     duplicate.children.push(first.clone());
     duplicate.children.push(first.clone());
     duplicate.data = duplicate.children.iter().flat_map(wire).collect();
-    duplicate.data_length = duplicate.data.len() as u32;
+    duplicate.data_length = u32::try_from(duplicate.data.len()).unwrap();
     assert!(Snapshot::from_record(duplicate).is_err());
 
     let malformed = root(vec![record(
@@ -147,6 +153,6 @@ fn rejects_wrong_root_and_stale_revision_operations() {
     let commit = editor.commit().unwrap();
     let mut changed = commit.snapshot().edit();
     changed.clear().unwrap();
-    let changed = changed.commit().unwrap();
-    assert!(commit.undo(&changed.snapshot()).is_err());
+    let changed_commit = changed.commit().unwrap();
+    assert!(commit.undo(changed_commit.snapshot()).is_err());
 }

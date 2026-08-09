@@ -6,7 +6,10 @@ use crate::consts::RecordType;
 use crate::package::{Error, Result};
 use crate::records::Record;
 
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "the tuple mirrors the record children grouping; a named type would obscure the parse flow"
+)]
 pub(crate) fn parse_optional_ole_children(
     children: &[Record],
 ) -> Result<(
@@ -65,20 +68,20 @@ pub(crate) fn append_optional_ole_children(
         (2, program_id, true),
         (3, clipboard_name, true),
     ] {
-        if let Some(value) = value {
+        if let Some(text) = value {
             children.extend_from_slice(&record_bytes(
                 0,
                 instance,
                 RecordType::CString,
-                &encode_ole_string(value, printable)?,
+                &encode_ole_string(text, printable)?,
             )?);
         }
     }
-    if let Some(metafile) = metafile {
-        if metafile.len() > MAX_METAFILE_BYTES {
+    if let Some(metafile_bytes) = metafile {
+        if metafile_bytes.len() > MAX_METAFILE_BYTES {
             return corrupted("MetafileBlob exceeds 64 MiB");
         }
-        children.extend_from_slice(&record_bytes(0, 0, RecordType::MetaFile, metafile)?);
+        children.extend_from_slice(&record_bytes(0, 0, RecordType::MetaFile, metafile_bytes)?);
     }
     Ok(())
 }
@@ -101,7 +104,7 @@ fn parse_ole_string(record: &Record, printable: bool) -> Result<String> {
         return corrupted("OLE object string contains an embedded null");
     }
     let value = String::from_utf16(&units)
-        .map_err(|_| Error::Corrupted("OLE object string contains invalid UTF-16".into()))?;
+        .map_err(|_err| Error::Corrupted("OLE object string contains invalid UTF-16".into()))?;
     if printable && value.chars().any(char::is_control) {
         return corrupted("OLE object printable string contains a control character");
     }

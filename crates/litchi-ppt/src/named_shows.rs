@@ -1,4 +1,4 @@
-//! Strict, inert PowerPoint named/custom slide-show metadata.
+//! Strict, inert `PowerPoint` named/custom slide-show metadata.
 
 use super::package::{Error, Result};
 use super::records::Record;
@@ -41,6 +41,12 @@ pub struct NamedShows {
 }
 
 impl NamedShows {
+    /// Discover and parse the optional `NamedShowsContainer` below a document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the container is duplicated, truncated, malformed,
+    /// or exceeds the named-show limit.
     pub fn parse(document: &Record) -> Result<Option<Self>> {
         let containers = document
             .children
@@ -76,6 +82,12 @@ impl NamedShows {
         Ok(Some(Self { shows }))
     }
 
+    /// Serialize this value as one canonical `NamedShowsContainer` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a named show exceeds its MS-PPT limits or the
+    /// canonical record cannot be re-parsed.
     pub fn to_record(&self) -> Result<Record> {
         let bytes = self.to_record_bytes()?;
         let (record, end) = Record::parse(&bytes, 0)?;
@@ -85,6 +97,12 @@ impl NamedShows {
         Ok(record)
     }
 
+    /// Serialize this value as canonical `NamedShowsContainer` record bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a show name, slide reference, or count exceeds its
+    /// MS-PPT limit.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         if self.shows.len() > MAX_NAMED_SHOWS {
             return corrupted(format!(
@@ -158,7 +176,7 @@ fn parse_named_show(record: &Record) -> Result<NamedShow> {
         }
         let mut ids = Vec::with_capacity(count);
         for bytes in slides.data.chunks_exact(4) {
-            let id = u32::from_le_bytes(bytes.try_into().expect("four-byte chunk"));
+            let id = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
             validate_slide_id_ref(id)?;
             ids.push(id);
         }
@@ -191,7 +209,7 @@ fn parse_name(record: &Record) -> Result<String> {
         units.push(unit);
     }
     String::from_utf16(&units)
-        .map_err(|_| Error::Corrupted("NamedShowNameAtom contains invalid UTF-16".to_string()))
+        .map_err(|_err| Error::Corrupted("NamedShowNameAtom contains invalid UTF-16".to_string()))
 }
 
 fn encode_name(name: &str) -> Result<Vec<u8>> {
@@ -235,7 +253,7 @@ fn require_header(
 
 fn record_bytes(version: u16, instance: u16, record_type: u16, data: &[u8]) -> Result<Vec<u8>> {
     let length = u32::try_from(data.len())
-        .map_err(|_| Error::Corrupted("PowerPoint record payload exceeds u32".to_string()))?;
+        .map_err(|_err| Error::Corrupted("PowerPoint record payload exceeds u32".to_string()))?;
     let mut bytes = Vec::with_capacity(8usize.saturating_add(data.len()));
     bytes.extend_from_slice(&((instance << 4) | version).to_le_bytes());
     bytes.extend_from_slice(&record_type.to_le_bytes());
@@ -249,6 +267,11 @@ fn corrupted<T>(message: impl Into<String>) -> Result<T> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

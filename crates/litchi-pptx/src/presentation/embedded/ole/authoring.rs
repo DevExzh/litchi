@@ -18,6 +18,10 @@ const MAX_NAME_CHARS: usize = 256;
 
 /// Add an inert embedded OLE/package payload and verify it through the read
 /// inventory before publishing the package mutation.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn add(
     package: &mut OpcPackage,
     slide_part_name: &str,
@@ -30,10 +34,10 @@ pub fn add(
     if let Some(value) = program_id {
         validate_program_id(value)?;
     }
-    if let Some(value) = name {
-        if value.is_empty() || value.chars().count() > MAX_NAME_CHARS {
-            return Err(invalid("OLE object name is empty or too long"));
-        }
+    if let Some(value) = name
+        && (value.is_empty() || value.chars().count() > MAX_NAME_CHARS)
+    {
+        return Err(invalid("OLE object name is empty or too long"));
     }
     if frame.cx <= 0 || frame.cy <= 0 {
         return Err(invalid("OLE frame extents must be positive"));
@@ -105,7 +109,7 @@ fn frame_xml(
     let default_name = format!("OLE Object {shape_id}");
     let name = name.unwrap_or(&default_name);
     let mut xml = String::with_capacity(1024);
-    let _ = write!(
+    let _result = write!(
         xml,
         r#"<p:graphicFrame xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:nvGraphicFramePr><p:cNvPr id="{shape_id}" name="{}"/><p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="{}" y="{}"/><a:ext cx="{}" cy="{}"/></p:xfrm><a:graphic><a:graphicData uri="{OLE_GRAPHIC_DATA_URI}"><p:oleObj"#,
         escape(name),
@@ -115,9 +119,9 @@ fn frame_xml(
         frame.cy
     );
     if let Some(program_id) = program_id {
-        let _ = write!(xml, r#" progId="{}""#, escape(program_id));
+        let _result = write!(xml, r#" progId="{}""#, escape(program_id));
     }
-    let _ = write!(
+    let _result = write!(
         xml,
         r#" r:id="{}"><p:embed/></p:oleObj></a:graphicData></a:graphic></p:graphicFrame>"#,
         escape(relationship_id)
@@ -133,7 +137,7 @@ fn insert_frame(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
     let mut insertion = None;
     loop {
         let before = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("slide XML offset overflow"))?;
+            .map_err(|_err| invalid("slide XML offset overflow"))?;
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
@@ -218,7 +222,8 @@ fn next_shape_id(xml: &[u8]) -> Result<u32> {
                 if element.local_name().as_ref() == b"cNvPr" =>
             {
                 if let Some(value) = unqualified_attribute_value(&element, b"id", decoder)? {
-                    maximum = maximum.max(value.parse().map_err(|_| invalid("invalid shape ID"))?);
+                    maximum =
+                        maximum.max(value.parse().map_err(|_err| invalid("invalid shape ID"))?);
                 }
             },
             Event::DocType(_) | Event::PI(_) => {

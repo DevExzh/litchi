@@ -9,6 +9,10 @@ const STRICT_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationship
 const CT: &str = "application/vnd.openxmlformats-officedocument.presentationml.viewProps+xml";
 
 /// Loads the presentation view-properties part through its package relationship.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load_from_package(package: &OpcPackage) -> Result<Option<ViewProperties>> {
     let presentation = package.main_document_part()?;
     let mut found = presentation

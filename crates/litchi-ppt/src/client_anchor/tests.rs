@@ -1,10 +1,16 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::*;
 
 fn record(payload: &[u8]) -> Vec<u8> {
     let mut bytes = Vec::new();
     bytes.extend_from_slice(&0u16.to_le_bytes());
     bytes.extend_from_slice(&RECORD_TYPE.to_le_bytes());
-    bytes.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+    bytes.extend_from_slice(&u32::try_from(payload.len()).unwrap().to_le_bytes());
     bytes.extend_from_slice(payload);
     bytes
 }
@@ -33,7 +39,7 @@ fn full_rect_round_trips_extreme_coordinates_without_overflow() {
     let parsed = Anchor::parse(anchor.to_bytes()).unwrap();
 
     assert_eq!(parsed.encoding(), Encoding::Full);
-    assert_eq!(parsed.width(), u32::MAX as i64);
+    assert_eq!(parsed.width(), i64::from(u32::MAX));
     assert_eq!(parsed.height(), 16);
 }
 

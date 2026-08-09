@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::*;
 use crate::consts::RecordType;
 use crate::records::Record;
@@ -8,7 +14,7 @@ fn atom(raw: u16, version: u16, instance: u16, data: &[u8]) -> Record {
         record_type_raw: raw,
         version,
         instance,
-        data_length: data.len() as u32,
+        data_length: u32::try_from(data.len()).unwrap(),
         data: data.to_vec(),
         children: Vec::new(),
     }
@@ -29,12 +35,11 @@ fn container(raw: u16, children: Vec<Record>) -> Record {
 fn slide_atom(context: Context) -> Record {
     let mut data = vec![0; 24];
     match context {
-        Context::Main => {},
         Context::Title => {
             data[..4].copy_from_slice(&2u32.to_le_bytes());
             data[12..16].copy_from_slice(&0x8000_0000u32.to_le_bytes());
         },
-        Context::Notes | Context::Handout => {},
+        Context::Main | Context::Notes | Context::Handout => {},
     }
     atom(RecordType::SlideAtom.as_u16(), 2, 0, &data)
 }

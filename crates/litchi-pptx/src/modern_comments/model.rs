@@ -59,6 +59,10 @@ impl Progress {
     };
 
     /// Construct progress from a whole percentage in 0..=100.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(percent: u32) -> Result<Self> {
         if percent <= 100 {
             Self::from_thousandths(percent * 1_000)
@@ -70,6 +74,10 @@ impl Progress {
     }
 
     /// Construct progress from Office's thousandths-of-a-percent units.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_thousandths(value: u32) -> Result<Self> {
         if value <= MAX_PROGRESS_THOUSANDTHS {
             NonZeroU32::new(value + 1).map(Self).ok_or_else(|| {
@@ -84,6 +92,7 @@ impl Progress {
 
     /// Return Office's thousandths-of-a-percent representation.
     #[inline]
+    #[must_use]
     pub const fn thousandths(self) -> u32 {
         self.0.get() - 1
     }
@@ -107,7 +116,7 @@ impl Progress {
 
         let whole = whole
             .parse::<u32>()
-            .map_err(|_| invalid(format!("invalid positive fixed percentage '{value}%'")))?;
+            .map_err(|_err| invalid(format!("invalid positive fixed percentage '{value}%'")))?;
         let fractional_thousandths = match fraction {
             Some(fraction) => {
                 let mut digits = fraction.bytes().map(|digit| u32::from(digit - b'0'));
@@ -120,7 +129,7 @@ impl Progress {
         };
         let thousandths = whole * 1_000 + fractional_thousandths;
         Self::from_thousandths(thousandths)
-            .map_err(|_| invalid(format!("invalid positive fixed percentage '{value}%'")))
+            .map_err(|_err| invalid(format!("invalid positive fixed percentage '{value}%'")))
     }
 }
 
@@ -139,7 +148,7 @@ impl FromStr for Progress {
         }
         let thousandths = value
             .parse::<u32>()
-            .map_err(|_| invalid(format!("invalid positive fixed percentage '{value}'")))?;
+            .map_err(|_err| invalid(format!("invalid positive fixed percentage '{value}'")))?;
         Self::from_thousandths(thousandths)
     }
 }
@@ -220,7 +229,7 @@ pub struct Comment {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct List {
-    /// Prefix used for the 2018 PowerPoint namespace. Empty means default.
+    /// Prefix used for the 2018 `PowerPoint` namespace. Empty means default.
     pub root_prefix: String,
     pub namespace_declarations: Vec<NamespaceDeclaration>,
     pub comments: Vec<Comment>,
@@ -248,7 +257,7 @@ pub struct Author {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Authors {
-    /// Prefix used for the 2018 PowerPoint namespace. Empty means default.
+    /// Prefix used for the 2018 `PowerPoint` namespace. Empty means default.
     pub root_prefix: String,
     pub namespace_declarations: Vec<NamespaceDeclaration>,
     pub authors: Vec<Author>,
@@ -270,25 +279,42 @@ pub struct Graph {
 impl Comment {
     /// Decode the inert `p188:extLst` envelope into its typed known payloads
     /// and preserved unknown entries.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn extensions(&self) -> Result<super::semantic::extensions::List> {
         super::wire::parse_extensions(self.extension_xml.as_deref())
     }
 
     /// Replace the extension envelope atomically after validating every typed
     /// payload. Empty lists remove the optional XML element.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_extensions(&mut self, value: super::semantic::extensions::List) -> Result<()> {
         self.extension_xml = super::wire::write_extensions(&value)?;
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn task_details(&self) -> Result<Option<super::semantic::tasks::Details>> {
         Ok(self.extensions()?.task_details().cloned())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn reactions(&self) -> Result<Option<super::semantic::reactions::List>> {
         Ok(self.extensions()?.reactions().cloned())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace_task_details(
         &mut self,
         uri: Option<&str>,
@@ -299,6 +325,9 @@ impl Comment {
         self.set_extensions(extensions)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace_reactions(
         &mut self,
         uri: Option<&str>,
@@ -311,19 +340,31 @@ impl Comment {
 }
 
 impl Reply {
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn extensions(&self) -> Result<super::semantic::extensions::List> {
         super::wire::parse_extensions(self.extension_xml.as_deref())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_extensions(&mut self, value: super::semantic::extensions::List) -> Result<()> {
         self.extension_xml = super::wire::write_extensions(&value)?;
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn reactions(&self) -> Result<Option<super::semantic::reactions::List>> {
         Ok(self.extensions()?.reactions().cloned())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace_reactions(
         &mut self,
         uri: Option<&str>,

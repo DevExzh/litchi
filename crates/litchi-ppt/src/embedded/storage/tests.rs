@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use std::borrow::Cow;
 
 use super::{Compression, Kind, Storage};
@@ -11,15 +17,21 @@ fn every_storage_kind_and_compression_roundtrips_exactly() {
         let uncompressed = Storage::uncompressed(kind, vec![1, 2, 3]).unwrap();
         assert_eq!(uncompressed.kind(), kind);
         assert_eq!(uncompressed.compression(), Compression::Uncompressed);
-        let record = uncompressed.to_record().unwrap();
-        assert_eq!(Storage::parse_as(&record, kind).unwrap(), uncompressed);
+        let uncompressed_record = uncompressed.to_record().unwrap();
+        assert_eq!(
+            Storage::parse_as(&uncompressed_record, kind).unwrap(),
+            uncompressed
+        );
 
         let compressed = Storage::compressed(kind, 4096, vec![0x78, 0x9c, 1, 2, 3, 4]).unwrap();
         assert_eq!(compressed.compression(), Compression::Zlib);
         assert_eq!(compressed.declared_uncompressed_len(), Some(4096));
-        let record = compressed.to_record().unwrap();
-        assert_eq!(record.instance, 1);
-        assert_eq!(Storage::parse_as(&record, kind).unwrap(), compressed);
+        let compressed_record = compressed.to_record().unwrap();
+        assert_eq!(compressed_record.instance, 1);
+        assert_eq!(
+            Storage::parse_as(&compressed_record, kind).unwrap(),
+            compressed
+        );
     }
 }
 
@@ -150,8 +162,12 @@ fn bounded_zlib_decompression_requires_exact_size_and_no_trailing_data() {
     let mut encoder = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
     encoder.write_all(&original).unwrap();
     let compressed = encoder.finish().unwrap();
-    let storage =
-        Storage::compressed(Kind::VbaProject, original.len() as u32, compressed.clone()).unwrap();
+    let storage = Storage::compressed(
+        Kind::VbaProject,
+        u32::try_from(original.len()).unwrap(),
+        compressed.clone(),
+    )
+    .unwrap();
     assert_eq!(
         storage.decompressed_bytes(original.len()).unwrap(),
         original
@@ -160,7 +176,7 @@ fn bounded_zlib_decompression_requires_exact_size_and_no_trailing_data() {
 
     let wrong_size = Storage::compressed(
         Kind::VbaProject,
-        original.len() as u32 + 1,
+        u32::try_from(original.len()).unwrap() + 1,
         compressed.clone(),
     )
     .unwrap();
@@ -168,7 +184,11 @@ fn bounded_zlib_decompression_requires_exact_size_and_no_trailing_data() {
 
     let mut trailing_bytes = compressed;
     trailing_bytes.push(0);
-    let trailing =
-        Storage::compressed(Kind::VbaProject, original.len() as u32, trailing_bytes).unwrap();
+    let trailing = Storage::compressed(
+        Kind::VbaProject,
+        u32::try_from(original.len()).unwrap(),
+        trailing_bytes,
+    )
+    .unwrap();
     assert!(trailing.decompressed_bytes(original.len()).is_err());
 }

@@ -1,10 +1,13 @@
-//! OfficeArt record wire primitives and zero-copy inspection.
+//! `OfficeArt` record wire primitives and zero-copy inspection.
 //!
 //! The encoder uses the shared `litchi-odraw` header vocabulary, while this
 //! module keeps the PPT writer's ergonomic builder and the exact source bytes
 //! needed for lossless inspection of producer-specific records.
 
-#![allow(dead_code)]
+#![allow(
+    dead_code,
+    reason = "wire helpers cover producer-specific records without a current caller"
+)]
 
 use std::collections::HashSet;
 use std::io::{Error, ErrorKind};
@@ -21,7 +24,7 @@ pub(crate) struct EscherBuilder {
 }
 
 impl EscherBuilder {
-    /// Creates an empty record with the supplied OfficeArt header fields.
+    /// Creates an empty record with the supplied `OfficeArt` header fields.
     pub(crate) fn new(version: u8, instance: u16, record_type: u16) -> Self {
         Self {
             header: EscherHeader::new(version, instance, record_type, 0),
@@ -30,6 +33,10 @@ impl EscherBuilder {
     }
 
     /// Appends a wire payload to the record.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "record payloads assembled by this writer are bounded well below the 4 GiB `OfficeArt` length field"
+    )]
     pub(crate) fn add_data(&mut self, data: &[u8]) {
         self.data.extend_from_slice(data);
         self.header.length = self.data.len() as u32;
@@ -44,7 +51,7 @@ impl EscherBuilder {
     }
 }
 
-/// A borrowed unknown OfficeArt record.
+/// A borrowed unknown `OfficeArt` record.
 ///
 /// `bytes` includes the eight-byte record header. Keeping the complete source
 /// slice, instead of only its payload, means an extension record can be copied
@@ -82,7 +89,7 @@ impl<'data> UnknownRecord<'data> {
 /// A checked, zero-copy PPT drawing view.
 ///
 /// The view intentionally borrows the input stream. Known shape topology is
-/// validated by the format-neutral OfficeArt substrate; unknown records are
+/// validated by the format-neutral `OfficeArt` substrate; unknown records are
 /// surfaced separately and remain byte-exact for a future snapshot editor.
 #[derive(Debug, Clone)]
 pub(crate) struct Drawing<'data> {
@@ -91,7 +98,7 @@ pub(crate) struct Drawing<'data> {
 }
 
 impl<'data> Drawing<'data> {
-    /// Parses one complete OfficeArt container without copying its payloads.
+    /// Parses one complete `OfficeArt` container without copying its payloads.
     pub(crate) fn parse(data: &'data [u8]) -> Result<Self, Error> {
         let root = Parser::new(data)
             .root()
@@ -151,9 +158,9 @@ impl<'data> Drawing<'data> {
 
 fn collect_shape_ids(container: &Container<'_>, ids: &mut Vec<u32>) -> Result<(), Error> {
     for child in container.children() {
-        let child = child.map_err(map_wire_error)?;
-        if child.kind() == RecordKind::Sp {
-            let payload = child.data();
+        let child_record = child.map_err(map_wire_error)?;
+        if child_record.kind() == RecordKind::Sp {
+            let payload = child_record.data();
             let id = payload
                 .get(..4)
                 .and_then(|bytes| bytes.try_into().ok())
@@ -161,8 +168,8 @@ fn collect_shape_ids(container: &Container<'_>, ids: &mut Vec<u32>) -> Result<()
                 .ok_or_else(|| invalid_data("OfficeArt Sp atom has no shape identifier"))?;
             ids.push(id);
         }
-        if child.kind().is_container() {
-            let nested = Container::try_new(child).map_err(map_wire_error)?;
+        if child_record.kind().is_container() {
+            let nested = Container::try_new(child_record).map_err(map_wire_error)?;
             collect_shape_ids(&nested, ids)?;
         }
     }
@@ -175,20 +182,20 @@ fn collect_unknown_records<'data>(
     records: &mut Vec<UnknownRecord<'data>>,
 ) -> Result<(), Error> {
     for child in container.children() {
-        let child = child.map_err(map_wire_error)?;
-        if matches!(child.kind(), RecordKind::Unknown(_)) {
+        let child_record = child.map_err(map_wire_error)?;
+        if matches!(child_record.kind(), RecordKind::Unknown(_)) {
             records.push(UnknownRecord {
-                raw_kind: child.raw_kind(),
-                version: child.version(),
-                instance: child.instance(),
-                bytes: raw_record_bytes(&child, source)?,
+                raw_kind: child_record.raw_kind(),
+                version: child_record.version(),
+                instance: child_record.instance(),
+                bytes: raw_record_bytes(&child_record, source)?,
             });
             // Unknown container grammars are intentionally opaque. Retaining
             // the complete record avoids guessing at extension child framing.
             continue;
         }
-        if child.kind().is_container() {
-            let nested = Container::try_new(child).map_err(map_wire_error)?;
+        if child_record.kind().is_container() {
+            let nested = Container::try_new(child_record).map_err(map_wire_error)?;
             collect_unknown_records(&nested, source, records)?;
         }
     }

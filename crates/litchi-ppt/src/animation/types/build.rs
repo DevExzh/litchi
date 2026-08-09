@@ -1,4 +1,4 @@
-//! PowerPoint 2002 build-list records.
+//! `PowerPoint` 2002 build-list records.
 
 use super::effects::BuildLevel;
 use super::time::ExtendedTimeNode;
@@ -12,6 +12,7 @@ pub struct BuildInfo {
 
 impl BuildInfo {
     /// Create a new empty build info.
+    #[must_use]
     pub fn new() -> Self {
         Self { builds: Vec::new() }
     }
@@ -22,14 +23,14 @@ impl BuildInfo {
     }
 }
 
-/// Exact PowerPoint 2002 build-list record for a slide.
+/// Exact `PowerPoint` 2002 build-list record for a slide.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct BuildList {
     /// Paragraph, chart, and diagram build subcontainers in file order.
     pub builds: Vec<BuildListEntry>,
 }
 
-/// PowerPoint 2002 animation metadata stored in a slide's `___PPT10` tag.
+/// `PowerPoint` 2002 animation metadata stored in a slide's `___PPT10` tag.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SlideAnimationExtension {
     /// Optional root animation timing tree.
@@ -49,7 +50,7 @@ pub struct SlideAnimationExtension {
 }
 
 impl SlideAnimationExtension {
-    /// Return the PowerPoint 2002 animation hash as its normative typed atom.
+    /// Return the `PowerPoint` 2002 animation hash as its normative typed atom.
     pub fn animation_hash_atom(&self) -> Option<crate::animation::hash::Hash10> {
         self.animation_hash.map(crate::animation::hash::Hash10::new)
     }
@@ -60,7 +61,7 @@ impl SlideAnimationExtension {
     }
 }
 
-/// PowerPoint 10 slide-level flags.
+/// `PowerPoint` 10 slide-level flags.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Flags {
     /// Raw flags word. Only bits 0 and 1 are defined by MS-PPT.
@@ -72,6 +73,7 @@ pub struct Flags {
 }
 
 impl BuildList {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -87,7 +89,7 @@ impl Default for BuildInfo {
     }
 }
 
-/// Shared build kind stored in a PowerPoint 2002 `BuildAtom`.
+/// Shared build kind stored in a `PowerPoint` 2002 `BuildAtom`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum BuildKind {
     Paragraph,
@@ -155,6 +157,10 @@ impl ParagraphBuildType {
 
 /// Exact paragraph-specific build atom fields.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "the bool fields mirror the independent flag bits of the fixed MS-PPT `ParagraphBuildAtom` layout, so they cannot be merged into enums without losing the bit-level mapping"
+)]
 pub struct ParagraphBuildAtom {
     pub build_type: ParagraphBuildType,
     pub build_level: u32,
@@ -314,7 +320,7 @@ pub struct DiagramBuild {
     pub diagram: DiagramBuildAtom,
 }
 
-/// One spec-defined PowerPoint 2002 build-list child.
+/// One spec-defined `PowerPoint` 2002 build-list child.
 #[derive(Debug, Clone, PartialEq)]
 pub enum BuildListEntry {
     Paragraph(ParagraphBuild),

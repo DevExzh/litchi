@@ -16,7 +16,10 @@ pub enum Direction {
 }
 
 impl Direction {
-    pub(crate) fn parse(value: &str) -> Result<Self> {
+    /// # Errors
+    ///
+    /// Returns an error when the input is malformed or exceeds the parser's resource limits.
+    pub fn parse(value: &str) -> Result<Self> {
         match value {
             "from-another-table" => Ok(Self::FromAnotherTable),
             "to-another-table" => Ok(Self::ToAnotherTable),
@@ -52,7 +55,10 @@ pub enum OperationKind {
 }
 
 impl OperationKind {
-    pub(crate) fn parse(value: &str) -> Result<Self> {
+    /// # Errors
+    ///
+    /// Returns an error when the input is malformed or exceeds the parser's resource limits.
+    pub fn parse(value: &str) -> Result<Self> {
         match value {
             "trace-dependents" => Ok(Self::TraceDependents),
             "remove-dependents" => Ok(Self::RemoveDependents),
@@ -212,7 +218,11 @@ impl Detective {
     }
 }
 
-pub(crate) fn write_detective(out: &mut String, detective: &Detective) {
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "the codec entry point keeps its historical element-qualified name"
+)]
+pub fn write_detective(out: &mut String, detective: &Detective) {
     out.push_str("<table:detective>");
     for range in detective.highlighted_ranges() {
         out.push_str("<table:highlighted-range");

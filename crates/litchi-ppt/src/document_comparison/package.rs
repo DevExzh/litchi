@@ -29,18 +29,30 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Parse a complete OLE2 PowerPoint package using default limits.
+    /// Parse a complete OLE2 `PowerPoint` package using default limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(bytes: &[u8]) -> Result<Self> {
         Self::from_bytes_with_limits(bytes.to_vec(), Limits::default())
     }
 
-    /// Capture a complete OLE2 PowerPoint package without another caller copy.
+    /// Capture a complete OLE2 `PowerPoint` package without another caller copy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         Self::from_bytes_with_limits(bytes, Limits::default())
     }
 
     /// Parse a package with the document-comparison resource limits supplied
     /// by the caller.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         if bytes.len() > MAX_PACKAGE_BYTES {
             return Err(Error::InvalidFormat(
@@ -60,21 +72,25 @@ impl Snapshot {
     }
 
     /// Exact source bytes of the complete OLE2 artifact.
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
     /// Immutable live `DocumentContainer` snapshot.
+    #[must_use]
     pub const fn document(&self) -> &DocumentSnapshot {
         &self.document
     }
 
     /// Native persist identifier used by the current `UserEditAtom`.
+    #[must_use]
     pub const fn document_persist_id(&self) -> u32 {
         self.document_persist_id
     }
 
     /// Limits captured by this package snapshot.
+    #[must_use]
     pub const fn limits(&self) -> Limits {
         self.limits
     }
@@ -86,6 +102,7 @@ impl Snapshot {
     }
 
     /// Begin an isolated package edit over the review-owned metadata.
+    #[must_use]
     pub fn edit(&self) -> Editor {
         Editor {
             source: self.clone(),
@@ -223,26 +240,42 @@ pub struct Commit {
 }
 
 impl Commit {
+    #[must_use]
     pub const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
+    #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
+    #[must_use]
     pub fn document(&self) -> &DocumentSnapshot {
         self.snapshot.document()
     }
 
+    /// Undo this commit against its exact committed target snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `current` does not match this commit's target
+    /// revision, or if the recovered source bytes fail to parse.
     pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.patch.undo(current)
     }
 
+    /// Redo this commit against its exact source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `current` does not match this commit's base
+    /// revision, or if the committed target bytes fail to parse.
     pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.patch.redo(current)
     }
 
+    #[must_use]
     pub fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
@@ -260,26 +293,37 @@ pub struct Patch {
 }
 
 impl Patch {
+    #[must_use]
     pub const fn base(&self) -> Revision {
         self.base
     }
 
+    #[must_use]
     pub const fn target(&self) -> Revision {
         self.target
     }
 
+    #[must_use]
     pub fn before_bytes(&self) -> &[u8] {
         &self.before
     }
 
+    #[must_use]
     pub fn after_bytes(&self) -> &[u8] {
         &self.after
     }
 
+    #[must_use]
     pub const fn document(&self) -> &DocumentPatch {
         &self.document
     }
 
+    /// Undo this patch against its exact committed target snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `current` does not match this patch's target
+    /// revision, or if the recovered source bytes fail to parse.
     pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision() != self.target || current.bytes() != self.after.as_ref() {
             return Err(Error::InvalidFormat(
@@ -289,6 +333,12 @@ impl Patch {
         Snapshot::from_bytes_with_limits(self.before.to_vec(), self.limits)
     }
 
+    /// Redo this patch against its exact source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `current` does not match this patch's base
+    /// revision, or if the committed target bytes fail to parse.
     pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision() != self.base || current.bytes() != self.before.as_ref() {
             return Err(Error::InvalidFormat(

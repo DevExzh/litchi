@@ -12,6 +12,10 @@ use super::spec::{
 use std::collections::HashMap;
 
 /// Persist reference - maps ID to offset
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`PersistRef` is the established public API name; renaming it would break downstream crates"
+)]
 #[derive(Debug, Clone)]
 pub struct PersistRef {
     /// Persist ID
@@ -20,7 +24,11 @@ pub struct PersistRef {
     pub offset: u32,
 }
 
-/// PersistPtr directory builder
+/// `PersistPtr` directory builder
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`PersistPtrBuilder` is the established public API name; renaming it would break downstream crates"
+)]
 #[derive(Debug)]
 pub struct PersistPtrBuilder {
     /// Map of persist ID to offset
@@ -30,7 +38,8 @@ pub struct PersistPtrBuilder {
 }
 
 impl PersistPtrBuilder {
-    /// Create a new PersistPtr builder
+    /// Create a new `PersistPtr` builder
+    #[must_use]
     pub fn new() -> Self {
         Self {
             refs: HashMap::new(),
@@ -51,16 +60,22 @@ impl PersistPtrBuilder {
     }
 
     /// Get the offset for a persist ID
+    #[must_use]
     pub fn get_offset(&self, persist_id: u32) -> Option<u32> {
         self.refs.get(&persist_id).copied()
     }
 
-    /// Generate the raw PersistDirectoryAtom payload (groups of (info + offsets)).
+    /// Generate the raw `PersistDirectoryAtom` payload (groups of (info + offsets)).
     ///
     /// Format per MS-PPT and Apache POI:
     /// - For each contiguous run of persist IDs, write a 4-byte info word:
     ///   lower 20 bits = base persist ID, upper 12 bits = count of following offsets
     /// - Then write `count` u32 little-endian offsets, one per ID in the run
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "a run of contiguous persist IDs cannot exceed the number of allocated references, which is bounded far below u32::MAX for any real presentation"
+    )]
+    #[must_use]
     pub fn generate_payload(&self) -> Vec<u8> {
         let mut payload = Vec::new();
 
@@ -94,13 +109,23 @@ impl PersistPtrBuilder {
         payload
     }
 
-    /// Generate the PersistPtrHolder (PersistDirectoryAtom) PPT record bytes.
+    /// Generate the `PersistPtrHolder` (`PersistDirectoryAtom`) PPT record bytes.
     /// Uses incremental block (6002) matching POI's empty.ppt format.
+    #[must_use]
     pub fn generate_record(&self) -> Vec<u8> {
         self.generate_incremental_record()
     }
 
-    /// Generate a PersistPtrFullBlock (6001) record with the current payload.
+    /// Generate a `PersistPtrFullBlock` (6001) record with the current payload.
+    ///
+    /// # Panics
+    ///
+    /// Panics if internal invariants are violated.
+    #[allow(
+        clippy::expect_used,
+        reason = "`RecordBuilder::build` only fails when writing the header to its in-memory `Vec`, which cannot fail; changing this infallible public API to return `Result` would break callers"
+    )]
+    #[must_use]
     pub fn generate_full_record(&self) -> Vec<u8> {
         let payload = self.generate_payload();
         let mut builder = RecordBuilder::new(0x00, 0, record_type::PERSIST_PTR_HOLDER);
@@ -110,7 +135,16 @@ impl PersistPtrBuilder {
             .expect("build persist full directory record")
     }
 
-    /// Generate a PersistPtrIncrementalBlock (6002) record with the current payload.
+    /// Generate a `PersistPtrIncrementalBlock` (6002) record with the current payload.
+    ///
+    /// # Panics
+    ///
+    /// Panics if internal invariants are violated.
+    #[allow(
+        clippy::expect_used,
+        reason = "`RecordBuilder::build` only fails when writing the header to its in-memory `Vec`, which cannot fail; changing this infallible public API to return `Result` would break callers"
+    )]
+    #[must_use]
     pub fn generate_incremental_record(&self) -> Vec<u8> {
         let payload = self.generate_payload();
         let mut builder = RecordBuilder::new(0x00, 0, record_type::PERSIST_PTR_INCREMENTAL_BLOCK);
@@ -122,11 +156,13 @@ impl PersistPtrBuilder {
 
     /// Get the highest allocated persist ID (seed).
     #[inline]
+    #[must_use]
     pub fn persist_id_seed(&self) -> u32 {
         self.next_id.saturating_sub(1)
     }
 
     /// Get the number of persist references
+    #[must_use]
     pub fn count(&self) -> usize {
         self.refs.len()
     }
@@ -138,16 +174,16 @@ impl Default for PersistPtrBuilder {
     }
 }
 
-/// UserEditAtom - contains persist directory offset (POI layout)
+/// `UserEditAtom` - contains persist directory offset (POI layout)
 #[derive(Debug, Clone)]
 pub struct UserEditAtom {
     /// lastViewedSlideID (usually first slide identifier 256 if present)
     pub last_viewed_slide_id: u32,
     /// pptVersion (opaque)
     pub ppt_version: u32,
-    /// offset to previous UserEditAtom (0 for first edit)
+    /// offset to previous `UserEditAtom` (0 for first edit)
     pub offset_last_edit: u32,
-    /// offset to PersistDirectoryAtom
+    /// offset to `PersistDirectoryAtom`
     pub offset_persist_dir: u32,
     /// docPersistRef (persist id of Document)
     pub doc_persist_id_ref: u32,
@@ -157,14 +193,15 @@ pub struct UserEditAtom {
     pub last_view_type: u16,
     /// unused padding
     pub unused: u16,
-    /// Optional persist reference to a CryptSession10Container.
+    /// Optional persist reference to a `CryptSession10Container`.
     pub encryption_session_persist_id: Option<u32>,
 }
 
 impl UserEditAtom {
-    /// Create a new minimal UserEditAtom with sane defaults.
+    /// Create a new minimal `UserEditAtom` with sane defaults.
     ///
     /// Uses constants from MS-PPT 2.4.16 specification.
+    #[must_use]
     pub fn new_minimal(
         offset_persist_dir: u32,
         doc_persist_id_ref: u32,
@@ -185,12 +222,22 @@ impl UserEditAtom {
     }
 
     /// Attach the encryption-session persist reference required by encrypted files.
+    #[must_use]
     pub fn with_encryption_session(mut self, persist_id: u32) -> Self {
         self.encryption_session_persist_id = Some(persist_id);
         self
     }
 
-    /// Generate a full PPT UserEditAtom record (type 4085) with proper header (28 bytes data).
+    /// Generate a full PPT `UserEditAtom` record (type 4085) with proper header (28 bytes data).
+    ///
+    /// # Panics
+    ///
+    /// Panics if internal invariants are violated.
+    #[allow(
+        clippy::expect_used,
+        reason = "`RecordBuilder::build` only fails when writing the header to its in-memory `Vec`, which cannot fail; changing this infallible public API to return `Result` would break callers"
+    )]
+    #[must_use]
     pub fn generate_record(&self) -> Vec<u8> {
         let mut data = Vec::with_capacity(if self.encryption_session_persist_id.is_some() {
             32
@@ -216,6 +263,11 @@ impl UserEditAtom {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

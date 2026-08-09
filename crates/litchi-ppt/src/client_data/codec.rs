@@ -1,4 +1,4 @@
-//! OfficeArtClientData binary codec and grammar validation.
+//! `OfficeArtClientData` binary codec and grammar validation.
 
 use std::sync::Arc;
 
@@ -8,7 +8,7 @@ use super::model::{
 use crate::embedded::reference::Reference;
 use crate::package::{Error, Result};
 
-/// OfficeArt record type for OfficeArtClientData.
+/// `OfficeArt` record type for `OfficeArtClientData`.
 pub const OFFICE_ART_CLIENT_DATA_RECORD_TYPE: u16 = 0xF011;
 
 const HEADER_LEN: usize = 8;
@@ -53,11 +53,20 @@ impl ClientDataChildKind {
 
     pub(super) fn canonical_header(self) -> (u16, u16) {
         match self {
-            Self::AnimationInfo => (0x0F, 0),
-            Self::MouseClickInteractiveInfo => (0x0F, 0),
+            Self::AnimationInfo | Self::MouseClickInteractiveInfo | Self::ProgrammableTags => {
+                (0x0F, 0)
+            },
             Self::MouseOverInteractiveInfo => (0x0F, 1),
-            Self::ProgrammableTags => (0x0F, 0),
-            _ => (0, 0),
+            Self::ShapeFlags
+            | Self::ShapeFlags10
+            | Self::ExternalObjectReference
+            | Self::Placeholder
+            | Self::RecolorInfo
+            | Self::RoundTripNewPlaceholderId12
+            | Self::RoundTripShapeId12
+            | Self::RoundTripHeaderFooterPlaceholder12
+            | Self::RoundTripShapeChecksumForCustomLayouts12
+            | Self::Unknown => (0, 0),
         }
     }
 
@@ -83,6 +92,10 @@ impl ClientDataChildKind {
 
 impl ClientDataChild {
     /// Construct a canonical child record for the selected alternative.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(kind: ClientDataChildKind, payload: Vec<u8>) -> Result<Self> {
         let record_type = kind.known_record_type().ok_or_else(|| {
             Error::InvalidFormat("opaque client-data children require a raw record type".into())
@@ -100,6 +113,10 @@ impl ClientDataChild {
     }
 
     /// Construct an inert producer-defined child without interpreting it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn opaque(version: u16, instance: u16, record_type: u16, payload: Vec<u8>) -> Result<Self> {
         let child = Self {
             kind: ClientDataChildKind::Unknown,
@@ -113,6 +130,10 @@ impl ClientDataChild {
     }
 
     /// Serialize this complete child record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the underlying writer reports an error.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         encode_record(self.version, self.instance, self.record_type, &self.payload)
     }
@@ -225,17 +246,29 @@ impl ClientDataChild {
 
 impl ClientData {
     /// Construct and validate a container from ordered typed children.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(children: Vec<ClientDataChild>) -> Result<Self> {
         validate_sequence(&children, ClientDataLimits::default())?;
         Ok(Self { children })
     }
 
-    /// Parse one exact complete OfficeArtClientData record.
+    /// Parse one exact complete `OfficeArtClientData` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(bytes: &[u8]) -> Result<Self> {
         Self::parse_with_limits(bytes, ClientDataLimits::default())
     }
 
     /// Parse one exact complete record with explicit resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_with_limits(bytes: &[u8], limits: ClientDataLimits) -> Result<Self> {
         if bytes.len() < HEADER_LEN {
             return corrupted("OfficeArtClientData header is truncated");
@@ -321,20 +354,28 @@ impl ClientData {
     }
 
     /// Serialize the complete container and every child byte-exactly.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the underlying writer reports an error.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         self.to_bytes_with_limits(ClientDataLimits::default())
     }
 
     /// Serialize with the same resource bounds used by a source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the underlying writer reports an error.
     pub fn to_bytes_with_limits(&self, limits: ClientDataLimits) -> Result<Vec<u8>> {
         validate_sequence(&self.children, limits)?;
         let payload_capacity = self
             .children
             .iter()
-            .try_fold(0usize, |length, child| {
-                length
+            .try_fold(0usize, |total, child| {
+                total
                     .checked_add(HEADER_LEN)
-                    .and_then(|length| length.checked_add(child.payload.len()))
+                    .and_then(|with_header| with_header.checked_add(child.payload.len()))
             })
             .ok_or_else(|| {
                 Error::Corrupted("OfficeArtClientData payload length overflows".into())
@@ -467,7 +508,7 @@ pub(super) fn encode_record(
         ));
     }
     let length = u32::try_from(data.len())
-        .map_err(|_| Error::Corrupted("PowerPoint record payload exceeds u32".into()))?;
+        .map_err(|_err| Error::Corrupted("PowerPoint record payload exceeds u32".into()))?;
     let mut bytes = Vec::with_capacity(HEADER_LEN.saturating_add(data.len()));
     bytes.extend_from_slice(&((instance << 4) | version).to_le_bytes());
     bytes.extend_from_slice(&record_type.to_le_bytes());

@@ -55,6 +55,9 @@ pub struct CustomShow {
 
 impl CustomShow {
     /// Create a validated custom show.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(name: impl Into<String>, pages: Vec<String>) -> Result<Self> {
         let value = Self {
             name: name.into(),
@@ -94,6 +97,9 @@ pub struct Settings {
 
 impl Settings {
     /// Validate all settings and cross-references.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> Result<()> {
         if let Some(pause) = &self.pause {
             validate_duration(pause)?;
@@ -151,10 +157,10 @@ impl Settings {
 /// Validate page-name references against the names that will be emitted on
 /// direct `draw:page` children.
 pub(crate) fn validate_page_references(
-    settings: Option<&Settings>,
+    maybe_settings: Option<&Settings>,
     page_names: &[String],
 ) -> Result<()> {
-    let Some(settings) = settings else {
+    let Some(settings) = maybe_settings else {
         return Ok(());
     };
     settings.validate()?;
@@ -197,9 +203,9 @@ pub(crate) fn validate_page_references(
     reason = "used by the pending transactional authoring layer"
 )]
 pub(crate) fn settings_reference_page(settings: Option<&Settings>, page_name: &str) -> bool {
-    settings.is_some_and(|settings| {
-        settings.start_page.as_deref() == Some(page_name)
-            || settings
+    settings.is_some_and(|value| {
+        value.start_page.as_deref() == Some(page_name)
+            || value
                 .custom_shows
                 .iter()
                 .any(|show| show.pages.iter().any(|name| name == page_name))
@@ -207,6 +213,9 @@ pub(crate) fn settings_reference_page(settings: Option<&Settings>, page_name: &s
 }
 
 /// Parse the single direct `presentation:settings` child, if present.
+///
+/// # Errors
+/// Returns an error when the input is malformed or a configured limit is exceeded.
 pub fn parse(xml: &str) -> Result<Option<Settings>> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("presentation settings XML exceeds 8 MiB"));
@@ -319,7 +328,11 @@ pub fn parse(xml: &str) -> Result<Option<Settings>> {
                 return Err(invalid("active XML declarations are prohibited"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -335,8 +348,8 @@ pub fn parse(xml: &str) -> Result<Option<Settings>> {
 }
 
 /// Serialize validated presentation settings in schema order.
-pub(crate) fn write(settings: Option<&Settings>) -> Result<String> {
-    let Some(settings) = settings else {
+pub(crate) fn write(maybe_settings: Option<&Settings>) -> Result<String> {
+    let Some(settings) = maybe_settings else {
         return Ok(String::new());
     };
     settings.validate()?;
@@ -393,8 +406,8 @@ fn parse_settings_attributes(
     settings: &mut Settings,
 ) -> Result<()> {
     let mut seen = HashSet::new();
-    for attribute in element.attributes() {
-        let attribute = attribute.map_err(xml_error)?;
+    for raw_attribute in element.attributes() {
+        let attribute = raw_attribute.map_err(xml_error)?;
         if is_namespace_declaration(attribute.key.as_ref()) {
             continue;
         }
@@ -452,8 +465,8 @@ fn parse_settings_attributes(
 fn parse_custom_show(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<CustomShow> {
     let mut name = None;
     let mut pages = None;
-    for attribute in element.attributes() {
-        let attribute = attribute.map_err(xml_error)?;
+    for raw_attribute in element.attributes() {
+        let attribute = raw_attribute.map_err(xml_error)?;
         if is_namespace_declaration(attribute.key.as_ref()) {
             continue;
         }
@@ -652,23 +665,23 @@ fn is_namespace_declaration(name: &[u8]) -> bool {
 }
 
 fn write_bool(output: &mut String, name: &str, value: Option<bool>) {
-    if let Some(value) = value {
-        write_text(output, name, Some(if value { "true" } else { "false" }));
+    if let Some(flag) = value {
+        write_text(output, name, Some(if flag { "true" } else { "false" }));
     }
 }
 
 fn write_state(output: &mut String, name: &str, value: Option<FeatureState>) {
-    if let Some(value) = value {
-        write_text(output, name, Some(value.as_str()));
+    if let Some(state) = value {
+        write_text(output, name, Some(state.as_str()));
     }
 }
 
 fn write_text(output: &mut String, name: &str, value: Option<&str>) {
-    if let Some(value) = value {
+    if let Some(text) = value {
         output.push_str(" presentation:");
         output.push_str(name);
         output.push_str("=\"");
-        output.push_str(&escape_xml(value));
+        output.push_str(&escape_xml(text));
         output.push('"');
     }
 }
@@ -682,6 +695,10 @@ fn xml_error(error: impl std::fmt::Display) -> Error {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use crate::{Builder, Presentation};

@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{FormField, FormFieldType, FormTextType, RtfDocument, RtfWriter};
 use std::borrow::Cow;
 use std::fs;
@@ -58,7 +67,7 @@ fn checkbox_undefined_result_and_mutation_are_typed_and_positional() {
     assert_eq!(checkbox.default_checked(), Some(true));
     assert_eq!(checkbox.checked(), None);
 
-    let mut mutated = RtfDocument::parse(r#"{\rtf1 AChoiceZ}"#).unwrap();
+    let mut mutated = RtfDocument::parse(r"{\rtf1 AChoiceZ}").unwrap();
     mutated
         .push_form_field(FormField {
             field_type: FormFieldType::DropDown,
@@ -101,16 +110,16 @@ fn checkbox_undefined_result_and_mutation_are_typed_and_positional() {
 #[test]
 fn rejects_malformed_conflicting_or_active_form_field_grammar() {
     let cases = [
-        r#"{\rtf1{\*\formfield{\fftype0}}}"#,
-        r#"{\rtf1{\*\datafield 00}}"#,
-        r#"{\rtf1{\field{\*\fldinst FORMTEXT{\*\formfield{}}}{\fldrslt x}}}"#,
-        r#"{\rtf1{\field{\*\fldinst FORMTEXT{\*\formfield{\fftype0\fftype0}}}{\fldrslt x}}}"#,
-        r#"{\rtf1{\field{\*\fldinst FORMTEXT{\*\formfield{\fftype0\ffownhelp}}}{\fldrslt x}}}"#,
-        r#"{\rtf1{\field{\*\fldinst FORMDROPDOWN{\*\formfield{\fftype2\ffhaslistbox\ffres2{\*\ffl x}}}}{\fldrslt x}}}"#,
-        r#"{\rtf1{\field{\*\fldinst FORMTEXT{\*\datafield abc}{\*\formfield{\fftype0}}}{\fldrslt x}}}"#,
-        r#"{\rtf1{\field{\*\fldinst FORMTEXT{\*\formfield{\fftype0{\object x}}}}{\fldrslt x}}}"#,
-        r#"{\rtf1{\field{\*\fldinst FORMTEXT{\*\formfield{\fftype0{\*\ffentrymcr{\field x}}}}}{\fldrslt x}}}"#,
-        r#"{\rtf1{\field{\*\fldinst FORMTEXT{\*\datafield\bin2 xx}{\*\formfield{\fftype0}}}{\fldrslt x}}}"#,
+        r"{\rtf1{\*\formfield{\fftype0}}}",
+        r"{\rtf1{\*\datafield 00}}",
+        r"{\rtf1{\field{\*\fldinst FORMTEXT{\*\formfield{}}}{\fldrslt x}}}",
+        r"{\rtf1{\field{\*\fldinst FORMTEXT{\*\formfield{\fftype0\fftype0}}}{\fldrslt x}}}",
+        r"{\rtf1{\field{\*\fldinst FORMTEXT{\*\formfield{\fftype0\ffownhelp}}}{\fldrslt x}}}",
+        r"{\rtf1{\field{\*\fldinst FORMDROPDOWN{\*\formfield{\fftype2\ffhaslistbox\ffres2{\*\ffl x}}}}{\fldrslt x}}}",
+        r"{\rtf1{\field{\*\fldinst FORMTEXT{\*\datafield abc}{\*\formfield{\fftype0}}}{\fldrslt x}}}",
+        r"{\rtf1{\field{\*\fldinst FORMTEXT{\*\formfield{\fftype0{\object x}}}}{\fldrslt x}}}",
+        r"{\rtf1{\field{\*\fldinst FORMTEXT{\*\formfield{\fftype0{\*\ffentrymcr{\field x}}}}}{\fldrslt x}}}",
+        r"{\rtf1{\field{\*\fldinst FORMTEXT{\*\datafield\bin2 xx}{\*\formfield{\fftype0}}}{\fldrslt x}}}",
     ];
     for rtf in cases {
         assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");

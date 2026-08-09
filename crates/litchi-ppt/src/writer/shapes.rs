@@ -5,10 +5,6 @@
 //!
 //! Reference: [MS-ODRAW] Section 2.4.6 - MSOSPT
 
-use super::shape_style::{ArrowStyle, FillStyle, LineStyleConfig, ShapeColor, ShapeStyle};
-use super::text_format::Paragraph;
-use litchi_odraw::image::Id as PictureId;
-
 // =============================================================================
 // Shape Type Constants (MS-ODRAW 2.4.6 MSOSPT)
 // =============================================================================
@@ -213,6 +209,10 @@ pub mod shape_type {
     pub const PICTURE_FRAME: u16 = 75;
 }
 
+use super::shape_style::{ArrowStyle, FillStyle, LineStyleConfig, ShapeColor, ShapeStyle};
+use super::text_format::Paragraph;
+use litchi_odraw::image::Id as PictureId;
+
 // =============================================================================
 // User-Friendly Shape Types
 // =============================================================================
@@ -325,6 +325,7 @@ pub enum ShapeKind {
 
 impl ShapeKind {
     /// Convert to Escher shape type code
+    #[must_use]
     pub fn to_escher_type(&self) -> u16 {
         match self {
             ShapeKind::Rectangle => shape_type::RECTANGLE,
@@ -376,6 +377,7 @@ impl ShapeKind {
     }
 
     /// Check if this shape type is a line/connector (no fill by default)
+    #[must_use]
     pub fn is_line(&self) -> bool {
         matches!(
             self,
@@ -387,6 +389,7 @@ impl ShapeKind {
     }
 
     /// Check if this shape type is an arrow
+    #[must_use]
     pub fn is_arrow(&self) -> bool {
         matches!(
             self,
@@ -405,6 +408,7 @@ impl ShapeKind {
     }
 
     /// Check if this shape can contain text
+    #[must_use]
     pub fn can_contain_text(&self) -> bool {
         !self.is_line()
     }
@@ -445,6 +449,7 @@ pub struct Shape {
 
 impl Shape {
     /// Create a new shape
+    #[must_use]
     pub fn new(kind: ShapeKind, x: i32, y: i32, width: i32, height: i32) -> Self {
         let style = if kind.is_line() {
             ShapeStyle::no_fill()
@@ -469,16 +474,19 @@ impl Shape {
     }
 
     /// Create rectangle
+    #[must_use]
     pub fn rectangle(x: i32, y: i32, width: i32, height: i32) -> Self {
         Self::new(ShapeKind::Rectangle, x, y, width, height)
     }
 
     /// Create ellipse
+    #[must_use]
     pub fn ellipse(x: i32, y: i32, width: i32, height: i32) -> Self {
         Self::new(ShapeKind::Ellipse, x, y, width, height)
     }
 
     /// Create line from (x1,y1) to (x2,y2)
+    #[must_use]
     pub fn line(x1: i32, y1: i32, x2: i32, y2: i32) -> Self {
         let x = x1.min(x2);
         let y = y1.min(y2);
@@ -495,6 +503,7 @@ impl Shape {
     }
 
     /// Create arrow from (x1,y1) to (x2,y2)
+    #[must_use]
     pub fn arrow(x1: i32, y1: i32, x2: i32, y2: i32) -> Self {
         let mut shape = Self::line(x1, y1, x2, y2);
         // Add end arrow
@@ -503,6 +512,7 @@ impl Shape {
     }
 
     /// Create text box
+    #[must_use]
     pub fn text_box(x: i32, y: i32, width: i32, height: i32, text: &str) -> Self {
         let mut shape = Self::new(ShapeKind::TextBox, x, y, width, height);
         shape.text = Some(vec![Paragraph::new(text)]);
@@ -511,6 +521,7 @@ impl Shape {
     }
 
     /// Create picture frame
+    #[must_use]
     pub fn picture(x: i32, y: i32, width: i32, height: i32, id: PictureId) -> Self {
         let mut shape = Self::new(ShapeKind::PictureFrame, x, y, width, height);
         shape.picture_index = Some(id);
@@ -519,60 +530,70 @@ impl Shape {
     }
 
     /// Set fill style
+    #[must_use]
     pub fn with_fill(mut self, fill: FillStyle) -> Self {
         self.style.fill = fill;
         self
     }
 
     /// Set solid fill color
+    #[must_use]
     pub fn with_fill_color(mut self, color: ShapeColor) -> Self {
         self.style.fill = FillStyle::solid(color);
         self
     }
 
     /// Set fill color from RGB
+    #[must_use]
     pub fn with_fill_rgb(mut self, r: u8, g: u8, b: u8) -> Self {
         self.style.fill = FillStyle::solid_rgb(r, g, b);
         self
     }
 
     /// Set no fill
+    #[must_use]
     pub fn with_no_fill(mut self) -> Self {
         self.style.fill = FillStyle::none();
         self
     }
 
     /// Set line style
+    #[must_use]
     pub fn with_line(mut self, line: LineStyleConfig) -> Self {
         self.style.line = line;
         self
     }
 
     /// Set line color and width
+    #[must_use]
     pub fn with_line_color(mut self, color: ShapeColor, width_pt: f32) -> Self {
         self.style.line = LineStyleConfig::with_color_and_width(color, width_pt);
         self
     }
 
     /// Set no line
+    #[must_use]
     pub fn with_no_line(mut self) -> Self {
         self.style.line = LineStyleConfig::none();
         self
     }
 
     /// Set text content
+    #[must_use]
     pub fn with_text(mut self, paragraphs: Vec<Paragraph>) -> Self {
         self.text = Some(paragraphs);
         self
     }
 
     /// Set rotation
+    #[must_use]
     pub fn with_rotation(mut self, degrees: f32) -> Self {
         self.rotation = degrees;
         self
     }
 
     /// Set flip
+    #[must_use]
     pub fn with_flip(mut self, horizontal: bool, vertical: bool) -> Self {
         self.flip_h = horizontal;
         self.flip_v = vertical;
@@ -580,6 +601,11 @@ impl Shape {
     }
 
     /// Set adjust value (shape-specific parameter)
+    ///
+    /// # Panics
+    ///
+    /// Panics if internal invariants are violated.
+    #[must_use]
     pub fn with_adjust(mut self, index: usize, value: i32) -> Self {
         assert!(
             index < 10,
@@ -593,20 +619,25 @@ impl Shape {
     }
 
     /// Build the Escher properties for this shape
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "float-to-int truncation toward zero is the intended 1/65536-degree fixed-point conversion, and adjust-value indices are bounded by the small `adjust_values` list"
+    )]
+    #[must_use]
     pub fn build_escher_properties(&self) -> Vec<(u16, u32)> {
         let mut props = self.style.build_properties();
 
         // Add rotation if non-zero
         if self.rotation.abs() > 0.001 {
             // Rotation is in 1/65536th of a degree
-            let rot_value = ((self.rotation * 65536.0) as i32) as u32;
-            props.push((0x0004, rot_value)); // rotation
+            let rot_value = (self.rotation * 65536.0) as i32;
+            props.push((0x0004, rot_value.cast_unsigned())); // rotation
         }
 
         // Add adjust values
         for (i, &value) in self.adjust_values.iter().enumerate() {
             let prop_id = 0x0147 + i as u16; // adjustValue, adjust2Value, etc.
-            props.push((prop_id, value as u32));
+            props.push((prop_id, value.cast_unsigned()));
         }
 
         // Add picture BLIP reference if present
@@ -618,6 +649,7 @@ impl Shape {
     }
 
     /// Get shape flags
+    #[must_use]
     pub fn get_shape_flags(&self) -> u32 {
         let mut flags = 0u32;
 
@@ -641,6 +673,7 @@ impl Shape {
     }
 
     /// Get bounds as (left, top, right, bottom)
+    #[must_use]
     pub fn bounds(&self) -> (i32, i32, i32, i32) {
         (self.x, self.y, self.x + self.width, self.y + self.height)
     }
@@ -658,6 +691,7 @@ pub struct ShapeCollection {
 
 impl ShapeCollection {
     /// Create new empty collection
+    #[must_use]
     pub fn new() -> Self {
         Self { shapes: Vec::new() }
     }
@@ -670,6 +704,7 @@ impl ShapeCollection {
     }
 
     /// Get shape by index
+    #[must_use]
     pub fn get(&self, index: usize) -> Option<&Shape> {
         self.shapes.get(index)
     }
@@ -680,11 +715,13 @@ impl ShapeCollection {
     }
 
     /// Get number of shapes
+    #[must_use]
     pub fn len(&self) -> usize {
         self.shapes.len()
     }
 
     /// Check if empty
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.shapes.is_empty()
     }
@@ -700,6 +737,7 @@ impl ShapeCollection {
     }
 
     /// Calculate bounding box of all shapes
+    #[must_use]
     pub fn bounds(&self) -> Option<(i32, i32, i32, i32)> {
         if self.shapes.is_empty() {
             return None;
@@ -727,6 +765,11 @@ impl ShapeCollection {
 // =============================================================================
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -831,9 +874,7 @@ mod tests {
             assert_eq!(
                 kind.to_escher_type(),
                 expected_type,
-                "{:?} should map to {}",
-                kind,
-                expected_type
+                "{kind:?} should map to {expected_type}"
             );
         }
     }
@@ -905,7 +946,7 @@ mod tests {
         let arrow = Shape::arrow(0, 0, 100, 0);
         assert_eq!(arrow.kind, ShapeKind::Line); // Arrow is a line with arrowhead
         // Arrow should have end arrow style set
-        assert!(arrow.style.line.end_arrow != ArrowStyle::None);
+        assert_ne!(arrow.style.line.end_arrow, ArrowStyle::None);
     }
 
     #[test]
@@ -973,13 +1014,13 @@ mod tests {
         assert_eq!(shape.style.fill.color.b, 0);
         assert!(shape.flip_h);
         assert!(!shape.flip_v);
-        assert_eq!(shape.rotation, 45.0);
+        assert!((shape.rotation - 45.0).abs() < f32::EPSILON);
     }
 
     #[test]
     fn test_shape_fill_color_methods() {
         let shape1 = Shape::rectangle(0, 0, 100, 100).with_fill_rgb(255, 0, 0);
-        assert_eq!(shape1.style.fill.color.to_rgbx(), 0x000000FF);
+        assert_eq!(shape1.style.fill.color.to_rgbx(), 0x0000_00FF);
 
         let shape2 = Shape::rectangle(0, 0, 100, 100).with_fill_color(ShapeColor::BLUE);
         assert_eq!(shape2.style.fill.color.b, 255);
@@ -1023,7 +1064,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "OfficeArt shapes support at most 10 adjustments")]
     fn test_shape_rejects_an_eleventh_adjustment() {
-        let _ = Shape::rectangle(0, 0, 100, 100).with_adjust(10, 1);
+        let _shape = Shape::rectangle(0, 0, 100, 100).with_adjust(10, 1);
     }
 
     #[test]
@@ -1048,8 +1089,8 @@ mod tests {
         let flags1 = shape1.get_shape_flags();
         assert!(flags1 & 0x0200 != 0); // fHaveAnchor
         assert!(flags1 & 0x0800 != 0); // fHaveSpt
-        assert!(flags1 & 0x0040 == 0); // fFlipH not set
-        assert!(flags1 & 0x0080 == 0); // fFlipV not set
+        assert_eq!(flags1 & 0x0040, 0); // fFlipH not set
+        assert_eq!(flags1 & 0x0080, 0); // fFlipV not set
 
         let shape2 = Shape::line(100, 100, 0, 0); // Backward line
         let flags2 = shape2.get_shape_flags();
@@ -1068,8 +1109,8 @@ mod tests {
         assert!(!collection.is_empty());
         assert_eq!(collection.len(), 1);
 
-        let idx = collection.add(Shape::ellipse(100, 100, 100, 100));
-        assert_eq!(idx, 1);
+        let idx_ellipse = collection.add(Shape::ellipse(100, 100, 100, 100));
+        assert_eq!(idx_ellipse, 1);
         assert_eq!(collection.len(), 2);
     }
 
@@ -1144,7 +1185,7 @@ mod tests {
 
     #[test]
     fn test_shape_collection_default() {
-        let collection: ShapeCollection = Default::default();
+        let collection = ShapeCollection::default();
         assert!(collection.is_empty());
     }
 

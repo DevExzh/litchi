@@ -1,4 +1,4 @@
-//! Optional system-font discovery and PowerPoint EOT publication.
+//! Optional system-font discovery and `PowerPoint` EOT publication.
 
 use litchi_fonts::{CollectGlyphs, GlyphMap, Prepared};
 
@@ -13,6 +13,10 @@ impl Package {
     /// The policy is available only to packages with a complete mutable
     /// presentation model. Opened packages retain opaque source text and are
     /// therefore rejected instead of risking an incomplete glyph inventory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_font_embedding(
         &mut self,
         embedding: litchi_fonts::embedding::Mode,
@@ -33,6 +37,10 @@ impl Package {
     }
 
     /// Select automatic system-font publication and return this package by value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn with_font_embedding(mut self, embedding: litchi_fonts::embedding::Mode) -> Result<Self> {
         self.set_font_embedding(embedding)?;
         Ok(self)
@@ -144,6 +152,11 @@ fn pitch(value: litchi_fonts::Pitch) -> Pitch {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use litchi_fonts::{Charset as FontCharset, FontProperties, License, Panose, Signature};

@@ -1,4 +1,4 @@
-//! Round-trip tests for the BIFF8 HeaderFooter record (even/first pages).
+//! Round-trip tests for the BIFF8 `HeaderFooter` record (even/first pages).
 
 use litchi_xls::writer::{PageSetupOptions, Writer};
 use litchi_xls::{HeaderFooter, Workbook};

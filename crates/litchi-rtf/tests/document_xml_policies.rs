@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{DocumentXmlPolicies, RtfDocument, RtfWriter};
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
@@ -31,7 +40,7 @@ fn parses_common_producer_policy_sequence() {
 
 #[test]
 fn omission_is_preserved_with_each_normative_effective_default() {
-    let document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     let policies = document.xml_policies();
     assert!(policies.is_empty());
     assert!(!policies.effective_rely_on_vml());
@@ -55,7 +64,7 @@ fn omission_is_preserved_with_each_normative_effective_default() {
 
 #[test]
 fn typed_api_round_trips_explicit_values_in_stable_order_and_clears() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     document.set_xml_policies(DocumentXmlPolicies {
         rely_on_vml: Some(true),
         validate_custom_xml: Some(false),
@@ -113,13 +122,13 @@ fn rejects_missing_non_boolean_overflow_and_duplicate_values() {
         "showxmlerrors",
     ] {
         for suffix in ["", "-1", "2", "32767", "99999999999"] {
-            let source = format!(r#"{{\rtf1\{name}{suffix} Body}}"#);
+            let source = format!(r"{{\rtf1\{name}{suffix} Body}}");
             assert!(
                 RtfDocument::parse(&source).is_err(),
                 "accepted malformed {source}"
             );
         }
-        let source = format!(r#"{{\rtf1\{name}0\{name}1 Body}}"#);
+        let source = format!(r"{{\rtf1\{name}0\{name}1 Body}}");
         assert!(
             RtfDocument::parse(&source).is_err(),
             "accepted duplicate {source}"
@@ -130,17 +139,17 @@ fn rejects_missing_non_boolean_overflow_and_duplicate_values() {
 #[test]
 fn rejects_every_starred_grouped_and_late_policy() {
     for control in [
-        r#"\relyonvml0"#,
-        r#"\validatexml1"#,
-        r#"\showplaceholdtext0"#,
-        r#"\ignoremixedcontent0"#,
-        r#"\saveinvalidxml0"#,
-        r#"\showxmlerrors1"#,
+        r"\relyonvml0",
+        r"\validatexml1",
+        r"\showplaceholdtext0",
+        r"\ignoremixedcontent0",
+        r"\saveinvalidxml0",
+        r"\showxmlerrors1",
     ] {
         for source in [
-            format!(r#"{{\rtf1{{\*{control}}}Body}}"#),
-            format!(r#"{{\rtf1{{{control}}}Body}}"#),
-            format!(r#"{{\rtf1 Body{control}}}"#),
+            format!(r"{{\rtf1{{\*{control}}}Body}}"),
+            format!(r"{{\rtf1{{{control}}}Body}}"),
+            format!(r"{{\rtf1 Body{control}}}"),
         ] {
             assert!(
                 RtfDocument::parse(&source).is_err(),

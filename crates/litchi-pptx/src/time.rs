@@ -1,4 +1,4 @@
-//! Checked PowerPoint 2010 universal time offsets.
+//! Checked `PowerPoint` 2010 universal time offsets.
 //!
 //! [`Offset`] implements the `p14:ST_UniversalTimeOffset` grammar from
 //! `[MS-PPTX]` section 2.3.4.6. Values are stored as canonical decimal
@@ -24,7 +24,7 @@ pub const MAX_BYTES: usize = 64;
 /// extended input is accepted only for unitless canonical milliseconds.
 pub const MAX_CANONICAL_BYTES: usize = MAX_BYTES + 16;
 
-/// A unit accepted by PowerPoint's universal-time-offset grammar.
+/// A unit accepted by `PowerPoint`'s universal-time-offset grammar.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u8)]
 pub enum Unit {
@@ -38,6 +38,7 @@ pub enum Unit {
 
 impl Unit {
     /// Return the unit suffix used by `[MS-PPTX]`.
+    #[must_use]
     pub const fn suffix(self) -> &'static str {
         match self {
             Self::Hour => "h",
@@ -134,7 +135,7 @@ enum Repr {
     Decimal(Box<str>),
 }
 
-/// A non-negative, exact PowerPoint universal time offset.
+/// A non-negative, exact `PowerPoint` universal time offset.
 ///
 /// The internal representation is private so its storage can evolve without
 /// exposing lexical strings in the semantic API. [`Self::as_str`] returns a
@@ -193,6 +194,10 @@ impl Offset {
     }
 
     /// Parse a decimal number paired with an explicit unit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn decimal(value: &str, unit: Unit) -> Result<Self, ParseError> {
         if value.is_empty() {
             return Err(ParseError::Empty);
@@ -217,6 +222,10 @@ impl Offset {
     }
 
     /// Parse an `[MS-PPTX]` universal-time-offset lexical value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     #[inline]
     pub fn parse(value: &str) -> Result<Self, ParseError> {
         value.parse()
@@ -224,11 +233,13 @@ impl Offset {
 
     /// Return whether this value is zero.
     #[inline]
+    #[must_use]
     pub const fn is_zero(&self) -> bool {
         matches!(self.0, Repr::Zero)
     }
 
     /// Return the canonical decimal-millisecond spelling.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         match &self.0 {
             Repr::Zero => "0",
@@ -238,6 +249,10 @@ impl Offset {
 
     /// Convert to [`Duration`] when the value has nanosecond precision and is
     /// within `Duration`'s range.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     #[inline]
     pub fn duration(&self) -> Result<Duration, ParseError> {
         Duration::try_from(self)
@@ -298,7 +313,7 @@ impl Offset {
 
         let (multiplier, unit_exponent) = unit.millisecond_parts();
         let fraction_digits =
-            i32::try_from(fraction_digits).map_err(|_| ParseError::InvalidNumber)?;
+            i32::try_from(fraction_digits).map_err(|_err| ParseError::InvalidNumber)?;
         let exponent = unit_exponent
             .checked_sub(fraction_digits)
             .ok_or(ParseError::InvalidNumber)?;
@@ -421,7 +436,7 @@ impl TryFrom<&Offset> for Duration {
 
         let mut coefficient = whole
             .parse::<u128>()
-            .map_err(|_| ParseError::NotRepresentableAsDuration)?;
+            .map_err(|_err| ParseError::NotRepresentableAsDuration)?;
         for digit in fraction.bytes() {
             coefficient = coefficient
                 .checked_mul(10)
@@ -436,9 +451,10 @@ impl TryFrom<&Offset> for Duration {
 
         let seconds = coefficient / 1_000_000_000;
         let nanoseconds = coefficient % 1_000_000_000;
-        let seconds = u64::try_from(seconds).map_err(|_| ParseError::NotRepresentableAsDuration)?;
+        let seconds =
+            u64::try_from(seconds).map_err(|_err| ParseError::NotRepresentableAsDuration)?;
         let nanoseconds =
-            u32::try_from(nanoseconds).map_err(|_| ParseError::NotRepresentableAsDuration)?;
+            u32::try_from(nanoseconds).map_err(|_err| ParseError::NotRepresentableAsDuration)?;
         Ok(Duration::new(seconds, nanoseconds))
     }
 }
@@ -578,6 +594,11 @@ fn compare_fraction(left: &str, right: &str) -> Ordering {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use std::collections::HashSet;

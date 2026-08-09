@@ -4,11 +4,11 @@ use litchi_odraw::shape::Shape;
 
 use super::package::corrupted;
 
-/// A parsed PowerPoint drawing with both its typed shapes and root records.
+/// A parsed `PowerPoint` drawing with both its typed shapes and root records.
 ///
 /// The shape projection intentionally omits records that do not describe
 /// visible shapes. The root records remain available here so callers can
-/// inspect unknown or future OfficeArt children without losing their borrowed
+/// inspect unknown or future `OfficeArt` children without losing their borrowed
 /// bytes. Use [`litchi_odraw::Container::try_new`] on a record when its direct
 /// children are needed.
 #[derive(Debug)]
@@ -22,13 +22,15 @@ impl<'data> Drawing<'data> {
         Self { records, shapes }
     }
 
-    /// Returns one validated OfficeArt root record for each drawing in the
+    /// Returns one validated `OfficeArt` root record for each drawing in the
     /// source stream, in source order.
+    #[must_use]
     pub fn records(&self) -> &[Record<'data>] {
         &self.records
     }
 
     /// Returns the typed, visible shape tree projected from the root records.
+    #[must_use]
     pub fn shapes(&self) -> &[Shape<'data>] {
         &self.shapes
     }
@@ -38,18 +40,18 @@ impl<'data> Drawing<'data> {
     }
 }
 
-/// Placeholder metadata embedded in a PowerPoint shape's client data.
+/// Placeholder metadata embedded in a `PowerPoint` shape's client data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Placeholder {
-    /// Placeholder position from the PowerPoint `PlaceholderAtom`.
+    /// Placeholder position from the `PowerPoint` `PlaceholderAtom`.
     pub position: Option<u16>,
-    /// Exact PowerPoint placeholder kind.
+    /// Exact `PowerPoint` placeholder kind.
     pub kind: crate::PlaceholderKind,
-    /// Checked PowerPoint placeholder size.
+    /// Checked `PowerPoint` placeholder size.
     pub size: crate::AtomPlaceholderSize,
 }
 
-/// Host-specific meaning of an OfficeArt picture-frame shape.
+/// Host-specific meaning of an `OfficeArt` picture-frame shape.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum FrameKind {
     /// An ordinary picture frame.
@@ -61,7 +63,7 @@ pub enum FrameKind {
     Media,
 }
 
-/// Checked PowerPoint shape bounds projected from either anchor encoding.
+/// Checked `PowerPoint` shape bounds projected from either anchor encoding.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Anchor {
     left: i32,
@@ -94,31 +96,37 @@ impl Anchor {
     }
 
     /// Minimum x-coordinate.
+    #[must_use]
     pub const fn left(self) -> i32 {
         self.left
     }
 
     /// Minimum y-coordinate.
+    #[must_use]
     pub const fn top(self) -> i32 {
         self.top
     }
 
     /// Maximum x-coordinate.
+    #[must_use]
     pub const fn right(self) -> i32 {
         self.right
     }
 
     /// Maximum y-coordinate.
+    #[must_use]
     pub const fn bottom(self) -> i32 {
         self.bottom
     }
 
-    /// Width in PowerPoint master units.
+    /// Width in `PowerPoint` master units.
+    #[must_use]
     pub const fn width(self) -> i32 {
         self.width
     }
 
-    /// Height in PowerPoint master units.
+    /// Height in `PowerPoint` master units.
+    #[must_use]
     pub const fn height(self) -> i32 {
         self.height
     }
@@ -130,75 +138,139 @@ pub(super) struct Frame {
     pub(super) object_id: Option<u32>,
 }
 
-/// PowerPoint-only behavior layered over a neutral OfficeArt shape.
+/// PowerPoint-only behavior layered over a neutral `OfficeArt` shape.
 ///
 /// Import this trait as `_` at PPT call sites.  The resulting method surface
 /// stays short without exposing `ClientData` record IDs to API users.
 pub trait ShapeExt {
-    /// Decodes the shape's PPT textbox payload.
-    fn text(&self) -> Result<Option<String>>;
-
-    /// Projects legacy placeholder metadata into checked semantic values.
-    fn placeholder(&self) -> Result<Option<Placeholder>>;
-
-    /// Distinguishes pictures, OLE frames, and media frames.
-    fn frame_kind(&self) -> Result<FrameKind>;
+    /// Parses inert legacy `PowerPoint` animation metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    fn animation(&self) -> Result<Option<crate::animation::AnimationInfo>>;
 
     /// Returns the PPT external-object reference for an OLE or media frame.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     fn external_object_id(&self) -> Result<Option<u32>>;
 
+    /// Distinguishes pictures, OLE frames, and media frames.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    fn frame_kind(&self) -> Result<FrameKind>;
+
     /// Parses click and mouse-over actions with default limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     fn interactions(&self) -> Result<Vec<crate::Interaction>>;
 
     /// Parses click and mouse-over actions with explicit limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     fn interactions_with_limits(
         &self,
         limits: crate::InteractionLimits,
     ) -> Result<Vec<crate::Interaction>>;
 
-    /// Parses range-anchored text actions with default limits.
-    fn text_interactions(&self) -> Result<Vec<crate::TextInteraction>>;
-
-    /// Parses range-anchored text actions with explicit limits.
-    fn text_interactions_with_limits(
-        &self,
-        limits: crate::TextInteractionLimits,
-    ) -> Result<Vec<crate::TextInteraction>>;
+    /// Projects legacy placeholder metadata into checked semantic values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    fn placeholder(&self) -> Result<Option<Placeholder>>;
 
     /// Parses a context-validated placeholder atom with default limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     fn placeholder_atom(
         &self,
         context: crate::PlaceholderContext,
     ) -> Result<Option<crate::PlaceholderAtom>>;
 
     /// Parses a context-validated placeholder atom with explicit limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     fn placeholder_atom_with_limits(
         &self,
         context: crate::PlaceholderContext,
         limits: crate::PlaceholderLimits,
     ) -> Result<Option<crate::PlaceholderAtom>>;
 
-    /// Parses PowerPoint 12 shape round-trip metadata.
+    /// Parses `PowerPoint` 12 shape round-trip metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     fn powerpoint12_shape_metadata(&self) -> Result<Option<crate::ShapeMetadata>>;
 
-    /// Parses inert shape programmable tags with default limits.
-    fn programmable_tags(&self) -> Result<Option<crate::ShapeProgrammableTags>>;
-
-    /// Parses inert shape programmable tags with explicit limits.
-    fn programmable_tags_with_limits(
-        &self,
-        limits: crate::ShapeProgrammableTagLimits,
-    ) -> Result<Option<crate::ShapeProgrammableTags>>;
-
     /// Parses the PPT shape-flag projection with default limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     fn ppt_flags(&self) -> Result<Option<crate::ShapeFlagProjection>>;
 
     /// Parses the PPT shape-flag projection with explicit limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     fn ppt_flags_with(
         &self,
         limits: crate::ShapeFlagLimits,
     ) -> Result<Option<crate::ShapeFlagProjection>>;
 
-    /// Parses inert legacy PowerPoint animation metadata.
-    fn animation(&self) -> Result<Option<crate::animation::AnimationInfo>>;
+    /// Parses inert shape programmable tags with default limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    fn programmable_tags(&self) -> Result<Option<crate::ShapeProgrammableTags>>;
+
+    /// Parses inert shape programmable tags with explicit limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    fn programmable_tags_with_limits(
+        &self,
+        limits: crate::ShapeProgrammableTagLimits,
+    ) -> Result<Option<crate::ShapeProgrammableTags>>;
+
+    /// Decodes the shape's PPT textbox payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    fn text(&self) -> Result<Option<String>>;
+
+    /// Parses range-anchored text actions with default limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    fn text_interactions(&self) -> Result<Vec<crate::TextInteraction>>;
+
+    /// Parses range-anchored text actions with explicit limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    fn text_interactions_with_limits(
+        &self,
+        limits: crate::TextInteractionLimits,
+    ) -> Result<Vec<crate::TextInteraction>>;
 }

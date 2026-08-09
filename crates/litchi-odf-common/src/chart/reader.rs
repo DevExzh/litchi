@@ -4,7 +4,7 @@ use crate::namespace::{CHARTNS, OFFICENS};
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesRef, Event};
-use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
 const MAX_CONTENT_BYTES: usize = 256 * 1024 * 1024;
@@ -52,6 +52,7 @@ pub struct Attribute {
     namespace_uri: Option<String>,
     local_name: String,
     value: String,
+    value_namespace_uri: Option<String>,
 }
 
 impl Attribute {
@@ -139,6 +140,22 @@ impl Element {
                 attribute.namespace_uri() == namespace_uri && attribute.local_name == local_name
             })
             .map(Attribute::value)
+    }
+
+    /// Decode the element's `chart:class` value as a typed namespaced token.
+    ///
+    /// The parser retains the exact QName spelling and resolves its prefix in
+    /// the producer's namespace context, so aliases are not normalized.
+    pub fn chart_class(&self) -> Result<super::ChartClass> {
+        let attribute = self
+            .attributes
+            .iter()
+            .find(|attribute| {
+                attribute.namespace_uri.as_deref() == Some(CHARTNS)
+                    && attribute.local_name == "class"
+            })
+            .ok_or_else(|| invalid_error("chart:chart requires chart:class"))?;
+        super::ChartClass::parse(&attribute.value, attribute.value_namespace_uri.as_deref())
     }
 
     /// Return direct character content, excluding descendant text.
@@ -446,10 +463,30 @@ fn make_node(
         if value.len() > MAX_ATTRIBUTE_BYTES {
             return invalid("chart attribute exceeds 1 MiB");
         }
+        let value_namespace_uri = if namespace_uri.as_deref() == Some(CHARTNS)
+            && attribute_name == "class"
+        {
+            let (value_namespace, _) = reader.resolver().resolve_element(QName(value.as_bytes()));
+            match value_namespace {
+                ResolveResult::Unbound => None,
+                ResolveResult::Bound(Namespace(uri)) => {
+                    Some(decode_name(uri, "chart class namespace URI")?)
+                },
+                ResolveResult::Unknown(prefix) => {
+                    return invalid(format!(
+                        "unknown chart class namespace prefix '{}'",
+                        String::from_utf8_lossy(&prefix)
+                    ));
+                },
+            }
+        } else {
+            None
+        };
         attributes.push(Attribute {
             namespace_uri,
             local_name: attribute_name,
             value,
+            value_namespace_uri,
         });
     }
 

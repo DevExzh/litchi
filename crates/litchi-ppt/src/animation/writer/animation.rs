@@ -1,7 +1,7 @@
-//! PowerPoint 97 animation-info records.
+//! `PowerPoint` 97 animation-info records.
 
 use super::build::map_effect_to_ppt97;
-use super::support::{create_record_header, serialize_raw_record};
+use super::support::{create_record_header, serialize_raw_record, wrap_record};
 use crate::animation::types::{
     AfterEffect, AnimationInfo, LegacyAnimationAtom, LegacyAnimationBuild, LegacyAnimationEffect,
     LegacyTextBuildSubEffect,
@@ -9,9 +9,10 @@ use crate::animation::types::{
 use crate::consts::RecordType;
 use crate::package::{Error, Result};
 
-/// Write InteractiveInfo container with InteractiveInfoAtom for animations.
-/// Per POI MovieShape, this is required alongside AnimationInfo in ClientData.
+/// Write `InteractiveInfo` container with `InteractiveInfoAtom` for animations.
+/// Per POI `MovieShape`, this is required alongside `AnimationInfo` in `ClientData`.
 /// For sound animations, soundRef should match AnimationInfoAtom.soundRef
+#[must_use]
 pub fn write_interactive_info_with_sound(sound_ref: u32) -> Vec<u8> {
     let mut data = Vec::new();
 
@@ -28,6 +29,10 @@ pub fn write_interactive_info_with_sound(sound_ref: u32) -> Vec<u8> {
     atom_data.extend(&0u8.to_le_bytes()); // unknown2
     atom_data.extend(&0u8.to_le_bytes()); // unknown3
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the InteractiveInfoAtom payload above is a fixed 16 bytes"
+    )]
     let atom_header = create_record_header(
         RecordType::InteractiveInfoAtom,
         0x00,
@@ -40,6 +45,10 @@ pub fn write_interactive_info_with_sound(sound_ref: u32) -> Vec<u8> {
     children.extend(atom_data);
 
     // InteractiveInfo container wrapping the atom
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the children are a fixed 8-byte header plus the 16-byte atom"
+    )]
     let header = create_record_header(RecordType::InteractiveInfo, 0x0F, 0, children.len() as u32);
     data.extend(header);
     data.extend(children);
@@ -47,8 +56,12 @@ pub fn write_interactive_info_with_sound(sound_ref: u32) -> Vec<u8> {
     data
 }
 
-/// Write AnimationInfo container record.
-/// Returns (AnimationInfo bytes, sound_ref for InteractiveInfo)
+/// Write `AnimationInfo` container record.
+/// Returns (`AnimationInfo` bytes, `sound_ref` for `InteractiveInfo`)
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
 pub fn write_animation_info(info: &AnimationInfo) -> Result<(Vec<u8>, u32)> {
     if !info.time_nodes.is_empty() {
         return Err(Error::InvalidFormat(
@@ -56,8 +69,6 @@ pub fn write_animation_info(info: &AnimationInfo) -> Result<(Vec<u8>, u32)> {
                 .to_string(),
         ));
     }
-    let mut data = Vec::new();
-
     let mut children: Vec<u8> = Vec::new();
 
     // AnimationInfoAtom MUST be the first child (per POI)
@@ -79,7 +90,7 @@ pub fn write_animation_info(info: &AnimationInfo) -> Result<(Vec<u8>, u32)> {
         let sound = info.sound.as_ref().or(build_sound);
         LegacyAnimationAtom {
             has_sound: sound.is_some(),
-            sound_id_ref: sound.map_or(0, |sound| sound.sound_ref),
+            sound_id_ref: sound.map_or(0, |animation_sound| animation_sound.sound_ref),
             build_type: if info.has_animations() {
                 LegacyAnimationBuild::OneBuild
             } else {
@@ -94,7 +105,10 @@ pub fn write_animation_info(info: &AnimationInfo) -> Result<(Vec<u8>, u32)> {
                 crate::animation::triggers::IterationType::ByLetter => {
                     LegacyTextBuildSubEffect::ByCharacter
                 },
-                _ => LegacyTextBuildSubEffect::AllAtOnce,
+                crate::animation::triggers::IterationType::All
+                | crate::animation::triggers::IterationType::ByElement => {
+                    LegacyTextBuildSubEffect::AllAtOnce
+                },
             },
             ..LegacyAnimationAtom::default()
         }
@@ -118,14 +132,16 @@ pub fn write_animation_info(info: &AnimationInfo) -> Result<(Vec<u8>, u32)> {
         children.extend(serialize_raw_record(raw_record));
     }
 
-    let header = create_record_header(RecordType::AnimationInfo, 0x0F, 0, children.len() as u32);
-    data.extend(header);
-    data.extend(children);
+    let data = wrap_record(RecordType::AnimationInfo, 0x0F, 0, children)?;
 
     Ok((data, sound_ref))
 }
 
-/// Serialize an exact PowerPoint 97 `AnimationInfoAtom`.
+/// Serialize an exact `PowerPoint` 97 `AnimationInfoAtom`.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
 pub fn write_animation_info_atom(atom: &LegacyAnimationAtom) -> Result<Vec<u8>> {
     if atom.automatic && atom.delay_time_ms < 0 {
         return Err(Error::InvalidFormat(

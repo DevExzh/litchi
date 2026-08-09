@@ -242,7 +242,8 @@ mod tests {
     fn atom(kind: u16, body: &[u8]) -> Vec<u8> {
         let mut bytes = vec![0x00, 0x00];
         bytes.extend_from_slice(&kind.to_le_bytes());
-        bytes.extend_from_slice(&(body.len() as u32).to_le_bytes());
+        let length = u32::try_from(body.len()).expect("body length fits in u32");
+        bytes.extend_from_slice(&length.to_le_bytes());
         bytes.extend_from_slice(body);
         bytes
     }
@@ -266,12 +267,12 @@ mod tests {
         let mut children = atom(RecordKind::Sp.raw(), &[1, 2, 3, 4]);
         children.extend_from_slice(&atom(RecordKind::Opt.raw(), &[5, 6]));
         let records: Result<Vec<_>> = Children::new(&children).collect();
-        let records = records.expect("valid children");
+        let parsed = records.expect("valid children");
 
-        assert_eq!(records.len(), 2);
-        assert_eq!(records[0].kind(), RecordKind::Sp);
-        assert_eq!(records[1].kind(), RecordKind::Opt);
-        assert_eq!(records[0].data(), &children[8..12]);
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0].kind(), RecordKind::Sp);
+        assert_eq!(parsed[1].kind(), RecordKind::Opt);
+        assert_eq!(parsed[0].data(), &children[8..12]);
     }
 
     #[test]
@@ -314,10 +315,12 @@ mod tests {
     fn recursive_traversal_enforces_record_and_depth_limits() {
         let atom = atom(RecordKind::Sp.raw(), &[]);
         let mut nested = vec![0x0F, 0x00, 0x04, 0xF0];
-        nested.extend_from_slice(&(atom.len() as u32).to_le_bytes());
+        let atom_length = u32::try_from(atom.len()).expect("atom length fits in u32");
+        nested.extend_from_slice(&atom_length.to_le_bytes());
         nested.extend_from_slice(&atom);
         let mut root = vec![0x0F, 0x00, 0x02, 0xF0];
-        root.extend_from_slice(&(nested.len() as u32).to_le_bytes());
+        let nested_length = u32::try_from(nested.len()).expect("nested length fits in u32");
+        root.extend_from_slice(&nested_length.to_le_bytes());
         root.extend_from_slice(&nested);
 
         let record = Record::parse(&root, 0).expect("valid root").0;

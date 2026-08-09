@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{ParagraphFontAlignment, ParagraphWrapping, RtfDocument, RtfWriter, StyleBlock};
 
 fn block<'a>(document: &'a RtfDocument<'a>, needle: &str) -> &'a StyleBlock<'a> {
@@ -36,7 +45,7 @@ fn parses_group_inheritance_resets_destinations_and_all_selectors() {
     assert_eq!(block(&document, "Tail").paragraph.line_breaking, outer);
     assert_eq!(
         block(&document, "Reset").paragraph.line_breaking,
-        Default::default()
+        litchi_rtf::ParagraphLineBreaking::default()
     );
     assert_eq!(
         block(&document, "Overflow")
@@ -71,7 +80,7 @@ fn parses_group_inheritance_resets_destinations_and_all_selectors() {
 #[test]
 fn deterministic_writer_and_stylesheet_round_trip() {
     let document = RtfDocument::parse(
-        r#"{\rtf1{\stylesheet{\s7\hyphpar\aspalpha\aspnum\nooverflow\facenter\adjustright Body;}}\pard\hyphpar\aspalpha\aspnum\nooverflow\facenter\adjustright Body}"#,
+        r"{\rtf1{\stylesheet{\s7\hyphpar\aspalpha\aspnum\nooverflow\facenter\adjustright Body;}}\pard\hyphpar\aspalpha\aspnum\nooverflow\facenter\adjustright Body}",
     ).unwrap();
     let expected = document
         .stylesheet()
@@ -86,7 +95,7 @@ fn deterministic_writer_and_stylesheet_round_trip() {
         .write_document(&document)
         .unwrap();
     let text = String::from_utf8(first.clone()).unwrap();
-    assert!(text.contains(r#"\hyphpar\nooverflow\aspalpha\aspnum\facenter\adjustright"#));
+    assert!(text.contains(r"\hyphpar\nooverflow\aspalpha\aspnum\facenter\adjustright"));
     let reparsed = RtfDocument::parse_bytes(&first).unwrap();
     assert_eq!(
         reparsed
@@ -151,20 +160,20 @@ fn parses_real_libreoffice_fixture() {
 #[test]
 fn rejects_invalid_parameters() {
     for source in [
-        r#"{\rtf1\hyphpar2 X}"#,
-        r#"{\rtf1\aspalpha-1 X}"#,
-        r#"{\rtf1\aspnum9 X}"#,
-        r#"{\rtf1\adjustright3 X}"#,
-        r#"{\rtf1\wrapdefault0 X}"#,
-        r#"{\rtf1\nocwrap1 X}"#,
-        r#"{\rtf1\nowwrap0 X}"#,
-        r#"{\rtf1\nooverflow1 X}"#,
-        r#"{\rtf1\faauto0 X}"#,
-        r#"{\rtf1\fahang1 X}"#,
-        r#"{\rtf1\facenter1 X}"#,
-        r#"{\rtf1\faroman1 X}"#,
-        r#"{\rtf1\favar1 X}"#,
-        r#"{\rtf1\fafixed1 X}"#,
+        r"{\rtf1\hyphpar2 X}",
+        r"{\rtf1\aspalpha-1 X}",
+        r"{\rtf1\aspnum9 X}",
+        r"{\rtf1\adjustright3 X}",
+        r"{\rtf1\wrapdefault0 X}",
+        r"{\rtf1\nocwrap1 X}",
+        r"{\rtf1\nowwrap0 X}",
+        r"{\rtf1\nooverflow1 X}",
+        r"{\rtf1\faauto0 X}",
+        r"{\rtf1\fahang1 X}",
+        r"{\rtf1\facenter1 X}",
+        r"{\rtf1\faroman1 X}",
+        r"{\rtf1\favar1 X}",
+        r"{\rtf1\fafixed1 X}",
     ] {
         assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
     }

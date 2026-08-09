@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{DocumentDataStore, RtfDocument, RtfWriter};
 use std::borrow::Cow;
 use std::fs;
@@ -13,14 +22,14 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 #[test]
 fn parses_inert_data_store_bytes_and_round_trips() {
     let document =
-        RtfDocument::parse(r#"{\rtf1{\*\datastore 01050000 0200000018000000}Body}"#).unwrap();
+        RtfDocument::parse(r"{\rtf1{\*\datastore 01050000 0200000018000000}Body}").unwrap();
     assert_eq!(document.text(), "Body");
     let store = document.data_store().unwrap();
     assert_eq!(store.data.as_ref(), [1, 5, 0, 0, 2, 0, 0, 0, 24, 0, 0, 0]);
 
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
-    assert!(serialized.contains(r#"{\*\datastore 010500000200000018000000}"#));
+    assert!(serialized.contains(r"{\*\datastore 010500000200000018000000}"));
     let reparsed = RtfDocument::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.data_store(), Some(store));
@@ -29,7 +38,7 @@ fn parses_inert_data_store_bytes_and_round_trips() {
 #[test]
 fn mutation_validates_and_clear_preserves_body() {
     let store = DocumentDataStore::new(Cow::Borrowed(b"opaque\0bytes")).unwrap();
-    let mut document = RtfDocument::parse(r#"{\rtf1 Text}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Text}").unwrap();
     document.set_data_store(store.clone()).unwrap();
     let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.data_store(), Some(&store));
@@ -44,15 +53,15 @@ fn mutation_validates_and_clear_preserves_body() {
 #[test]
 fn rejects_malformed_or_active_data_store_payloads() {
     let cases = [
-        r#"{\rtf1{\datastore 00}}"#,
-        r#"{\rtf1{\*\datastore 00}{\*\datastore 01}}"#,
-        r#"{\rtf1{\*\datastore }}"#,
-        r#"{\rtf1{\*\datastore 0}}"#,
-        r#"{\rtf1{\*\datastore 0x}}"#,
-        r#"{\rtf1{\*\datastore 00{11}}}"#,
-        r#"{\rtf1{\*\datastore 00\b 11}}"#,
-        r#"{\rtf1{\*\datastore\bin2 xx}}"#,
-        r#"{\rtf1\datastore 00}"#,
+        r"{\rtf1{\datastore 00}}",
+        r"{\rtf1{\*\datastore 00}{\*\datastore 01}}",
+        r"{\rtf1{\*\datastore }}",
+        r"{\rtf1{\*\datastore 0}}",
+        r"{\rtf1{\*\datastore 0x}}",
+        r"{\rtf1{\*\datastore 00{11}}}",
+        r"{\rtf1{\*\datastore 00\b 11}}",
+        r"{\rtf1{\*\datastore\bin2 xx}}",
+        r"{\rtf1\datastore 00}",
     ];
     for rtf in cases {
         assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");

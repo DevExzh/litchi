@@ -1,15 +1,19 @@
+#![allow(
+    clippy::print_stdout,
+    reason = "this command-line example intentionally prints its results"
+)]
+
 //! Example demonstrating PPT slide transitions
 //!
 //! This example creates a PPT file showcasing various slide transition effects
 //! including speed variations, directions, and advance modes.
 //!
-//! Run with: cargo run --example ppt_transitions_example
+//! Run with: `cargo run --example ppt_transitions_example`
 
 use litchi_ppt::Writer;
 use litchi_ppt::transition::{
     AdvanceMode, TransitionDirection, TransitionInfo, TransitionSpeed, TransitionType,
 };
-use litchi_ppt::writer::SlideTiming;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating PPT file with transitions...");
@@ -33,7 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let transition1 = TransitionInfo::with_type(TransitionType::Fade)
         .with_speed(TransitionSpeed::Medium)
         .with_advance_mode(AdvanceMode::OnClick);
-    writer.set_slide_timing(slide1, timing_from_transition(&transition1))?;
+    writer.set_slide_transition(slide1, transition1)?;
 
     // Slide 2: Directional Transitions
     println!("Creating slide 2: Directional Transitions");
@@ -45,7 +49,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_speed(TransitionSpeed::Fast)
         .with_direction(TransitionDirection::FromLeft)
         .with_advance_mode(AdvanceMode::OnClick);
-    writer.set_slide_timing(slide2, timing_from_transition(&transition2))?;
+    writer.set_slide_transition(slide2, transition2)?;
 
     // Slide 3: Wipe Transitions
     println!("Creating slide 3: Wipe Variations");
@@ -57,7 +61,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_speed(TransitionSpeed::Medium)
         .with_direction(TransitionDirection::FromBottom)
         .with_advance_mode(AdvanceMode::OnClick);
-    writer.set_slide_timing(slide3, timing_from_transition(&transition3))?;
+    writer.set_slide_transition(slide3, transition3)?;
 
     // Slide 4: Split Transitions
     println!("Creating slide 4: Split Transitions");
@@ -155,10 +159,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Slide 12: Speed Comparison
     println!("Creating slide 12: Speed Comparison");
-    let slide12 = writer.add_slide()?;
-    writer.add_textbox(slide12, 100, 100, 600, 80, "Speed Variations")?;
+    let speed_slide = writer.add_slide()?;
+    writer.add_textbox(speed_slide, 100, 100, 600, 80, "Speed Variations")?;
     writer.add_textbox(
-        slide12,
+        speed_slide,
         100,
         200,
         600,
@@ -166,20 +170,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Transition Speeds:\n\n• Slow (2 seconds)\n• Medium (1 second)\n• Fast (0.5 seconds)",
     )?;
 
-    let transition12 = TransitionInfo::with_type(TransitionType::Fade)
+    let speed_transition = TransitionInfo::with_type(TransitionType::Fade)
         .with_speed(TransitionSpeed::Slow)
         .with_advance_mode(AdvanceMode::OnClick);
 
     // Set transitions for remaining slides
-    writer.set_slide_timing(slide4, timing_from_transition(&transition4))?;
-    writer.set_slide_timing(slide5, timing_from_transition(&transition5))?;
-    writer.set_slide_timing(slide6, timing_from_transition(&transition6))?;
-    writer.set_slide_timing(slide7, timing_from_transition(&transition7))?;
-    writer.set_slide_timing(slide8, timing_from_transition(&transition8))?;
-    writer.set_slide_timing(slide9, timing_from_transition(&transition9))?;
-    writer.set_slide_timing(slide10, timing_from_transition(&transition10))?;
-    writer.set_slide_timing(slide11, timing_from_transition(&transition11))?;
-    writer.set_slide_timing(slide12, timing_from_transition(&transition12))?;
+    writer.set_slide_transition(slide4, transition4)?;
+    writer.set_slide_transition(slide5, transition5)?;
+    writer.set_slide_transition(slide6, transition6)?;
+    writer.set_slide_transition(slide7, transition7)?;
+    writer.set_slide_transition(slide8, transition8)?;
+    writer.set_slide_transition(slide9, transition9)?;
+    writer.set_slide_transition(slide10, transition10)?;
+    writer.set_slide_transition(slide11, transition11)?;
+    writer.set_slide_transition(speed_slide, speed_transition)?;
 
     // Save the presentation
     println!("Saving to ppt_transitions_showcase.ppt...");
@@ -198,17 +202,4 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Press F5 to enter Slide Show mode and observe the transitions between slides!");
 
     Ok(())
-}
-
-fn timing_from_transition(transition: &TransitionInfo) -> SlideTiming {
-    match transition.advance_mode {
-        AdvanceMode::OnClick => SlideTiming::on_click_only(),
-        AdvanceMode::Automatic => {
-            SlideTiming::auto_advance(transition.advance_time_ms.unwrap_or_default())
-                .with_click_advance(false)
-        },
-        AdvanceMode::Both => {
-            SlideTiming::auto_advance(transition.advance_time_ms.unwrap_or_default())
-        },
-    }
 }

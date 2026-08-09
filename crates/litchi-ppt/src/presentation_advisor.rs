@@ -8,7 +8,7 @@ use super::records::Record;
 const PRESENTATION_ADVISOR_RECORD_TYPE: u16 = 0x177a;
 const ADVISOR_RULE_MASK: u32 = 0x07ff;
 
-/// A presentation-style rule that PowerPoint can suppress warnings for.
+/// A presentation-style rule that `PowerPoint` can suppress warnings for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum AdvisorRule {
@@ -41,24 +41,34 @@ impl AdvisorRule {
         Self::PrintTip,
     ];
 
-    const fn bit(self) -> u32 {
-        1 << self as u8
+    const fn bit(self) -> u16 {
+        1u16 << (self as u8)
     }
 }
 
 /// Compact Presentation Advisor suppression settings.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`PresentationAdvisorSettings` is the established public API name; renaming it would break downstream crates"
+)]
 pub struct PresentationAdvisorSettings {
     disabled_mask: u16,
 }
 
 impl PresentationAdvisorSettings {
     /// Create settings with every advisor rule enabled.
+    #[must_use]
     pub const fn new() -> Self {
         Self { disabled_mask: 0 }
     }
 
     /// Parse one strict `PresAdvisorFlags9Atom`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record header or size is invalid or reserved
+    /// flag bits are set.
     pub fn parse(record: &Record) -> Result<Self> {
         if record.record_type_raw != PRESENTATION_ADVISOR_RECORD_TYPE
             || record.version != 0
@@ -69,15 +79,21 @@ impl PresentationAdvisorSettings {
                 "PresAdvisorFlags9Atom has an invalid record header or size".to_string(),
             ));
         }
-        let flags = u32::from_le_bytes(record.data[0..4].try_into().unwrap());
+        let flags = u32::from_le_bytes([
+            record.data[0],
+            record.data[1],
+            record.data[2],
+            record.data[3],
+        ]);
         if flags & !ADVISOR_RULE_MASK != 0 {
             return Err(Error::Corrupted(
                 "PresAdvisorFlags9Atom has nonzero reserved bits".to_string(),
             ));
         }
-        Ok(Self {
-            disabled_mask: flags as u16,
-        })
+        let disabled_mask = u16::try_from(flags).map_err(|_err| {
+            Error::Corrupted("PresAdvisorFlags9Atom flags exceed 16 bits".to_string())
+        })?;
+        Ok(Self { disabled_mask })
     }
 
     /// Discover the single advisor atom in the PPT9 document tag.
@@ -98,18 +114,19 @@ impl PresentationAdvisorSettings {
     }
 
     /// Return whether warnings for `rule` are disabled.
+    #[must_use]
     pub const fn is_disabled(self, rule: AdvisorRule) -> bool {
-        self.disabled_mask as u32 & rule.bit() != 0
+        self.disabled_mask & rule.bit() != 0
     }
 
     /// Disable warnings for `rule`.
     pub fn disable(&mut self, rule: AdvisorRule) {
-        self.disabled_mask |= rule.bit() as u16;
+        self.disabled_mask |= rule.bit();
     }
 
     /// Enable warnings for `rule`.
     pub fn enable(&mut self, rule: AdvisorRule) {
-        self.disabled_mask &= !(rule.bit() as u16);
+        self.disabled_mask &= !rule.bit();
     }
 
     /// Iterate over disabled rules in specification bit order.
@@ -119,7 +136,8 @@ impl PresentationAdvisorSettings {
             .filter(move |rule| self.is_disabled(*rule))
     }
 
-    /// Encode the exact PowerPoint 9 atom.
+    /// Encode the exact `PowerPoint` 9 atom.
+    #[must_use]
     pub fn to_record(self) -> Record {
         let flags = u32::from(self.disabled_mask);
         Record {
@@ -135,6 +153,11 @@ impl PresentationAdvisorSettings {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

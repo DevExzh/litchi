@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{RtfDocument, RtfWriter};
 
 #[test]
@@ -23,7 +32,7 @@ fn splits_real_libreoffice_floating_tables_at_non_table_paragraphs() {
 
 #[test]
 fn formatting_only_gap_is_an_ambiguous_continuation() {
-    let source = r#"{\rtf1\trowd\tphpg\tposx10\cellx1\intbl A\cell\row \pard {\b } \trowd\tphpg\tposx10\cellx1\intbl B\cell\row}"#;
+    let source = r"{\rtf1\trowd\tphpg\tposx10\cellx1\intbl A\cell\row \pard {\b } \trowd\tphpg\tposx10\cellx1\intbl B\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     assert_eq!(document.tables().len(), 1);
     assert_eq!(document.tables()[0].row_count(), 2);
@@ -32,8 +41,8 @@ fn formatting_only_gap_is_an_ambiguous_continuation() {
 #[test]
 fn rejects_inconsistent_positioning_without_a_provable_boundary() {
     for source in [
-        r#"{\rtf1\trowd\tphpg\tposx10\cellx1\intbl A\cell\row\trowd\tphpg\tposx20\cellx1\intbl B\cell\row}"#,
-        r#"{\rtf1\trowd\tphpg\tposx10\cellx1\intbl A\cell\row\pard {\*\unknown\tposx20 ignored}\trowd\tphpg\tposx20\cellx1\intbl B\cell\row}"#,
+        r"{\rtf1\trowd\tphpg\tposx10\cellx1\intbl A\cell\row\trowd\tphpg\tposx20\cellx1\intbl B\cell\row}",
+        r"{\rtf1\trowd\tphpg\tposx10\cellx1\intbl A\cell\row\pard {\*\unknown\tposx20 ignored}\trowd\tphpg\tposx20\cellx1\intbl B\cell\row}",
     ] {
         assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
     }
@@ -41,7 +50,7 @@ fn rejects_inconsistent_positioning_without_a_provable_boundary() {
 
 #[test]
 fn writer_preserves_logical_boundaries_deterministically() {
-    let source = r#"{\rtf1\trowd\tphpg\tposx10\cellx1\intbl A\cell\row\pard Between\par\trowd\tpvpara\tposy20\tabsnoovrlp\cellx1\intbl B\cell\row}"#;
+    let source = r"{\rtf1\trowd\tphpg\tposx10\cellx1\intbl A\cell\row\pard Between\par\trowd\tpvpara\tposy20\tabsnoovrlp\cellx1\intbl B\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     assert_eq!(document.tables().len(), 2);
     let mut first = Vec::new();

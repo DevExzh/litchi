@@ -46,8 +46,8 @@ pub(crate) fn validate_fields(master: &Master) -> Result<()> {
             "handout date-time declaration name",
         ),
     ] {
-        if let Some(value) = value {
-            validate_name(value, label)?;
+        if let Some(name) = value {
+            validate_name(name, label)?;
         }
     }
     if master.children.len() > MAX_CHILDREN {

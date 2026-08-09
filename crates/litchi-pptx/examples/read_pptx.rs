@@ -1,3 +1,8 @@
+#![allow(
+    clippy::print_stdout,
+    reason = "this command-line example intentionally prints its results"
+)]
+
 //! Open a `.pptx` presentation and print its slide count plus per-slide name
 //! (which corresponds to the slide title when one is set) and text content.
 //!
@@ -22,12 +27,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "test-data/ooxml/pptx/sample.pptx".to_string()
     };
 
-    println!("Opening PPTX: {}", path);
+    println!("Opening PPTX: {path}");
     let pkg = Package::open(&path)?;
     let pres = pkg.presentation()?;
 
     let slide_count = pres.slide_count()?;
-    println!("Slide count: {}", slide_count);
+    println!("Slide count: {slide_count}");
 
     let (width, height) = pres.slide_size()?;
     println!("Slide size : {width}x{height} EMUs");
@@ -45,11 +50,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             slide_count,
             shape_count
         );
-        println!("Name : {}", name);
+        println!("Name : {name}");
         if text.is_empty() {
             println!("(no text content)");
         } else {
-            println!("Text :\n{}", text);
+            println!("Text :\n{text}");
         }
     }
 

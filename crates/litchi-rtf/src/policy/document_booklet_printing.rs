@@ -17,6 +17,7 @@ pub struct DocumentBookletPrinting {
 
 impl DocumentBookletPrinting {
     /// Return whether no booklet-printing metadata was present.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         !self.book_fold && !self.reverse_book_fold && self.sheets_per_booklet.is_none()
     }

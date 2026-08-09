@@ -23,6 +23,13 @@ impl<'data> Props<'data> {
     }
 
     /// Parses the primary Opt child when present.
+    ///
+    /// # Errors
+    ///
+    /// Returns the `Error` from `Container::find` when a child record
+    /// preceding the match is malformed, and `Error::MalformedProperties`
+    /// or `Error::ArithmeticOverflow` from `Props::parse` when the Opt
+    /// table itself is malformed.
     pub fn from_container(container: &Container<'data>) -> Result<Self> {
         match container.find(RecordKind::Opt)? {
             Some(opt) => Self::parse(&opt),
@@ -60,7 +67,7 @@ impl<'data> Props<'data> {
     #[must_use]
     pub fn get_color(&self, id: Id) -> Option<ColorRef> {
         self.get_int(id)
-            .map(|value| ColorRef::from_raw(value as u32))
+            .map(|value| ColorRef::from_raw(value.cast_unsigned()))
     }
 
     /// Resolves an explicitly encoded boolean without applying defaults.
@@ -74,8 +81,8 @@ impl<'data> Props<'data> {
                 let bit = u32::from(terminal_id - raw_id);
                 let value_mask = 1u32 << bit;
                 let use_mask = value_mask << 16;
-                let value = value as u32;
-                return (value & use_mask != 0).then_some(value & value_mask != 0);
+                let bits = value.cast_unsigned();
+                return (bits & use_mask != 0).then_some(bits & value_mask != 0);
             }
         }
         self.get_int(id).map(|value| value != 0)
@@ -136,6 +143,10 @@ impl<'data> Props<'data> {
 
     #[inline]
     #[must_use]
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "16.16 fixed-point decoding to f32 is the intended semantics; rendering values do not require full i32 precision"
+    )]
     pub fn get_rotation_degrees(&self, id: Id) -> Option<f32> {
         self.get_int(id)
             .map(|fixed_point| (fixed_point as f32) / 65536.0)
@@ -143,6 +154,10 @@ impl<'data> Props<'data> {
 
     #[inline]
     #[must_use]
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "16.16 fixed-point decoding to f32 is the intended semantics; the result is clamped to 0.0..=1.0 anyway"
+    )]
     pub fn get_opacity(&self, id: Id) -> Option<f32> {
         self.get_int(id).map(|fixed_point| {
             let opacity = (fixed_point as f32) / 65536.0;
@@ -233,6 +248,11 @@ impl<'data> Props<'data> {
 
     /// Decodes the custom `pVertices`/`pSegmentInfo` geometry family when it
     /// is present, retaining the underlying arrays as borrowed wire views.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::MalformedProperties` or `Error::MalformedGeometry`
+    /// when the property family is present but malformed.
     pub fn geometry(&self) -> Result<Option<Geometry<'data>>> {
         super::geometry::parse(self)
     }
@@ -242,6 +262,11 @@ impl<'data> Props<'data> {
     /// The returned view borrows the original property array and retains
     /// indirect color references exactly; it never resolves colors or renders
     /// the gradient.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::MalformedProperties` if the `fillShadeColors` property
+    /// is not a complex `IMsoArray` value or fails shade-stop validation.
     pub fn gradient_stops(&self) -> Result<Option<super::gradient::Stops<'data>>> {
         super::gradient::parse(self)
     }
@@ -252,10 +277,21 @@ impl<'data> Props<'data> {
     /// exact raw flags, including undefined producer bits.  Use
     /// [`super::picture::Snapshot`] when an immutable record snapshot and
     /// lossless edit transaction are required.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::MalformedProperties` when the picture-name or
+    /// BLIP-flag properties are malformed or the name is not valid UTF-16.
     pub fn picture(&self) -> Result<Option<super::picture::Metadata<'data>>> {
         super::picture::parse_properties(self)
     }
 }
+impl Default for Props<'_> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn boolean_group_terminal(id: u16) -> Option<u16> {
     match id {
         0x0077..=0x007F => Some(0x007F),
@@ -270,11 +306,5 @@ fn boolean_group_terminal(id: u16) -> Option<u16> {
         0x02BC..=0x02BF => Some(0x02BF),
         0x033A..=0x033F => Some(0x033F),
         _ => None,
-    }
-}
-
-impl Default for Props<'_> {
-    fn default() -> Self {
-        Self::new()
     }
 }

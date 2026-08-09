@@ -10,8 +10,17 @@ use quick_xml::Reader;
 use quick_xml::events::Event;
 use std::collections::HashSet;
 
-use super::codec::*;
-use super::model::*;
+use super::codec::{
+    IdListAnchor, MAX_NAME_CHARS, MAX_PLACEHOLDERS_PER_OPERATION, MAX_SCAN_DEPTH, MAX_SCAN_NODES,
+    P_NS, R_NS, SPTREE_DEPTH, STRICT_SLIDE_LAYOUT_REL, STRICT_SLIDE_MASTER_REL, check_size,
+    escape_xml, find_placeholder_span, insert_bytes, insert_id_list_entry, invalid, layout_xml,
+    local_name, master_xml, next_shape_id, placeholder_shape_xml, remove_id_list_entry,
+    replace_span, scan_element_span, shape_id_within,
+};
+use super::model::{
+    AuthoredSlideLayout, AuthoredSlideMaster, MIN_MASTER_OR_LAYOUT_ID, PlaceholderSpec,
+    SlideLayoutKind,
+};
 
 // ============================================================================
 // Authoring operations
@@ -25,6 +34,10 @@ use super::model::*;
 /// otherwise a new theme part is generated. The presentation part gains a
 /// slide-master relationship plus a `p:sldMasterId` entry whose ID is one
 /// above the current maximum (starting at [`MIN_MASTER_OR_LAYOUT_ID`]).
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn add_slide_master(package: &mut OpcPackage) -> Result<AuthoredSlideMaster> {
     let presentation_name = package.main_document_part()?.partname().clone();
     require_presentation_part(package.get_part(&presentation_name)?.content_type())?;
@@ -93,6 +106,10 @@ pub fn add_slide_master(package: &mut OpcPackage) -> Result<AuthoredSlideMaster>
 /// part is written with the given `ST_SlideLayoutType` kind, name, and
 /// optional placeholder shapes, and carries the required relationship back to
 /// its owning master.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn add_slide_layout(
     package: &mut OpcPackage,
     master_part_name: &PackURI,
@@ -111,11 +128,7 @@ pub fn add_slide_layout(
         });
     }
     let references = parse_layout_id_list(master_part.blob())?;
-    let layout_id = allocate_id(
-        references
-            .iter()
-            .filter_map(|reference| reference.layout_id()),
-    )?;
+    let layout_id = allocate_id(references.iter().filter_map(LayoutReference::layout_id))?;
     let master_xml = master_part.blob().to_vec();
 
     let layout_index = next_part_index(package, "/ppt/slideLayouts/slideLayout", ".xml")?;
@@ -174,6 +187,10 @@ pub fn add_slide_layout(
 /// already exists its shape is replaced in place, keeping its shape ID;
 /// otherwise a new shape is appended to the shape tree with the next free
 /// shape ID. The optional text replaces the placeholder's prompt text.
+///
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn store_placeholder_shape(
     package: &mut OpcPackage,
     part_name: &PackURI,
@@ -198,16 +215,15 @@ pub fn store_placeholder_shape(
         None => next_shape_id(&xml)?,
     };
     let shape = placeholder_shape_xml(shape_id, spec, true);
-    let patched = match existing {
-        Some(span) => replace_span(&xml, &span, shape.as_bytes())?,
-        None => {
-            let tree = scan_element_span(&xml, "spTree", SPTREE_DEPTH)?
-                .ok_or_else(|| invalid("slide master or layout has no shape tree"))?;
-            if tree.empty {
-                return Err(invalid("slide master or layout has an empty shape tree"));
-            }
-            insert_bytes(&xml, tree.close_start, shape.as_bytes())?
-        },
+    let patched = if let Some(span) = existing {
+        replace_span(&xml, &span, shape.as_bytes())?
+    } else {
+        let tree = scan_element_span(&xml, "spTree", SPTREE_DEPTH)?
+            .ok_or_else(|| invalid("slide master or layout has no shape tree"))?;
+        if tree.empty {
+            return Err(invalid("slide master or layout has an empty shape tree"));
+        }
+        insert_bytes(&xml, tree.close_start, shape.as_bytes())?
     };
     // The patched part must inventory the placeholder back through the same
     // scan the read side's shape parser performs.
@@ -249,6 +265,10 @@ pub fn store_placeholder_shape(
 /// The owning master's `p:sldLayoutIdLst` entry and relationship are removed
 /// together with the layout part itself. Layouts still referenced by a slide,
 /// or not owned by any master, are rejected.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn remove_slide_layout(package: &mut OpcPackage, layout_part_name: &PackURI) -> Result<()> {
     let layout_uri = layout_part_name.clone();
     let layout_part = package.get_part(&layout_uri)?;
@@ -347,6 +367,10 @@ pub fn remove_slide_layout(package: &mut OpcPackage, layout_part_name: &PackURI)
 ///   slide-layout relationship to a part with the slide-layout content type;
 /// - every referenced layout has exactly one internal slide-master
 ///   relationship, pointing back to the master that references it.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn validate_master_layout_graph(package: &OpcPackage) -> Result<()> {
     let presentation = package.main_document_part()?;
     require_presentation_part(presentation.content_type())?;
@@ -563,7 +587,7 @@ fn push_layout_id_entry(
         if name == "id" {
             let parsed = value
                 .parse::<u32>()
-                .map_err(|_| invalid(format!("invalid slide-layout ID '{value}'")))?;
+                .map_err(|_err| invalid(format!("invalid slide-layout ID '{value}'")))?;
             if parsed < MIN_MASTER_OR_LAYOUT_ID {
                 return Err(invalid(format!(
                     "slide-layout ID {parsed} is below {MIN_MASTER_OR_LAYOUT_ID}"
@@ -682,7 +706,7 @@ fn push_master_id_entry(
         if name == "id" {
             let parsed = value
                 .parse::<u32>()
-                .map_err(|_| invalid(format!("invalid slide-master ID '{value}'")))?;
+                .map_err(|_err| invalid(format!("invalid slide-master ID '{value}'")))?;
             if parsed < MIN_MASTER_OR_LAYOUT_ID {
                 return Err(invalid(format!(
                     "slide-master ID {parsed} is below {MIN_MASTER_OR_LAYOUT_ID}"

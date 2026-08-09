@@ -22,18 +22,6 @@ const MAX_MASTER_DIMENSION: i32 = 0x7E00;
 /// than 10000).
 const MAX_FIRST_SLIDE_NUMBER: u16 = 9999;
 
-fn corrupted<T>(message: impl Into<String>) -> Result<T> {
-    Err(Error::Corrupted(message.into()))
-}
-
-fn strict_bool(value: u8, field: &str) -> Result<bool> {
-    match value {
-        0 => Ok(false),
-        1 => Ok(true),
-        _ => corrupted(format!("DocumentAtom {field} is not a bool1")),
-    }
-}
-
 /// Presentation slide size types (MS-PPT 2.13.26).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum SlideSizeType {
@@ -69,6 +57,7 @@ impl SlideSizeType {
     }
 
     /// The `SlideSizeEnum` value of this slide size type.
+    #[must_use]
     pub fn as_u16(self) -> u16 {
         match self {
             Self::Screen => 0x0000,
@@ -90,13 +79,19 @@ pub struct DocumentDimensions {
 }
 
 impl DocumentDimensions {
+    /// Construct validated slide or notes dimensions in master units.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either dimension is outside the MS-PPT master-unit
+    /// range.
     pub fn new(width: i32, height: i32) -> Result<Self> {
         let dimensions = Self { width, height };
         dimensions.validate()?;
         Ok(dimensions)
     }
 
-    fn validate(&self) -> Result<()> {
+    fn validate(self) -> Result<()> {
         for dimension in [self.width, self.height] {
             if !(MIN_MASTER_DIMENSION..=MAX_MASTER_DIMENSION).contains(&dimension) {
                 return corrupted("DocumentAtom dimension is outside the permitted range");
@@ -108,6 +103,10 @@ impl DocumentDimensions {
 
 /// A validated `DocumentAtom` (MS-PPT 2.4.2).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "fields mirror the independent `DocumentAtom` wire-format flags one-to-one"
+)]
 pub struct DocumentAtom {
     /// Dimensions of the presentation slides in master units.
     pub slide_size: DocumentDimensions,
@@ -135,7 +134,15 @@ pub struct DocumentAtom {
 
 impl DocumentAtom {
     /// Construct and validate a `DocumentAtom` value.
-    #[allow(clippy::too_many_arguments)]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    #[allow(
+        clippy::too_many_arguments,
+        clippy::fn_params_excessive_bools,
+        reason = "constructor parameters mirror the atom wire fields one-to-one"
+    )]
     pub fn new(
         slide_size: DocumentDimensions,
         notes_size: DocumentDimensions,
@@ -167,6 +174,15 @@ impl DocumentAtom {
     }
 
     /// Strictly parse one already-materialized `RT_DocumentAtom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record header is malformed, the payload has the
+    /// wrong size, or any field violates its MS-PPT constraints.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the document-atom payload length is the fixed constant 40, always representable as u32"
+    )]
     pub fn parse(record: &Record) -> Result<Self> {
         if record.version != DOCUMENT_ATOM_VERSION
             || record.instance != 0
@@ -177,29 +193,20 @@ impl DocumentAtom {
             return corrupted("DocumentAtom has an invalid record header or size");
         }
         let data = &record.data;
-        let read_i32 = |offset: usize| {
-            i32::from_le_bytes(data[offset..offset + 4].try_into().expect("fixed slice"))
-        };
-        let read_u32 = |offset: usize| {
-            u32::from_le_bytes(data[offset..offset + 4].try_into().expect("fixed slice"))
-        };
-        let read_u16 = |offset: usize| {
-            u16::from_le_bytes(data[offset..offset + 2].try_into().expect("fixed slice"))
-        };
         let atom = Self {
             slide_size: DocumentDimensions {
-                width: read_i32(0),
-                height: read_i32(4),
+                width: read_i32(data, 0),
+                height: read_i32(data, 4),
             },
             notes_size: DocumentDimensions {
-                width: read_i32(8),
-                height: read_i32(12),
+                width: read_i32(data, 8),
+                height: read_i32(data, 12),
             },
-            server_zoom: Ratio::new(read_i32(16), read_i32(20))?,
-            notes_master_persist_id_ref: read_u32(24),
-            handout_master_persist_id_ref: read_u32(28),
-            first_slide_number: read_u16(32),
-            slide_size_type: SlideSizeType::from_u16(read_u16(34))?,
+            server_zoom: Ratio::new(read_i32(data, 16), read_i32(data, 20))?,
+            notes_master_persist_id_ref: read_u32(data, 24),
+            handout_master_persist_id_ref: read_u32(data, 28),
+            first_slide_number: read_u16(data, 32),
+            slide_size_type: SlideSizeType::from_u16(read_u16(data, 34))?,
             save_with_fonts: strict_bool(data[36], "fSaveWithFonts")?,
             omit_title_place: strict_bool(data[37], "fOmitTitlePlace")?,
             right_to_left: strict_bool(data[38], "fRightToLeft")?,
@@ -210,6 +217,10 @@ impl DocumentAtom {
     }
 
     /// Serialize this value as one canonical `RT_DocumentAtom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_record(&self) -> Result<Record> {
         let bytes = self.to_record_bytes()?;
         let (record, end) = Record::parse(&bytes, 0)?;
@@ -220,6 +231,14 @@ impl DocumentAtom {
     }
 
     /// Serialize this value as canonical `RT_DocumentAtom` record bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the document-atom payload length is the fixed constant 40, always representable as u32"
+    )]
     pub fn to_record_bytes(&self) -> Result<[u8; 8 + DOCUMENT_ATOM_PAYLOAD_LEN]> {
         self.validate()?;
         let mut bytes = [0u8; 8 + DOCUMENT_ATOM_PAYLOAD_LEN];
@@ -258,7 +277,46 @@ impl DocumentAtom {
     }
 }
 
+fn corrupted<T>(message: impl Into<String>) -> Result<T> {
+    Err(Error::Corrupted(message.into()))
+}
+
+fn strict_bool(value: u8, field: &str) -> Result<bool> {
+    match value {
+        0 => Ok(false),
+        1 => Ok(true),
+        _ => corrupted(format!("DocumentAtom {field} is not a bool1")),
+    }
+}
+
+fn read_i32(data: &[u8], offset: usize) -> i32 {
+    i32::from_le_bytes([
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+    ])
+}
+
+fn read_u32(data: &[u8], offset: usize) -> u32 {
+    u32::from_le_bytes([
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+    ])
+}
+
+fn read_u16(data: &[u8], offset: usize) -> u16 {
+    u16::from_le_bytes([data[offset], data[offset + 1]])
+}
+
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -313,18 +371,18 @@ mod tests {
     fn rejects_malformed_records() {
         let mut bad_flag = sample_atom().to_record_bytes().unwrap();
         bad_flag[8 + 36] = 2; // fSaveWithFonts is not a bool1
-        let record = Record::parse(&bad_flag, 0).unwrap().0;
-        assert!(DocumentAtom::parse(&record).is_err());
+        let bad_flag_record = Record::parse(&bad_flag, 0).unwrap().0;
+        assert!(DocumentAtom::parse(&bad_flag_record).is_err());
 
         let mut bad_size_type = sample_atom().to_record_bytes().unwrap();
         bad_size_type[8 + 34] = 7; // not a SlideSizeEnum value
-        let record = Record::parse(&bad_size_type, 0).unwrap().0;
-        assert!(DocumentAtom::parse(&record).is_err());
+        let bad_size_type_record = Record::parse(&bad_size_type, 0).unwrap().0;
+        assert!(DocumentAtom::parse(&bad_size_type_record).is_err());
 
         let mut bad_version = sample_atom().to_record_bytes().unwrap();
         bad_version[0] = 0;
-        let record = Record::parse(&bad_version, 0).unwrap().0;
-        assert!(DocumentAtom::parse(&record).is_err());
+        let bad_version_record = Record::parse(&bad_version, 0).unwrap().0;
+        assert!(DocumentAtom::parse(&bad_version_record).is_err());
     }
 
     #[test]

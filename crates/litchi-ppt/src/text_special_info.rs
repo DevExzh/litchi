@@ -51,28 +51,9 @@ const MASTER_TEXT_PROP_RUN_LEN: usize = 6;
 /// Largest valid `IndentLevel` value (MS-PPT 2.2.13).
 const MAX_INDENT_LEVEL: u16 = 0x0004;
 
-fn corrupted(message: impl Into<String>) -> Error {
-    Error::Corrupted(message.into())
-}
-
-fn read_u16(data: &[u8], offset: usize) -> u16 {
-    u16::from_le_bytes(data[offset..offset + 2].try_into().expect("length checked"))
-}
-
-fn read_u32(data: &[u8], offset: usize) -> u32 {
-    u32::from_le_bytes(data[offset..offset + 4].try_into().expect("length checked"))
-}
-
-fn require_bytes(data: &[u8], offset: usize, needed: usize, field: &str) -> Result<()> {
-    if data.len() < offset.saturating_add(needed) {
-        return Err(corrupted(format!("{field} is truncated")));
-    }
-    Ok(())
-}
-
 /// A full `TextSIException` structure (MS-PPT 2.9.32) as stored in a
 /// `TextSIRun`. Unlike the defaults atom (MS-PPT 2.9.31), run-level special
-/// information may carry bidirectional flags, PowerPoint 10 extension data,
+/// information may carry bidirectional flags, `PowerPoint` 10 extension data,
 /// and smart-tag indices.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TextSIException {
@@ -95,30 +76,37 @@ pub struct TextSIException {
 
 impl TextSIException {
     /// Spelling status, when present.
+    #[must_use]
     pub const fn spelling(&self) -> Option<SpellingFlags> {
         self.spelling
     }
     /// Primary language identifier, when present.
+    #[must_use]
     pub const fn language(&self) -> Option<u16> {
         self.language
     }
     /// Alternate language identifier, when present.
+    #[must_use]
     pub const fn alternate_language(&self) -> Option<u16> {
         self.alternate_language
     }
     /// Whether the text contains bidirectional characters, when present.
+    #[must_use]
     pub const fn bidi(&self) -> Option<bool> {
         self.bidi
     }
     /// Four-bit `StyleTextProp11Atom` run identifier, when present.
+    #[must_use]
     pub const fn pp10_run_id(&self) -> Option<u8> {
         self.pp10_run_id
     }
     /// Whether a grammar error is flagged, when the PP10 extension exists.
+    #[must_use]
     pub const fn grammar_error(&self) -> Option<bool> {
         self.grammar_error
     }
     /// Zero-based indices into the document-wide smart-tag store.
+    #[must_use]
     pub fn smart_tag_indices(&self) -> &[u32] {
         &self.smart_tag_indices
     }
@@ -227,6 +215,10 @@ impl TextSIException {
     }
 
     /// Serialize the structure without any record header.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the smart-tag index count originates from a u32 on-disk field, so it always fits u32"
+    )]
     pub(crate) fn to_bytes(&self) -> Vec<u8> {
         let mut mask = 0u32;
         if self.spelling.is_some() {
@@ -290,16 +282,22 @@ pub struct TextSIRun {
 
 impl TextSIRun {
     /// Number of characters the special information applies to.
+    #[must_use]
     pub const fn count(&self) -> u32 {
         self.count
     }
     /// Language and spelling information for the run.
+    #[must_use]
     pub const fn special_info(&self) -> &TextSIException {
         &self.special_info
     }
 }
 
 /// Parsed payload of a `TextSpecialInfoAtom` (MS-PPT 2.9.54).
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`TextSpecialInfoRuns` is the established public API name mirroring the MS-PPT `TextSpecialInfoAtom` payload; renaming it would break downstream crates"
+)]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TextSpecialInfoRuns {
     runs: Vec<TextSIRun>,
@@ -307,6 +305,7 @@ pub struct TextSpecialInfoRuns {
 
 impl TextSpecialInfoRuns {
     /// The parsed runs, in source order.
+    #[must_use]
     pub fn runs(&self) -> &[TextSIRun] {
         &self.runs
     }
@@ -316,11 +315,16 @@ impl TextSpecialInfoRuns {
     /// Per MS-PPT 2.9.54 the sum of the `count` fields must equal the number
     /// of characters in the corresponding text; callers holding that length
     /// can compare it against this total.
+    #[must_use]
     pub fn total_count(&self) -> u64 {
         self.runs.iter().map(|run| u64::from(run.count)).sum()
     }
 
     /// Parse a complete `TextSpecialInfoAtom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_record(record: &Record) -> Result<Self> {
         if record.record_type != RecordType::TextSpecInfoAtom
             || record.record_type_raw != TEXT_SPECIAL_INFO_TYPE
@@ -333,6 +337,10 @@ impl TextSpecialInfoRuns {
     }
 
     /// Parse the `rgSIRun` payload of a `TextSpecialInfoAtom`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(data: &[u8]) -> Result<Self> {
         let mut offset = 0usize;
         let mut runs = Vec::new();
@@ -354,6 +362,11 @@ impl TextSpecialInfoRuns {
     }
 
     /// Serialize the complete record, including its header.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the runs are parsed from a PPT record payload whose length is a u32, so the re-serialized payload length always fits u32"
+    )]
+    #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut payload = Vec::new();
         for run in &self.runs {
@@ -380,10 +393,12 @@ pub struct MasterTextPropRun {
 
 impl MasterTextPropRun {
     /// Number of characters the indent level applies to.
+    #[must_use]
     pub const fn count(&self) -> u32 {
         self.count
     }
     /// The master indent level of the characters.
+    #[must_use]
     pub const fn indent_level(&self) -> u16 {
         self.indent_level
     }
@@ -397,16 +412,22 @@ pub struct MasterTextPropLevels {
 
 impl MasterTextPropLevels {
     /// The parsed runs, in source order.
+    #[must_use]
     pub fn runs(&self) -> &[MasterTextPropRun] {
         &self.runs
     }
 
     /// Total number of characters covered by all runs.
+    #[must_use]
     pub fn total_count(&self) -> u64 {
         self.runs.iter().map(|run| u64::from(run.count)).sum()
     }
 
     /// Parse a complete `MasterTextPropAtom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_record(record: &Record) -> Result<Self> {
         if record.record_type != RecordType::MasterTextPropAtom
             || record.record_type_raw != MASTER_TEXT_PROP_TYPE
@@ -419,6 +440,10 @@ impl MasterTextPropLevels {
     }
 
     /// Parse the `rgMasterTextPropRun` payload of a `MasterTextPropAtom`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if !data.len().is_multiple_of(MASTER_TEXT_PROP_RUN_LEN) {
             return Err(corrupted(
@@ -443,6 +468,11 @@ impl MasterTextPropLevels {
     }
 
     /// Serialize the complete record, including its header.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "each run serializes to 6 bytes and the runs are parsed from a PPT record payload whose length is a u32, so the total always fits u32"
+    )]
+    #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         let payload_len = self.runs.len() * MASTER_TEXT_PROP_RUN_LEN;
         let mut data = Vec::with_capacity(8 + payload_len);
@@ -457,7 +487,36 @@ impl MasterTextPropLevels {
     }
 }
 
+fn corrupted(message: impl Into<String>) -> Error {
+    Error::Corrupted(message.into())
+}
+
+fn read_u16(data: &[u8], offset: usize) -> u16 {
+    u16::from_le_bytes([data[offset], data[offset + 1]])
+}
+
+fn read_u32(data: &[u8], offset: usize) -> u32 {
+    u32::from_le_bytes([
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+    ])
+}
+
+fn require_bytes(data: &[u8], offset: usize, needed: usize, field: &str) -> Result<()> {
+    if data.len() < offset.saturating_add(needed) {
+        return Err(corrupted(format!("{field} is truncated")));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -467,7 +526,7 @@ mod tests {
             record_type_raw: TEXT_SPECIAL_INFO_TYPE,
             version: 0,
             instance: 0,
-            data_length: data.len() as u32,
+            data_length: u32::try_from(data.len()).unwrap(),
             data: data.to_vec(),
             children: Vec::new(),
         }
@@ -479,7 +538,7 @@ mod tests {
             record_type_raw: MASTER_TEXT_PROP_TYPE,
             version: 0,
             instance: 0,
-            data_length: data.len() as u32,
+            data_length: u32::try_from(data.len()).unwrap(),
             data: data.to_vec(),
             children: Vec::new(),
         }
@@ -526,12 +585,12 @@ mod tests {
 
         let second = &parsed.runs()[1];
         assert_eq!(second.count(), 3);
-        let si = second.special_info();
-        assert_eq!(si.spelling(), None);
-        assert_eq!(si.bidi(), Some(true));
-        assert_eq!(si.pp10_run_id(), Some(3));
-        assert_eq!(si.grammar_error(), Some(true));
-        assert_eq!(si.smart_tag_indices(), &[0, 7]);
+        let second_si = second.special_info();
+        assert_eq!(second_si.spelling(), None);
+        assert_eq!(second_si.bidi(), Some(true));
+        assert_eq!(second_si.pp10_run_id(), Some(3));
+        assert_eq!(second_si.grammar_error(), Some(true));
+        assert_eq!(second_si.smart_tag_indices(), &[0, 7]);
 
         assert_eq!(parsed.to_bytes()[8..], payload[..]);
     }
@@ -551,40 +610,46 @@ mod tests {
         // Truncated run count.
         assert!(TextSpecialInfoRuns::parse_record(&special_info_atom(&[1, 0])).is_err());
         // Zero run count.
-        let mut data = Vec::new();
-        data.extend_from_slice(&0u32.to_le_bytes());
-        data.extend_from_slice(&0u32.to_le_bytes());
-        assert!(TextSpecialInfoRuns::parse_record(&special_info_atom(&data)).is_err());
+        let mut zero_count_data = Vec::new();
+        zero_count_data.extend_from_slice(&0u32.to_le_bytes());
+        zero_count_data.extend_from_slice(&0u32.to_le_bytes());
+        assert!(TextSpecialInfoRuns::parse_record(&special_info_atom(&zero_count_data)).is_err());
         // Reserved mask bits.
-        let mut data = Vec::new();
-        data.extend_from_slice(&1u32.to_le_bytes());
-        data.extend_from_slice(&0x0100u32.to_le_bytes());
-        assert!(TextSpecialInfoRuns::parse_record(&special_info_atom(&data)).is_err());
+        let mut reserved_mask_data = Vec::new();
+        reserved_mask_data.extend_from_slice(&1u32.to_le_bytes());
+        reserved_mask_data.extend_from_slice(&0x0100u32.to_le_bytes());
+        assert!(
+            TextSpecialInfoRuns::parse_record(&special_info_atom(&reserved_mask_data)).is_err()
+        );
         // Grammar bit in spellInfo.
-        let mut data = Vec::new();
-        data.extend_from_slice(&1u32.to_le_bytes());
-        data.extend_from_slice(&0x0001u32.to_le_bytes());
-        data.extend_from_slice(&0x0004u16.to_le_bytes());
-        assert!(TextSpecialInfoRuns::parse_record(&special_info_atom(&data)).is_err());
+        let mut grammar_bit_data = Vec::new();
+        grammar_bit_data.extend_from_slice(&1u32.to_le_bytes());
+        grammar_bit_data.extend_from_slice(&0x0001u32.to_le_bytes());
+        grammar_bit_data.extend_from_slice(&0x0004u16.to_le_bytes());
+        assert!(TextSpecialInfoRuns::parse_record(&special_info_atom(&grammar_bit_data)).is_err());
         // Invalid bidi value.
-        let mut data = Vec::new();
-        data.extend_from_slice(&1u32.to_le_bytes());
-        data.extend_from_slice(&0x0040u32.to_le_bytes());
-        data.extend_from_slice(&2u16.to_le_bytes());
-        assert!(TextSpecialInfoRuns::parse_record(&special_info_atom(&data)).is_err());
+        let mut invalid_bidi_data = Vec::new();
+        invalid_bidi_data.extend_from_slice(&1u32.to_le_bytes());
+        invalid_bidi_data.extend_from_slice(&0x0040u32.to_le_bytes());
+        invalid_bidi_data.extend_from_slice(&2u16.to_le_bytes());
+        assert!(TextSpecialInfoRuns::parse_record(&special_info_atom(&invalid_bidi_data)).is_err());
         // PP10 reserved bits.
-        let mut data = Vec::new();
-        data.extend_from_slice(&1u32.to_le_bytes());
-        data.extend_from_slice(&0x0020u32.to_le_bytes());
-        data.extend_from_slice(&0x0010u32.to_le_bytes());
-        assert!(TextSpecialInfoRuns::parse_record(&special_info_atom(&data)).is_err());
+        let mut pp10_reserved_data = Vec::new();
+        pp10_reserved_data.extend_from_slice(&1u32.to_le_bytes());
+        pp10_reserved_data.extend_from_slice(&0x0020u32.to_le_bytes());
+        pp10_reserved_data.extend_from_slice(&0x0010u32.to_le_bytes());
+        assert!(
+            TextSpecialInfoRuns::parse_record(&special_info_atom(&pp10_reserved_data)).is_err()
+        );
         // Truncated smart-tag indices.
-        let mut data = Vec::new();
-        data.extend_from_slice(&1u32.to_le_bytes());
-        data.extend_from_slice(&0x0200u32.to_le_bytes());
-        data.extend_from_slice(&3u32.to_le_bytes());
-        data.extend_from_slice(&0u32.to_le_bytes());
-        assert!(TextSpecialInfoRuns::parse_record(&special_info_atom(&data)).is_err());
+        let mut truncated_tags_data = Vec::new();
+        truncated_tags_data.extend_from_slice(&1u32.to_le_bytes());
+        truncated_tags_data.extend_from_slice(&0x0200u32.to_le_bytes());
+        truncated_tags_data.extend_from_slice(&3u32.to_le_bytes());
+        truncated_tags_data.extend_from_slice(&0u32.to_le_bytes());
+        assert!(
+            TextSpecialInfoRuns::parse_record(&special_info_atom(&truncated_tags_data)).is_err()
+        );
     }
 
     #[test]

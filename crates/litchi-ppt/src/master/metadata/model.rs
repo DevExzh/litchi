@@ -16,24 +16,30 @@ pub struct Name(String);
 
 impl Name {
     /// Create a name under the semantic UTF-16 size bound.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(value: impl Into<String>) -> Result<Self> {
-        let value = value.into();
-        validate_unit_count(value.encode_utf16().count())?;
-        Ok(Self(value))
+        let name = value.into();
+        validate_unit_count(name.encode_utf16().count())?;
+        Ok(Self(name))
     }
 
     /// Borrow the decoded name.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
     /// Consume the value and return its decoded text.
+    #[must_use]
     pub fn into_string(self) -> String {
         self.0
     }
 
     pub(super) fn from_wire(bytes: &[u8]) -> Result<Self> {
-        if bytes.len() % 2 != 0 {
+        if !bytes.len().is_multiple_of(2) {
             return Err(Error::Corrupted(
                 "SlideNameAtom payload length must be even".into(),
             ));
@@ -43,14 +49,14 @@ impl Name {
         let mut units = Vec::new();
         units
             .try_reserve_exact(bytes.len() / 2)
-            .map_err(|_| Error::InvalidFormat("SlideNameAtom allocation failed".into()))?;
+            .map_err(|_err| Error::InvalidFormat("SlideNameAtom allocation failed".into()))?;
         units.extend(
             bytes
                 .chunks_exact(2)
                 .map(|pair| u16::from_le_bytes([pair[0], pair[1]])),
         );
         let value = String::from_utf16(&units)
-            .map_err(|_| Error::Corrupted("SlideNameAtom contains invalid UTF-16".into()))?;
+            .map_err(|_err| Error::Corrupted("SlideNameAtom contains invalid UTF-16".into()))?;
         Ok(Self(value))
     }
 
@@ -64,7 +70,7 @@ impl Name {
         let mut bytes = Vec::new();
         bytes
             .try_reserve_exact(byte_len)
-            .map_err(|_| Error::InvalidFormat("SlideNameAtom allocation failed".into()))?;
+            .map_err(|_err| Error::InvalidFormat("SlideNameAtom allocation failed".into()))?;
         for unit in units {
             bytes.extend_from_slice(&unit.to_le_bytes());
         }

@@ -1,4 +1,4 @@
-//! PowerPoint text-run extraction and bounded formatting decoding.
+//! `PowerPoint` text-run extraction and bounded formatting decoding.
 
 use super::model::{
     ParagraphAlignment, ParagraphFontAlignment, ParagraphRun, ParagraphRunFormatting,
@@ -13,11 +13,15 @@ use crate::text::extractor::{decode_text_bytes, from_utf16le_lossy};
 impl TextRunExtractor {
     /// Extract text runs from PPT records.
     ///
-    /// Based on Apache POI's TextExtractor and SlideShow text parsing logic.
+    /// Based on Apache POI's `TextExtractor` and `SlideShow` text parsing logic.
     ///
     /// # Arguments
     ///
     /// * `records` - PPT records to extract text from
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn extract_from_records(&mut self, records: &[Record]) -> Result<()> {
         for record in records {
             self.process_record(record)?;
@@ -26,6 +30,11 @@ impl TextRunExtractor {
     }
 
     /// Process a single PPT record.
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "`RecordType` mirrors the full MS-PPT record-type enumeration; every record other \
+                  than the three text atoms is handled uniformly by recursing into child records"
+    )]
     fn process_record(&mut self, record: &Record) -> Result<()> {
         match record.record_type {
             RecordType::TextCharsAtom => {
@@ -63,9 +72,9 @@ impl TextRunExtractor {
         Ok(())
     }
 
-    /// Apply style properties from StyleTextPropAtom.
+    /// Apply style properties from `StyleTextPropAtom`.
     ///
-    /// Based on Apache POI's StyleTextPropAtom parsing.
+    /// Based on Apache POI's `StyleTextPropAtom` parsing.
     fn apply_style_properties(&mut self, record: &Record) -> Result<()> {
         if record.data.len() < 8 {
             return Ok(()); // Not enough data
@@ -171,32 +180,32 @@ impl TextRunExtractor {
 pub(super) fn formatting_from_style(
     style: &crate::text_prop::TextPropCollection,
 ) -> Result<TextRunFormatting> {
-    let font_color_raw = style.get_value("font.color").map(|color| color as u32);
+    let font_color_raw = style.get_value("font.color").map(i32::cast_unsigned);
     if font_color_raw.is_some_and(|raw| !matches!((raw >> 24) as u8, 0x00..=0x07 | 0xFE | 0xFF)) {
         return Err(Error::Corrupted(
             "TextCFRun has an invalid ColorIndexStruct index".to_string(),
         ));
     }
-    let (font_color, font_scheme_color) = font_color_raw
-        .map(decode_color_index_struct)
-        .unwrap_or((None, None));
+    let (font_color, font_scheme_color) =
+        font_color_raw.map_or((None, None), decode_color_index_struct);
     let font_size = style
         .get_value("font.size")
         .map(|size| {
-            if (1..=4000).contains(&size) {
-                Ok(size as u16)
-            } else {
-                Err(Error::Corrupted(
-                    "TextCFRun font size is outside the 1..=4000 point range".to_string(),
-                ))
-            }
+            u16::try_from(size)
+                .ok()
+                .filter(|points| (1..=4000).contains(points))
+                .ok_or_else(|| {
+                    Error::Corrupted(
+                        "TextCFRun font size is outside the 1..=4000 point range".to_string(),
+                    )
+                })
         })
         .transpose()?;
     let font_index = |name| -> Result<Option<u16>> {
         style
             .get_value(name)
             .map(|index| {
-                u16::try_from(index).map_err(|_| {
+                u16::try_from(index).map_err(|_err| {
                     Error::Corrupted("TextCFRun has an invalid font index".to_string())
                 })
             })
@@ -205,13 +214,14 @@ pub(super) fn formatting_from_style(
     let baseline_position = style
         .get_value("superscript")
         .map(|position| {
-            if (-100..=100).contains(&position) {
-                Ok(position as i16)
-            } else {
-                Err(Error::Corrupted(
-                    "TextCFRun baseline position is outside the -100..=100 range".to_string(),
-                ))
-            }
+            i16::try_from(position)
+                .ok()
+                .filter(|percent| (-100..=100).contains(percent))
+                .ok_or_else(|| {
+                    Error::Corrupted(
+                        "TextCFRun baseline position is outside the -100..=100 range".to_string(),
+                    )
+                })
         })
         .transpose()?;
     let mut formatting = TextRunFormatting {
@@ -228,8 +238,10 @@ pub(super) fn formatting_from_style(
         ..TextRunFormatting::default()
     };
 
-    if let Some(flags) = style.get_value("char.flags") {
-        let flags = flags as u16;
+    if let Some(raw_flags) = style.get_value("char.flags") {
+        let flags = u16::try_from(raw_flags).map_err(|_err| {
+            Error::Corrupted("TextCFRun has an invalid CFStyle value".to_string())
+        })?;
         formatting.font_style_raw = Some(flags);
         let (bold, italic, underline) = crate::text_prop::extract_char_flags(i32::from(flags));
         formatting.bold = bold;
@@ -263,7 +275,27 @@ pub(super) fn paragraph_formatting_from_style(
         ));
     }
     let property_mask = style.property_mask;
-    let bullet_flags_raw = style.get_value("paragraph.flags").map(|value| value as u16);
+    let u16_property = |name: &str| -> Result<Option<u16>> {
+        style
+            .get_value(name)
+            .map(|value| {
+                u16::try_from(value).map_err(|_err| {
+                    Error::Corrupted(format!("TextPFRun has an invalid {name} value"))
+                })
+            })
+            .transpose()
+    };
+    let i16_property = |name: &str| -> Result<Option<i16>> {
+        style
+            .get_value(name)
+            .map(|value| {
+                i16::try_from(value).map_err(|_err| {
+                    Error::Corrupted(format!("TextPFRun has an invalid {name} value"))
+                })
+            })
+            .transpose()
+    };
+    let bullet_flags_raw = u16_property("paragraph.flags")?;
     if bullet_flags_raw.is_some_and(|flags| flags & !0x000F != 0) {
         return Err(Error::Corrupted(
             "TextPFRun has reserved BulletFlags bits set".to_string(),
@@ -273,15 +305,14 @@ pub(super) fn paragraph_formatting_from_style(
         (property_mask & mask != 0).then(|| bullet_flags_raw.is_some_and(|flags| flags & bit != 0))
     };
 
-    let bullet_color_raw = style.get_value("bullet.color").map(|value| value as u32);
+    let bullet_color_raw = style.get_value("bullet.color").map(i32::cast_unsigned);
     if bullet_color_raw.is_some_and(|raw| !matches!((raw >> 24) as u8, 0x00..=0x07 | 0xFE | 0xFF)) {
         return Err(Error::Corrupted(
             "TextPFRun has an invalid bullet ColorIndexStruct index".to_string(),
         ));
     }
-    let (bullet_color, bullet_scheme_color) = bullet_color_raw
-        .map(decode_color_index_struct)
-        .unwrap_or((None, None));
+    let (bullet_color, bullet_scheme_color) =
+        bullet_color_raw.map_or((None, None), decode_color_index_struct);
 
     let alignment = style
         .get_value("alignment")
@@ -327,7 +358,7 @@ pub(super) fn paragraph_formatting_from_style(
                 .tab_stops
                 .iter()
                 .map(|tab| {
-                    let alignment = match tab.alignment {
+                    let tab_alignment = match tab.alignment {
                         0 => ParagraphTabAlignment::Left,
                         1 => ParagraphTabAlignment::Center,
                         2 => ParagraphTabAlignment::Right,
@@ -340,7 +371,7 @@ pub(super) fn paragraph_formatting_from_style(
                     };
                     Ok(ParagraphTabStop {
                         position: tab.position,
-                        alignment,
+                        alignment: tab_alignment,
                     })
                 })
                 .collect::<Result<Vec<_>>>()?,
@@ -349,7 +380,7 @@ pub(super) fn paragraph_formatting_from_style(
         None
     };
 
-    let wrap_flags_raw = style.get_value("wrapFlags").map(|value| value as u16);
+    let wrap_flags_raw = u16_property("wrapFlags")?;
     if wrap_flags_raw.is_some_and(|flags| flags & !0x0007 != 0) {
         return Err(Error::Corrupted(
             "TextPFRun has reserved PFWrapFlags bits set".to_string(),
@@ -367,19 +398,19 @@ pub(super) fn paragraph_formatting_from_style(
         bullet_font_enabled: bullet_flag(0x0002, 0x0002),
         bullet_color_enabled: bullet_flag(0x0004, 0x0004),
         bullet_size_enabled: bullet_flag(0x0008, 0x0008),
-        bullet_character: style.get_value("bullet.char").map(|value| value as u16),
-        bullet_font_index: style.get_value("bullet.font").map(|value| value as u16),
-        bullet_size: style.get_value("bullet.size").map(|value| value as i16),
+        bullet_character: u16_property("bullet.char")?,
+        bullet_font_index: u16_property("bullet.font")?,
+        bullet_size: i16_property("bullet.size")?,
         bullet_color,
         bullet_color_raw,
         bullet_scheme_color,
         alignment,
-        line_spacing: style.get_value("linespacing").map(|value| value as i16),
-        space_before: style.get_value("spacebefore").map(|value| value as i16),
-        space_after: style.get_value("spaceafter").map(|value| value as i16),
-        left_margin: style.get_value("text.offset").map(|value| value as i16),
-        indent: style.get_value("bullet.offset").map(|value| value as i16),
-        default_tab_size: style.get_value("defaultTabSize").map(|value| value as i16),
+        line_spacing: i16_property("linespacing")?,
+        space_before: i16_property("spacebefore")?,
+        space_after: i16_property("spaceafter")?,
+        left_margin: i16_property("text.offset")?,
+        indent: i16_property("bullet.offset")?,
+        default_tab_size: i16_property("defaultTabSize")?,
         tab_stops,
         font_alignment,
         character_wrap: wrap_flag(0x0002_0000, 0x0001),

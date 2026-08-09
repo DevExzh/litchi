@@ -1,4 +1,4 @@
-//! OfficeArt shape-container record family.
+//! `OfficeArt` shape-container record family.
 
 use zerocopy::IntoBytes;
 
@@ -18,6 +18,16 @@ use super::text::{
 };
 use super::validation::validate_user_shape;
 use super::wire::EscherBuilder;
+
+#[derive(Clone, Copy)]
+enum ShapeAnchor {
+    /// Compact eight-byte PPT host anchor for ordinary top-level shapes.
+    Ppt,
+    /// Sixteen-byte host anchor used for a root group's direct member.
+    Host(ChildAnchor),
+    /// Sixteen-byte group-coordinate anchor for a nested member.
+    Child(ChildAnchor),
+}
 
 /// Creates a standalone PPT shape container with a host `ClientAnchor`.
 pub(crate) fn create_user_shape_container(
@@ -44,16 +54,6 @@ pub(super) fn create_root_group_shape_container(
     anchor: ChildAnchor,
 ) -> Result<Vec<u8>, Error> {
     create_shape_container(shape_id, shape, ShapeAnchor::Host(anchor))
-}
-
-#[derive(Clone, Copy)]
-enum ShapeAnchor {
-    /// Compact eight-byte PPT host anchor for ordinary top-level shapes.
-    Ppt,
-    /// Sixteen-byte host anchor used for a root group's direct member.
-    Host(ChildAnchor),
-    /// Sixteen-byte group-coordinate anchor for a nested member.
-    Child(ChildAnchor),
 }
 
 fn create_shape_container(
@@ -86,12 +86,25 @@ fn create_shape_container(
     if let Some(geometry) = &shape.freeform_geometry {
         let rect = geometry.coordinate_space();
         let (vertices, segments) = geometry.encode_arrays()?;
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "`encode_arrays` validates the vertex and segment counts to fit in `u16`"
+        )]
         properties.extend([
-            (Property::new(prop_id::GEOM_LEFT, rect.left as u32), None),
-            (Property::new(prop_id::GEOM_TOP, rect.top as u32), None),
-            (Property::new(prop_id::GEOM_RIGHT, rect.right as u32), None),
             (
-                Property::new(prop_id::GEOM_BOTTOM, rect.bottom as u32),
+                Property::new(prop_id::GEOM_LEFT, rect.left.cast_unsigned()),
+                None,
+            ),
+            (
+                Property::new(prop_id::GEOM_TOP, rect.top.cast_unsigned()),
+                None,
+            ),
+            (
+                Property::new(prop_id::GEOM_RIGHT, rect.right.cast_unsigned()),
+                None,
+            ),
+            (
+                Property::new(prop_id::GEOM_BOTTOM, rect.bottom.cast_unsigned()),
                 None,
             ),
             (
@@ -109,6 +122,10 @@ fn create_shape_container(
         ]);
     }
     properties.sort_by_key(|(property, _)| property.raw_id() & 0x3FFF);
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "a shape property table holds at most a few dozen `OfficeArt` properties"
+    )]
     let mut opt = EscherBuilder::new(
         header_version::OPT,
         properties.len() as u16,
@@ -177,18 +194,18 @@ fn create_shape_container(
             .interactions
             .iter()
             .filter(|interaction| interaction.trigger == trigger);
-        let interaction = matching.next();
+        let declared_interaction = matching.next();
         if matching.next().is_some() {
             return Err(std::io::Error::other(
                 "shape contains duplicate interactive triggers",
             ));
         }
-        let interaction = interaction.or_else(|| {
+        let interaction_or_legacy = declared_interaction.or_else(|| {
             (trigger == crate::InteractionTrigger::Click)
                 .then_some(legacy_click.as_ref())
                 .flatten()
         });
-        if let Some(interaction) = interaction {
+        if let Some(interaction) = interaction_or_legacy {
             let bytes = interaction
                 .to_bytes_with_limits(crate::InteractionLimits::default())
                 .map_err(|error| std::io::Error::other(error.to_string()))?;
@@ -206,10 +223,10 @@ fn create_shape_container(
     {
         append_client_data_payload(&mut client_data, &programmable_tags)?;
     }
-    if let Some(client_data) = client_data {
-        crate::ClientData::parse(&client_data)
+    if let Some(client_data_bytes) = client_data {
+        crate::ClientData::parse(&client_data_bytes)
             .map_err(|error| std::io::Error::other(error.to_string()))?;
-        container.add_data(&client_data);
+        container.add_data(&client_data_bytes);
     }
 
     if let Some(paragraphs) = &shape.paragraphs {

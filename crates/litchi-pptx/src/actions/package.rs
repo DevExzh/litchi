@@ -14,7 +14,11 @@ pub struct Limits {
     pub(super) action_count: usize,
 }
 
-/// Load bounded, inert action settings from one PresentationML slide.
+/// Load bounded, inert action settings from one `PresentationML` slide.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load_slide_action_settings(
     package: &OpcPackage,
     slide_index: usize,

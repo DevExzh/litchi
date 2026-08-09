@@ -1,4 +1,8 @@
-use super::*;
+use super::{
+    ControlWord, Cow, Destination, FontCharset, MAX_REVISIONS, ParsedBodyStoryEvent, Parser,
+    RtfEncoding, RtfError, RtfResult, SmallVec, State, StyleBlock, Token, append_transport_bytes,
+    control_symbol_text, parser_classification_error, require_parameterless,
+};
 
 impl<'a> Parser<'a> {
     /// Handle a control word encountered while parsing generic group content.
@@ -8,6 +12,10 @@ impl<'a> Parser<'a> {
     /// table is large, and leaving it inline would charge its stack frame to
     /// every level of group nesting on the recursive path.
     #[inline(never)]
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn dispatch_content_control(
         &mut self,
         control: &ControlWord<'a>,
@@ -130,7 +138,22 @@ impl<'a> Parser<'a> {
                 self.record_soft_break(crate::SoftBreakKind::LineHeight(height))?;
                 self.pos += 1;
             },
-            ControlWord::Section => {
+            ControlWord::Section
+            | ControlWord::Ansi
+            | ControlWord::AnsiCodePage(_)
+            | ControlWord::Mac
+            | ControlWord::Pc
+            | ControlWord::Pca
+            | ControlWord::FontNumber(_)
+            | ControlWord::Plain
+            | ControlWord::FormProtection(_)
+            | ControlWord::AnnotationProtection(_)
+            | ControlWord::RevisionProtection(_)
+            | ControlWord::ReadOnlyProtection(_)
+            | ControlWord::AllProtection(_)
+            | ControlWord::EnforceProtection(_)
+            | ControlWord::ProtectionLevel(_)
+            | ControlWord::ColorBackground(_) => {
                 if !text_buffer.is_empty() {
                     self.flush_text_buffer(text_buffer)?;
                 }
@@ -163,19 +186,6 @@ impl<'a> Parser<'a> {
                     self.flush_text_buffer(text_buffer)?;
                 }
                 self.parse_unicode_sequence(*code)?;
-            },
-            ControlWord::Ansi
-            | ControlWord::AnsiCodePage(_)
-            | ControlWord::Mac
-            | ControlWord::Pc
-            | ControlWord::Pca
-            | ControlWord::FontNumber(_)
-            | ControlWord::Plain => {
-                if !text_buffer.is_empty() {
-                    self.flush_text_buffer(text_buffer)?;
-                }
-                self.pos += 1;
-                self.apply_control_word(control)?;
             },
             ControlWord::NonBreakingSpace
             | ControlWord::OptionalHyphen
@@ -258,7 +268,11 @@ impl<'a> Parser<'a> {
                             super::super::super::annotation::RevisionType::Deletion => {
                                 ParsedBodyStoryEvent::RevisionDeletion(id)
                             },
-                            _ => return Err(parser_classification_error()),
+                            super::super::super::annotation::RevisionType::FormatChange
+                            | super::super::super::annotation::RevisionType::MovedFrom
+                            | super::super::super::annotation::RevisionType::MovedTo => {
+                                return Err(parser_classification_error());
+                            },
                         };
                         self.body_story_events.push(event);
                     }
@@ -271,26 +285,6 @@ impl<'a> Parser<'a> {
                 if let Some(id) = event_id {
                     self.current_state_mut()?.revision_event_id = Some(id);
                 }
-            },
-            ControlWord::FormProtection(_)
-            | ControlWord::AnnotationProtection(_)
-            | ControlWord::RevisionProtection(_)
-            | ControlWord::ReadOnlyProtection(_)
-            | ControlWord::AllProtection(_)
-            | ControlWord::EnforceProtection(_)
-            | ControlWord::ProtectionLevel(_) => {
-                if !text_buffer.is_empty() {
-                    self.flush_text_buffer(text_buffer)?;
-                }
-                self.pos += 1;
-                self.apply_control_word(control)?;
-            },
-            ControlWord::ColorBackground(_) => {
-                if !text_buffer.is_empty() {
-                    self.flush_text_buffer(text_buffer)?;
-                }
-                self.pos += 1;
-                self.apply_control_word(control)?;
             },
             _ => {
                 self.pos += 1;
@@ -458,21 +452,24 @@ impl<'a> Parser<'a> {
             self.append_table_text(text.as_bytes(), state.table_nesting_level)?;
             return Ok(());
         }
-        let text = self.arena.alloc_str(text);
+        let arena_text = self.arena.alloc_str(text);
         let start = self.body_text_len;
         if state.revision_type == Some(super::super::super::annotation::RevisionType::Deletion) {
-            return self.append_revision_text(&state, text, start, start);
+            return self.append_revision_text(&state, arena_text, start, start);
         }
-        self.body_text_len = self.body_text_len.checked_add(text.len()).ok_or_else(|| {
-            RtfError::MalformedDocument("RTF body text length overflow".to_string())
-        })?;
+        self.body_text_len = self
+            .body_text_len
+            .checked_add(arena_text.len())
+            .ok_or_else(|| {
+                RtfError::MalformedDocument("RTF body text length overflow".to_string())
+            })?;
         self.blocks.push(StyleBlock::new(
-            Cow::Borrowed(text),
+            Cow::Borrowed(arena_text),
             state.formatting,
             state.paragraph,
         ));
         self.current_state_mut()?.paragraph_content_started = true;
-        self.append_revision_text(&state, text, start, self.body_text_len)
+        self.append_revision_text(&state, arena_text, start, self.body_text_len)
     }
 
     /// Record a nonrequired (soft) break marker in the body story.
@@ -565,13 +562,13 @@ impl<'a> Parser<'a> {
         let id = state.revision_author_id.ok_or_else(|| {
             RtfError::MalformedDocument("RTF revision text is missing an author index".to_string())
         })?;
-        let index = usize::try_from(id).map_err(|_| {
+        let index = usize::try_from(id).map_err(|_err| {
             RtfError::MalformedDocument("RTF revision author index cannot be negative".to_string())
         })?;
         let author = self.revision_authors.get(index).ok_or_else(|| {
             RtfError::MalformedDocument("RTF revision author index is outside revtbl".to_string())
         })?;
-        let author = author.name.clone();
+        let author_name = author.name.clone();
         let date = state
             .revision_date
             .map(|value| Cow::Owned(value.to_string()));
@@ -593,12 +590,12 @@ impl<'a> Parser<'a> {
             .revision_event_id
             .and_then(|event_id| self.revision_event_indices.get(event_id).copied().flatten());
         let event_continues_previous = previous_event_revision
-            .is_some_and(|index| Some(index) == self.revisions.len().checked_sub(1));
+            .is_some_and(|last_index| Some(last_index) == self.revisions.len().checked_sub(1));
         if event_continues_previous
             && let Some(previous) = self.revisions.last_mut()
             && previous.revision_type == revision_type
             && previous.id == id
-            && previous.author == author
+            && previous.author == author_name
             && previous.date == date
             && previous.range_end == start
             && (revision_type != super::super::super::annotation::RevisionType::Deletion
@@ -632,7 +629,7 @@ impl<'a> Parser<'a> {
         }
         let revision = super::super::super::annotation::Revision {
             revision_type,
-            author,
+            author: author_name,
             date,
             id,
             content: Cow::Owned(text.to_string()),
@@ -652,21 +649,25 @@ impl<'a> Parser<'a> {
                 })? = Some(self.revisions.len() - 1);
         }
         if (state.in_table || state.table_nesting_level >= 2) && previous_event_revision.is_none() {
-            let index = self.revisions.len() - 1;
+            let revision_index = self.revisions.len() - 1;
             let event = match revision_type {
                 super::super::super::annotation::RevisionType::Insertion => {
                     crate::CellStoryEvent::RevisionStart(crate::CellStoryReference {
-                        index,
+                        index: revision_index,
                         position: start,
                     })
                 },
                 super::super::super::annotation::RevisionType::Deletion => {
                     crate::CellStoryEvent::RevisionDeletion(crate::CellStoryReference {
-                        index,
+                        index: revision_index,
                         position: start,
                     })
                 },
-                _ => return Err(parser_classification_error()),
+                super::super::super::annotation::RevisionType::FormatChange
+                | super::super::super::annotation::RevisionType::MovedFrom
+                | super::super::super::annotation::RevisionType::MovedTo => {
+                    return Err(parser_classification_error());
+                },
             };
             self.push_cell_story_event(state.table_nesting_level, event)?;
         }
@@ -688,7 +689,11 @@ impl<'a> Parser<'a> {
                     super::super::super::annotation::RevisionType::Deletion => {
                         ParsedBodyStoryEvent::RevisionDeletion(id)
                     },
-                    _ => return Err(parser_classification_error()),
+                    super::super::super::annotation::RevisionType::FormatChange
+                    | super::super::super::annotation::RevisionType::MovedFrom
+                    | super::super::super::annotation::RevisionType::MovedTo => {
+                        return Err(parser_classification_error());
+                    },
                 });
             }
             state.revision_event_id = Some(id);

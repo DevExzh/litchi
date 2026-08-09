@@ -49,13 +49,13 @@ pub(crate) fn parse_source(bytes: &[u8], limits: Limits) -> Result<ValidatedSour
         .iter()
         .map(|hyperlink| hyperlink.id)
         .collect::<Vec<_>>();
-    if let Some(collection) = &collection {
-        if hyperlink_ids.iter().any(|id| collection.get(*id).is_some()) {
+    if let Some(list) = &collection {
+        if hyperlink_ids.iter().any(|id| list.get(*id).is_some()) {
             return Err(Error::Corrupted(
                 "external-object list reuses an ID for media and a hyperlink".into(),
             ));
         }
-        validate_collection(collection, &hyperlink_ids)?;
+        validate_collection(list, &hyperlink_ids)?;
     }
 
     let mut owner_ids = Vec::new();
@@ -199,8 +199,8 @@ fn collect_officeart_owner_ids(
     depth: usize,
 ) -> Result<()> {
     for record in litchi_odraw::Parser::new(data).records() {
-        let record = record?;
-        collect_officeart_record(&record, limits, owner_ids, record_count, depth)?;
+        let parsed_record = record?;
+        collect_officeart_record(&parsed_record, limits, owner_ids, record_count, depth)?;
     }
     Ok(())
 }
@@ -226,9 +226,9 @@ fn collect_officeart_record(
     if record.is_container() {
         let container = litchi_odraw::Container::try_new(record.clone())?;
         for child in container.children() {
-            let child = child?;
+            let parsed_child = child?;
             collect_officeart_record(
-                &child,
+                &parsed_child,
                 limits,
                 owner_ids,
                 record_count,

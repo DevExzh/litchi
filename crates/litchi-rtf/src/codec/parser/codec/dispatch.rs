@@ -1,6 +1,10 @@
-use super::*;
+use super::{
+    ControlWord, Destination, MAX_OBJECTS, MAX_SHAPE_GROUPS, MAX_SHAPES, ParsedBodyStoryEvent,
+    Parser, RootDrawingOwner, RtfError, RtfResult, Token, parser_classification_error,
+    require_parameterless,
+};
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     /// Dispatch the destination-specific handling that a group may open with.
     ///
     /// Returns `true` when the group was fully consumed by a specialised
@@ -13,8 +17,15 @@ impl<'a> Parser<'a> {
     /// group-nesting path and blow the stack after only a handful of levels.
     // The complexity is concentrated here intentionally so every destination
     // transition remains visible in one auditable protocol dispatch table.
-    #[allow(clippy::cognitive_complexity)]
+    #[allow(
+        clippy::cognitive_complexity,
+        reason = "destination dispatch keeps every state transition visible in one table"
+    )]
     #[inline(never)]
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn dispatch_group_destination(&mut self) -> RtfResult<bool> {
         if let Some(token) = self.tokens.get(self.pos) {
             match token {
@@ -657,10 +668,10 @@ impl<'a> Parser<'a> {
                             let value = self.parse_external_reference_destination(*control)?;
                             match control {
                                 ControlWord::NextFile => {
-                                    self.external_references.next_file = Some(value)
+                                    self.external_references.next_file = Some(value);
                                 },
                                 ControlWord::DocumentTemplate => {
-                                    self.external_references.template = Some(value)
+                                    self.external_references.template = Some(value);
                                 },
                                 _ => return Err(parser_classification_error()),
                             }
@@ -681,7 +692,7 @@ impl<'a> Parser<'a> {
                                         .to_string(),
                                 ));
                             }
-                            let control = *control;
+                            let view_control = *control;
                             self.pos += 2;
                             if !matches!(self.tokens.get(self.pos), Some(Token::CloseBrace)) {
                                 return Err(RtfError::MalformedDocument(
@@ -690,7 +701,7 @@ impl<'a> Parser<'a> {
                                 ));
                             }
                             self.pos += 1;
-                            self.apply_document_view_control(&control)?;
+                            self.apply_document_view_control(&view_control)?;
                             self.states.pop();
                             return Ok(true);
                         },
@@ -1488,7 +1499,11 @@ impl<'a> Parser<'a> {
                     self.states.pop();
                     return Ok(true);
                 },
-                _ => {},
+                Token::OpenBrace
+                | Token::CloseBrace
+                | Token::Control(_)
+                | Token::Text(_)
+                | Token::Binary(_) => {},
             }
         }
 

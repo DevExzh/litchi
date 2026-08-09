@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use std::borrow::Cow;
 
 use litchi_rtf::{
@@ -34,7 +43,7 @@ fn named_group(name: &'static str, id: i32) -> ShapeGroup<'static> {
 
 #[test]
 fn document_shape_find_replace_remove_and_reorder_are_atomic() {
-    let mut document = RtfDocument::parse(r#"{\rtf1\ansi\ansicpg1252 Caf\'e9}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1\ansi\ansicpg1252 Caf\'e9}").unwrap();
     let mut first = named("first", 41);
     first.position = document.text().len();
     let mut second = named("second", 42);
@@ -85,7 +94,7 @@ fn document_shape_find_replace_remove_and_reorder_are_atomic() {
 
 #[test]
 fn document_group_crud_repairs_root_order_without_tree_clones() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 body}").unwrap();
     let anchor = document.text().len();
 
     let mut first = named_group("first group", 1);
@@ -131,9 +140,12 @@ fn document_group_crud_repairs_root_order_without_tree_clones() {
     let event_drawings: Vec<_> = document
         .body_story_events()
         .iter()
-        .filter_map(|event| match event {
-            BodyStoryEvent::Drawing(drawing) => Some(*drawing),
-            _ => None,
+        .filter_map(|event| {
+            if let BodyStoryEvent::Drawing(drawing) = event {
+                Some(*drawing)
+            } else {
+                None
+            }
         })
         .collect();
     assert_eq!(event_drawings, document.drawing_order());
@@ -178,7 +190,7 @@ fn typed_units_anchors_and_nested_group_mutation_round_trip() {
     assert_eq!(root.info[2].as_wrap(), Some(ShapeWrapStyle::Tight));
     assert_eq!(root.info[3].as_wrap_side(), Some(ShapeWrapSide::Right));
 
-    let mut document = RtfDocument::parse(r#"{\rtf1 body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 body}").unwrap();
     root.position = document.text().len();
     document.add_shape_group(root).unwrap();
     let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
@@ -219,7 +231,7 @@ fn libreoffice_fixture_mutates_without_interpreting_picture_or_ole_payloads() {
 
 #[test]
 fn reorder_across_body_anchors_and_invalid_group_indices_roll_back() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 AB}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 AB}").unwrap();
     let mut first = named("a", 1);
     first.position = 0;
     let mut second = named("b", 2);

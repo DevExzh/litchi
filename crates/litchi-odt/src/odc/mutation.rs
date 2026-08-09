@@ -2,17 +2,21 @@
 
 use super::{Axis, AxisSpec, Dimension, Document, Series, SeriesSpec};
 use litchi_core::{Error, Result, xml::escape_xml};
-use litchi_odf_common::chart::authoring::{serialize_axis_fragment, serialize_series_fragment};
-use litchi_odf_common::chart::read;
+use litchi_odf_common::chart::{
+    ChartClass,
+    authoring::{serialize_axis_fragment, serialize_series_fragment},
+    read,
+};
 use quick_xml::{
     Reader,
     events::{BytesStart, Event},
-    name::{Namespace, ResolveResult},
+    name::{Namespace, QName, ResolveResult},
     reader::NsReader,
 };
 use std::collections::HashSet;
 
 const CHART_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:chart:1.0";
+const CHART_NS_URI: &str = "urn:oasis:names:tc:opendocument:xmlns:chart:1.0";
 const XML_NS: &[u8] = b"http://www.w3.org/XML/1998/namespace";
 const MAX_CONTENT: usize = 16 * 1_048_576;
 const MAX_DEPTH: usize = 128;
@@ -51,7 +55,7 @@ struct AxisEntry {
 struct SeriesEntry {
     span: Span,
     xml_id: Option<String>,
-    class: Option<String>,
+    class: Option<ChartClass>,
     values: Option<String>,
     label: Option<String>,
     axis: Option<String>,
@@ -198,12 +202,17 @@ impl Document {
             .series
             .get(index)
             .ok_or_else(|| bounds("series", index, scan.series.len()))?;
+        let class = match update.class.clone() {
+            Some(Some(value)) => Some(parse_update_chart_class(value)?),
+            Some(None) => None,
+            None => entry.class.clone(),
+        };
         let series = SeriesSpec {
             xml_id: update
                 .xml_id
                 .clone()
                 .unwrap_or_else(|| entry.xml_id.clone()),
-            class: update.class.clone().unwrap_or_else(|| entry.class.clone()),
+            class,
             values_cell_range_address: update
                 .values_cell_range_address
                 .clone()
@@ -449,7 +458,7 @@ fn series_from_start(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Resu
     Ok(SeriesEntry {
         span: Span { start: 0, end: 0 },
         xml_id: ns_attr(reader, element, XML_NS, b"id")?,
-        class: chart_attr(reader, element, b"class")?,
+        class: chart_class_attr(reader, element)?,
         values: chart_attr(reader, element, b"values-cell-range-address")?,
         label: chart_attr(reader, element, b"label-cell-address")?,
         axis: chart_attr(reader, element, b"attached-axis")?,
@@ -492,6 +501,48 @@ fn chart_attr(
     local: &[u8],
 ) -> Result<Option<String>> {
     ns_attr(reader, element, CHART_NS, local)
+}
+fn chart_class_attr(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+) -> Result<Option<ChartClass>> {
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute.map_err(xml_error)?;
+        if !matches!(reader.resolver().resolve_attribute(attribute.key), (ResolveResult::Bound(Namespace(uri)), name) if uri == CHART_NS && name.as_ref() == b"class")
+        {
+            continue;
+        }
+        let value = attribute
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, reader.decoder())
+            .map_err(xml_error)?
+            .into_owned();
+        let (namespace, _) = reader.resolver().resolve_element(QName(value.as_bytes()));
+        let namespace = match namespace {
+            ResolveResult::Bound(Namespace(uri)) => std::str::from_utf8(&uri).map_err(xml_error)?,
+            ResolveResult::Unbound => return invalid("chart:class QName has no bound namespace"),
+            ResolveResult::Unknown(prefix) => {
+                return invalid(format!(
+                    "unknown chart:class namespace prefix '{}'",
+                    String::from_utf8_lossy(&prefix)
+                ));
+            },
+        };
+        return ChartClass::parse(value, Some(namespace)).map(Some);
+    }
+    Ok(None)
+}
+fn parse_update_chart_class(value: String) -> Result<ChartClass> {
+    let value = if value.contains(':') {
+        value
+    } else {
+        format!("chart:{value}")
+    };
+    if !value.starts_with("chart:") {
+        return invalid(
+            "SeriesUpdate::class only accepts a standard chart class; use SeriesSpec for extension classes",
+        );
+    }
+    ChartClass::parse(value, Some(CHART_NS_URI))
 }
 fn ns_attr(
     reader: &NsReader<&[u8]>,
@@ -630,11 +681,11 @@ fn invalid<T>(value: impl Into<String>) -> Result<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Definition, StyleElement};
+    use crate::{ChartClass, Definition, StyleElement};
 
     #[test]
     fn mixed_and_three_dimensional_chart_mutations_are_atomic() {
-        let mut definition = Definition::new("chart:bar");
+        let mut definition = Definition::new(ChartClass::bar());
         let mut x = AxisSpec::new(Dimension::X);
         x.name = Some("x".to_string());
         let mut y = AxisSpec::new(Dimension::Y);
@@ -645,7 +696,7 @@ mod tests {
         definition.plot_area.stock_range_line = Some(StyleElement::default());
         definition.plot_area.series.push(SeriesSpec {
             xml_id: Some("bars".to_string()),
-            class: Some("chart:bar".to_string()),
+            class: Some(ChartClass::bar()),
             attached_axis: Some("y".to_string()),
             ..Default::default()
         });
@@ -653,7 +704,7 @@ mod tests {
         document
             .add_series(&SeriesSpec {
                 xml_id: Some("line".to_string()),
-                class: Some("chart:line".to_string()),
+                class: Some(ChartClass::line()),
                 attached_axis: Some("y".to_string()),
                 ..Default::default()
             })

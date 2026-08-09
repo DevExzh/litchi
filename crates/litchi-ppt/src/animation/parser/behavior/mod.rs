@@ -1,4 +1,4 @@
-//! Layered parsers for shared PowerPoint animation behavior records.
+//! Layered parsers for shared `PowerPoint` animation behavior records.
 //!
 //! The façade keeps the historical parser entry points together while the
 //! implementation is organized by responsibility: record parsing, typed

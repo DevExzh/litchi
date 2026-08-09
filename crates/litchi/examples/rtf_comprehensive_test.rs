@@ -90,49 +90,49 @@ fn main() {
 }
 
 #[cfg(not(feature = "rtf"))]
-#[allow(dead_code)]
+#[allow(dead_code, reason = "stub used when the `rtf` feature is disabled")]
 fn test_character_formatting(_: &str) -> std::io::Result<()> {
     Ok(())
 }
 
 #[cfg(not(feature = "rtf"))]
-#[allow(dead_code)]
+#[allow(dead_code, reason = "stub used when the `rtf` feature is disabled")]
 fn test_paragraph_formatting(_: &str) -> std::io::Result<()> {
     Ok(())
 }
 
 #[cfg(not(feature = "rtf"))]
-#[allow(dead_code)]
+#[allow(dead_code, reason = "stub used when the `rtf` feature is disabled")]
 fn test_border_styles(_: &str) -> std::io::Result<()> {
     Ok(())
 }
 
 #[cfg(not(feature = "rtf"))]
-#[allow(dead_code)]
+#[allow(dead_code, reason = "stub used when the `rtf` feature is disabled")]
 fn test_shading_patterns(_: &str) -> std::io::Result<()> {
     Ok(())
 }
 
 #[cfg(not(feature = "rtf"))]
-#[allow(dead_code)]
+#[allow(dead_code, reason = "stub used when the `rtf` feature is disabled")]
 fn test_tables(_: &str) -> std::io::Result<()> {
     Ok(())
 }
 
 #[cfg(not(feature = "rtf"))]
-#[allow(dead_code)]
+#[allow(dead_code, reason = "stub used when the `rtf` feature is disabled")]
 fn test_unicode_special_chars(_: &str) -> std::io::Result<()> {
     Ok(())
 }
 
 #[cfg(not(feature = "rtf"))]
-#[allow(dead_code)]
+#[allow(dead_code, reason = "stub used when the `rtf` feature is disabled")]
 fn test_complete_rtf_document(_: &str) -> std::io::Result<()> {
     Ok(())
 }
 
 #[cfg(not(feature = "rtf"))]
-#[allow(dead_code)]
+#[allow(dead_code, reason = "stub used when the `rtf` feature is disabled")]
 fn write_and_verify(_: &str, _: &str, _: &str) -> std::io::Result<()> {
     Ok(())
 }

@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::*;
 use crate::consts::RecordType;
 use crate::records::Record;
@@ -89,21 +95,23 @@ fn rejects_known_non_diagram_build_kinds_but_keeps_unknown_kinds_bounded() {
 #[test]
 fn generic_records_validate_raw_types_lengths_and_children() {
     let value = sample(BuildType::AsOneObject);
-    let mut record = value.to_record();
-    record.record_type_raw ^= 1;
-    assert!(Container::parse_record(&record).is_err());
+    let mut wrong_type = value.to_record();
+    wrong_type.record_type_raw ^= 1;
+    assert!(Container::parse_record(&wrong_type).is_err());
 
-    let mut record = value.to_record();
-    record.data_length = 35;
-    assert!(Container::parse_record(&record).is_err());
+    let mut wrong_length = value.to_record();
+    wrong_length.data_length = 35;
+    assert!(Container::parse_record(&wrong_length).is_err());
 
-    let mut record = value.to_record();
-    record.children[1].children.push(value.atom().to_record());
-    assert!(Container::parse_record(&record).is_err());
+    let mut extra_child = value.to_record();
+    extra_child.children[1]
+        .children
+        .push(value.atom().to_record());
+    assert!(Container::parse_record(&extra_child).is_err());
 
-    let mut record = value.to_record();
-    record.data[0] ^= 1;
-    assert!(Container::parse_record(&record).is_err());
+    let mut wrong_data = value.to_record();
+    wrong_data.data[0] ^= 1;
+    assert!(Container::parse_record(&wrong_data).is_err());
 }
 
 #[test]

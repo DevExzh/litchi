@@ -7,7 +7,7 @@ use thiserror::Error;
 /// Result of a PPTX operation.
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// Failure to decode or encode a PresentationML capability.
+/// Failure to decode or encode a `PresentationML` capability.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum Error {
@@ -23,7 +23,7 @@ pub enum Error {
     #[error("invalid PresentationML XML: {0}")]
     Xml(String),
 
-    /// The document violates a PresentationML structural or value invariant.
+    /// The document violates a `PresentationML` structural or value invariant.
     #[error("invalid PresentationML: {0}")]
     Invalid(String),
 
@@ -36,7 +36,7 @@ pub enum Error {
         limit: usize,
     },
 
-    /// A bounded PresentationML operation could not reserve required memory.
+    /// A bounded `PresentationML` operation could not reserve required memory.
     #[error("could not reserve memory for PresentationML {resource}: {source}")]
     Allocation {
         /// Resource whose bounded plan could not be reserved.
@@ -46,7 +46,7 @@ pub enum Error {
         source: TryReserveError,
     },
 
-    /// A related part has a content type forbidden by PresentationML.
+    /// A related part has a content type forbidden by `PresentationML`.
     #[error("invalid PPTX content type: expected {expected}, got {actual}")]
     ContentType {
         /// Required content type.
@@ -55,7 +55,7 @@ pub enum Error {
         actual: String,
     },
 
-    /// A PresentationML relationship is missing or malformed.
+    /// A `PresentationML` relationship is missing or malformed.
     #[error("invalid PresentationML relationship: {0}")]
     Relationship(String),
 
@@ -179,7 +179,7 @@ pub enum Error {
         index: usize,
     },
 
-    /// A package URI supplied to the PresentationML graph is invalid.
+    /// A package URI supplied to the `PresentationML` graph is invalid.
     #[error("invalid PresentationML URI: {0}")]
     Uri(String),
 
@@ -220,7 +220,7 @@ pub enum Error {
     #[error("PresentationML attribute decoding error: {0}")]
     Decode(#[from] litchi_ooxml_common::XmlError),
 
-    /// A shared DrawingML chart or primitive codec failed.
+    /// A shared `DrawingML` chart or primitive codec failed.
     #[error("DrawingML error: {0}")]
     Drawing(#[from] litchi_drawingml::Error),
 

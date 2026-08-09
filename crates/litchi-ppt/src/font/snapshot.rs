@@ -17,25 +17,47 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
+    /// Snapshot a borrowed whole-CFB source with default limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the source is malformed, exceeds the default
+    /// limits, or its live font owner is not losslessly representable.
     pub fn parse(bytes: &[u8]) -> Result<Self> {
         Self::parse_with_limits(bytes, PackageLimits::default())
     }
 
     /// Copy a borrowed package only after enforcing the caller's source limit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_with_limits(bytes: &[u8], limits: PackageLimits) -> Result<Self> {
         validate_source_len(bytes.len(), limits)?;
         let mut owned = Vec::new();
         owned
             .try_reserve_exact(bytes.len())
-            .map_err(|_| Error::AllocationFailed("PowerPoint font snapshot source"))?;
+            .map_err(|_err| Error::AllocationFailed("PowerPoint font snapshot source"))?;
         owned.extend_from_slice(bytes);
         Self::from_arc(Arc::from(owned), limits)
     }
 
+    /// Snapshot an owned whole-CFB source with default limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the source is malformed, exceeds the default
+    /// limits, or its live font owner is not losslessly representable.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         Self::from_bytes_with_limits(bytes, PackageLimits::default())
     }
 
+    /// Snapshot an owned whole-CFB source with explicit limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the source is malformed, exceeds `limits`, or its
+    /// live font owner is not losslessly representable.
     pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: PackageLimits) -> Result<Self> {
         Self::from_bytes_with_options(
             bytes,
@@ -46,6 +68,13 @@ impl Snapshot {
         )
     }
 
+    /// Snapshot an owned whole-CFB source with explicit package options.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the source is malformed, exceeds the option limits,
+    /// supplies a password without the `encryption` feature, or its live font
+    /// owner is not losslessly representable.
     pub fn from_bytes_with_options(bytes: Vec<u8>, options: PackageOptions<'_>) -> Result<Self> {
         validate_source_len(bytes.len(), options.limits)?;
         Self::from_arc_with_options(Arc::from(bytes), options)
@@ -138,27 +167,39 @@ impl Snapshot {
         })
     }
 
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
+    #[must_use]
     pub fn document_bytes(&self) -> &[u8] {
         &self.document
     }
+    #[must_use]
     pub const fn fonts(&self) -> &FontCollections {
         &self.fonts
     }
+    #[must_use]
     pub const fn document_persist_id(&self) -> u32 {
         self.document_persist_id
     }
+    #[must_use]
     pub const fn limits(&self) -> PackageLimits {
         self.limits
     }
+    #[must_use]
     pub fn revision(&self) -> super::Revision {
         super::Revision::from_bytes(&self.bytes)
     }
 
+    /// Start a staged font transaction against this snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction cannot be initialized from this
+    /// snapshot.
     pub fn edit(&self) -> Result<super::Transaction> {
-        super::Transaction::new(self.clone())
+        Ok(super::Transaction::new(self.clone()))
     }
 }
 

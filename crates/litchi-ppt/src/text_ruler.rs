@@ -1,4 +1,4 @@
-//! PowerPoint `TextRulerAtom` parsing.
+//! `PowerPoint` `TextRulerAtom` parsing.
 
 use litchi_core::binary::{read_i16_le, read_u16_le, read_u32_le};
 
@@ -8,11 +8,15 @@ use super::text_prop::TextTabStop;
 use crate::consts::RecordType;
 
 /// Margin and first-line indent overrides for one paragraph level.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`TextRulerLevel` is the established public API name; renaming it would break downstream crates"
+)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TextRulerLevel {
-    /// Left margin in PowerPoint master units.
+    /// Left margin in `PowerPoint` master units.
     pub left_margin: Option<i16>,
-    /// First-line indent in PowerPoint master units.
+    /// First-line indent in `PowerPoint` master units.
     pub indent: Option<i16>,
 }
 
@@ -23,7 +27,7 @@ pub struct TextRuler {
     pub mask: u32,
     /// Number of style levels, when explicitly present.
     pub level_count: Option<i16>,
-    /// Default tab size in PowerPoint master units.
+    /// Default tab size in `PowerPoint` master units.
     pub default_tab_size: Option<i16>,
     /// Whether the tab-stop array was explicitly present.
     pub tab_stops_present: bool,
@@ -35,6 +39,10 @@ pub struct TextRuler {
 
 impl TextRuler {
     /// Parse the payload of a `TextRulerAtom`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(data: &[u8]) -> Result<Self> {
         require_bytes(data, 0, 4, "TextRuler mask")?;
         let mask = read_u32_le(data, 0).unwrap_or(0);
@@ -113,6 +121,10 @@ impl TextRuler {
     }
 
     /// Parse a `DefaultRulerAtom` payload and require all default fields.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_default(data: &[u8]) -> Result<Self> {
         let ruler = Self::parse(data)?;
         if ruler.mask & 0x0000_1fff != 0x0000_1fff {
@@ -125,6 +137,14 @@ impl TextRuler {
 }
 
 /// Discover and parse the document-wide `DefaultRulerAtom` below `root`.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`parse_default_text_ruler` is the established public entry point of this module; renaming it would break downstream crates"
+)]
 pub fn parse_default_text_ruler(root: &Record) -> Result<Option<TextRuler>> {
     let mut records = Vec::new();
     collect_default_rulers(root, &mut records);
@@ -182,6 +202,11 @@ fn require_bytes(data: &[u8], offset: usize, size: usize, field: &str) -> Result
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -263,7 +288,7 @@ mod tests {
             record_type_raw: 4011,
             version: 0,
             instance: 0,
-            data_length: data.len() as u32,
+            data_length: u32::try_from(data.len()).unwrap(),
             data,
             children: Vec::new(),
         };

@@ -1,4 +1,4 @@
-//! PowerPoint 2002 build-list records.
+//! `PowerPoint` 2002 build-list records.
 
 use super::support::{parse_bool1, read_u32, require_atom, require_container, require_header};
 use super::time_node::parse_extended_time_node;
@@ -11,7 +11,15 @@ use crate::consts::RecordType;
 use crate::package::{Error, Result};
 use crate::records::Record;
 
-/// Parse build list from BuildList container record.
+/// Parse build list from `BuildList` container record.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "`RecordType` spans the full MS-PPT record ID space; every child other than the three build containers is rejected uniformly"
+)]
 pub fn parse_build_list(record: &Record) -> Result<BuildList> {
     if record.record_type != RecordType::BuildList {
         return Err(Error::InvalidFormat(format!(
@@ -35,9 +43,9 @@ pub fn parse_build_list(record: &Record) -> Result<BuildList> {
             },
         };
         let atom = match &build {
-            BuildListEntry::Paragraph(build) => &build.atom,
-            BuildListEntry::Chart(build) => &build.atom,
-            BuildListEntry::Diagram(build) => &build.atom,
+            BuildListEntry::Paragraph(paragraph) => &paragraph.atom,
+            BuildListEntry::Chart(chart) => &chart.atom,
+            BuildListEntry::Diagram(diagram) => &diagram.atom,
         };
         if !identities.insert((atom.build_id, atom.shape_id_ref)) {
             return Err(Error::InvalidFormat(format!(

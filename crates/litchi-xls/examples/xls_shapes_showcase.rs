@@ -6,7 +6,7 @@
 //! Currently, the XLS writer does not have shape writing capabilities,
 //! but it can READ shapes using the shared Escher module.
 //!
-//! Run with: cargo run --example xls_shapes_showcase
+//! Run with: cargo run --example `xls_shapes_showcase`
 
 use std::error::Error;
 

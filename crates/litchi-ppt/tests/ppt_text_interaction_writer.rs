@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use litchi_ppt::writer::text_format::{Paragraph, TextRun};
 use litchi_ppt::writer::{Hyperlink, Writer};
 use litchi_ppt::{
@@ -78,8 +84,8 @@ fn plain_and_rich_utf16_ranges_round_trip_with_shape_actions() {
     let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
     let presentation = package.presentation().unwrap();
     let hyperlinks = presentation.hyperlinks().unwrap();
-    let slide = &presentation.slides().unwrap()[0];
-    let entries = slide.shape_text_interactions().unwrap();
+    let read_slide = &presentation.slides().unwrap()[0];
+    let entries = read_slide.shape_text_interactions().unwrap();
     assert_eq!(entries.len(), 2);
 
     let paired = entries
@@ -103,7 +109,7 @@ fn plain_and_rich_utf16_ranges_round_trip_with_shape_actions() {
             .any(|entry| entry.interactions.as_slice() == std::slice::from_ref(&rich))
     );
 
-    let shape_entries = slide.shape_interactions().unwrap();
+    let shape_entries = read_slide.shape_interactions().unwrap();
     assert_eq!(shape_entries.len(), 1);
     assert_eq!(shape_entries[0].interactions, [shape_action]);
 }

@@ -1,6 +1,10 @@
-use super::*;
+use super::{
+    BookmarkSpan, ControlWord, Cow, CustomXmlSpan, Destination, MAX_BOOKMARK_NAME_BYTES,
+    MAX_BOOKMARKS, OpenBookmark, OpenCustomXmlTag, ParsedBodyStoryEvent, Parser, RtfError,
+    RtfResult, SmallVec, Token, control_symbol_text,
+};
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     pub(super) fn parse_bookmark_destination(&mut self) -> RtfResult<()> {
         self.pos += 1; // ignorable-destination marker
         let is_start = match self.tokens.get(self.pos) {
@@ -19,7 +23,7 @@ impl<'a> Parser<'a> {
         let mut last_column = None;
         let mut is_public = false;
         let mut depth = 1usize;
-        let mut unicode_skip = self.current_state()?.unicode_skip.max(0) as usize;
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0).cast_unsigned() as usize;
         let mut fallback_skip = 0usize;
         while self.pos < self.tokens.len() && depth > 0 {
             match self.tokens.get(self.pos) {
@@ -43,6 +47,11 @@ impl<'a> Parser<'a> {
                     while let Some(Token::Control(ControlWord::Unicode(code))) =
                         self.tokens.get(self.pos)
                     {
+                        #[allow(
+                            clippy::cast_possible_truncation,
+                            clippy::cast_sign_loss,
+                            reason = "RTF \\uN parameters are signed 16-bit; the u16 wrap implements the specified negative-value conversion"
+                        )]
                         utf16.push(*code as u16);
                         self.pos += 1;
                     }
@@ -53,7 +62,7 @@ impl<'a> Parser<'a> {
                     continue;
                 },
                 Some(Token::Control(ControlWord::UnicodeSkip(value))) => {
-                    unicode_skip = (*value).max(0) as usize;
+                    unicode_skip = (*value).max(0).cast_unsigned() as usize;
                 },
                 Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
                     name.push_str(control_symbol_text(control).unwrap_or_default());
@@ -70,8 +79,8 @@ impl<'a> Parser<'a> {
         if depth != 0 {
             return Err(RtfError::UnexpectedEof);
         }
-        let name = name.trim_end_matches(['\r', '\n']).to_string();
-        if name.is_empty() {
+        let bookmark_name = name.trim_end_matches(['\r', '\n']).to_string();
+        if bookmark_name.is_empty() {
             return Ok(());
         }
 
@@ -82,7 +91,7 @@ impl<'a> Parser<'a> {
                 ));
             }
             let bookmark = OpenBookmark {
-                name: name.clone(),
+                name: bookmark_name.clone(),
                 position: self.body_text_len,
                 first_column,
                 last_column,
@@ -93,8 +102,15 @@ impl<'a> Parser<'a> {
                 crate::BodyStoryEvent::BookmarkStart(self.next_bookmark_order),
             ));
             self.next_bookmark_order += 1;
-            self.open_bookmarks.entry(name).or_default().push(bookmark);
-        } else if let Some(open) = self.open_bookmarks.get_mut(&name).and_then(Vec::pop) {
+            self.open_bookmarks
+                .entry(bookmark_name)
+                .or_default()
+                .push(bookmark);
+        } else if let Some(open) = self
+            .open_bookmarks
+            .get_mut(&bookmark_name)
+            .and_then(Vec::pop)
+        {
             self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
                 crate::BodyStoryEvent::BookmarkEnd(open.order),
             ));
@@ -170,6 +186,11 @@ impl<'a> Parser<'a> {
                 while let Some(Token::Control(ControlWord::Unicode(code))) =
                     self.tokens.get(self.pos)
                 {
+                    #[allow(
+                        clippy::cast_possible_truncation,
+                        clippy::cast_sign_loss,
+                        reason = "RTF \\uN parameters are signed 16-bit; the u16 wrap implements the specified negative-value conversion"
+                    )]
                     utf16.push(*code as u16);
                     self.pos += 1;
                 }
@@ -182,7 +203,7 @@ impl<'a> Parser<'a> {
                 Ok(true)
             },
             Some(Token::Control(ControlWord::UnicodeSkip(count))) => {
-                *unicode_skip = count.max(0) as usize;
+                *unicode_skip = count.max(0).cast_unsigned() as usize;
                 self.pos += 1;
                 Ok(true)
             },
@@ -205,7 +226,7 @@ impl<'a> Parser<'a> {
         max_bytes: usize,
     ) -> RtfResult<String> {
         let mut value = String::new();
-        let mut unicode_skip = self.current_state()?.unicode_skip.max(0) as usize;
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0).cast_unsigned() as usize;
         let mut fallback_skip = 0usize;
         loop {
             match self.tokens.get(self.pos) {
@@ -303,7 +324,7 @@ impl<'a> Parser<'a> {
         let mut namespace = None;
         let mut attributes: Vec<(String, String)> = Vec::new();
         let mut pending: Option<String> = None;
-        let mut unicode_skip = self.current_state()?.unicode_skip.max(0) as usize;
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0).cast_unsigned() as usize;
         let mut fallback_skip = 0usize;
         loop {
             match self.tokens.get(self.pos).cloned() {
@@ -323,7 +344,7 @@ impl<'a> Parser<'a> {
                                 .to_string(),
                         ));
                     }
-                    let id = value as u32;
+                    let id = value.cast_unsigned();
                     if !self.xml_namespaces.iter().any(|entry| entry.id == id) {
                         return Err(RtfError::MalformedDocument(
                             "RTF custom XML tag references an unknown XML namespace".to_string(),
@@ -386,8 +407,8 @@ impl<'a> Parser<'a> {
                 },
             }
         }
-        let name = name.trim_end_matches(['\r', '\n']).to_string();
-        if name.is_empty() {
+        let tag_name = name.trim_end_matches(['\r', '\n']).to_string();
+        if tag_name.is_empty() {
             return Err(RtfError::MalformedDocument(
                 "RTF custom XML tag name cannot be empty".to_string(),
             ));
@@ -416,11 +437,13 @@ impl<'a> Parser<'a> {
             }
             self.custom_xml_text_bytes = self
                 .custom_xml_text_bytes
-                .saturating_add(name.len())
+                .saturating_add(tag_name.len())
                 .saturating_add(
                     attributes
                         .iter()
-                        .map(|(name, value)| name.len().saturating_add(value.len()))
+                        .map(|(attr_name, attr_value)| {
+                            attr_name.len().saturating_add(attr_value.len())
+                        })
                         .sum::<usize>(),
                 );
             if self.custom_xml_text_bytes > crate::custom_xml::MAX_CUSTOM_XML_TOTAL_BYTES {
@@ -432,7 +455,7 @@ impl<'a> Parser<'a> {
                 crate::BodyStoryEvent::CustomXmlOpen(self.next_custom_xml_order),
             ));
             self.open_custom_xml_tags.push(OpenCustomXmlTag {
-                name,
+                name: tag_name,
                 namespace,
                 attributes,
                 position: self.body_text_len,
@@ -445,7 +468,7 @@ impl<'a> Parser<'a> {
         let open = self.open_custom_xml_tags.pop().ok_or_else(|| {
             RtfError::MalformedDocument("RTF custom XML close has no matching open".to_string())
         })?;
-        if open.name != name {
+        if open.name != tag_name {
             return Err(RtfError::MalformedDocument(
                 "RTF custom XML close does not match the innermost open tag".to_string(),
             ));

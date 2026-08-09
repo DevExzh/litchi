@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::*;
 
 #[test]
@@ -27,7 +33,7 @@ fn test_text_run_extractor() {
         record_type_raw: 4000,
         version: 0,
         instance: 0,
-        data_length: text_data.len() as u32,
+        data_length: u32::try_from(text_data.len()).unwrap(),
         data: text_data,
         children: Vec::new(),
     };
@@ -96,7 +102,7 @@ fn style_atom_splits_text_into_character_runs() {
         record_type_raw: 4001,
         version: 0,
         instance: 0,
-        data_length: style_data.len() as u32,
+        data_length: u32::try_from(style_data.len()).unwrap(),
         data: style_data,
         children: Vec::new(),
     };
@@ -131,7 +137,7 @@ fn exposes_complete_paragraph_runs_with_utf16_coverage() {
         record_type_raw: 4000,
         version: 0,
         instance: 0,
-        data_length: (text.encode_utf16().count() * 2) as u32,
+        data_length: u32::try_from(text.encode_utf16().count() * 2).unwrap(),
         data: text.encode_utf16().flat_map(u16::to_le_bytes).collect(),
         children: Vec::new(),
     };
@@ -188,7 +194,7 @@ fn exposes_complete_paragraph_runs_with_utf16_coverage() {
         record_type_raw: 4001,
         version: 0,
         instance: 0,
-        data_length: style_data.len() as u32,
+        data_length: u32::try_from(style_data.len()).unwrap(),
         data: style_data,
         children: Vec::new(),
     };
@@ -271,12 +277,12 @@ fn rejects_invalid_paragraph_enumerations() {
         alignment: 4,
     });
 
-    let error = paragraph_formatting_from_style(&style).unwrap_err();
-    assert!(error.to_string().contains("TextTabTypeEnum"));
+    let tab_error = paragraph_formatting_from_style(&style).unwrap_err();
+    assert!(tab_error.to_string().contains("TextTabTypeEnum"));
 
     style.indent_level = 5;
-    let error = paragraph_formatting_from_style(&style).unwrap_err();
-    assert!(error.to_string().contains("indent level"));
+    let indent_error = paragraph_formatting_from_style(&style).unwrap_err();
+    assert!(indent_error.to_string().contains("indent level"));
 }
 
 #[test]
@@ -302,7 +308,7 @@ fn preserves_formatting_for_an_empty_paragraph() {
         record_type_raw: 4001,
         version: 0,
         instance: 0,
-        data_length: style_data.len() as u32,
+        data_length: u32::try_from(style_data.len()).unwrap(),
         data: style_data,
         children: Vec::new(),
     };
@@ -354,7 +360,7 @@ fn rejects_invalid_text_cf_font_sizes() {
         record_type_raw: 4001,
         version: 0,
         instance: 0,
-        data_length: style_data.len() as u32,
+        data_length: u32::try_from(style_data.len()).unwrap(),
         data: style_data,
         children: Vec::new(),
     };

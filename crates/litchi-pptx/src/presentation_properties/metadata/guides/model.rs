@@ -28,7 +28,7 @@ pub enum ColorKind {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Color {
     pub kind: ColorKind,
-    /// Inert DrawingML color XML, including transforms.
+    /// Inert `DrawingML` color XML, including transforms.
     pub xml: Vec<u8>,
 }
 
@@ -59,6 +59,7 @@ pub struct Guides {
 
 impl Guides {
     /// Borrow one owner list without exposing its storage selector.
+    #[must_use]
     pub fn list(&self, kind: ListKind) -> Option<&List> {
         match kind {
             ListKind::Slide => self.slide.as_ref(),

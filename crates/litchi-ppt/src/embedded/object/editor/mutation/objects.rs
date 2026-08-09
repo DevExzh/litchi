@@ -4,6 +4,10 @@ use super::super::{Editor, ExternalObject, Result};
 use crate::embedded::storage::Storage;
 use crate::package::Error;
 
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "the public `Editor` API hands ownership of the storage to the staging area; it is serialized immediately and not retained"
+)]
 pub(crate) fn add(
     editor: &mut Editor,
     mut object: ExternalObject,
@@ -23,6 +27,10 @@ pub(crate) fn add(
     Ok(persist_id)
 }
 
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "the public `Editor` API hands ownership of the storage to the staging area; it is serialized immediately and not retained"
+)]
 pub(crate) fn replace_storage(
     editor: &mut Editor,
     persist_id: u32,

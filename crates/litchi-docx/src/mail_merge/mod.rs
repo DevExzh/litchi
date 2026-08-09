@@ -16,7 +16,7 @@ pub(crate) use adapter::{
 pub use codec::parse_settings_mail_merge;
 pub use model::{
     Conformance, DataSourceObject, DataType, Destination, FieldMap, FieldMappingType,
-    MainDocumentType, Recipient, Recipients, Settings,
+    MainDocumentType, Recipient, Recipients, RelationshipId, Settings,
 };
 pub use package::{Source, Target};
 pub use transaction::{Commit, Patch, Revision, Snapshot, Transaction};

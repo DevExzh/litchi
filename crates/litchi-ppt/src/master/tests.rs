@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::*;
 use crate::consts::RecordType;
 use crate::persist::PersistMapping;
@@ -15,7 +21,7 @@ fn record(
         record_type_raw: record_type.as_u16(),
         version,
         instance,
-        data_length: data.len() as u32,
+        data_length: u32::try_from(data.len()).unwrap(),
         data,
         children,
     }
@@ -27,7 +33,7 @@ fn unknown(raw: u16, data: &[u8]) -> Record {
         record_type_raw: raw,
         version: 0,
         instance: 7,
-        data_length: data.len() as u32,
+        data_length: u32::try_from(data.len()).unwrap(),
         data: data.to_vec(),
         children: Vec::new(),
     }
@@ -117,7 +123,7 @@ fn wire(record: &Record) -> Vec<u8> {
 fn mapping(ids: &[u32]) -> PersistMapping {
     let mut mapping = PersistMapping::new();
     for (index, id) in ids.iter().copied().enumerate() {
-        mapping.add_mapping(id, (index * 128) as u32);
+        mapping.add_mapping(id, u32::try_from(index * 128).unwrap());
     }
     mapping
 }
@@ -172,8 +178,8 @@ fn missing_or_wrong_persist_targets_fail_before_inventory_publication() {
     assert!(parse(&root, &objects, &mapping(&[9])).is_err());
 
     let wrong = handout_master();
-    let objects = Objects::from_records([(2, &wrong)]).unwrap();
-    assert!(parse(&root, &objects, &mapping(&[2])).is_err());
+    let wrong_objects = Objects::from_records([(2, &wrong)]).unwrap();
+    assert!(parse(&root, &wrong_objects, &mapping(&[2])).is_err());
 }
 
 #[test]
@@ -187,9 +193,9 @@ fn invalid_master_identity_and_title_base_are_rejected() {
         let atom = slide_atom(0x8000_00ff, 0);
         record(RecordType::Slide, 0x0f, 0, wire(&atom), vec![atom])
     };
-    let root = document(0, 0, vec![master_persist(2, 0x8000_0000)]);
-    let objects = Objects::from_records([(2, &title)]).unwrap();
-    assert!(parse(&root, &objects, &mapping(&[2])).is_err());
+    let title_root = document(0, 0, vec![master_persist(2, 0x8000_0000)]);
+    let title_objects = Objects::from_records([(2, &title)]).unwrap();
+    assert!(parse(&title_root, &title_objects, &mapping(&[2])).is_err());
 }
 
 #[test]

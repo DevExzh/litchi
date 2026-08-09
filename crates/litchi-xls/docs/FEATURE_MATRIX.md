@@ -41,7 +41,7 @@ rendering, external I/O, macro execution, or certificate trust.
 | Core, summary, and custom properties | ✅ | ✅ | ✅ | CFB property sets are exposed for summary information, document summary information, and user-defined properties. |
 | Theme, fonts, palette, number formats, and XF styles | ✅ | ✅ | ✅ | BIFF fonts, palette colors, number formats, cell/style XFs, XF extensions, differential formats, table styles, and theme metadata are typed. |
 | Workbook protection | ✅ | ✅ | ✅ | Workbook protection flags and legacy password records are modeled; the legacy hash is not cryptographic protection. |
-| BIFF password encryption | ✅ | ✅ | ✅ | Supported BIFF8 password-to-open profiles are decrypted and emitted through the XLS encryption integration; unsupported profiles fail rather than being treated as plaintext. |
+| BIFF password encryption | ✅ | ✅ | ✅ | Supported BIFF8 password-to-open profiles are decrypted and emitted through the XLS encryption integration; unsupported profiles fail rather than being treated as plaintext. RC4 writing uses `Writer::set_password`; legacy XOR is decode-only by default and writing it requires `WeakEncryptionPolicy::allow_xor_obfuscation()` plus `Writer::set_xor_obfuscation_password`. |
 | Legacy digital signatures | ✅ | ✅ | ✅ | CFB signature reports can be verified and signature graphs can be edited through the signature integration. Verification is integrity/signature verification only and does not establish certificate trust or revocation. |
 | VBA project and module storage | 🟡 | 🟡 | ✅ | VBA project topology, metadata, and bounded module/source payloads can be inspected or attached/replaced. VBA is never executed, resolved, or trusted; replacing project content invalidates stale signatures. |
 | Custom XML data store | 🟡 | 🟡 | 🟡 | The workbook exposes bounded custom XML storage through the CFB/package layer, but it is preserved as payload-oriented data rather than a general XML-mapping authoring model. |
@@ -51,7 +51,7 @@ rendering, external I/O, macro execution, or certificate trust.
 
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
-| Cell and worksheet CRUD | ✅ | ✅ | ✅ | Worksheets can be inspected and authored with typed cells, dimensions, shared strings, and sheet metadata. |
+| Cell and worksheet CRUD | ✅ | ✅ | ✅ | New worksheets can be authored with typed cells, dimensions, shared strings, and sheet metadata. Decoded `Worksheet` values are source-bound: every public create-only mutator returns a typed refusal because no whole-sheet BIFF8 re-save path exists; use a feature-specific source-checked transaction where available. |
 | Row and column dimensions | ✅ | ✅ | ✅ | Row heights, hidden/collapsed state, outline levels, column widths, best-fit flags, formatting, and phonetic-guide flags are supported. |
 | Cell formatting lookup | ✅ | ✅ | ✅ | Effective cell formats, number formats, borders, fills, alignment, fonts, colors, and date/time interpretation are available. |
 | Merged cells | ✅ | ✅ | ✅ | MERGECELLS ranges are read and emitted with checked range boundaries. |

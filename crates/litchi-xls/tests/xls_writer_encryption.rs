@@ -3,7 +3,7 @@ use std::io::Cursor;
 use litchi_cfb::OleFile;
 use litchi_core::sheet::{Cell, CellValue, WorkbookTrait};
 use litchi_xls::writer::{EncryptionProfile, Writer};
-use litchi_xls::{Error, OpenOptions, Workbook};
+use litchi_xls::{Error, OpenOptions, WeakEncryptionPolicy, Workbook};
 
 fn encrypted_workbook(profile: EncryptionProfile, password: &str) -> Vec<u8> {
     let mut writer = Writer::new();
@@ -16,7 +16,12 @@ fn encrypted_workbook(profile: EncryptionProfile, password: &str) -> Vec<u8> {
     writer
         .add_comment(first, 0, 0, "author", "comment text")
         .unwrap();
-    writer.set_password(password, profile).unwrap();
+    match profile {
+        EncryptionProfile::XorObfuscation => writer
+            .set_xor_obfuscation_password(password, WeakEncryptionPolicy::allow_xor_obfuscation())
+            .unwrap(),
+        _ => writer.set_password(password, profile).unwrap(),
+    }
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
     output.into_inner()

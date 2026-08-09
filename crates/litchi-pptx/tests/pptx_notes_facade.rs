@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, PackURI, Part, TargetMode};
 use litchi_pptx::{Error, Package, notes};
@@ -175,9 +181,9 @@ fn notes_descendant_limit_rejects_n_plus_one_before_mutation() {
         .edit_opc(|opc| {
             for index in 0..=MAX_OWNED_PARTS {
                 let notes_name =
-                    PackURI::new(&format!("/ppt/notesSlides/notesSlide{}.xml", index % 2 + 1))
+                    PackURI::new(format!("/ppt/notesSlides/notesSlide{}.xml", index % 2 + 1))
                         .unwrap();
-                let child_name = PackURI::new(&format!("/ppt/media/limit-{index}.bin")).unwrap();
+                let child_name = PackURI::new(format!("/ppt/media/limit-{index}.bin")).unwrap();
                 opc.try_add_part(Box::new(BlobPart::new(
                     child_name.clone(),
                     "application/octet-stream".into(),
@@ -241,7 +247,7 @@ fn opened_deck(slides: &[(&str, &str)]) -> Package {
     package.save(output.path()).unwrap();
     let mut package = Package::open(output.path()).unwrap();
     for (index, (name, _)) in slides.iter().enumerate() {
-        let slide_name = PackURI::new(&format!("/ppt/slides/slide{}.xml", index + 1)).unwrap();
+        let slide_name = PackURI::new(format!("/ppt/slides/slide{}.xml", index + 1)).unwrap();
         package
             .edit_opc(|opc| {
                 let slide = opc.get_part_mut(&slide_name)?;

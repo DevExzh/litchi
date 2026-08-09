@@ -44,8 +44,10 @@ pub use alignment::Alignment;
 pub use border::{Border, ParseRgbError, Rgb};
 pub use cell_style::CellStyle;
 pub use fill::Fill;
-pub use font::{Font, ParseError as FontParseError, Scheme, Script, Underline};
-pub use number_format::{NumberFormat, is_date_format};
+pub use font::{
+    Font, FontColor, FontColorKind, ParseError as FontParseError, Scheme, Script, Underline,
+};
+pub use number_format::{FIRST_CUSTOM_ID, InvalidNumberFormat, NumberFormat, is_date_format};
 pub use parser::parse_styles;
 
 use std::collections::HashMap;

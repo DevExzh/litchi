@@ -1,4 +1,4 @@
-//! Structural and semantic validation for PowerPoint anchors.
+//! Structural and semantic validation for `PowerPoint` anchors.
 
 use crate::package::{Error, Result};
 

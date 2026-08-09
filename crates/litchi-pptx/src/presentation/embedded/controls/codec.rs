@@ -193,7 +193,7 @@ fn parse_control(
             .map(|value| {
                 value
                     .parse()
-                    .map_err(|_| invalid(format!("invalid {label}")))
+                    .map_err(|_err| invalid(format!("invalid {label}")))
             })
             .transpose()
     };

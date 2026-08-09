@@ -1,4 +1,4 @@
-//! PresentationML package-level programmable-tag ownership.
+//! `PresentationML` package-level programmable-tag ownership.
 //!
 //! The facade keeps package discovery and snapshot edits ergonomic while the
 //! implementation is split into typed state, XML codecs, and bounded package

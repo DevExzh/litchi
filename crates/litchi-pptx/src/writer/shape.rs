@@ -139,28 +139,39 @@ impl MutableShape {
 
     /// The stable non-visual shape ID.
     #[inline]
+    #[must_use]
     pub fn shape_id(&self) -> u32 {
         self.shape_id
     }
 
     /// Borrow the current shape kind.
     #[inline]
+    #[must_use]
     pub fn shape_type(&self) -> &ShapeType {
         &self.shape_type
     }
 
-    /// Borrow the optional inert PowerPoint Designer drawing properties.
+    /// Borrow the optional inert `PowerPoint` Designer drawing properties.
     #[inline]
+    #[must_use]
     pub fn designer_properties(&self) -> Option<&DrawingProperties> {
         self.designer_properties.as_ref()
     }
 
     /// Set Designer drawing properties under safe default resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_designer_properties(&mut self, properties: DrawingProperties) -> Result<&mut Self> {
         self.set_designer_properties_with_limits(properties, DesignerLimits::default())
     }
 
     /// Set Designer drawing properties under caller-supplied resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_designer_properties_with_limits(
         &mut self,
         properties: DrawingProperties,
@@ -195,6 +206,7 @@ impl MutableShape {
     }
 
     /// Return text for a text box.
+    #[must_use]
     pub fn text(&self) -> Option<&str> {
         match &self.shape_type {
             ShapeType::TextBox { text, .. } => Some(text),
@@ -265,7 +277,7 @@ impl MutableShape {
         self
     }
 
-    /// Return the shape as PresentationML owned by a slide part.
+    /// Return the shape as `PresentationML` owned by a slide part.
     pub(crate) fn to_xml(&self) -> Result<String> {
         let designer = self.preflight_designer_properties()?;
         self.to_xml_with_designer(designer.as_deref())
@@ -327,14 +339,14 @@ impl MutableShape {
                     xml.push_str(" u=\"sng\"");
                 }
                 if let Some(size) = format.size {
-                    if !size.is_finite() || size < 0.0 || size > 400.0 {
+                    if !size.is_finite() || !(0.0..=400.0).contains(&size) {
                         return Err(Error::Invalid(
                             "text font size is outside the bounded domain".into(),
                         ));
                     }
                     xml.push_str(" sz=\"");
                     xml.push_str(&(size * 100.0).round().to_string());
-                    xml.push_str("\"");
+                    xml.push('"');
                 }
                 if let Some(color) = &format.color {
                     xml.push_str("><a:solidFill><a:srgbClr val=\"");
@@ -479,7 +491,7 @@ fn write_non_visual_properties(xml: &mut String, designer: Option<&str>) {
 
 fn designer_string(bytes: Vec<u8>) -> Result<String> {
     String::from_utf8(bytes)
-        .map_err(|_| Error::Invalid("Designer serializer produced non-UTF-8 XML".into()))
+        .map_err(|_err| Error::Invalid("Designer serializer produced non-UTF-8 XML".into()))
 }
 
 pub(crate) fn escape_xml(value: &str) -> String {

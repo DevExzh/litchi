@@ -22,16 +22,18 @@ pub enum Kind {
 
 impl Kind {
     /// Decode the raw `BuildTypeEnum` value without losing unknown values.
+    #[must_use]
     pub const fn from_raw(value: u32) -> Self {
         match value {
             1 => Self::Paragraph,
             2 => Self::Chart,
             3 => Self::Diagram,
-            value => Self::Unknown(value),
+            other => Self::Unknown(other),
         }
     }
 
     /// Return the exact wire value.
+    #[must_use]
     pub const fn raw(self) -> u32 {
         match self {
             Self::Paragraph => 1,
@@ -71,6 +73,7 @@ pub enum BuildType {
 
 impl BuildType {
     /// Decode the exact MS-PPT value, retaining future values.
+    #[must_use]
     pub const fn from_raw(value: u32) -> Self {
         match value {
             0x00 => Self::AsOneObject,
@@ -90,11 +93,12 @@ impl BuildType {
             0x0E => Self::Down,
             0x0F => Self::AllAtOnce,
             0x10 => Self::Custom,
-            value => Self::Unknown(value),
+            other => Self::Unknown(other),
         }
     }
 
     /// Return the exact wire value.
+    #[must_use]
     pub const fn raw(self) -> u32 {
         match self {
             Self::AsOneObject => 0x00,
@@ -136,6 +140,7 @@ pub struct Build {
 
 impl Build {
     /// Create a diagram build atom with normalized reserved bytes.
+    #[must_use]
     pub const fn new(build_id: u32, shape_id_ref: u32, expanded: bool, ui_expanded: bool) -> Self {
         Self {
             build_id,
@@ -148,16 +153,19 @@ impl Build {
     }
 
     /// Return the shared build kind, including an unknown raw value when read.
+    #[must_use]
     pub const fn kind(self) -> Kind {
         self.kind
     }
 
     /// Return the two undefined bytes retained from the source record.
+    #[must_use]
     pub const fn reserved(self) -> [u8; 2] {
         self.reserved
     }
 
     /// Preserve undefined bytes when authoring a lossless edit.
+    #[must_use]
     pub const fn with_reserved(mut self, reserved: [u8; 2]) -> Self {
         self.reserved = reserved;
         self
@@ -191,6 +199,7 @@ pub struct Atom {
 
 impl Atom {
     /// Create a typed diagram-build atom.
+    #[must_use]
     pub const fn new(build_type: BuildType) -> Self {
         Self { build_type }
     }
@@ -209,6 +218,10 @@ impl Container {
     /// Known paragraph/chart build kinds are rejected because they would
     /// make this container semantically incorrect. Unknown fixed-width kinds
     /// are retained for forward-compatible metadata round trips.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(build: Build, atom: Atom) -> Result<Self> {
         if matches!(build.kind, Kind::Paragraph | Kind::Chart) {
             return Err(Error::InvalidFormat(
@@ -219,11 +232,13 @@ impl Container {
     }
 
     /// Return the shared build child.
+    #[must_use]
     pub const fn build(self) -> Build {
         self.build
     }
 
     /// Return the diagram-specific atom child.
+    #[must_use]
     pub const fn atom(self) -> Atom {
         self.atom
     }

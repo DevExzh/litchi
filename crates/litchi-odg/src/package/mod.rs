@@ -2,4 +2,5 @@
 
 mod snapshot;
 
-pub(crate) use snapshot::{MIMETYPE, Snapshot};
+pub(crate) use snapshot::MIMETYPE;
+pub use snapshot::{Commit, Patch, Snapshot, TextChange, Transaction};

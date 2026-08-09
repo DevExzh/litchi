@@ -16,7 +16,15 @@ impl Package {
     }
 
     /// Resolve a mail-merge relationship without opening or fetching its target.
-    pub fn mail_merge_target(&self, relationship_id: &str) -> Result<Target> {
+    ///
+    /// The typed [`RelationshipId`] is validated and opaque: raw OPC
+    /// relationship IDs are package plumbing (ADR-0004) and never appear on
+    /// this semantic facade.
+    pub fn mail_merge_target(&self, relationship_id: &RelationshipId) -> Result<Target> {
+        self.mail_merge_target_str(relationship_id.as_str())
+    }
+
+    fn mail_merge_target_str(&self, relationship_id: &str) -> Result<Target> {
         let snapshot = self.settings_part_snapshot()?;
         let part = self.opc.get_part(&snapshot.target)?;
         let relationship = part.rels().get(relationship_id).ok_or_else(|| {
@@ -197,11 +205,17 @@ impl Package {
             .ok_or_else(|| Error::InvalidFormat("document has no mail-merge settings".into()))?;
         let data_source = settings
             .data_source_relationship_id()
-            .map(|id| self.mail_merge_target(id).map(mail_merge_target_as_source))
+            .map(|id| {
+                self.mail_merge_target_str(id)
+                    .map(mail_merge_target_as_source)
+            })
             .transpose()?;
         let header_source = settings
             .header_source_relationship_id()
-            .map(|id| self.mail_merge_target(id).map(mail_merge_target_as_source))
+            .map(|id| {
+                self.mail_merge_target_str(id)
+                    .map(mail_merge_target_as_source)
+            })
             .transpose()?;
         self.set_mail_merge(
             settings,

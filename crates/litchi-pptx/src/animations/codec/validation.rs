@@ -1,7 +1,10 @@
-//! Bounded scalar and structural validation for PresentationML timing values.
+//! Bounded scalar and structural validation for `PresentationML` timing values.
 
 use super::super::invalid;
-use super::super::model::*;
+use super::super::model::{
+    Direction, Duration, Effect, GroupId, MotionFraction, ParagraphBuildType, Repeat, Sequence,
+    SequenceContext,
+};
 use crate::{Error, Result};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -57,7 +60,7 @@ pub(super) fn parse_group_id(value: &str) -> Result<GroupId> {
     value
         .parse::<u32>()
         .map(GroupId::new)
-        .map_err(|_| invalid("invalid unsigned animation group ID"))
+        .map_err(|_err| invalid("invalid unsigned animation group ID"))
 }
 
 pub(super) fn parse_build_auto_advance(value: &str) -> Result<Duration> {
@@ -67,7 +70,7 @@ pub(super) fn parse_build_auto_advance(value: &str) -> Result<Duration> {
     value
         .parse::<u32>()
         .map(Duration::Finite)
-        .map_err(|_| invalid("invalid paragraph build auto-advance time"))
+        .map_err(|_err| invalid("invalid paragraph build auto-advance time"))
 }
 
 pub(super) fn validate_template_time_node(xml: &str) -> Result<()> {
@@ -244,7 +247,7 @@ pub(super) fn parse_timing_value(value: &str) -> Result<TimingValue> {
     }
     let value = value
         .parse::<u32>()
-        .map_err(|_| invalid("invalid animation timing value"))?;
+        .map_err(|_err| invalid("invalid animation timing value"))?;
     if value > MAX_TIMING_MILLISECONDS {
         return Err(invalid(
             "animation timing value exceeds the supported OOXML limit",
@@ -264,14 +267,14 @@ pub(super) fn parse_xml_bool(value: &str) -> Result<bool> {
 pub(super) fn parse_progress(value: &str, name: &str) -> Result<MotionFraction> {
     let value = value
         .parse::<u32>()
-        .map_err(|_| invalid(format!("invalid animation {name} percentage")))?;
+        .map_err(|_err| invalid(format!("invalid animation {name} percentage")))?;
     MotionFraction::new(value)
 }
 
 pub(super) fn parse_shape_id(value: &str) -> Result<u32> {
     let id = value
         .parse::<u32>()
-        .map_err(|_| invalid("invalid animation shape target ID"))?;
+        .map_err(|_err| invalid("invalid animation shape target ID"))?;
     if id == 0 {
         return Err(invalid("animation shape target ID must be nonzero"));
     }
@@ -346,6 +349,9 @@ pub(super) fn is_known_ole_chart_program_id(value: &str) -> bool {
 }
 
 impl Sequence {
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
     pub fn to_xml_for_slide(&self, valid_targets: &HashSet<u32>) -> Result<String> {
         if self.len() > MAX_ANIMATIONS {
             return Err(invalid("slide animation count exceeds safety limit"));
@@ -459,8 +465,7 @@ impl Sequence {
                 && (*trigger_shape_id == 0 || !valid_targets.contains(trigger_shape_id))
             {
                 return Err(invalid(format!(
-                    "interactive animation trigger {} is not a supported shape on the current slide",
-                    trigger_shape_id
+                    "interactive animation trigger {trigger_shape_id} is not a supported shape on the current slide"
                 )));
             }
             if animation.delay > MAX_TIMING_MILLISECONDS {

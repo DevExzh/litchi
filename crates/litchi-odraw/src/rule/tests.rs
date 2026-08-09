@@ -12,7 +12,11 @@ fn record(version: u8, instance: u16, kind: u16, body: &[u8]) -> Vec<u8> {
     let ver_inst = (u16::from(version) & 0x000F) | ((instance & 0x0FFF) << 4);
     bytes.extend_from_slice(&ver_inst.to_le_bytes());
     bytes.extend_from_slice(&kind.to_le_bytes());
-    bytes.extend_from_slice(&(body.len() as u32).to_le_bytes());
+    bytes.extend_from_slice(
+        &u32::try_from(body.len())
+            .expect("test record bodies fit in u32")
+            .to_le_bytes(),
+    );
     bytes.extend_from_slice(body);
     bytes
 }

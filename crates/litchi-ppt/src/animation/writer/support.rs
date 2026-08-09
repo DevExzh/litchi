@@ -9,7 +9,7 @@ pub(super) fn wrap_record(
     instance: u16,
     data: Vec<u8>,
 ) -> Result<Vec<u8>> {
-    let length = u32::try_from(data.len()).map_err(|_| {
+    let length = u32::try_from(data.len()).map_err(|_err| {
         Error::InvalidFormat(format!("{record_type:?} data exceeds 4 GiB record limit"))
     })?;
     let mut result = create_record_header(record_type, version, instance, length);
@@ -49,6 +49,10 @@ pub(super) fn create_record_header_raw(
 pub(super) fn serialize_raw_record(record: &crate::records::Record) -> Vec<u8> {
     let mut data = Vec::new();
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "raw record payloads are parsed from a 32-bit record length, so the length always fits in u32"
+    )]
     let header = create_record_header_raw(
         record.record_type_raw,
         record.version,

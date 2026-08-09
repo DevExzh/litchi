@@ -79,6 +79,7 @@ pub struct DocumentMathProperties {
 }
 
 impl DocumentMathProperties {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }

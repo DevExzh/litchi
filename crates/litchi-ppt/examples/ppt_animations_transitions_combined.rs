@@ -1,9 +1,14 @@
+#![allow(
+    clippy::print_stdout,
+    reason = "this command-line example intentionally prints its results"
+)]
+
 //! Comprehensive example demonstrating both animations and transitions
 //!
 //! This example creates a complete presentation showcasing the combination
 //! of animations and transitions working together.
 //!
-//! Run with: cargo run --example ppt_animations_transitions_combined
+//! Run with: cargo run --example `ppt_animations_transitions_combined`
 
 use litchi_ppt::Writer;
 use litchi_ppt::animation::writer::write_animation_info;
@@ -105,7 +110,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         build2.add_build(BuildLevel {
             build_type: BuildType::Entrance,
             shape_id: *shape_id,
-            build_order: (i * 2) as u32,
+            build_order: u32::try_from(i * 2)?,
             effect: AnimationEffect::FlyIn,
             speed: EffectSpeed::Fast,
             direction: EffectDirection::FromBottom,
@@ -124,7 +129,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         build2.add_build(BuildLevel {
             build_type: BuildType::Entrance,
             shape_id: *text_id,
-            build_order: (i * 2 + 1) as u32,
+            build_order: u32::try_from(i * 2 + 1)?,
             effect: AnimationEffect::FadeIn,
             speed: EffectSpeed::Fast,
             direction: EffectDirection::None,
@@ -172,7 +177,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         build3.add_build(BuildLevel {
             build_type: BuildType::Emphasis,
             shape_id: *shape_id,
-            build_order: i as u32,
+            build_order: u32::try_from(i)?,
             effect: *effect,
             speed: EffectSpeed::Medium,
             direction: EffectDirection::None,
@@ -220,7 +225,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         build4.add_build(BuildLevel {
             build_type: BuildType::Exit,
             shape_id: *shape_id,
-            build_order: i as u32,
+            build_order: u32::try_from(i)?,
             effect: *effect,
             speed: EffectSpeed::Fast,
             direction: EffectDirection::FromRight,
@@ -305,6 +310,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
     animation6.build_list = Some(build6);
 
+    // Attach the transitions to their slides so they are embedded in the file
+    writer.set_slide_transition(slide1, transition1.clone())?;
+    writer.set_slide_transition(slide2, transition2.clone())?;
+    writer.set_slide_transition(slide3, transition3.clone())?;
+    writer.set_slide_transition(slide4, transition4.clone())?;
+    writer.set_slide_transition(slide5, transition5.clone())?;
+    writer.set_slide_transition(slide6, transition6.clone())?;
+
     // Save the presentation
     println!("Saving to ppt_complete_showcase.ppt...");
     writer.save("ppt_complete_showcase.ppt")?;
@@ -322,8 +335,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             _ => unreachable!(),
         };
 
-        save_animation_sample(&format!("slide{}_animation.bin", i), anim)?;
-        save_transition_sample(&format!("slide{}_transition.bin", i), trans)?;
+        save_animation_sample(&format!("slide{i}_animation.bin"), anim)?;
+        save_transition_sample(&format!("slide{i}_transition.bin"), trans)?;
     }
 
     println!("✅ Complete showcase created successfully!");

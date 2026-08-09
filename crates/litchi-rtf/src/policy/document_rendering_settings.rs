@@ -32,11 +32,13 @@ pub struct DocumentRenderingSettings {
 
 impl DocumentRenderingSettings {
     /// Return whether all rendering controls were omitted.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.orientation.is_none() && self.justification_mode.is_none() && !self.line_based_on_grid
     }
 
     /// Return the explicit justification mode or the RTF default, compression.
+    #[must_use]
     pub fn effective_justification_mode(&self) -> DocumentJustificationMode {
         self.justification_mode
             .unwrap_or(DocumentJustificationMode::Compress)

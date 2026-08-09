@@ -1,7 +1,7 @@
-//! Presentation-specific SmartArt semantics.
+//! Presentation-specific `SmartArt` semantics.
 //!
 //! The diagram model and its five part codecs live in `litchi-drawingml`.
-//! This focused module supplies the PresentationML graphic-frame anchor and
+//! This focused module supplies the `PresentationML` graphic-frame anchor and
 //! gives the shared model contextual names (`Graphic`, `Node`, `Kind`, and
 //! `Builder`) without copying the diagram payload.
 
@@ -12,11 +12,12 @@ pub use litchi_drawingml::diagram::{
     generate_smartart_quickstyle_xml as quickstyle_xml,
 };
 
-/// Generate a PresentationML graphic frame for a diagram.
+/// Generate a `PresentationML` graphic frame for a diagram.
 ///
 /// Relationship IDs are escaped before insertion. The data relationship is
 /// expected to use the usual `rIdN` spelling; the non-numeric prefix is used
 /// for the companion layout, quick-style, and color relationships.
+#[must_use]
 pub fn graphic_frame(
     shape_id: u32,
     x: i64,
@@ -82,6 +83,11 @@ fn escape_attribute(value: &str) -> String {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

@@ -1,9 +1,32 @@
 //! RTF document-header output.
 
-use super::super::*;
+#![allow(
+    clippy::shadow_reuse,
+    reason = "serialization helpers deliberately rebind a working value as the output is assembled"
+)]
+use super::super::{
+    AbstractNumberingCleanupStatus, Charset, DefaultTabWidthPolicy, DocumentAsianGridCompatibility,
+    DocumentAutoFormatType, DocumentBookletPrinting, DocumentCompatibilityPolicy,
+    DocumentDefaultFonts, DocumentDrawingGrid, DocumentEastAsianCompatibility,
+    DocumentEmbeddingPolicies, DocumentExternalReferences, DocumentFileSettings,
+    DocumentHyphenation, DocumentJustificationMode, DocumentKinsoku, DocumentLanguageDefaults,
+    DocumentLegacyLayoutCompatibility, DocumentLineSpacingCompatibility, DocumentOrigin,
+    DocumentOutputSettings, DocumentPrintLayoutSettings, DocumentPrivacyPolicies,
+    DocumentProcessingSettings, DocumentReadOnlyRecommendation, DocumentRenderingOrientation,
+    DocumentRenderingSettings, DocumentReviewDisplay, DocumentRevisionPolicies,
+    DocumentSavePreferences, DocumentStyleListFilter, DocumentStylePolicies,
+    DocumentStyleRestrictions, DocumentStyleSortMethod, DocumentTableLayoutCompatibility,
+    DocumentThemeLanguages, DocumentThumbnailPreference, DocumentView, DocumentWindowCaption,
+    DocumentWord2003Compatibility, DocumentWriteReservations, DocumentXmlPolicies,
+    DocumentXslTransform, DocumentXslTransformUsage, HtmlEmailVersion, MAX_DEFAULT_TAB_WIDTH_TWIPS,
+    RtfDocument, RtfWriter, TextDirection, Write, io,
+};
 
 impl<W: Write> RtfWriter<W> {
     /// Write document header
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_header(&mut self) -> io::Result<()> {
         let default_tab_width = match self.options.default_tab_width {
             DefaultTabWidthPolicy::PreserveDocument => None,
@@ -14,16 +37,16 @@ impl<W: Write> RtfWriter<W> {
 
     pub(in super::super) fn write_document_header_with_origin(
         &mut self,
-        origin: Option<crate::DocumentOrigin>,
+        origin: Option<DocumentOrigin>,
         default_tab_width: Option<u32>,
-        default_fonts: Option<&crate::DocumentDefaultFonts>,
+        default_fonts: Option<&DocumentDefaultFonts>,
     ) -> io::Result<()> {
         self.write_str("{")?;
         self.write_control_word("rtf", Some(1))?;
 
         match self.options.charset {
             Charset::Ansi(page) => {
-                let parameter = i32::try_from(page.id()).map_err(|_| {
+                let parameter = i32::try_from(page.id()).map_err(|_err| {
                     io::Error::new(io::ErrorKind::InvalidInput, "RTF code page exceeds i32")
                 })?;
                 self.write_control_word("ansi", None)?;
@@ -35,14 +58,11 @@ impl<W: Write> RtfWriter<W> {
         }
 
         match origin {
-            Some(crate::DocumentOrigin::PlainTextEmail) => {
+            Some(DocumentOrigin::PlainTextEmail) => {
                 self.write_control_word("fromtext", None)?;
             },
-            Some(crate::DocumentOrigin::HtmlEmail { version }) => {
-                self.write_control_word(
-                    "fromhtml",
-                    version.map(crate::HtmlEmailVersion::rtf_value),
-                )?;
+            Some(DocumentOrigin::HtmlEmail { version }) => {
+                self.write_control_word("fromhtml", version.map(HtmlEmailVersion::rtf_value))?;
             },
             None => {},
         }
@@ -73,7 +93,7 @@ impl<W: Write> RtfWriter<W> {
             }
         }
         if let Some(width) = default_tab_width {
-            let width = i32::try_from(width).map_err(|_| {
+            let width = i32::try_from(width).map_err(|_err| {
                 io::Error::new(
                     io::ErrorKind::InvalidInput,
                     format!("RTF deftab width {width} exceeds {MAX_DEFAULT_TAB_WIDTH_TWIPS}"),
@@ -84,20 +104,24 @@ impl<W: Write> RtfWriter<W> {
 
         Ok(())
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_auto_format_type(
         &mut self,
-        document_type: Option<crate::DocumentAutoFormatType>,
+        document_type: Option<DocumentAutoFormatType>,
     ) -> io::Result<()> {
         if let Some(document_type) = document_type {
             self.write_control_word("doctype", Some(document_type.rtf_value()))?;
         }
         Ok(())
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_language_defaults(
         &mut self,
-        defaults: &crate::DocumentLanguageDefaults,
+        defaults: &DocumentLanguageDefaults,
     ) -> io::Result<()> {
         defaults
             .validate()
@@ -113,7 +137,9 @@ impl<W: Write> RtfWriter<W> {
         }
         Ok(())
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_direction(&mut self, doc: &RtfDocument<'_>) -> io::Result<()> {
         if let Some(direction) = doc.document_direction() {
             self.write_control_word(
@@ -131,18 +157,21 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write explicit passive document-level hyphenation settings.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_hyphenation(
         &mut self,
-        hyphenation: &crate::DocumentHyphenation,
+        hyphenation: &DocumentHyphenation,
     ) -> io::Result<()> {
         hyphenation
             .validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
         if let Some(value) = hyphenation.hot_zone_twips {
-            self.write_control_word("hyphhotz", Some(value as i32))?;
+            self.write_control_word("hyphhotz", Some(value.cast_signed()))?;
         }
         if let Some(value) = hyphenation.consecutive_line_limit {
-            self.write_control_word("hyphconsec", Some(value as i32))?;
+            self.write_control_word("hyphconsec", Some(value.cast_signed()))?;
         }
         if let Some(value) = hyphenation.capitalized_words {
             self.write_control_word("hyphcaps", Some(i32::from(value)))?;
@@ -154,9 +183,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write inert names without opening, resolving, or invoking referenced files.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_external_references(
         &mut self,
-        references: &crate::DocumentExternalReferences<'_>,
+        references: &DocumentExternalReferences<'_>,
     ) -> io::Result<()> {
         references
             .validate()
@@ -176,9 +208,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write passive compatibility and output flags in stable specification order.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_output_settings(
         &mut self,
-        settings: &crate::DocumentOutputSettings,
+        settings: &DocumentOutputSettings,
     ) -> io::Result<()> {
         if settings.word97_compatibility_marker {
             self.write_control_word("muser", None)?;
@@ -190,15 +225,18 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write passive rendering flags in stable specification order.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_rendering_settings(
         &mut self,
-        settings: &crate::DocumentRenderingSettings,
+        settings: &DocumentRenderingSettings,
     ) -> io::Result<()> {
         if let Some(orientation) = settings.orientation {
             self.write_control_word(
                 match orientation {
-                    crate::DocumentRenderingOrientation::Horizontal => "horzdoc",
-                    crate::DocumentRenderingOrientation::Vertical => "vertdoc",
+                    DocumentRenderingOrientation::Horizontal => "horzdoc",
+                    DocumentRenderingOrientation::Vertical => "vertdoc",
                 },
                 None,
             )?;
@@ -206,8 +244,8 @@ impl<W: Write> RtfWriter<W> {
         if let Some(justification_mode) = settings.justification_mode {
             self.write_control_word(
                 match justification_mode {
-                    crate::DocumentJustificationMode::Compress => "jcompress",
-                    crate::DocumentJustificationMode::Expand => "jexpand",
+                    DocumentJustificationMode::Compress => "jcompress",
+                    DocumentJustificationMode::Expand => "jexpand",
                 },
                 None,
             )?;
@@ -219,9 +257,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write passive printing, cleanup, and event properties in stable order.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_processing_settings(
         &mut self,
-        settings: &crate::DocumentProcessingSettings,
+        settings: &DocumentProcessingSettings,
     ) -> io::Result<()> {
         if settings.fractional_character_widths_for_printing {
             self.write_control_word("fracwidth", None)?;
@@ -230,8 +271,8 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word(
                 "ilfomacatclnup",
                 Some(match cleanup {
-                    crate::AbstractNumberingCleanupStatus::Reviewed => 0,
-                    crate::AbstractNumberingCleanupStatus::Incomplete => 1,
+                    AbstractNumberingCleanupStatus::Reviewed => 0,
+                    AbstractNumberingCleanupStatus::Incomplete => 1,
                 }),
             )?;
         }
@@ -242,10 +283,10 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write passive document-level drawing-grid properties in specification order.
-    pub fn write_document_drawing_grid(
-        &mut self,
-        grid: &crate::DocumentDrawingGrid,
-    ) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
+    pub fn write_document_drawing_grid(&mut self, grid: &DocumentDrawingGrid) -> io::Result<()> {
         if let Some(value) = grid.horizontal_spacing {
             self.write_control_word("dghspace", Some(i32::from(value.get())))?;
         }
@@ -274,9 +315,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write passive print-layout settings in stable specification order.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_print_layout_settings(
         &mut self,
-        settings: &crate::DocumentPrintLayoutSettings,
+        settings: &DocumentPrintLayoutSettings,
     ) -> io::Result<()> {
         settings
             .validate()
@@ -288,7 +332,7 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("margmirror", None)?;
         }
         if let Some(value) = settings.document_gutter_twips {
-            self.write_control_word("gutter", Some(value as i32))?;
+            self.write_control_word("gutter", Some(value.cast_signed()))?;
         }
         if settings.parallel_gutter {
             self.write_control_word("gutterprl", None)?;
@@ -300,9 +344,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write passive theme languages in stable specification order.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_theme_languages(
         &mut self,
-        languages: &crate::DocumentThemeLanguages,
+        languages: &DocumentThemeLanguages,
     ) -> io::Result<()> {
         if let Some(language) = languages.primary {
             self.write_control_word("themelang", Some(language.rtf_value()))?;
@@ -317,9 +364,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write passive web-save and custom-XML policies in specification order.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_xml_policies(
         &mut self,
-        policies: &crate::DocumentXmlPolicies,
+        policies: &DocumentXmlPolicies,
     ) -> io::Result<()> {
         for (name, value) in [
             ("relyonvml", policies.rely_on_vml),
@@ -337,9 +387,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write passive embedding policies in stable specification order.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_embedding_policies(
         &mut self,
-        policies: &crate::DocumentEmbeddingPolicies,
+        policies: &DocumentEmbeddingPolicies,
     ) -> io::Result<()> {
         if let Some(value) = policies.do_not_embed_system_fonts {
             self.write_control_word("donotembedsysfont", Some(i32::from(value)))?;
@@ -351,9 +404,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write passive revision policies in stable specification order.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_revision_policies(
         &mut self,
-        policies: &crate::DocumentRevisionPolicies,
+        policies: &DocumentRevisionPolicies,
     ) -> io::Result<()> {
         if let Some(value) = policies.track_moves {
             self.write_control_word("trackmoves", Some(i32::from(value)))?;
@@ -365,9 +421,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write passive style policies in stable specification order.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_style_policies(
         &mut self,
-        policies: &crate::DocumentStylePolicies,
+        policies: &DocumentStylePolicies,
     ) -> io::Result<()> {
         if policies.update_styles_from_template {
             self.write_control_word("linkstyles", None)?;
@@ -385,9 +444,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write passive legacy style restrictions in stable specification order.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_style_restrictions(
         &mut self,
-        restrictions: &crate::DocumentStyleRestrictions,
+        restrictions: &DocumentStyleRestrictions,
     ) -> io::Result<()> {
         if restrictions.restrictions_present {
             self.write_control_word("stylelock", None)?;
@@ -405,9 +467,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write passive booklet-printing metadata in stable specification order.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_booklet_printing(
         &mut self,
-        printing: &crate::DocumentBookletPrinting,
+        printing: &DocumentBookletPrinting,
     ) -> io::Result<()> {
         if printing.book_fold {
             self.write_control_word("bookfold", None)?;
@@ -422,15 +487,18 @@ impl<W: Write> RtfWriter<W> {
                     "booklet sheets must be an RTF signed nonnegative multiple of four",
                 ));
             }
-            self.write_control_word("bookfoldsheets", Some(value as i32))?;
+            self.write_control_word("bookfoldsheets", Some(value.cast_signed()))?;
         }
         Ok(())
     }
 
     /// Write passive privacy-removal requests in stable specification order.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_privacy_policies(
         &mut self,
-        policies: &crate::DocumentPrivacyPolicies,
+        policies: &DocumentPrivacyPolicies,
     ) -> io::Result<()> {
         if policies.remove_personal_information {
             self.write_control_word("rempersonalinfo", None)?;
@@ -442,9 +510,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write passive Word 2003 compatibility flags in specification order.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_word_2003_compatibility(
         &mut self,
-        compatibility: &crate::DocumentWord2003Compatibility,
+        compatibility: &DocumentWord2003Compatibility,
     ) -> io::Result<()> {
         if compatibility.preserve_autofit_table_width_around_shapes {
             self.write_control_word("noafcnsttbl", None)?;
@@ -492,9 +563,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write passive document compatibility policy in specification order.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_compatibility_policy(
         &mut self,
-        policy: &crate::DocumentCompatibilityPolicy,
+        policy: &DocumentCompatibilityPolicy,
     ) -> io::Result<()> {
         if policy.reset_options_to_defaults {
             self.write_control_word("nocompatoptions", None)?;
@@ -509,9 +583,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write passive Asian grid compatibility flags in specification order.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_asian_grid_compatibility(
         &mut self,
-        compatibility: &crate::DocumentAsianGridCompatibility,
+        compatibility: &DocumentAsianGridCompatibility,
     ) -> io::Result<()> {
         if compatibility.apply_thai_line_breaking_rules {
             self.write_control_word("ApplyBrkRules", None)?;
@@ -532,9 +609,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write passive legacy automatic-layout flags in specification order.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_legacy_layout_compatibility(
         &mut self,
-        compatibility: &crate::DocumentLegacyLayoutCompatibility,
+        compatibility: &DocumentLegacyLayoutCompatibility,
     ) -> io::Result<()> {
         if compatibility.do_not_use_word_97_shape_layout {
             self.write_control_word("splytwnine", None)?;
@@ -555,9 +635,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write passive table-layout compatibility flags in specification order.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_table_layout_compatibility(
         &mut self,
-        compatibility: &crate::DocumentTableLayoutCompatibility,
+        compatibility: &DocumentTableLayoutCompatibility,
     ) -> io::Result<()> {
         if compatibility.combine_borders_like_word_5 {
             self.write_control_word("otblrul", None)?;
@@ -587,9 +670,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write passive East Asian compatibility flags in specification order.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_east_asian_compatibility(
         &mut self,
-        compatibility: &crate::DocumentEastAsianCompatibility,
+        compatibility: &DocumentEastAsianCompatibility,
     ) -> io::Result<()> {
         if compatibility.do_not_balance_sbcs_dbcs {
             self.write_control_word("dntblnsbdb", None)?;
@@ -613,9 +699,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write passive line-spacing compatibility flags in specification order.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_line_spacing_compatibility(
         &mut self,
-        compatibility: &crate::DocumentLineSpacingCompatibility,
+        compatibility: &DocumentLineSpacingCompatibility,
     ) -> io::Result<()> {
         if compatibility.suppress_extra_spacing_for_raised_lowered_text {
             self.write_control_word("noextrasprl", None)?;
@@ -636,9 +725,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write passive file and template flags in stable specification order.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_file_settings(
         &mut self,
-        settings: &crate::DocumentFileSettings,
+        settings: &DocumentFileSettings,
     ) -> io::Result<()> {
         if settings.automatic_backup {
             self.write_control_word("makebackup", None)?;
@@ -653,7 +745,10 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write passive view metadata in stable `viewkind`, `viewscale`, `viewzk` order.
-    pub fn write_document_view(&mut self, view: &crate::DocumentView) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
+    pub fn write_document_view(&mut self, view: &DocumentView) -> io::Result<()> {
         view.validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
         if let Some(kind) = view.kind {
@@ -675,10 +770,10 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write passive review-display flags in stable specification order.
-    pub fn write_review_display(
-        &mut self,
-        display: &crate::DocumentReviewDisplay,
-    ) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
+    pub fn write_review_display(&mut self, display: &DocumentReviewDisplay) -> io::Result<()> {
         if display.hide_markup {
             self.write_control_word("donotshowmarkup", None)?;
         }
@@ -692,9 +787,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write an inert document-window caption as the canonical starred destination.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_window_caption(
         &mut self,
-        caption: Option<&crate::DocumentWindowCaption<'_>>,
+        caption: Option<&DocumentWindowCaption<'_>>,
     ) -> io::Result<()> {
         let Some(caption) = caption else {
             return Ok(());
@@ -708,7 +806,10 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write the inert custom kinsoku character sets and their language.
-    pub fn write_kinsoku(&mut self, kinsoku: &crate::DocumentKinsoku<'_>) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
+    pub fn write_kinsoku(&mut self, kinsoku: &DocumentKinsoku<'_>) -> io::Result<()> {
         kinsoku
             .validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
@@ -723,15 +824,18 @@ impl<W: Write> RtfWriter<W> {
             self.write_str("}")?;
         }
         if let Some(language) = kinsoku.language {
-            self.write_control_word("ksulang", Some(language as i32))?;
+            self.write_control_word("ksulang", Some(language.cast_signed()))?;
         }
         Ok(())
     }
 
     /// Write an inert custom XSL transform location as its required starred destination.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_xsl_transform(
         &mut self,
-        transform: Option<&crate::DocumentXslTransform<'_>>,
+        transform: Option<&DocumentXslTransform<'_>>,
     ) -> io::Result<()> {
         let Some(transform) = transform else {
             return Ok(());
@@ -745,9 +849,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write passive requested transform usage without applying the transform.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_xsl_transform_usage(
         &mut self,
-        usage: crate::DocumentXslTransformUsage,
+        usage: DocumentXslTransformUsage,
     ) -> io::Result<()> {
         if usage.is_requested() {
             self.write_control_word("usexform", None)?;
@@ -756,9 +863,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write passive style-list filter suggestions as exactly four hexadecimal digits.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_style_list_filter(
         &mut self,
-        filter: Option<crate::DocumentStyleListFilter>,
+        filter: Option<DocumentStyleListFilter>,
     ) -> io::Result<()> {
         let Some(filter) = filter else {
             return Ok(());
@@ -772,9 +882,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write a passive style-list sorting suggestion with an explicit value.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_style_sort_method(
         &mut self,
-        method: Option<crate::DocumentStyleSortMethod>,
+        method: Option<DocumentStyleSortMethod>,
     ) -> io::Result<()> {
         if let Some(method) = method {
             self.write_control_word("stylesortmethod", Some(method.rtf_value()))?;
@@ -783,9 +896,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write opaque reservation metadata without authenticating or decrypting it.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_write_reservations(
         &mut self,
-        reservations: &crate::DocumentWriteReservations<'_>,
+        reservations: &DocumentWriteReservations<'_>,
     ) -> io::Result<()> {
         reservations
             .validate()
@@ -806,14 +922,17 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write passive save preferences in stable specification order.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_save_preferences(
         &mut self,
-        preferences: &crate::DocumentSavePreferences,
+        preferences: &DocumentSavePreferences,
     ) -> io::Result<()> {
-        if preferences.read_only == crate::DocumentReadOnlyRecommendation::Recommended {
+        if preferences.read_only == DocumentReadOnlyRecommendation::Recommended {
             self.write_control_word("readonlyrecommended", None)?;
         }
-        if preferences.thumbnail == crate::DocumentThumbnailPreference::RequiredIfSupported {
+        if preferences.thumbnail == DocumentThumbnailPreference::RequiredIfSupported {
             self.write_control_word("saveprevpict", None)?;
         }
         Ok(())

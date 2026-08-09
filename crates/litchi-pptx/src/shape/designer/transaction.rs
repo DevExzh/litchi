@@ -21,6 +21,10 @@ impl Editor {
     }
 
     /// Set the typed boolean while retaining every opaque extension.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set(&mut self, value: bool) -> Result<()> {
         validate_value(value)?;
         self.working.value = Some(value);
@@ -34,17 +38,23 @@ impl Editor {
 
     /// Borrow the projected snapshot without mutating the original.
     #[inline]
+    #[must_use]
     pub fn snapshot(&self) -> &Snapshot {
         &self.working
     }
 
     /// Whether this edit changes the detached snapshot.
     #[inline]
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.original != self.working
     }
 
     /// Validate and consume the edit into a new snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn commit(self) -> Result<Snapshot> {
         validate_snapshot(&self.working)?;
         Ok(self.working)
@@ -111,10 +121,10 @@ pub(super) fn remove(xml: &[u8], source: &Source) -> Result<Option<Vec<u8>>> {
     {
         return Ok(Some(collapse_empty(xml, &source.layout.nv_pr)?));
     }
-    let replacement = if !known.other_content {
-        known.element.span.clone()
-    } else {
+    let replacement = if known.other_content {
         design.span.clone()
+    } else {
+        known.element.span.clone()
     };
     Ok(Some(codec::replace(xml, replacement, &[])?))
 }

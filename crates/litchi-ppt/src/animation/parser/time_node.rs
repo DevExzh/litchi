@@ -1,4 +1,4 @@
-//! Layered parsing façade for PowerPoint timing records.
+//! Layered parsing façade for `PowerPoint` timing records.
 //!
 //! The implementation is separated into semantic models, record parsers,
 //! property/extension decoders, and validation while retaining the historical

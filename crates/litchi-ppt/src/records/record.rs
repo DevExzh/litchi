@@ -41,12 +41,20 @@ impl Record {
     ///
     /// # Returns
     ///
-    /// Tuple of (parsed_record, bytes_consumed)
+    /// Tuple of (`parsed_record`, `bytes_consumed`)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(data: &[u8], offset: usize) -> Result<(Self, usize)> {
         Self::parse_with_limits(data, offset, RecordLimits::default())
     }
 
     /// Parse a PPT record with explicit finite resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_with_limits(
         data: &[u8],
         offset: usize,
@@ -121,7 +129,7 @@ impl Record {
 
         // Read data length (bytes 4-7)
         let data_length = u32::from_le_bytes([len_0, len_1, len_2, len_3]);
-        let declared_data_size = usize::try_from(data_length).map_err(|_| {
+        let declared_data_size = usize::try_from(data_length).map_err(|_err| {
             Error::Corrupted(format!(
                 "PPT record at offset {offset} has a data length that exceeds this platform"
             ))
@@ -167,7 +175,7 @@ impl Record {
         let mut record_data = Vec::new();
         record_data
             .try_reserve_exact(source.len())
-            .map_err(|_| Error::AllocationFailed("PPT record payload"))?;
+            .map_err(|_err| Error::AllocationFailed("PPT record payload"))?;
         record_data.extend_from_slice(source);
 
         let mut record = Record {
@@ -272,7 +280,7 @@ impl Record {
                 Ok((child, consumed)) => {
                     children
                         .try_reserve(1)
-                        .map_err(|_| Error::AllocationFailed("PPT child-record table"))?;
+                        .map_err(|_err| Error::AllocationFailed("PPT child-record table"))?;
                     children.push(child);
                     offset += consumed;
 
@@ -316,7 +324,7 @@ impl Record {
             }
             children
                 .try_reserve(1)
-                .map_err(|_| Error::AllocationFailed("PPT child-record table"))?;
+                .map_err(|_err| Error::AllocationFailed("PPT child-record table"))?;
             children.push(child);
             offset += consumed;
         }
@@ -324,6 +332,7 @@ impl Record {
     }
 
     /// Find a child record of a specific type.
+    #[must_use]
     pub fn find_child(&self, record_type: RecordType) -> Option<&Record> {
         self.children
             .iter()
@@ -331,6 +340,7 @@ impl Record {
     }
 
     /// Find all child records of a specific type.
+    #[must_use]
     pub fn find_children(&self, record_type: RecordType) -> Vec<&Record> {
         self.children
             .iter()
@@ -342,11 +352,19 @@ impl Record {
     ///
     /// `BinaryTagData` is an atom whose payload is itself a strict sequence of
     /// PPT records, so these records do not appear in the ordinary child tree.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn versioned_binary_tag_records(&self, version: u8) -> Result<Vec<Record>> {
         self.versioned_binary_tag_records_with_limits(version, RecordLimits::default())
     }
 
     /// Return versioned programmable-tag records with explicit parse limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn versioned_binary_tag_records_with_limits(
         &self,
         version: u8,
@@ -357,8 +375,8 @@ impl Record {
                 "Unsupported PowerPoint programmable-tag version".to_string(),
             ));
         }
-        let expected_name = format!("___PPT{version}");
-        let expected_name: Vec<u16> = expected_name.encode_utf16().collect();
+        let expected_tag_name = format!("___PPT{version}");
+        let expected_name: Vec<u16> = expected_tag_name.encode_utf16().collect();
         let mut session = RecordParseSession::new(limits, self.data.len())?;
         let prog_tags = collect_prog_tags(self, &mut session)?;
         let mut records = Vec::new();
@@ -412,7 +430,7 @@ impl Record {
                 )?;
                 records
                     .try_reserve(decoded.len())
-                    .map_err(|_| Error::AllocationFailed("versioned binary-tag records"))?;
+                    .map_err(|_err| Error::AllocationFailed("versioned binary-tag records"))?;
                 records.extend(decoded);
             }
         }
@@ -449,14 +467,14 @@ impl Record {
                     "Truncated record header in {context}"
                 )));
             }
-            let length = u32::from_le_bytes([
+            let declared_length = u32::from_le_bytes([
                 data[offset + 4],
                 data[offset + 5],
                 data[offset + 6],
                 data[offset + 7],
             ]);
-            let length = usize::try_from(length)
-                .map_err(|_| Error::Corrupted(format!("{context} record size overflow")))?;
+            let length = usize::try_from(declared_length)
+                .map_err(|_err| Error::Corrupted(format!("{context} record size overflow")))?;
             let record_end = header_end
                 .checked_add(length)
                 .ok_or_else(|| Error::Corrupted(format!("{context} record size overflow")))?;
@@ -471,7 +489,7 @@ impl Record {
             }
             records
                 .try_reserve(1)
-                .map_err(|_| Error::AllocationFailed("PPT strict record sequence"))?;
+                .map_err(|_err| Error::AllocationFailed("PPT strict record sequence"))?;
             records.push(record);
             offset = record_end;
         }
@@ -479,15 +497,15 @@ impl Record {
     }
 
     /// Extract slide data from this record.
+    #[must_use]
     pub fn extract_slide_data(&self) -> Option<Vec<u8>> {
         if let Some(ppdrawing) = self.find_child(RecordType::PPDrawing) {
             return Some(ppdrawing.data.clone());
         }
 
         if self.record_type == RecordType::Slide && !self.data.is_empty() && self.data.len() > 8 {
-            let first_record_type = U16::<LittleEndian>::read_from_bytes(&self.data[0..2])
-                .map(|v| v.get())
-                .unwrap_or(0);
+            let first_record_type =
+                U16::<LittleEndian>::read_from_bytes(&self.data[0..2]).map_or(0, U16::get);
             if first_record_type >= 0xF000 {
                 return Some(self.data.clone());
             }
@@ -497,6 +515,7 @@ impl Record {
     }
 
     /// Extract document information from this record.
+    #[must_use]
     pub fn extract_document_info(&self) -> Option<DocumentInfo> {
         if self.record_type != RecordType::Document {
             return None;
@@ -519,44 +538,36 @@ impl Record {
         Some(info)
     }
 
-    /// Parse DocumentAtom record data.
+    /// Parse `DocumentAtom` record data.
     fn parse_document_atom(record: &Record) -> DocumentInfo {
         let mut info = DocumentInfo::default();
 
         if record.data.len() >= 20 {
-            info.slide_width = U32::<LittleEndian>::read_from_bytes(&record.data[0..4])
-                .map(|v| v.get())
-                .unwrap_or(0);
-            info.slide_height = U32::<LittleEndian>::read_from_bytes(&record.data[4..8])
-                .map(|v| v.get())
-                .unwrap_or(0);
+            info.slide_width =
+                U32::<LittleEndian>::read_from_bytes(&record.data[0..4]).map_or(0, U32::get);
+            info.slide_height =
+                U32::<LittleEndian>::read_from_bytes(&record.data[4..8]).map_or(0, U32::get);
             info.slide_count = U32::<LittleEndian>::read_from_bytes(&record.data[8..12])
-                .map(|v| v.get() as usize)
-                .unwrap_or(0);
+                .map_or(0, |v| v.get() as usize);
             info.notes_count = U32::<LittleEndian>::read_from_bytes(&record.data[12..16])
-                .map(|v| v.get() as usize)
-                .unwrap_or(0);
+                .map_or(0, |v| v.get() as usize);
             info.master_count = U32::<LittleEndian>::read_from_bytes(&record.data[16..20])
-                .map(|v| v.get() as usize)
-                .unwrap_or(0);
+                .map_or(0, |v| v.get() as usize);
         }
         if record.data.len() >= 28 {
             info.notes_master_persist_id_ref =
-                U32::<LittleEndian>::read_from_bytes(&record.data[24..28])
-                    .map(|v| v.get())
-                    .unwrap_or(0);
+                U32::<LittleEndian>::read_from_bytes(&record.data[24..28]).map_or(0, U32::get);
         }
         if record.data.len() >= 32 {
             info.handout_master_persist_id_ref =
-                U32::<LittleEndian>::read_from_bytes(&record.data[28..32])
-                    .map(|v| v.get())
-                    .unwrap_or(0);
+                U32::<LittleEndian>::read_from_bytes(&record.data[28..32]).map_or(0, U32::get);
         }
 
         info
     }
 
     /// Extract slide information from this record.
+    #[must_use]
     pub fn extract_slide_info(&self) -> Option<SlideInfo> {
         if self.record_type != RecordType::Slide {
             return None;
@@ -577,26 +588,29 @@ impl Record {
         Some(info)
     }
 
-    /// Parse SlideAtom record data.
+    /// Parse `SlideAtom` record data.
     fn parse_slide_atom(record: &Record) -> SlideInfo {
         let mut info = SlideInfo::default();
 
         if record.data.len() >= 20 {
-            info.layout_id = U32::<LittleEndian>::read_from_bytes(&record.data[0..4])
-                .map(|v| v.get())
-                .unwrap_or(0);
-            info.master_id = U32::<LittleEndian>::read_from_bytes(&record.data[12..16])
-                .map(|v| v.get())
-                .unwrap_or(0);
-            info.notes_id = U32::<LittleEndian>::read_from_bytes(&record.data[16..20])
-                .map(|v| v.get())
-                .unwrap_or(0);
+            info.layout_id =
+                U32::<LittleEndian>::read_from_bytes(&record.data[0..4]).map_or(0, U32::get);
+            info.master_id =
+                U32::<LittleEndian>::read_from_bytes(&record.data[12..16]).map_or(0, U32::get);
+            info.notes_id =
+                U32::<LittleEndian>::read_from_bytes(&record.data[16..20]).map_or(0, U32::get);
         }
 
         info
     }
 
     /// Extract text content from this record and its children.
+    ///
+    /// # Errors
+    ///
+    /// Currently this function never fails: malformed atom payloads are skipped
+    /// rather than reported. The `Result` return type is kept so future parse
+    /// failures can surface without breaking the public API.
     pub fn extract_text(&self) -> Result<String> {
         if matches!(
             self.record_type,
@@ -610,23 +624,18 @@ impl Record {
         let mut text_parts = Vec::new();
 
         // Extract text from text-related records
-        match self.record_type {
-            RecordType::TextCharsAtom => {
-                if let Ok(text) = parse_text_chars_atom(&self.data) {
-                    text_parts.push(text);
-                }
-            },
-            RecordType::TextBytesAtom => {
-                if let Ok(text) = parse_text_bytes_atom(&self.data) {
-                    text_parts.push(text);
-                }
-            },
-            RecordType::CString => {
-                if let Ok(text) = parse_cstring(&self.data) {
-                    text_parts.push(text);
-                }
-            },
-            _ => {},
+        if self.record_type == RecordType::TextCharsAtom {
+            if let Ok(text) = parse_text_chars_atom(&self.data) {
+                text_parts.push(text);
+            }
+        } else if self.record_type == RecordType::TextBytesAtom {
+            if let Ok(text) = parse_text_bytes_atom(&self.data) {
+                text_parts.push(text);
+            }
+        } else if self.record_type == RecordType::CString
+            && let Ok(text) = parse_cstring(&self.data)
+        {
+            text_parts.push(text);
         }
 
         // Recursively extract text from children
@@ -641,7 +650,8 @@ impl Record {
         Ok(text_parts.join("\n"))
     }
 
-    /// Extract SlideListWithText records from Document record.
+    /// Extract `SlideListWithText` records from Document record.
+    #[must_use]
     pub fn extract_slide_list_with_texts(&self) -> Vec<&Record> {
         if self.record_type != RecordType::Document {
             return Vec::new();
@@ -654,12 +664,14 @@ impl Record {
     }
 
     /// Get the instance field from the record header.
+    #[must_use]
     pub fn get_instance(&self) -> u16 {
         self.instance
     }
 
-    /// Group children into SlideAtomsSets.
-    pub fn group_into_slide_atoms_sets<'a>(&'a self) -> Vec<SlideAtomsSet<'a>> {
+    /// Group children into `SlideAtomsSets`.
+    #[must_use]
+    pub fn group_into_slide_atoms_sets(&self) -> Vec<SlideAtomsSet<'_>> {
         if self.record_type != RecordType::SlideListWithText {
             return Vec::new();
         }
@@ -695,14 +707,11 @@ impl Record {
         sets
     }
 
-    /// Get the slide ID from a SlidePersistAtom record.
+    /// Get the slide ID from a `SlidePersistAtom` record.
+    #[must_use]
     pub fn get_slide_id(&self) -> Option<u32> {
         if self.record_type == RecordType::SlidePersistAtom && self.data.len() >= 4 {
-            Some(
-                U32::<LittleEndian>::read_from_bytes(&self.data[0..4])
-                    .map(|v| v.get())
-                    .unwrap_or(0),
-            )
+            Some(U32::<LittleEndian>::read_from_bytes(&self.data[0..4]).map_or(0, U32::get))
         } else {
             None
         }
@@ -828,23 +837,23 @@ fn collect_prog_tags<'a>(
     let mut pending = Vec::new();
     pending
         .try_reserve(1)
-        .map_err(|_| Error::AllocationFailed("programmable-tag traversal stack"))?;
+        .map_err(|_err| Error::AllocationFailed("programmable-tag traversal stack"))?;
     pending.push((record, 0usize));
-    while let Some((record, depth)) = pending.pop() {
+    while let Some((current, depth)) = pending.pop() {
         session.account_existing(depth)?;
-        if record.record_type == RecordType::ProgTags {
+        if current.record_type == RecordType::ProgTags {
             output
                 .try_reserve(1)
-                .map_err(|_| Error::AllocationFailed("programmable-tag table"))?;
-            output.push((record, depth));
+                .map_err(|_err| Error::AllocationFailed("programmable-tag table"))?;
+            output.push((current, depth));
             continue;
         }
         pending
-            .try_reserve(record.children.len())
-            .map_err(|_| Error::AllocationFailed("programmable-tag traversal stack"))?;
+            .try_reserve(current.children.len())
+            .map_err(|_err| Error::AllocationFailed("programmable-tag traversal stack"))?;
         let child_depth = checked_logical_depth(depth, 1)?;
         pending.extend(
-            record
+            current
                 .children
                 .iter()
                 .rev()
@@ -861,6 +870,11 @@ fn checked_logical_depth(depth: usize, increment: usize) -> Result<usize> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -868,7 +882,7 @@ mod tests {
         let mut bytes = Vec::with_capacity(8 + payload.len());
         bytes.extend_from_slice(&0x1234_u16.to_le_bytes());
         bytes.extend_from_slice(&record_type.to_le_bytes());
-        bytes.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(&u32::try_from(payload.len()).unwrap().to_le_bytes());
         bytes.extend_from_slice(payload);
         bytes
     }
@@ -877,27 +891,27 @@ mod tests {
         let mut bytes = Vec::with_capacity(8 + payload.len());
         bytes.extend_from_slice(&0u16.to_le_bytes());
         bytes.extend_from_slice(&record_type.as_u16().to_le_bytes());
-        bytes.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(&u32::try_from(payload.len()).unwrap().to_le_bytes());
         bytes.extend_from_slice(payload);
         bytes
     }
 
     fn versioned_tag_root(tag_count: usize) -> Record {
-        let mut name = Vec::new();
+        let mut name_bytes = Vec::new();
         for code_unit in "___PPT10".encode_utf16() {
-            name.extend_from_slice(&code_unit.to_le_bytes());
+            name_bytes.extend_from_slice(&code_unit.to_le_bytes());
         }
-        let name = canonical_record(RecordType::CString, &name);
+        let name = canonical_record(RecordType::CString, &name_bytes);
         let leaf = canonical_record(RecordType::Unknown, &[0u8; 16]);
         let blob = canonical_record(RecordType::BinaryTagData, &leaf);
         let mut tag_payload = name;
         tag_payload.extend_from_slice(&blob);
         let tag = canonical_record(RecordType::ProgBinaryTag, &tag_payload);
-        let mut tags = Vec::new();
+        let mut tag_bytes = Vec::new();
         for _ in 0..tag_count {
-            tags.extend_from_slice(&tag);
+            tag_bytes.extend_from_slice(&tag);
         }
-        let tags = canonical_record(RecordType::ProgTags, &tags);
+        let tags = canonical_record(RecordType::ProgTags, &tag_bytes);
         let root = canonical_record(RecordType::Document, &tags);
         Record::parse(&root, 0).unwrap().0
     }
@@ -1076,7 +1090,7 @@ mod tests {
             matches!(error, Error::ResourceLimit(message) if message.contains("copied payload"))
         );
 
-        let mut session = RecordParseSession::new(
+        let mut count_session = RecordParseSession::new(
             RecordLimits {
                 max_records: 1,
                 ..RecordLimits::default()
@@ -1084,13 +1098,13 @@ mod tests {
             0,
         )
         .unwrap();
-        session.account_existing(0).unwrap();
+        count_session.account_existing(0).unwrap();
         assert!(matches!(
-            session.account_existing(0),
+            count_session.account_existing(0),
             Err(Error::ResourceLimit(_))
         ));
 
-        let mut session = RecordParseSession::new(
+        let mut depth_session = RecordParseSession::new(
             RecordLimits {
                 max_depth: 1,
                 ..RecordLimits::default()
@@ -1099,7 +1113,7 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(
-            session.parse_sequence(&bytes, "deep", 2),
+            depth_session.parse_sequence(&bytes, "deep", 2),
             Err(Error::ResourceLimit(_))
         ));
     }

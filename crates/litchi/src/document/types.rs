@@ -13,7 +13,10 @@ use litchi_doc as doc;
 /// This enum wraps the format-specific implementations and provides
 /// a unified API. Users typically don't interact with this enum directly,
 /// but instead use the methods on `Document`.
-#[allow(clippy::large_enum_variant)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "crate-internal facade enum; boxing the large variant would complicate every match for no measurable gain"
+)]
 pub(super) enum DocumentImpl {
     /// Legacy .doc format
     #[cfg(feature = "doc")]
@@ -37,7 +40,10 @@ pub(super) enum DocumentImpl {
 /// This enum represents the supported document formats in the unified
 /// Document API. The format is automatically detected from file signatures.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(unused)] // The corresponding enum would only be used when the feature is enabled
+#[allow(
+    unused,
+    reason = "the enum is only constructed when the corresponding format feature is enabled"
+)]
 pub(super) enum DocumentFormat {
     /// Legacy .doc format (OLE2)
     Doc,
@@ -65,7 +71,10 @@ pub(super) enum DocumentFormat {
 ///
 /// * `Ok(DocumentFormat)` if a supported document format is detected
 /// * `Err(Error)` if the format is not recognized or unsupported
-#[allow(dead_code)] // For format detection, it is better to use the smart detection function, but the function is still useful for other purposes
+#[allow(
+    dead_code,
+    reason = "kept as a public detection helper; callers are expected to prefer smart detection"
+)]
 pub fn detect_document_format<R: Read + Seek>(reader: &mut R) -> Result<DocumentFormat> {
     // Use the common detection module
     let file_format = detection::detect_format_from_reader(reader).ok_or(Error::NotOfficeFile)?;
@@ -88,7 +97,10 @@ pub fn detect_document_format<R: Read + Seek>(reader: &mut R) -> Result<Document
 /// * `Ok(DocumentFormat)` if a supported document format is detected
 /// * `Err(Error)` if the format is not recognized or unsupported
 #[inline]
-#[allow(dead_code)] // For format detection, it is better to use the smart detection function, but the function is still useful for other purposes
+#[allow(
+    dead_code,
+    reason = "kept as a public detection helper; callers are expected to prefer smart detection"
+)]
 pub fn detect_document_format_from_bytes(bytes: &[u8]) -> Result<DocumentFormat> {
     if bytes.len() < 4 {
         return Err(Error::InvalidFormat(

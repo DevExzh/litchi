@@ -48,7 +48,7 @@ fn rrd(revision_type: u16, revision_id: i32, tab_id: u16) -> [u8; 14] {
 
 fn string_field(field_len: usize, text: &str) -> Vec<u8> {
     let mut field = vec![0u8; field_len];
-    field[1..1 + text.len()].copy_from_slice(text.as_bytes());
+    field[1..=text.len()].copy_from_slice(text.as_bytes());
     field
 }
 

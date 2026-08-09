@@ -22,6 +22,9 @@ pub struct GeneratedListMarker<'a> {
 }
 
 impl GeneratedListMarker<'_> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if self.text.is_empty() || self.text.len() > MAX_GENERATED_LIST_MARKER_BYTES {
             return Err(RtfError::MalformedDocument(

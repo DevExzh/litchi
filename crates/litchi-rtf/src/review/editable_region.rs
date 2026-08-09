@@ -31,6 +31,9 @@ pub struct EditableRegion<'a> {
 
 impl<'a> EditableRegion<'a> {
     /// Create a validated editable region.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(position: usize, content: Cow<'a, str>) -> RtfResult<Self> {
         let region = Self { position, content };
         region.validate()?;

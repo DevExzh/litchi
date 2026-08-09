@@ -1,4 +1,4 @@
-//! Strict PowerPoint 10 presentation-comment support.
+//! Strict `PowerPoint` 10 presentation-comment support.
 //!
 //! The public model is kept separate from the record codec. The codec accepts
 //! only the ordered, bounded records defined by [MS-PPT], while the model

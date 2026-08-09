@@ -5,7 +5,7 @@
 )]
 
 use super::{Flags, Kind, MAX_NAME_UNITS, Snapshot};
-use crate::prop::{Id, Props};
+use crate::prop::{Id, Prop, Props};
 use crate::{Error, Record, RecordKind};
 
 fn opt_record(properties: &[(u16, i32, Option<&[u8]>)]) -> Vec<u8> {
@@ -21,15 +21,17 @@ fn opt_record(properties: &[(u16, i32, Option<&[u8]>)]) -> Vec<u8> {
         body.extend_from_slice(&value.to_le_bytes());
     }
     for (_, _, data) in properties {
-        if let Some(data) = data {
-            body.extend_from_slice(data);
+        if let Some(complex_data) = data {
+            body.extend_from_slice(complex_data);
         }
     }
     let mut record = Vec::with_capacity(body.len() + 8);
-    let version_instance = ((properties.len() as u16) << 4) | 3;
+    let property_count = u16::try_from(properties.len()).expect("property count");
+    let version_instance = (property_count << 4) | 3;
     record.extend_from_slice(&version_instance.to_le_bytes());
     record.extend_from_slice(&RecordKind::Opt.raw().to_le_bytes());
-    record.extend_from_slice(&(body.len() as u32).to_le_bytes());
+    let body_len = u32::try_from(body.len()).expect("body length");
+    record.extend_from_slice(&body_len.to_le_bytes());
     record.extend_from_slice(&body);
     record
 }
@@ -49,10 +51,10 @@ fn decodes_picture_name_and_retains_reserved_flags() {
     let bytes = opt_record(&[
         (
             0x8000 | Id::PictureFileName.raw(),
-            name.len() as i32,
+            i32::try_from(name.len()).expect("name length"),
             Some(&name),
         ),
-        (Id::BlipFlags.raw(), 0x8000_0009_u32 as i32, None),
+        (Id::BlipFlags.raw(), 0x8000_0009_u32.cast_signed(), None),
     ]);
     let (record, consumed) = Record::parse(&bytes, 0).expect("picture Opt");
     assert_eq!(consumed, bytes.len());
@@ -62,9 +64,9 @@ fn decodes_picture_name_and_retains_reserved_flags() {
         .picture()
         .expect("picture metadata")
         .expect("metadata present");
-    let name = metadata.name().expect("name");
-    assert_eq!(name.text().expect("UTF-16"), "old");
-    assert_eq!(name.raw_bytes(), name_bytes("old").as_slice());
+    let decoded_name = metadata.name().expect("name");
+    assert_eq!(decoded_name.text().expect("UTF-16"), "old");
+    assert_eq!(decoded_name.raw_bytes(), name_bytes("old").as_slice());
     assert_eq!(metadata.flags().kind(), Kind::File);
     assert!(metadata.flags().link_to_file());
     assert_eq!(metadata.flags().reserved(), 0x8000_0000);
@@ -81,11 +83,15 @@ fn edits_only_modeled_picture_values_and_preserves_opaque_neighbors() {
         (0x0600, -7, None),
         (
             0x8000 | Id::PictureFileName.raw(),
-            old_name.len() as i32,
+            i32::try_from(old_name.len()).expect("name length"),
             Some(&old_name),
         ),
-        (Id::BlipFlags.raw(), 0x8000_0009_u32 as i32, None),
-        (0x8000 | 0x0601, opaque.len() as i32, Some(&opaque)),
+        (Id::BlipFlags.raw(), 0x8000_0009_u32.cast_signed(), None),
+        (
+            0x8000 | 0x0601,
+            i32::try_from(opaque.len()).expect("opaque length"),
+            Some(&opaque),
+        ),
     ]);
     let (record, _) = Record::parse(&bytes, 0).expect("picture Opt");
     let source = Snapshot::parse(&record).expect("snapshot");
@@ -136,7 +142,7 @@ fn edits_only_modeled_picture_values_and_preserves_opaque_neighbors() {
         edited
             .properties()
             .iter()
-            .map(|property| property.raw_id())
+            .map(Prop::raw_id)
             .collect::<Vec<_>>(),
         vec![
             0x0600,
@@ -181,7 +187,7 @@ fn validates_utf16_bounds_and_flag_dependencies() {
     let odd = [0x41, 0x00, 0x00];
     let bytes = opt_record(&[(
         0x8000 | Id::PictureFileName.raw(),
-        odd.len() as i32,
+        i32::try_from(odd.len()).expect("name length"),
         Some(&odd),
     )]);
     let (record, _) = Record::parse(&bytes, 0).expect("picture Opt");
@@ -193,28 +199,28 @@ fn validates_utf16_bounds_and_flag_dependencies() {
     ));
 
     let interior_nul = [0x41, 0x00, 0x00, 0x00, 0x00, 0x00];
-    let bytes = opt_record(&[(
+    let interior_bytes = opt_record(&[(
         0x8000 | Id::PictureFileName.raw(),
-        interior_nul.len() as i32,
+        i32::try_from(interior_nul.len()).expect("name length"),
         Some(&interior_nul),
     )]);
-    let (record, _) = Record::parse(&bytes, 0).expect("picture Opt");
+    let (interior_record, _) = Record::parse(&interior_bytes, 0).expect("picture Opt");
     assert!(matches!(
-        Snapshot::parse(&record),
+        Snapshot::parse(&interior_record),
         Err(Error::MalformedProperties {
             reason: "picture name contains an interior NUL"
         })
     ));
 
     let too_long = [0x41, 0x00].repeat(MAX_NAME_UNITS + 2);
-    let bytes = opt_record(&[(
+    let too_long_bytes = opt_record(&[(
         0x8000 | Id::PictureFileName.raw(),
-        too_long.len() as i32,
+        i32::try_from(too_long.len()).expect("name length"),
         Some(&too_long),
     )]);
-    let (record, _) = Record::parse(&bytes, 0).expect("picture Opt");
+    let (too_long_record, _) = Record::parse(&too_long_bytes, 0).expect("picture Opt");
     assert!(matches!(
-        Snapshot::parse(&record),
+        Snapshot::parse(&too_long_record),
         Err(Error::MalformedProperties {
             reason: "picture name must be a bounded even-length UTF-16 string"
         })
@@ -224,7 +230,11 @@ fn validates_utf16_bounds_and_flag_dependencies() {
 #[test]
 fn appends_and_clears_names_without_touching_other_properties() {
     let opaque = [1, 2, 3];
-    let bytes = opt_record(&[(0x8000 | 0x0601, opaque.len() as i32, Some(&opaque))]);
+    let bytes = opt_record(&[(
+        0x8000 | 0x0601,
+        i32::try_from(opaque.len()).expect("opaque length"),
+        Some(&opaque),
+    )]);
     let (record, _) = Record::parse(&bytes, 0).expect("picture Opt");
     let source = Snapshot::parse(&record).expect("snapshot");
 

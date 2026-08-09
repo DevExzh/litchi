@@ -1,5 +1,9 @@
 //! Inert RTF 1.9.1 mail-merge metadata.
 
+#![allow(
+    clippy::shadow_reuse,
+    reason = "builder-style helpers deliberately rebind a working value as it is refined"
+)]
 use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 
@@ -19,10 +23,12 @@ pub const MAX_MAIL_MERGE_NESTING_DEPTH: usize = 4;
 pub struct MailMergeDataSourceType(i32);
 
 impl MailMergeDataSourceType {
+    #[must_use]
     pub const fn from_rtf(value: i32) -> Self {
         Self(value)
     }
 
+    #[must_use]
     pub const fn rtf_value(self) -> i32 {
         self.0
     }
@@ -33,8 +39,11 @@ impl MailMergeDataSourceType {
 pub struct MailMergeColumnIndex(u32);
 
 impl MailMergeColumnIndex {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn from_rtf(value: i32) -> RtfResult<Self> {
-        let value = u32::try_from(value).map_err(|_| {
+        let value = u32::try_from(value).map_err(|_err| {
             RtfError::MalformedDocument(
                 "RTF mail-merge column index cannot be negative".to_string(),
             )
@@ -42,16 +51,20 @@ impl MailMergeColumnIndex {
         Ok(Self(value))
     }
 
+    #[must_use]
     pub const fn new(value: u32) -> Self {
         Self(value)
     }
 
+    #[must_use]
     pub const fn get(self) -> u32 {
         self.0
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn rtf_value(self) -> RtfResult<i32> {
-        i32::try_from(self.0).map_err(|_| {
+        i32::try_from(self.0).map_err(|_err| {
             RtfError::MalformedDocument(
                 "RTF mail-merge column index exceeds the signed control-word range".to_string(),
             )
@@ -76,11 +89,13 @@ impl<'a> MailMergeFieldMapping<'a> {
         }
     }
 
+    #[must_use]
     pub fn with_mapped_name(mut self, name: impl Into<Cow<'a, str>>) -> Self {
         self.mapped_name = Some(name.into());
         self
     }
 
+    #[must_use]
     pub fn into_owned(self) -> MailMergeFieldMapping<'static> {
         MailMergeFieldMapping {
             column: self.column,
@@ -88,7 +103,9 @@ impl<'a> MailMergeFieldMapping<'a> {
             mapped_name: self.mapped_name.map(|value| Cow::Owned(value.into_owned())),
         }
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         self.column.rtf_value()?;
         validate_required_text("field name", self.name.as_ref())?;
@@ -148,14 +165,16 @@ impl MailMergeDataSourceObject<'_> {
                 .collect(),
         }
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         for (name, value) in [
             ("active record", self.active_record),
             ("column count", self.column_count),
         ] {
             if let Some(value) = value {
-                i32::try_from(value).map_err(|_| {
+                i32::try_from(value).map_err(|_err| {
                     RtfError::MalformedDocument(format!(
                         "RTF mail-merge {name} exceeds the signed control-word range"
                     ))
@@ -219,7 +238,9 @@ impl MailMerge<'_> {
                 .map(MailMergeDataSourceObject::into_owned),
         }
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         let mut total = 0usize;
         for (name, value) in [

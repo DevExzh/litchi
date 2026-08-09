@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::{Bookmark, Summary};
 use crate::consts::RecordType;
 use crate::records::Record;

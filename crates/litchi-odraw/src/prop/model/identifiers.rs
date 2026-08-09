@@ -547,9 +547,10 @@ impl Id {
         if raw > PROPERTY_ID_MASK {
             return None;
         }
-        match Self::from(raw) {
-            id @ Self::Unknown(_) => Some(id),
-            _ => None,
+        if let id @ Self::Unknown(_) = Self::from(raw) {
+            Some(id)
+        } else {
+            None
         }
     }
 

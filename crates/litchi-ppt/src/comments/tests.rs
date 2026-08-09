@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::{Authors, Catalog, parse_slide_comments};
 use crate::consts::RecordType;
 use crate::presentation::ParsedSlideComments;
@@ -7,7 +13,7 @@ fn record_bytes(version: u16, instance: u16, kind: u16, payload: &[u8]) -> Vec<u
     let mut data = Vec::new();
     data.extend_from_slice(&((instance << 4) | version).to_le_bytes());
     data.extend_from_slice(&kind.to_le_bytes());
-    data.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+    data.extend_from_slice(&u32::try_from(payload.len()).unwrap().to_le_bytes());
     data.extend_from_slice(payload);
     data
 }
@@ -27,7 +33,7 @@ fn prog_tags_record(version: u8, blob_payload: &[u8]) -> Record {
         record_type_raw: 0x1388,
         version: 0x0f,
         instance: 0,
-        data_length: tag.len() as u32,
+        data_length: u32::try_from(tag.len()).unwrap(),
         data: tag,
         children: Vec::new(),
     }

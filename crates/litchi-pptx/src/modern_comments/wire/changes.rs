@@ -163,15 +163,15 @@ fn parse_metadata(fragment: &Fragment) -> Result<Metadata> {
             "v" => {
                 value.version = Some(
                     text.parse()
-                        .map_err(|_| invalid("invalid change version"))?,
-                )
+                        .map_err(|_err| invalid("invalid change version"))?,
+                );
             },
             "id" => value.change_id = Some(text.clone()),
             "actId" => {
                 value.action_id = Some(
                     text.parse()
-                        .map_err(|_| invalid("invalid change action ID"))?,
-                )
+                        .map_err(|_err| invalid("invalid change action ID"))?,
+                );
             },
             other => {
                 return Err(invalid(format!(

@@ -1,4 +1,4 @@
-//! Record-level parsing for shared PowerPoint animation behaviors.
+//! Record-level parsing for shared `PowerPoint` animation behaviors.
 
 use super::super::support::{read_f32, read_i32, read_u32, require_atom, require_container};
 use super::model::{
@@ -24,6 +24,10 @@ use crate::package::{Error, Result};
 use crate::records::Record;
 
 /// Parse the common behavior information shared by all extended animation behaviors.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_behavior(record: &Record) -> Result<TimeBehavior> {
     require_container(
         record,
@@ -79,6 +83,10 @@ pub fn parse_time_behavior(record: &Record) -> Result<TimeBehavior> {
 }
 
 /// Parse an exact 16-byte `TimeBehaviorAtom` payload.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_behavior_atom(record: &Record) -> Result<TimeBehaviorAtom> {
     require_atom(record, RecordType::TimeBehavior, 0, 16, "TimeBehaviorAtom")?;
     let flags = read_u32(&record.data, 0);
@@ -112,6 +120,10 @@ pub fn parse_time_behavior_atom(record: &Record) -> Result<TimeBehaviorAtom> {
 }
 
 /// Parse an exact generic property-animation behavior container.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_animate_behavior(record: &Record) -> Result<TimeAnimateBehavior> {
     require_container(
         record,
@@ -174,6 +186,10 @@ pub fn parse_time_animate_behavior(record: &Record) -> Result<TimeAnimateBehavio
 }
 
 /// Parse an exact 12-byte `TimeAnimateBehaviorAtom` payload.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_animate_behavior_atom(record: &Record) -> Result<TimeAnimateBehaviorAtom> {
     require_atom(
         record,
@@ -232,6 +248,10 @@ pub fn parse_time_animate_behavior_atom(record: &Record) -> Result<TimeAnimateBe
 }
 
 /// Parse a generic animation keyframe list.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_animation_value_list(record: &Record) -> Result<TimeAnimationValueList> {
     require_container(
         record,
@@ -273,6 +293,10 @@ pub fn parse_time_animation_value_list(record: &Record) -> Result<TimeAnimationV
 }
 
 /// Parse an exact 4-byte `TimeAnimationValueAtom` payload.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_animation_value_atom(record: &Record) -> Result<i32> {
     require_atom(
         record,
@@ -291,6 +315,10 @@ pub fn parse_time_animation_value_atom(record: &Record) -> Result<i32> {
 }
 
 /// Parse an exact color behavior container.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_color_behavior(record: &Record) -> Result<TimeColorBehavior> {
     require_container(
         record,
@@ -310,6 +338,10 @@ pub fn parse_time_color_behavior(record: &Record) -> Result<TimeColorBehavior> {
 }
 
 /// Parse an exact 52-byte `TimeColorBehaviorAtom` payload.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_color_behavior_atom(record: &Record) -> Result<TimeColorBehaviorAtom> {
     require_atom(
         record,
@@ -343,6 +375,10 @@ pub fn parse_time_color_behavior_atom(record: &Record) -> Result<TimeColorBehavi
 }
 
 /// Parse an exact image-effect behavior container.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_effect_behavior(record: &Record) -> Result<TimeEffectBehavior> {
     require_container(
         record,
@@ -411,6 +447,10 @@ pub fn parse_time_effect_behavior(record: &Record) -> Result<TimeEffectBehavior>
 }
 
 /// Parse an exact 8-byte `TimeEffectBehaviorAtom` payload.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_effect_behavior_atom(record: &Record) -> Result<TimeEffectBehaviorAtom> {
     require_atom(
         record,
@@ -425,9 +465,9 @@ pub fn parse_time_effect_behavior_atom(record: &Record) -> Result<TimeEffectBeha
         Some(match value {
             0 => TimeEffectTransition::In,
             1 => TimeEffectTransition::Out,
-            value => {
+            invalid => {
                 return Err(Error::InvalidFormat(format!(
-                    "invalid image-effect transition {value}"
+                    "invalid image-effect transition {invalid}"
                 )));
             },
         })
@@ -447,6 +487,10 @@ pub fn parse_time_effect_behavior_atom(record: &Record) -> Result<TimeEffectBeha
 }
 
 /// Parse an exact motion-path behavior container.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_motion_behavior(record: &Record) -> Result<TimeMotionBehavior> {
     require_container(
         record,
@@ -502,6 +546,10 @@ pub fn parse_time_motion_behavior(record: &Record) -> Result<TimeMotionBehavior>
 }
 
 /// Parse an exact 32-byte `TimeMotionBehaviorAtom` payload.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_motion_behavior_atom(record: &Record) -> Result<TimeMotionBehaviorAtom> {
     require_atom(
         record,
@@ -551,6 +599,10 @@ pub fn parse_time_motion_behavior_atom(record: &Record) -> Result<TimeMotionBeha
 }
 
 /// Parse a `TimePropertyList4TimeBehavior` record.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_behavior_property_list(record: &Record) -> Result<TimeBehaviorPropertyList> {
     require_container(
         record,
@@ -639,6 +691,10 @@ fn parse_time_behavior_property(record: &Record) -> Result<TimeBehaviorProperty>
 }
 
 /// Parse a `ClientVisualElementContainer` animation target.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_time_visual_element(record: &Record) -> Result<TimeVisualElement> {
     require_container(
         record,

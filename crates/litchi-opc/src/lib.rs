@@ -28,9 +28,11 @@
 //! specification maxima, and provides a defensive-consumer boundary for
 //! ECMA-376 Part 2 sections 7.3.6 and 10 and MS-OI29500 sections 2.1.1749-1752.
 //!
-//! Macros, VBA, ActiveX, controls, OLE objects, and embedded code are retained
+//! Macros, VBA, `ActiveX`, controls, OLE objects, and embedded code are retained
 //! only as inert blobs when exposed or preserved. This crate never executes or
 //! activates them.
+
+#![forbid(unsafe_code)]
 
 pub mod atomic;
 

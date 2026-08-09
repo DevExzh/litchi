@@ -12,6 +12,10 @@ pub(crate) const MAX_LIST_LEVELS: usize = 9;
 pub(crate) const MAX_LIST_TEXT_BYTES: usize = 65_536;
 pub(crate) const MAX_LIST_TABS: usize = 64;
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// List level type (bullet or numbered)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ListLevelType {
@@ -40,6 +44,10 @@ pub enum ListLevelType {
     Other(i32),
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Text emitted after a list label.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ListFollow {
@@ -52,6 +60,10 @@ pub enum ListFollow {
     Nothing,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// List level justification
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ListJustification {
@@ -64,6 +76,14 @@ pub enum ListJustification {
     Center,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent RTF feature flags stay flat for direct access"
+)]
 /// A single level in a list (for multi-level lists)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ListLevel<'a> {
@@ -111,9 +131,10 @@ pub struct ListLevel<'a> {
     pub template_id: Option<i32>,
 }
 
-impl<'a> ListLevel<'a> {
+impl ListLevel<'_> {
     /// Create a new list level
     #[inline]
+    #[must_use]
     pub fn new(level: u8) -> Self {
         Self {
             level,
@@ -143,18 +164,20 @@ impl<'a> ListLevel<'a> {
 
     /// Check if this level is a bullet
     #[inline]
+    #[must_use]
     pub fn is_bullet(&self) -> bool {
         matches!(self.level_type, ListLevelType::Bullet)
     }
 
     /// Check if this level is numbered
     #[inline]
+    #[must_use]
     pub fn is_numbered(&self) -> bool {
         !self.is_bullet() && self.level_type != ListLevelType::None
     }
 }
 
-impl<'a> Default for ListLevel<'a> {
+impl Default for ListLevel<'_> {
     fn default() -> Self {
         Self::new(0)
     }
@@ -182,6 +205,7 @@ pub struct List<'a> {
 impl<'a> List<'a> {
     /// Create a new list
     #[inline]
+    #[must_use]
     pub fn new(id: i32) -> Self {
         Self {
             id,
@@ -203,17 +227,23 @@ impl<'a> List<'a> {
 
     /// Get a level by index
     #[inline]
+    #[must_use]
     pub fn get_level(&self, level: u8) -> Option<&ListLevel<'a>> {
         self.levels.iter().find(|l| l.level == level)
     }
 
     /// Get the number of levels
     #[inline]
+    #[must_use]
     pub fn level_count(&self) -> usize {
         self.levels.len()
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// List override entry (instance of a list)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ListOverrideLevel {
@@ -222,6 +252,10 @@ pub struct ListOverrideLevel {
     pub format_override: bool,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ListOverride {
     /// List override index
@@ -238,6 +272,7 @@ pub struct ListOverride {
 impl ListOverride {
     /// Create a new list override
     #[inline]
+    #[must_use]
     pub fn new(index: i32, list_id: i32) -> Self {
         Self {
             index,
@@ -249,6 +284,10 @@ impl ListOverride {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// List table containing all list definitions
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ListTable<'a> {
@@ -263,6 +302,7 @@ pub struct ListTable<'a> {
 impl<'a> ListTable<'a> {
     /// Create a new list table
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             lists: Vec::new(),
@@ -279,17 +319,20 @@ impl<'a> ListTable<'a> {
 
     /// Get a list by ID
     #[inline]
+    #[must_use]
     pub fn get(&self, id: i32) -> Option<&List<'a>> {
         self.lists.iter().find(|l| l.id == id)
     }
 
     /// Get all lists
     #[inline]
+    #[must_use]
     pub fn lists(&self) -> &[List<'a>] {
         &self.lists
     }
 
     /// Return retained picture-store indices for nonempty picture-bullet records.
+    #[must_use]
     pub fn picture_bullet_picture_indices(&self) -> &[Option<usize>] {
         &self.picture_bullet_picture_indices
     }
@@ -303,7 +346,7 @@ impl<'a> ListTable<'a> {
                 "RTF list-picture record count exceeds the safety limit".to_string(),
             ));
         }
-        self.picture_bullet_count = u32::try_from(indices.len()).map_err(|_| {
+        self.picture_bullet_count = u32::try_from(indices.len()).map_err(|_err| {
             RtfError::MalformedDocument("RTF list-picture count overflow".to_string())
         })?;
         self.picture_bullet_picture_indices = indices;
@@ -364,6 +407,10 @@ impl<'a> ListTable<'a> {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// List override table containing list instances
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ListOverrideTable {
@@ -374,6 +421,7 @@ pub struct ListOverrideTable {
 impl ListOverrideTable {
     /// Create a new list override table
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             overrides: Vec::new(),
@@ -388,16 +436,19 @@ impl ListOverrideTable {
 
     /// Get a list override by index
     #[inline]
+    #[must_use]
     pub fn get(&self, index: i32) -> Option<&ListOverride> {
         self.overrides.iter().find(|o| o.index == index)
     }
 
     /// Get all overrides
     #[inline]
+    #[must_use]
     pub fn overrides(&self) -> &[ListOverride] {
         &self.overrides
     }
 
+    #[must_use]
     pub fn resolve<'a>(
         &'a self,
         index: i32,

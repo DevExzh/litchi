@@ -26,6 +26,10 @@ impl ProgBinaryTag {
     /// Versioned tag payloads are guaranteed to decode successfully because
     /// they were validated at parse time; unknown payloads may hold arbitrary
     /// bytes and can fail here.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn records(&self) -> Result<Vec<Record>> {
         Record::parse_sequence_strict(&self.payload, "BinaryTagDataBlob payload")
     }
@@ -37,6 +41,10 @@ impl ProgTags {
     /// The container is an optional child of the document's
     /// `DocInfoListContainer` (MS-PPT section 2.4.4); each record type MUST
     /// NOT occur there more than once, so duplicates are an error.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_document(document: &Record, limits: ProgTagLimits) -> Result<Option<Self>> {
         if document.record_type != RecordType::Document {
             return corrupted("Document ProgTags require a DocumentContainer record");
@@ -53,6 +61,10 @@ impl ProgTags {
     /// Parse the `SlideProgTagsContainer` of a slide-like container record
     /// (`SlideContainer`, `NotesContainer`, `MainMasterContainer`, or
     /// `HandoutContainer`; MS-PPT section 2.5.19).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_slide(container: &Record, limits: ProgTagLimits) -> Result<Option<Self>> {
         let Some(record) = single_child(container, RecordType::ProgTags)? else {
             return Ok(None);
@@ -62,6 +74,10 @@ impl ProgTags {
 
     /// Parse and validate a complete `DocProgTagsContainer` or
     /// `SlideProgTagsContainer` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(record: &Record, scope: ProgTagScope, limits: ProgTagLimits) -> Result<Self> {
         if record.record_type != RecordType::ProgTags
             || record.record_type_raw != RecordType::ProgTags.as_u16()
@@ -70,7 +86,7 @@ impl ProgTags {
             return corrupted("Invalid ProgTags container record header");
         }
         let declared = usize::try_from(record.data_length)
-            .map_err(|_| Error::Corrupted("ProgTags container size overflow".into()))?;
+            .map_err(|_err| Error::Corrupted("ProgTags container size overflow".into()))?;
         if declared != record.data.len() {
             return corrupted("ProgTags container length does not match its payload");
         }
@@ -78,6 +94,10 @@ impl ProgTags {
     }
 
     /// Parse a `ProgTags` container payload and its record instance.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_payload(
         data: &[u8],
         instance: u16,
@@ -100,10 +120,10 @@ impl ProgTags {
             )?;
             let tag = match record.record_type {
                 value if value == RecordType::ProgStringTag.as_u16() => {
-                    ProgTag::String(parse_string_tag(record, limits)?)
+                    ProgTag::String(parse_string_tag(&record, limits)?)
                 },
                 value if value == RecordType::ProgBinaryTag.as_u16() => {
-                    let tag = parse_binary_tag(record, scope, limits)?;
+                    let tag = parse_binary_tag(&record, scope, limits)?;
                     // Sections 2.4.23.1 and 2.5.19: the array MUST NOT contain
                     // more than one of each versioned extension.
                     let duplicate = match tag.version {
@@ -134,19 +154,27 @@ impl ProgTags {
     }
 
     /// Serialize a complete `ProgTags` container record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the underlying writer reports an error.
     pub fn to_bytes(&self, limits: ProgTagLimits) -> Result<Vec<u8>> {
         let payload = self.to_payload(limits)?;
         encode_record(0x0f, self.instance, RecordType::ProgTags.as_u16(), &payload)
     }
 
     /// Serialize only the `ProgTags` container payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_payload(&self, limits: ProgTagLimits) -> Result<Vec<u8>> {
         check_limit(self.tags.len(), limits.max_tags, "programmable tag count")?;
         let mut payload = Vec::new();
         for tag in &self.tags {
             let encoded = match tag {
-                ProgTag::String(tag) => encode_string_tag(tag)?,
-                ProgTag::Binary(tag) => encode_binary_tag(tag)?,
+                ProgTag::String(string_tag) => encode_string_tag(string_tag)?,
+                ProgTag::Binary(binary_tag) => encode_binary_tag(binary_tag)?,
             };
             check_limit(
                 encoded.len().saturating_sub(8),
@@ -167,10 +195,14 @@ impl ProgTags {
     }
 
     /// Build a generic PPT record for insertion into a document or slide tree.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_record(&self, limits: ProgTagLimits) -> Result<Record> {
         let data = self.to_payload(limits)?;
         let data_length = u32::try_from(data.len())
-            .map_err(|_| Error::Corrupted("ProgTags payload exceeds u32".into()))?;
+            .map_err(|_err| Error::Corrupted("ProgTags payload exceeds u32".into()))?;
         Ok(Record {
             record_type: RecordType::ProgTags,
             record_type_raw: RecordType::ProgTags.as_u16(),
@@ -183,10 +215,11 @@ impl ProgTags {
     }
 
     /// Return the binary tag for an assigned version, when present.
+    #[must_use]
     pub fn binary_tag(&self, version: ProgBinaryTagVersion) -> Option<&ProgBinaryTag> {
         self.tags.iter().find_map(|tag| match tag {
-            ProgTag::Binary(tag) if tag.version == version => Some(tag),
-            _ => None,
+            ProgTag::Binary(binary_tag) if binary_tag.version == version => Some(binary_tag),
+            ProgTag::String(_) | ProgTag::Binary(_) => None,
         })
     }
 }
@@ -199,8 +232,8 @@ struct RawRecord {
     data: Vec<u8>,
 }
 
-fn parse_string_tag(record: RawRecord, limits: ProgTagLimits) -> Result<ProgStringTag> {
-    require_container_header(&record, RecordType::ProgStringTag, "ProgStringTagContainer")?;
+fn parse_string_tag(record: &RawRecord, limits: ProgTagLimits) -> Result<ProgStringTag> {
+    require_container_header(record, RecordType::ProgStringTag, "ProgStringTagContainer")?;
     let children = parse_sequence(&record.data, 2, "ProgStringTagContainer")?;
     if children.is_empty() || children.len() > 2 {
         return corrupted("ProgStringTagContainer must contain a name and at most one value");
@@ -222,11 +255,11 @@ fn parse_string_tag(record: RawRecord, limits: ProgTagLimits) -> Result<ProgStri
 }
 
 fn parse_binary_tag(
-    record: RawRecord,
+    record: &RawRecord,
     scope: ProgTagScope,
     limits: ProgTagLimits,
 ) -> Result<ProgBinaryTag> {
-    require_container_header(&record, RecordType::ProgBinaryTag, "ProgBinaryTagContainer")?;
+    require_container_header(record, RecordType::ProgBinaryTag, "ProgBinaryTagContainer")?;
     let children = parse_sequence(&record.data, 2, "ProgBinaryTagContainer")?;
     if children.len() != 2 {
         return corrupted("ProgBinaryTagContainer must contain exactly one CString/blob pair");
@@ -342,7 +375,7 @@ fn decode_units(units: &[u16], field: &str) -> Result<String> {
         .position(|&unit| unit == 0)
         .unwrap_or(units.len());
     String::from_utf16(&units[..end])
-        .map_err(|_| Error::Corrupted(format!("{field} contains invalid UTF-16")))
+        .map_err(|_err| Error::Corrupted(format!("{field} contains invalid UTF-16")))
 }
 
 fn require_container_header(record: &RawRecord, kind: RecordType, name: &str) -> Result<()> {
@@ -389,14 +422,14 @@ fn parse_one(data: &[u8], offset: usize, context: &str) -> Result<(RawRecord, us
     }
     let version_instance = u16::from_le_bytes([data[offset], data[offset + 1]]);
     let record_type = u16::from_le_bytes([data[offset + 2], data[offset + 3]]);
-    let length = u32::from_le_bytes([
+    let length_u32 = u32::from_le_bytes([
         data[offset + 4],
         data[offset + 5],
         data[offset + 6],
         data[offset + 7],
     ]);
-    let length = usize::try_from(length)
-        .map_err(|_| Error::Corrupted(format!("{context} record length overflow")))?;
+    let length = usize::try_from(length_u32)
+        .map_err(|_err| Error::Corrupted(format!("{context} record length overflow")))?;
     let end = header_end
         .checked_add(length)
         .ok_or_else(|| Error::Corrupted(format!("{context} record end overflow")))?;
@@ -424,7 +457,7 @@ pub(super) fn encode_record(
         return corrupted("PPT record version or instance exceeds its bit field");
     }
     let length = u32::try_from(data.len())
-        .map_err(|_| Error::Corrupted("PPT record payload exceeds u32".into()))?;
+        .map_err(|_err| Error::Corrupted("PPT record payload exceeds u32".into()))?;
     let mut result = Vec::with_capacity(8usize.saturating_add(data.len()));
     result.extend_from_slice(&((instance << 4) | version).to_le_bytes());
     result.extend_from_slice(&record_type.to_le_bytes());

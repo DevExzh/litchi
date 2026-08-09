@@ -1,5 +1,9 @@
 //! RTF document information and properties.
 
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items stay grouped by RTF feature area rather than by item kind"
+)]
 use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 
@@ -17,7 +21,7 @@ fn parse_legacy_timestamp_triplet(
             RtfError::MalformedDocument("RTF info time must use YYYY-MM-DDTHH:MM:SS".to_string())
         })?
         .parse()
-        .map_err(|_| RtfError::MalformedDocument(invalid_component.to_string()))
+        .map_err(|_err| RtfError::MalformedDocument(invalid_component.to_string()))
     };
     let components = [
         parse(parts.next())?,
@@ -51,7 +55,9 @@ impl RtfTimestamp {
     pub fn is_valid(&self) -> bool {
         self.validate().is_ok()
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if self.year.is_some_and(|value| value > 9999)
             || self.month.is_some_and(|value| !(1..=12).contains(&value))
@@ -80,7 +86,9 @@ impl RtfTimestamp {
         }
         Ok(())
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn from_legacy(value: &str) -> RtfResult<Self> {
         let (date, time) = value.split_once('T').ok_or_else(|| {
             RtfError::MalformedDocument("RTF info time must contain T".to_string())
@@ -101,6 +109,7 @@ impl RtfTimestamp {
         Ok(timestamp)
     }
 
+    #[must_use]
     pub fn legacy_string(self) -> String {
         format!(
             "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}",
@@ -152,25 +161,31 @@ pub struct DocumentInfo<'a> {
 }
 
 impl<'a> DocumentInfo<'a> {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
+    #[must_use]
     pub fn with_title(mut self, value: Cow<'a, str>) -> Self {
         self.title = Some(value);
         self
     }
+    #[must_use]
     pub fn with_author(mut self, value: Cow<'a, str>) -> Self {
         self.author = Some(value);
         self
     }
+    #[must_use]
     pub fn with_subject(mut self, value: Cow<'a, str>) -> Self {
         self.subject = Some(value);
         self
     }
+    #[must_use]
     pub fn with_keywords(mut self, value: Cow<'a, str>) -> Self {
         self.keywords = Some(value);
         self
     }
+    #[must_use]
     pub fn with_comment(mut self, value: Cow<'a, str>) -> Self {
         self.comment = Some(value);
         self
@@ -225,8 +240,8 @@ impl<'a> DocumentInfo<'a> {
             (self.backup_timestamp, self.backup_time.as_deref()),
         ] {
             if let Some(timestamp) = typed {
-                if let Some(legacy) = legacy
-                    && legacy != timestamp.legacy_string()
+                if let Some(legacy_text) = legacy
+                    && legacy_text != timestamp.legacy_string()
                 {
                     return Err(RtfError::MalformedDocument(
                         "conflicting typed and legacy RTF info timestamps".to_string(),
@@ -236,8 +251,8 @@ impl<'a> DocumentInfo<'a> {
                     // producer values. Newly authored typed values are strict.
                     timestamp.validate()?;
                 }
-            } else if let Some(legacy) = legacy {
-                RtfTimestamp::from_legacy(legacy)?;
+            } else if let Some(legacy_text) = legacy {
+                RtfTimestamp::from_legacy(legacy_text)?;
             }
         }
         self.protection.validate()?;
@@ -304,7 +319,8 @@ pub struct DocumentProtection<'a> {
     pub password_hash: Option<Cow<'a, str>>,
 }
 
-impl<'a> DocumentProtection<'a> {
+impl DocumentProtection<'_> {
+    #[must_use]
     pub fn new(protection_type: ProtectionType) -> Self {
         let mut protection = Self {
             enforced: Some(true),
@@ -338,6 +354,7 @@ impl<'a> DocumentProtection<'a> {
         }
     }
 
+    #[must_use]
     pub fn is_protected(&self) -> bool {
         self.enforced != Some(false) && self.protection_type() != ProtectionType::None
     }
@@ -355,6 +372,7 @@ impl<'a> DocumentProtection<'a> {
         Ok(())
     }
 
+    #[must_use]
     pub fn into_owned(self) -> DocumentProtection<'static> {
         DocumentProtection {
             forms: self.forms,

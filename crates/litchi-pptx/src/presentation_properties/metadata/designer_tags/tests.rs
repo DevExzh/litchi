@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 
@@ -26,7 +32,7 @@ fn package(hosts: &str) -> OpcPackage {
     package.add_part(Box::new(presentation));
     for index in 1..=2 {
         package.add_part(Box::new(BlobPart::new(
-            PackURI::new(&format!("/ppt/slides/slide{index}.xml")).unwrap(),
+            PackURI::new(format!("/ppt/slides/slide{index}.xml")).unwrap(),
             ct::PML_SLIDE.into(),
             format!("<p:sld xmlns:p=\"{P}\"/>").into_bytes(),
         )));

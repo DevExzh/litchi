@@ -12,7 +12,7 @@ pub(super) use crate::encryption::{Limits, Mode};
 /// Package implementation for Word documents.
 pub(super) use crate::error::{Error, Result};
 pub(super) use crate::mail_merge::{
-    self, Recipients, Settings as MailMergeSettings, Source, Target,
+    self, Recipients, RelationshipId, Settings as MailMergeSettings, Source, Target,
     is_mail_merge_relationship_type, map_docx_error,
 };
 pub(super) use crate::parts::DocumentPart;

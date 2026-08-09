@@ -139,6 +139,9 @@ impl Node {
     }
 
     /// Add a schema-valid child effect.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn add_child(&mut self, child: Node) -> Result<()> {
         if !self.kind.allows_child(child.kind) {
             return Err(invalid_child(self.kind, child.kind));

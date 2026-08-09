@@ -1,7 +1,7 @@
 //! Package-independent slide background values and XML codec.
 //!
-//! This module owns the PresentationML semantic model for slide backgrounds
-//! and the package-free `<p:bg>`/DrawingML fill codec. Relationship lookup and
+//! This module owns the `PresentationML` semantic model for slide backgrounds
+//! and the package-free `<p:bg>`/`DrawingML` fill codec. Relationship lookup and
 //! image-part loading remain responsibilities of the package host.
 
 use crate::format::ImageFormat;
@@ -231,6 +231,7 @@ impl SlideBackground {
     /// ];
     /// let bg = SlideBackground::linear_gradient(90.0, stops);
     /// ```
+    #[must_use]
     pub fn linear_gradient(angle: f64, stops: Vec<GradientStop>) -> Self {
         SlideBackground::Gradient {
             gradient_type: GradientType::Linear,
@@ -243,6 +244,7 @@ impl SlideBackground {
     ///
     /// # Arguments
     /// * `stops` - Vector of gradient stops
+    #[must_use]
     pub fn radial_gradient(stops: Vec<GradientStop>) -> Self {
         SlideBackground::Gradient {
             gradient_type: GradientType::Radial,
@@ -257,6 +259,7 @@ impl SlideBackground {
     /// * `image_data` - Image bytes
     /// * `format` - Image format
     /// * `style` - How to display the image
+    #[must_use]
     pub fn picture(image_data: Vec<u8>, format: ImageFormat, style: PictureStyle) -> Self {
         SlideBackground::Picture {
             image_data,
@@ -271,6 +274,7 @@ impl SlideBackground {
     /// * `pattern_type` - Type of pattern
     /// * `fg_color` - Foreground color in hex
     /// * `bg_color` - Background color in hex
+    #[must_use]
     pub fn pattern(pattern_type: PatternType, fg_color: String, bg_color: String) -> Self {
         SlideBackground::Pattern {
             pattern_type,
@@ -283,6 +287,7 @@ impl SlideBackground {
     ///
     /// This is the narrow resource seam used by package writers to publish
     /// the bytes and allocate a relationship without copying the image.
+    #[must_use]
     pub fn image_data(&self) -> Option<(&[u8], &ImageFormat)> {
         match self {
             SlideBackground::Picture {

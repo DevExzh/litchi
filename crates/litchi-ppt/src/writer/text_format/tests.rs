@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::*;
 
 #[test]
@@ -12,11 +18,11 @@ fn test_font_style() {
 fn test_text_color() {
     // Red = RGB(255, 0, 0) -> PPT format: R | G<<8 | B<<16 | 0xFE<<24 = 0xFE0000FF
     let red = TextColor::RED;
-    assert_eq!(red.to_ppt_color(), 0xFE0000FF);
+    assert_eq!(red.to_ppt_color(), 0xFE00_00FF);
 
     // Scheme color index occupies the fourth byte.
     let scheme = TextColor::scheme(4);
-    assert_eq!(scheme.to_ppt_color(), 0x04000000);
+    assert_eq!(scheme.to_ppt_color(), 0x0400_0000);
 }
 
 #[test]
@@ -159,7 +165,7 @@ fn character_flags_preserve_values_and_presence() {
         record_type_raw: 4001,
         version: 0,
         instance: 0,
-        data_length: style.len() as u32,
+        data_length: u32::try_from(style.len()).unwrap(),
         data: style,
         children: Vec::new(),
     };
@@ -222,7 +228,7 @@ fn paragraph_properties_round_trip_in_spec_order() {
     assert_eq!(properties.get_value("bullet.size"), Some(-24));
     assert_eq!(
         properties.get_value("bullet.color"),
-        Some(0xFE03_0201u32 as i32)
+        Some(0xFE03_0201u32.cast_signed())
     );
     assert_eq!(properties.get_value("alignment"), Some(4));
     assert_eq!(properties.get_value("linespacing"), Some(120));

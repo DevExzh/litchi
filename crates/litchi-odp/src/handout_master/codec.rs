@@ -83,7 +83,7 @@ fn bound(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
 
 fn expanded(reader: &NsReader<&[u8]>, name: quick_xml::name::QName<'_>) -> Result<Name> {
     let (namespace, local) = reader.resolver().resolve_element(name);
-    let namespace = match namespace {
+    let resolved = match namespace {
         ResolveResult::Bound(Namespace(value)) => Some(value.to_vec()),
         ResolveResult::Unbound => None,
         ResolveResult::Unknown(prefix) => {
@@ -94,7 +94,7 @@ fn expanded(reader: &NsReader<&[u8]>, name: quick_xml::name::QName<'_>) -> Resul
         },
     };
     Ok(Name {
-        namespace,
+        namespace: resolved,
         local: local.as_ref().to_vec(),
     })
 }
@@ -137,9 +137,9 @@ fn parse_attribute(
 ) -> Result<Option<String>> {
     let mut found = None;
     for raw in element.attributes().with_checks(true) {
-        let raw =
+        let attribute =
             raw.map_err(|error| invalid(format!("invalid handout-master attribute: {error}")))?;
-        let (namespace, local) = reader.resolver().resolve_attribute(raw.key);
+        let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
         if bound(&namespace, expected_namespace) && local.as_ref() == local_name {
             if found.is_some() {
                 return Err(invalid(format!(
@@ -147,7 +147,7 @@ fn parse_attribute(
                     String::from_utf8_lossy(local_name)
                 )));
             }
-            let value = raw
+            let value = attribute
                 .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
                 .map_err(|error| {
                     invalid(format!("invalid handout-master attribute value: {error}"))
@@ -159,18 +159,28 @@ fn parse_attribute(
     Ok(found)
 }
 
+#[derive(Clone, Debug)]
+struct ActiveFields {
+    page_layout: String,
+    presentation_page_layout: Option<String>,
+    drawing_style: Option<String>,
+    header: Option<String>,
+    footer: Option<String>,
+    date_time: Option<String>,
+}
+
 fn root_fields(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<ActiveFields> {
     let page_layout_name = parse_attribute(reader, element, STYLE, b"page-layout-name")?
         .ok_or_else(|| invalid("style:handout-master is missing style:page-layout-name"))?;
     let mut expanded = HashSet::new();
     for raw in element.attributes().with_checks(true) {
-        let raw =
+        let attribute =
             raw.map_err(|error| invalid(format!("invalid handout-master attribute: {error}")))?;
-        if raw.key.as_ref() == b"xmlns" || raw.key.as_ref().starts_with(b"xmlns:") {
+        if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
             continue;
         }
-        let (namespace, local) = reader.resolver().resolve_attribute(raw.key);
-        let namespace = match namespace {
+        let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+        let resolved = match namespace {
             ResolveResult::Bound(Namespace(value)) => Some(value.to_vec()),
             ResolveResult::Unbound => None,
             ResolveResult::Unknown(prefix) => {
@@ -180,34 +190,24 @@ fn root_fields(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Act
                 )));
             },
         };
-        let key = (namespace, local.as_ref().to_vec());
+        let key = (resolved, local.as_ref().to_vec());
         if !expanded.insert(key) {
             return Err(invalid("duplicate expanded handout-master attribute"));
         }
     }
     Ok(ActiveFields {
-        page_layout_name,
-        presentation_page_layout_name: parse_attribute(
+        page_layout: page_layout_name,
+        presentation_page_layout: parse_attribute(
             reader,
             element,
             PRESENTATION,
             b"presentation-page-layout-name",
         )?,
-        drawing_style_name: parse_attribute(reader, element, DRAW, b"style-name")?,
-        header_name: parse_attribute(reader, element, PRESENTATION, b"use-header-name")?,
-        footer_name: parse_attribute(reader, element, PRESENTATION, b"use-footer-name")?,
-        date_time_name: parse_attribute(reader, element, PRESENTATION, b"use-date-time-name")?,
+        drawing_style: parse_attribute(reader, element, DRAW, b"style-name")?,
+        header: parse_attribute(reader, element, PRESENTATION, b"use-header-name")?,
+        footer: parse_attribute(reader, element, PRESENTATION, b"use-footer-name")?,
+        date_time: parse_attribute(reader, element, PRESENTATION, b"use-date-time-name")?,
     })
-}
-
-#[derive(Clone, Debug)]
-struct ActiveFields {
-    page_layout_name: String,
-    presentation_page_layout_name: Option<String>,
-    drawing_style_name: Option<String>,
-    header_name: Option<String>,
-    footer_name: Option<String>,
-    date_time_name: Option<String>,
 }
 
 /// Read the optional singleton handout master from a styles XML part.
@@ -285,8 +285,7 @@ pub(crate) fn write(master: &Master) -> Result<String> {
         let parts = fragment_parts(&master.source)?;
         let open = render_open(&parts.open, master)?;
         let inner = if parse_fragment(&master.source)
-            .map(|original| original.children == master.children)
-            .unwrap_or(false)
+            .is_ok_and(|original| original.children == master.children)
         {
             parts.inner
         } else {
@@ -323,19 +322,18 @@ pub(crate) fn write(master: &Master) -> Result<String> {
 }
 
 pub(crate) fn replace_in_styles(styles: &str, fragment: &str) -> Result<String> {
-    let fragment = parse_fragment(fragment)?;
-    let fragment = fragment.source;
+    let fragment_source = parse_fragment(fragment)?.source;
     let (bom, body) = split_bom(styles);
     let parsed = parse_document(body)?;
-    let body = if let Some(location) = parsed.master_location {
-        replace_range(body, location.start, location.end, &fragment)?
+    let updated_body = if let Some(location) = parsed.master_location {
+        replace_range(body, location.start, location.end, &fragment_source)?
     } else {
         let container = parsed
             .container
             .ok_or_else(|| invalid("styles XML is missing office:master-styles"))?;
-        insert_into_container(body, &container, &fragment)?
+        insert_into_container(body, &container, &fragment_source)?
     };
-    Ok(format!("{bom}{body}"))
+    Ok(format!("{bom}{updated_body}"))
 }
 
 pub(crate) fn remove_from_styles(styles: &str) -> Result<String> {
@@ -344,16 +342,16 @@ pub(crate) fn remove_from_styles(styles: &str) -> Result<String> {
     let Some(location) = parsed.master_location else {
         return Ok(styles.to_string());
     };
-    let body = replace_range(body, location.start, location.end, "")?;
-    Ok(format!("{bom}{body}"))
+    let updated_body = replace_range(body, location.start, location.end, "")?;
+    Ok(format!("{bom}{updated_body}"))
 }
 
 fn parse_document(xml: &str) -> Result<Parsed> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("handout-master XML exceeds 64 MiB"));
     }
-    let xml = xml.strip_prefix('\u{feff}').unwrap_or(xml);
-    let mut reader = NsReader::from_str(xml);
+    let stripped = xml.strip_prefix('\u{feff}').unwrap_or(xml);
+    let mut reader = NsReader::from_str(stripped);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
@@ -370,13 +368,15 @@ fn parse_document(xml: &str) -> Result<Parsed> {
         if events > MAX_EVENTS {
             return Err(invalid("handout-master XML has too many events"));
         }
-        let event_start = reader.buffer_position() as usize;
+        let event_start = usize::try_from(reader.buffer_position())
+            .map_err(|_err| invalid("handout-master XML position overflow"))?;
         let (_namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| invalid(format!("handout-master XML parsing error: {error}")))?;
-        let event_end = reader.buffer_position() as usize;
-        let event = event.into_owned();
-        match event {
+        let event_end = usize::try_from(reader.buffer_position())
+            .map_err(|_err| invalid("handout-master XML position overflow"))?;
+        let owned_event = event.into_owned();
+        match owned_event {
             Event::Start(element) => {
                 if stack.len() >= MAX_DEPTH {
                     return Err(invalid("handout-master XML exceeds 256 levels"));
@@ -410,28 +410,28 @@ fn parse_document(xml: &str) -> Result<Parsed> {
                     }
                     let fields = root_fields(&reader, &element)?;
                     active = Some(Active {
-                        page_layout_name: fields.page_layout_name,
-                        presentation_page_layout_name: fields.presentation_page_layout_name,
-                        drawing_style_name: fields.drawing_style_name,
-                        header_name: fields.header_name,
-                        footer_name: fields.footer_name,
-                        date_time_name: fields.date_time_name,
+                        page_layout_name: fields.page_layout,
+                        presentation_page_layout_name: fields.presentation_page_layout,
+                        drawing_style_name: fields.drawing_style,
+                        header_name: fields.header,
+                        footer_name: fields.footer,
+                        date_time_name: fields.date_time,
                         start: event_start,
                         depth,
                         children: Vec::new(),
                         child: None,
                         child_bytes: 0,
                     });
-                } else if let Some(active) = active.as_mut()
-                    && depth == active.depth + 1
+                } else if let Some(current) = active.as_mut()
+                    && depth == current.depth + 1
                 {
-                    if active.child.is_some() {
+                    if current.child.is_some() {
                         return Err(invalid("handout drawing children overlap"));
                     }
                     if !is_shape(&name) {
                         return Err(invalid("unsupported direct style:handout-master child"));
                     }
-                    active.child = Some((event_start, depth));
+                    current.child = Some((event_start, depth));
                 }
                 stack.push(name);
             },
@@ -471,14 +471,14 @@ fn parse_document(xml: &str) -> Result<Parsed> {
                     }
                     let fields = root_fields(&reader, &element)?;
                     let value = Master {
-                        page_layout_name: fields.page_layout_name,
-                        presentation_page_layout_name: fields.presentation_page_layout_name,
-                        drawing_style_name: fields.drawing_style_name,
-                        header_name: fields.header_name,
-                        footer_name: fields.footer_name,
-                        date_time_name: fields.date_time_name,
+                        page_layout_name: fields.page_layout,
+                        presentation_page_layout_name: fields.presentation_page_layout,
+                        drawing_style_name: fields.drawing_style,
+                        header_name: fields.header,
+                        footer_name: fields.footer,
+                        date_time_name: fields.date_time,
                         children: Vec::new(),
-                        source: xml[event_start..event_end].to_string(),
+                        source: stripped[event_start..event_end].to_string(),
                     };
                     super::validation::validate_fields(&value)?;
                     master_location = Some(Location {
@@ -490,35 +490,35 @@ fn parse_document(xml: &str) -> Result<Parsed> {
                         empty: true,
                     });
                     master = Some(value);
-                } else if let Some(active) = active.as_mut()
-                    && depth == active.depth + 1
+                } else if let Some(current) = active.as_mut()
+                    && depth == current.depth + 1
                 {
                     if !is_shape(&name) {
                         return Err(invalid("unsupported direct style:handout-master child"));
                     }
-                    push_child(active, xml, event_start, event_end)?;
+                    push_child(current, stripped, event_start, event_end)?;
                 }
             },
             Event::End(element) => {
                 let depth = stack.len();
-                if let Some(active) = active.as_mut()
-                    && active
+                if let Some(current) = active.as_mut()
+                    && current
                         .child
                         .as_ref()
                         .is_some_and(|(_, child_depth)| *child_depth == depth)
                 {
-                    let (start, _) = active.child.take().ok_or_else(|| {
+                    let (start, _) = current.child.take().ok_or_else(|| {
                         invalid("handout-master child state disappeared during close")
                     })?;
-                    push_child(active, xml, start, event_end)?;
+                    push_child(current, stripped, start, event_end)?;
                 }
-                if let Some(active_value) = active.as_ref()
-                    && active_value.depth == depth
+                if let Some(current) = active.as_ref()
+                    && current.depth == depth
                 {
                     let active_value = active
                         .take()
                         .ok_or_else(|| invalid("handout-master state disappeared during close"))?;
-                    let source = xml[active_value.start..event_end].to_string();
+                    let source = stripped[active_value.start..event_end].to_string();
                     let value = Master {
                         page_layout_name: active_value.page_layout_name,
                         presentation_page_layout_name: active_value.presentation_page_layout_name,
@@ -532,7 +532,7 @@ fn parse_document(xml: &str) -> Result<Parsed> {
                     super::validation::validate_fields(&value)?;
                     master_location = Some(Location {
                         start: active_value.start,
-                        open_end: find_open_end(xml, active_value.start, event_start)?,
+                        open_end: find_open_end(stripped, active_value.start, event_start)?,
                         content_end: event_start,
                         end: event_end,
                         qname: end_name(&element)?,
@@ -562,8 +562,8 @@ fn parse_document(xml: &str) -> Result<Parsed> {
                 if stack.is_empty() && !bytes.iter().all(u8::is_ascii_whitespace) {
                     return Err(invalid("non-whitespace text is outside the XML document"));
                 }
-                if let Some(active) = &active
-                    && stack.len() == active.depth
+                if let Some(current) = &active
+                    && stack.len() == current.depth
                     && !bytes.iter().all(u8::is_ascii_whitespace)
                 {
                     return Err(invalid(
@@ -576,8 +576,8 @@ fn parse_document(xml: &str) -> Result<Parsed> {
                 if stack.is_empty() && !bytes.iter().all(u8::is_ascii_whitespace) {
                     return Err(invalid("non-whitespace CDATA is outside the XML document"));
                 }
-                if let Some(active) = &active
-                    && stack.len() == active.depth
+                if let Some(current) = &active
+                    && stack.len() == current.depth
                     && !bytes.iter().all(u8::is_ascii_whitespace)
                 {
                     return Err(invalid("CDATA is not allowed directly in handout-master"));
@@ -587,7 +587,7 @@ fn parse_document(xml: &str) -> Result<Parsed> {
                 return Err(invalid("DTDs and processing instructions are not allowed"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Comment(_) | Event::Decl(_) | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -748,13 +748,13 @@ fn canonical_open(master: &Master) -> String {
 }
 
 fn append_optional(output: &mut String, prefix: &str, local: &str, value: Option<&str>) {
-    if let Some(value) = value {
+    if let Some(text) = value {
         output.push(' ');
         output.push_str(prefix);
         output.push(':');
         output.push_str(local);
         output.push_str("=\"");
-        output.push_str(&escape_attr(value));
+        output.push_str(&escape_attr(text));
         output.push('"');
     }
 }
@@ -769,11 +769,13 @@ fn fragment_parts(xml: &str) -> Result<FragmentParts> {
     let mut open_end = 0usize;
     let mut qname = String::new();
     loop {
-        let event_start = reader.buffer_position() as usize;
+        let event_start = usize::try_from(reader.buffer_position())
+            .map_err(|_err| invalid("handout fragment position overflow"))?;
         let event = reader
             .read_event_into(&mut buffer)
             .map_err(|error| invalid(format!("handout fragment parsing error: {error}")))?;
-        let event_end = reader.buffer_position() as usize;
+        let event_end = usize::try_from(reader.buffer_position())
+            .map_err(|_err| invalid("handout fragment position overflow"))?;
         match event {
             Event::Start(element) => {
                 if depth == 0 {
@@ -797,10 +799,11 @@ fn fragment_parts(xml: &str) -> Result<FragmentParts> {
                     .checked_sub(1)
                     .ok_or_else(|| invalid("handout fragment depth underflow"))?;
                 if depth == 0 {
-                    let start = start.ok_or_else(|| invalid("handout fragment has no root"))?;
+                    let root_start =
+                        start.ok_or_else(|| invalid("handout fragment has no root"))?;
                     return Ok(FragmentParts {
                         qname,
-                        open: xml[start..open_end].to_string(),
+                        open: xml[root_start..open_end].to_string(),
                         inner: xml[open_end..event_start].to_string(),
                     });
                 }
@@ -823,7 +826,11 @@ fn fragment_parts(xml: &str) -> Result<FragmentParts> {
                 return Err(invalid("DTD or PI in handout fragment"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -839,23 +846,33 @@ fn parse_start_attributes(xml: &str) -> Result<(String, Vec<Attribute>)> {
         .map_err(|error| invalid(format!("handout root parsing error: {error}")))?;
     let element = match event {
         Event::Start(element) | Event::Empty(element) => element.into_owned(),
-        _ => return Err(invalid("handout source does not start with an element")),
+        Event::End(_)
+        | Event::Text(_)
+        | Event::CData(_)
+        | Event::Comment(_)
+        | Event::Decl(_)
+        | Event::PI(_)
+        | Event::DocType(_)
+        | Event::Eof
+        | Event::GeneralRef(_) => {
+            return Err(invalid("handout source does not start with an element"));
+        },
     };
     let qname = element_name(&element)?;
     let mut attributes = Vec::new();
     for raw in element.attributes().with_checks(true) {
-        let raw =
+        let attribute =
             raw.map_err(|error| invalid(format!("invalid handout source attribute: {error}")))?;
-        let qname = std::str::from_utf8(raw.key.as_ref())
+        let attribute_qname = std::str::from_utf8(attribute.key.as_ref())
             .map(str::to_owned)
             .map_err(|_err| invalid("handout source attribute name is not UTF-8"))?;
-        let (namespace, local) = reader.resolver().resolve_attribute(raw.key);
-        let namespace = match namespace {
+        let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+        let resolved = match namespace {
             ResolveResult::Bound(Namespace(value)) => Some(value.to_vec()),
             ResolveResult::Unbound => None,
             ResolveResult::Unknown(prefix) => {
-                let prefix: &[u8] = prefix.as_ref();
-                match prefix {
+                let well_known: &[u8] = prefix.as_ref();
+                match well_known {
                     b"office" => Some(OFFICE.to_vec()),
                     b"style" => Some(STYLE.to_vec()),
                     b"draw" => Some(DRAW.to_vec()),
@@ -868,17 +885,17 @@ fn parse_start_attributes(xml: &str) -> Result<(String, Vec<Attribute>)> {
                 }
             },
         };
-        let local = std::str::from_utf8(local.as_ref())
+        let local_name = std::str::from_utf8(local.as_ref())
             .map(str::to_owned)
             .map_err(|_err| invalid("handout source attribute local name is not UTF-8"))?;
-        let value = raw
+        let value = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
             .map_err(|error| invalid(format!("invalid handout source attribute value: {error}")))?
             .into_owned();
         attributes.push(Attribute {
-            qname,
-            namespace,
-            local,
+            qname: attribute_qname,
+            namespace: resolved,
+            local: local_name,
             value,
         });
     }
@@ -979,11 +996,11 @@ fn render_open(source: &str, master: &Master) -> Result<String> {
             attribute.namespace.as_deref() == Some(namespace) && attribute.local == local
         });
         match (position, value) {
-            (Some(position), Some(value)) => attributes[position].value = value.to_string(),
-            (Some(position), None) => {
-                attributes.remove(position);
+            (Some(index), Some(new_value)) => attributes[index].value = new_value.to_string(),
+            (Some(index), None) => {
+                attributes.remove(index);
             },
-            (None, Some(value)) => {
+            (None, Some(new_value)) => {
                 let prefix = attributes
                     .iter()
                     .find_map(|attribute| {
@@ -996,7 +1013,7 @@ fn render_open(source: &str, master: &Master) -> Result<String> {
                     qname: format!("{prefix}:{local}"),
                     namespace: Some(namespace.to_vec()),
                     local: local.to_string(),
-                    value: value.to_string(),
+                    value: new_value.to_string(),
                 });
             },
             (None, None) => {},

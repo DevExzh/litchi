@@ -15,6 +15,10 @@ use crate::text_extensions::{TextStyleExtension9, TextStyleExtension10, TextStyl
 
 impl ShapeProgrammableTags {
     /// Parse and validate a complete `ShapeProgTagsContainer` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(record: &Record, limits: ShapeProgrammableTagLimits) -> Result<Self> {
         if record.record_type != RecordType::ProgTags
             || record.record_type_raw != RecordType::ProgTags.as_u16()
@@ -23,7 +27,7 @@ impl ShapeProgrammableTags {
             return corrupted("Invalid ShapeProgTagsContainer record header");
         }
         let declared = usize::try_from(record.data_length)
-            .map_err(|_| Error::Corrupted("ShapeProgTagsContainer size overflow".into()))?;
+            .map_err(|_err| Error::Corrupted("ShapeProgTagsContainer size overflow".into()))?;
         if declared != record.data.len() {
             return corrupted("ShapeProgTagsContainer length does not match its payload");
         }
@@ -31,6 +35,10 @@ impl ShapeProgrammableTags {
     }
 
     /// Parse a `ShapeProgTagsContainer` payload and its record instance.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_payload(
         data: &[u8],
         instance: u16,
@@ -55,10 +63,10 @@ impl ShapeProgrammableTags {
             )?;
             let tag = match record.record_type {
                 value if value == RecordType::ProgStringTag.as_u16() => {
-                    ShapeProgrammableTag::String(parse_string_tag(record, limits)?)
+                    ShapeProgrammableTag::String(parse_string_tag(&record, limits)?)
                 },
                 value if value == RecordType::ProgBinaryTag.as_u16() => {
-                    let tag = parse_binary_tag(record, limits)?;
+                    let tag = parse_binary_tag(&record, limits)?;
                     let duplicate = match tag.version {
                         ShapeBinaryTagVersion::PowerPoint9 => std::mem::replace(&mut seen9, true),
                         ShapeBinaryTagVersion::PowerPoint10 => std::mem::replace(&mut seen10, true),
@@ -84,12 +92,20 @@ impl ShapeProgrammableTags {
     }
 
     /// Serialize a complete `ShapeProgTagsContainer` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the underlying writer reports an error.
     pub fn to_bytes(&self, limits: ShapeProgrammableTagLimits) -> Result<Vec<u8>> {
         let payload = self.to_payload(limits)?;
         encode_record(0x0f, self.instance, RecordType::ProgTags.as_u16(), &payload)
     }
 
     /// Serialize only the `ShapeProgTagsContainer` payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_payload(&self, limits: ShapeProgrammableTagLimits) -> Result<Vec<u8>> {
         check_limit(
             self.tags.len(),
@@ -99,8 +115,8 @@ impl ShapeProgrammableTags {
         let mut payload = Vec::new();
         for tag in &self.tags {
             let encoded = match tag {
-                ShapeProgrammableTag::String(tag) => encode_string_tag(tag)?,
-                ShapeProgrammableTag::Binary(tag) => encode_binary_tag(tag)?,
+                ShapeProgrammableTag::String(string_tag) => encode_string_tag(string_tag)?,
+                ShapeProgrammableTag::Binary(binary_tag) => encode_binary_tag(binary_tag)?,
             };
             check_limit(
                 encoded.len().saturating_sub(8),
@@ -120,11 +136,16 @@ impl ShapeProgrammableTags {
         Ok(payload)
     }
 
-    /// Build a generic PPT record for insertion into OfficeArt client data.
+    /// Build a generic PPT record for insertion into `OfficeArt` client data.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_record(&self, limits: ShapeProgrammableTagLimits) -> Result<Record> {
         let data = self.to_payload(limits)?;
-        let data_length = u32::try_from(data.len())
-            .map_err(|_| Error::Corrupted("ShapeProgTagsContainer payload exceeds u32".into()))?;
+        let data_length = u32::try_from(data.len()).map_err(|_err| {
+            Error::Corrupted("ShapeProgTagsContainer payload exceeds u32".into())
+        })?;
         Ok(Record {
             record_type: RecordType::ProgTags,
             record_type_raw: RecordType::ProgTags.as_u16(),
@@ -145,11 +166,22 @@ struct RawRecord {
     data: Vec<u8>,
 }
 
+impl From<RawRecord> for ShapeStyleAtom {
+    fn from(value: RawRecord) -> Self {
+        Self {
+            version: value.version,
+            instance: value.instance,
+            record_type: value.record_type,
+            data: value.data,
+        }
+    }
+}
+
 fn parse_string_tag(
-    record: RawRecord,
+    record: &RawRecord,
     limits: ShapeProgrammableTagLimits,
 ) -> Result<ShapeStringTag> {
-    require_container_header(&record, RecordType::ProgStringTag, "ProgStringTagContainer")?;
+    require_container_header(record, RecordType::ProgStringTag, "ProgStringTagContainer")?;
     let children = parse_sequence(&record.data, 2, "ProgStringTagContainer")?;
     if children.is_empty() || children.len() > 2 {
         return corrupted("ProgStringTagContainer must contain a name and at most one value");
@@ -171,11 +203,11 @@ fn parse_string_tag(
 }
 
 fn parse_binary_tag(
-    record: RawRecord,
+    record: &RawRecord,
     limits: ShapeProgrammableTagLimits,
 ) -> Result<ShapeBinaryTag> {
     require_container_header(
-        &record,
+        record,
         RecordType::ProgBinaryTag,
         "ShapeProgBinaryTagContainer",
     )?;
@@ -308,17 +340,6 @@ where
     decode(atom)
 }
 
-impl From<RawRecord> for ShapeStyleAtom {
-    fn from(value: RawRecord) -> Self {
-        Self {
-            version: value.version,
-            instance: value.instance,
-            record_type: value.record_type,
-            data: value.data,
-        }
-    }
-}
-
 fn encode_string_tag(tag: &ShapeStringTag) -> Result<Vec<u8>> {
     let name = encode_cstring_atom(0, &tag.name_units)?;
     let mut payload = name;
@@ -403,7 +424,7 @@ fn decode_units(units: &[u16], field: &str) -> Result<String> {
         .position(|&unit| unit == 0)
         .unwrap_or(units.len());
     String::from_utf16(&units[..end])
-        .map_err(|_| Error::Corrupted(format!("{field} contains invalid UTF-16")))
+        .map_err(|_err| Error::Corrupted(format!("{field} contains invalid UTF-16")))
 }
 
 fn require_container_header(record: &RawRecord, kind: RecordType, name: &str) -> Result<()> {
@@ -450,14 +471,14 @@ fn parse_one(data: &[u8], offset: usize, context: &str) -> Result<(RawRecord, us
     }
     let version_instance = u16::from_le_bytes([data[offset], data[offset + 1]]);
     let record_type = u16::from_le_bytes([data[offset + 2], data[offset + 3]]);
-    let length = u32::from_le_bytes([
+    let length_u32 = u32::from_le_bytes([
         data[offset + 4],
         data[offset + 5],
         data[offset + 6],
         data[offset + 7],
     ]);
-    let length = usize::try_from(length)
-        .map_err(|_| Error::Corrupted(format!("{context} record length overflow")))?;
+    let length = usize::try_from(length_u32)
+        .map_err(|_err| Error::Corrupted(format!("{context} record length overflow")))?;
     let end = header_end
         .checked_add(length)
         .ok_or_else(|| Error::Corrupted(format!("{context} record end overflow")))?;
@@ -485,7 +506,7 @@ pub(super) fn encode_record(
         return corrupted("PPT record version or instance exceeds its bit field");
     }
     let length = u32::try_from(data.len())
-        .map_err(|_| Error::Corrupted("PPT record payload exceeds u32".into()))?;
+        .map_err(|_err| Error::Corrupted("PPT record payload exceeds u32".into()))?;
     let mut result = Vec::with_capacity(8usize.saturating_add(data.len()));
     result.extend_from_slice(&((instance << 4) | version).to_le_bytes());
     result.extend_from_slice(&record_type.to_le_bytes());

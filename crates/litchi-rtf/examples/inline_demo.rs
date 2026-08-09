@@ -1,3 +1,8 @@
+#![allow(
+    clippy::print_stdout,
+    reason = "this command-line example intentionally prints its results"
+)]
+
 //! Parse the README's inline RTF snippet and inspect the resulting structure.
 //!
 //! Run from the workspace root:
@@ -14,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rtf = r"{\rtf1\ansi{\fonttbl{\f0\fswiss Helvetica;}}\f0\pard Hello World!\par}";
 
     println!("Input RTF source:");
-    println!("{}", rtf);
+    println!("{rtf}");
     println!("{}", "=".repeat(60));
 
     let doc = Document::parse(rtf)?;
@@ -52,7 +57,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     println!(
                         "  text={:?} font={:?} bold={} italic={} underline={:?}",
                         run.text(),
-                        format.font().map(|font| font.name()),
+                        format.font().map(litchi_rtf::font::Font::name),
                         format.bold(),
                         format.italic(),
                         format.underline()

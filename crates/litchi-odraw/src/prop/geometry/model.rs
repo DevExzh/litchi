@@ -15,9 +15,13 @@ pub enum Coordinate {
 
 impl Coordinate {
     /// Decodes the coordinate marker defined by `[MS-ODRAW]` section 2.3.6.7.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the range guard bounds the difference to 0..=0x7F; const fn cannot use u8::try_from"
+    )]
     #[must_use]
     pub const fn from_raw(raw: i32) -> Self {
-        let bits = raw as u32;
+        let bits = raw.cast_unsigned();
         if bits >= 0x8000_0000 && bits <= 0x8000_007F {
             Self::Guide((bits - 0x8000_0000) as u8)
         } else {
@@ -30,7 +34,7 @@ impl Coordinate {
     pub const fn raw(self) -> i32 {
         match self {
             Self::Value(value) => value,
-            Self::Guide(index) => (0x8000_0000u32 | index as u32) as i32,
+            Self::Guide(index) => (0x8000_0000u32 | index as u32).cast_signed(),
         }
     }
 
@@ -172,7 +176,12 @@ impl Instruction {
     pub const fn escape(self) -> Option<EscapeKind> {
         match self {
             Self::Escape(value) | Self::ClientEscape(value) => Some(value),
-            _ => None,
+            Self::LineTo
+            | Self::CurveTo
+            | Self::MoveTo
+            | Self::Close
+            | Self::End
+            | Self::Unknown(_) => None,
         }
     }
 }
@@ -295,16 +304,18 @@ impl EscapeKind {
 
     pub(crate) const fn point_count(self, segments: u16) -> Option<usize> {
         match self {
-            Self::Extension | Self::Unknown(_) => None,
-            Self::AngleEllipseTo | Self::AngleEllipse => Some(segments as usize),
-            Self::ArcTo | Self::Arc | Self::ClockwiseArcTo | Self::ClockwiseArc => {
-                Some(segments as usize)
-            },
-            Self::EllipticalQuadrantX | Self::EllipticalQuadrantY | Self::QuadraticBezier => {
-                Some(segments as usize)
-            },
+            Self::AngleEllipseTo
+            | Self::AngleEllipse
+            | Self::ArcTo
+            | Self::Arc
+            | Self::ClockwiseArcTo
+            | Self::ClockwiseArc
+            | Self::EllipticalQuadrantX
+            | Self::EllipticalQuadrantY
+            | Self::QuadraticBezier => Some(segments as usize),
             Self::FillColor | Self::LineColor => Some(1),
-            Self::NoFill
+            Self::Extension
+            | Self::NoFill
             | Self::NoLine
             | Self::AutoLine
             | Self::AutoCurve
@@ -314,7 +325,8 @@ impl EscapeKind {
             | Self::SmoothCurve
             | Self::SymmetricLine
             | Self::SymmetricCurve
-            | Self::Freeform => None,
+            | Self::Freeform
+            | Self::Unknown(_) => None,
         }
     }
 }
@@ -391,7 +403,7 @@ impl PathInfo {
 }
 
 /// A borrowed typed view over `pVertices_complex`.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct Points<'data> {
     array: Option<Array<'data>>,
     index: usize,
@@ -424,7 +436,7 @@ impl Iterator for Points<'_> {
 impl ExactSizeIterator for Points<'_> {}
 
 /// A borrowed typed view over `pSegmentInfo_complex`.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct PathInfos<'data> {
     array: Option<Array<'data>>,
     index: usize,

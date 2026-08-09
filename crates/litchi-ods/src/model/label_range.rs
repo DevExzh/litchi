@@ -88,7 +88,10 @@ impl Range {
     }
 }
 
-pub(crate) fn parse(xml: &str) -> Result<Vec<Range>> {
+/// # Errors
+///
+/// Returns an error when the input is malformed or exceeds the parser's resource limits.
+pub fn parse(xml: &str) -> Result<Vec<Range>> {
     let mut reader = NsReader::from_str(xml);
     let mut buf = Vec::new();
     let mut ranges = Vec::new();
@@ -300,7 +303,10 @@ fn required_attribute(
     )))
 }
 
-pub(crate) fn write(out: &mut String, ranges: &[Range]) -> Result<()> {
+/// # Errors
+///
+/// Returns an error when the value cannot be serialized.
+pub fn write(out: &mut String, ranges: &[Range]) -> Result<()> {
     if ranges.is_empty() {
         return Ok(());
     }

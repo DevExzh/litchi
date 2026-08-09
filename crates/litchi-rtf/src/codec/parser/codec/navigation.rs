@@ -1,4 +1,9 @@
-use super::*;
+use super::{
+    ControlWord, Cow, Destination, IndexEntry, IndexPageReference, MAX_NAVIGATION_ENTRIES,
+    MAX_NAVIGATION_ENTRY_DEPTH, MAX_NAVIGATION_ENTRY_TEXT_BYTES,
+    MAX_NAVIGATION_ENTRY_TEXT_TOTAL_BYTES, NavigationEntry, ParsedBodyStoryEvent, Parser, RtfError,
+    RtfResult, SmallVec, TableOfContentsEntry, Token, control_symbol_text,
+};
 
 impl<'a> Parser<'a> {
     pub(super) fn parse_navigation_entry_destination(&mut self) -> RtfResult<()> {
@@ -83,7 +88,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     let marker = crate::GeneratedListMarker {
                         kind,
-                        text: Cow::Borrowed(self.arena.alloc_str(&text) as &str),
+                        text: Cow::Borrowed(self.arena.alloc_str(&text)),
                         position: self.body_text_len,
                     };
                     marker.validate()?;
@@ -283,10 +288,10 @@ impl<'a> Parser<'a> {
                             "RTF xef must occur once before index text".to_string(),
                         ));
                     }
-                    let value = value.ok_or_else(|| {
+                    let identifier = value.ok_or_else(|| {
                         RtfError::MalformedDocument("RTF xef requires a parameter".to_string())
                     })?;
-                    index_id = Some(u8::try_from(value).map_err(|_| {
+                    index_id = Some(u8::try_from(identifier).map_err(|_err| {
                         RtfError::MalformedDocument("RTF xef parameter is out of range".to_string())
                     })?);
                     self.pos += 1;
@@ -397,7 +402,7 @@ impl<'a> Parser<'a> {
                             "RTF tcf must occur once before TOC-entry text".to_string(),
                         ));
                     }
-                    table_id = u8::try_from(*value).map_err(|_| {
+                    table_id = u8::try_from(*value).map_err(|_err| {
                         RtfError::MalformedDocument("RTF tcf parameter is out of range".to_string())
                     })?;
                     saw_table = true;
@@ -409,7 +414,7 @@ impl<'a> Parser<'a> {
                             "RTF tcl must occur once before TOC-entry text".to_string(),
                         ));
                     }
-                    level = u8::try_from(*value).map_err(|_| {
+                    level = u8::try_from(*value).map_err(|_err| {
                         RtfError::MalformedDocument("RTF tcl parameter is out of range".to_string())
                     })?;
                     saw_level = true;
@@ -520,9 +525,9 @@ impl<'a> Parser<'a> {
                             .to_string(),
                     ));
                 }
-                let control = *control;
+                let control_word = *control;
                 self.pos += 1;
-                self.apply_control_word(&control)?;
+                self.apply_control_word(&control_word)?;
                 None
             },
             Some(Token::Binary(_)) => {
@@ -537,28 +542,36 @@ impl<'a> Parser<'a> {
             },
             None => return Err(RtfError::UnexpectedEof),
         };
-        if let Some(decoded) = decoded {
-            let new_len = output.len().checked_add(decoded.len()).ok_or_else(|| {
-                RtfError::MalformedDocument("RTF navigation-entry size overflow".to_string())
-            })?;
+        if let Some(decoded_text) = decoded {
+            let new_len = output
+                .len()
+                .checked_add(decoded_text.len())
+                .ok_or_else(|| {
+                    RtfError::MalformedDocument("RTF navigation-entry size overflow".to_string())
+                })?;
             if new_len > MAX_NAVIGATION_ENTRY_TEXT_BYTES {
                 return Err(RtfError::MalformedDocument(
                     "RTF navigation-entry text limit exceeded".to_string(),
                 ));
             }
-            output.push_str(&decoded);
+            output.push_str(&decoded_text);
             if visible && !self.current_state()?.formatting.hidden {
-                self.append_semantic_text(&decoded)?;
+                self.append_semantic_text(&decoded_text)?;
             }
         }
         Ok(())
     }
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "RTF \\uN parameters are signed 16-bit; the u16 wrap implements the specified negative-value conversion"
+    )]
     pub(super) fn parse_navigation_unicode_sequence(
         &mut self,
         first_code: i32,
     ) -> RtfResult<String> {
-        let skip_count = self.current_state()?.unicode_skip.max(0) as usize;
+        let skip_count = self.current_state()?.unicode_skip.max(0).cast_unsigned() as usize;
         let mut utf16 = SmallVec::<[u16; 4]>::new();
         let mut code = first_code;
         let mut remainder = String::new();

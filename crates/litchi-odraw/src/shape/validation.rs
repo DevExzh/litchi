@@ -84,8 +84,8 @@ pub(crate) fn scan_meta<'data>(
 ) -> Result<Meta<'data>> {
     validate_container_header(container, RecordKind::SpContainer)?;
     let mut meta = Meta::new();
-    for child in container.children() {
-        let child = child?;
+    for child_result in container.children() {
+        let child = child_result?;
         budget.visit()?;
         match child.kind() {
             RecordKind::Sp => {
@@ -119,7 +119,29 @@ pub(crate) fn scan_meta<'data>(
             RecordKind::ClientData => insert(&mut meta.client_data, child)?,
             RecordKind::ClientTextbox => insert(&mut meta.textbox, child)?,
             RecordKind::Unknown(_) => {},
-            _ => {
+            RecordKind::DggContainer
+            | RecordKind::BStoreContainer
+            | RecordKind::DgContainer
+            | RecordKind::SpgrContainer
+            | RecordKind::SpContainer
+            | RecordKind::SolverContainer
+            | RecordKind::Dgg
+            | RecordKind::Bse
+            | RecordKind::Dg
+            | RecordKind::ConnectorRule
+            | RecordKind::AlignRule
+            | RecordKind::ArcRule
+            | RecordKind::ClientRule
+            | RecordKind::CalloutRule
+            | RecordKind::BlipEmf
+            | RecordKind::BlipWmf
+            | RecordKind::BlipPict
+            | RecordKind::BlipJpeg
+            | RecordKind::BlipPng
+            | RecordKind::BlipDib
+            | RecordKind::BlipTiff
+            | RecordKind::ColorMru
+            | RecordKind::SplitMenuColors => {
                 return Err(Error::MalformedShape {
                     reason: "SpContainer contains an invalid child record",
                 });
@@ -227,7 +249,6 @@ pub(crate) fn validate_meta(
 pub(crate) fn detect(native: Native, props: &Props<'_>) -> Kind {
     match native.raw() {
         0 if props.has(Id::Vertices) => Kind::Polygon,
-        0 => Kind::AutoShape,
         1 => Kind::Rectangle,
         3 => Kind::Ellipse,
         20 => Kind::Line,
@@ -235,7 +256,7 @@ pub(crate) fn detect(native: Native, props: &Props<'_>) -> Kind {
         41..=52 | 61..=63 | 106 | 178..=189 => Kind::Callout,
         75 => Kind::Picture,
         202 => Kind::TextBox,
-        2..=201 => Kind::AutoShape,
+        0 | 2..=201 => Kind::AutoShape,
         _ => Kind::Unknown,
     }
 }
@@ -314,8 +335,8 @@ pub(crate) fn coordinate(data: &[u8], offset: usize) -> Result<i32> {
     let bytes = data.get(offset..end).ok_or(Error::MalformedShape {
         reason: "group coordinate atom payload is truncated",
     })?;
-    let bytes: [u8; 4] = bytes.try_into().map_err(|_err| Error::MalformedShape {
+    let quad: [u8; 4] = bytes.try_into().map_err(|_err| Error::MalformedShape {
         reason: "group coordinate atom payload is truncated",
     })?;
-    Ok(i32::from_le_bytes(bytes))
+    Ok(i32::from_le_bytes(quad))
 }

@@ -1,3 +1,8 @@
+#![allow(
+    clippy::print_stdout,
+    reason = "this command-line example intentionally prints its results"
+)]
+
 //! Example demonstrating all new PPT writer features
 //!
 //! This example showcases:
@@ -8,7 +13,7 @@
 //! - Hyperlinks
 //! - Notes slides
 //!
-//! Run with: cargo run --example ppt_writer_features
+//! Run with: cargo run --example `ppt_writer_features`
 
 use litchi_ppt::writer::{
     FillStyle, FontEntity, Hyperlink, LineStyleConfig, NotesPage, Paragraph, ShadowStyle,
@@ -112,7 +117,7 @@ fn create_text_formatting_demo() -> Result<(), Box<dyn std::error::Error>> {
         TextRun::new("Red ").size(18).color_rgb(255, 0, 0),
         TextRun::new("Green ").size(18).color_rgb(0, 255, 0),
         TextRun::new("Blue ").size(18).color_rgb(0, 0, 255),
-        TextRun::new("Orange").size(18).color_hex(0xFF8800),
+        TextRun::new("Orange").size(18).color_hex(0x00FF_8800),
     ]);
     writer.add_rich_textbox(slide, 50, 340, 600, 40, vec![colors_para])?;
 
@@ -608,7 +613,7 @@ fn create_comprehensive_demo() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     for (i, fill) in styles.iter().enumerate() {
-        let x = 50 + (i as i32) * 160;
+        let x = 50 + i32::try_from(i)? * 160;
         let style = ShapeStyle::new().with_fill(fill.clone()).with_line(
             LineStyleConfig::with_color_and_width(ShapeColor::BLACK, 1.5),
         );
@@ -617,7 +622,7 @@ fn create_comprehensive_demo() -> Result<(), Box<dyn std::error::Error>> {
 
     // Row 2: Ellipses
     for (i, fill) in styles.iter().enumerate() {
-        let x = 50 + (i as i32) * 160;
+        let x = 50 + i32::try_from(i)? * 160;
         let style = ShapeStyle::new()
             .with_fill(fill.clone())
             .with_line(LineStyleConfig::none());

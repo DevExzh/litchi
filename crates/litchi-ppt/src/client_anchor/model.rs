@@ -10,7 +10,7 @@ pub(super) const RECT_LEN: usize = 16;
 /// Resource limits for parsing an anchor record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
-    /// Maximum accepted payload size, excluding the eight-byte OfficeArt header.
+    /// Maximum accepted payload size, excluding the eight-byte `OfficeArt` header.
     pub max_payload_bytes: usize,
 }
 
@@ -31,7 +31,7 @@ pub enum Encoding {
     Full,
 }
 
-/// Compact `SmallRectStruct` coordinates in PowerPoint master units.
+/// Compact `SmallRectStruct` coordinates in `PowerPoint` master units.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SmallRect {
     pub(super) top: i16,
@@ -42,6 +42,10 @@ pub struct SmallRect {
 
 impl SmallRect {
     /// Construct checked bounds in geometric order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(left: i16, top: i16, right: i16, bottom: i16) -> Result<Self> {
         validation::bounds(left.into(), top.into(), right.into(), bottom.into())?;
         Ok(Self {
@@ -52,24 +56,28 @@ impl SmallRect {
         })
     }
 
+    #[must_use]
     pub const fn left(self) -> i16 {
         self.left
     }
 
+    #[must_use]
     pub const fn top(self) -> i16 {
         self.top
     }
 
+    #[must_use]
     pub const fn right(self) -> i16 {
         self.right
     }
 
+    #[must_use]
     pub const fn bottom(self) -> i16 {
         self.bottom
     }
 }
 
-/// Full-width `RectStruct` coordinates in PowerPoint master units.
+/// Full-width `RectStruct` coordinates in `PowerPoint` master units.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Rect {
     pub(super) top: i32,
@@ -80,6 +88,10 @@ pub struct Rect {
 
 impl Rect {
     /// Construct checked bounds in geometric order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(left: i32, top: i32, right: i32, bottom: i32) -> Result<Self> {
         validation::bounds(left, top, right, bottom)?;
         Ok(Self {
@@ -90,18 +102,22 @@ impl Rect {
         })
     }
 
+    #[must_use]
     pub const fn left(self) -> i32 {
         self.left
     }
 
+    #[must_use]
     pub const fn top(self) -> i32 {
         self.top
     }
 
+    #[must_use]
     pub const fn right(self) -> i32 {
         self.right
     }
 
+    #[must_use]
     pub const fn bottom(self) -> i32 {
         self.bottom
     }
@@ -115,6 +131,7 @@ pub enum Data {
 }
 
 impl Data {
+    #[must_use]
     pub const fn encoding(self) -> Encoding {
         match self {
             Self::Small(_) => Encoding::Small,
@@ -122,6 +139,7 @@ impl Data {
         }
     }
 
+    #[must_use]
     pub const fn encoded_len(self) -> usize {
         match self {
             Self::Small(_) => SMALL_RECT_LEN,
@@ -129,6 +147,7 @@ impl Data {
         }
     }
 
+    #[must_use]
     pub const fn left(self) -> i32 {
         match self {
             Self::Small(value) => value.left() as i32,
@@ -136,6 +155,7 @@ impl Data {
         }
     }
 
+    #[must_use]
     pub const fn top(self) -> i32 {
         match self {
             Self::Small(value) => value.top() as i32,
@@ -143,6 +163,7 @@ impl Data {
         }
     }
 
+    #[must_use]
     pub const fn right(self) -> i32 {
         match self {
             Self::Small(value) => value.right() as i32,
@@ -150,6 +171,7 @@ impl Data {
         }
     }
 
+    #[must_use]
     pub const fn bottom(self) -> i32 {
         match self {
             Self::Small(value) => value.bottom() as i32,
@@ -157,10 +179,12 @@ impl Data {
         }
     }
 
+    #[must_use]
     pub fn width(self) -> i64 {
         i64::from(self.right()) - i64::from(self.left())
     }
 
+    #[must_use]
     pub fn height(self) -> i64 {
         i64::from(self.bottom()) - i64::from(self.top())
     }
@@ -173,52 +197,72 @@ pub struct Anchor {
 }
 
 impl Anchor {
+    #[must_use]
     pub const fn new(data: Data) -> Self {
         Self { data }
     }
 
+    /// Construct an anchor with compact `SmallRectStruct` coordinates.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `left` exceeds `right` or `top` exceeds `bottom`.
     pub fn small(left: i16, top: i16, right: i16, bottom: i16) -> Result<Self> {
         Ok(Self::new(Data::Small(SmallRect::new(
             left, top, right, bottom,
         )?)))
     }
 
+    /// Construct an anchor with full `RectStruct` coordinates.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `left` exceeds `right` or `top` exceeds `bottom`.
     pub fn full(left: i32, top: i32, right: i32, bottom: i32) -> Result<Self> {
         Ok(Self::new(Data::Full(Rect::new(left, top, right, bottom)?)))
     }
 
+    #[must_use]
     pub const fn data(self) -> Data {
         self.data
     }
 
+    #[must_use]
     pub const fn encoding(self) -> Encoding {
         self.data.encoding()
     }
 
+    #[must_use]
     pub const fn left(self) -> i32 {
         self.data.left()
     }
 
+    #[must_use]
     pub const fn top(self) -> i32 {
         self.data.top()
     }
 
+    #[must_use]
     pub const fn right(self) -> i32 {
         self.data.right()
     }
 
+    #[must_use]
     pub const fn bottom(self) -> i32 {
         self.data.bottom()
     }
 
+    #[must_use]
     pub fn width(self) -> i64 {
         self.data.width()
     }
 
+    #[must_use]
     pub fn height(self) -> i64 {
         self.data.height()
     }
 
+    #[must_use]
     pub const fn encoded_len(self) -> usize {
         super::codec::HEADER_LEN + self.data.encoded_len()
     }

@@ -30,33 +30,53 @@ pub enum InteractiveTrigger {
 
 impl InteractiveTrigger {
     /// Check if this is a click-based trigger.
+    #[must_use]
     pub fn is_click_based(&self) -> bool {
         matches!(self, Self::OnSlideClick | Self::OnShapeClick { .. })
     }
 
     /// Check if this is time-based trigger.
+    #[must_use]
     pub fn is_time_based(&self) -> bool {
         matches!(self, Self::AfterPrevious { .. } | Self::Automatic { .. })
     }
 
     /// Check if this is media-based trigger.
+    #[must_use]
     pub fn is_media_based(&self) -> bool {
         matches!(self, Self::OnMediaEnd { .. } | Self::OnMediaStart { .. })
     }
 
     /// Get delay in milliseconds (if applicable).
+    #[must_use]
     pub fn delay_ms(&self) -> Option<u32> {
         match self {
             Self::AfterPrevious { delay_ms } | Self::Automatic { delay_ms } => Some(*delay_ms),
-            _ => None,
+            Self::OnSlideClick
+            | Self::OnShapeClick { .. }
+            | Self::OnBookmark { .. }
+            | Self::OnMediaEnd { .. }
+            | Self::OnMediaStart { .. }
+            | Self::OnPreviousEnd
+            | Self::OnNextStart
+            | Self::WithPrevious => None,
         }
     }
 
     /// Get shape ID for shape click triggers.
+    #[must_use]
     pub fn shape_id(&self) -> Option<u32> {
         match self {
             Self::OnShapeClick { shape_id } => Some(*shape_id),
-            _ => None,
+            Self::OnSlideClick
+            | Self::OnBookmark { .. }
+            | Self::OnMediaEnd { .. }
+            | Self::OnMediaStart { .. }
+            | Self::OnPreviousEnd
+            | Self::OnNextStart
+            | Self::WithPrevious
+            | Self::AfterPrevious { .. }
+            | Self::Automatic { .. } => None,
         }
     }
 }
@@ -154,25 +174,33 @@ pub enum RepeatBehavior {
 
 impl RepeatBehavior {
     /// Check if animation repeats.
+    #[must_use]
     pub fn repeats(&self) -> bool {
         !matches!(self, Self::None)
     }
 
     /// Get repeat count (if applicable).
+    #[must_use]
     pub fn count(&self) -> Option<u32> {
         match self {
             Self::Count(n) => Some(*n),
-            _ => None,
+            Self::None | Self::Duration(_) | Self::Indefinite => None,
         }
     }
 
     /// Check if repeats indefinitely.
+    #[must_use]
     pub fn is_indefinite(&self) -> bool {
         matches!(self, Self::Indefinite)
     }
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

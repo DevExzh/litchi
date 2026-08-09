@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::super::model::*;
 use super::super::package::Part;
 use super::CONTENT_TYPE;

@@ -4,7 +4,7 @@ use super::{
     DiagramBuild, EffectInstance, GraphicBuild, OleChartBuild, ParagraphBuild, TimingTree,
 };
 
-/// EffectInstance sequence for a slide.
+/// `EffectInstance` sequence for a slide.
 #[derive(Debug, Clone, Default)]
 pub struct Sequence {
     /// List of animations in order
@@ -13,7 +13,7 @@ pub struct Sequence {
     pub paragraph_builds: Vec<ParagraphBuild>,
     /// Typed OLE diagram entries from the slide build list.
     pub diagram_builds: Vec<DiagramBuild>,
-    /// Typed chart and SmartArt entries from the slide build list.
+    /// Typed chart and `SmartArt` entries from the slide build list.
     pub graphic_builds: Vec<GraphicBuild>,
     /// Typed embedded OLE chart entries from the slide build list.
     pub ole_chart_builds: Vec<OleChartBuild>,
@@ -41,6 +41,7 @@ impl Eq for Sequence {}
 
 impl Sequence {
     /// Create a new empty animation sequence.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -61,7 +62,7 @@ impl Sequence {
         self.diagram_builds.push(build);
     }
 
-    /// Add a chart or SmartArt build to the slide build list.
+    /// Add a chart or `SmartArt` build to the slide build list.
     pub fn add_graphic_build(&mut self, build: GraphicBuild) {
         self.graphic_builds.push(build);
     }
@@ -72,20 +73,24 @@ impl Sequence {
     }
 
     /// Get the number of animations.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.animations.len()
     }
 
     /// Check if the sequence is empty.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.animations.is_empty()
     }
 
     /// Return the preserved source timing subtree, when this sequence was parsed.
+    #[must_use]
     pub fn preserved_timing_xml(&self) -> Option<&str> {
         self.source_timing_xml.as_deref()
     }
 
+    #[must_use]
     pub fn timing_tree(&self) -> Option<&TimingTree> {
         self.timing_tree.as_ref()
     }

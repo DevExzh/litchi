@@ -3,7 +3,7 @@ pub const MSO_ENVELOPE_CLSID: [u8; 16] = [
     0x1a, 0xf0, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46,
 ];
 
-/// A complete PowerPoint 9 envelope atom.
+/// A complete `PowerPoint` 9 envelope atom.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EnvelopeData {
     pub clsid: [u8; 16],
@@ -12,7 +12,10 @@ pub struct EnvelopeData {
 
 /// Payload selected by the envelope CLSID.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(clippy::large_enum_variant)] // public payload enum; boxing would break the API
+#[allow(
+    clippy::large_enum_variant,
+    reason = "public payload enum; boxing would break the API"
+)]
 pub enum EnvelopePayload {
     Mso(MsoEnvelope),
     /// A payload whose CLSID-defined syntax is outside MS-OSHARED.
@@ -36,6 +39,7 @@ pub enum MsoEnvelopeText {
 
 impl MsoEnvelopeText {
     /// Decode for display. Invalid ANSI bytes are mapped one-to-one as Latin-1.
+    #[must_use]
     pub fn to_string_lossy(&self) -> String {
         match self {
             Self::Ansi(bytes) => bytes.iter().map(|byte| char::from(*byte)).collect(),

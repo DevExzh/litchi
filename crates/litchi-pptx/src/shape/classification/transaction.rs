@@ -25,6 +25,10 @@ impl Editor {
     }
 
     /// Replace the typed outcome while retaining every opaque extension.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set(&mut self, outcome: Outcome) -> Result<()> {
         validate_outcome(outcome)?;
         self.working.outcome = Some(outcome);
@@ -39,17 +43,23 @@ impl Editor {
 
     /// Borrow the projected snapshot.
     #[inline]
+    #[must_use]
     pub fn snapshot(&self) -> &Snapshot {
         &self.working
     }
 
     /// Whether the edit changes the semantic snapshot.
     #[inline]
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.original != self.working
     }
 
     /// Validate and consume the edit into a new snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn commit(self) -> Result<Snapshot> {
         validate_snapshot(&self.working)?;
         Ok(self.working)

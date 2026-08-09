@@ -1,10 +1,10 @@
-//! PowerPoint 9 picture-bullet collection parsing.
+//! `PowerPoint` 9 picture-bullet collection parsing.
 
 use super::package::{Error, Result};
 use super::records::Record;
 use crate::consts::RecordType;
 
-/// Preferred native picture format for a PowerPoint 9 bullet.
+/// Preferred native picture format for a `PowerPoint` 9 bullet.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum PictureBulletType {
@@ -54,17 +54,25 @@ pub struct PictureBullet {
     pub picture_type: PictureBulletType,
     /// Undefined byte preserved from the atom.
     pub unused: u8,
-    /// Complete embedded OfficeArt BLIP or FBSE record, including its header.
+    /// Complete embedded `OfficeArt` BLIP or FBSE record, including its header.
     pub officeart_record: Vec<u8>,
 }
 
 impl PictureBullet {
-    /// Parses the embedded OfficeArt image without copying its file data.
+    /// Parses the embedded `OfficeArt` image without copying its file data.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn blip(&self) -> Result<litchi_odraw::image::Blip<'_>> {
         self.blip_with_delay(None)
     }
 
     /// Parses the image, optionally resolving a delay-loaded FBSE.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn blip_with_delay<'data>(
         &'data self,
         delay: Option<&'data [u8]>,
@@ -107,6 +115,10 @@ pub struct PictureBulletCollection {
 
 impl PictureBulletCollection {
     /// Parse a `BlipCollection9Container` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(record: &Record) -> Result<Self> {
         if record.record_type != RecordType::BlipCollection9
             || record.version != 0x0f
@@ -140,7 +152,11 @@ impl PictureBulletCollection {
         Ok(Self { bullets })
     }
 
-    /// Discover the single PowerPoint 9 picture-bullet collection below `root`.
+    /// Discover the single `PowerPoint` 9 picture-bullet collection below `root`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_from(root: &Record) -> Result<Option<Self>> {
         let mut result = None;
         for record in root.versioned_binary_tag_records(9)? {
@@ -157,6 +173,7 @@ impl PictureBulletCollection {
     }
 
     /// Resolve a `bulletBlipRef`; `-1` is the null reference.
+    #[must_use]
     pub fn get(&self, reference: i16) -> Option<&PictureBullet> {
         let index = u16::try_from(reference).ok()?;
         self.bullets.iter().find(|bullet| bullet.index == index)
@@ -205,6 +222,11 @@ fn picture_type_matches(
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -212,7 +234,7 @@ mod tests {
         let mut data = Vec::new();
         data.extend_from_slice(&((instance << 4) | version).to_le_bytes());
         data.extend_from_slice(&kind.to_le_bytes());
-        data.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+        data.extend_from_slice(&u32::try_from(payload.len()).unwrap().to_le_bytes());
         data.extend_from_slice(payload);
         data
     }
@@ -234,7 +256,7 @@ mod tests {
         let mut fbse = vec![0x06, 0x06];
         fbse.extend_from_slice(&[0; 16]);
         fbse.extend_from_slice(&0xffu16.to_le_bytes());
-        fbse.extend_from_slice(&(blip.len() as u32).to_le_bytes());
+        fbse.extend_from_slice(&u32::try_from(blip.len()).unwrap().to_le_bytes());
         fbse.extend_from_slice(&1u32.to_le_bytes());
         fbse.extend_from_slice(&u32::MAX.to_le_bytes());
         fbse.extend_from_slice(&[0, 0, 0, 0]);
@@ -250,7 +272,7 @@ mod tests {
             record_type_raw: 2040,
             version: 0x0f,
             instance: 0,
-            data_length: payload.len() as u32,
+            data_length: u32::try_from(payload.len()).unwrap(),
             data: payload,
             children: Vec::new(),
         }
@@ -271,7 +293,7 @@ mod tests {
             record_type_raw: 0x1388,
             version: 0x0f,
             instance: 0,
-            data_length: tag.len() as u32,
+            data_length: u32::try_from(tag.len()).unwrap(),
             data: tag,
             children: Vec::new(),
         }

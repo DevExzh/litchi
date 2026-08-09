@@ -1,9 +1,13 @@
-use super::*;
+use super::{
+    ControlWord, Cow, HashMap, MAX_ANNOTATION_TEXT_BYTES, MAX_ANNOTATIONS, MAX_BOOKMARK_NAME_BYTES,
+    ParsedBodyStoryEvent, Parser, RtfError, RtfResult, Token, control_symbol_text,
+    parser_classification_error, require_parameterless,
+};
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     pub(super) fn parse_annotation_range_marker(&mut self, is_start: bool) -> RtfResult<()> {
         let value = self.parse_ignorable_text_destination()?;
-        let reference = value.trim().parse::<i32>().map_err(|_| {
+        let reference = value.trim().parse::<i32>().map_err(|_err| {
             RtfError::MalformedDocument(
                 "RTF annotation range reference must be a signed integer".to_string(),
             )
@@ -103,7 +107,7 @@ impl<'a> Parser<'a> {
                                 ));
                             }
                             let value = self.parse_nested_annotation_value()?;
-                            reference = Some(value.trim().parse::<i32>().map_err(|_| {
+                            reference = Some(value.trim().parse::<i32>().map_err(|_err| {
                                 RtfError::MalformedDocument(
                                     "RTF annotation reference must be a signed integer".to_string(),
                                 )
@@ -292,7 +296,7 @@ impl<'a> Parser<'a> {
                 Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
                     value.push_str(control_symbol_text(control).unwrap_or_default());
                 },
-                Some(Token::Binary(_)) | Some(Token::Control(_)) => {
+                Some(Token::Binary(_) | Token::Control(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF annotation metadata contains active or invalid controls".to_string(),
                     ));
@@ -359,7 +363,7 @@ impl<'a> Parser<'a> {
         let mut output = Vec::with_capacity(self.body_story_events.len());
         for event in self.body_story_events.drain(..) {
             let resolved = match event {
-                ParsedBodyStoryEvent::Resolved(event) => event,
+                ParsedBodyStoryEvent::Resolved(resolved_event) => resolved_event,
                 ParsedBodyStoryEvent::AnnotationStart(reference) => {
                     crate::BodyStoryEvent::AnnotationStart(
                         *annotation_indices.get(&reference).ok_or_else(|| {

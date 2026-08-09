@@ -1,6 +1,22 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 //! Round-trip tests for East Asian `\acc*` emphasis-mark character controls.
 
 use litchi_rtf::{EmphasisMark, RtfDocument, RtfWriter};
+
+const MARKS: &[(EmphasisMark, &str)] = &[
+    (EmphasisMark::Dot, r"\accdot"),
+    (EmphasisMark::Comma, r"\acccomma"),
+    (EmphasisMark::UnderDot, r"\accunderdot"),
+    (EmphasisMark::Circle, r"\acccircle"),
+];
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
     let mut output = Vec::new();
@@ -9,13 +25,6 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
         .unwrap();
     output
 }
-
-const MARKS: &[(EmphasisMark, &str)] = &[
-    (EmphasisMark::Dot, r"\accdot"),
-    (EmphasisMark::Comma, r"\acccomma"),
-    (EmphasisMark::UnderDot, r"\accunderdot"),
-    (EmphasisMark::Circle, r"\acccircle"),
-];
 
 #[test]
 fn emphasis_marks_round_trip() {

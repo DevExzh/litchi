@@ -30,7 +30,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for i in 0..5 {
         let row = 5 + i as u32;
         w.write_string(s1, row, 0, &format!("Row {}", i + 1))?;
-        w.write_number(s1, row, 1, (i + 1) as f64 * 100.0)?;
+        w.write_number(s1, row, 1, f64::from(i + 1) * 100.0)?;
     }
 
     // Protect: password "secret", protect objects, protect scenarios.
@@ -107,7 +107,7 @@ fn round_trip_verify(path: &std::path::Path) -> Result<(), Box<dyn std::error::E
     println!("Worksheets: {:?}", wb.worksheet_names());
 
     for (idx, name) in wb.worksheet_names().iter().enumerate() {
-        println!("\n--- Sheet {}: \"{}\" ---", idx, name);
+        println!("\n--- Sheet {idx}: \"{name}\" ---");
 
         let xls_sheet = wb.xls_worksheet(idx)?;
 
@@ -117,7 +117,8 @@ fn round_trip_verify(path: &std::path::Path) -> Result<(), Box<dyn std::error::E
         println!("  scenarios_protected:{}", prot.scenarios_protected());
         println!(
             "  password_hash:      0x{:04X}",
-            prot.password().map_or(0, |verifier| verifier.raw())
+            prot.password()
+                .map_or(0, litchi_xls::protection::PasswordVerifier::raw)
         );
         println!("  has_password:       {}", prot.has_password());
     }

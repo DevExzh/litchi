@@ -114,7 +114,10 @@ impl Range {
     }
 }
 
-pub(crate) fn validate_database_range_collection(ranges: &[Range]) -> Result<()> {
+/// # Errors
+///
+/// Returns an error when a value violates the format or resource constraints.
+pub fn validate_database_range_collection(ranges: &[Range]) -> Result<()> {
     use std::collections::HashSet;
     if ranges.len() > MAX_DATABASE_RANGES {
         return too_many("database ranges");
@@ -154,7 +157,10 @@ fn too_many(label: &str) -> Result<()> {
     )))
 }
 
-pub(crate) fn validate_filter(filter: &Filter) -> Result<()> {
+/// # Errors
+///
+/// Returns an error when a value violates the format or resource constraints.
+pub fn validate_filter(filter: &Filter) -> Result<()> {
     validate_filter_expression(&filter.expression, 0, None)?;
     if filter.condition_source == Some(ConditionSource::CellRange)
         && filter.condition_source_range_address.is_none()

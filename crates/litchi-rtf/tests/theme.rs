@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{DocumentTheme, RtfDocument, RtfWriter};
 use std::borrow::Cow;
 use std::fs;
@@ -27,8 +36,8 @@ fn parses_inert_theme_bytes_and_round_trips_without_interpretation() {
 
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
-    assert!(serialized.contains(r#"{\*\themedata 504b03041400}"#));
-    assert!(serialized.contains(r#"{\*\colorschememapping 3c3f786d6c3e}"#));
+    assert!(serialized.contains(r"{\*\themedata 504b03041400}"));
+    assert!(serialized.contains(r"{\*\colorschememapping 3c3f786d6c3e}"));
     let reparsed = RtfDocument::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.theme(), Some(theme));
@@ -36,7 +45,7 @@ fn parses_inert_theme_bytes_and_round_trips_without_interpretation() {
 
 #[test]
 fn mutation_validates_and_clear_preserves_body() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 Text}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Text}").unwrap();
     let theme = DocumentTheme::new(
         Cow::Borrowed(b"PK\x03\x04"),
         Some(Cow::Borrowed(b"<mapping/>")),
@@ -57,16 +66,16 @@ fn mutation_validates_and_clear_preserves_body() {
 #[test]
 fn rejects_malformed_or_active_theme_payloads() {
     let cases = [
-        r#"{\rtf1{\themedata 00}}"#,
-        r#"{\rtf1{\*\themedata 00}{\*\themedata 01}}"#,
-        r#"{\rtf1{\*\colorschememapping 00}}"#,
-        r#"{\rtf1{\*\themedata }}"#,
-        r#"{\rtf1{\*\themedata 0}}"#,
-        r#"{\rtf1{\*\themedata 0x}}"#,
-        r#"{\rtf1{\*\themedata 00{11}}}"#,
-        r#"{\rtf1{\*\themedata 00\b 11}}"#,
-        r#"{\rtf1{\*\themedata\bin2 xx}}"#,
-        r#"{\rtf1\themedata 00}"#,
+        r"{\rtf1{\themedata 00}}",
+        r"{\rtf1{\*\themedata 00}{\*\themedata 01}}",
+        r"{\rtf1{\*\colorschememapping 00}}",
+        r"{\rtf1{\*\themedata }}",
+        r"{\rtf1{\*\themedata 0}}",
+        r"{\rtf1{\*\themedata 0x}}",
+        r"{\rtf1{\*\themedata 00{11}}}",
+        r"{\rtf1{\*\themedata 00\b 11}}",
+        r"{\rtf1{\*\themedata\bin2 xx}}",
+        r"{\rtf1\themedata 00}",
     ];
     for rtf in cases {
         assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");

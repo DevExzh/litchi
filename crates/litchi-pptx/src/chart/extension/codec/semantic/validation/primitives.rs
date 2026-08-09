@@ -1,6 +1,9 @@
-//! Shared scalar and structural validation validation concerns for the ChartEx graph.
+//! Shared scalar and structural validation validation concerns for the `ChartEx` graph.
 
-use super::*;
+use super::{
+    CX, DoubleOrAutomatic, MAX_SUBTOTALS, MiniNode, QuartileMethod, Result, invalid, invalid_error,
+    limit, optional, parse_u32, reject_unknown, required, valid_xml_double,
+};
 use std::collections::HashSet;
 
 pub(super) fn parse_statistics(node: &MiniNode) -> Result<Option<QuartileMethod>> {
@@ -58,7 +61,7 @@ pub(super) fn parse_nonnegative_or_auto(value: &str, label: &str) -> Result<Doub
     }
     let number = value
         .parse::<f64>()
-        .map_err(|_| invalid_error(format!("invalid  {label}")))?;
+        .map_err(|_err| invalid_error(format!("invalid  {label}")))?;
     if number.is_nan() || number < 0.0 {
         return invalid(format!("invalid  {label}"));
     }
@@ -71,7 +74,7 @@ pub(super) fn parse_positive_or_auto(value: &str, label: &str) -> Result<DoubleO
     }
     let number = value
         .parse::<f64>()
-        .map_err(|_| invalid_error(format!("invalid  {label}")))?;
+        .map_err(|_err| invalid_error(format!("invalid  {label}")))?;
     if number.is_nan() || number <= 0.0 {
         return invalid(format!("invalid  {label}"));
     }

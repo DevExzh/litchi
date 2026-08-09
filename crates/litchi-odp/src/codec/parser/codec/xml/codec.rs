@@ -1,6 +1,15 @@
 //! XML token and event traversal for the ODP parser.
 
-use super::super::*;
+use super::super::{
+    ANIMATION_NAMESPACE_BYTES, Action, AnimationKind, AnimationNode, BytesRef, BytesStart,
+    DRAW_NAMESPACE, DrawingHyperlink, DrawingShapeKind, Effect, EffectDirection, Element,
+    EnhancedGeometry, EnhancedGeometryChild, EnhancedGeometryChildKind, Error, Event,
+    EventListener, Kind, Node, NsReader, OFFICE_NAMESPACE, PRESENTATION_NAMESPACE, ParagraphText,
+    Parser, Result, SCRIPT_NAMESPACE, STYLE_NAMESPACE, ScriptEventListener, Shape, ShapeBuilder,
+    ShapeContainerScope, ShapeEventListener, ShapeType, Slide, Speed, Transition,
+    TransitionStyleDefinition, TransitionStyles, XLINK_NAMESPACE, XmlVersion,
+    validate_legacy_animation_root,
+};
 
 impl Parser {
     pub(super) fn parse_animation_node(
@@ -89,8 +98,8 @@ impl Parser {
                     return Ok(Node::from_parsed(kind, attributes, children));
                 },
                 Event::Text(ref text) => {
-                    let text = Self::decode_text(text)?;
-                    if !text.trim().is_empty() {
+                    let decoded = Self::decode_text(text)?;
+                    if !decoded.trim().is_empty() {
                         return Err(Error::InvalidFormat(format!(
                             "anim:{} cannot contain text",
                             kind.local_name()
@@ -98,10 +107,10 @@ impl Parser {
                     }
                 },
                 Event::CData(ref text) => {
-                    let text = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                    let content = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
                         Error::InvalidFormat(format!("invalid animation CDATA: {error}"))
                     })?;
-                    if !text.trim().is_empty() {
+                    if !content.trim().is_empty() {
                         return Err(Error::InvalidFormat(format!(
                             "anim:{} cannot contain text",
                             kind.local_name()
@@ -120,7 +129,7 @@ impl Parser {
                         kind.local_name()
                     )));
                 },
-                _ => {},
+                Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {},
             }
             buffer.clear();
         }
@@ -234,7 +243,12 @@ impl Parser {
                         "invalid content in legacy presentation animation tree".to_string(),
                     ));
                 },
-                _ => {},
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_) => {},
             }
             buffer.clear();
         }
@@ -311,7 +325,14 @@ impl Parser {
                         "unterminated draw:enhanced-geometry".to_string(),
                     ));
                 },
-                _ => {
+                Event::Start(_)
+                | Event::Empty(_)
+                | Event::End(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Decl(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {
                     return Err(Error::InvalidFormat(
                         "draw:enhanced-geometry may only contain equations and handles".to_string(),
                     ));
@@ -355,7 +376,7 @@ impl Parser {
             macro_name,
             href,
             actuate_on_request: Self::parse_on_request(
-                Self::get_attr(reader, element, XLINK_NAMESPACE, b"actuate")?,
+                Self::get_attr(reader, element, XLINK_NAMESPACE, b"actuate")?.as_deref(),
                 "script:event-listener",
             )?,
         };
@@ -413,7 +434,7 @@ impl Parser {
                 },
             };
         listener.actuate_on_request = Self::parse_on_request(
-            Self::get_attr(reader, element, XLINK_NAMESPACE, b"actuate")?,
+            Self::get_attr(reader, element, XLINK_NAMESPACE, b"actuate")?.as_deref(),
             "presentation:event-listener",
         )?;
         listener.verb = Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"verb")?
@@ -457,7 +478,16 @@ impl Parser {
                         "unterminated {description} element"
                     )));
                 },
-                _ => {
+                Event::Start(_)
+                | Event::Empty(_)
+                | Event::End(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {
                     return Err(Error::InvalidFormat(format!(
                         "{description} must not contain content"
                     )));
@@ -516,7 +546,16 @@ impl Parser {
                         "unterminated presentation:event-listener".to_string(),
                     ));
                 },
-                _ => {
+                Event::Start(_)
+                | Event::Empty(_)
+                | Event::End(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {
                     return Err(Error::InvalidFormat(
                         "presentation:event-listener may only contain presentation:sound"
                             .to_string(),
@@ -567,12 +606,12 @@ impl Parser {
                         ));
                     }
                     let listener = Self::presentation_event_listener(reader, element)?;
-                    let listener = if matches!(event, Event::Start(_)) {
+                    let parsed_listener = if matches!(event, Event::Start(_)) {
                         Self::parse_listener_body(reader, listener)?
                     } else {
                         listener
                     };
-                    listeners.push(ShapeEventListener::Action(Box::new(listener)));
+                    listeners.push(ShapeEventListener::Action(Box::new(parsed_listener)));
                 },
                 Event::End(ref end)
                     if Self::is_namespace(&namespace, OFFICE_NAMESPACE)
@@ -592,7 +631,16 @@ impl Parser {
                         "unterminated office:event-listeners".to_string(),
                     ));
                 },
-                _ => {
+                Event::Start(_)
+                | Event::Empty(_)
+                | Event::End(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {
                     return Err(Error::InvalidFormat(
                         "office:event-listeners may only contain script or presentation listeners"
                             .to_string(),
@@ -677,8 +725,8 @@ impl Parser {
                             )?,
                             transition: Transition::new(),
                         };
-                        if let Some(name) = name {
-                            result.named.insert(name, definition);
+                        if let Some(style_name) = name {
+                            result.named.insert(style_name, definition);
                         } else {
                             result.default = definition.transition;
                         }
@@ -689,12 +737,13 @@ impl Parser {
                         && Self::is_namespace(&namespace, STYLE_NAMESPACE)
                         && element.local_name().as_ref() == b"drawing-page-properties" =>
                 {
-                    let (_, _, definition) = current.as_mut().expect("style checked above");
-                    Self::parse_transition_properties(
-                        &reader,
-                        element,
-                        &mut definition.transition,
-                    )?;
+                    if let Some((_, _, definition)) = current.as_mut() {
+                        Self::parse_transition_properties(
+                            &reader,
+                            element,
+                            &mut definition.transition,
+                        )?;
+                    }
                     in_properties = matches!(event, Event::Start(_));
                 },
                 Event::Start(ref element) | Event::Empty(ref element)
@@ -702,9 +751,10 @@ impl Parser {
                         && Self::is_namespace(&namespace, PRESENTATION_NAMESPACE)
                         && element.local_name().as_ref() == b"sound" =>
                 {
-                    let (_, _, definition) = current.as_mut().expect("properties require style");
-                    definition.transition.sound =
-                        Some(Self::parse_transition_sound(&reader, element)?);
+                    if let Some((_, _, definition)) = current.as_mut() {
+                        definition.transition.sound =
+                            Some(Self::parse_transition_sound(&reader, element)?);
+                    }
                 },
                 Event::End(ref element)
                     if Self::is_namespace(&namespace, STYLE_NAMESPACE)
@@ -719,8 +769,8 @@ impl Parser {
                     if let Some((name, is_drawing_page, definition)) = current.take()
                         && is_drawing_page
                     {
-                        if let Some(name) = name {
-                            result.named.insert(name, definition);
+                        if let Some(style_name) = name {
+                            result.named.insert(style_name, definition);
                         } else {
                             result.default = definition.transition;
                         }
@@ -728,7 +778,16 @@ impl Parser {
                     in_properties = false;
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Start(_)
+                | Event::Empty(_)
+                | Event::End(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {},
             }
             buf.clear();
         }
@@ -884,24 +943,25 @@ impl Parser {
                         },
                         Element::Notes if in_slide => in_notes = true,
                         Element::EnhancedGeometry if !shape_stack.is_empty() => {
-                            let builder = shape_stack.last().expect("shape checked above");
-                            if builder.drawing_kind != Some(DrawingShapeKind::CustomShape) {
-                                return Err(Error::InvalidFormat(
-                                    "draw:enhanced-geometry requires draw:custom-shape".to_string(),
-                                ));
-                            }
-                            if builder.enhanced_geometry.is_some() {
-                                return Err(Error::InvalidFormat(
-                                    "draw:custom-shape contains multiple enhanced geometries"
-                                        .to_string(),
-                                ));
+                            if let Some(builder) = shape_stack.last() {
+                                if builder.drawing_kind != Some(DrawingShapeKind::CustomShape) {
+                                    return Err(Error::InvalidFormat(
+                                        "draw:enhanced-geometry requires draw:custom-shape"
+                                            .to_string(),
+                                    ));
+                                }
+                                if builder.enhanced_geometry.is_some() {
+                                    return Err(Error::InvalidFormat(
+                                        "draw:custom-shape contains multiple enhanced geometries"
+                                            .to_string(),
+                                    ));
+                                }
                             }
                             let geometry = Self::parse_enhanced_geometry(&mut reader, element)?;
                             element_depth = Self::rewind_consumed_subtree(element_depth);
-                            shape_stack
-                                .last_mut()
-                                .expect("shape checked above")
-                                .enhanced_geometry = Some(geometry);
+                            if let Some(builder) = shape_stack.last_mut() {
+                                builder.enhanced_geometry = Some(geometry);
+                            }
                         },
                         Element::EnhancedGeometry
                         | Element::EnhancedEquation
@@ -942,21 +1002,23 @@ impl Parser {
                             current_legacy_animation = Some(root);
                         },
                         Element::Plugin if !shape_stack.is_empty() => {
-                            let builder = shape_stack.last_mut().expect("shape checked above");
-                            if !builder.is_frame {
-                                return Err(Error::InvalidFormat(
-                                    "draw:plugin must be contained directly by draw:frame"
-                                        .to_string(),
-                                ));
+                            if let Some(builder) = shape_stack.last_mut() {
+                                if !builder.is_frame {
+                                    return Err(Error::InvalidFormat(
+                                        "draw:plugin must be contained directly by draw:frame"
+                                            .to_string(),
+                                    ));
+                                }
+                                if builder.media.is_some() {
+                                    return Err(Error::InvalidFormat(
+                                        "ODP frame contains multiple draw:plugin elements"
+                                            .to_string(),
+                                    ));
+                                }
+                                builder.shape_type = ShapeType::GraphicFrame;
+                                builder.media = Some(Self::media_reference(&reader, element)?);
+                                in_media_plugin = true;
                             }
-                            if builder.media.is_some() {
-                                return Err(Error::InvalidFormat(
-                                    "ODP frame contains multiple draw:plugin elements".to_string(),
-                                ));
-                            }
-                            builder.shape_type = ShapeType::GraphicFrame;
-                            builder.media = Some(Self::media_reference(&reader, element)?);
-                            in_media_plugin = true;
                         },
                         Element::Plugin if in_slide => {
                             return Err(Error::InvalidFormat(
@@ -968,12 +1030,13 @@ impl Parser {
                                 && !in_media_parameter
                                 && !shape_stack.is_empty() =>
                         {
-                            shape_stack
+                            if let Some(media) = shape_stack
                                 .last_mut()
                                 .and_then(|builder| builder.media.as_mut())
-                                .expect("media plugin state checked above")
-                                .add_parameter(Self::media_parameter(&reader, element)?)?;
-                            in_media_parameter = true;
+                            {
+                                media.add_parameter(Self::media_parameter(&reader, element)?)?;
+                                in_media_parameter = true;
+                            }
                         },
                         Element::DrawingHyperlink
                             if in_slide && !in_notes && current_hyperlink.is_none() =>
@@ -988,25 +1051,26 @@ impl Parser {
                             ));
                         },
                         Element::EventListeners if !shape_stack.is_empty() => {
-                            let builder = shape_stack.last_mut().expect("shape checked above");
-                            if builder
-                                .drawing_kind
-                                .is_some_and(|kind| kind.is_three_dimensional())
-                            {
-                                return Err(Error::InvalidFormat(
-                                    "3D shapes cannot contain presentation event listeners"
-                                        .to_string(),
-                                ));
+                            if let Some(builder) = shape_stack.last_mut() {
+                                if builder
+                                    .drawing_kind
+                                    .is_some_and(DrawingShapeKind::is_three_dimensional)
+                                {
+                                    return Err(Error::InvalidFormat(
+                                        "3D shapes cannot contain presentation event listeners"
+                                            .to_string(),
+                                    ));
+                                }
+                                if builder.event_listeners_seen {
+                                    return Err(Error::InvalidFormat(
+                                        "ODP shape contains multiple office:event-listeners elements"
+                                            .to_string(),
+                                    ));
+                                }
+                                builder.event_listeners = Self::parse_event_listeners(&mut reader)?;
+                                element_depth = Self::rewind_consumed_subtree(element_depth);
+                                builder.event_listeners_seen = true;
                             }
-                            if builder.event_listeners_seen {
-                                return Err(Error::InvalidFormat(
-                                    "ODP shape contains multiple office:event-listeners elements"
-                                        .to_string(),
-                                ));
-                            }
-                            builder.event_listeners = Self::parse_event_listeners(&mut reader)?;
-                            element_depth = Self::rewind_consumed_subtree(element_depth);
-                            builder.event_listeners_seen = true;
                         },
                         Element::EventListeners
                         | Element::EventListener
@@ -1040,12 +1104,9 @@ impl Parser {
                         Element::TextSpace | Element::TextTab | Element::TextLineBreak
                             if current_paragraph.is_some() =>
                         {
-                            Self::push_text_control(
-                                &reader,
-                                element,
-                                element_type,
-                                current_paragraph.as_mut().expect("paragraph checked above"),
-                            )?;
+                            if let Some(paragraph) = current_paragraph.as_mut() {
+                                Self::push_text_control(&reader, element, element_type, paragraph)?;
+                            }
                         },
                         _ if in_notes => {},
                         Element::UnknownAnimation if in_slide => {
@@ -1164,36 +1225,58 @@ impl Parser {
                             }
                         },
                         Element::Image if !shape_stack.is_empty() => {
-                            let builder = shape_stack.last_mut().expect("shape checked above");
-                            builder.shape_type = ShapeType::Picture;
-                            builder.image_href =
-                                Self::get_attr(&reader, element, XLINK_NAMESPACE, b"href")?;
+                            if let Some(builder) = shape_stack.last_mut() {
+                                builder.shape_type = ShapeType::Picture;
+                                builder.image_href =
+                                    Self::get_attr(&reader, element, XLINK_NAMESPACE, b"href")?;
+                            }
                         },
                         Element::Table if !shape_stack.is_empty() => {
-                            shape_stack
-                                .last_mut()
-                                .expect("shape checked above")
-                                .shape_type = ShapeType::Table;
+                            if let Some(builder) = shape_stack.last_mut() {
+                                builder.shape_type = ShapeType::Table;
+                            }
                         },
                         Element::Object if !shape_stack.is_empty() => {
-                            shape_stack
-                                .last_mut()
-                                .expect("shape checked above")
-                                .shape_type = ShapeType::GraphicFrame;
+                            if let Some(builder) = shape_stack.last_mut() {
+                                builder.shape_type = ShapeType::GraphicFrame;
+                            }
                         },
-                        _ => {},
+                        Element::Page
+                        | Element::Notes
+                        | Element::SheetShapes
+                        | Element::SpreadsheetRoot
+                        | Element::Image
+                        | Element::Table
+                        | Element::Object
+                        | Element::Plugin
+                        | Element::PluginParameter
+                        | Element::DrawingHyperlink
+                        | Element::EnhancedGeometry
+                        | Element::EnhancedEquation
+                        | Element::EnhancedHandle
+                        | Element::EventListeners
+                        | Element::EventListener
+                        | Element::ScriptEventListener
+                        | Element::Sound
+                        | Element::TextParagraph
+                        | Element::TextSpace
+                        | Element::TextTab
+                        | Element::TextLineBreak
+                        | Element::Animation(_)
+                        | Element::UnknownAnimation
+                        | Element::LegacyAnimation(_)
+                        | Element::Other => {},
                     }
                 },
                 Event::Text(ref text) if current_paragraph.is_some() => {
-                    let text = Self::decode_text(text)?;
-                    current_paragraph
-                        .as_mut()
-                        .expect("paragraph checked above")
-                        .push_text(&text);
+                    let decoded = Self::decode_text(text)?;
+                    if let Some(paragraph) = current_paragraph.as_mut() {
+                        paragraph.push_text(&decoded);
+                    }
                 },
                 Event::Text(ref text) if in_media_plugin => {
-                    let text = Self::decode_text(text)?;
-                    if !text.trim().is_empty() {
+                    let decoded = Self::decode_text(text)?;
+                    if !decoded.trim().is_empty() {
                         return Err(Error::InvalidFormat(
                             "draw:plugin cannot contain text".to_string(),
                         ));
@@ -1207,8 +1290,8 @@ impl Parser {
                         })
                     }) =>
                 {
-                    let text = Self::decode_text(text)?;
-                    if !text.trim().is_empty() {
+                    let decoded = Self::decode_text(text)?;
+                    if !decoded.trim().is_empty() {
                         return Err(Error::InvalidFormat(
                             "3D drawing elements cannot contain text".to_string(),
                         ));
@@ -1218,10 +1301,9 @@ impl Parser {
                     let decoded = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
                         Error::InvalidFormat(format!("invalid presentation CDATA: {error}"))
                     })?;
-                    current_paragraph
-                        .as_mut()
-                        .expect("paragraph checked above")
-                        .push_text(&decoded);
+                    if let Some(paragraph) = current_paragraph.as_mut() {
+                        paragraph.push_text(&decoded);
+                    }
                 },
                 Event::CData(ref text) if in_media_plugin => {
                     let decoded = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
@@ -1235,10 +1317,9 @@ impl Parser {
                 },
                 Event::GeneralRef(ref reference) if current_paragraph.is_some() => {
                     let text = Self::decode_reference(reference)?;
-                    current_paragraph
-                        .as_mut()
-                        .expect("paragraph checked above")
-                        .push_text(&text);
+                    if let Some(paragraph) = current_paragraph.as_mut() {
+                        paragraph.push_text(&text);
+                    }
                 },
                 Event::GeneralRef(_) if in_media_plugin => {
                     return Err(Error::InvalidFormat(
@@ -1307,22 +1388,24 @@ impl Parser {
                             slide_index += 1;
                         },
                         Element::EnhancedGeometry if !shape_stack.is_empty() => {
-                            let builder = shape_stack.last_mut().expect("shape checked above");
-                            if builder.drawing_kind != Some(DrawingShapeKind::CustomShape) {
-                                return Err(Error::InvalidFormat(
-                                    "draw:enhanced-geometry requires draw:custom-shape".to_string(),
-                                ));
+                            if let Some(builder) = shape_stack.last_mut() {
+                                if builder.drawing_kind != Some(DrawingShapeKind::CustomShape) {
+                                    return Err(Error::InvalidFormat(
+                                        "draw:enhanced-geometry requires draw:custom-shape"
+                                            .to_string(),
+                                    ));
+                                }
+                                if builder.enhanced_geometry.is_some() {
+                                    return Err(Error::InvalidFormat(
+                                        "draw:custom-shape contains multiple enhanced geometries"
+                                            .to_string(),
+                                    ));
+                                }
+                                builder.enhanced_geometry = Some(EnhancedGeometry {
+                                    attributes: Self::exact_geometry_attributes(&reader, element)?,
+                                    children: Vec::new(),
+                                });
                             }
-                            if builder.enhanced_geometry.is_some() {
-                                return Err(Error::InvalidFormat(
-                                    "draw:custom-shape contains multiple enhanced geometries"
-                                        .to_string(),
-                                ));
-                            }
-                            builder.enhanced_geometry = Some(EnhancedGeometry {
-                                attributes: Self::exact_geometry_attributes(&reader, element)?,
-                                children: Vec::new(),
-                            });
                         },
                         Element::EnhancedGeometry
                         | Element::EnhancedEquation
@@ -1361,23 +1444,24 @@ impl Parser {
                             ));
                         },
                         Element::EventListeners if !shape_stack.is_empty() => {
-                            let builder = shape_stack.last_mut().expect("shape checked above");
-                            if builder
-                                .drawing_kind
-                                .is_some_and(|kind| kind.is_three_dimensional())
-                            {
-                                return Err(Error::InvalidFormat(
-                                    "3D shapes cannot contain presentation event listeners"
-                                        .to_string(),
-                                ));
+                            if let Some(builder) = shape_stack.last_mut() {
+                                if builder
+                                    .drawing_kind
+                                    .is_some_and(DrawingShapeKind::is_three_dimensional)
+                                {
+                                    return Err(Error::InvalidFormat(
+                                        "3D shapes cannot contain presentation event listeners"
+                                            .to_string(),
+                                    ));
+                                }
+                                if builder.event_listeners_seen {
+                                    return Err(Error::InvalidFormat(
+                                        "ODP shape contains multiple office:event-listeners elements"
+                                            .to_string(),
+                                    ));
+                                }
+                                builder.event_listeners_seen = true;
                             }
-                            if builder.event_listeners_seen {
-                                return Err(Error::InvalidFormat(
-                                    "ODP shape contains multiple office:event-listeners elements"
-                                        .to_string(),
-                                ));
-                            }
-                            builder.event_listeners_seen = true;
                         },
                         Element::EventListeners
                         | Element::EventListener
@@ -1395,11 +1479,12 @@ impl Parser {
                                 && !in_media_parameter
                                 && !shape_stack.is_empty() =>
                         {
-                            shape_stack
+                            if let Some(media) = shape_stack
                                 .last_mut()
                                 .and_then(|builder| builder.media.as_mut())
-                                .expect("media plugin state checked above")
-                                .add_parameter(Self::media_parameter(&reader, element)?)?;
+                            {
+                                media.add_parameter(Self::media_parameter(&reader, element)?)?;
+                            }
                         },
                         _ if in_media_parameter => {
                             return Err(Error::InvalidFormat(
@@ -1425,12 +1510,9 @@ impl Parser {
                         Element::TextSpace | Element::TextTab | Element::TextLineBreak
                             if current_paragraph.is_some() =>
                         {
-                            Self::push_text_control(
-                                &reader,
-                                element,
-                                element_type,
-                                current_paragraph.as_mut().expect("paragraph checked above"),
-                            )?;
+                            if let Some(paragraph) = current_paragraph.as_mut() {
+                                Self::push_text_control(&reader, element, element_type, paragraph)?;
+                            }
                         },
                         _ if in_notes => {},
                         Element::LegacyAnimation(kind) if in_slide => {
@@ -1594,18 +1676,37 @@ impl Parser {
                                 );
                             }
                         },
-                        _ => {},
+                        Element::Page
+                        | Element::Notes
+                        | Element::SheetShapes
+                        | Element::SpreadsheetRoot
+                        | Element::Shape(_)
+                        | Element::PluginParameter
+                        | Element::DrawingHyperlink
+                        | Element::EnhancedGeometry
+                        | Element::EnhancedEquation
+                        | Element::EnhancedHandle
+                        | Element::EventListeners
+                        | Element::EventListener
+                        | Element::ScriptEventListener
+                        | Element::Sound
+                        | Element::TextParagraph
+                        | Element::TextSpace
+                        | Element::TextTab
+                        | Element::TextLineBreak
+                        | Element::Animation(_)
+                        | Element::UnknownAnimation
+                        | Element::LegacyAnimation(_)
+                        | Element::Other => {},
                     }
                 },
                 Event::End(ref element) => {
                     element_depth = element_depth.saturating_sub(1);
                     let element_type = Self::classify(&namespace, element.local_name().as_ref());
-                    if matches!(element_type, Element::TextParagraph) && current_paragraph.is_some()
+                    if matches!(element_type, Element::TextParagraph)
+                        && let Some(parsed_paragraph) = current_paragraph.take()
                     {
-                        let paragraph = current_paragraph
-                            .take()
-                            .expect("paragraph checked above")
-                            .finish();
+                        let paragraph = parsed_paragraph.finish();
                         Self::push_parsed_paragraph(
                             &paragraph,
                             in_notes,
@@ -1731,11 +1832,41 @@ impl Parser {
                                 );
                             }
                         },
-                        _ => {},
+                        Element::Page
+                        | Element::Notes
+                        | Element::SheetShapes
+                        | Element::SpreadsheetRoot
+                        | Element::Image
+                        | Element::Table
+                        | Element::Object
+                        | Element::Plugin
+                        | Element::PluginParameter
+                        | Element::DrawingHyperlink
+                        | Element::EnhancedGeometry
+                        | Element::EnhancedEquation
+                        | Element::EnhancedHandle
+                        | Element::EventListeners
+                        | Element::EventListener
+                        | Element::ScriptEventListener
+                        | Element::Sound
+                        | Element::TextParagraph
+                        | Element::TextSpace
+                        | Element::TextTab
+                        | Element::TextLineBreak
+                        | Element::Animation(_)
+                        | Element::UnknownAnimation
+                        | Element::LegacyAnimation(_)
+                        | Element::Other => {},
                     }
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {},
             }
             buf.clear();
         }

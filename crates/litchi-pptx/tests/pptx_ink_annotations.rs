@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use litchi_opc::XmlPart;
 use litchi_opc::constants::relationship_type::CUSTOM_XML;
 use litchi_opc::{OpcError, OpcPackage, PackURI};
@@ -67,7 +73,7 @@ fn package_with_ink() -> Package {
     package.save(output.path()).unwrap();
 
     let package = Package::open(output.path()).unwrap();
-    edit_package(package, |opc| install_local_ink(opc))
+    edit_package(package, install_local_ink)
 }
 
 fn install_local_ink(package: &mut OpcPackage) {

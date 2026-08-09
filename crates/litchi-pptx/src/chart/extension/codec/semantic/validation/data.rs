@@ -1,6 +1,11 @@
-//! Chart data and dimensions validation concerns for the ChartEx graph.
+//! Chart data and dimensions validation concerns for the `ChartEx` graph.
 
-use super::*;
+use super::{
+    CX, DataSet, Dimension, Formula, FormulaDirection, MAX_FORMULA_BYTES, MAX_LEVELS_PER_DIMENSION,
+    MAX_POINTS_PER_LEVEL, MiniNode, NumericDimensionType, NumericLevel, NumericPoint, Result,
+    SeriesDataReference, StringDimensionType, StringLevel, StringPoint, bounded_optional, invalid,
+    limit, optional, parse_u32, reject_unknown, required, valid_xml_double,
+};
 use std::collections::HashSet;
 
 pub(super) fn validate_series_point_references(
@@ -168,7 +173,7 @@ pub(super) fn dimension_children(
         match child.name.as_str() {
             "f" if formula.is_none() && levels.is_empty() => formula = Some(parse_formula(child)?),
             "nf" if formula.is_some() && name_formula.is_none() && levels.is_empty() => {
-                name_formula = Some(parse_formula(child)?)
+                name_formula = Some(parse_formula(child)?);
             },
             "lvl" => levels.push(child),
             _ => return invalid(" dimension formula/literal choice is invalid"),

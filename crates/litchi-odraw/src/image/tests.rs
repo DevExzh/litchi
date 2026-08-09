@@ -11,7 +11,7 @@ fn record(version: u8, instance: u16, kind: u16, body: &[u8]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(8 + body.len());
     bytes.extend_from_slice(&(u16::from(version) | (instance << 4)).to_le_bytes());
     bytes.extend_from_slice(&kind.to_le_bytes());
-    bytes.extend_from_slice(&(body.len() as u32).to_le_bytes());
+    bytes.extend_from_slice(&u32::try_from(body.len()).unwrap().to_le_bytes());
     bytes.extend_from_slice(body);
     bytes
 }
@@ -38,11 +38,11 @@ fn parses_borrowed_two_uid_bitmap_and_retains_jpeg_flavor() {
     assert_eq!(bitmap.data().as_ptr(), bytes[8 + 33..].as_ptr());
 
     let jpeg = record(0, 0x46A, 0xF02A, &png_body(false, b"jpeg"));
-    let Blip::Jpeg(bitmap) = Blip::parse(&jpeg).expect("valid alternate JPEG") else {
+    let Blip::Jpeg(jpeg_bitmap) = Blip::parse(&jpeg).expect("valid alternate JPEG") else {
         panic!("expected JPEG")
     };
-    assert_eq!(bitmap.jpeg_flavor(), Some(JpegFlavor::Alternate));
-    assert_eq!(bitmap.record().raw_kind(), 0xF02A);
+    assert_eq!(jpeg_bitmap.jpeg_flavor(), Some(JpegFlavor::Alternate));
+    assert_eq!(jpeg_bitmap.record().raw_kind(), 0xF02A);
 }
 
 #[test]
@@ -85,21 +85,21 @@ fn preserves_unknown_file_block_kinds() {
 #[test]
 fn lazily_validates_direct_and_fbse_store_blocks() {
     let png = record(0, 0x6E0, 0xF01E, &png_body(false, b"x"));
-    let mut fbse = Vec::new();
-    fbse.extend_from_slice(&[Kind::Png.raw(), Kind::Pict.raw()]);
-    fbse.extend_from_slice(&[1; 16]);
-    fbse.extend_from_slice(&0u16.to_le_bytes());
-    fbse.extend_from_slice(&(png.len() as u32).to_le_bytes());
-    fbse.extend_from_slice(&1u32.to_le_bytes());
-    fbse.extend_from_slice(&0u32.to_le_bytes());
-    fbse.extend_from_slice(&[0; 4]);
-    fbse.extend_from_slice(&png);
-    let fbse = record(2, u16::from(Kind::Png.raw()), 0xF007, &fbse);
+    let mut fbse_body = Vec::new();
+    fbse_body.extend_from_slice(&[Kind::Png.raw(), Kind::Pict.raw()]);
+    fbse_body.extend_from_slice(&[1; 16]);
+    fbse_body.extend_from_slice(&0u16.to_le_bytes());
+    fbse_body.extend_from_slice(&u32::try_from(png.len()).unwrap().to_le_bytes());
+    fbse_body.extend_from_slice(&1u32.to_le_bytes());
+    fbse_body.extend_from_slice(&0u32.to_le_bytes());
+    fbse_body.extend_from_slice(&[0; 4]);
+    fbse_body.extend_from_slice(&png);
+    let fbse = record(2, u16::from(Kind::Png.raw()), 0xF007, &fbse_body);
 
     let mut body = fbse;
     body.extend_from_slice(&png);
-    let store = record(0x0F, 2, 0xF001, &body);
-    let store = Store::parse(&store).expect("valid store");
+    let store_record = record(0x0F, 2, 0xF001, &body);
+    let store = Store::parse(&store_record).expect("valid store");
     assert_eq!(store.len(), 2);
     let Some(Block::Entry(entry)) = store.get(Id::new(1).unwrap()).unwrap() else {
         panic!("expected FBSE")
@@ -115,17 +115,17 @@ fn lazily_validates_direct_and_fbse_store_blocks() {
 #[test]
 fn resolves_delay_offset_zero_and_rejects_missing_context() {
     let png = record(0, 0x6E0, 0xF01E, &png_body(false, b"x"));
-    let mut fbse = Vec::new();
-    fbse.extend_from_slice(&[Kind::Png.raw(), Kind::Png.raw()]);
-    fbse.extend_from_slice(&[1; 16]);
-    fbse.extend_from_slice(&0u16.to_le_bytes());
-    fbse.extend_from_slice(&(png.len() as u32).to_le_bytes());
-    fbse.extend_from_slice(&1u32.to_le_bytes());
-    fbse.extend_from_slice(&0u32.to_le_bytes());
-    fbse.extend_from_slice(&[0; 4]);
-    let fbse = record(2, u16::from(Kind::Png.raw()), 0xF007, &fbse);
-    let store = record(0x0F, 1, 0xF001, &fbse);
-    let store = Store::parse(&store).unwrap();
+    let mut fbse_body = Vec::new();
+    fbse_body.extend_from_slice(&[Kind::Png.raw(), Kind::Png.raw()]);
+    fbse_body.extend_from_slice(&[1; 16]);
+    fbse_body.extend_from_slice(&0u16.to_le_bytes());
+    fbse_body.extend_from_slice(&u32::try_from(png.len()).unwrap().to_le_bytes());
+    fbse_body.extend_from_slice(&1u32.to_le_bytes());
+    fbse_body.extend_from_slice(&0u32.to_le_bytes());
+    fbse_body.extend_from_slice(&[0; 4]);
+    let fbse = record(2, u16::from(Kind::Png.raw()), 0xF007, &fbse_body);
+    let store_record = record(0x0F, 1, 0xF001, &fbse);
+    let store = Store::parse(&store_record).unwrap();
     let id = Id::new(1).unwrap();
     assert_eq!(
         store.resolve(id, Context::new()).unwrap_err(),

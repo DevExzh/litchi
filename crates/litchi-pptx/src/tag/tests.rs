@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use litchi_opc::{OpcPackage, PackURI, XmlPart};
 
 use super::model::escaped_len;
@@ -379,9 +385,9 @@ fn mce_owner_fixture(
     };
     let common_slide = root != "presentation";
     let active = if common_slide {
-        format!(r#"<p:spTree/>{active_container}<p:extLst/>"#)
+        format!(r"<p:spTree/>{active_container}<p:extLst/>")
     } else {
-        format!(r#"{active_container}<p:defaultTextStyle/>"#)
+        format!(r"{active_container}<p:defaultTextStyle/>")
     };
     let inactive = if common_slide {
         r#"<p:spTree/><p:custDataLst x:keep="inactive"><!--inactive-comment--><p:tags r:id="rIdInactive"/></p:custDataLst><p:extLst/>"#.to_owned()
@@ -393,7 +399,7 @@ fn mce_owner_fixture(
             format!(
                 r#"<mc:Choice Requires="p14">{active}</mc:Choice><mc:Fallback>{inactive}</mc:Fallback>"#
             ),
-            format!(r#"<mc:Fallback>{inactive}</mc:Fallback>"#),
+            format!(r"<mc:Fallback>{inactive}</mc:Fallback>"),
         ),
         MceBranch::Fallback => (
             format!(
@@ -403,9 +409,9 @@ fn mce_owner_fixture(
         ),
     };
     let body = if common_slide {
-        format!(r#"<p:cSld><mc:AlternateContent>{alternate}</mc:AlternateContent></p:cSld>"#)
+        format!(r"<p:cSld><mc:AlternateContent>{alternate}</mc:AlternateContent></p:cSld>")
     } else {
-        format!(r#"<mc:AlternateContent>{alternate}</mc:AlternateContent>"#)
+        format!(r"<mc:AlternateContent>{alternate}</mc:AlternateContent>")
     };
     (
             format!(
@@ -596,7 +602,7 @@ fn malformed_owner_order_is_rejected_before_mutation() {
         package.add_part(Box::new(XmlPart::new(
             owner.clone(),
             "application/vnd.openxmlformats-officedocument.presentationml.slide+xml".into(),
-            format!(r#"<p:sld xmlns:p="{PML_TEXT}" xmlns:r="{REL_TEXT}">{body}</p:sld>"#,)
+            format!(r#"<p:sld xmlns:p="{PML_TEXT}" xmlns:r="{REL_TEXT}">{body}</p:sld>"#)
                 .into_bytes(),
         )));
         let owner_before = package.get_part(&owner).unwrap().blob_arc();

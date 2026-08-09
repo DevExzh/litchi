@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{
     BodyStoryEvent, Cell, CellStoryEvent, FieldOwner, NoteSeparatorElement, NoteSeparatorKind,
     RtfDocument, RtfWriter, Shape, ShapeGroup, ShapeType, StoryDrawing, StoryEvent, StoryField,
@@ -52,8 +61,7 @@ fn field_index(document: &RtfDocument<'_>, instruction: &str) -> usize {
 #[test]
 fn owns_and_round_trips_equal_offset_drawings_in_supported_substreams() {
     let source = format!(
-        "{{\\rtf1\\ansi{{\\*\\ftnsep N{{\\b {drawings}}}\\chftnsep\\par}}\\trowd\\cellx1200\\intbl C{{\\i {drawings}}}D\\cell\\row}}",
-        drawings = GROUP_THEN_SHAPE,
+        "{{\\rtf1\\ansi{{\\*\\ftnsep N{{\\b {GROUP_THEN_SHAPE}}}\\chftnsep\\par}}\\trowd\\cellx1200\\intbl C{{\\i {GROUP_THEN_SHAPE}}}D\\cell\\row}}",
     );
     let document = RtfDocument::parse(&source).unwrap();
 

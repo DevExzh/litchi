@@ -1,6 +1,11 @@
 //! Namespace, attribute, and structural validation for ODP XML.
 
-use super::super::*;
+use super::super::{
+    Attribute, BytesStart, DR3D_NAMESPACE, DRAW_NAMESPACE, DrawingAttribute,
+    DrawingAttributeNamespace, DrawingShapeKind, Element, Error, HashSet, Namespace, NsReader,
+    Parser, ResolveResult, Result, SVG_NAMESPACE, ShapeBuilder, XLINK_NAMESPACE, XmlNamespace,
+    XmlVersion,
+};
 
 impl Parser {
     pub(super) fn validate_shape_parent(
@@ -61,7 +66,31 @@ impl Parser {
             // `svg:title`, `svg:desc`, `draw:glue-point`, and foreign
             // extension elements are intentionally handled as opaque content.
             Element::Other => Ok(()),
-            _ => Err(Error::InvalidFormat(
+            Element::Page
+            | Element::Notes
+            | Element::SheetShapes
+            | Element::SpreadsheetRoot
+            | Element::Shape(_)
+            | Element::Image
+            | Element::Table
+            | Element::Object
+            | Element::Plugin
+            | Element::PluginParameter
+            | Element::DrawingHyperlink
+            | Element::EnhancedGeometry
+            | Element::EnhancedEquation
+            | Element::EnhancedHandle
+            | Element::EventListeners
+            | Element::EventListener
+            | Element::ScriptEventListener
+            | Element::Sound
+            | Element::TextParagraph
+            | Element::TextSpace
+            | Element::TextTab
+            | Element::TextLineBreak
+            | Element::Animation(_)
+            | Element::UnknownAnimation
+            | Element::LegacyAnimation(_) => Err(Error::InvalidFormat(
                 "dr3d:scene can only contain 3D content".to_string(),
             )),
         }
@@ -131,11 +160,11 @@ impl Parser {
         attribute: &str,
     ) -> Result<Option<bool>> {
         value
-            .map(|value| match value.as_str() {
+            .map(|text| match text.as_str() {
                 "true" | "1" => Ok(true),
                 "false" | "0" => Ok(false),
                 _ => Err(Error::InvalidFormat(format!(
-                    "invalid {attribute} value '{value}'"
+                    "invalid {attribute} value '{text}'"
                 ))),
             })
             .transpose()
@@ -166,15 +195,16 @@ impl Parser {
         }
         let mut attributes = Vec::with_capacity(element.attributes().count());
         let mut expanded_names = HashSet::new();
-        for attribute in element.attributes() {
-            let attribute = attribute
+        for attribute_result in element.attributes() {
+            let attribute = attribute_result
                 .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
             let qualified_name = attribute.key.as_ref();
             if qualified_name == b"xmlns" || qualified_name.starts_with(b"xmlns:") {
                 continue;
             }
-            let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
-            let namespace_uri = match namespace {
+            let (resolved_namespace, local_name) =
+                reader.resolver().resolve_attribute(attribute.key);
+            let namespace_uri = match resolved_namespace {
                 ResolveResult::Unbound => None,
                 ResolveResult::Bound(XmlNamespace(uri)) => {
                     Some(std::str::from_utf8(uri).map_err(|_err| {
@@ -188,15 +218,15 @@ impl Parser {
                     )));
                 },
             };
-            let local_name = std::str::from_utf8(local_name.as_ref())
+            let local_name_text = std::str::from_utf8(local_name.as_ref())
                 .map_err(|_err| {
                     Error::InvalidFormat("non-UTF-8 animation attribute name".to_string())
                 })?
                 .to_string();
             let namespace = Namespace::from_uri(namespace_uri);
-            if !expanded_names.insert((namespace.clone(), local_name.clone())) {
+            if !expanded_names.insert((namespace.clone(), local_name_text.clone())) {
                 return Err(Error::InvalidFormat(format!(
-                    "duplicate animation attribute '{local_name}'"
+                    "duplicate animation attribute '{local_name_text}'"
                 )));
             }
             let value = attribute
@@ -210,7 +240,7 @@ impl Parser {
                     "ODP animation attribute exceeds 1 MiB".to_string(),
                 ));
             }
-            attributes.push(Attribute::from_parsed(namespace, local_name, value)?);
+            attributes.push(Attribute::from_parsed(namespace, local_name_text, value)?);
         }
         Ok(attributes)
     }
@@ -220,16 +250,17 @@ impl Parser {
         element: &BytesStart<'_>,
     ) -> Result<Vec<DrawingAttribute>> {
         let mut attributes = Vec::new();
-        for attribute in element.attributes() {
-            let attribute = attribute.map_err(|error| {
+        for attribute_result in element.attributes() {
+            let attribute = attribute_result.map_err(|error| {
                 Error::InvalidFormat(format!("invalid enhanced-geometry attribute: {error}"))
             })?;
-            let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
-            let namespace = if Self::is_namespace(&namespace, DRAW_NAMESPACE) {
+            let (resolved_namespace, local_name) =
+                reader.resolver().resolve_attribute(attribute.key);
+            let namespace = if Self::is_namespace(&resolved_namespace, DRAW_NAMESPACE) {
                 DrawingAttributeNamespace::Drawing
-            } else if Self::is_namespace(&namespace, SVG_NAMESPACE) {
+            } else if Self::is_namespace(&resolved_namespace, SVG_NAMESPACE) {
                 DrawingAttributeNamespace::Svg
-            } else if Self::is_namespace(&namespace, DR3D_NAMESPACE) {
+            } else if Self::is_namespace(&resolved_namespace, DR3D_NAMESPACE) {
                 DrawingAttributeNamespace::Dr3d
             } else {
                 continue;
@@ -260,8 +291,8 @@ impl Parser {
         namespace_uri: &[u8],
         local_name: &[u8],
     ) -> Result<Option<String>> {
-        for attribute in element.attributes() {
-            let attribute = attribute
+        for attribute_result in element.attributes() {
+            let attribute = attribute_result
                 .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
             let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
             if Self::is_namespace(&namespace, namespace_uri) && local.as_ref() == local_name {

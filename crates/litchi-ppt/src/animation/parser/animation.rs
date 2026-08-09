@@ -1,5 +1,6 @@
-//! PowerPoint 97 animation-info records.
+//! `PowerPoint` 97 animation-info records.
 
+use super::support::{read_i16, read_i32, read_u16, read_u32};
 use crate::animation::triggers::IterationType;
 use crate::animation::types::{
     AfterEffect, AnimationInfo, LegacyAnimationAtom, LegacyAnimationBuild, LegacyAnimationEffect,
@@ -9,7 +10,11 @@ use crate::consts::RecordType;
 use crate::package::{Error, Result};
 use crate::records::Record;
 
-/// Parse animation info from AnimationInfo container record.
+/// Parse animation info from `AnimationInfo` container record.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_animation_info(record: &Record) -> Result<AnimationInfo> {
     if record.record_type != RecordType::AnimationInfo {
         return Err(Error::InvalidFormat(format!(
@@ -53,7 +58,12 @@ pub fn parse_animation_info(record: &Record) -> Result<AnimationInfo> {
     Ok(info)
 }
 
-/// Parse the exact PowerPoint 97 `AnimationInfoAtom` payload.
+/// Parse the exact `PowerPoint` 97 `AnimationInfoAtom` payload.
+///
+/// # Errors
+///
+/// Returns an error if the record is not a 28-byte version-1 `AnimationInfoAtom`,
+/// or if any field holds a value the format does not permit.
 pub fn parse_animation_info_atom(record: &Record) -> Result<LegacyAnimationAtom> {
     if record.record_type != RecordType::AnimationInfoAtom {
         return Err(Error::InvalidFormat(format!(
@@ -70,8 +80,8 @@ pub fn parse_animation_info_atom(record: &Record) -> Result<LegacyAnimationAtom>
         )));
     }
 
-    let dim_color = u32::from_le_bytes(record.data[0..4].try_into().expect("length checked"));
-    let flags = u16::from_le_bytes(record.data[4..6].try_into().expect("length checked"));
+    let dim_color = read_u32(&record.data, 0);
+    let flags = read_u16(&record.data, 4);
     let mut decoded_flags = [false; 8];
     for (index, decoded) in decoded_flags.iter_mut().enumerate() {
         let value = (flags >> (index * 2)) & 0x03;
@@ -82,20 +92,20 @@ pub fn parse_animation_info_atom(record: &Record) -> Result<LegacyAnimationAtom>
         }
         *decoded = value == 1;
     }
-    let sound_id_ref = u32::from_le_bytes(record.data[8..12].try_into().expect("length checked"));
-    let delay_time_ms = i32::from_le_bytes(record.data[12..16].try_into().expect("length checked"));
+    let sound_id_ref = read_u32(&record.data, 8);
+    let delay_time_ms = read_i32(&record.data, 12);
     if decoded_flags[1] && delay_time_ms < 0 {
         return Err(Error::InvalidFormat(
             "automatic AnimationInfoAtom has a negative delay".to_string(),
         ));
     }
-    let order_id = i16::from_le_bytes(record.data[16..18].try_into().expect("length checked"));
+    let order_id = read_i16(&record.data, 16);
     if order_id < -2 {
         return Err(Error::InvalidFormat(format!(
             "AnimationInfoAtom orderID {order_id} is less than -2"
         )));
     }
-    let slide_count = u16::from_le_bytes(record.data[18..20].try_into().expect("length checked"));
+    let slide_count = read_u16(&record.data, 18);
     let build_type = LegacyAnimationBuild::parse(record.data[20]).ok_or_else(|| {
         Error::InvalidFormat(format!(
             "invalid AnimationInfoAtom animBuildType {:#04X}",

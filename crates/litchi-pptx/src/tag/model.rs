@@ -1,4 +1,8 @@
-use super::*;
+use super::{
+    EMPTY_WIRE_BYTES, MAX_PART_BYTES, MAX_TAGS, NONEMPTY_WIRE_BYTES, PML_TEXT, REL_TEXT,
+    STRICT_REL_TEXT, STRICT_TAG_REL, STRICT_TEXT, TAG_CLOSE, TAG_OPEN, TAG_REL, allocation,
+    bounded_text, invalid, is_namespace, validate_qname, write,
+};
 use crate::{Error, Result};
 use caseless::Caseless;
 use litchi_opc::PackURI;
@@ -50,6 +54,10 @@ pub mod raw {
 
     impl Attr {
         /// Construct a bounded XML attribute without interpreting its value.
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the operation fails.
         pub fn new(qualified_name: impl Into<String>, value: impl Into<String>) -> Result<Self> {
             let qualified_name = qualified_name.into();
             let value = value.into();
@@ -62,11 +70,13 @@ pub mod raw {
         }
 
         /// Return the retained qualified spelling.
+        #[must_use]
         pub fn qualified_name(&self) -> &str {
             &self.qualified_name
         }
 
         /// Return the inert retained value.
+        #[must_use]
         pub fn value(&self) -> &str {
             &self.value
         }
@@ -107,6 +117,10 @@ pub struct Tag {
 
 impl Tag {
     /// Construct an owned name/value pair.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(name: impl Into<String>, value: impl Into<String>) -> Result<Self> {
         let name = name.into();
         let value = value.into();
@@ -124,21 +138,25 @@ impl Tag {
     }
 
     /// Return the producer spelling of the name.
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Return the inert string value.
+    #[must_use]
     pub fn value(&self) -> &str {
         &self.value
     }
 
     /// Return retained extension namespace declarations.
+    #[must_use]
     pub fn namespaces(&self) -> &[raw::Attr] {
         &self.namespaces
     }
 
     /// Return retained extension attributes.
+    #[must_use]
     pub fn attrs(&self) -> &[raw::Attr] {
         &self.attrs
     }
@@ -147,6 +165,10 @@ impl Tag {
     ///
     /// In-list renames should use [`List::replace`] so uniqueness is checked
     /// against the complete list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn rename(&mut self, name: impl Into<String>) -> Result<()> {
         let name = name.into();
         bounded_text(&name, "tag name")?;
@@ -159,6 +181,10 @@ impl Tag {
     }
 
     /// Replace the inert value, returning the previous allocation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_value(&mut self, value: impl Into<String>) -> Result<String> {
         let value = value.into();
         bounded_text(&value, "tag value")?;
@@ -174,6 +200,10 @@ impl Tag {
     }
 
     /// Add one local namespace declaration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn with_namespace(mut self, attr: raw::Attr) -> Result<Self> {
         check_namespace(&self.namespaces, &self.attrs, &attr, &["p", "xml"])?;
         let wire_len = checked_wire_add(self.wire_len, attr_wire_len(&attr)?)?;
@@ -184,6 +214,10 @@ impl Tag {
     }
 
     /// Add one prefixed inert extension attribute.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn with_attr(mut self, attr: raw::Attr) -> Result<Self> {
         check_extension(&self.attrs, &self.namespaces, &attr, &["p", "xml"])?;
         let wire_len = checked_wire_add(self.wire_len, attr_wire_len(&attr)?)?;
@@ -196,7 +230,7 @@ impl Tag {
 
 /// A detached, source-ordered programmable-tag list.
 ///
-/// The checked-in `[MS-OE376]` section 2.1.1170(c) states that PowerPoint
+/// The checked-in `[MS-OE376]` section 2.1.1170(c) states that `PowerPoint`
 /// requires names within one `tagLst` to be case-insensitively unique. One
 /// NFD/default-case-fold/NFD identity therefore drives lookup and every CRUD
 /// operation while producer spelling remains unchanged. Parsing retains
@@ -212,6 +246,7 @@ pub struct List {
 
 impl List {
     /// Construct an empty list.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             tags: Vec::new(),
@@ -222,36 +257,46 @@ impl List {
     }
 
     /// Return all tags in source order.
+    #[must_use]
     pub fn tags(&self) -> &[Tag] {
         &self.tags
     }
 
     /// Iterate without exposing a mutable slice that could violate uniqueness.
+    #[must_use]
     pub fn iter(&self) -> impl ExactSizeIterator<Item = &Tag> {
         self.tags.iter()
     }
 
     /// Return the number of tags.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.tags.len()
     }
 
     /// Report whether the list is empty.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.tags.is_empty()
     }
 
     /// Return retained root namespace declarations.
+    #[must_use]
     pub fn namespaces(&self) -> &[raw::Attr] {
         &self.namespaces
     }
 
     /// Return retained root extension attributes.
+    #[must_use]
     pub fn attrs(&self) -> &[raw::Attr] {
         &self.attrs
     }
 
     /// Select by semantic name or checked numeric position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn get<'a, 'k>(&'a self, key: impl Into<Key<'k>>) -> Result<&'a Tag> {
         let offset = self.offset(key.into())?;
         self.tags.get(offset).ok_or(Error::IndexOutOfBounds {
@@ -261,6 +306,10 @@ impl List {
     }
 
     /// Append an owned tag without copying its strings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add(&mut self, tag: Tag) -> Result<()> {
         self.ensure_can_add(&tag, None)?;
         let wire_len = self.wire_after_add(&tag)?;
@@ -270,6 +319,10 @@ impl List {
     }
 
     /// Insert an owned tag at a checked source-order position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn insert(&mut self, index: usize, tag: Tag) -> Result<()> {
         if index > self.tags.len() {
             return Err(Error::IndexOutOfBounds {
@@ -286,6 +339,10 @@ impl List {
 
     /// Replace a selected tag by moving in its successor and returning the old
     /// allocation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace<'k>(&mut self, key: impl Into<Key<'k>>, tag: Tag) -> Result<Tag> {
         let offset = self.offset(key.into())?;
         self.ensure_can_add(&tag, Some(offset))?;
@@ -310,6 +367,10 @@ impl List {
     }
 
     /// Replace only a selected tag's inert value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set<'k>(&mut self, key: impl Into<Key<'k>>, value: impl Into<String>) -> Result<String> {
         let offset = self.offset(key.into())?;
         let value = value.into();
@@ -335,6 +396,10 @@ impl List {
     }
 
     /// Remove and return a selected tag without panicking on a stale selector.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove<'k>(&mut self, key: impl Into<Key<'k>>) -> Result<Tag> {
         let offset = self.offset(key.into())?;
         let removed_wire_len =
@@ -372,6 +437,10 @@ impl List {
     ///
     /// `list.reorder(&["second", "first"])` is the semantic common path;
     /// `list.reorder(&[1_usize, 0])` supports source-order repair tooling.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn reorder<'k, K>(&mut self, order: &'k [K]) -> Result<()>
     where
         K: Copy + Into<Key<'k>>,
@@ -412,11 +481,16 @@ impl List {
     }
 
     /// Move all owned tags out of this list.
+    #[must_use]
     pub fn into_tags(self) -> Vec<Tag> {
         self.tags
     }
 
     /// Add one root namespace declaration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn with_namespace(mut self, attr: raw::Attr) -> Result<Self> {
         check_namespace(&self.namespaces, &self.attrs, &attr, &["p", "xml"])?;
         let wire_len = checked_wire_add(self.wire_len, attr_wire_len(&attr)?)?;
@@ -427,6 +501,10 @@ impl List {
     }
 
     /// Add one prefixed inert root extension attribute.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn with_attr(mut self, attr: raw::Attr) -> Result<Self> {
         check_extension(&self.attrs, &self.namespaces, &attr, &["p", "xml"])?;
         let wire_len = checked_wire_add(self.wire_len, attr_wire_len(&attr)?)?;
@@ -437,6 +515,10 @@ impl List {
     }
 
     /// Encode with the requested namespace conformance.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn xml(&self, conformance: Conformance) -> Result<Vec<u8>> {
         write(self, conformance)
     }
@@ -531,33 +613,39 @@ pub struct Source {
 }
 
 impl Source {
-    /// Return the relationship ID on the source PresentationML part.
+    /// Return the relationship ID on the source `PresentationML` part.
+    #[must_use]
     pub fn rel(&self) -> &str {
         &self.relationship_id
     }
 
     /// Return the typed absolute target part name.
+    #[must_use]
     pub fn part(&self) -> &PackURI {
         &self.part_name
     }
 
     /// Return the namespace profile detected from the source tag-list root.
+    #[must_use]
     pub fn conformance(&self) -> Conformance {
         self.conformance
     }
 
     /// Borrow the parsed list.
+    #[must_use]
     pub fn list(&self) -> &List {
         &self.list
     }
 
     /// Move the parsed list out of its source descriptor.
+    #[must_use]
     pub fn into_list(self) -> List {
         self.list
     }
 }
 
 /// Report whether a relationship type identifies a tag-list part.
+#[must_use]
 pub fn is_relationship(value: &str) -> bool {
     matches!(value, TAG_REL | STRICT_TAG_REL)
 }

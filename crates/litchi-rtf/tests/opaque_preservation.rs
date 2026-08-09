@@ -1,8 +1,33 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::opaque::{Anchor, Context, Kind};
 use litchi_rtf::{
     DefaultTabWidthPolicy, Document, ParseLimits, RtfDocument, RtfError, RtfWriter, WriterOptions,
 };
 use std::io::{self, Write};
+
+#[derive(Default)]
+struct WriteProbe {
+    touched: bool,
+}
+
+impl Write for WriteProbe {
+    fn write(&mut self, _buffer: &[u8]) -> io::Result<usize> {
+        self.touched = true;
+        Err(io::Error::other("unexpected sink write"))
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
 
 #[test]
 fn immutable_snapshot_preserves_unknown_syntax_byte_for_byte() {
@@ -107,7 +132,7 @@ fn nested_header_syntax_keeps_its_owner_and_refuses_reparenting() {
     let error = RtfWriter::new(&mut output)
         .write_document(&document)
         .unwrap_err();
-    assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+    assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
     assert!(output.is_empty());
 }
 
@@ -168,22 +193,6 @@ fn field_and_note_syntax_retain_their_structural_contexts() {
                 .is_err()
         );
         assert!(output.is_empty());
-    }
-}
-
-#[derive(Default)]
-struct WriteProbe {
-    touched: bool,
-}
-
-impl Write for WriteProbe {
-    fn write(&mut self, _buffer: &[u8]) -> io::Result<usize> {
-        self.touched = true;
-        Err(io::Error::other("unexpected sink write"))
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
     }
 }
 

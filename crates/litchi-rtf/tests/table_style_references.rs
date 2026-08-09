@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{Row, RtfDocument, RtfWriter, StyleType};
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
@@ -53,27 +62,27 @@ fn preserves_zero_maximum_omission_and_public_mutation() {
 #[test]
 fn rejects_malformed_body_and_stylesheet_handles_and_duplicate_selectors() {
     for source in [
-        r#"{\rtf1\trowd\ts\cellx1000\intbl X\cell\row}"#,
-        r#"{\rtf1\trowd\ts-1\cellx1000\intbl X\cell\row}"#,
-        r#"{\rtf1\trowd\ts65536\cellx1000\intbl X\cell\row}"#,
-        r#"{\rtf1{\stylesheet{\*\ts Missing;}}}"#,
-        r#"{\rtf1{\stylesheet{\*\ts-1 Negative;}}}"#,
-        r#"{\rtf1{\stylesheet{\*\ts65536 Overflow;}}}"#,
-        r#"{\rtf1{\stylesheet{\ts1 Unstarred;}}}"#,
-        r#"{\rtf1{\stylesheet{\*\b\ts1 Late;}}}"#,
-        r#"{\rtf1{\stylesheet{\*\ts1\ts2 Duplicate;}}}"#,
+        r"{\rtf1\trowd\ts\cellx1000\intbl X\cell\row}",
+        r"{\rtf1\trowd\ts-1\cellx1000\intbl X\cell\row}",
+        r"{\rtf1\trowd\ts65536\cellx1000\intbl X\cell\row}",
+        r"{\rtf1{\stylesheet{\*\ts Missing;}}}",
+        r"{\rtf1{\stylesheet{\*\ts-1 Negative;}}}",
+        r"{\rtf1{\stylesheet{\*\ts65536 Overflow;}}}",
+        r"{\rtf1{\stylesheet{\ts1 Unstarred;}}}",
+        r"{\rtf1{\stylesheet{\*\b\ts1 Late;}}}",
+        r"{\rtf1{\stylesheet{\*\ts1\ts2 Duplicate;}}}",
     ] {
         assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
     }
 
     let inert =
-        RtfDocument::parse(r#"{\rtf1{\field{\*\fldinst TEST \ts65536}{\fldrslt Result}}Body}"#)
+        RtfDocument::parse(r"{\rtf1{\field{\*\fldinst TEST \ts65536}{\fldrslt Result}}Body}")
             .unwrap();
     assert!(
         inert
             .tables()
             .iter()
-            .flat_map(|table| table.rows())
+            .flat_map(litchi_rtf::raw::Table::rows)
             .all(|row| row.table_style().is_none())
     );
 }
@@ -94,8 +103,8 @@ fn canonical_writer_round_trips_outer_and_nested_row_references_stably() {
 
     let first = write(&document);
     let serialized = String::from_utf8(first.clone()).unwrap();
-    assert!(serialized.contains(r#"\trowd\ts3"#));
-    assert!(serialized.contains(r#"\trowd\ts4"#));
+    assert!(serialized.contains(r"\trowd\ts3"));
+    assert!(serialized.contains(r"\trowd\ts4"));
     let reparsed = RtfDocument::parse_bytes(&first).unwrap();
     assert_eq!(reparsed.stylesheet(), document.stylesheet());
     assert_eq!(reparsed.tables()[0].rows()[0].table_style(), Some(3));
@@ -125,7 +134,7 @@ fn parses_libreoffice_table_style_declaration_and_body_references() {
         document
             .tables()
             .iter()
-            .flat_map(|table| table.rows())
+            .flat_map(litchi_rtf::raw::Table::rows)
             .any(|row| row.table_style() == Some(11))
     );
 }

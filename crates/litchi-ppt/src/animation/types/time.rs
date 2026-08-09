@@ -1,8 +1,8 @@
-//! PowerPoint 2002 time-node and behavior data types.
+//! `PowerPoint` 2002 time-node and behavior data types.
 
 use super::build::ChartBuildType;
 
-/// Exact PowerPoint 2002 extended time-node container envelope.
+/// Exact `PowerPoint` 2002 extended time-node container envelope.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ExtendedTimeNode {
     /// Required first atom containing time-node attributes.
@@ -64,7 +64,7 @@ pub enum TimeSubEffectBehavior {
     Command(TimeCommandBehavior),
 }
 
-/// Exact fields controlled by a PowerPoint 2002 `TimeNodeAtom`.
+/// Exact fields controlled by a `PowerPoint` 2002 `TimeNodeAtom`.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct TimeNodeAtom {
     /// Fill behavior when explicitly set; otherwise the format default applies.
@@ -201,21 +201,34 @@ pub enum TimeEffectType {
 }
 
 pub(crate) fn has_valid_time_effect_properties(properties: &[TimeNodeProperty]) -> bool {
-    let mut effect_id = None;
-    let mut direction = None;
-    let mut effect_type = None;
+    let mut maybe_effect_id = None;
+    let mut maybe_direction = None;
+    let mut maybe_effect_type = None;
     for property in properties {
         match property {
-            TimeNodeProperty::EffectId(value) => effect_id = Some(*value),
-            TimeNodeProperty::EffectDirection(value) => direction = Some(*value),
-            TimeNodeProperty::EffectType(value) => effect_type = Some(*value),
-            _ => {},
+            TimeNodeProperty::EffectId(value) => maybe_effect_id = Some(*value),
+            TimeNodeProperty::EffectDirection(value) => maybe_direction = Some(*value),
+            TimeNodeProperty::EffectType(value) => maybe_effect_type = Some(*value),
+            TimeNodeProperty::DisplayHidden(_)
+            | TimeNodeProperty::MasterRelation(_)
+            | TimeNodeProperty::SubType
+            | TimeNodeProperty::AfterEffect(_)
+            | TimeNodeProperty::SlideCount(_)
+            | TimeNodeProperty::TimeFilter(_)
+            | TimeNodeProperty::EventFilter(_)
+            | TimeNodeProperty::HideWhenStopped(_)
+            | TimeNodeProperty::GroupId(_)
+            | TimeNodeProperty::EffectNodeType(_)
+            | TimeNodeProperty::PlaceholderNode(_)
+            | TimeNodeProperty::MediaVolume(_)
+            | TimeNodeProperty::MediaMute(_)
+            | TimeNodeProperty::ZoomToFullScreen(_) => {},
         }
     }
-    let Some(effect_id) = effect_id else {
-        return direction.is_none();
+    let Some(effect_id) = maybe_effect_id else {
+        return maybe_direction.is_none();
     };
-    let Some(effect_type) = effect_type else {
+    let Some(effect_type) = maybe_effect_type else {
         return false;
     };
     let valid_id = match effect_type {
@@ -226,9 +239,23 @@ pub(crate) fn has_valid_time_effect_properties(properties: &[TimeNodeProperty]) 
         TimeEffectType::ActionVerb => false,
     };
     valid_id
-        && direction.is_none_or(|direction| {
+        && maybe_direction.is_none_or(|direction| {
             is_valid_time_effect_direction(effect_type, effect_id, direction)
         })
+}
+
+/// Role of a time node in the timing structure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeEffectNodeType {
+    ClickEffect,
+    WithPrevious,
+    AfterPrevious,
+    MainSequence,
+    InteractiveSequence,
+    ClickParallel,
+    WithGroup,
+    AfterGroup,
+    TimingRoot,
 }
 
 fn is_valid_time_effect_direction(
@@ -262,21 +289,7 @@ fn is_valid_time_effect_direction(
     }
 }
 
-/// Role of a time node in the timing structure.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TimeEffectNodeType {
-    ClickEffect,
-    WithPrevious,
-    AfterPrevious,
-    MainSequence,
-    InteractiveSequence,
-    ClickParallel,
-    WithGroup,
-    AfterGroup,
-    TimingRoot,
-}
-
-/// Shared information used by all PowerPoint 2002 animation behaviors.
+/// Shared information used by all `PowerPoint` 2002 animation behaviors.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TimeBehavior {
     pub atom: TimeBehaviorAtom,
@@ -302,7 +315,7 @@ pub enum TimeBehaviorAdditive {
     Add,
 }
 
-/// A PowerPoint 2002 rotation behavior and its common target information.
+/// A `PowerPoint` 2002 rotation behavior and its common target information.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TimeRotationBehavior {
     pub atom: TimeRotationBehaviorAtom,
@@ -325,7 +338,7 @@ pub enum TimeRotationDirection {
     CounterClockwise,
 }
 
-/// A PowerPoint 2002 scale behavior and its common target information.
+/// A `PowerPoint` 2002 scale behavior and its common target information.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TimeScaleBehavior {
     pub atom: TimeScaleBehaviorAtom,
@@ -341,7 +354,7 @@ pub struct TimeScaleBehaviorAtom {
     pub zoom_contents: Option<bool>,
 }
 
-/// A PowerPoint 2002 command behavior and its common target information.
+/// A `PowerPoint` 2002 command behavior and its common target information.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TimeCommandBehavior {
     pub atom: TimeCommandBehaviorAtom,
@@ -512,7 +525,7 @@ pub enum TimeColorDirection {
     CounterClockwise,
 }
 
-/// A PowerPoint 2002 color behavior and its common target information.
+/// A `PowerPoint` 2002 color behavior and its common target information.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TimeColorBehavior {
     pub atom: TimeColorBehaviorAtom,
@@ -552,7 +565,7 @@ pub enum TimeAnimateColor {
     Scheme(u32),
 }
 
-/// A PowerPoint 2002 image-transition behavior.
+/// A `PowerPoint` 2002 image-transition behavior.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TimeEffectBehavior {
     pub atom: TimeEffectBehaviorAtom,
@@ -702,7 +715,7 @@ impl TimeEffectFilter {
     }
 }
 
-/// A PowerPoint 2002 motion-path behavior.
+/// A `PowerPoint` 2002 motion-path behavior.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TimeMotionBehavior {
     pub atom: TimeMotionBehaviorAtom,
@@ -733,7 +746,7 @@ pub enum TimeMotionOrigin {
     ObjectCenter,
 }
 
-/// A PowerPoint 2002 behavior that assigns one property value.
+/// A `PowerPoint` 2002 behavior that assigns one property value.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TimeSetBehavior {
     pub atom: TimeSetBehaviorAtom,
@@ -758,7 +771,7 @@ pub enum TimeAnimateValueType {
     Color,
 }
 
-/// A generic PowerPoint 2002 property animation.
+/// A generic `PowerPoint` 2002 property animation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TimeAnimateBehavior {
     pub atom: TimeAnimateBehaviorAtom,
@@ -772,6 +785,10 @@ pub struct TimeAnimateBehavior {
 
 /// Calculation mode and use flags from a `TimeAnimateBehaviorAtom`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "the bool fields mirror the independent `f*Used` flag bits of the fixed MS-PPT `TimeAnimateBehaviorAtom` layout, so they cannot be merged into enums without losing the bit-level mapping"
+)]
 pub struct TimeAnimateBehaviorAtom {
     /// Explicit interpolation mode, or `None` for linear interpolation.
     pub calculation_mode: Option<TimeAnimateCalculationMode>,

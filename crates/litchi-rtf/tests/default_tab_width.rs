@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{
     DEFAULT_TAB_WIDTH_TWIPS, DefaultTabWidthPolicy, MAX_DEFAULT_TAB_WIDTH_TWIPS, RtfDocument,
     RtfWriter, WriterOptions,
@@ -27,8 +36,11 @@ fn omission_and_explicit_producer_values_remain_distinct() {
 
     for width in [0, 14, 284, 420, 480, 708, 709, 720, 840, 1298, i32::MAX] {
         let doc = RtfDocument::parse(&format!(r"{{\rtf1\ansi\deftab{width} body}}")).unwrap();
-        assert_eq!(doc.default_tab_width_twips(), Some(width as u32));
-        assert_eq!(doc.effective_default_tab_width_twips(), width as u32);
+        assert_eq!(doc.default_tab_width_twips(), Some(width.cast_unsigned()));
+        assert_eq!(
+            doc.effective_default_tab_width_twips(),
+            width.cast_unsigned()
+        );
     }
 }
 

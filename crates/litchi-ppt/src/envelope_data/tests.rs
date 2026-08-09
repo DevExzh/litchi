@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::codec::MAX_MINUTE_TIME;
 use super::model::{
     EnvelopeData, EnvelopePayload, MSO_ENVELOPE_CLSID, MsoAttachment, MsoEnvelope, MsoEnvelopeText,

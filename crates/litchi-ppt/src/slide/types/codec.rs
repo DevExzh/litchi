@@ -1,4 +1,4 @@
-//! Binary record and OfficeArt decoding used by the slide facade.
+//! Binary record and `OfficeArt` decoding used by the slide facade.
 
 use super::Slide;
 use crate::animation::{ShapeAnimation, SlideAnimationExtension};
@@ -7,7 +7,7 @@ use crate::odraw::{FrameKind, ShapeExt as _};
 use crate::package::{Error, Result};
 use crate::shapes::ShapeEnum;
 
-impl<'doc> Slide<'doc> {
+impl Slide<'_> {
     pub(super) fn parse_animations(&self) -> Result<Vec<ShapeAnimation>> {
         let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(Vec::new());
@@ -50,9 +50,8 @@ impl<'doc> Slide<'doc> {
 
     pub(super) fn parse_shapes(&self) -> Result<Vec<ShapeEnum<'static>>> {
         // Find PPDrawing record
-        let ppdrawing = match self.record.find_child(RecordType::PPDrawing) {
-            Some(record) => record,
-            None => return Ok(Vec::new()),
+        let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) else {
+            return Ok(Vec::new());
         };
 
         // Extract Escher shapes from PPDrawing data
@@ -70,7 +69,7 @@ impl<'doc> Slide<'doc> {
         Ok(shapes)
     }
 
-    /// Convert an EscherShape to ShapeEnum with full property extraction.
+    /// Convert an `EscherShape` to `ShapeEnum` with full property extraction.
     ///
     /// # Performance
     ///
@@ -86,15 +85,19 @@ impl<'doc> Slide<'doc> {
         escher_shape: &litchi_odraw::shape::Shape<'_>,
         depth: usize,
     ) -> Result<Option<ShapeEnum<'static>>> {
+        use crate::shapes::{
+            AutoShape, PictureFrameKind, PictureShape, Placeholder, PlaceholderSize,
+            PlaceholderType, ShapeEnum, ShapeType, TextBox, shape, shape_enum,
+        };
+        use crate::slide_extension::HeaderFooterPlaceholder;
+        use litchi_odraw::prop::Id;
+        use litchi_odraw::shape::Kind;
+
         if depth >= super::validation::MAX_SHAPE_DEPTH {
             return Err(Error::Corrupted(
                 "OfficeArt shape tree exceeds the PPT nesting limit".to_string(),
             ));
         }
-
-        use crate::shapes::*;
-        use crate::slide_extension::HeaderFooterPlaceholder;
-        use litchi_odraw::shape::Kind;
 
         let shape_id = escher_shape.id();
         let anchor = crate::odraw::anchor(escher_shape)?;
@@ -197,14 +200,13 @@ impl<'doc> Slide<'doc> {
                 picture.set_powerpoint12_shape_metadata(powerpoint12_shape_metadata);
 
                 // Extract the one-based BLIP store index from the pib property.
-                use litchi_odraw::prop::Id;
                 if let Some(blip_id) = escher_shape.props().get_int(Id::BlipToDisplay) {
-                    let blip_id = u32::try_from(blip_id).map_err(|_| {
+                    let blip_index = u32::try_from(blip_id).map_err(|_err| {
                         litchi_odraw::Error::MalformedProperties {
                             reason: "BlipToDisplay must be a positive one-based image identifier",
                         }
                     })?;
-                    picture.set_decoded_blip_index(blip_id)?;
+                    picture.set_decoded_blip_index(blip_index)?;
                 }
 
                 Ok(Some(ShapeEnum::Picture(picture)))
@@ -232,7 +234,6 @@ impl<'doc> Slide<'doc> {
                     };
 
                     // Extract line properties
-                    use litchi_odraw::prop::Id;
                     if let Some(width) = escher_shape.props().get_int(Id::LineWidth) {
                         line.set_decoded_width(width);
                     }
@@ -277,17 +278,22 @@ impl<'doc> Slide<'doc> {
                         Kind::Rectangle | Kind::TextBox | Kind::AutoShape
                     )
                 }) {
-                    if let Some(anchor) = crate::odraw::anchor(child)?
-                        && anchor.width() > 0
-                        && anchor.height() > 0
+                    if let Some(cell_anchor) = crate::odraw::anchor(child)?
+                        && cell_anchor.width() > 0
+                        && cell_anchor.height() > 0
                     {
-                        cells.push((child, anchor));
+                        cells.push((child, cell_anchor));
                     }
                 }
 
-                let columns: BTreeSet<i32> =
-                    cells.iter().map(|(_, anchor)| anchor.left()).collect();
-                let rows: BTreeSet<i32> = cells.iter().map(|(_, anchor)| anchor.top()).collect();
+                let columns: BTreeSet<i32> = cells
+                    .iter()
+                    .map(|(_, cell_anchor)| cell_anchor.left())
+                    .collect();
+                let rows: BTreeSet<i32> = cells
+                    .iter()
+                    .map(|(_, cell_anchor)| cell_anchor.top())
+                    .collect();
                 let column_positions: Vec<_> = columns.into_iter().collect();
                 let row_positions: Vec<_> = rows.into_iter().collect();
 
@@ -342,7 +348,7 @@ impl<'doc> Slide<'doc> {
             },
 
             // Unknown or unsupported shape types
-            _ => Ok(None),
+            Kind::Unknown => Ok(None),
         }
     }
 
@@ -353,18 +359,18 @@ impl<'doc> Slide<'doc> {
         // 1. Extract text from direct slide records (TextCharsAtom, etc.)
         // Note: record.extract_text() already recursively processes all children
         let record_text = self.record.extract_text()?;
-        let trimmed = record_text.trim();
-        if !trimmed.is_empty() {
-            text_parts.push(trimmed.to_string());
+        let record_trimmed = record_text.trim();
+        if !record_trimmed.is_empty() {
+            text_parts.push(record_trimmed.to_string());
         }
 
         // 2. Extract text from Escher/PPDrawing (shapes, text boxes)
         // This is separate from regular record text extraction
         if let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) {
             let escher_text = crate::odraw::text_from_drawing(&ppdrawing.data)?;
-            let trimmed = escher_text.trim();
-            if !trimmed.is_empty() {
-                text_parts.push(trimmed.to_string());
+            let escher_trimmed = escher_text.trim();
+            if !escher_trimmed.is_empty() {
+                text_parts.push(escher_trimmed.to_string());
             }
         }
 

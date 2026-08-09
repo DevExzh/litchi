@@ -1,4 +1,4 @@
-//! Source-preserving PresentationML custom-show wire operations.
+//! Source-preserving `PresentationML` custom-show wire operations.
 //!
 //! The semantic List deliberately stays small. This layer owns the source
 //! layout needed to edit only known custShow and sld nodes while retaining
@@ -652,10 +652,8 @@ fn attach_frame(
                 children: value.children,
                 shows: value.show_layouts,
             };
-            if parent.kind == FrameKind::Root {
-                if custom_list.replace(layout).is_some() {
-                    return Err(invalid("presentation contains multiple custom-show lists"));
-                }
+            if parent.kind == FrameKind::Root && custom_list.replace(layout).is_some() {
+                return Err(invalid("presentation contains multiple custom-show lists"));
             }
         },
         FrameKind::Show => {
@@ -695,7 +693,7 @@ fn attach_frame(
                 let id = find_attribute(&value.attributes, "id")
                     .ok_or_else(|| invalid("presentation slide is missing its ID"))?
                     .parse::<u32>()
-                    .map_err(|_| invalid("presentation slide ID is not a u32"))?;
+                    .map_err(|_err| invalid("presentation slide ID is not a u32"))?;
                 let relationship_id = find_qualified_relationship_attribute(&value.attributes)
                     .ok_or_else(|| invalid("presentation slide is missing its relationship ID"))?
                     .to_owned();
@@ -720,7 +718,7 @@ fn parse_show_layout(source: &[u8], span: Span, value: &Frame) -> Result<ShowLay
     let id = find_attribute(&parsed, "id")
         .ok_or_else(|| invalid("custom show is missing its ID"))?
         .parse::<u32>()
-        .map_err(|_| invalid("custom show ID is not a u32"))?;
+        .map_err(|_err| invalid("custom show ID is not a u32"))?;
     let name = find_attribute(&parsed, "name")
         .ok_or_else(|| invalid("custom show is missing its name"))?
         .to_owned();
@@ -777,8 +775,7 @@ fn parse_raw_start_tag(raw: &[u8]) -> Result<(String, Vec<(String, String)>)> {
     let name_end = tag[name_start..]
         .iter()
         .position(|byte| byte.is_ascii_whitespace() || *byte == b'>' || *byte == b'/')
-        .map(|offset| name_start + offset)
-        .unwrap_or(end);
+        .map_or(end, |offset| name_start + offset);
     let qualified_name = std::str::from_utf8(&tag[name_start..name_end])
         .map_err(|error| Error::Xml(error.to_string()))?
         .to_owned();
@@ -895,16 +892,14 @@ fn find_attribute<'a>(attributes: &'a [(String, String)], wanted: &str) -> Optio
         .map(|(_, value)| value.as_str())
 }
 
-fn find_relationship_attribute<'a>(attributes: &'a [(String, String)]) -> Option<&'a str> {
+fn find_relationship_attribute(attributes: &[(String, String)]) -> Option<&str> {
     attributes.iter().find_map(|(name, value)| {
         (name.rsplit_once(':').map(|(_, local)| local) == Some("id") || name == "id")
             .then_some(value.as_str())
     })
 }
 
-fn find_qualified_relationship_attribute<'a>(
-    attributes: &'a [(String, String)],
-) -> Option<&'a str> {
+fn find_qualified_relationship_attribute(attributes: &[(String, String)]) -> Option<&str> {
     attributes.iter().find_map(|(name, value)| {
         (name.rsplit_once(':').map(|(_, local)| local) == Some("id")).then_some(value.as_str())
     })
@@ -1159,11 +1154,7 @@ fn render_new_slide_list(layout: &Layout, slide_ids: &[u32]) -> Result<String> {
         .map(|slide_id| render_new_slide(layout, *slide_id))
         .collect::<Result<Vec<_>>>()?
         .join("");
-    Ok(format!(
-        "<{name}>{slides}</{name}>",
-        name = name,
-        slides = slides
-    ))
+    Ok(format!("<{name}>{slides}</{name}>"))
 }
 
 fn qualified(prefix: &str, local: &str) -> String {

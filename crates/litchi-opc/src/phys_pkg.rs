@@ -45,6 +45,10 @@ struct RelationshipBudget {
 /// Uses `soapberry_zip` for high-performance zero-copy ZIP parsing with lazy decompression.
 /// File contents are decompressed on-demand and cached for efficiency. This enables
 /// pipelining of decompression with XML parsing for better throughput.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "name mirrors the OPC 'physical package' concept and is part of the public API"
+)]
 pub struct PhysPkgReader<'data> {
     /// The underlying ZIP archive reader (lazy decompression with caching)
     archive: LazyArchiveReader<'data>,
@@ -89,32 +93,43 @@ impl OwnedPhysPkgReader {
     }
 
     /// Open an OPC package from a file path with explicit resource limits.
+    ///
+    /// # Errors
+    /// Returns an error if the file does not exist, cannot be read, exceeds the
+    /// input-byte limit, or is not a valid ZIP archive.
     pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: ReadLimits) -> Result<Self> {
-        let path = path.as_ref();
+        let path_ref = path.as_ref();
 
-        if !path.exists() {
-            return Err(OpcError::PackageNotFound(path.display().to_string()));
+        if !path_ref.exists() {
+            return Err(OpcError::PackageNotFound(path_ref.display().to_string()));
         }
 
-        let metadata = std::fs::metadata(path)?;
+        let metadata = std::fs::metadata(path_ref)?;
         if metadata.is_file() {
             limits.check_input_bytes(metadata.len())?;
         }
-        let data = read_limited(std::fs::File::open(path)?, limits)?;
+        let data = read_limited(std::fs::File::open(path_ref)?, limits)?;
         Self::from_bytes_with_limits(data, limits)
     }
 
     /// Create a new `OwnedPhysPkgReader` from owned bytes.
+    ///
+    /// # Errors
+    /// Returns an error if `data` is not a valid ZIP archive under the default limits.
     pub fn from_bytes(data: Vec<u8>) -> Result<Self> {
         Self::from_bytes_with_limits(data, ReadLimits::default())
     }
 
     /// Create a new owned physical reader with explicit resource limits.
+    ///
+    /// # Errors
+    /// Returns an error if `data` exceeds the input-byte limit or is not a valid
+    /// ZIP archive under `limits`.
     pub fn from_bytes_with_limits(data: Vec<u8>, limits: ReadLimits) -> Result<Self> {
         limits.check_input_bytes(data.len() as u64)?;
         // Validate the ZIP archive can be parsed
         let _ = LazyArchiveReader::new_with_limits(&data, limits.zip_limits())
-            .map_err(map_archive_error)?;
+            .map_err(|error| map_archive_error(&error))?;
         Ok(Self {
             data,
             limits,
@@ -130,17 +145,29 @@ impl OwnedPhysPkgReader {
     ///
     /// # Returns
     /// A new `OwnedPhysPkgReader` instance
+    ///
+    /// # Errors
+    /// Returns an error if the stream cannot be read or is not a valid ZIP archive
+    /// under the default limits.
     pub fn from_reader<R: Read>(mut reader: R) -> Result<Self> {
         Self::from_reader_with_limits(&mut reader, ReadLimits::default())
     }
 
     /// Create a new owned physical reader from a stream with explicit limits.
+    ///
+    /// # Errors
+    /// Returns an error if the stream cannot be read, exceeds `limits`, or is not
+    /// a valid ZIP archive.
     pub fn from_reader_with_limits<R: Read>(reader: R, limits: ReadLimits) -> Result<Self> {
         let data = read_limited(reader, limits)?;
         Self::from_bytes_with_limits(data, limits)
     }
 
     /// Get a borrowed reader for accessing archive contents.
+    ///
+    /// # Errors
+    /// Returns an error if the owned data fails archive validation under the
+    /// retained limits.
     #[inline]
     pub fn reader(&self) -> Result<PhysPkgReader<'_>> {
         PhysPkgReader::new_with_limits_and_budget(
@@ -152,42 +179,66 @@ impl OwnedPhysPkgReader {
     }
 
     /// Get the binary content for a part by its `PackURI`.
+    ///
+    /// # Errors
+    /// Returns an error if the part is missing, unreadable, or exceeds the
+    /// configured part limits.
     #[inline]
     pub fn blob_for(&self, pack_uri: &PackURI) -> Result<Vec<u8>> {
         self.reader()?.blob_for(pack_uri)
     }
 
     /// Get the `[Content_Types].xml` content.
+    ///
+    /// # Errors
+    /// Returns an error if the part is missing, unreadable, or exceeds the
+    /// content-types byte limit.
     #[inline]
     pub fn content_types_xml(&self) -> Result<Vec<u8>> {
         self.reader()?.content_types_xml()
     }
 
     /// Get the relationships XML for a specific source URI.
+    ///
+    /// # Errors
+    /// Returns an error if the relationships part is unreadable or exceeds the
+    /// relationship limits.
     #[inline]
     pub fn rels_xml_for(&self, source_uri: &PackURI) -> Result<Option<Vec<u8>>> {
         self.reader()?.rels_xml_for(source_uri)
     }
 
     /// Get the number of files in the package.
+    ///
+    /// # Errors
+    /// Returns an error if the borrowed reader cannot be created.
     #[inline]
     pub fn len(&self) -> Result<usize> {
         Ok(self.reader()?.len())
     }
 
     /// Check if the package is empty.
+    ///
+    /// # Errors
+    /// Returns an error if the borrowed reader cannot be created.
     #[inline]
     pub fn is_empty(&self) -> Result<bool> {
         Ok(self.reader()?.is_empty())
     }
 
     /// List all member names in the package.
+    ///
+    /// # Errors
+    /// Returns an error if the borrowed reader cannot be created.
     #[inline]
     pub fn member_names(&self) -> Result<Vec<String>> {
         self.reader()?.member_names()
     }
 
     /// Check if a specific member exists in the package.
+    ///
+    /// # Errors
+    /// Returns an error if the borrowed reader cannot be created.
     #[inline]
     pub fn contains(&self, pack_uri: &PackURI) -> Result<bool> {
         Ok(self.reader()?.contains(pack_uri))
@@ -198,6 +249,9 @@ impl OwnedPhysPkgReader {
     /// This is physical ZIP access: it observes input and ZIP archive limits,
     /// but deliberately does not charge the OPC materialized-part budget. Use
     /// [`Self::blob_for`] for an OPC part.
+    ///
+    /// # Errors
+    /// Returns an error if the member is missing or unreadable.
     pub fn read_member(&self, name: &str) -> Result<Vec<u8>> {
         self.reader()?.read_member(name)
     }
@@ -225,11 +279,17 @@ impl<'data> PhysPkgReader<'data> {
     ///
     /// # Returns
     /// A new `PhysPkgReader` instance
+    ///
+    /// # Errors
+    /// Returns an error if `data` is not a valid ZIP archive under the default limits.
     pub fn new(data: &'data [u8]) -> Result<Self> {
         Self::new_with_limits(data, ReadLimits::default())
     }
 
     /// Create a physical reader from a byte slice with explicit resource limits.
+    ///
+    /// # Errors
+    /// Returns an error if `data` exceeds `limits` or is not a valid ZIP archive.
     pub fn new_with_limits(data: &'data [u8], limits: ReadLimits) -> Result<Self> {
         Self::new_with_limits_and_budget(
             data,
@@ -247,7 +307,7 @@ impl<'data> PhysPkgReader<'data> {
     ) -> Result<Self> {
         limits.check_input_bytes(data.len() as u64)?;
         let archive = LazyArchiveReader::new_with_limits(data, limits.zip_limits())
-            .map_err(map_archive_error)?;
+            .map_err(|error| map_archive_error(&error))?;
         Ok(Self {
             archive,
             limits,
@@ -267,6 +327,10 @@ impl<'data> PhysPkgReader<'data> {
     ///
     /// # Returns
     /// The binary content of the part
+    ///
+    /// # Errors
+    /// Returns an error if the part is missing, unreadable, or exceeds the
+    /// configured part limits.
     pub fn blob_for(&self, pack_uri: &PackURI) -> Result<Vec<u8>> {
         let membername = pack_uri.membername();
         let label = pack_uri.to_string();
@@ -274,16 +338,12 @@ impl<'data> PhysPkgReader<'data> {
         let reservation = self.reserve_declared_parts(&[declared])?;
         match self.archive.read(membername) {
             Ok(blob) => {
-                if let Err(error) =
-                    self.commit_actual_parts(reservation, std::slice::from_ref(&blob))
-                {
-                    return Err(error);
-                }
+                self.commit_actual_parts(reservation, std::slice::from_ref(&blob))?;
                 Ok(blob)
             },
             Err(error) => {
                 self.release_declared_parts(reservation);
-                Err(map_part_error(&label, error))
+                Err(map_part_error(&label, &error))
             },
         }
     }
@@ -293,19 +353,28 @@ impl<'data> PhysPkgReader<'data> {
     /// This low-level physical operation is archive-budgeted only. It does not
     /// consume `max_part_bytes` or `max_total_part_bytes`; callers loading OPC
     /// parts must use [`Self::blob_for`] instead.
+    ///
+    /// # Errors
+    /// Returns an error if the member is missing or unreadable.
     pub fn read_member(&self, name: &str) -> Result<Vec<u8>> {
-        self.archive.read(name).map_err(map_archive_error)
+        self.archive
+            .read(name)
+            .map_err(|error| map_archive_error(&error))
     }
 
     /// Get the `[Content_Types].xml` content.
     ///
     /// This is a required part of every OPC package that maps parts to content types.
+    ///
+    /// # Errors
+    /// Returns an error if the part is missing, unreadable, or exceeds the
+    /// content-types byte limit.
     pub fn content_types_xml(&self) -> Result<Vec<u8>> {
         let content_types_uri =
             PackURI::new(crate::packuri::CONTENT_TYPES_URI).map_err(OpcError::InvalidPackUri)?;
         self.read_bounded_member(
             content_types_uri.membername(),
-            &content_types_uri.to_string(),
+            content_types_uri.as_ref(),
             ReadResource::ContentTypesBytes,
             self.limits.max_content_types_bytes() as u64,
         )
@@ -318,10 +387,14 @@ impl<'data> PhysPkgReader<'data> {
     ///
     /// # Arguments
     /// * `source_uri` - The `PackURI` of the source (part or package)
+    ///
+    /// # Errors
+    /// Returns an error if the relationships part is unreadable or exceeds the
+    /// relationship limits.
     pub fn rels_xml_for(&self, source_uri: &PackURI) -> Result<Option<Vec<u8>>> {
         let rels_uri = source_uri.rels_uri().map_err(OpcError::InvalidPackUri)?;
 
-        match self.read_relationship_member(rels_uri.membername(), &rels_uri.to_string()) {
+        match self.read_relationship_member(rels_uri.membername(), rels_uri.as_ref()) {
             Ok(blob) => Ok(Some(blob)),
             Err(OpcError::PartNotFound(_)) => Ok(None),
             Err(e) => Err(e),
@@ -342,6 +415,10 @@ impl<'data> PhysPkgReader<'data> {
     ///
     /// Returns all file names in the ZIP archive (excluding directories).
     /// Useful for debugging or exploring package contents.
+    ///
+    /// # Errors
+    /// This function currently always succeeds; the `Result` is retained for
+    /// API symmetry with the other readers.
     pub fn member_names(&self) -> Result<Vec<String>> {
         Ok(self.archive.file_names().map(String::from).collect())
     }
@@ -371,6 +448,10 @@ impl<'data> PhysPkgReader<'data> {
     /// The operation is all-or-nothing: an error for any requested part drops
     /// every successful buffer and returns that error. Each URI occurrence
     /// consumes one `max_parts` slot, including repeated URIs.
+    ///
+    /// # Errors
+    /// Returns an error if any requested part is missing, unreadable, fails
+    /// allocation, or exceeds the configured limits.
     pub fn blobs_parallel(&self, uris: &[PackURI]) -> Result<HashMap<String, Vec<u8>>> {
         self.limits.check(
             ReadResource::Parts,
@@ -411,7 +492,7 @@ impl<'data> PhysPkgReader<'data> {
                 Ok(blob) => materialized.push(blob),
                 Err(error) => {
                     self.release_declared_parts(reservation);
-                    return Err(map_part_error(name, error));
+                    return Err(map_part_error(name, &error));
                 },
             }
         }
@@ -470,7 +551,7 @@ impl<'data> PhysPkgReader<'data> {
         self.archive
             .metadata(name)
             .map(|metadata| metadata.uncompressed_size())
-            .map_err(|error| map_part_error(label, error))
+            .map_err(|error| map_part_error(label, &error))
     }
 
     fn read_bounded_member(
@@ -484,12 +565,12 @@ impl<'data> PhysPkgReader<'data> {
             .archive
             .metadata(name)
             .map(|metadata| metadata.uncompressed_size())
-            .map_err(|error| map_part_error(label, error))?;
+            .map_err(|error| map_part_error(label, &error))?;
         self.limits.check(resource, declared, maximum)?;
         let blob = self
             .archive
             .read(name)
-            .map_err(|error| map_part_error(label, error))?;
+            .map_err(|error| map_part_error(label, &error))?;
         self.limits.check(resource, blob.len() as u64, maximum)?;
         Ok(blob)
     }
@@ -499,7 +580,7 @@ impl<'data> PhysPkgReader<'data> {
             .archive
             .metadata(name)
             .map(|metadata| metadata.uncompressed_size())
-            .map_err(|error| map_part_error(label, error))?;
+            .map_err(|error| map_part_error(label, &error))?;
         self.limits.check(
             ReadResource::RelationshipXmlBytes,
             declared,
@@ -508,14 +589,12 @@ impl<'data> PhysPkgReader<'data> {
         self.reserve_declared_relationship(declared)?;
         match self.archive.read(name) {
             Ok(blob) => {
-                if let Err(error) = self.commit_relationship(declared, blob.len() as u64) {
-                    return Err(error);
-                }
+                self.commit_relationship(declared, blob.len() as u64)?;
                 Ok(blob)
             },
             Err(error) => {
                 self.release_declared_relationship(declared);
-                Err(map_part_error(label, error))
+                Err(map_part_error(label, &error))
             },
         }
     }
@@ -524,7 +603,7 @@ impl<'data> PhysPkgReader<'data> {
         let mut budget = self
             .relationship_budget
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let parts = budget
             .materialized_parts
             .checked_add(budget.reserved_parts)
@@ -578,7 +657,7 @@ impl<'data> PhysPkgReader<'data> {
         let mut budget = self
             .relationship_budget
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         budget.reserved_parts = budget.reserved_parts.saturating_sub(1);
         budget.reserved_bytes = budget.reserved_bytes.saturating_sub(declared);
     }
@@ -593,7 +672,7 @@ impl<'data> PhysPkgReader<'data> {
             let mut budget = self
                 .relationship_budget
                 .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner());
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             let reserved_parts = budget
                 .reserved_parts
                 .checked_sub(1)
@@ -678,7 +757,7 @@ impl<'data> PhysPkgReader<'data> {
         let mut budget = self
             .part_budget
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let count = budget
             .materialized_parts
             .checked_add(budget.reserved_parts)
@@ -737,7 +816,7 @@ impl<'data> PhysPkgReader<'data> {
         let mut budget = self
             .part_budget
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         budget.reserved_parts = budget.reserved_parts.saturating_sub(reservation.parts);
         budget.reserved_declared = budget
             .reserved_declared
@@ -766,7 +845,7 @@ impl<'data> PhysPkgReader<'data> {
                 let mut budget = self
                     .part_budget
                     .lock()
-                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
                 let remaining_parts = budget.reserved_parts.checked_sub(reservation.parts).ok_or(
                     OpcError::ZipError("OPC part count reservation underflow".to_owned()),
                 )?;
@@ -830,12 +909,101 @@ impl<'data> PhysPkgReader<'data> {
     }
 }
 
+/// Physical package writer for creating OPC packages.
+///
+/// Handles the low-level writing of parts to a ZIP archive with optimal compression.
+/// Uses soapberry-zip's high-performance writer.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "name mirrors the OPC 'physical package' concept and is part of the public API"
+)]
+pub struct PhysPkgWriter<W: Write = Cursor<Vec<u8>>> {
+    /// The underlying ZIP archive writer
+    archive: soapberry_zip::office::StreamingArchiveWriter<W>,
+}
+
+impl PhysPkgWriter<Cursor<Vec<u8>>> {
+    /// Create a new package writer that writes to memory.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            archive: soapberry_zip::office::StreamingArchiveWriter::new(),
+        }
+    }
+
+    /// Finish writing and return the package bytes.
+    ///
+    /// Consumes the writer and returns the complete ZIP archive.
+    ///
+    /// # Errors
+    /// Returns an error if the ZIP archive cannot be finalized.
+    pub fn finish(self) -> Result<Vec<u8>> {
+        self.archive
+            .finish_to_bytes()
+            .map_err(|error| OpcError::ZipError(error.to_string()))
+    }
+}
+
+impl<W: Write> PhysPkgWriter<W> {
+    /// Create a physical package writer over a sequential sink.
+    pub fn with_writer(writer: W) -> Self {
+        Self {
+            archive: soapberry_zip::office::StreamingArchiveWriter::with_writer(writer),
+        }
+    }
+
+    /// Write a part to the package with Deflate compression.
+    ///
+    /// # Arguments
+    /// * `pack_uri` - The `PackURI` for the part
+    /// * `blob` - The binary content to write
+    ///
+    /// # Errors
+    /// Returns an error if the part cannot be written to the archive.
+    pub fn write(&mut self, pack_uri: &PackURI, blob: &[u8]) -> Result<()> {
+        self.archive
+            .write_deflated(pack_uri.membername(), blob)
+            .map_err(|error| OpcError::ZipError(error.to_string()))
+    }
+
+    /// Write a part to the package without compression (stored).
+    ///
+    /// # Arguments
+    /// * `pack_uri` - The `PackURI` for the part
+    /// * `blob` - The binary content to write
+    ///
+    /// # Errors
+    /// Returns an error if the part cannot be written to the archive.
+    pub fn write_stored(&mut self, pack_uri: &PackURI, blob: &[u8]) -> Result<()> {
+        self.archive
+            .write_stored(pack_uri.membername(), blob)
+            .map_err(|error| OpcError::ZipError(error.to_string()))
+    }
+
+    /// Finalize the archive and recover the sequential sink.
+    ///
+    /// # Errors
+    /// Returns an error if the ZIP archive cannot be finalized.
+    pub fn finish_into_inner(self) -> Result<W> {
+        self.archive
+            .finish()
+            .map_err(|error| OpcError::ZipError(error.to_string()))
+    }
+}
+
+impl Default for PhysPkgWriter<Cursor<Vec<u8>>> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn read_limited<R: Read>(mut reader: R, limits: ReadLimits) -> Result<Vec<u8>> {
-    let maximum =
-        usize::try_from(limits.max_input_bytes()).map_err(|_| OpcError::InvalidReadLimit {
+    let Ok(maximum) = usize::try_from(limits.max_input_bytes()) else {
+        return Err(OpcError::InvalidReadLimit {
             resource: ReadResource::InputBytes,
             value: limits.max_input_bytes(),
-        })?;
+        });
+    };
     let mut data = Vec::new();
     data.try_reserve(maximum.min(8 * 1024))
         .map_err(|source| OpcError::Allocation {
@@ -872,14 +1040,14 @@ fn read_limited<R: Read>(mut reader: R, limits: ReadLimits) -> Result<Vec<u8>> {
     }
 }
 
-fn map_archive_error(error: soapberry_zip::Error) -> OpcError {
+fn map_archive_error(error: &soapberry_zip::Error) -> OpcError {
     if let soapberry_zip::ErrorKind::LimitExceeded {
         resource,
         actual,
         maximum,
     } = error.kind()
     {
-        let resource = match resource {
+        let opc_resource = match resource {
             LimitResource::FileCount => ReadResource::ArchiveMembers,
             LimitResource::MemberNameBytes => ReadResource::ArchiveMemberNameBytes,
             LimitResource::MetadataBytes => ReadResource::ArchiveMetadataBytes,
@@ -888,7 +1056,7 @@ fn map_archive_error(error: soapberry_zip::Error) -> OpcError {
             LimitResource::TotalSize => ReadResource::ArchiveTotalBytes,
         };
         return OpcError::ReadLimit {
-            resource,
+            resource: opc_resource,
             actual: *actual,
             maximum: *maximum,
         };
@@ -896,83 +1064,11 @@ fn map_archive_error(error: soapberry_zip::Error) -> OpcError {
     OpcError::ZipError(error.to_string())
 }
 
-fn map_part_error(label: &str, error: soapberry_zip::Error) -> OpcError {
+fn map_part_error(label: &str, error: &soapberry_zip::Error) -> OpcError {
     if matches!(error.kind(), soapberry_zip::ErrorKind::FileNotFound(_)) {
         OpcError::PartNotFound(label.to_owned())
     } else {
         map_archive_error(error)
-    }
-}
-
-/// Physical package writer for creating OPC packages.
-///
-/// Handles the low-level writing of parts to a ZIP archive with optimal compression.
-/// Uses soapberry-zip's high-performance writer.
-pub struct PhysPkgWriter<W: Write = Cursor<Vec<u8>>> {
-    /// The underlying ZIP archive writer
-    archive: soapberry_zip::office::StreamingArchiveWriter<W>,
-}
-
-impl PhysPkgWriter<Cursor<Vec<u8>>> {
-    /// Create a new package writer that writes to memory.
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            archive: soapberry_zip::office::StreamingArchiveWriter::new(),
-        }
-    }
-
-    /// Finish writing and return the package bytes.
-    ///
-    /// Consumes the writer and returns the complete ZIP archive.
-    pub fn finish(self) -> Result<Vec<u8>> {
-        self.archive
-            .finish_to_bytes()
-            .map_err(|error| OpcError::ZipError(error.to_string()))
-    }
-}
-
-impl<W: Write> PhysPkgWriter<W> {
-    /// Create a physical package writer over a sequential sink.
-    pub fn with_writer(writer: W) -> Self {
-        Self {
-            archive: soapberry_zip::office::StreamingArchiveWriter::with_writer(writer),
-        }
-    }
-
-    /// Write a part to the package with Deflate compression.
-    ///
-    /// # Arguments
-    /// * `pack_uri` - The `PackURI` for the part
-    /// * `blob` - The binary content to write
-    pub fn write(&mut self, pack_uri: &PackURI, blob: &[u8]) -> Result<()> {
-        self.archive
-            .write_deflated(pack_uri.membername(), blob)
-            .map_err(|error| OpcError::ZipError(error.to_string()))
-    }
-
-    /// Write a part to the package without compression (stored).
-    ///
-    /// # Arguments
-    /// * `pack_uri` - The `PackURI` for the part
-    /// * `blob` - The binary content to write
-    pub fn write_stored(&mut self, pack_uri: &PackURI, blob: &[u8]) -> Result<()> {
-        self.archive
-            .write_stored(pack_uri.membername(), blob)
-            .map_err(|error| OpcError::ZipError(error.to_string()))
-    }
-
-    /// Finalize the archive and recover the sequential sink.
-    pub fn finish_into_inner(self) -> Result<W> {
-        self.archive
-            .finish()
-            .map_err(|error| OpcError::ZipError(error.to_string()))
-    }
-}
-
-impl Default for PhysPkgWriter<Cursor<Vec<u8>>> {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -988,7 +1084,7 @@ mod tests {
     fn stored_archive(entries: &[(&str, &[u8])]) -> Vec<u8> {
         let mut writer = PhysPkgWriter::new();
         for (name, bytes) in entries {
-            let uri = PackURI::new(&format!("/{name}")).unwrap();
+            let uri = PackURI::new(format!("/{name}")).unwrap();
             writer.write_stored(&uri, bytes).unwrap();
         }
         writer.finish().unwrap()
@@ -1103,10 +1199,13 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let reader = PhysPkgReader::new_with_limits(&bytes, aggregate).unwrap();
-        assert_eq!(reader.rels_xml_for(&root).unwrap(), Some(b"rels".to_vec()));
+        let aggregate_reader = PhysPkgReader::new_with_limits(&bytes, aggregate).unwrap();
+        assert_eq!(
+            aggregate_reader.rels_xml_for(&root).unwrap(),
+            Some(b"rels".to_vec())
+        );
         assert!(matches!(
-            reader.rels_xml_for(&root),
+            aggregate_reader.rels_xml_for(&root),
             Err(OpcError::ReadLimit {
                 resource: ReadResource::TotalRelationshipXmlBytes,
                 actual: 8,
@@ -1164,13 +1263,13 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let reader = PhysPkgReader::new_with_limits(&corrupt, rollback).unwrap();
+        let rollback_reader = PhysPkgReader::new_with_limits(&corrupt, rollback).unwrap();
         assert!(matches!(
-            reader.rels_xml_for(&root),
+            rollback_reader.rels_xml_for(&root),
             Err(OpcError::ZipError(_))
         ));
         assert!(matches!(
-            reader.rels_xml_for(&root),
+            rollback_reader.rels_xml_for(&root),
             Err(OpcError::ZipError(_))
         ));
     }
@@ -1288,9 +1387,9 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let reader = PhysPkgReader::new_with_limits(&bytes, per_part).unwrap();
+        let per_part_reader = PhysPkgReader::new_with_limits(&bytes, per_part).unwrap();
         assert!(matches!(
-            reader.blob_for(&second),
+            per_part_reader.blob_for(&second),
             Err(OpcError::ReadLimit {
                 resource: ReadResource::PartBytes,
                 actual: 4,
@@ -1303,10 +1402,10 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let reader = PhysPkgReader::new_with_limits(&bytes, total).unwrap();
-        assert_eq!(reader.blob_for(&first).unwrap(), b"one");
+        let total_reader = PhysPkgReader::new_with_limits(&bytes, total).unwrap();
+        assert_eq!(total_reader.blob_for(&first).unwrap(), b"one");
         assert!(matches!(
-            reader.blob_for(&second),
+            total_reader.blob_for(&second),
             Err(OpcError::ReadLimit {
                 resource: ReadResource::TotalPartBytes,
                 actual: 7,
@@ -1363,10 +1462,10 @@ mod tests {
             })
         ));
 
-        let reader = PhysPkgReader::new_with_limits(&bytes, limits).unwrap();
-        assert_eq!(reader.blob_for(&first).unwrap(), b"one");
+        let repeat_reader = PhysPkgReader::new_with_limits(&bytes, limits).unwrap();
+        assert_eq!(repeat_reader.blob_for(&first).unwrap(), b"one");
         assert!(matches!(
-            reader.blob_for(&first),
+            repeat_reader.blob_for(&first),
             Err(OpcError::ReadLimit {
                 resource: ReadResource::Parts,
                 actual: 2,
@@ -1472,9 +1571,9 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let reader = PhysPkgReader::new_with_limits(&bytes, over).unwrap();
+        let over_reader = PhysPkgReader::new_with_limits(&bytes, over).unwrap();
         assert!(matches!(
-            reader.blobs_parallel(&[first, second]),
+            over_reader.blobs_parallel(&[first, second]),
             Err(OpcError::ReadLimit {
                 resource: ReadResource::TotalPartBytes,
                 actual: 7,
@@ -1527,13 +1626,13 @@ mod tests {
             Err(OpcError::PartNotFound(name)) if name == "/missing.bin"
         ));
 
-        let reader = PhysPkgReader::new(&bytes).unwrap();
+        let bulk_reader = PhysPkgReader::new(&bytes).unwrap();
         assert!(matches!(
-            reader.blobs_parallel(&[good, bad]),
+            bulk_reader.blobs_parallel(&[good, bad]),
             Err(OpcError::ZipError(_))
         ));
         assert_eq!(
-            reader
+            bulk_reader
                 .blob_for(&PackURI::new("/good.bin").unwrap())
                 .unwrap(),
             b"good"

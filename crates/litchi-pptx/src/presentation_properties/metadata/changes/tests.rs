@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 
 use super::*;
@@ -203,7 +209,7 @@ fn create_read_update_delete_is_atomic_and_rejects_unexpected_inbound_edges() {
         .rels_mut()
         .add_relationship(
             RELATIONSHIP_TYPE.into(),
-            target.relative_ref("/ppt/").into(),
+            target.relative_ref("/ppt/"),
             "rIdOther".into(),
             false,
         );

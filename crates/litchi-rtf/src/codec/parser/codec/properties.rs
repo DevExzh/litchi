@@ -1,4 +1,10 @@
-use super::*;
+use super::{
+    ControlWord, Cow, DocumentVariable, MAX_DOCUMENT_VARIABLE_NAME_BYTES,
+    MAX_DOCUMENT_VARIABLE_TEXT_BYTES, MAX_DOCUMENT_VARIABLE_VALUE_BYTES, MAX_DOCUMENT_VARIABLES,
+    MAX_USER_PROPERTIES, MAX_USER_PROPERTY_NAME_BYTES, MAX_USER_PROPERTY_TEXT_BYTES,
+    MAX_USER_PROPERTY_VALUE_BYTES, Mbcs, Parser, RtfEncoding, RtfError, RtfResult, SmallVec, Token,
+    UserProperty, UserPropertyValue, append_transport_bytes, control_symbol_text,
+};
 
 impl<'a> Parser<'a> {
     pub(super) fn parse_document_variable_destination(&mut self) -> RtfResult<()> {
@@ -166,16 +172,21 @@ impl<'a> Parser<'a> {
         destination: ControlWord<'a>,
         limit: usize,
     ) -> RtfResult<String> {
-        self.expect_token(Token::OpenBrace)?;
-        self.expect_token(Token::Control(destination))?;
+        self.expect_token(&Token::OpenBrace)?;
+        self.expect_token(&Token::Control(destination))?;
         self.parse_inert_text_group_contents(limit, "user-property")
     }
 
     pub(super) fn parse_document_variable_text_group(&mut self, limit: usize) -> RtfResult<String> {
-        self.expect_token(Token::OpenBrace)?;
+        self.expect_token(&Token::OpenBrace)?;
         self.parse_inert_text_group_contents(limit, "document-variable")
     }
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "RTF \\uN parameters are signed 16-bit; the double wrap converts them into UTF-16 code units"
+    )]
     pub(super) fn parse_inert_text_group_contents(
         &mut self,
         limit: usize,

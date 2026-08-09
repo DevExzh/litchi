@@ -1,6 +1,15 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{ListLevelType, RtfDocument, RtfWriter};
 
-const SYNTHETIC: &str = r#"{\rtf1\ansi\ansicpg1250
+const SYNTHETIC: &str = r"{\rtf1\ansi\ansicpg1250
 {\*\listtable
 {\*\listpicture}
 {\list\listtemplateid42\listhybrid
@@ -12,7 +21,7 @@ const SYNTHETIC: &str = r#"{\rtf1\ansi\ansicpg1250
 {\lfolevel\listoverridestartat\levelstartat9}
 {\lfolevel\listoverrideformat}
 \ls4}}
-\pard\ls4\ilvl0 Body}"#;
+\pard\ls4\ilvl0 Body}";
 
 #[test]
 fn retains_and_resolves_extended_list_metadata() {
@@ -70,13 +79,13 @@ fn writer_round_trips_list_models_deterministically() {
 #[test]
 fn rejects_malformed_list_roots_ids_and_overrides() {
     let malformed = [
-        r#"{\rtf1{\*\listtable}{\*\listtable}}"#,
-        r#"{\rtf1{\*\listoverridetable}{\*\listtable}}"#,
-        r#"{\rtf1 Body{\*\listtable}}"#,
-        r#"{\rtf1{\*\listtable{\list\listtemplateid1{\listlevel\levelnfc0{\leveltext\'01.;}{\levelnumbers;} }\listid1}{\list\listtemplateid2{\listlevel\levelnfc0{\leveltext\'01.;}{\levelnumbers;} }\listid1}}}"#,
-        r#"{\rtf1{\*\listtable{\list\listtemplateid1\listsimple\listhybrid{\listlevel\levelnfc0{\leveltext\'01.;}{\levelnumbers;} }\listid1}}}"#,
-        r#"{\rtf1{\*\listtable{\list\listtemplateid1{\listlevel\levelnfc0{\leveltext\'01.;}{\levelnumbers;} }\listid1}}{\*\listoverridetable{\listoverride\listid2\listoverridecount0\ls1}}}"#,
-        r#"{\rtf1{\*\listtable{\list\listtemplateid1{\listlevel\levelnfc0{\leveltext\'01.;}{\levelnumbers;} }\listid1}}{\*\listoverridetable{\listoverride\listid1\listoverridecount1\ls1}}}"#,
+        r"{\rtf1{\*\listtable}{\*\listtable}}",
+        r"{\rtf1{\*\listoverridetable}{\*\listtable}}",
+        r"{\rtf1 Body{\*\listtable}}",
+        r"{\rtf1{\*\listtable{\list\listtemplateid1{\listlevel\levelnfc0{\leveltext\'01.;}{\levelnumbers;} }\listid1}{\list\listtemplateid2{\listlevel\levelnfc0{\leveltext\'01.;}{\levelnumbers;} }\listid1}}}",
+        r"{\rtf1{\*\listtable{\list\listtemplateid1\listsimple\listhybrid{\listlevel\levelnfc0{\leveltext\'01.;}{\levelnumbers;} }\listid1}}}",
+        r"{\rtf1{\*\listtable{\list\listtemplateid1{\listlevel\levelnfc0{\leveltext\'01.;}{\levelnumbers;} }\listid1}}{\*\listoverridetable{\listoverride\listid2\listoverridecount0\ls1}}}",
+        r"{\rtf1{\*\listtable{\list\listtemplateid1{\listlevel\levelnfc0{\leveltext\'01.;}{\levelnumbers;} }\listid1}}{\*\listoverridetable{\listoverride\listid1\listoverridecount1\ls1}}}",
     ];
     for source in malformed {
         assert!(

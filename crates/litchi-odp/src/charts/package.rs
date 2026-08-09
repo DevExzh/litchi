@@ -22,7 +22,7 @@ pub(crate) fn apply(source: &OwnedPackage, original: &[Chart], draft: &[Chart]) 
         let after = draft
             .iter()
             .find(|candidate| candidate.same_identity(before));
-        let Some(after) = after else {
+        let Some(update) = after else {
             let Location::Existing {
                 object_start,
                 object_end,
@@ -39,7 +39,7 @@ pub(crate) fn apply(source: &OwnedPackage, original: &[Chart], draft: &[Chart]) 
             continue;
         };
 
-        if before.part().xml() == after.part().xml() {
+        if before.part().xml() == update.part().xml() {
             continue;
         }
         let Location::Existing {
@@ -51,14 +51,14 @@ pub(crate) fn apply(source: &OwnedPackage, original: &[Chart], draft: &[Chart]) 
             continue;
         };
         if let Some(path) = content_path {
-            let bytes = after.part().xml().as_bytes().to_vec();
+            let bytes = update.part().xml().as_bytes().to_vec();
             if let Some(previous) = additions.insert(path.clone(), bytes.clone())
                 && previous != bytes
             {
                 return invalid("ODP chart transaction has conflicting shared-part edits");
             }
         } else if let Some((start, end)) = payload {
-            edits.push((*start, *end, content_inline(after.part().xml())?, 1));
+            edits.push((*start, *end, content_inline(update.part().xml())?, 1));
         } else {
             return invalid("inline ODP chart payload span is missing");
         }

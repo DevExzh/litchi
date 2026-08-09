@@ -1,4 +1,4 @@
-//! Package-free PresentationML background XML codec.
+//! Package-free `PresentationML` background XML codec.
 //!
 //! This layer serializes and parses the semantic background model without
 //! resolving package relationships or loading image parts.
@@ -12,6 +12,10 @@ impl SlideBackground {
     /// The codec reads solid, gradient, and pattern fills. Picture fills are
     /// intentionally returned as `None`: their relationship and image bytes
     /// belong to the package-aware host adapter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_xml(xml: &[u8]) -> Result<Option<Self>> {
         use quick_xml::Reader;
         use quick_xml::events::Event;
@@ -24,7 +28,7 @@ impl SlideBackground {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
+                Ok(Event::Start(ref e) | Event::Empty(ref e)) => {
                     let tag_name = e.local_name();
 
                     if tag_name.as_ref() == b"bg" {
@@ -90,7 +94,7 @@ impl SlideBackground {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Empty(ref e)) | Ok(Event::Start(ref e)) => {
+                Ok(Event::Empty(ref e) | Event::Start(ref e)) => {
                     let tag_name = e.local_name();
                     if tag_name.as_ref() == b"srgbClr" {
                         // RGB color
@@ -142,7 +146,7 @@ impl SlideBackground {
                                 if let Ok(pos_str) = std::str::from_utf8(&attr.value)
                                     && let Ok(pos_val) = pos_str.parse::<f64>()
                                 {
-                                    position = pos_val / 100000.0;
+                                    position = pos_val / 100_000.0;
                                 }
                             }
                         }
@@ -167,14 +171,14 @@ impl SlideBackground {
             }
         }
 
-        if !stops.is_empty() {
+        if stops.is_empty() {
+            Ok(None)
+        } else {
             Ok(Some(SlideBackground::Gradient {
                 gradient_type,
                 angle,
                 stops,
             }))
-        } else {
-            Ok(None)
         }
     }
 
@@ -329,6 +333,10 @@ impl SlideBackground {
     /// `rel_id` is supplied by the package host after it resolves a picture
     /// relationship. The owner never interprets or allocates relationship
     /// identifiers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
     pub fn to_xml(&self, rel_id: Option<&str>) -> Result<String> {
         let mut xml = String::with_capacity(512);
 
@@ -362,8 +370,8 @@ impl SlideBackground {
                         xml.push_str(" rotWithShape=\"1\">");
                         xml.push_str("<a:gsLst>");
                         for stop in stops {
-                            let pos = (stop.position * 100000.0) as i32;
-                            xml.push_str(&format!("<a:gs pos=\"{}\">", pos));
+                            let pos = (stop.position * 100_000.0) as i32;
+                            xml.push_str(&format!("<a:gs pos=\"{pos}\">"));
                             xml.push_str("<a:srgbClr val=\"");
                             xml.push_str(&stop.color);
                             xml.push_str("\"/>");
@@ -373,15 +381,15 @@ impl SlideBackground {
 
                         if let Some(ang) = angle {
                             let ang_val = (ang * 60000.0) as i32;
-                            xml.push_str(&format!("<a:lin ang=\"{}\" scaled=\"0\"/>", ang_val));
+                            xml.push_str(&format!("<a:lin ang=\"{ang_val}\" scaled=\"0\"/>"));
                         }
                     },
                     GradientType::Radial => {
                         xml.push('>');
                         xml.push_str("<a:gsLst>");
                         for stop in stops {
-                            let pos = (stop.position * 100000.0) as i32;
-                            xml.push_str(&format!("<a:gs pos=\"{}\">", pos));
+                            let pos = (stop.position * 100_000.0) as i32;
+                            xml.push_str(&format!("<a:gs pos=\"{pos}\">"));
                             xml.push_str("<a:srgbClr val=\"");
                             xml.push_str(&stop.color);
                             xml.push_str("\"/>");
@@ -394,8 +402,8 @@ impl SlideBackground {
                         xml.push('>');
                         xml.push_str("<a:gsLst>");
                         for stop in stops {
-                            let pos = (stop.position * 100000.0) as i32;
-                            xml.push_str(&format!("<a:gs pos=\"{}\">", pos));
+                            let pos = (stop.position * 100_000.0) as i32;
+                            xml.push_str(&format!("<a:gs pos=\"{pos}\">"));
                             xml.push_str("<a:srgbClr val=\"");
                             xml.push_str(&stop.color);
                             xml.push_str("\"/>");

@@ -41,6 +41,7 @@ impl Hyperlink {
     }
 
     /// Construct a one-based internal slide target.
+    #[must_use]
     pub fn slide(slide_number: usize) -> Self {
         Self::Slide {
             slide_number,
@@ -82,11 +83,16 @@ impl Hyperlink {
     ///
     /// The parser is kept on the value facade for discoverability while the
     /// bounded grammar lives in the sibling codec module.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_xml(target: &str, tooltip: Option<String>) -> Result<Self> {
         super::codec::parse(target, tooltip)
     }
 
     /// Return the target spelling used by a writer.
+    #[must_use]
     pub fn target(&self) -> String {
         match self {
             Self::External { url, .. } => url.clone(),
@@ -101,6 +107,7 @@ impl Hyperlink {
     }
 
     /// Return the optional tooltip without copying it.
+    #[must_use]
     pub fn tooltip(&self) -> Option<&str> {
         match self {
             Self::External { tooltip, .. }
@@ -110,6 +117,7 @@ impl Hyperlink {
     }
 
     /// Return whether this target leaves the current presentation.
+    #[must_use]
     pub fn is_external(&self) -> bool {
         matches!(self, Self::External { .. } | Self::Email { .. })
     }

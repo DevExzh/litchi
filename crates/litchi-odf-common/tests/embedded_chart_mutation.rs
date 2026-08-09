@@ -1,5 +1,5 @@
 use litchi_odf_common::{
-    chart::authoring::{Definition, Text, serialize_content},
+    chart::authoring::{ChartClass, Definition, SeriesSpec, Text, serialize_content},
     constants,
     core::{OwnedPackage, PackageWriter},
     embedded::{Root, Source, scan_package},
@@ -10,7 +10,7 @@ const OBJECT: &str = r#"<draw:object xlink:href="./Object_1"/>"#;
 const CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:text><text:p>host</text:p><draw:frame draw:name="Chart">OBJECT</draw:frame></office:text></office:body></office:document-content>"#;
 
 fn chart(title: &str) -> Definition {
-    let mut definition = Definition::new("chart:bar");
+    let mut definition = Definition::new(ChartClass::bar());
     definition.title = Some(Text::new(title));
     definition
 }
@@ -118,7 +118,10 @@ fn inline_chart_is_inert_and_invalid_mutations_do_not_publish_bytes() {
 
     let source = package("Stable");
     let mut invalid = chart("Rejected");
-    invalid.class = "not a qualified name".to_string();
+    invalid.plot_area.series.push(SeriesSpec {
+        attached_axis: Some("missing".to_string()),
+        ..SeriesSpec::default()
+    });
     assert!(serialize_content(&invalid).is_err());
     assert!(splice(&flat, flat.len() + 1, flat.len() + 1, "").is_err());
     assert_eq!(source, package("Stable"));

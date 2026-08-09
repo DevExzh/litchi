@@ -1,4 +1,4 @@
-//! Main-master context and TemplateNameAtom wire invariants.
+//! Main-master context and `TemplateNameAtom` wire invariants.
 
 use super::model::Name;
 use crate::consts::RecordType;

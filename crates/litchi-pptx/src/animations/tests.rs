@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::codec::*;
 use super::model::*;
 use std::collections::HashSet;
@@ -146,7 +152,7 @@ mod tests {
 
     fn slide_with_ole(timing: &str) -> String {
         slide(timing).replace(
-            r#"</p:nvGraphicFramePr></p:graphicFrame>"#,
+            r"</p:nvGraphicFramePr></p:graphicFrame>",
             r#"</p:nvGraphicFramePr><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/presentationml/2006/ole"><p:oleObj/></a:graphicData></a:graphic></p:graphicFrame>"#,
         )
     }
@@ -182,7 +188,7 @@ mod tests {
                 r#"<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p=""#,
             )
             .replace(
-                r#"</p:nvGraphicFramePr></p:graphicFrame>"#,
+                r"</p:nvGraphicFramePr></p:graphicFrame>",
                 r#"</p:nvGraphicFramePr><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/></a:graphicData></a:graphic></p:graphicFrame><p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="6" name="SmartArt"/></p:nvGraphicFramePr><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/diagram"><dgm:relIds xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram"/></a:graphicData></a:graphic></p:graphicFrame>"#,
             )
     }
@@ -745,21 +751,20 @@ mod tests {
     #[test]
     fn rejects_invalid_paragraph_template_cardinality_levels_order_and_namespaces() {
         let par = r#"<p:par><p:cTn id="80"/></p:par>"#;
-        let template = |level: &str, body: &str| {
-            format!(r#"<p:tmpl{level}><p:tnLst>{body}</p:tnLst></p:tmpl>"#)
-        };
+        let template =
+            |level: &str, body: &str| format!(r"<p:tmpl{level}><p:tnLst>{body}</p:tnLst></p:tmpl>");
         let lists = [
             template("", ""),
-            r#"<p:tmpl/>"#.to_string(),
-            format!(r#"<p:tmpl><p:tnLst>{par}{par}</p:tnLst></p:tmpl>"#),
-            r#"<p:tmpl><p:tnLst><p:par><p:cTn/><p:cTn/></p:par></p:tnLst></p:tmpl>"#.to_string(),
-            r#"<p:tmpl><p:tnLst><p:seq><p:cTn/></p:seq></p:tnLst></p:tmpl>"#.to_string(),
+            r"<p:tmpl/>".to_string(),
+            format!(r"<p:tmpl><p:tnLst>{par}{par}</p:tnLst></p:tmpl>"),
+            r"<p:tmpl><p:tnLst><p:par><p:cTn/><p:cTn/></p:par></p:tnLst></p:tmpl>".to_string(),
+            r"<p:tmpl><p:tnLst><p:seq><p:cTn/></p:seq></p:tnLst></p:tmpl>".to_string(),
             r#"<p:tmpl><p:tnLst><x:par xmlns:x="urn:foreign"><x:cTn/></x:par></p:tnLst></p:tmpl>"#
                 .to_string(),
-            format!(r#"<p:tmpl><p:tnLst>{par}</p:tnLst><p:tnLst>{par}</p:tnLst></p:tmpl>"#),
+            format!(r"<p:tmpl><p:tnLst>{par}</p:tnLst><p:tnLst>{par}</p:tnLst></p:tmpl>"),
             format!(r#"<p:tmpl lvl="10"><p:tnLst>{par}</p:tnLst></p:tmpl>"#),
             format!(r#"<p:tmpl lvl="nope"><p:tnLst>{par}</p:tnLst></p:tmpl>"#),
-            format!(r#"{}{}"#, template("", par), template("", par)),
+            format!(r"{}{}", template("", par), template("", par)),
             (0..10)
                 .map(|level| template(&format!(r#" lvl="{level}""#), par))
                 .collect::<String>(),
@@ -777,11 +782,11 @@ mod tests {
     fn validates_programmatic_paragraph_template_fragments_and_constraints() {
         for xml in [
             "",
-            r#"<p:seq><p:cTn/></p:seq>"#,
-            r#"<p:par/>"#,
-            r#"<p:par><p:cTn/><p:cTn/></p:par>"#,
+            r"<p:seq><p:cTn/></p:seq>",
+            r"<p:par/>",
+            r"<p:par><p:cTn/><p:cTn/></p:par>",
             r#"<x:par xmlns:x="urn:foreign"><x:cTn/></x:par>"#,
-            r#"<!DOCTYPE x><p:par><p:cTn/></p:par>"#,
+            r"<!DOCTYPE x><p:par><p:cTn/></p:par>",
         ] {
             assert!(TemplateTimeNode::parse(xml).is_err());
         }
@@ -884,7 +889,7 @@ mod tests {
                 r#"<x:bldDgm xmlns:x="urn:foreign" spid="5" grpId="77"/>"#,
             )),
             slide_with_ole(&diagram_timing("5", "77", ""))
-                .replace(r#"<p:oleObj/>"#, r#"<x:oleObj xmlns:x="urn:foreign"/>"#),
+                .replace(r"<p:oleObj/>", r#"<x:oleObj xmlns:x="urn:foreign"/>"#),
         ];
         for xml in cases {
             assert!(Sequence::parse_slide_xml(xml.as_bytes()).is_err());
@@ -1075,11 +1080,11 @@ mod tests {
         assert!(Sequence::parse_slide_xml(marker_elsewhere.as_bytes()).is_err());
 
         let nested_marker = slide_with_graphic_hosts(&valid_chart)
-            .replace(chart_marker, &format!(r#"<a:ext>{chart_marker}</a:ext>"#));
+            .replace(chart_marker, &format!(r"<a:ext>{chart_marker}</a:ext>"));
         assert!(Sequence::parse_slide_xml(nested_marker.as_bytes()).is_err());
 
         let duplicate_marker = slide_with_graphic_hosts(&valid_chart)
-            .replace(chart_marker, &format!(r#"{chart_marker}{chart_marker}"#));
+            .replace(chart_marker, &format!(r"{chart_marker}{chart_marker}"));
         assert!(Sequence::parse_slide_xml(duplicate_marker.as_bytes()).is_err());
 
         let ambiguous_marker = slide_with_graphic_hosts(&valid_chart).replace(
@@ -1091,10 +1096,8 @@ mod tests {
         let valid_diagram = graphic_timing("6", "88", "", "<p:bldSub><a:bldDgm/></p:bldSub>");
         let diagram_marker =
             r#"<dgm:relIds xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram"/>"#;
-        let nested_diagram_marker = slide_with_graphic_hosts(&valid_diagram).replace(
-            diagram_marker,
-            &format!(r#"<a:ext>{diagram_marker}</a:ext>"#),
-        );
+        let nested_diagram_marker = slide_with_graphic_hosts(&valid_diagram)
+            .replace(diagram_marker, &format!(r"<a:ext>{diagram_marker}</a:ext>"));
         assert!(Sequence::parse_slide_xml(nested_diagram_marker.as_bytes()).is_err());
 
         let duplicate = valid_chart.replace(

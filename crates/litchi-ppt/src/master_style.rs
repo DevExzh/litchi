@@ -1,4 +1,4 @@
-//! PowerPoint `TxMasterStyleAtom` parsing.
+//! `PowerPoint` `TxMasterStyleAtom` parsing.
 
 use litchi_core::binary::{read_u16_le, read_u32_le};
 
@@ -20,6 +20,11 @@ pub struct TextMasterStyleLevel {
 }
 
 /// Parsed text defaults from a `TxMasterStyleAtom`.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`TextMasterStyle` is the established public API name for the `TxMasterStyleAtom` \
+              model; renaming it would break downstream crates"
+)]
 #[derive(Debug, Clone)]
 pub struct TextMasterStyle {
     /// `TextTypeEnum` value from the record instance.
@@ -30,6 +35,10 @@ pub struct TextMasterStyle {
 
 impl TextMasterStyle {
     /// Parse a `TxMasterStyleAtom` payload for the supplied record instance.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(data: &[u8], text_type: u16) -> Result<Self> {
         if !matches!(text_type, 0 | 1 | 2 | 4 | 5 | 6 | 7 | 8) {
             return Err(Error::Corrupted(
@@ -74,7 +83,7 @@ impl TextMasterStyle {
                 "TextMasterStyleLevel paragraph",
             )?;
             let paragraph_end = offset + paragraph_size;
-            let (properties, tab_stops) =
+            let (paragraph_properties, tab_stops) =
                 parse_paragraph_properties(data, &mut offset, paragraph_mask);
             if offset != paragraph_end {
                 return Err(Error::Corrupted(
@@ -84,7 +93,7 @@ impl TextMasterStyle {
             let effective_level = explicit_level.unwrap_or(logical_level);
             let mut paragraph = TextPropCollection::new(0, TextPropType::Paragraph);
             paragraph.indent_level = effective_level;
-            paragraph.properties = properties;
+            paragraph.properties = paragraph_properties;
             paragraph.property_mask = paragraph_mask;
             paragraph.tab_stops = tab_stops;
 
@@ -99,14 +108,15 @@ impl TextMasterStyle {
                 "TextMasterStyleLevel character",
             )?;
             let character_end = offset + character_size;
-            let properties = parse_character_properties(data, &mut offset, character_mask);
+            let character_properties =
+                parse_character_properties(data, &mut offset, character_mask);
             if offset != character_end {
                 return Err(Error::Corrupted(
                     "TextMasterStyleLevel character size mismatch".to_string(),
                 ));
             }
             let mut character = TextPropCollection::new(0, TextPropType::Character);
-            character.properties = properties;
+            character.properties = character_properties;
             character.property_mask = character_mask;
 
             levels.push(TextMasterStyleLevel {
@@ -126,6 +136,11 @@ impl TextMasterStyle {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -155,8 +170,8 @@ mod tests {
         centered.extend_from_slice(&0u16.to_le_bytes());
         centered.extend_from_slice(&0u32.to_le_bytes());
         centered.extend_from_slice(&0u32.to_le_bytes());
-        let style = TextMasterStyle::parse(&centered, 5).unwrap();
-        assert_eq!(style.levels[0].explicit_level, Some(0));
+        let centered_style = TextMasterStyle::parse(&centered, 5).unwrap();
+        assert_eq!(centered_style.levels[0].explicit_level, Some(0));
     }
 
     #[test]

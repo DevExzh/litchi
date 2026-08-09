@@ -1,13 +1,19 @@
 //! Semantic ODP model assembly from XML elements.
 
-use super::super::*;
+use super::super::{
+    ANIMATION_NAMESPACE_BYTES, Actuate, AnimationKind, BytesStart, DR3D_NAMESPACE, DRAW_NAMESPACE,
+    Direction, DrawingAttribute, DrawingAttributeNamespace, DrawingHyperlink, DrawingShapeKind,
+    Element, Error, HashMap, HashSet, HyperlinkShow, Kind, NsReader, OFFICE_NAMESPACE,
+    PRESENTATION_NAMESPACE, ParagraphText, Parameter, Parser, Reference, ResolveResult, Result,
+    SCRIPT_NAMESPACE, SMIL_NAMESPACE, SVG_NAMESPACE, Shape, ShapeBuilder, ShapeElement, ShapeType,
+    Show, Sound, SoundShow, Speed, Style, TABLE_NAMESPACE, TEXT_NAMESPACE, Transition,
+    TransitionStyleDefinition, TransitionStyles, Type, XLINK_NAMESPACE, XML_NAMESPACE, XmlVersion,
+};
 
 impl Parser {
     pub(super) fn classify(namespace: &ResolveResult<'_>, local_name: &[u8]) -> Element {
         if Self::is_namespace(namespace, ANIMATION_NAMESPACE_BYTES) {
-            Kind::from_local_name(local_name)
-                .map(Element::Animation)
-                .unwrap_or(Element::UnknownAnimation)
+            Kind::from_local_name(local_name).map_or(Element::UnknownAnimation, Element::Animation)
         } else if Self::is_namespace(namespace, DRAW_NAMESPACE) {
             match local_name {
                 b"page" => Element::Page,
@@ -62,8 +68,7 @@ impl Parser {
                 Element::Sound
             } else {
                 AnimationKind::from_local_name(local_name)
-                    .map(Element::LegacyAnimation)
-                    .unwrap_or(Element::Other)
+                    .map_or(Element::Other, Element::LegacyAnimation)
             }
         } else if Self::is_namespace(namespace, SCRIPT_NAMESPACE) && local_name == b"event-listener"
         {
@@ -121,8 +126,9 @@ impl Parser {
     ) -> Result<ShapeBuilder> {
         let mut builder = ShapeBuilder::new();
         let presentation_class = Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"class")?;
+        let drawing_kind = Self::drawing_kind(shape_element);
         builder.is_frame = matches!(shape_element, ShapeElement::Frame);
-        builder.drawing_kind = Some(Self::drawing_kind(shape_element));
+        builder.drawing_kind = Some(drawing_kind);
         builder.is_title = presentation_class.as_deref() == Some("title");
         builder.shape_type = match shape_element {
             ShapeElement::Frame => match presentation_class.as_deref() {
@@ -132,7 +138,22 @@ impl Parser {
             ShapeElement::Line | ShapeElement::Measure => ShapeType::Line,
             ShapeElement::Connector => ShapeType::Connector,
             ShapeElement::Group | ShapeElement::ThreeDimensionalScene => ShapeType::Group,
-            _ => ShapeType::AutoShape,
+            ShapeElement::Rect
+            | ShapeElement::Ellipse
+            | ShapeElement::CustomShape
+            | ShapeElement::Circle
+            | ShapeElement::Path
+            | ShapeElement::Polygon
+            | ShapeElement::Polyline
+            | ShapeElement::RegularPolygon
+            | ShapeElement::PageThumbnail
+            | ShapeElement::Caption
+            | ShapeElement::Control
+            | ShapeElement::ThreeDimensionalLight
+            | ShapeElement::ThreeDimensionalCube
+            | ShapeElement::ThreeDimensionalSphere
+            | ShapeElement::ThreeDimensionalExtrude
+            | ShapeElement::ThreeDimensionalRotate => ShapeType::AutoShape,
         };
         builder.name = Self::get_attr(reader, element, DRAW_NAMESPACE, b"name")?;
         if matches!(
@@ -169,7 +190,7 @@ impl Parser {
         )?;
         builder.drawing_attributes = Self::drawing_attributes(reader, element)?;
         Self::validate_required_three_dimensional_attributes(
-            builder.drawing_kind.expect("shape kind initialized"),
+            drawing_kind,
             &builder.drawing_attributes,
         )?;
         Ok(builder)
@@ -180,23 +201,24 @@ impl Parser {
         element: &BytesStart<'_>,
     ) -> Result<Vec<DrawingAttribute>> {
         let mut attributes = Vec::new();
-        for attribute in element.attributes() {
-            let attribute = attribute.map_err(|error| {
+        for attribute_result in element.attributes() {
+            let attribute = attribute_result.map_err(|error| {
                 Error::InvalidFormat(format!("invalid ODP shape attribute: {error}"))
             })?;
-            let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
-            let namespace = if Self::is_namespace(&namespace, DRAW_NAMESPACE) {
+            let (namespace_uri, local_name_ref) =
+                reader.resolver().resolve_attribute(attribute.key);
+            let namespace = if Self::is_namespace(&namespace_uri, DRAW_NAMESPACE) {
                 DrawingAttributeNamespace::Drawing
-            } else if Self::is_namespace(&namespace, SVG_NAMESPACE) {
+            } else if Self::is_namespace(&namespace_uri, SVG_NAMESPACE) {
                 DrawingAttributeNamespace::Svg
-            } else if Self::is_namespace(&namespace, DR3D_NAMESPACE) {
+            } else if Self::is_namespace(&namespace_uri, DR3D_NAMESPACE) {
                 DrawingAttributeNamespace::Dr3d
-            } else if Self::is_namespace(&namespace, TABLE_NAMESPACE) {
+            } else if Self::is_namespace(&namespace_uri, TABLE_NAMESPACE) {
                 DrawingAttributeNamespace::Table
             } else {
                 continue;
             };
-            let local_name = local_name.as_ref();
+            let local_name = local_name_ref.as_ref();
             let modeled = match namespace {
                 DrawingAttributeNamespace::Drawing => matches!(
                     local_name,
@@ -274,12 +296,12 @@ impl Parser {
         Parameter::new(name, value)
     }
 
-    pub(super) fn parse_on_request(value: Option<String>, description: &str) -> Result<bool> {
-        match value.as_deref() {
+    pub(super) fn parse_on_request(value: Option<&str>, description: &str) -> Result<bool> {
+        match value {
             None => Ok(false),
             Some("onRequest") => Ok(true),
-            Some(value) => Err(Error::InvalidFormat(format!(
-                "invalid {description} xlink:actuate '{value}'"
+            Some(actuate) => Err(Error::InvalidFormat(format!(
+                "invalid {description} xlink:actuate '{actuate}'"
             ))),
         }
     }
@@ -292,7 +314,7 @@ impl Parser {
         let href = Self::required_attr(reader, element, XLINK_NAMESPACE, b"href", "xlink:href")?;
         let mut hyperlink = DrawingHyperlink::new(href)?;
         hyperlink.set_actuate_on_request(Self::parse_on_request(
-            Self::get_attr(reader, element, XLINK_NAMESPACE, b"actuate")?,
+            Self::get_attr(reader, element, XLINK_NAMESPACE, b"actuate")?.as_deref(),
             "draw:a",
         )?);
         hyperlink.set_show(
@@ -360,8 +382,8 @@ impl Parser {
     ) {
         if in_notes {
             Self::append_segment(notes, notes_has_paragraph, text);
-        } else if let Some(shape) = shape {
-            shape.push_paragraph(text);
+        } else if let Some(builder) = shape {
+            builder.push_paragraph(text);
         } else {
             Self::append_segment(slide_text, slide_has_segment, text);
         }
@@ -392,7 +414,29 @@ impl Parser {
                 }
                 paragraph.push_explicit(' ', count);
             },
-            _ => {},
+            Element::Page
+            | Element::Notes
+            | Element::SheetShapes
+            | Element::SpreadsheetRoot
+            | Element::Shape(_)
+            | Element::Image
+            | Element::Table
+            | Element::Object
+            | Element::Plugin
+            | Element::PluginParameter
+            | Element::DrawingHyperlink
+            | Element::EnhancedGeometry
+            | Element::EnhancedEquation
+            | Element::EnhancedHandle
+            | Element::EventListeners
+            | Element::EventListener
+            | Element::ScriptEventListener
+            | Element::Sound
+            | Element::TextParagraph
+            | Element::Animation(_)
+            | Element::UnknownAnimation
+            | Element::LegacyAnimation(_)
+            | Element::Other => {},
         }
         Ok(())
     }
@@ -438,16 +482,6 @@ impl Parser {
         content: &str,
         styles: Option<&str>,
     ) -> Result<(HashMap<String, Transition>, Transition)> {
-        let mut definitions = TransitionStyles::default();
-        if let Some(styles) = styles {
-            definitions = Self::parse_transition_style_definitions(styles)?;
-        }
-        let content_definitions = Self::parse_transition_style_definitions(content)?;
-        definitions.named.extend(content_definitions.named);
-        if !content_definitions.default.is_empty() {
-            definitions.default = content_definitions.default;
-        }
-
         fn resolve(
             name: &str,
             definitions: &HashMap<String, TransitionStyleDefinition>,
@@ -475,6 +509,16 @@ impl Parser {
             visiting.remove(name);
             cache.insert(name.to_string(), value.clone());
             Ok(value)
+        }
+
+        let mut definitions = TransitionStyles::default();
+        if let Some(styles_source) = styles {
+            definitions = Self::parse_transition_style_definitions(styles_source)?;
+        }
+        let content_definitions = Self::parse_transition_style_definitions(content)?;
+        definitions.named.extend(content_definitions.named);
+        if !content_definitions.default.is_empty() {
+            definitions.default = content_definitions.default;
         }
 
         let mut resolved = HashMap::with_capacity(definitions.named.len());
@@ -507,10 +551,11 @@ impl Parser {
             )));
         }
         let actuate = Self::get_attr(reader, element, XLINK_NAMESPACE, b"actuate")?;
-        if actuate.as_deref().is_some_and(|value| value != "onRequest") {
+        if let Some(actuate_value) = actuate.as_deref()
+            && actuate_value != "onRequest"
+        {
             return Err(Error::InvalidFormat(format!(
-                "invalid presentation:sound xlink:actuate '{}'",
-                actuate.as_deref().expect("actuate checked above")
+                "invalid presentation:sound xlink:actuate '{actuate_value}'"
             )));
         }
         let show = Self::get_attr(reader, element, XLINK_NAMESPACE, b"show")?

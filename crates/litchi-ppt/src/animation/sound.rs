@@ -2,8 +2,12 @@
 //!
 //! Provides structures for embedded and external sounds in animations.
 
-/// Built-in PowerPoint sound types.
+/// Built-in `PowerPoint` sound types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`BuiltinSound` is the established public API name; renaming it would break downstream crates"
+)]
 pub enum BuiltinSound {
     Applause,
     Arrow,
@@ -29,6 +33,7 @@ pub enum BuiltinSound {
 
 impl BuiltinSound {
     /// Get the sound ID for this built-in sound.
+    #[must_use]
     pub fn id(self) -> u32 {
         match self {
             Self::Applause => 1,
@@ -55,6 +60,7 @@ impl BuiltinSound {
     }
 
     /// Get the display name for this built-in sound.
+    #[must_use]
     pub fn name(self) -> &'static str {
         match self {
             Self::Applause => "Applause",
@@ -81,6 +87,7 @@ impl BuiltinSound {
     }
 
     /// Parse a built-in sound from name (case-insensitive).
+    #[must_use]
     pub fn from_name(name: &str) -> Option<Self> {
         match name.to_lowercase().replace(' ', "").as_str() {
             "applause" => Some(Self::Applause),
@@ -108,6 +115,7 @@ impl BuiltinSound {
     }
 
     /// Parse a built-in sound from ID.
+    #[must_use]
     pub fn from_id(id: u32) -> Option<Self> {
         match id {
             1 => Some(Self::Applause),
@@ -135,6 +143,7 @@ impl BuiltinSound {
     }
 
     /// List all available built-in sounds.
+    #[must_use]
     pub fn all() -> &'static [Self] {
         &[
             Self::Applause,
@@ -163,8 +172,12 @@ impl BuiltinSound {
 
 /// Sound type for animations.
 #[derive(Debug, Clone, PartialEq)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`SoundType` is the established public API name; renaming it would break downstream crates"
+)]
 pub enum SoundType {
-    /// Built-in PowerPoint sound
+    /// Built-in `PowerPoint` sound
     Builtin(BuiltinSound),
     /// Embedded sound data
     Embedded { name: String, data: Vec<u8> },
@@ -174,6 +187,10 @@ pub enum SoundType {
 
 /// Sound information for animation.
 #[derive(Debug, Clone, PartialEq)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`AnimationSound` is the established public API name; renaming it would break downstream crates"
+)]
 pub struct AnimationSound {
     /// Sound type and data
     pub sound_type: SoundType,
@@ -193,6 +210,7 @@ impl Default for AnimationSound {
 
 impl AnimationSound {
     /// Create a new empty sound with default Click sound.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             sound_type: SoundType::Builtin(BuiltinSound::Click),
@@ -203,6 +221,7 @@ impl AnimationSound {
     }
 
     /// Create a built-in sound.
+    #[must_use]
     pub fn builtin(sound: BuiltinSound) -> Self {
         Self {
             sound_type: SoundType::Builtin(sound),
@@ -239,36 +258,41 @@ impl AnimationSound {
     }
 
     /// Check if this is a built-in sound.
+    #[must_use]
     pub fn is_builtin(&self) -> bool {
         matches!(self.sound_type, SoundType::Builtin(_))
     }
 
     /// Check if this is an embedded sound.
+    #[must_use]
     pub fn is_embedded(&self) -> bool {
         matches!(self.sound_type, SoundType::Embedded { .. })
     }
 
     /// Check if this is a linked sound.
+    #[must_use]
     pub fn is_linked(&self) -> bool {
         matches!(self.sound_type, SoundType::Linked { .. })
     }
 
     /// Get the sound name.
+    #[must_use]
     pub fn name(&self) -> &str {
         match &self.sound_type {
             SoundType::Builtin(sound) => sound.name(),
-            SoundType::Embedded { name, .. } => name,
-            SoundType::Linked { name, .. } => name,
+            SoundType::Embedded { name, .. } | SoundType::Linked { name, .. } => name,
         }
     }
 
     /// Set loop sound flag.
+    #[must_use]
     pub fn with_loop(mut self, loop_sound: bool) -> Self {
         self.loop_sound = loop_sound;
         self
     }
 
     /// Set stop previous sound flag.
+    #[must_use]
     pub fn with_stop_previous(mut self, stop: bool) -> Self {
         self.stop_previous = stop;
         self
@@ -276,6 +300,11 @@ impl AnimationSound {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -300,7 +329,7 @@ mod tests {
         assert_eq!(sound.name(), "CustomSound");
         match &sound.sound_type {
             SoundType::Embedded { data: d, .. } => assert_eq!(d, &data),
-            _ => panic!("Expected embedded sound"),
+            SoundType::Builtin(_) | SoundType::Linked { .. } => panic!("Expected embedded sound"),
         }
     }
 
@@ -316,7 +345,7 @@ mod tests {
             SoundType::Linked { file_path, .. } => {
                 assert_eq!(file_path, "/path/to/sound.wav");
             },
-            _ => panic!("Expected linked sound"),
+            SoundType::Builtin(_) | SoundType::Embedded { .. } => panic!("Expected linked sound"),
         }
     }
 

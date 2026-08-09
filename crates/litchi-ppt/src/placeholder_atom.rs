@@ -1,7 +1,7 @@
 //! Strict MS-PPT 2.7.8 `PlaceholderAtom` support.
 //!
 //! Placeholder metadata is inert. Undefined payload bytes and unrelated
-//! OfficeArt client-data records are retained for byte-exact serialization.
+//! `OfficeArt` client-data records are retained for byte-exact serialization.
 
 use crate::consts::RecordType;
 
@@ -133,6 +133,10 @@ pub struct PlaceholderAtom {
 
 impl PlaceholderAtom {
     /// Parse a complete `RT_PlaceholderAtom` record for its owning slide context.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(record: &Record, context: PlaceholderContext) -> Result<Self> {
         if record.record_type != RecordType::OEPlaceholderAtom
             || record.record_type_raw != RecordType::OEPlaceholderAtom.as_u16()
@@ -147,6 +151,10 @@ impl PlaceholderAtom {
     }
 
     /// Parse the exact eight-byte payload for its owning slide context.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_payload(data: &[u8], context: PlaceholderContext) -> Result<Self> {
         if data.len() != 8 {
             return corrupted("PlaceholderAtom payload must be exactly eight bytes");
@@ -162,6 +170,10 @@ impl PlaceholderAtom {
     }
 
     /// Serialize the exact eight-byte payload after revalidating its context.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_payload(self, context: PlaceholderContext) -> Result<[u8; 8]> {
         validate_context(self.kind, context)?;
         let mut data = [0u8; 8];
@@ -173,6 +185,10 @@ impl PlaceholderAtom {
     }
 
     /// Build a generic PPT record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_record(self, context: PlaceholderContext) -> Result<Record> {
         Ok(Record {
             record_type: RecordType::OEPlaceholderAtom,
@@ -186,6 +202,10 @@ impl PlaceholderAtom {
     }
 
     /// Serialize a complete PPT atom record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the underlying writer reports an error.
     pub fn to_bytes(self, context: PlaceholderContext) -> Result<Vec<u8>> {
         Ok(encode_record(
             0,
@@ -214,7 +234,7 @@ impl Default for PlaceholderLimits {
     }
 }
 
-/// Context-validated placeholder projected from OfficeArt `ClientData`.
+/// Context-validated placeholder projected from `OfficeArt` `ClientData`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct PlaceholderProjection {
     pub placeholder: Option<PlaceholderAtom>,
@@ -238,7 +258,11 @@ pub struct PresentationPlaceholderEntry {
 }
 
 impl PlaceholderProjection {
-    /// Parse a complete OfficeArt `ClientData` record.
+    /// Parse a complete `OfficeArt` `ClientData` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_officeart_client_data(
         data: &[u8],
         context: PlaceholderContext,
@@ -250,7 +274,7 @@ impl PlaceholderProjection {
         let version_instance = u16::from_le_bytes([data[0], data[1]]);
         let record_type = u16::from_le_bytes([data[2], data[3]]);
         let length = usize::try_from(u32::from_le_bytes([data[4], data[5], data[6], data[7]]))
-            .map_err(|_| Error::Corrupted("OfficeArt ClientData size overflow".into()))?;
+            .map_err(|_err| Error::Corrupted("OfficeArt ClientData size overflow".into()))?;
         if version_instance != 0x000f || record_type != OFFICEART_CLIENT_DATA_TYPE {
             return corrupted("Invalid OfficeArt ClientData record header");
         }
@@ -260,7 +284,11 @@ impl PlaceholderProjection {
         Self::parse_client_data_payload(&data[8..], context, limits)
     }
 
-    /// Parse the direct PPT-record sequence inside OfficeArt `ClientData`.
+    /// Parse the direct PPT-record sequence inside `OfficeArt` `ClientData`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_client_data_payload(
         data: &[u8],
         context: PlaceholderContext,
@@ -331,15 +359,21 @@ impl PlaceholderProjection {
         })
     }
 
+    #[must_use]
     pub fn before_records(&self) -> &[Vec<u8>] {
         &self.before_records
     }
 
+    #[must_use]
     pub fn after_records(&self) -> &[Vec<u8>] {
         &self.after_records
     }
 
     /// Serialize the PPT-record payload while retaining unrelated data exactly.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_client_data_payload(
         &self,
         context: PlaceholderContext,
@@ -375,7 +409,11 @@ impl PlaceholderProjection {
         Ok(data)
     }
 
-    /// Serialize a complete OfficeArt `ClientData` record.
+    /// Serialize a complete `OfficeArt` `ClientData` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_officeart_client_data(
         &self,
         context: PlaceholderContext,
@@ -463,7 +501,7 @@ fn split_records(data: &[u8], max_records: usize) -> Result<Vec<Vec<u8>>> {
             data[offset + 6],
             data[offset + 7],
         ]))
-        .map_err(|_| Error::Corrupted("ClientData record size overflow".into()))?;
+        .map_err(|_err| Error::Corrupted("ClientData record size overflow".into()))?;
         let end = header_end
             .checked_add(length)
             .ok_or_else(|| Error::Corrupted("ClientData record end overflow".into()))?;
@@ -476,6 +514,10 @@ fn split_records(data: &[u8], max_records: usize) -> Result<Vec<Vec<u8>>> {
     Ok(records)
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "placeholder payloads are validated against `PlaceholderLimits`, far below the u32 record-length range"
+)]
 fn encode_record(version: u16, instance: u16, kind: u16, data: &[u8]) -> Vec<u8> {
     let mut output = Vec::with_capacity(8usize.saturating_add(data.len()));
     output.extend_from_slice(&((instance << 4) | version).to_le_bytes());
@@ -498,6 +540,11 @@ fn corrupted<T>(message: impl Into<String>) -> Result<T> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

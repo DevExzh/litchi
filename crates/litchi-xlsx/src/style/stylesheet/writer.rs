@@ -15,7 +15,7 @@ use super::alignment::Alignment;
 use super::border::{Border, Color, Conformance, Side};
 use super::cell_style::CellStyle;
 use super::fill::Fill;
-use super::font::Font;
+use super::font::{Font, FontColor, FontColorKind};
 use super::{NumberFormat, Styles};
 
 const TRANSITIONAL_NAMESPACE: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -89,12 +89,12 @@ fn write_number_formats(xml: &mut String, styles: &Styles) -> Result<()> {
         return Ok(());
     }
     let mut formats: Vec<&NumberFormat> = styles.number_formats.values().collect();
-    formats.sort_unstable_by_key(|format| format.id);
+    formats.sort_unstable_by_key(|format| format.id());
     write_xml(xml, format_args!(r#"<numFmts count="{}">"#, formats.len()))?;
     for format in formats {
         let mut element = String::from("<numFmt");
-        attr(&mut element, "numFmtId", &format.id.to_string())?;
-        attr(&mut element, "formatCode", &format.code)?;
+        attr(&mut element, "numFmtId", &format.id().to_string())?;
+        attr(&mut element, "formatCode", format.code())?;
         element.push_str("/>");
         xml.push_str(&element);
     }
@@ -126,7 +126,7 @@ fn write_font(xml: &mut String, font: &Font) -> Result<()> {
         empty_attribute_element(xml, "u", "val", underline.as_str())?;
     }
     if let Some(color) = &font.color {
-        write_string_color(xml, "color", color)?;
+        write_font_color(xml, "color", color)?;
     }
     if let Some(charset) = font.charset {
         empty_attribute_element(xml, "charset", "val", &charset.to_string())?;
@@ -441,6 +441,25 @@ fn write_string_color(xml: &mut String, element: &str, value: &str) -> Result<()
     Ok(())
 }
 
+fn write_font_color(xml: &mut String, element: &str, color: &FontColor) -> Result<()> {
+    let mut output = format!("<{element}");
+    match color.kind() {
+        FontColorKind::Default => {},
+        FontColorKind::Rgb(value) => attr(&mut output, "rgb", &value.to_string())?,
+        FontColorKind::Theme(index) => attr(&mut output, "theme", &index.to_string())?,
+        FontColorKind::Indexed(index) => attr(&mut output, "indexed", &index.to_string())?,
+        FontColorKind::Auto(enabled) => {
+            attr(&mut output, "auto", if enabled { "1" } else { "0" })?;
+        },
+    }
+    if let Some(tint) = color.tint() {
+        attr(&mut output, "tint", &tint.get().to_string())?;
+    }
+    output.push_str("/>");
+    xml.push_str(&output);
+    Ok(())
+}
+
 fn validate_pattern(pattern: &str) -> Result<()> {
     if matches!(
         pattern,
@@ -494,7 +513,9 @@ mod tests {
             name: Some("A&B".into()),
             size: Some(11.0),
             bold: true,
-            color: Some("#FF112233".into()),
+            color: Some(FontColor::rgb(crate::color::Rgb::argb(
+                0xFF, 0x11, 0x22, 0x33,
+            ))),
             ..Font::default()
         });
         styles.fills.push(Fill::solid("#FFFF0000".into()));

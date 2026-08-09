@@ -45,7 +45,7 @@ fn sync_container(record: &mut Record) -> Result<()> {
         payload.extend_from_slice(&encode_record(child, false)?);
     }
     record.data_length = u32::try_from(payload.len())
-        .map_err(|_| Error::InvalidFormat("PPT structural payload exceeds u32::MAX".into()))?;
+        .map_err(|_err| Error::InvalidFormat("PPT structural payload exceeds u32::MAX".into()))?;
     record.data = payload;
     Ok(())
 }
@@ -67,7 +67,7 @@ fn encode_record(record: &Record, force_children: bool) -> Result<Vec<u8>> {
         payload
     };
     let payload_len = u32::try_from(payload.len())
-        .map_err(|_| Error::InvalidFormat("PPT record payload exceeds u32::MAX".into()))?;
+        .map_err(|_err| Error::InvalidFormat("PPT record payload exceeds u32::MAX".into()))?;
     if record.version > 0x000f || record.instance > 0x0fff {
         return Err(Error::InvalidFormat(
             "PPT record version or instance is out of range".into(),

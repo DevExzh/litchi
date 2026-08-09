@@ -1,6 +1,6 @@
 use litchi_docx::mail_merge::{
     Conformance, DataSourceObject, DataType, Destination, FieldMap, FieldMappingType, Recipient,
-    Recipients, Settings, Source, Target,
+    Recipients, RelationshipId, Settings, Source, Target,
 };
 use litchi_docx::{Error, Package};
 use litchi_opc::constants::content_type as ct;
@@ -71,7 +71,9 @@ fn generated_graph_round_trips_without_fetching_or_interpreting_sources() {
     assert_eq!(merge.query(), Some("SELECT * FROM [Sheet1$]"));
     assert_eq!(merge.odso().unwrap().field_maps().len(), 1);
     match reopened
-        .mail_merge_target(merge.data_source_relationship_id().unwrap())
+        .mail_merge_target(
+            &RelationshipId::new(merge.data_source_relationship_id().unwrap()).unwrap(),
+        )
         .unwrap()
     {
         Target::External(uri) => {
@@ -223,7 +225,9 @@ fn clear_preserves_an_internal_source_still_shared_elsewhere() {
         .unwrap();
     let merge = package.mail_merge_settings().unwrap().unwrap();
     let target = match package
-        .mail_merge_target(merge.data_source_relationship_id().unwrap())
+        .mail_merge_target(
+            &RelationshipId::new(merge.data_source_relationship_id().unwrap()).unwrap(),
+        )
         .unwrap()
     {
         Target::Internal { part_name, .. } => part_name,

@@ -27,9 +27,7 @@ fn default_theme_round_trips() {
 #[test]
 fn large_custom_theme_round_trips_across_continuations() {
     // Exceeds one BIFF8 record, forcing ContinueFrt12 chunking.
-    let contents: Vec<u8> = (0..40_000u32)
-        .flat_map(|value| value.to_le_bytes())
-        .collect();
+    let contents: Vec<u8> = (0..40_000u32).flat_map(u32::to_le_bytes).collect();
     let workbook = Workbook::new(Cursor::new(written_workbook(Some(
         Theme::custom(contents.clone()).unwrap(),
     ))))

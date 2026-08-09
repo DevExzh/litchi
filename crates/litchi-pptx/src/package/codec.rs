@@ -29,7 +29,11 @@ const EXTENDED_PROPERTIES_PART: &str = "/docProps/app.xml";
 pub(super) const STALE_PRESENTATION_GRAPH_REASON: &str = "the mutable presentation model has unflushed changes; save and reopen before reading the canonical package graph";
 
 impl Package {
-    /// Create a minimal valid, mutable PresentationML package.
+    /// Create a minimal valid, mutable `PresentationML` package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new() -> Result<Self> {
         let mut package = OpcPackage::new();
         let presentation_name = pack_uri(PRESENTATION_PART)?;
@@ -165,11 +169,19 @@ impl Package {
     }
 
     /// Open a PPTX from a filesystem path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         Self::open_with_limits(path, litchi_opc::ReadLimits::default())
     }
 
     /// Open a PPTX from a filesystem path with explicit OPC resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn open_with_limits<P: AsRef<Path>>(
         path: P,
         limits: litchi_opc::ReadLimits,
@@ -178,11 +190,19 @@ impl Package {
     }
 
     /// Parse a PPTX from a reader.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
         Self::from_reader_with_limits(reader, litchi_opc::ReadLimits::default())
     }
 
     /// Parse a PPTX from a reader with explicit OPC resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_reader_with_limits<R: Read>(
         reader: R,
         limits: litchi_opc::ReadLimits,
@@ -191,26 +211,46 @@ impl Package {
     }
 
     /// Parse a PPTX from an owned ZIP buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_vec(bytes: Vec<u8>) -> Result<Self> {
         Self::from_vec_with_limits(bytes, litchi_opc::ReadLimits::default())
     }
 
     /// Parse a PPTX from an owned ZIP buffer with explicit OPC resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_vec_with_limits(bytes: Vec<u8>, limits: litchi_opc::ReadLimits) -> Result<Self> {
         Self::from_opc_package(OpcPackage::from_vec_with_limits(bytes, limits)?)
     }
 
     /// Parse a PPTX from a borrowed ZIP buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         Self::from_bytes_with_limits(bytes, litchi_opc::ReadLimits::default())
     }
 
     /// Parse a PPTX from a borrowed ZIP buffer with explicit OPC resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_bytes_with_limits(bytes: &[u8], limits: litchi_opc::ReadLimits) -> Result<Self> {
         Self::from_opc_package(OpcPackage::from_bytes_with_limits(bytes, limits)?)
     }
 
     /// Adopt an already parsed OPC graph without hydrating a mutable model.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_opc_package(opc: OpcPackage) -> Result<Self> {
         let main = opc.main_document_part()?;
         PresentationPart::from_part(main)?;
@@ -225,6 +265,10 @@ impl Package {
     }
 
     /// Save the package atomically through the OPC writer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
     pub fn save<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
         #[cfg(feature = "encryption")]
         self.encryption
@@ -239,6 +283,10 @@ impl Package {
     }
 
     /// Serialize the package into a new ZIP buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_bytes(&mut self) -> Result<Vec<u8>> {
         #[cfg(feature = "encryption")]
         self.encryption
@@ -296,7 +344,7 @@ impl Package {
         if !presentation_modified && !fonts_requested {
             return Ok(());
         }
-        let Some(presentation) = self.mutable_pres.as_ref().cloned() else {
+        let Some(presentation) = self.mutable_pres.clone() else {
             return Err(Error::UnsafeEdit {
                 operation: "save",
                 reason: "the lossless facade cannot publish an opened package's mutable graph",
@@ -317,10 +365,8 @@ impl Package {
                 if fonts_requested {
                     self.font_embedding_dirty = false;
                 }
-                if presentation_modified {
-                    if let Some(presentation) = self.mutable_pres.as_mut() {
-                        presentation.mark_clean();
-                    }
+                if presentation_modified && let Some(presentation) = self.mutable_pres.as_mut() {
+                    presentation.mark_clean();
                 }
                 Ok(())
             },

@@ -88,12 +88,18 @@ pub struct Parameter {
 
 impl Parameter {
     /// Create a plugin parameter.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(name: impl Into<String>, value: impl Into<String>) -> Result<Self> {
-        let name = name.into();
-        let value = value.into();
-        validate_bounded_xml_value(&name, "media parameter name")?;
-        validate_bounded_xml_value(&value, "media parameter value")?;
-        Ok(Self { name, value })
+        let name_string = name.into();
+        let value_string = value.into();
+        validate_bounded_xml_value(&name_string, "media parameter name")?;
+        validate_bounded_xml_value(&value_string, "media parameter value")?;
+        Ok(Self {
+            name: name_string,
+            value: value_string,
+        })
     }
 
     /// Return the parameter name.
@@ -127,11 +133,14 @@ impl Reference {
     /// Create the minimal schema-valid plugin reference.
     ///
     /// The serialized `XLink` type is always `simple`, as required by ODF.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(href: impl Into<String>) -> Result<Self> {
-        let href = href.into();
-        validate_href(&href)?;
+        let href_string = href.into();
+        validate_href(&href_string)?;
         Ok(Self {
-            href,
+            href: href_string,
             mime_type: None,
             show: None,
             actuate: None,
@@ -169,10 +178,13 @@ impl Reference {
     }
 
     /// Replace the `XLink` target.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_href(&mut self, href: impl Into<String>) -> Result<()> {
-        let href = href.into();
-        validate_href(&href)?;
-        self.href = href;
+        let new_href = href.into();
+        validate_href(&new_href)?;
+        self.href = new_href;
         Ok(())
     }
 
@@ -183,10 +195,13 @@ impl Reference {
     }
 
     /// Set the plugin MIME type.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_mime_type(&mut self, mime_type: impl Into<String>) -> Result<()> {
-        let mime_type = mime_type.into();
-        validate_media_type(&mime_type)?;
-        self.mime_type = Some(mime_type);
+        let new_mime_type = mime_type.into();
+        validate_media_type(&new_mime_type)?;
+        self.mime_type = Some(new_mime_type);
         Ok(())
     }
 
@@ -224,10 +239,13 @@ impl Reference {
     }
 
     /// Set the XML ID.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_xml_id(&mut self, xml_id: impl Into<String>) -> Result<()> {
-        let xml_id = xml_id.into();
-        validate_ncname(&xml_id, "media XML ID")?;
-        self.xml_id = Some(xml_id);
+        let new_xml_id = xml_id.into();
+        validate_ncname(&new_xml_id, "media XML ID")?;
+        self.xml_id = Some(new_xml_id);
         Ok(())
     }
 
@@ -248,6 +266,9 @@ impl Reference {
     }
 
     /// Add an inert plugin parameter.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn add_parameter(&mut self, parameter: Parameter) -> Result<()> {
         if self.parameters.len() >= 1024 {
             return Err(Error::InvalidFormat(
@@ -332,29 +353,29 @@ pub(crate) fn embed_media(
     bytes: impl Into<Vec<u8>>,
     media_type: impl Into<String>,
 ) -> Result<Reference> {
-    let path = path.into();
-    let media_type = media_type.into();
-    validate_package_media_path(&path)?;
-    validate_media_type(&media_type)?;
+    let embedded_path = path.into();
+    let embedded_media_type = media_type.into();
+    validate_package_media_path(&embedded_path)?;
+    validate_media_type(&embedded_media_type)?;
     if files.len() >= 65_536 {
         return Err(Error::InvalidFormat(
             "ODP package exceeds 65536 newly embedded media files".to_string(),
         ));
     }
-    if files.contains_key(&path) {
+    if files.contains_key(&embedded_path) {
         return Err(Error::InvalidFormat(format!(
-            "duplicate embedded ODP media path '{path}'"
+            "duplicate embedded ODP media path '{embedded_path}'"
         )));
     }
-    let mut reference = Reference::new(path.clone())?;
-    reference.set_mime_type(media_type.clone())?;
+    let mut reference = Reference::new(embedded_path.clone())?;
+    reference.set_mime_type(embedded_media_type.clone())?;
     reference.set_show(Some(Show::Embed));
     reference.set_actuate(Some(Actuate::OnLoad));
     files.insert(
-        path,
+        embedded_path,
         EmbeddedMedia {
             bytes: bytes.into(),
-            media_type,
+            media_type: embedded_media_type,
         },
     );
     Ok(reference)
@@ -478,6 +499,10 @@ pub(crate) fn validate_ncname(value: &str, description: &str) -> Result<()> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

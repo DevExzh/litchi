@@ -21,6 +21,10 @@ const ROUTING_FLAGS_MASK: u32 = FLAG_ONE_AFTER_ANOTHER
 
 impl Slip {
     /// Parse one bounded `DocRoutingSlipAtom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(record: &Record) -> Result<Self> {
         if record.record_type != RecordType::DocRoutingSlipAtom
             || record.version != 0
@@ -36,7 +40,7 @@ impl Slip {
             "DocRoutingSlipAtom fixed fields",
         )?;
         let length = usize::try_from(u32_at(data, 0)?)
-            .map_err(|_| corrupted("routing-slip length does not fit in memory"))?;
+            .map_err(|_err| corrupted("routing-slip length does not fit in memory"))?;
         if length > data.len() || length < RECORD_HEADER_LEN + FIXED_PAYLOAD_LEN {
             return Err(corrupted("DocRoutingSlipAtom has an invalid length"));
         }
@@ -47,7 +51,7 @@ impl Slip {
             ));
         }
         let recipient_count = usize::try_from(u32_at(data, 8)?)
-            .map_err(|_| corrupted("routing-slip recipient count does not fit in memory"))?;
+            .map_err(|_err| corrupted("routing-slip recipient count does not fit in memory"))?;
         let current_raw = u32_at(data, 12)?;
         let max_current = u32::try_from(recipient_count)
             .ok()
@@ -106,9 +110,13 @@ impl Slip {
     }
 
     /// Encode this routing slip as a `DocRoutingSlipAtom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_record(&self) -> Result<Record> {
         let recipient_count = u32::try_from(self.recipients.len())
-            .map_err(|_| corrupted("routing slip has too many recipients"))?;
+            .map_err(|_err| corrupted("routing slip has too many recipients"))?;
         let current = match self.current_recipient {
             CurrentRecipient::OriginatorBeforeRouting => 0,
             CurrentRecipient::Recipient(index) if index != 0 && index <= recipient_count => index,
@@ -156,11 +164,11 @@ impl Slip {
         write_text(&mut data, 3, &self.subject)?;
         write_text(&mut data, 4, &self.message)?;
         let length = u32::try_from(RECORD_HEADER_LEN + data.len())
-            .map_err(|_| corrupted("routing-slip record is too large"))?;
+            .map_err(|_err| corrupted("routing-slip record is too large"))?;
         data[0..4].copy_from_slice(&length.to_le_bytes());
         data.extend_from_slice(&self.trailing_undefined);
-        let data_length =
-            u32::try_from(data.len()).map_err(|_| corrupted("routing-slip record is too large"))?;
+        let data_length = u32::try_from(data.len())
+            .map_err(|_err| corrupted("routing-slip record is too large"))?;
         Ok(Record {
             record_type: RecordType::DocRoutingSlipAtom,
             record_type_raw: 0x0406,
@@ -238,8 +246,8 @@ fn write_address(data: &mut Vec<u8>, kind: u16, value: &Address) -> Result<()> {
 }
 
 fn write_text(data: &mut Vec<u8>, kind: u16, value: &Text) -> Result<()> {
-    let length =
-        u16::try_from(value.bytes.len()).map_err(|_| corrupted("routing-slip text is too long"))?;
+    let length = u16::try_from(value.bytes.len())
+        .map_err(|_err| corrupted("routing-slip text is too long"))?;
     data.extend_from_slice(&kind.to_le_bytes());
     data.extend_from_slice(&length.to_le_bytes());
     data.extend_from_slice(&value.bytes);

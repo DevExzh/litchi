@@ -12,6 +12,10 @@ use std::collections::HashSet;
 
 impl Summary {
     /// Parse the optional document `SummaryContainer`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(document: &Record) -> Result<Option<Self>> {
         let summaries = document
             .children
@@ -55,7 +59,7 @@ impl Summary {
             seed.data
                 .as_slice()
                 .try_into()
-                .map_err(|_| Error::Corrupted("BookmarkSeedAtom is truncated".to_string()))?,
+                .map_err(|_err| Error::Corrupted("BookmarkSeedAtom is truncated".to_string()))?,
         );
         let mut bookmarks = Vec::with_capacity(children.len().saturating_sub(1));
         let mut ids = HashSet::with_capacity(children.len().saturating_sub(1));
@@ -72,6 +76,10 @@ impl Summary {
     }
 
     /// Serialize the summary into a validated `SummaryContainer` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_record(&self) -> Result<Record> {
         let bytes = self.to_record_bytes()?;
         let (record, end) = Record::parse(&bytes, 0)?;
@@ -81,7 +89,11 @@ impl Summary {
         Ok(record)
     }
 
-    /// Serialize the summary into canonical PowerPoint record bytes.
+    /// Serialize the summary into canonical `PowerPoint` record bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         validate_summary(self)?;
         let mut collection = record_bytes(
@@ -109,13 +121,13 @@ impl Summary {
                 &entity_children,
             )?);
         }
-        let collection = record_bytes(
+        let collection_record = record_bytes(
             0x0f,
             0,
             RecordType::BookmarkCollection.as_u16(),
             &collection,
         )?;
-        record_bytes(0x0f, 0, RecordType::Summary.as_u16(), &collection)
+        record_bytes(0x0f, 0, RecordType::Summary.as_u16(), &collection_record)
     }
 }
 
@@ -137,13 +149,13 @@ fn parse_bookmark(container: &Record) -> Result<Bookmark> {
         RecordType::BookmarkEntityAtom,
         "BookmarkEntityAtom",
     )?;
-    if entity.data.len() != ENTITY_BYTES || entity.data_length != ENTITY_BYTES as u32 {
+    if entity.data.len() != ENTITY_BYTES || entity.data_length as usize != ENTITY_BYTES {
         return corrupted("BookmarkEntityAtom must contain 68 bytes");
     }
     let id = u32::from_le_bytes(
         entity.data[..4]
             .try_into()
-            .map_err(|_| Error::Corrupted("BookmarkEntityAtom is truncated".to_string()))?,
+            .map_err(|_err| Error::Corrupted("BookmarkEntityAtom is truncated".to_string()))?,
     );
     let name = parse_name(&entity.data[4..])?;
     let value_atom = &children[1];
@@ -197,7 +209,7 @@ fn parse_utf16_terminated(data: &[u8], context: &str) -> Result<String> {
         units.push(unit);
     }
     String::from_utf16(&units)
-        .map_err(|_| Error::Corrupted(format!("{context} contains invalid UTF-16")))
+        .map_err(|_err| Error::Corrupted(format!("{context} contains invalid UTF-16")))
 }
 
 fn encode_name(name: &str) -> Result<[u8; NAME_BYTES]> {
@@ -236,7 +248,7 @@ fn record_bytes(version: u16, instance: u16, record_type: u16, data: &[u8]) -> R
         return corrupted("PowerPoint record header fields exceed their wire widths");
     }
     let length = u32::try_from(data.len())
-        .map_err(|_| Error::Corrupted("PowerPoint record payload exceeds u32".to_string()))?;
+        .map_err(|_err| Error::Corrupted("PowerPoint record payload exceeds u32".to_string()))?;
     let mut bytes = Vec::with_capacity(8usize.saturating_add(data.len()));
     bytes.extend_from_slice(&((instance << 4) | version).to_le_bytes());
     bytes.extend_from_slice(&record_type.to_le_bytes());

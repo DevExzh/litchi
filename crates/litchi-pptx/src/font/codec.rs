@@ -1,4 +1,4 @@
-//! Bounded PresentationML and font-container codecs.
+//! Bounded `PresentationML` and font-container codecs.
 
 use super::model::{Charset, Conformance, License, Panose, PitchFamily, Style};
 use super::{
@@ -338,7 +338,7 @@ pub(super) fn parse_descriptor(
         .map(|value| {
             value
                 .parse::<u8>()
-                .map_err(|_| invalid(format!("invalid pitchFamily value '{value}'")))
+                .map_err(|_err| invalid(format!("invalid pitchFamily value '{value}'")))
                 .and_then(PitchFamily::from_wire)
         })
         .transpose()?;
@@ -347,7 +347,7 @@ pub(super) fn parse_descriptor(
         .map(|value| {
             value
                 .parse::<i8>()
-                .map_err(|_| invalid(format!("invalid charset byte value '{value}'")))
+                .map_err(|_err| invalid(format!("invalid charset byte value '{value}'")))
                 .map(Charset::from_wire)
         })
         .transpose()?;
@@ -524,12 +524,12 @@ pub(super) fn validate_eot(value: &[u8]) -> Result<()> {
     const EUDC: u32 = 0x0000_0020;
 
     let eot_size = usize::try_from(le_u32(value, 0)?)
-        .map_err(|_| invalid("EOT size does not fit this platform"))?;
+        .map_err(|_err| invalid("EOT size does not fit this platform"))?;
     if eot_size != value.len() {
         return Err(invalid("EOT size does not match the container length"));
     }
     let font_size = usize::try_from(le_u32(value, 4)?)
-        .map_err(|_| invalid("EOT font-data size does not fit this platform"))?;
+        .map_err(|_err| invalid("EOT font-data size does not fit this platform"))?;
     if font_size == 0 {
         return Err(invalid("EOT font-data payload is empty"));
     }
@@ -611,7 +611,7 @@ pub(super) fn validate_eot(value: &[u8]) -> Result<()> {
                 font_start,
                 "EUDC font-data size",
             )?)
-            .map_err(|_| invalid("EOT EUDC font-data size does not fit this platform"))?;
+            .map_err(|_err| invalid("EOT EUDC font-data size does not fit this platform"))?;
             eot_take(value, &mut cursor, eudc_size, font_start, "EUDC font data")?;
             if (flags & EUDC != 0) != (eudc_size != 0) {
                 return Err(invalid("EOT EUDC flag and payload disagree"));
@@ -643,7 +643,7 @@ pub(super) fn validate_sfnt(value: &[u8]) -> Result<()> {
                 )));
             }
             let fonts = usize::try_from(be_u32(value, 8)?)
-                .map_err(|_| invalid("TrueType Collection font count does not fit"))?;
+                .map_err(|_err| invalid("TrueType Collection font count does not fit"))?;
             if fonts == 0 {
                 return Err(invalid("TrueType Collection contains no fonts"));
             }
@@ -662,7 +662,7 @@ pub(super) fn validate_sfnt(value: &[u8]) -> Result<()> {
                     .checked_add(index * 4)
                     .ok_or_else(|| invalid("TrueType Collection font offset overflows"))?;
                 let offset = usize::try_from(be_u32(value, field)?)
-                    .map_err(|_| invalid("TrueType Collection font offset does not fit"))?;
+                    .map_err(|_err| invalid("TrueType Collection font offset does not fit"))?;
                 if offset % 4 != 0 {
                     return Err(invalid("TrueType Collection font offset is not aligned"));
                 }
@@ -898,7 +898,7 @@ pub(super) fn hex_panose(value: Panose) -> Result<String> {
     let mut output = String::with_capacity(20);
     for byte in value.bytes() {
         use std::fmt::Write;
-        write!(&mut output, "{byte:02X}").map_err(|_| Error::Write)?;
+        write!(&mut output, "{byte:02X}").map_err(|_err| Error::Write)?;
     }
     Ok(output)
 }

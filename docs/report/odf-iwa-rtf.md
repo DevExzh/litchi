@@ -1,11 +1,18 @@
 # Workspace-Split Audit: ODF / iWork / RTF
 
+> Historical audit record. This report preserves the branch names, crate
+> paths, source paths, line references, and conclusions observed during the
+> original `refactor/workspace-split` review. It does not describe current
+> ownership after the ODF family split or later IWA migration. In particular,
+> every path below is evidence from that audit unless explicitly labelled
+> current.
+
 ## 1. Scope
 
 Compared the `refactor/workspace-split` branch against `main` for three sibling
 crates carved out of the umbrella `src/`:
 
-| New crate                   | Source on `main` |
+| Historical split target     | Source on `main` |
 | --------------------------- | ---------------- |
 | `crates/litchi-odf/src/`    | `src/odf/`       |
 | `crates/litchi-iwa/src/`    | `src/iwa/`       |

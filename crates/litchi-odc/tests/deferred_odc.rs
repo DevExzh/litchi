@@ -3,7 +3,7 @@
     reason = "tests are expected to panic on unexpected errors"
 )]
 
-use litchi_odc::{AxisUpdate, FlatChart};
+use litchi_odc::{AxisUpdate, ChartClassKind, FlatChart};
 
 const ODC: &str = concat!(
     r#"<?xml version="1.0" encoding="UTF-8"?>"#,
@@ -49,6 +49,10 @@ fn flat_chart_reads_tree_preserves_bytes_and_rejects_wrong_family() {
     assert_eq!(flat.as_bytes(), ODC.as_bytes());
     assert!(flat.chart().all_text().contains("Revenue"));
     assert!(flat.find_axis("primary-x").is_some());
+    assert_eq!(
+        flat.chart().chart_class().unwrap().kind(),
+        ChartClassKind::Bar
+    );
     assert_invalid(
         "wrong family",
         r#"<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:mimetype="application/vnd.oasis.opendocument.graphics"><office:body><office:drawing/></office:body></office:document>"#
@@ -56,6 +60,24 @@ fn flat_chart_reads_tree_preserves_bytes_and_rejects_wrong_family() {
             .to_vec(),
     );
     assert_invalid("packaged input", b"PK\x03\x04mimetype".to_vec());
+}
+
+#[test]
+fn flat_chart_preserves_a_chart_class_alias_losslessly() {
+    let input = ODC
+        .replace("chart:class=\"chart:bar\"", "chart:class=\"c:bar\"")
+        .replace(
+            "xmlns:chart=",
+            "xmlns:c=\"urn:oasis:names:tc:opendocument:xmlns:chart:1.0\" xmlns:chart=",
+        );
+    let flat = FlatChart::from_bytes(input.clone().into_bytes()).unwrap();
+    let class = flat.chart().chart_class().unwrap();
+    assert_eq!(class.kind(), ChartClassKind::Bar);
+    assert_eq!(class.lexical(), "c:bar");
+    assert_eq!(
+        flat.edit().commit().unwrap().snapshot().as_bytes(),
+        input.as_bytes()
+    );
 }
 
 #[test]

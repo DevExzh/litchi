@@ -8,4 +8,4 @@ mod codec;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use codec::{ParsedDocument, Parser};
+pub(crate) use codec::Parser;

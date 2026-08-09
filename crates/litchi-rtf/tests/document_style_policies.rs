@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{DocumentStylePolicies, RtfDocument, RtfWriter};
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
@@ -11,7 +20,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 #[test]
 fn parses_all_four_passive_flags_without_applying_styles() {
     let document = RtfDocument::parse(
-        r#"{\rtf1\linkstyles\stylelocktheme\stylelockqfset\usenormstyforlist Body}"#,
+        r"{\rtf1\linkstyles\stylelocktheme\stylelockqfset\usenormstyforlist Body}",
     )
     .unwrap();
     assert_eq!(
@@ -28,7 +37,7 @@ fn parses_all_four_passive_flags_without_applying_styles() {
 
 #[test]
 fn parses_common_producer_flag_independently() {
-    let document = RtfDocument::parse(r#"{\rtf1\usenormstyforlist Body}"#).unwrap();
+    let document = RtfDocument::parse(r"{\rtf1\usenormstyforlist Body}").unwrap();
     assert!(!document.style_policies().update_styles_from_template);
     assert!(!document.style_policies().lock_theme);
     assert!(!document.style_policies().lock_quick_format_set);
@@ -38,7 +47,7 @@ fn parses_common_producer_flag_independently() {
 
 #[test]
 fn omission_remains_empty_and_is_not_serialized() {
-    let document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     assert!(document.style_policies().is_empty());
     let serialized = String::from_utf8(write(&document)).unwrap();
     assert!(!serialized.contains("stylelocktheme"));
@@ -48,7 +57,7 @@ fn omission_remains_empty_and_is_not_serialized() {
 
 #[test]
 fn typed_api_round_trips_in_stable_order_and_clears_without_style_changes() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     document.set_style_policies(DocumentStylePolicies {
         update_styles_from_template: true,
         lock_theme: true,
@@ -120,17 +129,17 @@ fn rejects_parameters_duplicates_starred_grouped_and_late_flags() {
         "usenormstyforlist",
     ] {
         for suffix in ["0", "1", "2147483647", "99999999999"] {
-            let source = format!(r#"{{\rtf1\{name}{suffix} Body}}"#);
+            let source = format!(r"{{\rtf1\{name}{suffix} Body}}");
             assert!(
                 RtfDocument::parse(&source).is_err(),
                 "accepted malformed {source}"
             );
         }
         for source in [
-            format!(r#"{{\rtf1\{name}\{name} Body}}"#),
-            format!(r#"{{\rtf1{{\*\{name}}}Body}}"#),
-            format!(r#"{{\rtf1{{\{name}}}Body}}"#),
-            format!(r#"{{\rtf1 Body\{name}}}"#),
+            format!(r"{{\rtf1\{name}\{name} Body}}"),
+            format!(r"{{\rtf1{{\*\{name}}}Body}}"),
+            format!(r"{{\rtf1{{\{name}}}Body}}"),
+            format!(r"{{\rtf1 Body\{name}}}"),
         ] {
             assert!(
                 RtfDocument::parse(&source).is_err(),

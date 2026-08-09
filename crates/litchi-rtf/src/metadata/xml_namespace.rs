@@ -14,6 +14,9 @@ pub struct XmlNamespace<'a> {
 }
 
 impl<'a> XmlNamespace<'a> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(id: u32, namespace: Cow<'a, str>) -> RtfResult<Self> {
         let entry = Self { id, namespace };
         entry.validate()?;

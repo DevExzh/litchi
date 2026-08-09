@@ -1,6 +1,15 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{
-    RtfDocument, RtfWriter, TableCellTextFlow, TableCellVerticalAlignment, TableRowAlignment,
-    TextDirection,
+    RtfDocument, RtfWriter, TableCellLayout, TableCellTextFlow, TableCellVerticalAlignment,
+    TableRowAlignment, TableRowLayout, TextDirection,
 };
 
 fn write(document: &RtfDocument<'_>) -> String {
@@ -11,7 +20,7 @@ fn write(document: &RtfDocument<'_>) -> String {
 
 #[test]
 fn parses_complete_layout_family_and_round_trips_deterministically() {
-    let source = r#"{\rtf1\trowd\trhdr\trkeep\trkeepfollow\trqc\rtlrow\clvertalt\cltxlrtb\clFitText\clNoWrap\clhidemark\cellx1000\clvertalc\cltxtbrl\cellx2000\clvertalb\cltxbtlr\cellx3000\cltxlrtbv\cellx4000\cltxtbrlv\cellx5000\intbl A\cell B\cell C\cell D\cell E\cell\row}"#;
+    let source = r"{\rtf1\trowd\trhdr\trkeep\trkeepfollow\trqc\rtlrow\clvertalt\cltxlrtb\clFitText\clNoWrap\clhidemark\cellx1000\clvertalc\cltxtbrl\cellx2000\clvertalb\cltxbtlr\cellx3000\cltxlrtbv\cellx4000\cltxtbrlv\cellx5000\intbl A\cell B\cell C\cell D\cell E\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     let row = &document.tables()[0].rows()[0];
     assert_eq!(row.direction(), Some(TextDirection::RightToLeft));
@@ -53,20 +62,20 @@ fn parses_complete_layout_family_and_round_trips_deterministically() {
 
 #[test]
 fn resets_trowd_and_restores_groups_and_inert_destinations() {
-    let source = r#"{\rtf1\trowd{\trhdr\trqr\rtlrow\clvertalb\clNoWrap}{\*\unknown\trhdr\clNoWrap}\trql\cellx1000\intbl A\cell\row\trowd\cellx1000\intbl B\cell\row}"#;
+    let source = r"{\rtf1\trowd{\trhdr\trqr\rtlrow\clvertalb\clNoWrap}{\*\unknown\trhdr\clNoWrap}\trql\cellx1000\intbl A\cell\row\trowd\cellx1000\intbl B\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     let rows = document.tables()[0].rows();
     assert_eq!(rows[0].layout().alignment, Some(TableRowAlignment::Left));
     assert!(!rows[0].layout().header);
     assert_eq!(rows[0].direction(), None);
-    assert_eq!(*rows[0].cells()[0].layout(), Default::default());
-    assert_eq!(*rows[1].layout(), Default::default());
-    assert_eq!(*rows[1].cells()[0].layout(), Default::default());
+    assert_eq!(*rows[0].cells()[0].layout(), TableCellLayout::default());
+    assert_eq!(*rows[1].layout(), TableRowLayout::default());
+    assert_eq!(*rows[1].cells()[0].layout(), TableCellLayout::default());
 }
 
 #[test]
 fn applies_end_defined_nested_layout_without_leaking_outer_state() {
-    let source = r#"{\rtf1\trowd\trhdr\trqc\clvertalc\cellx5000\intbl\itap2 Inner\nestcell{\*\nesttableprops\itap2\trowd\trkeep\trqr\ltrrow\clvertalb\cltxbtlr\clNoWrap\cellx1000\nestrow}\intbl\itap1\cell\row}"#;
+    let source = r"{\rtf1\trowd\trhdr\trqc\clvertalc\cellx5000\intbl\itap2 Inner\nestcell{\*\nesttableprops\itap2\trowd\trkeep\trqr\ltrrow\clvertalb\cltxbtlr\clNoWrap\cellx1000\nestrow}\intbl\itap1\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     let outer = &document.tables()[0].rows()[0];
     assert!(outer.layout().header);

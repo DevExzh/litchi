@@ -2,6 +2,10 @@
 //!
 //! This module provides support for borders and shading in RTF documents.
 
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items stay grouped by RTF feature area rather than by item kind"
+)]
 use super::types::ColorRef;
 
 /// RTF 1.9.1 character-border line style selected after `chbrdr`.
@@ -99,6 +103,9 @@ impl Default for CharacterBorder {
 }
 
 impl CharacterBorder {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::RtfResult<()> {
         if self.width > 75 {
             return Err(crate::RtfError::MalformedDocument(
@@ -119,6 +126,9 @@ pub struct CharacterShading {
 }
 
 impl CharacterShading {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::RtfResult<()> {
         if self.amount > 10_000 {
             return Err(crate::RtfError::MalformedDocument(
@@ -256,6 +266,7 @@ impl Default for Border {
 impl Border {
     /// Create a new border
     #[inline]
+    #[must_use]
     pub fn new(style: BorderStyle) -> Self {
         Self {
             style,
@@ -265,10 +276,13 @@ impl Border {
 
     /// Check if border is visible
     #[inline]
+    #[must_use]
     pub fn is_visible(&self) -> bool {
         self.style != BorderStyle::None && self.width > 0
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate_table(&self) -> crate::RtfResult<()> {
         if !(0..=75).contains(&self.width) {
             return Err(crate::RtfError::MalformedDocument(
@@ -304,12 +318,14 @@ pub struct Borders {
 impl Borders {
     /// Create new empty borders
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Set all borders to the same style
     #[inline]
+    #[must_use]
     pub fn all(border: Border) -> Self {
         Self {
             top: border,
@@ -323,6 +339,7 @@ impl Borders {
 
     /// Check if any border is visible
     #[inline]
+    #[must_use]
     pub fn has_any_border(&self) -> bool {
         self.top.is_visible()
             || self.bottom.is_visible()
@@ -427,12 +444,14 @@ pub struct Shading {
 impl Shading {
     /// Create new shading
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Create solid color shading
     #[inline]
+    #[must_use]
     pub fn solid(color: ColorRef) -> Self {
         Self {
             amount: Some(10_000),
@@ -444,6 +463,7 @@ impl Shading {
 
     /// Whether any paragraph-shading control was explicitly retained.
     #[inline]
+    #[must_use]
     pub fn is_present(&self) -> bool {
         self.amount.is_some()
             || self.pattern.is_some()
@@ -453,6 +473,7 @@ impl Shading {
 
     /// Check if shading is visible
     #[inline]
+    #[must_use]
     pub fn is_visible(&self) -> bool {
         self.amount.is_some_and(|amount| amount != 0)
             || self
@@ -461,7 +482,9 @@ impl Shading {
             || self.foreground_color.is_some_and(|color| color != 0)
             || self.background_color.is_some_and(|color| color != 0)
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::RtfResult<()> {
         if self.amount.is_some_and(|amount| amount > 10_000) {
             return Err(crate::RtfError::MalformedDocument(
@@ -472,8 +495,11 @@ impl Shading {
     }
 
     /// Set or clear the exact `\shadingN` amount.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_amount(&mut self, amount: Option<u16>) -> crate::RtfResult<()> {
-        if amount.is_some_and(|amount| amount > 10_000) {
+        if amount.is_some_and(|value| value > 10_000) {
             return Err(crate::RtfError::MalformedDocument(
                 "RTF paragraph shading must be in 0..=10000".to_string(),
             ));
@@ -572,6 +598,7 @@ pub struct TabStops {
 impl TabStops {
     /// Create an empty collection.
     #[inline]
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             entries: [TabStop {
@@ -585,18 +612,21 @@ impl TabStops {
 
     /// Number of stored custom tab stops.
     #[inline]
+    #[must_use]
     pub const fn len(&self) -> usize {
         self.len as usize
     }
 
     /// Whether no custom tab stops are stored.
     #[inline]
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.len == 0
     }
 
     /// Stored tab stops in declaration order.
     #[inline]
+    #[must_use]
     pub fn as_slice(&self) -> &[TabStop] {
         self.entries.get(..self.len()).unwrap_or(&[])
     }
@@ -608,6 +638,9 @@ impl TabStops {
     }
 
     /// Append a tab stop, returning the value when the collection is full.
+    ///
+    /// # Errors
+    /// Returns the tab stop as an error when the table is already full.
     pub fn push(&mut self, tab: TabStop) -> Result<(), TabStop> {
         let index = self.len();
         let Some(slot) = self.entries.get_mut(index) else {
@@ -649,6 +682,7 @@ impl<'a> IntoIterator for &'a TabStops {
 impl TabStop {
     /// Create a new tab stop
     #[inline]
+    #[must_use]
     pub fn new(position: i32) -> Self {
         Self {
             position,
@@ -659,12 +693,14 @@ impl TabStop {
 
     /// Create a left-aligned tab stop
     #[inline]
+    #[must_use]
     pub fn left(position: i32) -> Self {
         Self::new(position)
     }
 
     /// Create a right-aligned tab stop
     #[inline]
+    #[must_use]
     pub fn right(position: i32) -> Self {
         Self {
             position,
@@ -675,6 +711,7 @@ impl TabStop {
 
     /// Create a centered tab stop
     #[inline]
+    #[must_use]
     pub fn center(position: i32) -> Self {
         Self {
             position,
@@ -685,6 +722,7 @@ impl TabStop {
 
     /// Create a decimal tab stop
     #[inline]
+    #[must_use]
     pub fn decimal(position: i32) -> Self {
         Self {
             position,
@@ -696,6 +734,16 @@ impl TabStop {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
+    #![allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_possible_wrap,
+        reason = "test loop indices stay far below the i32 range"
+    )]
     use super::*;
 
     #[test]

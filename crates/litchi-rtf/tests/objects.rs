@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use std::borrow::Cow;
 
 use litchi_rtf::{EmbeddedObject, ObjectKind, ObjectResultKind, RtfDocument, RtfWriter};
@@ -43,13 +52,13 @@ fn round_trips_real_libreoffice_inline_ole_object() {
 
 #[test]
 fn preserves_typed_object_metadata_and_shared_result_picture_indices() {
-    let source = r#"{\rtf1\ansi A{\object\objocx\linkself\objlock\objupdate
+    let source = r"{\rtf1\ansi A{\object\objocx\linkself\objlock\objupdate
         {\*\objclass Control.Class}{\*\objname Visible Name}\objsetsize
         \objalign20\objtransy-3\objh40\objw50\objcropt1\objcropb2
         \objcropl3\objcropr4\objscalex125\objscaley80\rsltmerge\rslthtml
         {\*\oleclsid 00112233-4455-6677-8899-AABBCCDDEEFF}
         {\*\objdata 0102a0ff}
-        {\result fallback{\pict\pngblip\picw1\pich1 89504e470d0a1a0a}}}B}"#;
+        {\result fallback{\pict\pngblip\picw1\pich1 89504e470d0a1a0a}}}B}";
     let document = RtfDocument::parse(source).unwrap();
     let object = &document.objects()[0];
     assert_eq!(object.position, 1);
@@ -71,7 +80,7 @@ fn preserves_typed_object_metadata_and_shared_result_picture_indices() {
     let picture_index = object.result_picture_indices[0];
     assert!(std::ptr::eq(
         document.picture_for_object_result(object, 0).unwrap(),
-        &document.pictures()[picture_index]
+        &raw const document.pictures()[picture_index]
     ));
 
     let output = write(&document);
@@ -90,7 +99,7 @@ fn preserves_typed_object_metadata_and_shared_result_picture_indices() {
 #[test]
 fn typed_mutation_validates_positions_and_clear_keeps_shared_pictures() {
     let mut document = RtfDocument::parse(
-        r#"{\rtf1 Body{\object\objemb{\*\objdata 00}{\result{\pict\pngblip\picw1\pich1 89504e470d0a1a0a}}}}"#,
+        r"{\rtf1 Body{\object\objemb{\*\objdata 00}{\result{\pict\pngblip\picw1\pich1 89504e470d0a1a0a}}}}",
     )
     .unwrap();
     assert_eq!(document.pictures().len(), 1);
@@ -132,18 +141,18 @@ fn typed_mutation_validates_positions_and_clear_keeps_shared_pictures() {
 #[test]
 fn rejects_hostile_object_destination_grammar() {
     for source in [
-        r#"{\rtf1{\*\object\objemb{\*\objdata 00}}}"#,
-        r#"{\rtf1{\object1\objemb{\*\objdata 00}}}"#,
-        r#"{\rtf1{\object\objemb1{\*\objdata 00}}}"#,
-        r#"{\rtf1{\object\objemb\objalign{\*\objdata 00}}}"#,
-        r#"{\rtf1{\object\objemb\objalign1\objalign2{\*\objdata 00}}}"#,
-        r#"{\rtf1{\object\objemb{\objclass X}{\*\objdata 00}}}"#,
-        r#"{\rtf1{\object\objemb{\*\oleclsid1 X}{\*\objdata 00}}}"#,
-        r#"{\rtf1{\object\objemb{\*\oleclsid X}{\*\oleclsid Y}{\*\objdata 00}}}"#,
-        r#"{\rtf1{\object\objemb{\*\objdata 00}{\*\oleclsid X}}}"#,
-        r#"{\rtf1{\object\objemb{\*\objdata 00}{\*\result x}}}"#,
-        r#"{\rtf1{\object\objemb{\*\objclass X{\object}}{\*\objdata 00}}}"#,
-        r#"{\rtf1\intbl{\object\objemb{\*\objdata 00}}}"#,
+        r"{\rtf1{\*\object\objemb{\*\objdata 00}}}",
+        r"{\rtf1{\object1\objemb{\*\objdata 00}}}",
+        r"{\rtf1{\object\objemb1{\*\objdata 00}}}",
+        r"{\rtf1{\object\objemb\objalign{\*\objdata 00}}}",
+        r"{\rtf1{\object\objemb\objalign1\objalign2{\*\objdata 00}}}",
+        r"{\rtf1{\object\objemb{\objclass X}{\*\objdata 00}}}",
+        r"{\rtf1{\object\objemb{\*\oleclsid1 X}{\*\objdata 00}}}",
+        r"{\rtf1{\object\objemb{\*\oleclsid X}{\*\oleclsid Y}{\*\objdata 00}}}",
+        r"{\rtf1{\object\objemb{\*\objdata 00}{\*\oleclsid X}}}",
+        r"{\rtf1{\object\objemb{\*\objdata 00}{\*\result x}}}",
+        r"{\rtf1{\object\objemb{\*\objclass X{\object}}{\*\objdata 00}}}",
+        r"{\rtf1\intbl{\object\objemb{\*\objdata 00}}}",
     ] {
         assert!(
             RtfDocument::parse(source).is_err(),
@@ -154,12 +163,12 @@ fn rejects_hostile_object_destination_grammar() {
 
 #[test]
 fn round_trips_object_alias_and_section_metadata() {
-    let source = r#"{\rtf1\ansi A{\object\objemb\objh40\objw50
+    let source = r"{\rtf1\ansi A{\object\objemb\objh40\objw50
         {\*\objclass Package}{\*\objname Visible Name}
         {\*\objalias Alias Name}{\*\objsect Section1}
         {\*\oleclsid 00112233-4455-6677-8899-AABBCCDDEEFF}
         {\*\objdata 0102a0ff}
-        {\result fallback}}B}"#;
+        {\result fallback}}B}";
     let document = RtfDocument::parse(source).unwrap();
     let object = &document.objects()[0];
     assert_eq!(object.alias.as_deref(), Some("Alias Name"));
@@ -182,16 +191,16 @@ fn round_trips_object_alias_and_section_metadata() {
 fn rejects_misplaced_object_alias_and_section_destinations() {
     for source in [
         // Unstarred destinations.
-        r#"{\rtf1{\object\objemb{\objalias X}{\*\objdata 00}}}"#,
-        r#"{\rtf1{\object\objemb{\objsect X}{\*\objdata 00}}}"#,
+        r"{\rtf1{\object\objemb{\objalias X}{\*\objdata 00}}}",
+        r"{\rtf1{\object\objemb{\objsect X}{\*\objdata 00}}}",
         // Duplicate destinations.
-        r#"{\rtf1{\object\objemb{\*\objalias X}{\*\objalias Y}{\*\objdata 00}}}"#,
-        r#"{\rtf1{\object\objemb{\*\objsect X}{\*\objsect Y}{\*\objdata 00}}}"#,
+        r"{\rtf1{\object\objemb{\*\objalias X}{\*\objalias Y}{\*\objdata 00}}}",
+        r"{\rtf1{\object\objemb{\*\objsect X}{\*\objsect Y}{\*\objdata 00}}}",
         // Metadata after objdata.
-        r#"{\rtf1{\object\objemb{\*\objdata 00}{\*\objalias X}}}"#,
-        r#"{\rtf1{\object\objemb{\*\objdata 00}{\*\objsect X}}}"#,
+        r"{\rtf1{\object\objemb{\*\objdata 00}{\*\objalias X}}}",
+        r"{\rtf1{\object\objemb{\*\objdata 00}{\*\objsect X}}}",
         // Metadata after the CLSID.
-        r#"{\rtf1{\object\objemb{\*\oleclsid X}{\*\objalias A}{\*\objdata 00}}}"#,
+        r"{\rtf1{\object\objemb{\*\oleclsid X}{\*\objalias A}{\*\objdata 00}}}",
     ] {
         assert!(
             RtfDocument::parse(source).is_err(),
@@ -202,12 +211,12 @@ fn rejects_misplaced_object_alias_and_section_destinations() {
 
 #[test]
 fn round_trips_object_time_metadata() {
-    let source = r#"{\rtf1\ansi A{\object\objlink\objh40\objw50
+    let source = r"{\rtf1\ansi A{\object\objlink\objh40\objw50
         {\*\objclass Package}{\*\objname Visible Name}
         {\*\objsect Section1}{\*\objtime \yr1994\mo6\dy16\hr12\min30}
         {\*\oleclsid 00112233-4455-6677-8899-AABBCCDDEEFF}
         {\*\objdata 0102a0ff}
-        {\result fallback}}B}"#;
+        {\result fallback}}B}";
     let document = RtfDocument::parse(source).unwrap();
     let object = &document.objects()[0];
     let time = object.time.unwrap();
@@ -231,15 +240,15 @@ fn round_trips_object_time_metadata() {
 fn rejects_misplaced_object_time_destinations() {
     for source in [
         // Unstarred destination.
-        r#"{\rtf1{\object\objemb{\objtime \yr1994}{\*\objdata 00}}}"#,
+        r"{\rtf1{\object\objemb{\objtime \yr1994}{\*\objdata 00}}}",
         // Duplicate destination.
-        r#"{\rtf1{\object\objemb{\*\objtime \yr1994}{\*\objtime \yr1995}{\*\objdata 00}}}"#,
+        r"{\rtf1{\object\objemb{\*\objtime \yr1994}{\*\objtime \yr1995}{\*\objdata 00}}}",
         // Destination after objdata.
-        r#"{\rtf1{\object\objemb{\*\objdata 00}{\*\objtime \yr1994}}}"#,
+        r"{\rtf1{\object\objemb{\*\objdata 00}{\*\objtime \yr1994}}}",
         // Text payload in the destination.
-        r#"{\rtf1{\object\objemb{\*\objtime noon}{\*\objdata 00}}}"#,
+        r"{\rtf1{\object\objemb{\*\objtime noon}{\*\objdata 00}}}",
         // Active non-time control in the destination.
-        r#"{\rtf1{\object\objemb{\*\objtime \b\yr1994}{\*\objdata 00}}}"#,
+        r"{\rtf1{\object\objemb{\*\objtime \b\yr1994}{\*\objdata 00}}}",
     ] {
         assert!(
             RtfDocument::parse(source).is_err(),

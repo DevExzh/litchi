@@ -1,8 +1,3 @@
-use std::io::Write;
-
-/// Error type for PPT operations
-pub type Error = std::io::Error;
-
 /// PPT record types
 pub mod record_type {
     pub const DOCUMENT: u16 = 1000;
@@ -69,6 +64,11 @@ pub mod record_type {
     pub const NAMED_SHOW_SLIDES: u16 = 1042; // EPP_NamedShowSlides atom
 }
 
+use std::io::Write;
+
+/// Error type for PPT operations
+pub type Error = std::io::Error;
+
 /// PPT record header
 #[derive(Debug, Clone)]
 pub struct RecordHeader {
@@ -84,6 +84,7 @@ pub struct RecordHeader {
 
 impl RecordHeader {
     /// Create a new record header
+    #[must_use]
     pub fn new(version: u8, instance: u16, record_type: u16, length: u32) -> Self {
         Self {
             version: version & 0x0F,
@@ -94,9 +95,13 @@ impl RecordHeader {
     }
 
     /// Write the header to a writer (8 bytes)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the underlying writer reports an error.
     pub fn write<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         // Combine version and instance into first 2 bytes
-        let ver_inst = (self.version as u16) | ((self.instance & 0x0FFF) << 4);
+        let ver_inst = u16::from(self.version) | ((self.instance & 0x0FFF) << 4);
         writer.write_all(&ver_inst.to_le_bytes())?;
 
         // Write type (2 bytes)
@@ -109,6 +114,7 @@ impl RecordHeader {
     }
 
     /// Total size including header
+    #[must_use]
     pub fn total_size(&self) -> u32 {
         8 + self.length
     }
@@ -122,6 +128,7 @@ pub struct RecordBuilder {
 
 impl RecordBuilder {
     /// Create a new record builder
+    #[must_use]
     pub fn new(version: u8, instance: u16, record_type: u16) -> Self {
         Self {
             header: RecordHeader::new(version, instance, record_type, 0),
@@ -130,18 +137,30 @@ impl RecordBuilder {
     }
 
     /// Write data to the record
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "record payloads are assembled in memory and bounded far below the u32 length field of the on-disk format"
+    )]
     pub fn write_data(&mut self, data: &[u8]) {
         self.data.extend_from_slice(data);
         self.header.length = self.data.len() as u32;
     }
 
     /// Write a child record
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "record payloads are assembled in memory and bounded far below the u32 length field of the on-disk format"
+    )]
     pub fn write_child(&mut self, child: &[u8]) {
         self.data.extend_from_slice(child);
         self.header.length = self.data.len() as u32;
     }
 
     /// Build the complete record (header + data)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the underlying writer reports an error.
     pub fn build(&self) -> Result<Vec<u8>, Error> {
         let mut record = Vec::new();
         self.header.write(&mut record)?;
@@ -150,11 +169,13 @@ impl RecordBuilder {
     }
 
     /// Get the current length
+    #[must_use]
     pub fn len(&self) -> u32 {
         self.header.total_size()
     }
 
     /// Check if record is empty
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
     }

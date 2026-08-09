@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{ProtectionRange, RtfDocument, RtfWriter};
 use std::borrow::Cow;
 
@@ -50,7 +59,7 @@ fn unclosed_range_extends_to_body_end_and_unmatched_end_is_ignored() {
 #[test]
 fn coexists_with_bookmarks_and_body_markup() {
     let document = RtfDocument::parse(
-        r#"{\rtf1 a{\*\bkmkstart bm}b{\*\bkmkend bm}{\*\protstart 0a0b}cd{\*\protend 0a0b}e}"#,
+        r"{\rtf1 a{\*\bkmkstart bm}b{\*\bkmkend bm}{\*\protstart 0a0b}cd{\*\protend 0a0b}e}",
     )
     .unwrap();
     assert_eq!(document.text(), "abcde");

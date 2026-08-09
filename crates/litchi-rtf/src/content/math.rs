@@ -11,6 +11,10 @@
 //! typesets, or renders an equation. The document-level math defaults
 //! (`\mmathPr`) are modeled separately in [`crate::DocumentMathProperties`].
 
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items stay grouped by RTF feature area rather than by item kind"
+)]
 use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 use std::collections::HashSet;
@@ -27,6 +31,10 @@ fn malformed(message: impl Into<String>) -> RtfError {
     RtfError::MalformedDocument(message.into())
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// The kind of an RTF math zone destination.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MathZoneKind {
@@ -36,6 +44,10 @@ pub enum MathZoneKind {
     Display,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// The kind of a math structure destination.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MathStructureKind {
@@ -79,6 +91,10 @@ pub enum MathStructureKind {
     ScriptSup,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// The role of a math argument destination.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MathElementRole {
@@ -100,6 +116,10 @@ pub enum MathElementRole {
     FunctionName,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// A named math property from a `\*Pr` destination.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MathPropertyName {
@@ -201,6 +221,10 @@ pub enum MathPropertyName {
     ArgumentSize,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// One inert math property: a name with its verbatim decoded value text.
 ///
 /// On the wire a property is a group holding a control word followed by its
@@ -216,6 +240,9 @@ pub struct MathProperty<'a> {
 
 impl<'a> MathProperty<'a> {
     /// Create a validated math property.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(name: MathPropertyName, value: Cow<'a, str>) -> RtfResult<Self> {
         let property = Self { name, value };
         property.validate()?;
@@ -244,6 +271,10 @@ impl<'a> MathProperty<'a> {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// The kind of a math property destination.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MathPropertiesKind {
@@ -261,6 +292,10 @@ pub enum MathPropertiesKind {
     MatrixColumn,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// One inert matrix column description (`\mmc`) from the `\mmcs` destination
 /// of a matrix property destination.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -270,7 +305,7 @@ pub struct MathMatrixColumn<'a> {
     pub properties: Option<MathProperties<'a>>,
 }
 
-impl<'a> MathMatrixColumn<'a> {
+impl MathMatrixColumn<'_> {
     pub(crate) fn validate(&self) -> RtfResult<()> {
         if let Some(properties) = &self.properties {
             if properties.kind != MathPropertiesKind::MatrixColumn {
@@ -290,6 +325,10 @@ impl<'a> MathMatrixColumn<'a> {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// An inert math property destination.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MathProperties<'a> {
@@ -306,6 +345,9 @@ pub struct MathProperties<'a> {
 
 impl<'a> MathProperties<'a> {
     /// Create a validated math property destination.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(kind: MathPropertiesKind, properties: Vec<MathProperty<'a>>) -> RtfResult<Self> {
         let destination = Self {
             kind,
@@ -338,7 +380,10 @@ impl<'a> MathProperties<'a> {
                     property.name,
                     MathPropertyName::MatrixCellCount | MathPropertyName::MatrixCellJustify
                 ),
-                _ => property.name != MathPropertyName::ArgumentSize,
+                MathPropertiesKind::Structure(_)
+                | MathPropertiesKind::Run
+                | MathPropertiesKind::Paragraph
+                | MathPropertiesKind::Control => property.name != MathPropertyName::ArgumentSize,
             };
             if !permitted {
                 return Err(malformed(
@@ -390,6 +435,10 @@ impl<'a> MathProperties<'a> {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// A math argument destination (`\me`, `\mnum`, `\mden`, and the like).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MathElement<'a> {
@@ -401,6 +450,10 @@ pub struct MathElement<'a> {
     pub content: Vec<MathObject<'a>>,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// One matrix row (`\mmr`) with its `\me` cell arguments.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MathMatrixRow<'a> {
@@ -408,6 +461,10 @@ pub struct MathMatrixRow<'a> {
     pub cells: Vec<MathElement<'a>>,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// A direct child of a math structure destination.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MathStructureChild<'a> {
@@ -417,6 +474,10 @@ pub enum MathStructureChild<'a> {
     MatrixRow(MathMatrixRow<'a>),
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// A math run (`\mr`) with its inert text.
 ///
 /// Character formatting controls inside the run are passive and are not
@@ -431,6 +492,10 @@ pub struct MathRun<'a> {
     pub text: Cow<'a, str>,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// One object inside a math zone or argument.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MathObject<'a> {
@@ -440,6 +505,10 @@ pub enum MathObject<'a> {
     Run(MathRun<'a>),
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// A math structure destination with its properties and children.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MathStructure<'a> {
@@ -451,6 +520,10 @@ pub struct MathStructure<'a> {
     pub children: Vec<MathStructureChild<'a>>,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// An inert math zone anchored at a body-text position.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MathZone<'a> {
@@ -466,6 +539,7 @@ pub struct MathZone<'a> {
 
 impl MathStructureKind {
     /// The property-destination kind matching this structure.
+    #[must_use]
     pub const fn properties_kind(self) -> MathPropertiesKind {
         MathPropertiesKind::Structure(self)
     }
@@ -562,6 +636,9 @@ pub(crate) fn validate_element(element: &MathElement<'_>, depth: usize) -> RtfRe
 
 impl<'a> MathStructure<'a> {
     /// Create a validated math structure.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(
         kind: MathStructureKind,
         properties: Option<MathProperties<'a>>,
@@ -676,7 +753,7 @@ impl<'a> MathStructure<'a> {
     }
 }
 
-impl<'a> MathStructureChild<'a> {
+impl MathStructureChild<'_> {
     pub(crate) fn into_owned(self) -> MathStructureChild<'static> {
         match self {
             Self::Element(element) => MathStructureChild::Element(element.into_owned()),
@@ -685,7 +762,7 @@ impl<'a> MathStructureChild<'a> {
     }
 }
 
-impl<'a> MathElement<'a> {
+impl MathElement<'_> {
     pub(crate) fn into_owned(self) -> MathElement<'static> {
         MathElement {
             role: self.role,
@@ -699,7 +776,7 @@ impl<'a> MathElement<'a> {
     }
 }
 
-impl<'a> MathMatrixRow<'a> {
+impl MathMatrixRow<'_> {
     pub(crate) fn into_owned(self) -> MathMatrixRow<'static> {
         MathMatrixRow {
             cells: self
@@ -711,7 +788,7 @@ impl<'a> MathMatrixRow<'a> {
     }
 }
 
-impl<'a> MathObject<'a> {
+impl MathObject<'_> {
     pub(crate) fn into_owned(self) -> MathObject<'static> {
         match self {
             Self::Structure(structure) => MathObject::Structure(structure.into_owned()),
@@ -720,7 +797,7 @@ impl<'a> MathObject<'a> {
     }
 }
 
-impl<'a> MathRun<'a> {
+impl MathRun<'_> {
     pub(crate) fn into_owned(self) -> MathRun<'static> {
         MathRun {
             properties: self.properties.map(MathProperties::into_owned),
@@ -732,6 +809,9 @@ impl<'a> MathRun<'a> {
 
 impl<'a> MathZone<'a> {
     /// Create a validated math zone.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(
         kind: MathZoneKind,
         paragraph_properties: Option<MathProperties<'a>>,

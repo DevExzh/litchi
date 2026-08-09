@@ -11,6 +11,46 @@ pub(super) const ENTITY_BYTES: usize = 68;
 pub(super) const MAX_VALUE_BYTES: usize = 510;
 pub(super) const MAX_BOOKMARKS: usize = 4_096;
 
+impl Summary {
+    /// Validate summary IDs against document `TextBookMarkAtom` identifiers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn validate_text_bookmark_ids(
+        &self,
+        text_bookmark_ids: impl IntoIterator<Item = u32>,
+    ) -> Result<()> {
+        let mut text_ids = HashSet::new();
+        for id in text_bookmark_ids {
+            if text_ids.len() >= MAX_BOOKMARKS {
+                return corrupted(format!(
+                    "text bookmark collection exceeds {MAX_BOOKMARKS} entries"
+                ));
+            }
+            if !text_ids.insert(id) {
+                return corrupted(format!("duplicate TextBookMarkAtom ID {id}"));
+            }
+        }
+        for bookmark in &self.bookmarks {
+            if !text_ids.contains(&bookmark.id) {
+                return corrupted(format!(
+                    "summary bookmark ID {} has no TextBookMarkAtom",
+                    bookmark.id
+                ));
+            }
+        }
+        if text_ids.len() != self.bookmarks.len() {
+            return corrupted("a TextBookMarkAtom has no summary bookmark entity");
+        }
+        self.validate_seed(text_ids)
+    }
+
+    pub(super) fn validate_seed(&self, other_ids: impl IntoIterator<Item = u32>) -> Result<()> {
+        validate_seed(self, other_ids)
+    }
+}
+
 /// Validate the complete authored summary before it reaches the record codec.
 pub(super) fn validate_summary(summary: &Summary) -> Result<()> {
     if summary.bookmarks.len() > MAX_BOOKMARKS {
@@ -57,42 +97,6 @@ pub(super) fn validate_bookmark(bookmark: &Bookmark) -> Result<()> {
         return corrupted("BookmarkValueAtom exceeds 255 UTF-16 code units");
     }
     Ok(())
-}
-
-impl Summary {
-    /// Validate summary IDs against document `TextBookMarkAtom` identifiers.
-    pub fn validate_text_bookmark_ids(
-        &self,
-        text_bookmark_ids: impl IntoIterator<Item = u32>,
-    ) -> Result<()> {
-        let mut text_ids = HashSet::new();
-        for id in text_bookmark_ids {
-            if text_ids.len() >= MAX_BOOKMARKS {
-                return corrupted(format!(
-                    "text bookmark collection exceeds {MAX_BOOKMARKS} entries"
-                ));
-            }
-            if !text_ids.insert(id) {
-                return corrupted(format!("duplicate TextBookMarkAtom ID {id}"));
-            }
-        }
-        for bookmark in &self.bookmarks {
-            if !text_ids.contains(&bookmark.id) {
-                return corrupted(format!(
-                    "summary bookmark ID {} has no TextBookMarkAtom",
-                    bookmark.id
-                ));
-            }
-        }
-        if text_ids.len() != self.bookmarks.len() {
-            return corrupted("a TextBookMarkAtom has no summary bookmark entity");
-        }
-        self.validate_seed(text_ids)
-    }
-
-    pub(super) fn validate_seed(&self, other_ids: impl IntoIterator<Item = u32>) -> Result<()> {
-        validate_seed(self, other_ids)
-    }
 }
 
 fn validate_seed(summary: &Summary, other_ids: impl IntoIterator<Item = u32>) -> Result<()> {

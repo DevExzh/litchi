@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 //! Animation-info round trips and default-state invariants.
 use super::super::*;
 use super::support::*;
@@ -15,9 +21,9 @@ fn round_trips_exact_animation_info_atoms_and_containers() {
     info.legacy_atom = Some(atom.clone());
     let (container, sound_ref) = write_animation_info(&info).unwrap();
     assert_eq!(sound_ref, 42);
-    let (record, consumed) = Record::parse(&container, 0).unwrap();
-    assert_eq!(consumed, container.len());
-    let parsed = parse_animation_info(&record).unwrap();
+    let (container_record, container_consumed) = Record::parse(&container, 0).unwrap();
+    assert_eq!(container_consumed, container.len());
+    let parsed = parse_animation_info(&container_record).unwrap();
     assert_eq!(parsed.legacy_atom, Some(atom));
     assert_eq!(parsed.animation_count(), 1);
     assert_eq!(parsed.after_effect_color, Some(0x0011_2233));

@@ -16,6 +16,7 @@ pub struct DocumentReviewDisplay {
 
 impl DocumentReviewDisplay {
     /// Return whether no review-display suppression flag is present.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         !self.hide_markup && !self.hide_comments && !self.hide_insertions_and_deletions
     }

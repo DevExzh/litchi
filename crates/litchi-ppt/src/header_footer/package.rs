@@ -44,6 +44,12 @@ impl HeaderFooters {
         let mut aggregate = 0usize;
 
         for parent in records {
+            #[allow(
+                clippy::wildcard_enum_match_arm,
+                reason = "`RecordType` mirrors the full MS-PPT record-type enumeration; only \
+                          Document, Slide, and MainMaster can directly parent a header/footer \
+                          container and every other record is skipped"
+            )]
             match parent.record_type {
                 RecordType::Document => {
                     let mut saw_slides = false;

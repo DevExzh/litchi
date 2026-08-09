@@ -1,4 +1,4 @@
-//! Typed PresentationML models for slide masters, layouts, and placeholders.
+//! Typed `PresentationML` models for slide masters, layouts, and placeholders.
 
 use litchi_opc::packuri::PackURI;
 
@@ -52,6 +52,7 @@ pub enum SlideLayoutKind {
 
 impl SlideLayoutKind {
     /// The spec token written to the `type` attribute of `p:sldLayout`.
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Title => "title",
@@ -117,6 +118,7 @@ pub enum PlaceholderKind {
 
 impl PlaceholderKind {
     /// The spec token written to the `type` attribute of `p:ph`.
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Title => "title",
@@ -176,6 +178,7 @@ pub struct PlaceholderSpec {
 
 impl PlaceholderSpec {
     /// Create a placeholder of the given kind with no index, name, or text.
+    #[must_use]
     pub const fn new(kind: PlaceholderKind) -> Self {
         Self {
             kind,
@@ -186,18 +189,21 @@ impl PlaceholderSpec {
     }
 
     /// Set the placeholder index (`p:ph/@idx`).
+    #[must_use]
     pub fn with_index(mut self, index: u32) -> Self {
         self.index = Some(index);
         self
     }
 
     /// Set the shape name.
+    #[must_use]
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
     }
 
     /// Set the prompt text of the placeholder.
+    #[must_use]
     pub fn with_text(mut self, text: impl Into<String>) -> Self {
         self.text = Some(text.into());
         self

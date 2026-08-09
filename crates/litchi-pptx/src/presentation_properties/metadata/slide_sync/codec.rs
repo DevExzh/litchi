@@ -26,6 +26,10 @@ fn limit(what: &str) -> Error {
 
 impl Properties {
     /// Parse a complete Slide Synchronization Data part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(xml: &[u8]) -> Result<Self> {
         if xml.len() > MAX_PART_XML_BYTES {
             return Err(limit("slide synchronization XML bytes"));
@@ -122,6 +126,10 @@ impl Properties {
     }
 
     /// Serialize a complete Slide Synchronization Data part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
     pub fn to_xml(&self) -> Result<Vec<u8>> {
         if self.server_slide_id.len() > MAX_SERVER_SLIDE_ID_BYTES {
             return Err(limit("slide synchronization server slide ID bytes"));

@@ -19,6 +19,9 @@ pub struct ProtectionUser<'a> {
 
 impl<'a> ProtectionUser<'a> {
     /// Create and validate one inert protection-user entry.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(name: Cow<'a, str>) -> RtfResult<Self> {
         let user = Self { name };
         user.validate()?;
@@ -59,6 +62,9 @@ pub struct ProtectionUserTable<'a> {
 
 impl<'a> ProtectionUserTable<'a> {
     /// Create a protection-user table. RTF 1.9.1 requires at least one entry.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(users: Vec<ProtectionUser<'a>>) -> RtfResult<Self> {
         let table = Self { users };
         table.validate()?;
@@ -66,11 +72,15 @@ impl<'a> ProtectionUserTable<'a> {
     }
 
     /// Return protection users in source order.
+    #[must_use]
     pub fn users(&self) -> &[ProtectionUser<'a>] {
         &self.users
     }
 
     /// Append a validated username while enforcing table-wide limits.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push(&mut self, user: ProtectionUser<'a>) -> RtfResult<()> {
         user.validate()?;
         if self.users.len() >= MAX_PROTECTION_USERS {

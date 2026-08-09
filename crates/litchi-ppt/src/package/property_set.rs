@@ -1,7 +1,7 @@
 //! Source-preserving property-set transactions for a complete PPT package.
 //!
 //! OLE property-set grammar and typed PID owners are shared by
-//! `litchi-ole-common`; this module only owns the PowerPoint package boundary
+//! `litchi-ole-common`; this module only owns the `PowerPoint` package boundary
 //! and the whole-artifact source check.
 
 use super::{Error, Result};
@@ -20,6 +20,10 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parses and validates an owned PPT compound-file artifact.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         validate_host(&bytes)?;
         Ok(Self {
@@ -28,16 +32,25 @@ impl Snapshot {
     }
 
     /// Parses a borrowed PPT artifact while retaining an owned source copy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(bytes: &[u8]) -> Result<Self> {
         Self::from_bytes(bytes.to_vec())
     }
 
     /// Returns the exact source artifact bytes.
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
-    /// Projects the standard SummaryInformation section, when present.
+    /// Projects the standard `SummaryInformation` section, when present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn summary_information(
         &self,
     ) -> Result<Option<property_set::summary_information::Snapshot>> {
@@ -49,7 +62,11 @@ impl Snapshot {
             .map_err(Into::into)
     }
 
-    /// Projects the standard DocumentSummaryInformation section, when present.
+    /// Projects the standard `DocumentSummaryInformation` section, when present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn document_summary_information(
         &self,
     ) -> Result<Option<property_set::document_summary::Snapshot>> {
@@ -62,17 +79,26 @@ impl Snapshot {
     }
 
     /// Returns the generic user-defined section, when present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn user_defined_properties(&self) -> Result<Option<Section>> {
         Ok(read_stream(&self.bytes, Binding::UserDefinedProperties)?
             .and_then(|stream| stream.section(USER_DEFINED_PROPERTIES_FMTID).cloned()))
     }
 
     /// Starts an isolated, source-checked property-set transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn transaction(&self) -> Result<Transaction> {
         Transaction::new(self.clone())
     }
 
     /// Consumes the snapshot into owned source bytes.
+    #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
         self.bytes.to_vec()
     }
@@ -95,11 +121,16 @@ impl Transaction {
     }
 
     /// Whether a successful edit has changed the transaction state.
+    #[must_use]
     pub const fn is_changed(&self) -> bool {
         self.changed
     }
 
-    /// Projects the current transaction-local SummaryInformation section.
+    /// Projects the current transaction-local `SummaryInformation` section.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn summary_information(
         &self,
     ) -> Result<Option<property_set::summary_information::Snapshot>> {
@@ -111,7 +142,11 @@ impl Transaction {
             .map_err(Into::into)
     }
 
-    /// Projects the current transaction-local DocumentSummaryInformation section.
+    /// Projects the current transaction-local `DocumentSummaryInformation` section.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn document_summary_information(
         &self,
     ) -> Result<Option<property_set::document_summary::Snapshot>> {
@@ -127,13 +162,21 @@ impl Transaction {
     }
 
     /// Returns the current transaction-local user-defined section.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn user_defined_properties(&self) -> Result<Option<Section>> {
         self.editor
             .property_set(Binding::UserDefinedProperties)
             .map_err(Into::into)
     }
 
-    /// Applies a typed SummaryInformation edit through the common PIDSI owner.
+    /// Applies a typed `SummaryInformation` edit through the common PIDSI owner.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn edit_summary_information<F>(&mut self, edit: F) -> Result<bool>
     where
         F: for<'a> FnOnce(
@@ -160,7 +203,11 @@ impl Transaction {
         Ok(true)
     }
 
-    /// Applies a typed DocumentSummaryInformation edit through the common PIDDSI owner.
+    /// Applies a typed `DocumentSummaryInformation` edit through the common PIDDSI owner.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn edit_document_summary_information<F>(&mut self, edit: F) -> Result<bool>
     where
         F: for<'a> FnOnce(
@@ -188,6 +235,10 @@ impl Transaction {
     }
 
     /// Applies a generic user-defined property-section edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn edit_user_defined_properties<F>(&mut self, edit: F) -> Result<bool>
     where
         F: FnOnce(&mut Section) -> std::result::Result<(), OleError>,
@@ -210,7 +261,11 @@ impl Transaction {
     }
 
     /// Removes the user-defined section while retaining the rest of the
-    /// DocumentSummaryInformation stream.
+    /// `DocumentSummaryInformation` stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_user_defined_properties(&mut self) -> Result<bool> {
         if self
             .editor
@@ -225,6 +280,10 @@ impl Transaction {
     }
 
     /// Publishes the transaction as an owned, source-checked package commit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn commit(self) -> Result<Commit> {
         let before = self.source.bytes.clone();
         let bytes = self.editor.finish()?;
@@ -241,6 +300,7 @@ impl Transaction {
     }
 
     /// Discards the transaction and recovers its exact source snapshot.
+    #[must_use]
     pub fn rollback(self) -> Snapshot {
         self.source
     }
@@ -256,26 +316,31 @@ pub struct Commit {
 
 impl Commit {
     /// Whether the complete output differs from the source artifact.
+    #[must_use]
     pub const fn changed(&self) -> bool {
         self.changed
     }
 
     /// Borrows the validated output snapshot.
+    #[must_use]
     pub const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrows the source-checked reversible whole-package patch.
+    #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Consumes the commit into its owned output bytes.
+    #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
         self.snapshot.into_bytes()
     }
 
     /// Consumes the commit into its output snapshot and patch.
+    #[must_use]
     pub fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
@@ -290,16 +355,22 @@ pub struct Patch {
 
 impl Patch {
     /// Returns the exact source bytes bound to this patch.
+    #[must_use]
     pub fn source(&self) -> &[u8] {
         &self.source
     }
 
     /// Returns the exact replacement bytes produced by the commit.
+    #[must_use]
     pub fn replacement(&self) -> &[u8] {
         &self.replacement
     }
 
     /// Applies the patch only to the exact source snapshot it was created from.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.bytes.as_ref() != self.source.as_ref() {
             return Err(Error::InvalidFormat(
@@ -310,6 +381,10 @@ impl Patch {
     }
 
     /// Reverts the patch only from its exact replacement snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn revert(&self, replacement: &Snapshot) -> Result<Snapshot> {
         if replacement.bytes.as_ref() != self.replacement.as_ref() {
             return Err(Error::InvalidFormat(
@@ -340,6 +415,11 @@ fn read_stream(bytes: &[u8], binding: Binding) -> Result<Option<Stream>> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use litchi_cfb::{OleFile, OleWriter};
@@ -353,24 +433,27 @@ mod tests {
         let mut summary = Section::new(SUMMARY_INFORMATION_FMTID);
         summary.set_page(CodePage::Utf16Le);
         summary.add(2, Value::Lpwstr("before".to_string())).unwrap();
-        let summary = PropertyStream::new(summary).to_bytes().unwrap();
+        let summary_bytes = PropertyStream::new(summary).to_bytes().unwrap();
 
         let mut document_summary = Section::new(DOCUMENT_SUMMARY_INFORMATION_FMTID);
         document_summary.set_page(CodePage::Utf16Le);
         document_summary
             .add(0x0000_000F, Value::Lpwstr("before company".to_string()))
             .unwrap();
-        let document_summary = PropertyStream::new(document_summary).to_bytes().unwrap();
+        let document_summary_bytes = PropertyStream::new(document_summary).to_bytes().unwrap();
 
         let mut writer = OleWriter::new();
         writer
             .create_stream(&["PowerPoint Document"], b"ppt")
             .unwrap();
         writer
-            .create_stream(&["\u{0005}SummaryInformation"], &summary)
+            .create_stream(&["\u{0005}SummaryInformation"], &summary_bytes)
             .unwrap();
         writer
-            .create_stream(&["\u{0005}DocumentSummaryInformation"], &document_summary)
+            .create_stream(
+                &["\u{0005}DocumentSummaryInformation"],
+                &document_summary_bytes,
+            )
             .unwrap();
         writer
             .create_stream(&["Unrelated", "Nested"], b"untouched")

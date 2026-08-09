@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::codec::text_from_ppt_records;
 use super::{Container, RecordKind, anchor, parse, parse_drawing, text_from_drawing};
 
@@ -5,7 +11,7 @@ fn record(version: u16, instance: u16, kind: u16, payload: &[u8]) -> Vec<u8> {
     let mut bytes = Vec::new();
     bytes.extend_from_slice(&((instance << 4) | version).to_le_bytes());
     bytes.extend_from_slice(&kind.to_le_bytes());
-    bytes.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+    bytes.extend_from_slice(&u32::try_from(payload.len()).unwrap().to_le_bytes());
     bytes.extend_from_slice(payload);
     bytes
 }
@@ -76,11 +82,11 @@ fn drawing_retains_root_records_alongside_typed_shapes() {
     assert_eq!(parsed.shapes()[0].id(), 42);
 
     let root = Container::try_new(parsed.records()[0].clone()).unwrap();
-    let future = root.find(RecordKind::Unknown(0xf123)).unwrap().unwrap();
-    assert_eq!(future.version(), 2);
-    assert_eq!(future.instance(), 7);
-    assert_eq!(future.data(), &[0xaa, 0xbb]);
-    assert!(future.data_offset(&drawing).is_some());
+    let found = root.find(RecordKind::Unknown(0xf123)).unwrap().unwrap();
+    assert_eq!(found.version(), 2);
+    assert_eq!(found.instance(), 7);
+    assert_eq!(found.data(), &[0xaa, 0xbb]);
+    assert!(found.data_offset(&drawing).is_some());
 }
 
 #[test]
@@ -88,7 +94,7 @@ fn ppt_client_anchor_projects_small_rect_order() {
     let mut shape_atom = Vec::new();
     shape_atom.extend_from_slice(&42u32.to_le_bytes());
     shape_atom.extend_from_slice(&0x0A00u32.to_le_bytes());
-    let mut shape = record(2, 1, RecordKind::Sp.raw(), &shape_atom);
+    let mut sp_record = record(2, 1, RecordKind::Sp.raw(), &shape_atom);
     let anchor_data = [
         20i16.to_le_bytes(),
         10i16.to_le_bytes(),
@@ -96,8 +102,8 @@ fn ppt_client_anchor_projects_small_rect_order() {
         70i16.to_le_bytes(),
     ]
     .concat();
-    shape.extend(record(0, 0, RecordKind::ClientAnchor.raw(), &anchor_data));
-    let shape = record(0x0f, 0, RecordKind::SpContainer.raw(), &shape);
+    sp_record.extend(record(0, 0, RecordKind::ClientAnchor.raw(), &anchor_data));
+    let shape = record(0x0f, 0, RecordKind::SpContainer.raw(), &sp_record);
     let mut drawing_children = record(0, 0, RecordKind::Dg.raw(), &[0; 8]);
     drawing_children.extend(shape);
     let drawing = record(0x0f, 0, RecordKind::DgContainer.raw(), &drawing_children);

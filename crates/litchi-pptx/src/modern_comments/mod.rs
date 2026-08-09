@@ -1,4 +1,4 @@
-//! Canonical layered owner for PowerPoint 2018 modern comments.
+//! Canonical layered owner for `PowerPoint` 2018 modern comments.
 //!
 //! The model, bounded XML codecs, OPC graph lifecycle, and regression tests
 //! stay together under this owner. Model names are contextual to this module.

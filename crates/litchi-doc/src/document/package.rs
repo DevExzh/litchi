@@ -66,7 +66,7 @@ impl Document {
     /// Create a new Document from an OLE file with password-to-open options.
     pub(crate) fn from_ole_with_options<R: Read + Seek>(
         ole: &mut OleFile<R>,
-        options: OpenOptions<'_>,
+        options: OpenOptions,
         limits: Limits,
     ) -> Result<Self> {
         // Resolve hostile lengths before materializing the corresponding payload.
@@ -148,7 +148,7 @@ impl Document {
                 &mut word_document,
                 &mut table_stream,
                 data_stream.as_deref_mut(),
-                options.password,
+                options.password(),
             )?;
             // FibBase is clear, but the rest of the FIB was encrypted and must be
             // reparsed before any offsets or character counts are consulted.

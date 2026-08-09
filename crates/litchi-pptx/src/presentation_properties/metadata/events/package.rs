@@ -12,12 +12,20 @@ use super::validation::validate_events;
 use crate::{Error, Result};
 
 /// Discover the typed event records on one slide without executing them.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load(package: &OpcPackage, slide_part_name: &PackURI) -> Result<Option<Vec<Event>>> {
     load_snapshot(package, slide_part_name)
         .map(|value| value.map(|snapshot| snapshot.events().to_vec()))
 }
 
 /// Capture one slide's event list and exact source context.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load_snapshot(package: &OpcPackage, slide_part_name: &PackURI) -> Result<Option<Snapshot>> {
     let slide = package.get_part(slide_part_name)?;
     if slide.content_type() != ct::PML_SLIDE {
@@ -33,6 +41,10 @@ pub fn load_snapshot(package: &OpcPackage, slide_part_name: &PackURI) -> Result<
 }
 
 /// Add a new slide-show event extension atomically.
+///
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn store(package: &mut OpcPackage, slide_part_name: &PackURI, events: &[Draft]) -> Result<()> {
     validate_events(events)?;
     let mut candidate = package.clone();
@@ -47,6 +59,10 @@ pub fn store(package: &mut OpcPackage, slide_part_name: &PackURI, events: &[Draf
 
 /// Remove only the MS-PPTX show-event extension, retaining neighboring opaque
 /// extension blocks and all other slide XML.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn remove(package: &mut OpcPackage, slide_part_name: &PackURI) -> Result<Option<Snapshot>> {
     let Some(before) = load_snapshot(package, slide_part_name)? else {
         return Ok(None);
@@ -65,6 +81,10 @@ pub fn remove(package: &mut OpcPackage, slide_part_name: &PackURI) -> Result<Opt
 }
 
 /// Apply a committed source-checked event patch atomically.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
     let slide_name = PackURI::new(patch.before().slide_part_name()).map_err(Error::Uri)?;
     let current = load_snapshot(package, &slide_name)?
@@ -92,6 +112,10 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
 }
 
 /// Apply a committed edit and return its validated post-publication snapshot.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
     apply_patch(package, commit.patch())
 }

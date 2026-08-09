@@ -155,9 +155,150 @@ pub struct Document {
 }
 
 impl Document {
+    /// Reject source semantics that the Markdown adapter cannot place without
+    /// guessing.  The adapter never follows targets or activates content.
+    #[cfg(feature = "markdown")]
+    #[allow(
+        unreachable_patterns,
+        reason = "the fallback is required when a subset of document-format features is enabled"
+    )]
+    pub(crate) fn validate_markdown_projection(&self) -> Result<()> {
+        let unsupported = |kind: &str| {
+            Error::Unsupported(format!(
+                "Markdown export cannot preserve {kind} without its source placement context"
+            ))
+        };
+
+        match &self.inner {
+            #[cfg(feature = "doc")]
+            DocumentImpl::Doc(document, _) => {
+                if !document.hyperlinks().map_err(Error::from)?.is_empty() {
+                    return Err(unsupported("DOC hyperlinks"));
+                }
+                if !document.footnotes().map_err(Error::from)?.is_empty() {
+                    return Err(unsupported("DOC footnotes"));
+                }
+            },
+            #[cfg(feature = "docx")]
+            DocumentImpl::Docx(package, _) => {
+                let document = package.document().map_err(crate::map_ooxml_error)?;
+                if !document
+                    .hyperlinks()
+                    .map_err(crate::map_ooxml_error)?
+                    .is_empty()
+                {
+                    return Err(unsupported("DOCX hyperlinks"));
+                }
+                if !document
+                    .footnotes()
+                    .map_err(crate::map_ooxml_error)?
+                    .is_empty()
+                {
+                    return Err(unsupported("DOCX footnotes"));
+                }
+            },
+            #[cfg(feature = "rtf")]
+            DocumentImpl::Rtf(document) => {
+                if !document.hyperlinks().is_empty() {
+                    return Err(unsupported("RTF hyperlinks"));
+                }
+                if !document.footnotes().is_empty() {
+                    return Err(unsupported("RTF footnotes"));
+                }
+                if !document.quote_fields().is_empty() {
+                    return Err(unsupported("RTF quote fields"));
+                }
+            },
+            #[cfg(feature = "odt")]
+            DocumentImpl::Odt(document) => {
+                if !document
+                    .hyperlinks()
+                    .map_err(|error| {
+                        Error::ParseError(format!("Failed to inspect ODT hyperlinks: {error}"))
+                    })?
+                    .is_empty()
+                {
+                    return Err(unsupported("ODT hyperlinks"));
+                }
+                if !document
+                    .footnotes()
+                    .map_err(|error| {
+                        Error::ParseError(format!("Failed to inspect ODT footnotes: {error}"))
+                    })?
+                    .is_empty()
+                {
+                    return Err(unsupported("ODT footnotes"));
+                }
+                if !document
+                    .images()
+                    .map_err(|error| {
+                        Error::ParseError(format!("Failed to inspect ODT images: {error}"))
+                    })?
+                    .is_empty()
+                {
+                    return Err(unsupported("ODT images"));
+                }
+            },
+            _ => {},
+        }
+        Ok(())
+    }
+
+    /// Preserve ODT outline levels while the ODT semantic model is still
+    /// available. The unified paragraph facade intentionally stores only
+    /// paragraph content, so this sidecar is aligned with `elements()`.
+    #[cfg(feature = "markdown")]
+    pub(crate) fn markdown_heading_levels(&self) -> Result<Vec<Option<u8>>> {
+        match &self.inner {
+            #[cfg(feature = "odt")]
+            DocumentImpl::Odt(document) => {
+                use litchi_odt::elements::parser::OrderElement;
+
+                let source = document.elements().map_err(|error| {
+                    Error::ParseError(format!("Failed to inspect ODT headings: {error}"))
+                })?;
+                let mut levels = Vec::new();
+                levels
+                    .try_reserve_exact(source.len())
+                    .map_err(|source| Error::Allocation {
+                        resource: "Markdown ODT heading metadata",
+                        source,
+                    })?;
+                for element in source {
+                    match element {
+                        OrderElement::Paragraph(_)
+                        | OrderElement::NumberedParagraph(_)
+                        | OrderElement::Table(_) => levels.push(None),
+                        OrderElement::Heading(heading) => {
+                            let level = heading.level().ok_or_else(|| {
+                                Error::Unsupported(
+                                    "ODT heading has no representable outline level".to_owned(),
+                                )
+                            })?;
+                            if !(1..=6).contains(&level) {
+                                return Err(Error::Unsupported(format!(
+                                    "ODT heading outline level {level} is outside Markdown's range"
+                                )));
+                            }
+                            levels.push(Some(level));
+                        },
+                        // `elements()` deliberately omits ODT lists from the
+                        // unified facade, so they must not consume alignment.
+                        OrderElement::List(_) => {},
+                    }
+                }
+                Ok(levels)
+            },
+            _ => Ok(Vec::new()),
+        }
+    }
+
     /// Resolve list semantics while the format owner and its definitions remain available.
     #[cfg(feature = "markdown")]
-    #[allow(unreachable_patterns)]
+    #[allow(
+        unreachable_patterns,
+        reason = "match arms are feature-gated; some are unreachable depending on the enabled features"
+    )]
     pub(crate) fn markdown_list_items(&self) -> Result<Vec<Option<crate::markdown::ListItemInfo>>> {
         match &self.inner {
             #[cfg(feature = "doc")]
@@ -199,7 +340,7 @@ impl Document {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         #[cfg(feature = "docx")]
         {
-            return Self::open_with_limits(path, crate::docx::ReadLimits::default());
+            Self::open_with_limits(path, crate::docx::ReadLimits::default())
         }
 
         #[cfg(not(feature = "docx"))]
@@ -262,7 +403,7 @@ impl Document {
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         #[cfg(feature = "docx")]
         {
-            return Self::from_bytes_with_limits(bytes, crate::docx::ReadLimits::default());
+            Self::from_bytes_with_limits(bytes, crate::docx::ReadLimits::default())
         }
 
         #[cfg(not(feature = "docx"))]
@@ -366,7 +507,10 @@ impl Document {
                 })
             },
             // Handle mismatched formats
-            #[allow(unreachable_patterns)]
+            #[allow(
+                unreachable_patterns,
+                reason = "match arms are feature-gated; the fallback is unreachable when every format feature is enabled"
+            )]
             _ => Err(Error::InvalidFormat(
                 "Detected format is not a document format or feature not enabled".to_string(),
             )),

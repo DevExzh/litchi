@@ -423,10 +423,7 @@ fn attached_glossary_round_trips_inside_encrypted_template() {
     template.write_to(&mut output).unwrap();
     let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
     let document = package
-        .document_with_options(OpenOptions {
-            password: Some("secret"),
-            ..Default::default()
-        })
+        .document_with_options(OpenOptions::default().with_password("secret".to_owned().into()))
         .unwrap();
 
     assert_eq!(document.text().unwrap(), "Protected template\r");

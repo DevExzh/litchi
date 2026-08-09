@@ -1,9 +1,9 @@
-//! Handout master support for PowerPoint presentations.
+//! Handout master support for `PowerPoint` presentations.
 //!
 //! Handout masters define the layout for printed handouts that show
 //! multiple slides per page.
 
-use super::model::*;
+use super::model::Master;
 use crate::presentation_properties::metadata::new_guid;
 use crate::{Error, Result};
 use quick_xml::Reader;
@@ -11,6 +11,10 @@ use quick_xml::events::Event;
 
 impl Master {
     /// Parse handout master XML.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_xml(xml: &str) -> Result<Self> {
         let mut master = Self::default();
         let xml = litchi_ooxml_common::mce::process_str(xml)?;
@@ -19,23 +23,23 @@ impl Master {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => match e.local_name().as_ref() {
+                Ok(Event::Start(e) | Event::Empty(e)) => match e.local_name().as_ref() {
                     b"hf" => {
                         for attr in e.attributes().flatten() {
                             match attr.key.as_ref() {
                                 b"hdr" => {
-                                    master.header_footer.show_header = attr.value.as_ref() == b"1"
+                                    master.header_footer.show_header = attr.value.as_ref() == b"1";
                                 },
                                 b"ftr" => {
-                                    master.header_footer.show_footer = attr.value.as_ref() == b"1"
+                                    master.header_footer.show_footer = attr.value.as_ref() == b"1";
                                 },
                                 b"sldNum" => {
                                     master.header_footer.show_slide_number =
-                                        attr.value.as_ref() == b"1"
+                                        attr.value.as_ref() == b"1";
                                 },
                                 b"dt" => {
                                     master.header_footer.show_date_time =
-                                        attr.value.as_ref() == b"1"
+                                        attr.value.as_ref() == b"1";
                                 },
                                 _ => {},
                             }
@@ -63,6 +67,7 @@ impl Master {
 
     /// Generate handout master XML.
     /// Structure matches Apache POI PowerPoint-created files.
+    #[must_use]
     pub fn to_xml(&self) -> String {
         let mut xml = String::with_capacity(8192);
 
@@ -113,7 +118,13 @@ impl Master {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
+    use super::super::model::Layout;
     use super::*;
     use std::str::FromStr;
 

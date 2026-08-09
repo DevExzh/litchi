@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use std::io::Cursor;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -6,7 +12,7 @@ use litchi_ppt::odraw::ShapeExt as _;
 use litchi_ppt::writer::{FontEntity, NotesPage, Paragraph, SmartTagDefinition, TextRun, Writer};
 use litchi_ppt::{
     EscherTextboxWrapper, Font, FontEmbeddingFlags, FontFacet, FontScope, Package,
-    ProgBinaryTagVersion, ProgTag, ProgTagScope, ProgTags, Record, RecordType,
+    ProgBinaryTagVersion, ProgTag, ProgTagLimits, ProgTagScope, ProgTags, Record, RecordType,
 };
 
 fn configured_writer() -> Writer {
@@ -264,7 +270,8 @@ fn font_ppt10_and_smart_tag_ppt11_share_one_document_prog_tags_owner() {
         "DocInfo must contain one DocProgTags owner"
     );
 
-    let raw_tags = ProgTags::parse(owners[0], ProgTagScope::Document, Default::default()).unwrap();
+    let raw_tags =
+        ProgTags::parse(owners[0], ProgTagScope::Document, ProgTagLimits::default()).unwrap();
     assert_eq!(
         raw_tags
             .tags
@@ -381,11 +388,11 @@ fn notes_font_references_round_trip_through_the_rich_text_path() {
         let Some(textbox) = shape.textbox() else {
             continue;
         };
-        let textbox = EscherTextboxWrapper::new(textbox.data().to_vec()).unwrap();
-        if textbox.text().is_empty() {
+        let wrapper = EscherTextboxWrapper::new(textbox.data().to_vec()).unwrap();
+        if wrapper.text().is_empty() {
             continue;
         }
-        break (textbox, shape.programmable_tags().unwrap().unwrap());
+        break (wrapper, shape.programmable_tags().unwrap().unwrap());
     };
 
     assert_eq!(textbox.text(), "notes fonts");

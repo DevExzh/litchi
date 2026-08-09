@@ -66,16 +66,16 @@ impl Page {
             ),
             (self.href.as_deref(), "xlink:href"),
         ] {
-            if let Some(value) = value {
-                validate_text(value, description, false)?;
+            if let Some(text) = value {
+                validate_text(text, description, false)?;
             }
         }
         for (value, description) in [
             (self.draw_id.as_deref(), "draw:id"),
             (self.xml_id.as_deref(), "xml:id"),
         ] {
-            if let Some(value) = value {
-                validate_ncname(value, description)?;
+            if let Some(id) = value {
+                validate_ncname(id, description)?;
             }
         }
         if let (Some(draw_id), Some(xml_id)) = (&self.draw_id, &self.xml_id)
@@ -107,6 +107,9 @@ pub struct Collection {
 
 impl Collection {
     /// Create and validate an ordered page metadata collection.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(pages: Vec<Page>) -> Result<Self> {
         let value = Self { pages };
         value.validate()?;
@@ -129,11 +132,17 @@ impl Collection {
     }
 
     /// Validate ordering, identifiers, and per-page values.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> Result<()> {
         self.validate_for_slide_count(None)
     }
 
     /// Validate all page indices against a concrete slide count.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate_for_slides(&self, slide_count: usize) -> Result<()> {
         self.validate_for_slide_count(Some(slide_count))
     }
@@ -184,16 +193,15 @@ pub(crate) fn effective_page_names(
     if slide_count > MAX_PAGES {
         return Err(invalid("presentation exceeds 65536 pages"));
     }
-    if let Some(metadata) = metadata {
-        metadata.validate_for_slides(slide_count)?;
+    if let Some(collection) = metadata {
+        collection.validate_for_slides(slide_count)?;
     }
     (0..slide_count)
         .map(|index| {
             metadata
                 .and_then(|value| value.page(index))
                 .and_then(|value| value.name.clone())
-                .map(Ok)
-                .unwrap_or_else(|| fallback_page_name(index))
+                .map_or_else(|| fallback_page_name(index), Ok)
         })
         .collect()
 }
@@ -305,6 +313,9 @@ fn fallback_page_name(slide_index: usize) -> Result<String> {
 }
 
 /// Parse static metadata from direct `draw:page` children.
+///
+/// # Errors
+/// Returns an error when the input is malformed or a configured limit is exceeded.
 pub fn parse(xml: &str) -> Result<Collection> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("presentation page metadata XML exceeds 8 MiB"));
@@ -360,13 +371,22 @@ pub fn parse(xml: &str) -> Result<Collection> {
                 return Err(invalid("active XML declarations are prohibited"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
     Collection::new(pages)
 }
 
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "kept Result-returning for uniformity with the sibling fallible page writers called by the same authoring code"
+)]
 pub(crate) fn write_page_attributes(
     metadata: Option<&Collection>,
     slide_index: usize,
@@ -393,28 +413,28 @@ pub(crate) fn write_page_attributes(
         page.and_then(|value| value.master_page_name.as_deref())
             .unwrap_or("Default"),
     );
-    if let Some(page) = page {
-        if let Some(value) = &page.page_layout_name {
+    if let Some(known_page) = page {
+        if let Some(value) = &known_page.page_layout_name {
             write_attribute(
                 &mut output,
                 "presentation:presentation-page-layout-name",
                 value,
             );
         }
-        if let Some(value) = &page.draw_id {
+        if let Some(value) = &known_page.draw_id {
             write_attribute(&mut output, "draw:id", value);
         }
-        if let Some(value) = &page.xml_id {
+        if let Some(value) = &known_page.xml_id {
             write_attribute(&mut output, "xml:id", value);
         }
-        if let Some(value) = &page.href {
+        if let Some(value) = &known_page.href {
             write_attribute(&mut output, "xlink:href", value);
         }
-        if !page.navigation_order.is_empty() {
+        if !known_page.navigation_order.is_empty() {
             write_attribute(
                 &mut output,
                 "draw:nav-order",
-                &page.navigation_order.join(" "),
+                &known_page.navigation_order.join(" "),
             );
         }
     }
@@ -427,8 +447,8 @@ fn parse_page(
     slide_index: usize,
 ) -> Result<Page> {
     let mut page = Page::new(slide_index);
-    for attribute in element.attributes() {
-        let attribute = attribute.map_err(xml_error)?;
+    for raw_attribute in element.attributes() {
+        let attribute = raw_attribute.map_err(xml_error)?;
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
         let slot = match (namespace, local.as_ref()) {
             (ResolveResult::Bound(found), b"name") if found == Namespace(DRAW_NAMESPACE) => {
@@ -485,7 +505,7 @@ fn decode_attribute(
     attribute
         .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
         .map_err(xml_error)
-        .map(|value| value.into_owned())
+        .map(std::borrow::Cow::into_owned)
 }
 
 fn validate_ncname(value: &str, description: &str) -> Result<()> {
@@ -565,6 +585,10 @@ fn xml_error(error: impl std::fmt::Display) -> Error {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use crate::{Builder, Presentation};

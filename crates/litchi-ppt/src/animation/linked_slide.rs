@@ -1,4 +1,4 @@
-//! Inert PowerPoint 10 linked-slide records (MS-PPT 2.5.32-2.5.33).
+//! Inert `PowerPoint` 10 linked-slide records (MS-PPT 2.5.32-2.5.33).
 
 use super::types::SlideAnimationExtension;
 use crate::consts::RecordType;
@@ -35,6 +35,10 @@ pub struct LinkedSlide {
 
 impl LinkedSlide {
     /// Creates an atom without resolving or opening the referenced document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(linked_slide_id_ref: u32, linked_shape_count: u32) -> Result<Self> {
         if linked_shape_count > i32::MAX as u32 {
             return Err(Error::InvalidFormat(
@@ -48,19 +52,35 @@ impl LinkedSlide {
     }
 
     /// Returns the slide identifier; zero is the normative null reference.
+    #[must_use]
     pub const fn linked_slide_id_ref(self) -> u32 {
         self.linked_slide_id_ref
     }
 
     /// Returns the declared number of immediately following shape atoms.
+    #[must_use]
     pub const fn linked_shape_count(self) -> u32 {
         self.linked_shape_count
     }
 
+    /// Parses a generic record using the default resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record type, header fields, or payload do not
+    /// match the fixed `LinkedSlide10Atom` layout, or if the shape count is
+    /// negative or exceeds the configured limits.
     pub fn parse_record(record: &Record) -> Result<Self> {
         Self::parse_record_with_limits(record, LinkedSlideLimits::default())
     }
 
+    /// Parses a generic record using explicit resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record type, header fields, or payload do not
+    /// match the fixed `LinkedSlide10Atom` layout, or if the shape count is
+    /// negative or exceeds the given limits.
     pub fn parse_record_with_limits(record: &Record, limits: LinkedSlideLimits) -> Result<Self> {
         let payload = validate_record(
             record,
@@ -71,10 +91,23 @@ impl LinkedSlide {
         Self::parse_payload(payload, limits)
     }
 
+    /// Parses exactly one serialized record using the default resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bytes are not exactly one `LinkedSlide10Atom`
+    /// record, or if the shape count is negative or exceeds the configured
+    /// limits.
     pub fn parse_bytes(bytes: &[u8]) -> Result<Self> {
         Self::parse_bytes_with_limits(bytes, LinkedSlideLimits::default())
     }
 
+    /// Parses exactly one serialized record using explicit resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bytes are not exactly one `LinkedSlide10Atom`
+    /// record, or if the shape count is negative or exceeds the given limits.
     pub fn parse_bytes_with_limits(bytes: &[u8], limits: LinkedSlideLimits) -> Result<Self> {
         let payload = validate_bytes(
             bytes,
@@ -86,16 +119,16 @@ impl LinkedSlide {
     }
 
     fn parse_payload(payload: &[u8], limits: LinkedSlideLimits) -> Result<Self> {
-        let linked_slide_id_ref = u32::from_le_bytes(payload[0..4].try_into().map_err(|_| {
+        let linked_slide_id_ref = u32::from_le_bytes(payload[0..4].try_into().map_err(|_err| {
             Error::Corrupted("LinkedSlide10Atom slide identifier is truncated".to_string())
         })?);
-        let signed_count = i32::from_le_bytes(payload[4..8].try_into().map_err(|_| {
+        let signed_count = i32::from_le_bytes(payload[4..8].try_into().map_err(|_err| {
             Error::Corrupted("LinkedSlide10Atom shape count is truncated".to_string())
         })?);
-        let linked_shape_count = u32::try_from(signed_count).map_err(|_| {
+        let linked_shape_count = u32::try_from(signed_count).map_err(|_err| {
             Error::InvalidFormat("LinkedSlide10Atom shape count cannot be negative".to_string())
         })?;
-        let count = usize::try_from(linked_shape_count).map_err(|_| {
+        let count = usize::try_from(linked_shape_count).map_err(|_err| {
             Error::InvalidFormat(
                 "LinkedSlide10Atom shape count does not fit this platform".to_string(),
             )
@@ -109,17 +142,20 @@ impl LinkedSlide {
         Self::new(linked_slide_id_ref, linked_shape_count)
     }
 
+    #[must_use]
     pub fn to_payload(self) -> [u8; PAYLOAD_LEN] {
         let mut payload = [0; PAYLOAD_LEN];
         payload[..4].copy_from_slice(&self.linked_slide_id_ref.to_le_bytes());
-        payload[4..].copy_from_slice(&(self.linked_shape_count as i32).to_le_bytes());
+        payload[4..].copy_from_slice(&self.linked_shape_count.to_le_bytes());
         payload
     }
 
+    #[must_use]
     pub fn to_bytes(self) -> Vec<u8> {
         serialize_atom(RecordType::LinkedSlide10Atom, &self.to_payload())
     }
 
+    #[must_use]
     pub fn to_record(self) -> Record {
         generic_record(RecordType::LinkedSlide10Atom, self.to_payload().to_vec())
     }
@@ -133,6 +169,7 @@ pub struct LinkedShape {
 }
 
 impl LinkedShape {
+    #[must_use]
     pub const fn new(shape_id_ref: u32, linked_shape_id_ref: u32) -> Self {
         Self {
             shape_id_ref,
@@ -140,18 +177,32 @@ impl LinkedShape {
         }
     }
 
+    #[must_use]
     pub const fn shape_id_ref(self) -> u32 {
         self.shape_id_ref
     }
 
+    #[must_use]
     pub const fn linked_shape_id_ref(self) -> u32 {
         self.linked_shape_id_ref
     }
 
+    /// Parses a generic record using the default resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record type, header fields, or payload do not
+    /// match the fixed `LinkedShape10Atom` layout.
     pub fn parse_record(record: &Record) -> Result<Self> {
         Self::parse_record_with_limits(record, LinkedSlideLimits::default())
     }
 
+    /// Parses a generic record using explicit resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record type, header fields, or payload do not
+    /// match the fixed `LinkedShape10Atom` layout.
     pub fn parse_record_with_limits(record: &Record, limits: LinkedSlideLimits) -> Result<Self> {
         Self::parse_payload(validate_record(
             record,
@@ -161,10 +212,22 @@ impl LinkedShape {
         )?)
     }
 
+    /// Parses exactly one serialized record using the default resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bytes are not exactly one `LinkedShape10Atom`
+    /// record.
     pub fn parse_bytes(bytes: &[u8]) -> Result<Self> {
         Self::parse_bytes_with_limits(bytes, LinkedSlideLimits::default())
     }
 
+    /// Parses exactly one serialized record using explicit resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bytes are not exactly one `LinkedShape10Atom`
+    /// record.
     pub fn parse_bytes_with_limits(bytes: &[u8], limits: LinkedSlideLimits) -> Result<Self> {
         Self::parse_payload(validate_bytes(
             bytes,
@@ -175,15 +238,16 @@ impl LinkedShape {
     }
 
     fn parse_payload(payload: &[u8]) -> Result<Self> {
-        let shape_id_ref = u32::from_le_bytes(payload[0..4].try_into().map_err(|_| {
+        let shape_id_ref = u32::from_le_bytes(payload[0..4].try_into().map_err(|_err| {
             Error::Corrupted("LinkedShape10Atom shape identifier is truncated".to_string())
         })?);
-        let linked_shape_id_ref = u32::from_le_bytes(payload[4..8].try_into().map_err(|_| {
+        let linked_shape_id_ref = u32::from_le_bytes(payload[4..8].try_into().map_err(|_err| {
             Error::Corrupted("LinkedShape10Atom linked-shape identifier is truncated".to_string())
         })?);
         Ok(Self::new(shape_id_ref, linked_shape_id_ref))
     }
 
+    #[must_use]
     pub fn to_payload(self) -> [u8; PAYLOAD_LEN] {
         let mut payload = [0; PAYLOAD_LEN];
         payload[..4].copy_from_slice(&self.shape_id_ref.to_le_bytes());
@@ -191,16 +255,19 @@ impl LinkedShape {
         payload
     }
 
+    #[must_use]
     pub fn to_bytes(self) -> Vec<u8> {
         serialize_atom(RecordType::LinkedShape10Atom, &self.to_payload())
     }
 
+    #[must_use]
     pub fn to_record(self) -> Record {
         generic_record(RecordType::LinkedShape10Atom, self.to_payload().to_vec())
     }
 }
 
 impl SlideAnimationExtension {
+    #[must_use]
     pub fn linked_slide_atom(&self) -> Option<LinkedSlide> {
         self.linked_slide
     }
@@ -209,6 +276,7 @@ impl SlideAnimationExtension {
         self.linked_slide = linked_slide;
     }
 
+    #[must_use]
     pub fn linked_shape_atoms(&self) -> &[LinkedShape] {
         &self.linked_shapes
     }
@@ -218,6 +286,10 @@ impl SlideAnimationExtension {
     }
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "`PAYLOAD_LEN` is a compile-time 8-byte constant, so it always fits in `u32`"
+)]
 fn validate_record<'a>(
     record: &'a Record,
     expected_type: RecordType,
@@ -250,6 +322,10 @@ fn validate_record<'a>(
     Ok(&record.data)
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "`PAYLOAD_LEN` is a compile-time 8-byte constant, so it always fits in `u32`"
+)]
 fn validate_bytes<'a>(
     bytes: &'a [u8],
     expected_type: RecordType,
@@ -292,6 +368,10 @@ fn validate_bytes<'a>(
     Ok(&bytes[HEADER_LEN..expected_len])
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "callers pass only the fixed eight-byte atom payloads, so the payload length always fits in `u32`"
+)]
 fn serialize_atom(record_type: RecordType, payload: &[u8]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(HEADER_LEN + payload.len());
     bytes.extend_from_slice(&0u16.to_le_bytes());
@@ -301,6 +381,10 @@ fn serialize_atom(record_type: RecordType, payload: &[u8]) -> Vec<u8> {
     bytes
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "`PAYLOAD_LEN` is a compile-time 8-byte constant, so it always fits in `u32`"
+)]
 fn generic_record(record_type: RecordType, data: Vec<u8>) -> Record {
     Record {
         record_type,
@@ -314,6 +398,11 @@ fn generic_record(record_type: RecordType, data: Vec<u8>) -> Record {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use crate::animation::{Flags, parse_slide_animation_extension};

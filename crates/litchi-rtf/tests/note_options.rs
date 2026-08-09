@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{
     EndnoteRestart, FootnoteRestart, NoteNumberingStyle, NoteOptions, NotePlacement,
     PresentNoteKinds, RtfDocument, RtfWriter,
@@ -92,7 +101,7 @@ fn supports_all_42_note_numbering_control_spellings() {
     ];
 
     for (footnote, endnote, style) in cases {
-        let source = format!(r#"{{\rtf1\{footnote}\{endnote} X}}"#);
+        let source = format!(r"{{\rtf1\{footnote}\{endnote} X}}");
         let document = RtfDocument::parse(&source).unwrap();
         assert_eq!(document.note_options().footnote_numbering, Some(style));
         assert_eq!(document.note_options().endnote_numbering, Some(style));
@@ -102,34 +111,34 @@ fn supports_all_42_note_numbering_control_spellings() {
             .write_document(&document)
             .unwrap();
         let output = String::from_utf8(output).unwrap();
-        assert!(output.contains(&format!(r#"\{footnote}"#)));
-        assert!(output.contains(&format!(r#"\{endnote}"#)));
+        assert!(output.contains(&format!(r"\{footnote}")));
+        assert!(output.contains(&format!(r"\{endnote}")));
     }
 }
 
 #[test]
 fn rejects_invalid_values_and_non_root_or_late_note_options() {
     let malformed = [
-        r#"{\rtf1\fet-1 Body}"#,
-        r#"{\rtf1\fet3 Body}"#,
-        r#"{\rtf1\fet4 Body}"#,
-        r#"{\rtf1\ftnstart0 Body}"#,
-        r#"{\rtf1\ftnstart-1 Body}"#,
-        r#"{\rtf1\aftnstart0 Body}"#,
-        r#"{\rtf1\aftnstart-1 Body}"#,
-        r#"{\rtf1\ftnstart2147483648 Body}"#,
-        r#"{\rtf1 Body\ftnbj}"#,
-        r#"{\rtf1\'41\ftnbj}"#,
-        r#"{\rtf1\u65?\ftnbj}"#,
-        r#"{\rtf1{\ftnbj}Body}"#,
-        r#"{\rtf1{\*\ftnbj}Body}"#,
-        r#"{\rtf1{\header\ftnbj X}Body}"#,
-        r#"{\rtf1{\footer\aftnbj X}Body}"#,
-        r#"{\rtf1{\annotation\ftnstart2 X}Body}"#,
-        r#"{\rtf1{\footnote\ftnrstpg X}Body}"#,
-        r#"{\rtf1{\field\ftnnar X}Body}"#,
-        r#"{\rtf1{\object\aftnnar X}Body}"#,
-        r#"{\rtf1{\ftnbj\bin2 AB}Body}"#,
+        r"{\rtf1\fet-1 Body}",
+        r"{\rtf1\fet3 Body}",
+        r"{\rtf1\fet4 Body}",
+        r"{\rtf1\ftnstart0 Body}",
+        r"{\rtf1\ftnstart-1 Body}",
+        r"{\rtf1\aftnstart0 Body}",
+        r"{\rtf1\aftnstart-1 Body}",
+        r"{\rtf1\ftnstart2147483648 Body}",
+        r"{\rtf1 Body\ftnbj}",
+        r"{\rtf1\'41\ftnbj}",
+        r"{\rtf1\u65?\ftnbj}",
+        r"{\rtf1{\ftnbj}Body}",
+        r"{\rtf1{\*\ftnbj}Body}",
+        r"{\rtf1{\header\ftnbj X}Body}",
+        r"{\rtf1{\footer\aftnbj X}Body}",
+        r"{\rtf1{\annotation\ftnstart2 X}Body}",
+        r"{\rtf1{\footnote\ftnrstpg X}Body}",
+        r"{\rtf1{\field\ftnnar X}Body}",
+        r"{\rtf1{\object\aftnnar X}Body}",
+        r"{\rtf1{\ftnbj\bin2 AB}Body}",
     ];
     for source in malformed {
         assert!(
@@ -151,13 +160,13 @@ fn rejects_invalid_values_and_non_root_or_late_note_options() {
 
 #[test]
 fn omission_stays_empty_and_note_bodies_do_not_infer_options() {
-    let document = RtfDocument::parse(r#"{\rtf1 A{\footnote Note}B}"#).unwrap();
+    let document = RtfDocument::parse(r"{\rtf1 A{\footnote Note}B}").unwrap();
     assert!(document.note_options().is_empty());
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(&document)
         .unwrap();
-    assert!(!String::from_utf8(output).unwrap().contains(r#"\fet"#));
+    assert!(!String::from_utf8(output).unwrap().contains(r"\fet"));
 }
 
 #[test]

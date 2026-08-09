@@ -51,11 +51,11 @@ use crate::embedded::object::{
 use crate::embedded::reference::Reference;
 use crate::embedded::storage::{Kind as StorageKind, Storage};
 
-/// MSOSPT value of the OfficeArt frame used for OLE objects ([MS-ODRAW]).
+/// MSOSPT value of the `OfficeArt` frame used for OLE objects ([MS-ODRAW]).
 const MSOSPT_PICTURE_FRAME: u16 = 75;
 /// `RT_ExternalObjectRefAtom` ([MS-PPT] 2.13).
 const EX_OBJ_REF_ATOM: u16 = 3009;
-/// ProgID declared for authored chart objects.
+/// `ProgID` declared for authored chart objects.
 const EXCEL_CHART_PROG_ID: &str = "Excel.Chart.8";
 /// Maximum categories or values per series (BIFF8 `SERIES` count bound).
 const MAX_DATA_POINT_COUNT: usize = 32_767;
@@ -68,11 +68,11 @@ const MAX_STRING_UNITS: usize = 255;
 /// Matches the read-side inventory bound in [`crate::chart`].
 pub(crate) const MAX_CHART_OBJECTS: usize = 512;
 
-fn invalid(message: impl Into<String>) -> WriteError {
-    WriteError::InvalidData(message.into())
-}
-
 /// Requested native-chart family.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`ChartKind` is the established public API name; renaming it would break downstream crates"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ChartKind {
     /// Clustered column chart (BIFF `Bar` group).
@@ -85,6 +85,10 @@ pub enum ChartKind {
 }
 
 /// One requested data series: an optional name and its values.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`ChartSeries` is the established public API name; renaming it would break downstream crates"
+)]
 #[derive(Debug)]
 pub struct ChartSeries {
     /// Series name shown in the legend.
@@ -104,6 +108,7 @@ pub struct Chart {
 
 impl Chart {
     /// Create an empty chart of the given kind.
+    #[must_use]
     pub fn new(kind: ChartKind) -> Self {
         Self {
             kind,
@@ -114,6 +119,7 @@ impl Chart {
     }
 
     /// Returns this chart's requested chart kind.
+    #[must_use]
     pub fn kind(&self) -> ChartKind {
         self.kind
     }
@@ -133,6 +139,10 @@ impl Chart {
     }
 
     /// Append a data series. Values must be finite and within BIFF8 bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add_series(
         &mut self,
         name: Option<impl Into<String>>,
@@ -149,11 +159,14 @@ impl Chart {
         if values.iter().any(|value| !value.is_finite()) {
             return Err(invalid("chart series values must be finite"));
         }
-        let name = name.map(Into::into);
-        if let Some(name) = &name {
-            check_string_units(name, "chart series name")?;
+        let series_name = name.map(Into::into);
+        if let Some(name_text) = &series_name {
+            check_string_units(name_text, "chart series name")?;
         }
-        self.series.push(ChartSeries { name, values });
+        self.series.push(ChartSeries {
+            name: series_name,
+            values,
+        });
         Ok(())
     }
 
@@ -177,15 +190,6 @@ impl Chart {
         }
         Ok(())
     }
-}
-
-fn check_string_units(value: &str, context: &str) -> Result<(), WriteError> {
-    if value.encode_utf16().count() > MAX_STRING_UNITS {
-        return Err(invalid(format!(
-            "{context} exceeds {MAX_STRING_UNITS} UTF-16 code units"
-        )));
-    }
-    Ok(())
 }
 
 /// A chart pinned to a slide rectangle, with its generated workbook payload.
@@ -245,41 +249,6 @@ impl ChartPlan {
     }
 }
 
-/// Build the document `ExObjList` combining hyperlink and chart objects.
-///
-/// Returns empty bytes when the presentation has neither, matching the
-/// previous hyperlink-only behavior.
-pub(crate) fn build_ex_obj_list(
-    hyperlinks: &HyperlinkCollection,
-    plans: &[ChartPlan],
-) -> Result<Vec<u8>, WriteError> {
-    if hyperlinks.is_empty() && plans.is_empty() {
-        return Ok(Vec::new());
-    }
-    let id_seed = plans
-        .last()
-        .map_or_else(|| hyperlinks.id_seed(), |plan| plan.ex_obj_id);
-    let mut container = RecordBuilder::new(0x0F, 0, hyperlink_record_type::EX_OBJ_LIST);
-    let mut list_atom = RecordBuilder::new(0x00, 0, hyperlink_record_type::EX_OBJ_LIST_ATOM);
-    list_atom.write_data(&id_seed.to_le_bytes());
-    container.write_child(&list_atom.build()?);
-    for record in hyperlinks.build_ex_hyperlink_records()? {
-        container.write_child(&record);
-    }
-    for plan in plans {
-        container.write_child(&plan.embed_container_bytes()?);
-    }
-    Ok(container.build()?)
-}
-
-/// Build the uncompressed `ExOleObjStg` record persisting a chart workbook.
-pub(crate) fn chart_storage_record(workbook: &[u8]) -> Result<Vec<u8>, WriteError> {
-    Storage::uncompressed(StorageKind::OleObject, workbook.to_vec())
-        .map_err(|error| invalid(format!("chart storage is invalid: {error}")))?
-        .to_record_bytes()
-        .map_err(|error| invalid(format!("chart storage record is invalid: {error}")))
-}
-
 /// A chart frame shape placed into a slide's drawing at save time.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ChartFrame {
@@ -332,6 +301,54 @@ impl ChartFrame {
     }
 }
 
+fn invalid(message: impl Into<String>) -> WriteError {
+    WriteError::InvalidData(message.into())
+}
+
+fn check_string_units(value: &str, context: &str) -> Result<(), WriteError> {
+    if value.encode_utf16().count() > MAX_STRING_UNITS {
+        return Err(invalid(format!(
+            "{context} exceeds {MAX_STRING_UNITS} UTF-16 code units"
+        )));
+    }
+    Ok(())
+}
+
+/// Build the document `ExObjList` combining hyperlink and chart objects.
+///
+/// Returns empty bytes when the presentation has neither, matching the
+/// previous hyperlink-only behavior.
+pub(crate) fn build_ex_obj_list(
+    hyperlinks: &HyperlinkCollection,
+    plans: &[ChartPlan],
+) -> Result<Vec<u8>, WriteError> {
+    if hyperlinks.is_empty() && plans.is_empty() {
+        return Ok(Vec::new());
+    }
+    let id_seed = plans
+        .last()
+        .map_or_else(|| hyperlinks.id_seed(), |plan| plan.ex_obj_id);
+    let mut container = RecordBuilder::new(0x0F, 0, hyperlink_record_type::EX_OBJ_LIST);
+    let mut list_atom = RecordBuilder::new(0x00, 0, hyperlink_record_type::EX_OBJ_LIST_ATOM);
+    list_atom.write_data(&id_seed.to_le_bytes());
+    container.write_child(&list_atom.build()?);
+    for record in hyperlinks.build_ex_hyperlink_records()? {
+        container.write_child(&record);
+    }
+    for plan in plans {
+        container.write_child(&plan.embed_container_bytes()?);
+    }
+    Ok(container.build()?)
+}
+
+/// Build the uncompressed `ExOleObjStg` record persisting a chart workbook.
+pub(crate) fn chart_storage_record(workbook: &[u8]) -> Result<Vec<u8>, WriteError> {
+    Storage::uncompressed(StorageKind::OleObject, workbook.to_vec())
+        .map_err(|error| invalid(format!("chart storage is invalid: {error}")))?
+        .to_record_bytes()
+        .map_err(|error| invalid(format!("chart storage record is invalid: {error}")))
+}
+
 /// Build the OLE object frame `SpContainer` for one chart.
 ///
 /// Layout per [MS-ODRAW] and POI `HSLFOLEShape`: an `Sp` record with the
@@ -376,6 +393,11 @@ pub(crate) fn build_chart_sp_container(
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -389,13 +411,13 @@ mod tests {
         chart.add_series(None::<String>, vec![1.0]).unwrap();
         assert!(chart.validate().is_err());
 
-        let mut chart = Chart::new(ChartKind::Line);
+        let mut overflow_chart = Chart::new(ChartKind::Line);
         for _ in 0..=MAX_SERIES_COUNT {
-            chart
+            overflow_chart
                 .add_series(None::<String>, vec![1.0])
                 .expect("individual series is valid");
         }
-        assert!(chart.validate().is_err());
+        assert!(overflow_chart.validate().is_err());
     }
 
     #[test]
@@ -427,13 +449,14 @@ mod tests {
 
     #[test]
     fn chart_frame_container_exposes_object_reference() {
+        use crate::odraw::ShapeExt as _;
+
         let frame =
             ChartFrame::new(914_400, 914_400, 3_657_600, 2_743_200, 42).expect("valid frame");
         let bytes = build_chart_sp_container(&frame, 1027).unwrap();
         let (record, consumed) = litchi_odraw::Record::parse(&bytes, 0).unwrap();
         assert_eq!(consumed, bytes.len());
         let shape = litchi_odraw::shape::Shape::try_from(record).unwrap();
-        use crate::odraw::ShapeExt as _;
         assert_eq!(shape.external_object_id().unwrap(), Some(42));
     }
 

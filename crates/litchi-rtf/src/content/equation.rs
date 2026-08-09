@@ -11,6 +11,15 @@
 //! element text are exposed exactly as stored. Nothing here evaluates, lays
 //! out, typesets, or renders an equation.
 
+#![allow(
+    clippy::shadow_reuse,
+    clippy::shadow_unrelated,
+    reason = "builder-style helpers deliberately rebind a working value as it is refined"
+)]
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items stay grouped by RTF feature area rather than by item kind"
+)]
 use crate::error::{RtfError, RtfResult};
 
 /// Maximum number of switched groups in one `EQ` expression.
@@ -34,6 +43,7 @@ pub struct EquationSpacing(u32);
 
 impl EquationSpacing {
     /// Return the spacing value in points.
+    #[must_use]
     pub const fn points(self) -> u32 {
         self.0
     }
@@ -41,7 +51,7 @@ impl EquationSpacing {
     fn parse(text: &str) -> RtfResult<Self> {
         let value: u32 = text
             .parse()
-            .map_err(|_| malformed("RTF EQ switch has a non-numeric spacing argument"))?;
+            .map_err(|_err| malformed("RTF EQ switch has a non-numeric spacing argument"))?;
         if value > MAX_SPACING_POINTS {
             return Err(malformed(
                 "RTF EQ spacing argument exceeds the safety limit",
@@ -146,6 +156,10 @@ pub struct EquationScript {
     pub down: Option<EquationSpacing>,
 }
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent RTF feature flags stay flat for direct access"
+)]
 /// Options of the box switch (`\x`).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct EquationBox {
@@ -215,11 +229,15 @@ impl<'a> EquationModel<'a> {
     /// element lists, missing numeric or character arguments, and inputs
     /// exceeding the safety limits are reported as errors; the model is never
     /// partially returned for malformed input.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn parse(expression: &'a str) -> RtfResult<Self> {
         Parser::new(expression).run()
     }
 
     /// Return the expression segments in stored order.
+    #[must_use]
     pub fn segments(&self) -> &[EquationSegment<'a>] {
         &self.segments
     }
@@ -233,6 +251,7 @@ impl<'a> EquationModel<'a> {
     }
 
     /// Whether the expression contains no segments at all.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.segments.is_empty()
     }
@@ -358,7 +377,7 @@ impl<'a> Parser<'a> {
     /// `\bc\{` selects `{`.
     fn read_char(&mut self) -> RtfResult<char> {
         self.expect_backslash()
-            .map_err(|_| malformed("RTF EQ switch option lacks a character argument"))?;
+            .map_err(|_err| malformed("RTF EQ switch option lacks a character argument"))?;
         let Some(character) = self.peek()? else {
             return Err(malformed("RTF EQ switch option lacks a character argument"));
         };
@@ -427,13 +446,13 @@ impl<'a> Parser<'a> {
         };
         match switch {
             EquationSwitch::Array(options) => match name {
-                [b'a', b'l'] | [b'a', b'c'] | [b'a', b'r'] => {
+                [b'a', b'l' | b'c' | b'r'] => {
                     options.alignment = alignment();
                     Ok(())
                 },
                 [b'c', b'o'] => {
                     let columns = parser.read_number()?.points();
-                    let columns = u8::try_from(columns).map_err(|_| {
+                    let columns = u8::try_from(columns).map_err(|_err| {
                         malformed("RTF EQ array column count exceeds the safety limit")
                     })?;
                     if columns > MAX_ARRAY_COLUMNS {
@@ -512,7 +531,7 @@ impl<'a> Parser<'a> {
                 _ => Err(malformed("RTF EQ integral switch has an unknown option")),
             },
             EquationSwitch::Overstrike(options) => match name {
-                [b'a', b'l'] | [b'a', b'c'] | [b'a', b'r'] => {
+                [b'a', b'l' | b'c' | b'r'] => {
                     options.alignment = alignment();
                     Ok(())
                 },
@@ -596,6 +615,11 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::*;
 
     fn only_group<'a>(model: &'a EquationModel<'a>) -> &'a EquationGroup<'a> {
@@ -667,7 +691,15 @@ mod tests {
                 assert_eq!(options.fixed_char, Some('|'));
                 assert_eq!(options.symbol, EquationIntegralSymbol::Integral);
             },
-            _ => panic!("expected an integral switch"),
+            EquationSwitch::Array(_)
+            | EquationSwitch::Bracket(_)
+            | EquationSwitch::Displace(_)
+            | EquationSwitch::Fraction
+            | EquationSwitch::List
+            | EquationSwitch::Overstrike(_)
+            | EquationSwitch::Radical
+            | EquationSwitch::Script(_)
+            | EquationSwitch::Box(_) => panic!("expected an integral switch"),
         }
     }
 

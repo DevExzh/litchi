@@ -25,7 +25,7 @@ pub struct DocumentKinsoku<'a> {
     pub language: Option<u32>,
 }
 
-impl<'a> DocumentKinsoku<'a> {
+impl DocumentKinsoku<'_> {
     pub(crate) fn validate_characters(kind: &str, characters: &str) -> RtfResult<()> {
         if characters.is_empty() {
             return Err(RtfError::MalformedDocument(format!(

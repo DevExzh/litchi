@@ -1,9 +1,18 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{Annotation, NavigationEntry, RtfDocument, RtfWriter};
 use std::borrow::Cow;
 
 #[test]
 fn parses_full_comment_metadata_range_unicode_and_hidden_body() {
-    let source = r#"{\rtf1\ansi A{\*\atrfstart 7}\u20320?{\*\atrfend 7}{\*\atnid AM}{\*\atnauthor Ada \u20320?}\chatn{\*\annotation{\*\atnref 7}{\*\atndate -12}{\*\atnparent root}{\*\atnicn 2}{\*\atntime 42}Review \u-10179?\u-8704?}Z}"#;
+    let source = r"{\rtf1\ansi A{\*\atrfstart 7}\u20320?{\*\atrfend 7}{\*\atnid AM}{\*\atnauthor Ada \u20320?}\chatn{\*\annotation{\*\atnref 7}{\*\atndate -12}{\*\atnparent root}{\*\atnicn 2}{\*\atntime 42}Review \u-10179?\u-8704?}Z}";
     let document = RtfDocument::parse(source).unwrap();
     assert_eq!(document.text(), "A你Z");
     let annotation = &document.annotations()[0];
@@ -43,7 +52,7 @@ fn parses_bundled_libreoffice_comment_fixtures() {
 
 #[test]
 fn point_and_range_comments_round_trip_without_visible_text_duplication() {
-    let source = r#"{\rtf1 A{\*\atnid }{\*\atnauthor Point}\chatn{\*\annotation point}B{\*\atrfstart 9}\u20320?{\*\atrfend 9}{\*\atnid R}{\*\atnauthor Range}\chatn{\*\annotation{\*\atnref 9}range}C}"#;
+    let source = r"{\rtf1 A{\*\atnid }{\*\atnauthor Point}\chatn{\*\annotation point}B{\*\atrfstart 9}\u20320?{\*\atrfend 9}{\*\atnid R}{\*\atnauthor Range}\chatn{\*\annotation{\*\atnref 9}range}C}";
     let document = RtfDocument::parse(source).unwrap();
     assert!(!document.annotations()[0].has_reference);
     let mut output = Vec::new();
@@ -58,7 +67,7 @@ fn point_and_range_comments_round_trip_without_visible_text_duplication() {
 
 #[test]
 fn typed_mutation_validates_positions_identity_and_coexists_with_navigation_marks() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 Body{\tc\v Heading}}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Body{\tc\v Heading}}").unwrap();
     assert!(matches!(
         document.navigation_entries()[0],
         NavigationEntry::TableOfContents(_)
@@ -75,16 +84,16 @@ fn typed_mutation_validates_positions_identity_and_coexists_with_navigation_mark
 #[test]
 fn rejects_conflicts_orphans_active_data_and_invalid_metadata() {
     for source in [
-        r#"{\rtf1{\*\atrfstart nope}x}"#,
-        r#"{\rtf1{\*\atrfend 1}x}"#,
-        r#"{\rtf1{\*\atrfstart 1}{\*\atrfstart 1}x}"#,
-        r#"{\rtf1{\*\atrfstart 1}x}"#,
-        r#"{\rtf1{\*\atnauthor A}{\*\atnauthor B}\chatn{\*\annotation x}}"#,
-        r#"{\rtf1{\*\atnauthor A}{\*\atnid X}{\*\annotation x}}"#,
-        r#"{\rtf1\chatn{\*\annotation{\*\atnref nope}x}}"#,
-        r#"{\rtf1\chatn{\*\annotation{\*\atndate 1}{\*\atndate 2}x}}"#,
-        r#"{\rtf1\chatn{\*\annotation{\field danger}}}"#,
-        r#"{\rtf1\chatn{\*\annotation{\object danger}}}"#,
+        r"{\rtf1{\*\atrfstart nope}x}",
+        r"{\rtf1{\*\atrfend 1}x}",
+        r"{\rtf1{\*\atrfstart 1}{\*\atrfstart 1}x}",
+        r"{\rtf1{\*\atrfstart 1}x}",
+        r"{\rtf1{\*\atnauthor A}{\*\atnauthor B}\chatn{\*\annotation x}}",
+        r"{\rtf1{\*\atnauthor A}{\*\atnid X}{\*\annotation x}}",
+        r"{\rtf1\chatn{\*\annotation{\*\atnref nope}x}}",
+        r"{\rtf1\chatn{\*\annotation{\*\atndate 1}{\*\atndate 2}x}}",
+        r"{\rtf1\chatn{\*\annotation{\field danger}}}",
+        r"{\rtf1\chatn{\*\annotation{\object danger}}}",
         "{\\rtf1\\chatn{\\*\\annotation\\bin4 abcd}}",
     ] {
         assert!(RtfDocument::parse(source).is_err(), "{source}");

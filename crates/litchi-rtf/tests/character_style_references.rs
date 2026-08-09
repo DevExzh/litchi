@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{Formatting, RtfDocument, RtfWriter, StyleType};
 
 fn formatting_for<'a>(document: &'a RtfDocument<'a>, text: &str) -> Formatting {
@@ -47,8 +56,7 @@ fn retains_scoped_references_without_materializing_style_properties() {
 #[test]
 fn defaults_mutation_and_canonical_writer_preserve_zero_and_omission() {
     let document =
-        RtfDocument::parse(r#"{\rtf1{\*\defchp\cs0\i}{\cs65535\b Maximum}{\plain Reset}}"#)
-            .unwrap();
+        RtfDocument::parse(r"{\rtf1{\*\defchp\cs0\i}{\cs65535\b Maximum}{\plain Reset}}").unwrap();
     assert_eq!(
         document
             .default_formatting()
@@ -75,8 +83,8 @@ fn defaults_mutation_and_canonical_writer_preserve_zero_and_omission() {
         .write_document(&document)
         .unwrap();
     let serialized = String::from_utf8(first.clone()).unwrap();
-    assert!(serialized.contains(r#"{\*\defchp\cs0"#));
-    assert!(serialized.contains(r#"\cs65535\fs24\b"#));
+    assert!(serialized.contains(r"{\*\defchp\cs0"));
+    assert!(serialized.contains(r"\cs65535\fs24\b"));
     let reparsed = RtfDocument::parse_bytes(&first).unwrap();
     assert_eq!(
         reparsed.default_formatting().character(),
@@ -96,21 +104,21 @@ fn defaults_mutation_and_canonical_writer_preserve_zero_and_omission() {
 #[test]
 fn rejects_missing_out_of_range_duplicate_and_misplaced_references() {
     for source in [
-        r#"{\rtf1\cs X}"#,
-        r#"{\rtf1\cs-1 X}"#,
-        r#"{\rtf1\cs65536 X}"#,
-        r#"{\rtf1{\stylesheet{\*\cs Missing;}}}"#,
-        r#"{\rtf1{\stylesheet{\*\cs-1 Negative;}}}"#,
-        r#"{\rtf1{\stylesheet{\*\cs65536 Overflow;}}}"#,
-        r#"{\rtf1{\stylesheet{\b\cs1 Late;}}}"#,
-        r#"{\rtf1{\*\defchp\cs1\cs2}X}"#,
-        r#"{\rtf1{\*\defchp\cs}X}"#,
+        r"{\rtf1\cs X}",
+        r"{\rtf1\cs-1 X}",
+        r"{\rtf1\cs65536 X}",
+        r"{\rtf1{\stylesheet{\*\cs Missing;}}}",
+        r"{\rtf1{\stylesheet{\*\cs-1 Negative;}}}",
+        r"{\rtf1{\stylesheet{\*\cs65536 Overflow;}}}",
+        r"{\rtf1{\stylesheet{\b\cs1 Late;}}}",
+        r"{\rtf1{\*\defchp\cs1\cs2}X}",
+        r"{\rtf1{\*\defchp\cs}X}",
     ] {
         assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
     }
 
     let inert =
-        RtfDocument::parse(r#"{\rtf1{\field{\*\fldinst TEST \cs65536}{\fldrslt Result}}Body}"#)
+        RtfDocument::parse(r"{\rtf1{\field{\*\fldinst TEST \cs65536}{\fldrslt Result}}Body}")
             .unwrap();
     assert_eq!(inert.fields().len(), 1);
     assert!(

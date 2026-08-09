@@ -1,10 +1,15 @@
+#![allow(
+    clippy::print_stdout,
+    reason = "this command-line example intentionally prints its results"
+)]
+
 //! Example demonstrating PPT file writing with the Litchi library
 //!
 //! NOTE: This example demonstrates the API but will not work until
-//! the PPT writer implementation is complete. See OLE_WRITE_SUPPORT_STATUS.md
+//! the PPT writer implementation is complete. See `OLE_WRITE_SUPPORT_STATUS.md`
 //! for implementation status.
 //!
-//! Run with: cargo run --example ppt_write_example
+//! Run with: `cargo run --example ppt_write_example`
 use litchi_ppt::Writer;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

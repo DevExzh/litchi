@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 //! Unit tests for table authoring and Escher emission.
 
 use super::*;
@@ -149,8 +155,8 @@ fn tertiary_opt_carries_table_flag_and_row_heights() {
 
     let bytes = build_table_spgr_container(&positioned(table, 0, 0), 3).unwrap();
     let root = root(&bytes);
-    let header = root.find(RecordKind::SpContainer).unwrap().unwrap();
-    let header = Container::try_new(header).unwrap();
+    let header_record = root.find(RecordKind::SpContainer).unwrap().unwrap();
+    let header = Container::try_new(header_record).unwrap();
     let opt = header.find(RecordKind::TertiaryOpt).unwrap().unwrap();
 
     // Two properties: table flag + complex row-height array.
@@ -184,8 +190,8 @@ fn header_records_appear_in_poi_order() {
     let table = Table::new(1, 1).unwrap();
     let bytes = build_table_spgr_container(&positioned(table, 0, 0), 9).unwrap();
     let root = root(&bytes);
-    let header = root.find(RecordKind::SpContainer).unwrap().unwrap();
-    let header = Container::try_new(header).unwrap();
+    let header_record = root.find(RecordKind::SpContainer).unwrap().unwrap();
+    let header = Container::try_new(header_record).unwrap();
 
     let order: Vec<RecordKind> = header
         .children()
@@ -259,8 +265,8 @@ fn dg_container_accounts_for_table_shapes() {
     assert_eq!(spid_cur, (2 << 10) + 9);
 
     // The slide-level group contains the patriarch and the table group.
-    let spgr = root.find(RecordKind::SpgrContainer).unwrap().unwrap();
-    let spgr = Container::try_new(spgr).unwrap();
+    let spgr_record = root.find(RecordKind::SpgrContainer).unwrap().unwrap();
+    let spgr = Container::try_new(spgr_record).unwrap();
     let table_groups = spgr.find_all(RecordKind::SpgrContainer).unwrap();
     assert_eq!(table_groups.len(), 1);
 }

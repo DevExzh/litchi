@@ -1,34 +1,150 @@
 //! Number format definitions and utilities.
 
+use std::fmt;
+
+/// First `numFmtId` available to user-defined number formats.
+///
+/// ECMA-376 §18.8.30 lists the built-in formats whose `formatCode` is
+/// implied rather than saved; IDs `0..=163` are reserved for built-in and
+/// locale-specific formats, and Excel assigns user-defined formats starting
+/// at 164 (the same convention as Apache POI's
+/// `FIRST_USER_DEFINED_FORMAT_INDEX`).
+pub const FIRST_CUSTOM_ID: u32 = 164;
+
+/// Maximum length of a format code in Unicode scalar values.
+///
+/// `formatCode` is `ST_Xstring` (ECMA-376 §22.9.2.19) and therefore
+/// schema-unbounded, but Excel rejects format codes longer than 255
+/// characters; enforcing the application limit keeps authored formats
+/// storable by Excel.
+const MAX_CODE_LENGTH: usize = 255;
+
+/// Error returned when a number format fails authoring validation.
+///
+/// Deserialization never produces this error: [`NumberFormat::from_raw`]
+/// preserves authored file content losslessly (ADR-0006).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum InvalidNumberFormat {
+    /// The format code is empty; `formatCode` must name a display format.
+    EmptyCode,
+    /// The format code exceeds Excel's 255-character limit.
+    CodeTooLong {
+        /// Number of Unicode scalar values in the rejected code.
+        length: usize,
+    },
+    /// A user-defined format used an ID from the reserved built-in range
+    /// `0..=163`; custom formats must use [`FIRST_CUSTOM_ID`] or above.
+    ReservedId {
+        /// The rejected reserved identifier.
+        id: u32,
+    },
+}
+
+impl fmt::Display for InvalidNumberFormat {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EmptyCode => formatter.write_str("number-format code must not be empty"),
+            Self::CodeTooLong { length } => write!(
+                formatter,
+                "number-format code has {length} characters, exceeding Excel's \
+                 {MAX_CODE_LENGTH}-character limit"
+            ),
+            Self::ReservedId { id } => write!(
+                formatter,
+                "number-format ID {id} is in the reserved built-in range 0..={}",
+                FIRST_CUSTOM_ID - 1
+            ),
+        }
+    }
+}
+
+impl std::error::Error for InvalidNumberFormat {}
+
 /// Number format information.
 ///
 /// Excel number formats control how cell values are displayed.
-/// This includes both built-in formats (IDs 0-163) and custom formats.
-#[derive(Debug, Clone)]
+/// This includes both built-in formats (IDs below [`FIRST_CUSTOM_ID`]) and
+/// custom formats. Construction through [`NumberFormat::new`] and
+/// [`NumberFormat::custom`] validates the format code (ADR-0004); the
+/// stylesheet deserializer uses [`NumberFormat::from_raw`] to preserve
+/// authored content losslessly.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NumberFormat {
-    /// Format ID
-    pub id: u32,
-    /// Format code (e.g., "General", "0.00", "mm/dd/yyyy")
-    pub code: String,
+    id: u32,
+    code: String,
 }
 
 impl NumberFormat {
-    /// Create a new number format.
-    #[inline]
-    pub fn new(id: u32, code: String) -> Self {
+    /// Create a number format with a validated format code.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InvalidNumberFormat::EmptyCode`] for an empty code and
+    /// [`InvalidNumberFormat::CodeTooLong`] for a code above Excel's
+    /// 255-character limit.
+    pub fn new(id: u32, code: String) -> Result<Self, InvalidNumberFormat> {
+        if code.is_empty() {
+            return Err(InvalidNumberFormat::EmptyCode);
+        }
+        let length = code.chars().count();
+        if length > MAX_CODE_LENGTH {
+            return Err(InvalidNumberFormat::CodeTooLong { length });
+        }
+        Ok(Self { id, code })
+    }
+
+    /// Create a user-defined number format, reserving the built-in ID range.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InvalidNumberFormat::ReservedId`] when `id` is below
+    /// [`FIRST_CUSTOM_ID`], in addition to the code errors of
+    /// [`NumberFormat::new`].
+    pub fn custom(id: u32, code: String) -> Result<Self, InvalidNumberFormat> {
+        if id < FIRST_CUSTOM_ID {
+            return Err(InvalidNumberFormat::ReservedId { id });
+        }
+        Self::new(id, code)
+    }
+
+    /// Construct without validation for the stylesheet deserializer.
+    ///
+    /// Real files may declare format codes the authoring API rejects
+    /// (ECMA-376 §18.8.30 marks unlisted IDs as implementation-defined);
+    /// ADR-0006 requires reading to preserve such content rather than newly
+    /// fail, so this constructor stays crate-private and the writer echoes
+    /// the stored values verbatim.
+    pub(crate) fn from_raw(id: u32, code: String) -> Self {
         Self { id, code }
     }
 
-    /// Check if this is a built-in format (ID < 164).
+    /// Format ID.
+    #[must_use]
     #[inline]
-    pub fn is_builtin(&self) -> bool {
-        self.id < 164
+    pub const fn id(&self) -> u32 {
+        self.id
+    }
+
+    /// Format code (e.g., "General", "0.00", "mm/dd/yyyy").
+    #[must_use]
+    #[inline]
+    pub fn code(&self) -> &str {
+        &self.code
+    }
+
+    /// Check if this is a built-in format (ID below [`FIRST_CUSTOM_ID`]).
+    #[must_use]
+    #[inline]
+    pub const fn is_builtin(&self) -> bool {
+        self.id < FIRST_CUSTOM_ID
     }
 
     /// Check if this format represents a date/time format.
     ///
     /// This uses heuristics to detect date/time formats based on
     /// the format code string.
+    #[must_use]
     pub fn is_date_format(&self) -> bool {
         is_date_format(&self.code)
     }
@@ -120,40 +236,71 @@ mod tests {
     #[test]
     fn test_number_format_new() {
         let format = NumberFormat::new(14, "mm-dd-yy".to_string());
-        assert_eq!(format.id, 14);
-        assert_eq!(format.code, "mm-dd-yy");
+        assert_eq!(
+            format.map(|value| (value.id(), value.code().to_string())),
+            Ok((14, "mm-dd-yy".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_number_format_validation() {
+        assert_eq!(
+            NumberFormat::new(164, String::new()),
+            Err(InvalidNumberFormat::EmptyCode)
+        );
+
+        let oversized = "0".repeat(256);
+        assert_eq!(
+            NumberFormat::new(164, oversized),
+            Err(InvalidNumberFormat::CodeTooLong { length: 256 })
+        );
+        assert!(NumberFormat::new(164, "0".repeat(255)).is_ok());
+
+        assert_eq!(
+            NumberFormat::custom(0, "General".to_string()),
+            Err(InvalidNumberFormat::ReservedId { id: 0 })
+        );
+        assert_eq!(
+            NumberFormat::custom(163, "0.00".to_string()),
+            Err(InvalidNumberFormat::ReservedId { id: 163 })
+        );
+        assert!(NumberFormat::custom(FIRST_CUSTOM_ID, "0.00".to_string()).is_ok());
+        assert_eq!(
+            InvalidNumberFormat::ReservedId { id: 14 }.to_string(),
+            "number-format ID 14 is in the reserved built-in range 0..=163"
+        );
     }
 
     #[test]
     fn test_number_format_is_builtin() {
-        let builtin = NumberFormat::new(100, "0.00".to_string());
+        let builtin = NumberFormat::from_raw(100, "0.00".to_string());
         assert!(builtin.is_builtin());
 
-        let custom = NumberFormat::new(164, "Custom Format".to_string());
+        let custom = NumberFormat::from_raw(164, "Custom Format".to_string());
         assert!(!custom.is_builtin());
 
-        let custom2 = NumberFormat::new(200, "Another Custom".to_string());
+        let custom2 = NumberFormat::from_raw(200, "Another Custom".to_string());
         assert!(!custom2.is_builtin());
     }
 
     #[test]
     fn test_number_format_is_date_format() {
-        let date_format = NumberFormat::new(14, "mm-dd-yy".to_string());
+        let date_format = NumberFormat::from_raw(14, "mm-dd-yy".to_string());
         assert!(date_format.is_date_format());
 
-        let time_format = NumberFormat::new(20, "h:mm".to_string());
+        let time_format = NumberFormat::from_raw(20, "h:mm".to_string());
         assert!(time_format.is_date_format());
 
-        let number_format = NumberFormat::new(1, "0".to_string());
+        let number_format = NumberFormat::from_raw(1, "0".to_string());
         assert!(!number_format.is_date_format());
     }
 
     #[test]
     fn test_number_format_clone() {
-        let format = NumberFormat::new(2, "0.00".to_string());
+        let format = NumberFormat::from_raw(2, "0.00".to_string());
         let format2 = format.clone();
-        assert_eq!(format.id, format2.id);
-        assert_eq!(format.code, format2.code);
+        assert_eq!(format.id(), format2.id());
+        assert_eq!(format.code(), format2.code());
     }
 
     #[test]

@@ -1,5 +1,5 @@
 //! Neutral, inert chart views and bounded Graph-package transactions for
-//! legacy PowerPoint OLE objects.
+//! legacy `PowerPoint` OLE objects.
 //!
 //! PPT owns only external-object discovery, frame attribution, storage
 //! decompression, and host metadata. `[MS-OGRAPH]` Workbook validation and
@@ -30,6 +30,10 @@ mod transaction;
 #[cfg(test)]
 mod tests;
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`SemanticChart`/`SemanticCharts` are the established public API names mirroring the `litchi-ograph` semantic model; renaming them would break downstream crates"
+)]
 pub use model::{
     Chart, Excel, Failure, Frame, Graph, Info, Inventory, Kind, SemanticChart, SemanticCharts,
 };

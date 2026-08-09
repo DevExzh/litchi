@@ -4,6 +4,7 @@ pub struct DrawingGridSpacing(u16);
 
 impl DrawingGridSpacing {
     /// Construct a spacing from `0` through `32767` twips.
+    #[must_use]
     pub const fn new(value: u16) -> Option<Self> {
         if value <= i16::MAX as u16 {
             Some(Self(value))
@@ -13,6 +14,7 @@ impl DrawingGridSpacing {
     }
 
     /// Return the spacing in twips.
+    #[must_use]
     pub const fn get(self) -> u16 {
         self.0
     }
@@ -24,6 +26,7 @@ pub struct DrawingGridLineInterval(u16);
 
 impl DrawingGridLineInterval {
     /// Construct an interval from `0` through `32767`.
+    #[must_use]
     pub const fn new(value: u16) -> Option<Self> {
         if value <= i16::MAX as u16 {
             Some(Self(value))
@@ -33,6 +36,7 @@ impl DrawingGridLineInterval {
     }
 
     /// Return the display interval.
+    #[must_use]
     pub const fn get(self) -> u16 {
         self.0
     }
@@ -68,6 +72,7 @@ impl DocumentDrawingGrid {
     pub const DEFAULT_VERTICAL_LINE_INTERVAL: DrawingGridLineInterval = DrawingGridLineInterval(0);
 
     /// Return whether every drawing-grid control was omitted.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         !self.follows_margins
             && !self.snap_to_grid
@@ -79,31 +84,37 @@ impl DocumentDrawingGrid {
             && self.vertical_line_interval.is_none()
     }
 
+    #[must_use]
     pub fn effective_horizontal_spacing(&self) -> DrawingGridSpacing {
         self.horizontal_spacing
             .unwrap_or(Self::DEFAULT_HORIZONTAL_SPACING)
     }
 
+    #[must_use]
     pub fn effective_vertical_spacing(&self) -> DrawingGridSpacing {
         self.vertical_spacing
             .unwrap_or(Self::DEFAULT_VERTICAL_SPACING)
     }
 
+    #[must_use]
     pub fn effective_horizontal_origin_twips(&self) -> i16 {
         self.horizontal_origin_twips
             .unwrap_or(Self::DEFAULT_HORIZONTAL_ORIGIN_TWIPS)
     }
 
+    #[must_use]
     pub fn effective_vertical_origin_twips(&self) -> i16 {
         self.vertical_origin_twips
             .unwrap_or(Self::DEFAULT_VERTICAL_ORIGIN_TWIPS)
     }
 
+    #[must_use]
     pub fn effective_horizontal_line_interval(&self) -> DrawingGridLineInterval {
         self.horizontal_line_interval
             .unwrap_or(Self::DEFAULT_HORIZONTAL_LINE_INTERVAL)
     }
 
+    #[must_use]
     pub fn effective_vertical_line_interval(&self) -> DrawingGridLineInterval {
         self.vertical_line_interval
             .unwrap_or(Self::DEFAULT_VERTICAL_LINE_INTERVAL)

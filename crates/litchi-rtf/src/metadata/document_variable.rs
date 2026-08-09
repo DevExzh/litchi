@@ -19,6 +19,9 @@ pub struct DocumentVariable<'a> {
 }
 
 impl<'a> DocumentVariable<'a> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(name: impl Into<Cow<'a, str>>, value: impl Into<Cow<'a, str>>) -> RtfResult<Self> {
         let variable = Self {
             name: name.into(),
@@ -47,6 +50,7 @@ impl<'a> DocumentVariable<'a> {
         Ok(())
     }
 
+    #[must_use]
     pub fn into_owned(self) -> DocumentVariable<'static> {
         DocumentVariable {
             name: Cow::Owned(self.name.into_owned()),

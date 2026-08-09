@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use litchi_opc::OpcPackage;
 use litchi_opc::PackURI;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};

@@ -27,11 +27,16 @@ impl Edit {
 
     /// Borrow the optional staged tag list.
     #[inline]
+    #[must_use]
     pub fn tags(&self) -> Option<&Tags> {
         self.desired.as_ref()
     }
 
     /// Replace or create the tag list after bounded validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set(&mut self, value: Tags) -> Result<bool> {
         validate_tags(&value, self.original.limits)?;
         if self.desired.as_ref() == Some(&value) {
@@ -48,6 +53,10 @@ impl Edit {
     }
 
     /// Apply a checked mutation to a cloned present tag list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn update(&mut self, edit: impl FnOnce(&mut Tags) -> Result<()>) -> Result<()> {
         let mut candidate = self
             .desired
@@ -61,11 +70,16 @@ impl Edit {
 
     /// Return whether the staged semantic presence/value differs from source.
     #[inline]
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.original.occurrences.first() != self.desired.as_ref()
     }
 
     /// Consume the edit into a candidate-reparsed reversible commit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn commit(self) -> Result<Commit> {
         if !self.is_changed() {
             let before = self.original;
@@ -124,29 +138,37 @@ pub struct Commit {
 impl Commit {
     /// Return whether the commit changes the selected host.
     #[inline]
+    #[must_use]
     pub const fn is_changed(&self) -> bool {
         self.changed
     }
 
     /// Borrow the candidate-reparsed result snapshot.
     #[inline]
+    #[must_use]
     pub fn snapshot(&self) -> &Snapshot {
         &self.patch.after
     }
 
     /// Borrow the reversible source-checked patch.
     #[inline]
+    #[must_use]
     pub fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Consume the commit into its reversible patch.
     #[inline]
+    #[must_use]
     pub fn into_patch(self) -> Patch {
         self.patch
     }
 
     /// Publish this commit atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     #[inline]
     pub fn apply(self, package: &mut OpcPackage) -> Result<Snapshot> {
         super::apply_commit(package, self)
@@ -163,29 +185,34 @@ pub struct Patch {
 impl Patch {
     /// Borrow the required selected-host state.
     #[inline]
+    #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Borrow the candidate selected-host state.
     #[inline]
+    #[must_use]
     pub fn after(&self) -> &Snapshot {
         &self.after
     }
 
     /// Return whether this patch changes the selected host.
     #[inline]
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         !self.before.same_selected_source(&self.after)
     }
 
     /// Return the required selected-host revision.
     #[inline]
+    #[must_use]
     pub const fn expected_revision(&self) -> Revision {
         self.before.revision
     }
 
     /// Build the exact inverse patch.
+    #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
             before: self.after.duplicate(),
@@ -194,6 +221,10 @@ impl Patch {
     }
 
     /// Apply this patch atomically after re-resolving the stable slide ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     #[inline]
     pub fn apply(&self, package: &mut OpcPackage) -> Result<Snapshot> {
         super::apply_patch(package, self)

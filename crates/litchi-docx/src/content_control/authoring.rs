@@ -1,6 +1,6 @@
 use super::{
-    BindingFlavor, DataBinding, FORMATTING_ALLOWED_NAMESPACE, FormattingAllowed, Kind, Limits,
-    Lock, STORE_ITEM_CHECKSUM_NAMESPACE, validate_data_binding_values,
+    Appearance, BindingFlavor, DataBinding, FORMATTING_ALLOWED_NAMESPACE, FormattingAllowed, Kind,
+    Limits, Lock, STORE_ITEM_CHECKSUM_NAMESPACE, SdtColor, validate_data_binding_values,
 };
 use crate::error::{Error, Result};
 use litchi_core::xml::escape_xml;
@@ -31,6 +31,10 @@ pub struct AuthoringView<'a> {
     date_value: Option<&'a str>,
     repeating_section_title: Option<&'a str>,
     formatting_allowed: Option<FormattingAllowed>,
+    appearance: Option<Appearance>,
+    color: Option<SdtColor>,
+    web_extension_linked: Option<bool>,
+    web_extension_created: Option<bool>,
 }
 
 impl<'a> AuthoringView<'a> {
@@ -54,6 +58,10 @@ impl<'a> AuthoringView<'a> {
             date_value: None,
             repeating_section_title: None,
             formatting_allowed: None,
+            appearance: None,
+            color: None,
+            web_extension_linked: None,
+            web_extension_created: None,
         }
     }
 
@@ -132,6 +140,34 @@ impl<'a> AuthoringView<'a> {
     #[must_use]
     pub const fn formatting_allowed(mut self, value: Option<FormattingAllowed>) -> Self {
         self.formatting_allowed = value;
+        self
+    }
+
+    /// Set Word 2012 visual treatment metadata.
+    #[must_use]
+    pub const fn appearance(mut self, value: Option<Appearance>) -> Self {
+        self.appearance = value;
+        self
+    }
+
+    /// Set Word 2012 visual base-color metadata.
+    #[must_use]
+    pub const fn color(mut self, value: Option<SdtColor>) -> Self {
+        self.color = value;
+        self
+    }
+
+    /// Set the inert Word 2012 web-extension linked marker.
+    #[must_use]
+    pub const fn web_extension_linked(mut self, value: Option<bool>) -> Self {
+        self.web_extension_linked = value;
+        self
+    }
+
+    /// Set the inert Word 2012 web-extension-created marker.
+    #[must_use]
+    pub const fn web_extension_created(mut self, value: Option<bool>) -> Self {
+        self.web_extension_created = value;
         self
     }
 }
@@ -417,7 +453,11 @@ fn requirements(view: &AuthoringView<'_>) -> NamespaceRequirements {
         word_2012: matches!(view.kind, Kind::RepeatingSection | Kind::RepeatingItem)
             || view
                 .data_binding
-                .is_some_and(|binding| binding.flavor() == BindingFlavor::Word2012),
+                .is_some_and(|binding| binding.flavor() == BindingFlavor::Word2012)
+            || view.appearance.is_some()
+            || view.color.is_some()
+            || view.web_extension_linked.is_some()
+            || view.web_extension_created.is_some(),
         checksum: view
             .data_binding
             .and_then(DataBinding::checksum_value)
@@ -434,6 +474,38 @@ fn write_optional_value(xml: &mut String, name: &str, value: Option<&str>) -> Re
 }
 
 fn write_kind(xml: &mut String, view: &AuthoringView<'_>) -> Result<()> {
+    if let Some(appearance) = view.appearance {
+        write!(
+            xml,
+            r#"<w15:appearance w15:val="{}"/>"#,
+            appearance.as_str()
+        )?;
+    }
+    if let Some(color) = view.color {
+        match color {
+            SdtColor::Auto => xml.push_str(r#"<w15:color w:val="auto"/>"#),
+            SdtColor::Rgb([red, green, blue]) => {
+                write!(
+                    xml,
+                    r#"<w15:color w:val="{red:02X}{green:02X}{blue:02X}"/>"#
+                )?;
+            },
+        }
+    }
+    if let Some(value) = view.web_extension_linked {
+        write!(
+            xml,
+            r#"<w15:webExtensionLinked w:val="{}"/>"#,
+            u8::from(value)
+        )?;
+    }
+    if let Some(value) = view.web_extension_created {
+        write!(
+            xml,
+            r#"<w15:webExtensionCreated w:val="{}"/>"#,
+            u8::from(value)
+        )?;
+    }
     match view.kind {
         Kind::ComboBox | Kind::Dropdown => {
             let name = view.kind.as_str();

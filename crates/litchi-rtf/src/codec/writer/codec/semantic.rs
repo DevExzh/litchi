@@ -3,17 +3,20 @@
 //! This layer validates snapshot ownership, ordering, and cross-story
 //! invariants before the output layer emits bytes.
 
-use super::*;
+use super::{
+    BodyStoryEvent, CellStoryEvent, Field, FieldOwner, HeaderFooterType, NavigationEntry, Revision,
+    RevisionType, RtfDocument, RtfWriter, Section, StoryEvent, StoryField, Table, Write, field, io,
+};
 
 impl<W: Write> RtfWriter<W> {
     pub(super) fn validate_section_boundary_mapping(
         sections: &[Section<'_>],
-        body_story_events: &[crate::BodyStoryEvent],
+        body_story_events: &[BodyStoryEvent],
     ) -> io::Result<()> {
         let first_section_is_boundary_scoped = body_story_events.iter().any(|event| {
             matches!(
                 event,
-                crate::BodyStoryEvent::SectionBreak(section_break)
+                BodyStoryEvent::SectionBreak(section_break)
                     if section_break.next_section == Some(0)
             )
         });
@@ -23,7 +26,7 @@ impl<W: Write> RtfWriter<W> {
             usize::from(!sections.is_empty())
         };
         for event in body_story_events {
-            if let crate::BodyStoryEvent::SectionBreak(section_break) = *event
+            if let BodyStoryEvent::SectionBreak(section_break) = *event
                 && let Some(index) = section_break.next_section
             {
                 if index != next_section_index || index >= sections.len() {
@@ -44,6 +47,10 @@ impl<W: Write> RtfWriter<W> {
         Ok(())
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn validate_table_story_metadata_ownership(doc: &RtfDocument<'_>) -> io::Result<()> {
         let mut navigation_owners = vec![0u8; doc.navigation_entries().len()];
         let mut revision_owners = vec![0u8; doc.revisions().len()];
@@ -52,7 +59,7 @@ impl<W: Write> RtfWriter<W> {
         let mut body_deletions = vec![false; doc.revisions().len()];
         for event in doc.body_story_events() {
             match *event {
-                crate::BodyStoryEvent::NavigationEntry(index) => {
+                BodyStoryEvent::NavigationEntry(index) => {
                     let owner = navigation_owners.get_mut(index).ok_or_else(|| {
                         io::Error::new(
                             io::ErrorKind::InvalidInput,
@@ -66,7 +73,7 @@ impl<W: Write> RtfWriter<W> {
                         )
                     })?;
                 },
-                crate::BodyStoryEvent::RevisionStart(index) => {
+                BodyStoryEvent::RevisionStart(index) => {
                     let revision = doc.revisions().get(index).ok_or_else(|| {
                         io::Error::new(
                             io::ErrorKind::InvalidInput,
@@ -88,7 +95,7 @@ impl<W: Write> RtfWriter<W> {
                         ));
                     }
                 },
-                crate::BodyStoryEvent::RevisionEnd(index) => {
+                BodyStoryEvent::RevisionEnd(index) => {
                     let revision = doc.revisions().get(index).ok_or_else(|| {
                         io::Error::new(
                             io::ErrorKind::InvalidInput,
@@ -110,7 +117,7 @@ impl<W: Write> RtfWriter<W> {
                         ));
                     }
                 },
-                crate::BodyStoryEvent::RevisionDeletion(index) => {
+                BodyStoryEvent::RevisionDeletion(index) => {
                     let revision = doc.revisions().get(index).ok_or_else(|| {
                         io::Error::new(
                             io::ErrorKind::InvalidInput,
@@ -146,13 +153,17 @@ impl<W: Write> RtfWriter<W> {
             let owned = match revision.revision_type {
                 RevisionType::Insertion => *start || *end,
                 RevisionType::Deletion => *deletion,
-                _ => false,
+                RevisionType::FormatChange | RevisionType::MovedFrom | RevisionType::MovedTo => {
+                    false
+                },
             };
             if owned {
                 let valid = match revision.revision_type {
                     RevisionType::Insertion => *start && *end && !*deletion,
                     RevisionType::Deletion => *deletion && !*start && !*end,
-                    _ => false,
+                    RevisionType::FormatChange
+                    | RevisionType::MovedFrom
+                    | RevisionType::MovedTo => false,
                 };
                 if !valid {
                     return Err(io::Error::new(
@@ -189,7 +200,7 @@ impl<W: Write> RtfWriter<W> {
 
     pub(super) fn validate_table_metadata_tree(
         table: &Table<'_>,
-        navigation_entries: &[crate::NavigationEntry<'_>],
+        navigation_entries: &[NavigationEntry<'_>],
         revisions: &[Revision<'_>],
         navigation_owners: &mut [u8],
         revision_owners: &mut [u8],
@@ -201,7 +212,7 @@ impl<W: Write> RtfWriter<W> {
                 let mut deletions = vec![false; revisions.len()];
                 for event in cell.story_events() {
                     match *event {
-                        crate::CellStoryEvent::NavigationEntry(reference) => {
+                        CellStoryEvent::NavigationEntry(reference) => {
                             let entry =
                                 navigation_entries.get(reference.index).ok_or_else(|| {
                                     io::Error::new(
@@ -234,7 +245,7 @@ impl<W: Write> RtfWriter<W> {
                                 )
                             })?;
                         },
-                        crate::CellStoryEvent::RevisionStart(reference) => {
+                        CellStoryEvent::RevisionStart(reference) => {
                             let revision = revisions.get(reference.index).ok_or_else(|| {
                                 io::Error::new(
                                     io::ErrorKind::InvalidInput,
@@ -259,7 +270,7 @@ impl<W: Write> RtfWriter<W> {
                                 ));
                             }
                         },
-                        crate::CellStoryEvent::RevisionEnd(reference) => {
+                        CellStoryEvent::RevisionEnd(reference) => {
                             let revision = revisions.get(reference.index).ok_or_else(|| {
                                 io::Error::new(
                                     io::ErrorKind::InvalidInput,
@@ -282,7 +293,7 @@ impl<W: Write> RtfWriter<W> {
                                 ));
                             }
                         },
-                        crate::CellStoryEvent::RevisionDeletion(reference) => {
+                        CellStoryEvent::RevisionDeletion(reference) => {
                             let revision = revisions.get(reference.index).ok_or_else(|| {
                                 io::Error::new(
                                     io::ErrorKind::InvalidInput,
@@ -309,7 +320,11 @@ impl<W: Write> RtfWriter<W> {
                                 ));
                             }
                         },
-                        _ => {},
+                        CellStoryEvent::NestedTable(_)
+                        | CellStoryEvent::Drawing(_)
+                        | CellStoryEvent::Field(_)
+                        | CellStoryEvent::PageBreak(_)
+                        | CellStoryEvent::ColumnBreak(_) => {},
                     }
                 }
                 for ((((revision, start), end), deletion), owners) in revisions
@@ -324,7 +339,9 @@ impl<W: Write> RtfWriter<W> {
                         let valid = match revision.revision_type {
                             RevisionType::Insertion => *start && *end && !*deletion,
                             RevisionType::Deletion => *deletion && !*start && !*end,
-                            _ => false,
+                            RevisionType::FormatChange
+                            | RevisionType::MovedFrom
+                            | RevisionType::MovedTo => false,
                         };
                         if !valid {
                             return Err(io::Error::new(
@@ -355,9 +372,9 @@ impl<W: Write> RtfWriter<W> {
     }
 
     pub(super) fn mark_owned_field(
-        reference: crate::StoryField,
-        owner: crate::FieldOwner,
-        fields: &[crate::Field<'_>],
+        reference: StoryField,
+        owner: FieldOwner,
+        fields: &[Field<'_>],
         seen: &mut [bool],
     ) -> io::Result<()> {
         let field = fields
@@ -376,13 +393,13 @@ impl<W: Write> RtfWriter<W> {
         field
             .validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
-        let seen = seen.get_mut(reference.field_index).ok_or_else(|| {
+        let seen_slot = seen.get_mut(reference.field_index).ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "RTF generic-field index is out of range",
             )
         })?;
-        if std::mem::replace(seen, true) {
+        if std::mem::replace(seen_slot, true) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "RTF generic field is referenced by multiple owning stories",
@@ -394,16 +411,16 @@ impl<W: Write> RtfWriter<W> {
     pub(super) fn mark_table_fields(
         table: &Table<'_>,
         depth: u8,
-        fields: &[crate::Field<'_>],
+        fields: &[Field<'_>],
         seen: &mut [bool],
     ) -> io::Result<()> {
         for row in table.rows() {
             for cell in row.cells() {
                 for event in cell.story_events() {
-                    if let crate::CellStoryEvent::Field(reference) = *event {
+                    if let CellStoryEvent::Field(reference) = *event {
                         Self::mark_owned_field(
                             reference,
-                            crate::FieldOwner::TableCell(depth),
+                            FieldOwner::TableCell(depth),
                             fields,
                             seen,
                         )?;
@@ -429,7 +446,7 @@ impl<W: Write> RtfWriter<W> {
 
     pub(super) fn validate_generic_field_ownership(doc: &RtfDocument<'_>) -> io::Result<()> {
         let fields = doc.fields();
-        if fields.len() > crate::field::MAX_GENERIC_FIELDS {
+        if fields.len() > field::MAX_GENERIC_FIELDS {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "RTF generic field count exceeds the safety limit",
@@ -437,14 +454,14 @@ impl<W: Write> RtfWriter<W> {
         }
         let mut seen = vec![false; fields.len()];
         for event in doc.body_story_events() {
-            if let crate::BodyStoryEvent::Field(index) = *event {
+            if let BodyStoryEvent::Field(index) = *event {
                 let position = fields.get(index).map_or(usize::MAX, |field| field.position);
                 Self::mark_owned_field(
-                    crate::StoryField {
+                    StoryField {
                         field_index: index,
                         position,
                     },
-                    crate::FieldOwner::Body,
+                    FieldOwner::Body,
                     fields,
                     &mut seen,
                 )?;
@@ -456,14 +473,14 @@ impl<W: Write> RtfWriter<W> {
                     HeaderFooterType::Header
                     | HeaderFooterType::HeaderFirst
                     | HeaderFooterType::HeaderLeft
-                    | HeaderFooterType::HeaderRight => crate::FieldOwner::Header,
+                    | HeaderFooterType::HeaderRight => FieldOwner::Header,
                     HeaderFooterType::Footer
                     | HeaderFooterType::FooterFirst
                     | HeaderFooterType::FooterLeft
-                    | HeaderFooterType::FooterRight => crate::FieldOwner::Footer,
+                    | HeaderFooterType::FooterRight => FieldOwner::Footer,
                 };
                 for event in &hf.story_events {
-                    if let crate::StoryEvent::Field(reference) = *event {
+                    if let StoryEvent::Field(reference) = *event {
                         Self::mark_owned_field(reference, owner, fields, &mut seen)?;
                     }
                 }
@@ -471,13 +488,13 @@ impl<W: Write> RtfWriter<W> {
         }
         for note in doc.notes() {
             for event in &note.story_events {
-                if let crate::StoryEvent::Field(reference) = *event {
+                if let StoryEvent::Field(reference) = *event {
                     Self::mark_owned_field(
                         reference,
                         if note.is_footnote {
-                            crate::FieldOwner::Footnote
+                            FieldOwner::Footnote
                         } else {
-                            crate::FieldOwner::Endnote
+                            FieldOwner::Endnote
                         },
                         fields,
                         &mut seen,
@@ -490,27 +507,22 @@ impl<W: Write> RtfWriter<W> {
         }
         for field in fields {
             for event in &field.result_events {
-                if let crate::StoryEvent::Field(reference) = *event {
-                    Self::mark_owned_field(
-                        reference,
-                        crate::FieldOwner::FieldResult,
-                        fields,
-                        &mut seen,
-                    )?;
+                if let StoryEvent::Field(reference) = *event {
+                    Self::mark_owned_field(reference, FieldOwner::FieldResult, fields, &mut seen)?;
                 }
             }
         }
-        if fields.iter().zip(seen).any(|(field, seen)| {
+        if fields.iter().zip(seen).any(|(field, was_seen)| {
             matches!(
                 field.owner,
-                crate::FieldOwner::Body
-                    | crate::FieldOwner::Header
-                    | crate::FieldOwner::Footer
-                    | crate::FieldOwner::Footnote
-                    | crate::FieldOwner::Endnote
-                    | crate::FieldOwner::TableCell(_)
-                    | crate::FieldOwner::FieldResult
-            ) && !seen
+                FieldOwner::Body
+                    | FieldOwner::Header
+                    | FieldOwner::Footer
+                    | FieldOwner::Footnote
+                    | FieldOwner::Endnote
+                    | FieldOwner::TableCell(_)
+                    | FieldOwner::FieldResult
+            ) && !was_seen
         }) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,

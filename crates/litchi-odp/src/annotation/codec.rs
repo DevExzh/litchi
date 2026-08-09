@@ -13,7 +13,7 @@ use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashSet};
 
 const OFFICE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
@@ -67,6 +67,19 @@ struct Frame {
 struct ActiveBuilder {
     record: usize,
     builder: Builder,
+}
+
+pub(super) struct Edit {
+    pub(super) start: usize,
+    pub(super) end: usize,
+    pub(super) replacement: String,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum NamespaceKind {
+    Office,
+    Draw,
+    Other,
 }
 
 /// Read annotations in document order.
@@ -322,7 +335,8 @@ fn scan(xml: &str) -> Result<Scan> {
                         records[record].span.close_start = Some(start);
                         records[record].annotation = active.builder.finish()?;
                     },
-                    kind => {
+                    kind
+                    @ (FrameKind::Page { .. } | FrameKind::Shape { .. } | FrameKind::Other) => {
                         for active in &mut builders {
                             active.builder.end_element()?;
                         }
@@ -348,7 +362,7 @@ fn scan(xml: &str) -> Result<Scan> {
             },
             Event::DocType(_) => return invalid("DOCTYPE is not allowed in presentation XML"),
             Event::Eof => break,
-            _ => {},
+            Event::Comment(_) | Event::Decl(_) | Event::PI(_) => {},
         }
         buffer.clear();
     }
@@ -361,7 +375,10 @@ fn scan(xml: &str) -> Result<Scan> {
     Ok(Scan { records, sites })
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the structural scanner threads the full parser context through explicit parameters to avoid a state struct for one call site"
+)]
 fn structural_kind(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
@@ -373,8 +390,8 @@ fn structural_kind(
     next_page: &mut usize,
     frames: &[Frame],
 ) -> Result<FrameKind> {
-    let local = element.local_name();
-    let local = local.as_ref();
+    let local_name = element.local_name();
+    let local = local_name.as_ref();
     if namespace == NamespaceKind::Draw && local == b"page" {
         let page = *next_page;
         *next_page = next_page
@@ -426,7 +443,7 @@ fn current_position(frames: &[Frame], sites: &[Site]) -> Result<Position> {
             FrameKind::Shape { site } | FrameKind::Page { site, .. } => {
                 return sites
                     .get(site)
-                    .map(|site| site.position.clone())
+                    .map(|found_site| found_site.position.clone())
                     .ok_or_else(|| invalid_error("presentation annotation site disappeared"));
             },
             FrameKind::Annotation { .. } | FrameKind::Other => {},
@@ -457,11 +474,11 @@ fn push_site(
 }
 
 fn finish_site(kind: &FrameKind, close_start: usize, end: usize, sites: &mut [Site]) {
-    let site = match kind {
+    let site_index = match kind {
         FrameKind::Page { site, .. } | FrameKind::Shape { site } => Some(*site),
         FrameKind::Annotation { .. } | FrameKind::Other => None,
     };
-    if let Some(site) = site
+    if let Some(site) = site_index
         && let Some(target) = sites.get_mut(site)
     {
         target.span.end = end;
@@ -483,10 +500,10 @@ fn site_for<'a>(scan: &'a Scan, position: &Position) -> Result<&'a Site> {
 }
 
 fn validate_record_names(records: &[Record]) -> Result<()> {
-    let mut names = HashMap::new();
+    let mut names = HashSet::new();
     for record in records {
         if let Some(name) = record.annotation.name()
-            && names.insert(name.to_string(), ()).is_some()
+            && !names.insert(name.to_string())
         {
             return invalid(format!("duplicate annotation name '{name}'"));
         }
@@ -499,23 +516,23 @@ fn validate_new_name(scan: &Scan, name: Option<&str>) -> Result<()> {
 }
 
 fn validate_new_name_except(scan: &Scan, name: Option<&str>, except: usize) -> Result<()> {
-    let Some(name) = name else { return Ok(()) };
-    if name.is_empty() {
+    let Some(new_name) = name else { return Ok(()) };
+    if new_name.is_empty() {
         return invalid("annotation office:name cannot be empty");
     }
     if scan
         .records
         .iter()
         .enumerate()
-        .any(|(index, record)| index != except && record.annotation.name() == Some(name))
+        .any(|(index, record)| index != except && record.annotation.name() == Some(new_name))
     {
-        return invalid(format!("duplicate annotation name '{name}'"));
+        return invalid(format!("duplicate annotation name '{new_name}'"));
     }
     Ok(())
 }
 
 pub(super) fn serialize(annotation: &Annotation) -> Result<String> {
-    let mut annotation = annotation.clone();
+    let mut annotated = annotation.clone();
     for (prefix, uri) in [
         ("office", OFFICE),
         ("text", TEXT),
@@ -527,11 +544,11 @@ pub(super) fn serialize(annotation: &Annotation) -> Result<String> {
         ("xlink", XLINK),
         ("loext", LOEXT),
     ] {
-        annotation.set_namespace(prefix, uri)?;
+        annotated.set_namespace(prefix, uri)?;
     }
-    validate_annotation(&annotation)?;
+    validate_annotation(&annotated)?;
     let mut output = String::new();
-    annotation.write_xml(&mut output);
+    annotated.write_xml(&mut output);
     if output.len() > MAX_FRAGMENT_BYTES {
         return invalid("annotation XML exceeds the fragment size limit");
     }
@@ -561,12 +578,6 @@ fn insert_child(xml: &str, site: &Site, fragment: &str) -> Result<String> {
     apply_edits(xml, vec![edit])
 }
 
-pub(super) struct Edit {
-    pub(super) start: usize,
-    pub(super) end: usize,
-    pub(super) replacement: String,
-}
-
 pub(super) fn apply_edits(xml: &str, mut edits: Vec<Edit>) -> Result<String> {
     edits.sort_by(|left, right| right.start.cmp(&left.start).then(right.end.cmp(&left.end)));
     let mut output = xml.to_string();
@@ -592,16 +603,18 @@ fn apply_namespace_declarations(
     namespaces: &mut BTreeMap<String, String>,
 ) -> Result<Vec<(String, Option<String>)>> {
     let mut changes = Vec::new();
-    for attribute in element.attributes() {
-        let attribute = attribute
+    for raw_attribute in element.attributes() {
+        let attribute = raw_attribute
             .map_err(|error| invalid_error(format!("invalid presentation namespace: {error}")))?;
         let raw = qname(attribute.key.as_ref())?;
-        let prefix = if raw == "xmlns" {
+        let namespace_prefix = if raw == "xmlns" {
             Some(String::new())
         } else {
             raw.strip_prefix("xmlns:").map(str::to_string)
         };
-        let Some(prefix) = prefix else { continue };
+        let Some(prefix) = namespace_prefix else {
+            continue;
+        };
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
             .map_err(|error| {
@@ -619,8 +632,8 @@ fn restore_namespaces(
     namespaces: &mut BTreeMap<String, String>,
 ) {
     for (prefix, previous) in changes.into_iter().rev() {
-        if let Some(previous) = previous {
-            namespaces.insert(prefix, previous);
+        if let Some(previous_value) = previous {
+            namespaces.insert(prefix, previous_value);
         } else {
             namespaces.remove(&prefix);
         }
@@ -634,9 +647,9 @@ fn attribute(
     expected_local: &[u8],
 ) -> Result<Option<String>> {
     let mut result = None;
-    for raw in element.attributes() {
-        let raw =
-            raw.map_err(|error| invalid_error(format!("invalid presentation attribute: {error}")))?;
+    for raw_attribute in element.attributes() {
+        let raw = raw_attribute
+            .map_err(|error| invalid_error(format!("invalid presentation attribute: {error}")))?;
         let (namespace, local) = reader.resolver().resolve_attribute(raw.key);
         if matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == *expected_namespace)
             && local.as_ref() == expected_local
@@ -656,18 +669,15 @@ fn attribute(
     Ok(result)
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum NamespaceKind {
-    Office,
-    Draw,
-    Other,
-}
-
-fn namespace(value: &ResolveResult<'_>) -> NamespaceKind {
-    match value {
-        ResolveResult::Bound(Namespace(value)) if *value == OFFICE_NS => NamespaceKind::Office,
-        ResolveResult::Bound(Namespace(value)) if *value == DRAW_NS => NamespaceKind::Draw,
-        _ => NamespaceKind::Other,
+fn namespace(resolved: &ResolveResult<'_>) -> NamespaceKind {
+    match resolved {
+        ResolveResult::Bound(Namespace(namespace)) if *namespace == OFFICE_NS => {
+            NamespaceKind::Office
+        },
+        ResolveResult::Bound(Namespace(namespace)) if *namespace == DRAW_NS => NamespaceKind::Draw,
+        ResolveResult::Unbound | ResolveResult::Bound(_) | ResolveResult::Unknown(_) => {
+            NamespaceKind::Other
+        },
     }
 }
 

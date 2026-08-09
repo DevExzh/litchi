@@ -1,8 +1,11 @@
-//! PowerPoint 2017 WebVTT Track parts.
+//! `PowerPoint` 2017 `WebVTT` Track parts.
 //!
 //! External tracks are retained as targets and are never fetched.
 
-use super::model::*;
+use super::model::{
+    Block, Cue, CueSetting, CueSettingKind, File, Header, RegionSetting, RegionSettingKind, Target,
+    Track,
+};
 use crate::{Error, Result};
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use std::collections::HashSet;
@@ -21,10 +24,16 @@ const MAX_LINE: usize = 1024 * 1024;
 const MAX_SETTINGS: usize = 64;
 
 impl File {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(bytes: &[u8]) -> Result<Self> {
         parse_vtt(bytes)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         validate(self)?;
         let mut out = b"WEBVTT".to_vec();
@@ -57,6 +66,9 @@ impl File {
     }
 }
 
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load(package: &OpcPackage) -> Result<Vec<Track>> {
     if package
         .rels()
@@ -127,6 +139,9 @@ pub fn load(package: &OpcPackage) -> Result<Vec<Track>> {
     Ok(values)
 }
 
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn store(package: &mut OpcPackage, value: &Track) -> Result<()> {
     load(package)?;
     valid_rel_id(&value.relationship_id)?;
@@ -543,21 +558,21 @@ fn timestamp(value: &str) -> Result<u64> {
     let (hours, minutes, seconds) = match parts.as_slice() {
         [m, s] if m.len() == 2 => (0u64, *m, *s),
         [h, m, s] if h.len() >= 2 && m.len() == 2 => {
-            (h.parse().map_err(|_| invalid("invalid hours"))?, *m, *s)
+            (h.parse().map_err(|_err| invalid("invalid hours"))?, *m, *s)
         },
         _ => return Err(invalid("invalid WebVTT timestamp")),
     };
-    let minutes: u64 = minutes.parse().map_err(|_| invalid("invalid minutes"))?;
+    let minutes: u64 = minutes.parse().map_err(|_err| invalid("invalid minutes"))?;
     let (seconds, millis) = seconds
         .split_once('.')
         .ok_or_else(|| invalid("invalid timestamp fraction"))?;
     if seconds.len() != 2 || millis.len() != 3 {
         return Err(invalid("invalid timestamp precision"));
     }
-    let seconds: u64 = seconds.parse().map_err(|_| invalid("invalid seconds"))?;
+    let seconds: u64 = seconds.parse().map_err(|_err| invalid("invalid seconds"))?;
     let millis: u64 = millis
         .parse()
-        .map_err(|_| invalid("invalid milliseconds"))?;
+        .map_err(|_err| invalid("invalid milliseconds"))?;
     if minutes > 59 || seconds > 59 {
         return Err(invalid("timestamp component out of range"));
     }
@@ -645,6 +660,11 @@ fn limit(label: &str) -> Error {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use litchi_opc::Part;

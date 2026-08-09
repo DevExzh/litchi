@@ -1,14 +1,15 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 //! Round-trip tests for theme-font selectors on font-table entries.
 
 use litchi_rtf::{FontTheme, RtfDocument, RtfWriter};
-
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
-    let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
-    output
-}
 
 const SELECTORS: &[(&str, FontTheme)] = &[
     (r"\flomajor", FontTheme::MajorLatin),
@@ -20,6 +21,14 @@ const SELECTORS: &[(&str, FontTheme)] = &[
     (r"\fdbminor", FontTheme::MinorDoubleByte),
     (r"\fbiminor", FontTheme::MinorBidi),
 ];
+
+fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+    let mut output = Vec::new();
+    RtfWriter::new(&mut output)
+        .write_document(document)
+        .unwrap();
+    output
+}
 
 #[test]
 fn theme_font_selectors_round_trip() {

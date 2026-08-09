@@ -1,9 +1,12 @@
-use super::*;
+use super::{
+    ControlWord, Cow, Destination, DrawingStoryCapture, MAX_GROUP_NESTING_DEPTH, Parser, RtfError,
+    RtfResult, State, Token, control_symbol_text, require_parameterless,
+};
 
 impl<'a> Parser<'a> {
     /// Parse a group (content between braces).
     pub(super) fn parse_group(&mut self) -> RtfResult<()> {
-        self.expect_token(Token::OpenBrace)?;
+        self.expect_token(&Token::OpenBrace)?;
 
         // Group parsing recurses, so refuse pathological nesting before it can
         // exhaust the call stack. Reporting a typed error keeps a hostile file
@@ -184,7 +187,7 @@ impl<'a> Parser<'a> {
         let parsed = self.parse_content();
         self.unicode_alternate_depth -= 1;
         parsed?;
-        self.expect_token(Token::CloseBrace)?; // outer upr group
+        self.expect_token(&Token::CloseBrace)?; // outer upr group
         Ok(())
     }
 
@@ -285,7 +288,7 @@ impl<'a> Parser<'a> {
                     continue;
                 },
                 Some(Token::Control(ControlWord::UnicodeSkip(value))) => {
-                    *unicode_skip = (*value).max(0)
+                    *unicode_skip = (*value).max(0);
                 },
                 Some(Token::Control(ControlWord::NoteSeparatorCharacter)) => self
                     .current_note_separator_elements
@@ -304,7 +307,7 @@ impl<'a> Parser<'a> {
                     self.current_note_separator_drawings.story_offset += 1;
                 },
                 Some(Token::Control(ControlWord::Tab)) => {
-                    self.push_note_separator_text("\t".to_string())
+                    self.push_note_separator_text("\t".to_string());
                 },
                 Some(Token::Control(control)) if control_symbol_text(control).is_some() => self
                     .push_note_separator_text(
@@ -331,7 +334,11 @@ impl<'a> Parser<'a> {
                 .iter()
                 .map(|element| match element {
                     crate::NoteSeparatorElement::Text(text) => text.len(),
-                    _ => 0,
+                    crate::NoteSeparatorElement::SeparatorMark
+                    | crate::NoteSeparatorElement::ContinuationSeparatorMark
+                    | crate::NoteSeparatorElement::ParagraphBreak
+                    | crate::NoteSeparatorElement::LineBreak
+                    | crate::NoteSeparatorElement::Drawing(_) => 0,
                 })
                 .sum::<usize>();
             if text_bytes > crate::note_separator::MAX_NOTE_SEPARATOR_TEXT_BYTES {

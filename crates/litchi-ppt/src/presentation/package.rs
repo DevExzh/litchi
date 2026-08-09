@@ -48,7 +48,7 @@ impl Presentation {
         let aggregate_bytes = document
             .1
             .checked_add(current_user.map_or(0, |value| value.1))
-            .and_then(|value| value.checked_add(pictures.map_or(0, |value| value.1)))
+            .and_then(|value| value.checked_add(pictures.map_or(0, |entry| entry.1)))
             .ok_or_else(|| Error::ResourceLimit("PPT stream-size sum overflow".to_string()))?;
         if aggregate_bytes > record_limits.max_aggregate_input_bytes {
             return Err(Error::ResourceLimit(format!(
@@ -89,10 +89,10 @@ impl Presentation {
         // Parse document structure
         let mut parser = RecordParser::new();
         #[cfg(feature = "encryption")]
-        if let Some(encrypted) = &encrypted {
+        if let Some(encryption) = &encrypted {
             parser.parse_document_at_offsets_with_limits(
                 &powerpoint_document,
-                &encrypted.live_offsets,
+                &encryption.live_offsets,
                 record_limits,
             )?;
         } else {
@@ -101,44 +101,48 @@ impl Presentation {
         #[cfg(not(feature = "encryption"))]
         parser.parse_document_with_limits(&powerpoint_document, record_limits)?;
 
-        let current_user_data = current_user_data
+        let current_user_bytes = current_user_data
             .as_deref()
             .ok_or_else(|| Error::StreamNotFound("Current User".to_string()))?;
         #[cfg(feature = "encryption")]
-        let persist_mapping = if let Some(encrypted) = &encrypted {
+        let persist_mapping = if let Some(encryption) = &encrypted {
             let mut mapping = PersistMapping::new();
-            for &(persist_id, offset) in &encrypted.mappings {
+            for &(persist_id, offset) in &encryption.mappings {
                 mapping.add_mapping(persist_id, offset);
             }
             mapping
         } else {
             crate::embedded::object::Editor::inspect_live_mapping(
                 &powerpoint_document,
-                current_user_data,
+                current_user_bytes,
             )?
         };
         #[cfg(not(feature = "encryption"))]
         let persist_mapping = crate::embedded::object::Editor::inspect_live_mapping(
             &powerpoint_document,
-            current_user_data,
+            current_user_bytes,
         )?;
         let slide_directory = SlideDirectory::build_with_limits(
             &powerpoint_document,
-            current_user_data,
+            current_user_bytes,
             &persist_mapping,
             record_limits,
         )?;
 
         // Try to read Pictures stream for image extraction
         let pictures_data = if let Some((index, _)) = pictures {
-            let pictures = ole.open_stream(PICTURES_PATHS[index])?;
             #[cfg(feature = "encryption")]
-            let mut pictures = pictures;
-            #[cfg(feature = "encryption")]
-            if let Some(encrypted) = &encrypted {
-                decrypt_pictures(&mut pictures, &encrypted.crypto, record_limits)?;
+            {
+                let mut stream = ole.open_stream(PICTURES_PATHS[index])?;
+                if let Some(encryption) = &encrypted {
+                    decrypt_pictures(&mut stream, &encryption.crypto, record_limits)?;
+                }
+                Some(stream)
             }
-            Some(pictures)
+            #[cfg(not(feature = "encryption"))]
+            {
+                Some(ole.open_stream(PICTURES_PATHS[index])?)
+            }
         } else {
             None
         };
@@ -163,15 +167,15 @@ fn locate_stream<R: Read + Seek>(
     for (index, path) in paths.iter().enumerate() {
         match ole.stream_len(path) {
             Ok(size) => {
-                let size = usize::try_from(size).map_err(|_| {
+                let size_bytes = usize::try_from(size).map_err(|_err| {
                     Error::ResourceLimit(format!("{label} stream size exceeds this platform"))
                 })?;
-                if size > max_bytes {
+                if size_bytes > max_bytes {
                     return Err(Error::ResourceLimit(format!(
-                        "{label} stream size {size} exceeds limit {max_bytes}"
+                        "{label} stream size {size_bytes} exceeds limit {max_bytes}"
                     )));
                 }
-                return Ok(Some((index, size)));
+                return Ok(Some((index, size_bytes)));
             },
             Err(litchi_cfb::OleError::StreamNotFound) => {},
             Err(error) => return Err(error.into()),

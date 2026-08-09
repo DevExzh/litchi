@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 //! Parser robustness sweeps: truncation and single-byte mutation of
 //! feature-rich seeds must never panic, only yield typed results or errors.
 
@@ -114,7 +123,7 @@ const SEEDS: &[(&str, &str)] = &[
 
 fn parse_all(prefixes: &[u8]) {
     for end in 0..=prefixes.len() {
-        let _ = RtfDocument::parse_bytes(&prefixes[..end]);
+        drop(RtfDocument::parse_bytes(&prefixes[..end]));
     }
 }
 
@@ -124,13 +133,13 @@ fn mutate_all(seed: &[u8]) {
         for &replacement in REPLACEMENTS {
             let mut mutated = seed.to_vec();
             mutated[index] = replacement;
-            let _ = RtfDocument::parse_bytes(&mutated);
+            drop(RtfDocument::parse_bytes(&mutated));
         }
         // Also flip the byte through all values that change control-word shape.
         for replacement in *b"a9- *" {
             let mut mutated = seed.to_vec();
             mutated[index] = replacement;
-            let _ = RtfDocument::parse_bytes(&mutated);
+            drop(RtfDocument::parse_bytes(&mutated));
         }
     }
 }
@@ -157,9 +166,8 @@ fn single_byte_mutation_sweeps_never_panic() {
 #[test]
 fn hex_escape_at_char_boundary_is_a_typed_error() {
     for rtf in ["{\rtf1\\'ÿ9}", "{\rtf1\\'é}", "{\rtf1\\'ÿ}", "{\rtf1\\'0ÿ}"] {
-        let error = match RtfDocument::parse(rtf) {
-            Ok(_) => panic!("accepted boundary-split hex escape {rtf:?}"),
-            Err(error) => error,
+        let Err(error) = RtfDocument::parse(rtf) else {
+            panic!("accepted boundary-split hex escape {rtf:?}")
         };
         assert!(
             matches!(error, litchi_rtf::RtfError::InvalidUnicode(_)),

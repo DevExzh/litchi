@@ -1,4 +1,4 @@
-use super::model::*;
+use super::model::{PlaceholderSpec, SlideLayoutKind};
 use crate::{Error, Result};
 use quick_xml::Reader;
 use quick_xml::events::Event;
@@ -25,7 +25,7 @@ pub(super) const MAX_NAME_CHARS: usize = 256;
 /// Bounded ceiling for placeholder shapes authored in a single operation.
 pub(super) const MAX_PLACEHOLDERS_PER_OPERATION: usize = 64;
 /// Indentation step between the nine paragraph levels, in EMUs.
-pub(super) const LEVEL_MARGIN_STEP_EMU: u32 = 457200;
+pub(super) const LEVEL_MARGIN_STEP_EMU: u32 = 457_200;
 /// Default body font size for generated text-style levels, in hundredths of a point.
 pub(super) const LEVEL_FONT_SIZE_HUNDREDTHS: u32 = 1800;
 
@@ -83,7 +83,7 @@ pub(super) fn master_xml() -> String {
 pub(super) fn push_text_style_levels(xml: &mut String) {
     for level in 1..=9u32 {
         let margin = (level - 1) * LEVEL_MARGIN_STEP_EMU;
-        let _ = write!(
+        let _result = write!(
             xml,
             "<a:lvl{level}pPr marL=\"{margin}\" algn=\"l\" defTabSz=\"457200\" rtl=\"0\" eaLnBrk=\"1\" latinLnBrk=\"0\" hangingPunct=\"1\"><a:defRPr sz=\"{LEVEL_FONT_SIZE_HUNDREDTHS}\" kern=\"1200\"><a:solidFill><a:schemeClr val=\"tx1\"/></a:solidFill><a:latin typeface=\"+mn-lt\"/><a:ea typeface=\"+mn-ea\"/><a:cs typeface=\"+mn-cs\"/></a:defRPr></a:lvl{level}pPr>"
         );
@@ -98,7 +98,7 @@ pub(super) fn layout_xml(
 ) -> Result<String> {
     let mut xml = String::with_capacity(2048);
     xml.push_str(XML_DECL);
-    let _ = write!(
+    let _result = write!(
         xml,
         "<p:sldLayout xmlns:a=\"{A_NS}\" xmlns:r=\"{R_NS}\" xmlns:p=\"{P_NS}\" type=\"{}\" matchingName=\"{}\"><p:cSld name=\"{}\">",
         kind.as_str(),
@@ -138,20 +138,20 @@ pub(super) fn placeholder_shape_xml(
     let mut xml = String::with_capacity(512);
     xml.push_str("<p:sp");
     if declare_namespaces {
-        let _ = write!(xml, " xmlns:p=\"{P_NS}\" xmlns:a=\"{A_NS}\"");
+        let _result = write!(xml, " xmlns:p=\"{P_NS}\" xmlns:a=\"{A_NS}\"");
     }
-    let _ = write!(
+    let _result = write!(
         xml,
         "><p:nvSpPr><p:cNvPr id=\"{shape_id}\" name=\"{}\"/><p:cNvSpPr><a:spLocks noGrp=\"1\"/></p:cNvSpPr><p:nvPr><p:ph type=\"{}\"",
         escape_xml(&name),
         spec.kind.as_str()
     );
     if let Some(index) = spec.index {
-        let _ = write!(xml, " idx=\"{index}\"");
+        let _result = write!(xml, " idx=\"{index}\"");
     }
     xml.push_str("/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"0\" cy=\"0\"/></a:xfrm><a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p>");
     if let Some(text) = &spec.text {
-        let _ = write!(xml, "<a:r><a:t>{}</a:t></a:r>", escape_xml(text));
+        let _result = write!(xml, "<a:r><a:t>{}</a:t></a:r>", escape_xml(text));
     }
     xml.push_str("<a:endParaRPr lang=\"en-US\"/></a:p></p:txBody></p:sp>");
     xml
@@ -510,7 +510,7 @@ pub(super) fn placeholder_matches(
                     .map_err(|error| Error::Xml(error.to_string()))?;
                 ph_index = value
                     .parse::<u32>()
-                    .map_err(|_| invalid(format!("invalid placeholder index '{value}'")))?;
+                    .map_err(|_err| invalid(format!("invalid placeholder index '{value}'")))?;
             },
             _ => {},
         }
@@ -547,7 +547,7 @@ pub(super) fn shape_id_within(bytes: &[u8]) -> Result<u32> {
     let mut reader = Reader::from_reader(bytes);
     loop {
         match reader.read_event() {
-            Ok(Event::Start(element)) | Ok(Event::Empty(element))
+            Ok(Event::Start(element) | Event::Empty(element))
                 if local_name(element.name().as_ref()) == b"cNvPr" =>
             {
                 for attribute in element.attributes().with_checks(true) {
@@ -557,7 +557,7 @@ pub(super) fn shape_id_within(bytes: &[u8]) -> Result<u32> {
                             .map_err(|error| Error::Xml(error.to_string()))?;
                         return value
                             .parse::<u32>()
-                            .map_err(|_| invalid("invalid shape ID in placeholder"));
+                            .map_err(|_err| invalid("invalid shape ID in placeholder"));
                     }
                 }
                 return Err(invalid("placeholder shape has no shape ID"));
@@ -578,7 +578,7 @@ pub(super) fn next_shape_id(xml: &[u8]) -> Result<u32> {
     let mut nodes = 0usize;
     loop {
         match reader.read_event() {
-            Ok(Event::Start(element)) | Ok(Event::Empty(element)) => {
+            Ok(Event::Start(element) | Event::Empty(element)) => {
                 nodes += 1;
                 if nodes > MAX_SCAN_NODES {
                     return Err(invalid("part XML resource limit exceeded"));
@@ -591,7 +591,7 @@ pub(super) fn next_shape_id(xml: &[u8]) -> Result<u32> {
                                 .map_err(|error| Error::Xml(error.to_string()))?;
                             let id = value
                                 .parse::<u32>()
-                                .map_err(|_| invalid(format!("invalid shape ID '{value}'")))?;
+                                .map_err(|_err| invalid(format!("invalid shape ID '{value}'")))?;
                             max_id = max_id.max(id);
                         }
                     }

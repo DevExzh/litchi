@@ -5,6 +5,10 @@
 //! This module provides support for shapes, text boxes, and drawing objects
 //! in RTF documents.
 
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items stay grouped by RTF feature area rather than by item kind"
+)]
 use super::border::Border;
 use super::types::Formatting;
 use std::borrow::Cow;
@@ -14,7 +18,7 @@ pub(crate) const MAX_GROUPS_PER_GROUP: usize = 16_384;
 const MAX_SHAPE_GROUP_CHILDREN: usize = 65_536;
 const MAX_SHAPE_NESTING_DEPTH: usize = 64;
 
-/// Raw 32-bit OfficeArt color value used by RTF shape properties.
+/// Raw 32-bit `OfficeArt` color value used by RTF shape properties.
 ///
 /// The low three bytes contain blue, green, and red respectively. The high
 /// byte contains the palette, scheme, and system-color flags defined by
@@ -23,43 +27,61 @@ const MAX_SHAPE_NESTING_DEPTH: usize = 64;
 pub struct OfficeArtColor(pub u32);
 
 impl OfficeArtColor {
-    /// Default OfficeArt white.
+    /// Default `OfficeArt` white.
     pub const WHITE: Self = Self(0x00FF_FFFF);
-    /// Default OfficeArt black.
+    /// Default `OfficeArt` black.
     pub const BLACK: Self = Self(0);
 
     /// Construct a direct RGB color.
     #[inline]
+    #[must_use]
     pub const fn from_rgb(red: u8, green: u8, blue: u8) -> Self {
         Self((blue as u32) | ((green as u32) << 8) | ((red as u32) << 16))
     }
 
-    /// Return the unmodified OfficeArt value, including its high-byte flags.
+    /// Return the unmodified `OfficeArt` value, including its high-byte flags.
     #[inline]
+    #[must_use]
     pub const fn raw(self) -> u32 {
         self.0
     }
 
     /// Whether the high byte marks this color as ignored.
     #[inline]
+    #[must_use]
     pub const fn is_ignored(self) -> bool {
         self.0 >> 24 == 0xFF
     }
 
     /// Red component of a direct RGB value.
     #[inline]
+    #[must_use]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the shift isolates the target color byte"
+    )]
     pub const fn red(self) -> u8 {
         (self.0 >> 16) as u8
     }
 
     /// Green component of a direct RGB value.
     #[inline]
+    #[must_use]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the shift isolates the target color byte"
+    )]
     pub const fn green(self) -> u8 {
         (self.0 >> 8) as u8
     }
 
     /// Blue component of a direct RGB value.
     #[inline]
+    #[must_use]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the shift isolates the target color byte"
+    )]
     pub const fn blue(self) -> u8 {
         self.0 as u8
     }
@@ -77,7 +99,7 @@ impl From<u16> for OfficeArtColor {
     }
 }
 
-/// Unsigned 16.16 fixed-point value used by OfficeArt opacity properties.
+/// Unsigned 16.16 fixed-point value used by `OfficeArt` opacity properties.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OfficeArtOpacity(pub u32);
 
@@ -89,12 +111,14 @@ impl OfficeArtOpacity {
 
     /// Return the unmodified unsigned 16.16 value.
     #[inline]
+    #[must_use]
     pub const fn raw(self) -> u32 {
         self.0
     }
 
     /// Convert the fixed-point value to a fraction.
     #[inline]
+    #[must_use]
     pub fn as_fraction(self) -> f64 {
         f64::from(self.0) / 65_536.0
     }
@@ -106,6 +130,10 @@ impl Default for OfficeArtOpacity {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// A signed RTF drawing coordinate measured in twentieths of a point.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct ShapeTwips(i32);
@@ -114,11 +142,13 @@ impl ShapeTwips {
     pub const ZERO: Self = Self(0);
 
     #[inline]
+    #[must_use]
     pub const fn new(value: i32) -> Self {
         Self(value)
     }
 
     #[inline]
+    #[must_use]
     pub const fn get(self) -> i32 {
         self.0
     }
@@ -136,38 +166,54 @@ impl From<ShapeTwips> for i32 {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// A clockwise shape rotation measured in whole degrees.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ShapeRotationDegrees(i32);
 
 impl ShapeRotationDegrees {
     #[inline]
+    #[must_use]
     pub const fn new(value: i32) -> Self {
         Self(value)
     }
 
     #[inline]
+    #[must_use]
     pub const fn get(self) -> i32 {
         self.0
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// A signed root-shape stacking order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct ShapeZOrder(i32);
 
 impl ShapeZOrder {
     #[inline]
+    #[must_use]
     pub const fn new(value: i32) -> Self {
         Self(value)
     }
 
     #[inline]
+    #[must_use]
     pub const fn get(self) -> i32 {
         self.0
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Shape type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ShapeType {
@@ -190,7 +236,7 @@ pub enum ShapeType {
     PictureFrame,
     /// Group of shapes
     Group,
-    /// A valid OfficeArt shape type not represented by a named variant
+    /// A valid `OfficeArt` shape type not represented by a named variant
     Custom(i32),
     /// No usable shape type was specified
     Unknown,
@@ -243,7 +289,7 @@ pub struct Fill {
     pub color2: Option<OfficeArtColor>,
     /// Gradient direction
     pub gradient_direction: GradientDirection,
-    /// Exact OfficeArt 16.16 fill opacity
+    /// Exact `OfficeArt` 16.16 fill opacity
     pub opacity: OfficeArtOpacity,
 }
 
@@ -287,12 +333,16 @@ impl Fill {
     }
 }
 
-/// Exact OfficeArt line properties used by a shape.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
+/// Exact `OfficeArt` line properties used by a shape.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ShapeLine {
     /// Whether the line is enabled (`fLine`)
     pub visible: bool,
-    /// Raw OfficeArt foreground color
+    /// Raw `OfficeArt` foreground color
     pub color: OfficeArtColor,
     /// Width in English Metric Units (EMUs)
     pub width_emu: i32,
@@ -308,9 +358,13 @@ impl Default for ShapeLine {
     }
 }
 
-/// Maximum decoded binary bytes retained by one OfficeArt property.
+/// Maximum decoded binary bytes retained by one `OfficeArt` property.
 pub const MAX_SHAPE_PROPERTY_BINARY_BYTES: usize = 64 * 1024 * 1024;
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Theme accent selector retained from an RTF `hsv` destination.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShapeThemeColor {
@@ -326,7 +380,11 @@ pub enum ShapeThemeColor {
     Text2,
 }
 
-/// Inert theme metadata attached to a scalar OfficeArt color property.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
+/// Inert theme metadata attached to a scalar `OfficeArt` color property.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ShapeThemeValue {
     pub color: ShapeThemeColor,
@@ -336,6 +394,9 @@ pub struct ShapeThemeValue {
 
 impl ShapeThemeValue {
     /// Validate the RTF rule that a color may be tinted or shaded, but not both.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::RtfResult<()> {
         if self.tint < 255 && self.shade < 255 {
             return Err(crate::RtfError::MalformedDocument(
@@ -345,7 +406,10 @@ impl ShapeThemeValue {
         Ok(())
     }
 }
-
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Typed inert Word 6/95 drawing fallback from a shape's `shprslt` destination.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShapeResult<'a> {
@@ -354,6 +418,9 @@ pub struct ShapeResult<'a> {
 }
 
 impl ShapeResult<'_> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::RtfResult<()> {
         if self.drawing.position != 0 {
             return Err(crate::RtfError::MalformedDocument(
@@ -373,6 +440,10 @@ impl ShapeResult<'_> {
 /// Upper bound for one inert shape-hyperlink string, in bytes.
 pub const MAX_SHAPE_HYPERLINK_BYTES: usize = 65_536;
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Inert hyperlink metadata from the `\hl` group of a shape property.
 ///
 /// The RTF specification ("Hyperlink Property for Shapes") defines the
@@ -393,7 +464,7 @@ pub struct ShapeHyperlink<'a> {
     pub friendly_name: Option<Cow<'a, str>>,
 }
 
-impl<'a> ShapeHyperlink<'a> {
+impl ShapeHyperlink<'_> {
     fn validate_string(kind: &str, value: &str) -> crate::RtfResult<()> {
         if value.len() > MAX_SHAPE_HYPERLINK_BYTES {
             return Err(crate::RtfError::MalformedDocument(format!(
@@ -409,6 +480,9 @@ impl<'a> ShapeHyperlink<'a> {
     }
 
     /// Validate presence and resource constraints.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::RtfResult<()> {
         if self.location.is_none() && self.source.is_none() && self.friendly_name.is_none() {
             return Err(crate::RtfError::MalformedDocument(
@@ -438,10 +512,14 @@ impl<'a> ShapeHyperlink<'a> {
     }
 }
 
-/// A scalar or binary OfficeArt property retained from an RTF `sp` destination.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
+/// A scalar or binary `OfficeArt` property retained from an RTF `sp` destination.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShapeProperty<'a> {
-    /// OfficeArt property name from the `sn` destination
+    /// `OfficeArt` property name from the `sn` destination
     pub name: Cow<'a, str>,
     /// Text value from the `sv` destination
     pub value: Cow<'a, str>,
@@ -456,6 +534,7 @@ pub struct ShapeProperty<'a> {
 impl<'a> ShapeProperty<'a> {
     /// Construct a scalar shape property.
     #[inline]
+    #[must_use]
     pub fn new(name: Cow<'a, str>, value: Cow<'a, str>) -> Self {
         Self {
             name,
@@ -468,6 +547,7 @@ impl<'a> ShapeProperty<'a> {
 
     /// Construct a scalar color property with inert theme metadata.
     #[inline]
+    #[must_use]
     pub fn new_themed(
         name: Cow<'a, str>,
         value: Cow<'a, str>,
@@ -484,6 +564,7 @@ impl<'a> ShapeProperty<'a> {
 
     /// Construct a property whose value is an inert binary `svb` payload.
     #[inline]
+    #[must_use]
     pub fn new_binary(name: Cow<'a, str>, value: Cow<'a, [u8]>) -> Self {
         Self {
             name,
@@ -495,6 +576,9 @@ impl<'a> ShapeProperty<'a> {
     }
 
     /// Validate scalar/binary exclusivity and resource constraints.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::RtfResult<()> {
         if self.name.is_empty() {
             return Err(crate::RtfError::MalformedDocument(
@@ -528,6 +612,10 @@ impl<'a> ShapeProperty<'a> {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Shape position and size
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ShapeGeometry {
@@ -548,6 +636,7 @@ pub struct ShapeGeometry {
 impl ShapeGeometry {
     /// Create a new geometry
     #[inline]
+    #[must_use]
     pub fn new(x: i32, y: i32, width: i32, height: i32) -> Self {
         Self {
             x,
@@ -561,6 +650,7 @@ impl ShapeGeometry {
 
     /// Construct geometry using named RTF coordinate units.
     #[inline]
+    #[must_use]
     pub const fn from_twips(
         x: ShapeTwips,
         y: ShapeTwips,
@@ -578,31 +668,37 @@ impl ShapeGeometry {
     }
 
     #[inline]
+    #[must_use]
     pub const fn x_twips(self) -> ShapeTwips {
         ShapeTwips(self.x)
     }
 
     #[inline]
+    #[must_use]
     pub const fn y_twips(self) -> ShapeTwips {
         ShapeTwips(self.y)
     }
 
     #[inline]
+    #[must_use]
     pub const fn width_twips(self) -> ShapeTwips {
         ShapeTwips(self.width)
     }
 
     #[inline]
+    #[must_use]
     pub const fn height_twips(self) -> ShapeTwips {
         ShapeTwips(self.height)
     }
 
     #[inline]
+    #[must_use]
     pub const fn rotation_degrees(self) -> ShapeRotationDegrees {
         ShapeRotationDegrees(self.rotation)
     }
 
     #[inline]
+    #[must_use]
     pub const fn z_order_value(self) -> ShapeZOrder {
         ShapeZOrder(self.z_order)
     }
@@ -638,6 +734,10 @@ pub enum WrapMode {
     InFront,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Horizontal anchoring control used by `shpbx*` shape metadata.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShapeHorizontalAnchor {
@@ -647,6 +747,10 @@ pub enum ShapeHorizontalAnchor {
     ShapeProperty,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Vertical anchoring control used by `shpby*` shape metadata.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShapeVerticalAnchor {
@@ -656,6 +760,10 @@ pub enum ShapeVerticalAnchor {
     ShapeProperty,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Typed value of the RTF `shpwr` control.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShapeWrapStyle {
@@ -669,6 +777,7 @@ pub enum ShapeWrapStyle {
 }
 
 impl ShapeWrapStyle {
+    #[must_use]
     pub const fn from_rtf(value: i32) -> Self {
         match value {
             0 => Self::Around,
@@ -681,6 +790,7 @@ impl ShapeWrapStyle {
         }
     }
 
+    #[must_use]
     pub const fn to_rtf(self) -> i32 {
         match self {
             Self::Around => 0,
@@ -694,6 +804,10 @@ impl ShapeWrapStyle {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Typed value of the RTF `shpwrk` wrap-side control.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShapeWrapSide {
@@ -705,6 +819,7 @@ pub enum ShapeWrapSide {
 }
 
 impl ShapeWrapSide {
+    #[must_use]
     pub const fn from_rtf(value: i32) -> Self {
         match value {
             0 => Self::Both,
@@ -715,6 +830,7 @@ impl ShapeWrapSide {
         }
     }
 
+    #[must_use]
     pub const fn to_rtf(self) -> i32 {
         match self {
             Self::Both => 0,
@@ -726,6 +842,10 @@ impl ShapeWrapSide {
     }
 }
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent RTF feature flags stay flat for direct access"
+)]
 /// RTF shape/drawing object
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Shape<'a> {
@@ -741,7 +861,7 @@ pub struct Shape<'a> {
     pub fill: Fill,
     /// Border
     pub border: Border,
-    /// Exact OfficeArt line properties
+    /// Exact `OfficeArt` line properties
     pub line: ShapeLine,
     /// Text content (for text boxes)
     pub text: Cow<'a, str>,
@@ -767,7 +887,7 @@ pub struct Shape<'a> {
     pub locked: bool,
     /// Shape name/identifier
     pub name: Cow<'a, str>,
-    /// All scalar OfficeArt properties, including properties unknown to this crate
+    /// All scalar `OfficeArt` properties, including properties unknown to this crate
     pub properties: Vec<ShapeProperty<'a>>,
     /// Optional typed legacy drawing fallback from the root-only `shprslt` destination
     pub result: Option<ShapeResult<'a>>,
@@ -778,6 +898,7 @@ pub struct Shape<'a> {
 impl<'a> Shape<'a> {
     /// Create a new shape
     #[inline]
+    #[must_use]
     pub fn new(shape_type: ShapeType) -> Self {
         Self {
             position: 0,
@@ -807,6 +928,7 @@ impl<'a> Shape<'a> {
 
     /// Create a text box
     #[inline]
+    #[must_use]
     pub fn text_box(text: Cow<'a, str>) -> Self {
         let mut shape = Self::new(ShapeType::TextBox);
         shape.text = text;
@@ -831,6 +953,9 @@ impl<'a> Shape<'a> {
     }
 
     /// Append a validated positional root shape to this text-box story.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_text_shape(&mut self, shape: Shape<'a>) -> crate::RtfResult<()> {
         validate_story_shape(
             self.text.as_ref(),
@@ -856,6 +981,9 @@ impl<'a> Shape<'a> {
     }
 
     /// Append a validated positional root shape group to this text-box story.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_text_shape_group(&mut self, group: ShapeGroup<'a>) -> crate::RtfResult<()> {
         validate_story_group(
             self.text.as_ref(),
@@ -894,10 +1022,13 @@ impl<'a> Shape<'a> {
             .iter()
             .filter_map(|event| match event {
                 crate::StoryEvent::PageBreak(page_break) => Some(page_break),
-                _ => None,
+                crate::StoryEvent::Drawing(_) | crate::StoryEvent::Field(_) => None,
             })
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_page_break(&mut self, position: usize) -> crate::RtfResult<()> {
         self.text_destination_present = true;
         crate::field::push_story_page_break(
@@ -915,12 +1046,14 @@ impl<'a> Shape<'a> {
 
     /// Check if this is a text box
     #[inline]
+    #[must_use]
     pub fn is_text_box(&self) -> bool {
         self.shape_type == ShapeType::TextBox
     }
 
-    /// Return the last scalar OfficeArt property with the requested name.
+    /// Return the last scalar `OfficeArt` property with the requested name.
     #[inline]
+    #[must_use]
     pub fn property(&self, name: &str) -> Option<&str> {
         self.properties
             .iter()
@@ -930,6 +1063,11 @@ impl<'a> Shape<'a> {
     }
 
     /// Return the last declared `shplid`, if present.
+    #[must_use]
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub fn shape_id(&self) -> Option<i32> {
         self.info.iter().rev().find_map(|info| match info {
             ShapeGroupInfo::ShapeId(value) => Some(*value),
@@ -938,6 +1076,7 @@ impl<'a> Shape<'a> {
     }
 
     /// Recursively find this shape or one owned by its text story by name.
+    #[must_use]
     pub fn find_by_name(&self, name: &str) -> Option<&Shape<'a>> {
         if self.name == name || self.property("wzName") == Some(name) {
             return Some(self);
@@ -953,6 +1092,7 @@ impl<'a> Shape<'a> {
     }
 
     /// Recursively find this shape or one owned by its text story by `shplid`.
+    #[must_use]
     pub fn find_by_id(&self, id: i32) -> Option<&Shape<'a>> {
         if self.shape_id() == Some(id) {
             return Some(self);
@@ -968,6 +1108,9 @@ impl<'a> Shape<'a> {
     }
 
     /// Insert or replace the last property with the same name atomically.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_property(
         &mut self,
         property: ShapeProperty<'a>,
@@ -1009,6 +1152,9 @@ impl<'a> Shape<'a> {
     }
 
     /// Validate a standalone shape independently of its document position.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::RtfResult<()> {
         self.validate_at_depth(0)
     }
@@ -1138,6 +1284,10 @@ impl<'a> Shape<'a> {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Reference to a shape-group child in bottom-to-top order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShapeGroupChild {
@@ -1156,6 +1306,10 @@ pub enum StoryDrawing {
     ShapeGroup(usize),
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Shape-info control retained on a group instance.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShapeGroupInfo {
@@ -1176,6 +1330,7 @@ pub enum ShapeGroupInfo {
 }
 
 impl ShapeGroupInfo {
+    #[must_use]
     pub const fn horizontal_anchor(value: ShapeHorizontalAnchor) -> Self {
         match value {
             ShapeHorizontalAnchor::Page => Self::HorizontalPage,
@@ -1185,6 +1340,7 @@ impl ShapeGroupInfo {
         }
     }
 
+    #[must_use]
     pub const fn vertical_anchor(value: ShapeVerticalAnchor) -> Self {
         match value {
             ShapeVerticalAnchor::Page => Self::VerticalPage,
@@ -1194,39 +1350,71 @@ impl ShapeGroupInfo {
         }
     }
 
+    #[must_use]
     pub const fn wrap(value: ShapeWrapStyle) -> Self {
         Self::Wrap(value.to_rtf())
     }
+    #[must_use]
     pub const fn wrap_side(value: ShapeWrapSide) -> Self {
         Self::WrapSide(value.to_rtf())
     }
 
+    #[must_use]
     pub const fn as_horizontal_anchor(self) -> Option<ShapeHorizontalAnchor> {
         match self {
             Self::HorizontalPage => Some(ShapeHorizontalAnchor::Page),
             Self::HorizontalMargin => Some(ShapeHorizontalAnchor::Margin),
             Self::HorizontalColumn => Some(ShapeHorizontalAnchor::Column),
             Self::IgnoreHorizontal => Some(ShapeHorizontalAnchor::ShapeProperty),
-            _ => None,
+            Self::ShapeId(_)
+            | Self::InHeader(_)
+            | Self::VerticalPage
+            | Self::VerticalMargin
+            | Self::VerticalParagraph
+            | Self::IgnoreVertical
+            | Self::Wrap(_)
+            | Self::WrapSide(_)
+            | Self::BelowText(_)
+            | Self::LockAnchor => None,
         }
     }
 
+    #[must_use]
     pub const fn as_vertical_anchor(self) -> Option<ShapeVerticalAnchor> {
         match self {
             Self::VerticalPage => Some(ShapeVerticalAnchor::Page),
             Self::VerticalMargin => Some(ShapeVerticalAnchor::Margin),
             Self::VerticalParagraph => Some(ShapeVerticalAnchor::Paragraph),
             Self::IgnoreVertical => Some(ShapeVerticalAnchor::ShapeProperty),
-            _ => None,
+            Self::ShapeId(_)
+            | Self::InHeader(_)
+            | Self::HorizontalPage
+            | Self::HorizontalMargin
+            | Self::HorizontalColumn
+            | Self::IgnoreHorizontal
+            | Self::Wrap(_)
+            | Self::WrapSide(_)
+            | Self::BelowText(_)
+            | Self::LockAnchor => None,
         }
     }
 
+    #[must_use]
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub const fn as_wrap(self) -> Option<ShapeWrapStyle> {
         match self {
             Self::Wrap(value) => Some(ShapeWrapStyle::from_rtf(value)),
             _ => None,
         }
     }
+    #[must_use]
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub const fn as_wrap_side(self) -> Option<ShapeWrapSide> {
         match self {
             Self::WrapSide(value) => Some(ShapeWrapSide::from_rtf(value)),
@@ -1235,6 +1423,10 @@ impl ShapeGroupInfo {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Group of shapes
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShapeGroup<'a> {
@@ -1252,15 +1444,15 @@ pub struct ShapeGroup<'a> {
     pub info: Vec<ShapeGroupInfo>,
     /// Group geometry (bounding box)
     pub geometry: ShapeGeometry,
-    /// All scalar OfficeArt properties attached to the group
+    /// All scalar `OfficeArt` properties attached to the group
     pub properties: Vec<ShapeProperty<'a>>,
     /// Optional legacy fallback for the complete root group.
     pub result: Option<ShapeResult<'a>>,
 }
-
 impl<'a> ShapeGroup<'a> {
     /// Create a new shape group
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             position: 0,
@@ -1276,6 +1468,9 @@ impl<'a> ShapeGroup<'a> {
     }
 
     /// Append a validated shape and return its index in [`Self::shapes`].
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn add_shape(&mut self, shape: Shape<'a>) -> crate::RtfResult<usize> {
         if self.shapes.len() >= MAX_SHAPES_PER_GROUP
             || self.child_order.len() >= MAX_SHAPE_GROUP_CHILDREN
@@ -1295,6 +1490,9 @@ impl<'a> ShapeGroup<'a> {
     }
 
     /// Append a validated nested group and return its index in [`Self::groups`].
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn add_group(&mut self, group: ShapeGroup<'a>) -> crate::RtfResult<usize> {
         if self.groups.len() >= MAX_GROUPS_PER_GROUP
             || self.child_order.len() >= MAX_SHAPE_GROUP_CHILDREN
@@ -1315,24 +1513,28 @@ impl<'a> ShapeGroup<'a> {
 
     /// Get all shapes in the group
     #[inline]
+    #[must_use]
     pub fn shapes(&self) -> &[Shape<'a>] {
         &self.shapes
     }
 
     /// Get directly nested shape groups.
     #[inline]
+    #[must_use]
     pub fn groups(&self) -> &[ShapeGroup<'a>] {
         &self.groups
     }
 
     /// Return child indices in bottom-to-top z-order.
     #[inline]
+    #[must_use]
     pub fn child_order(&self) -> &[ShapeGroupChild] {
         &self.child_order
     }
 
-    /// Return the last scalar OfficeArt property with the requested name.
+    /// Return the last scalar `OfficeArt` property with the requested name.
     #[inline]
+    #[must_use]
     pub fn property(&self, name: &str) -> Option<&str> {
         self.properties
             .iter()
@@ -1342,6 +1544,7 @@ impl<'a> ShapeGroup<'a> {
     }
 
     /// Recursively find a shape by its `wzName` property or typed name.
+    #[must_use]
     pub fn find_shape_by_name(&self, name: &str) -> Option<&Shape<'a>> {
         self.shapes
             .iter()
@@ -1354,6 +1557,7 @@ impl<'a> ShapeGroup<'a> {
     }
 
     /// Recursively find a shape by `shplid`.
+    #[must_use]
     pub fn find_shape_by_id(&self, id: i32) -> Option<&Shape<'a>> {
         self.shapes
             .iter()
@@ -1364,8 +1568,10 @@ impl<'a> ShapeGroup<'a> {
                     .find_map(|group| group.find_shape_by_id(id))
             })
     }
-
     /// Atomically replace a directly contained shape.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn replace_shape(
         &mut self,
         index: usize,
@@ -1384,6 +1590,9 @@ impl<'a> ShapeGroup<'a> {
     }
 
     /// Atomically remove a directly contained shape and repair child indices.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn remove_shape(&mut self, index: usize) -> crate::RtfResult<Shape<'a>> {
         if self.shapes.get(index).is_none() {
             return Err(grouped_shape_index_error(index));
@@ -1401,8 +1610,10 @@ impl<'a> ShapeGroup<'a> {
         }
         Ok(old)
     }
-
     /// Atomically replace a directly nested group.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn replace_group(
         &mut self,
         index: usize,
@@ -1421,6 +1632,9 @@ impl<'a> ShapeGroup<'a> {
     }
 
     /// Atomically remove a directly nested group and repair child indices.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn remove_group(&mut self, index: usize) -> crate::RtfResult<ShapeGroup<'a>> {
         if self.groups.get(index).is_none() {
             return Err(nested_group_index_error(index));
@@ -1440,6 +1654,9 @@ impl<'a> ShapeGroup<'a> {
     }
 
     /// Atomically reorder direct children in bottom-to-top order.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn move_child(&mut self, from: usize, to: usize) -> crate::RtfResult<()> {
         if from >= self.child_order.len() || to >= self.child_order.len() {
             return Err(crate::RtfError::MalformedDocument(
@@ -1456,6 +1673,9 @@ impl<'a> ShapeGroup<'a> {
     }
 
     /// Validate root-group structure and resource limits.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::RtfResult<()> {
         self.validate_at_depth(0, true)
     }
@@ -1616,8 +1836,8 @@ fn validate_nested_group_at_depth(group: &ShapeGroup<'_>, depth: usize) -> crate
 
 fn claim_ordered_item<'a, T>(items: &'a [T], seen: &mut [bool], index: usize) -> Option<&'a T> {
     let item = items.get(index)?;
-    let seen = seen.get_mut(index)?;
-    if std::mem::replace(seen, true) {
+    let seen_slot = seen.get_mut(index)?;
+    if std::mem::replace(seen_slot, true) {
         None
     } else {
         Some(item)
@@ -1696,7 +1916,7 @@ fn validate_story_shape(
 ) -> crate::RtfResult<()> {
     if shape.is_background
         || text.get(shape.position..shape.position).is_none()
-        || previous.is_some_and(|previous| previous.position > shape.position)
+        || previous.is_some_and(|prior| prior.position > shape.position)
     {
         return Err(crate::RtfError::MalformedDocument(format!(
             "RTF {story} shapes are outside or out of story order"
@@ -1712,7 +1932,7 @@ fn validate_story_group(
     story: &str,
 ) -> crate::RtfResult<()> {
     if text.get(group.position..group.position).is_none()
-        || previous.is_some_and(|previous| previous.position > group.position)
+        || previous.is_some_and(|prior| prior.position > group.position)
     {
         return Err(crate::RtfError::MalformedDocument(format!(
             "RTF {story} shape groups are outside or out of story order"
@@ -1721,7 +1941,7 @@ fn validate_story_group(
     Ok(())
 }
 
-impl<'a> Default for ShapeGroup<'a> {
+impl Default for ShapeGroup<'_> {
     fn default() -> Self {
         Self::new()
     }

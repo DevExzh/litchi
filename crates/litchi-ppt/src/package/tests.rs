@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::{Error, Package, RecordLimits};
 use litchi_cfb::{OleFile, OleWriter};
 use std::io::Cursor;
@@ -119,7 +125,7 @@ fn package_byte_limit_accepts_exact_size_and_rejects_one_less() {
 }
 
 #[test]
-#[ignore] // Requires test file
+#[ignore = "requires a test file"]
 fn test_invalid_file() {
     // Create a non-PPT file
     std::fs::write("test_invalid.tmp", b"Not a PPT file").unwrap();

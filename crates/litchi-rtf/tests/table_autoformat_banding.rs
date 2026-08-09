@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{
     RtfDocument, RtfWriter, TableAutoformatFlag, TableAutoformatFlags, TableRowBandIndex,
     TableRowBanding,
@@ -11,7 +20,7 @@ fn write(document: &RtfDocument<'_>) -> String {
 
 #[test]
 fn parses_all_flags_and_canonically_round_trips() {
-    let source = r#"{\rtf1\trowd\irow7\irowband-1\tbllknocolband\tbllklastcol\tbllkborder\tbllkshading\tbllkfont\tbllkcolor\tbllkbestfit\tbllkhdrrows\tbllklastrow\tbllkhdrcols\tbllknorowband\lastrow\cellx1000\intbl X\cell\row}"#;
+    let source = r"{\rtf1\trowd\irow7\irowband-1\tbllknocolband\tbllklastcol\tbllkborder\tbllkshading\tbllkfont\tbllkcolor\tbllkbestfit\tbllkhdrrows\tbllklastrow\tbllkhdrcols\tbllknorowband\lastrow\cellx1000\intbl X\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     let row = &document.tables()[0].rows()[0];
     assert_eq!(
@@ -38,7 +47,7 @@ fn parses_all_flags_and_canonically_round_trips() {
         assert!(row.autoformat_flags().contains(flag));
     }
     let first = write(&document);
-    assert!(first.contains(r#"\irow7\irowband-1\tbllkborder\tbllkshading\tbllkfont\tbllkcolor\tbllkbestfit\tbllkhdrrows\tbllklastrow\tbllkhdrcols\tbllklastcol\tbllknorowband\tbllknocolband\lastrow"#));
+    assert!(first.contains(r"\irow7\irowband-1\tbllkborder\tbllkshading\tbllkfont\tbllkcolor\tbllkbestfit\tbllkhdrrows\tbllklastrow\tbllkhdrcols\tbllklastcol\tbllknorowband\tbllknocolband\lastrow"));
     let reparsed = RtfDocument::parse(&first).unwrap();
     assert_eq!(reparsed.tables()[0].rows()[0].banding(), row.banding());
     assert_eq!(
@@ -50,7 +59,7 @@ fn parses_all_flags_and_canonically_round_trips() {
 
 #[test]
 fn restores_groups_resets_trowd_and_preserves_owned_rows() {
-    let source = r#"{\rtf1\trowd{\irow9\irowband2\tbllkborder\lastrow}\cellx1000\intbl A\cell\row\trowd\irow1\irowband0\tbllkhdrrows\cellx1000\intbl B\cell\row\trowd\cellx1000\intbl C\cell\row}"#;
+    let source = r"{\rtf1\trowd{\irow9\irowband2\tbllkborder\lastrow}\cellx1000\intbl A\cell\row\trowd\irow1\irowband0\tbllkhdrrows\cellx1000\intbl B\cell\row\trowd\cellx1000\intbl C\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     let expected_banding;
     let expected_flags;
@@ -78,7 +87,7 @@ fn restores_groups_resets_trowd_and_preserves_owned_rows() {
 
 #[test]
 fn snapshots_end_defined_nested_rows() {
-    let source = r#"{\rtf1\trowd\cellx3000\intbl\itap2 X\nestcell{\*\nesttableprops\itap2\trowd\irow4\irowband3\tbllknorowband\lastrow\cellx1000\nestrow}\intbl\itap1\cell\row}"#;
+    let source = r"{\rtf1\trowd\cellx3000\intbl\itap2 X\nestcell{\*\nesttableprops\itap2\trowd\irow4\irowband3\tbllknorowband\lastrow\cellx1000\nestrow}\intbl\itap1\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     let row = &document.tables()[0].rows()[0].cells()[0].nested_tables()[0]
         .table
@@ -121,11 +130,11 @@ fn rejects_missing_parameters_parameters_on_flags_duplicates_and_out_of_range_va
         "lastrow\\lastrow",
         "tbllkfont\\tbllkfont",
     ] {
-        let source = format!(r#"{{\rtf1\trowd\{controls}\cellx1000\intbl X\cell\row}}"#);
+        let source = format!(r"{{\rtf1\trowd\{controls}\cellx1000\intbl X\cell\row}}");
         assert!(RtfDocument::parse(&source).is_err(), "accepted {controls}");
     }
     assert!(
-        RtfDocument::parse(r#"{\rtf1\trowd\irow65535\irowband65535\cellx1000\intbl X\cell\row}"#)
+        RtfDocument::parse(r"{\rtf1\trowd\irow65535\irowband65535\cellx1000\intbl X\cell\row}")
             .is_ok()
     );
 }
@@ -139,7 +148,7 @@ fn parses_real_libreoffice_row_banding_fixture() {
     let rows = document
         .tables()
         .iter()
-        .flat_map(|table| table.rows())
+        .flat_map(litchi_rtf::raw::Table::rows)
         .collect::<Vec<_>>();
     assert!(rows.iter().any(|row| row.banding().row_index.is_some()));
     assert!(

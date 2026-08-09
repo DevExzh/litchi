@@ -11,6 +11,9 @@ pub struct DocumentDataStore<'a> {
 }
 
 impl<'a> DocumentDataStore<'a> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(data: Cow<'a, [u8]>) -> RtfResult<Self> {
         let store = Self { data };
         store.validate()?;

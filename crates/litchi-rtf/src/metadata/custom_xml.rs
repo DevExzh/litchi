@@ -10,6 +10,10 @@
 //! attribute names are never resolved against a schema, and no XML content is
 //! fetched, validated, or executed.
 
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items stay grouped by RTF feature area rather than by item kind"
+)]
 use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 use std::collections::HashSet;
@@ -52,6 +56,9 @@ pub struct CustomXmlAttribute<'a> {
 
 impl<'a> CustomXmlAttribute<'a> {
     /// Create a validated custom XML attribute.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(name: Cow<'a, str>, value: Cow<'a, str>) -> RtfResult<Self> {
         let attribute = Self { name, value };
         attribute.validate()?;
@@ -108,6 +115,9 @@ pub struct CustomXmlTag<'a> {
 
 impl<'a> CustomXmlTag<'a> {
     /// Create a validated custom XML markup tag.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(
         name: Cow<'a, str>,
         namespace: Option<u32>,

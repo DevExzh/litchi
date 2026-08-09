@@ -11,6 +11,9 @@ pub struct DocumentGenerator<'a> {
 }
 
 impl<'a> DocumentGenerator<'a> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(value: Cow<'a, str>) -> RtfResult<Self> {
         let generator = Self { value };
         generator.validate()?;

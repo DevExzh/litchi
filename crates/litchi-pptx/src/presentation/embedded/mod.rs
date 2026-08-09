@@ -1,10 +1,10 @@
-//! Bounded embedded-resource services for a PresentationML graph.
+//! Bounded embedded-resource services for a `PresentationML` graph.
 //!
 //! Each child module keeps its semantic model, bounded XML codec, and OPC
 //! graph operations together. Executable payloads remain inert: controls and
 //! OLE objects expose metadata only, VBA exposes an opaque package part, and
-//! InkML exposes structural counts rather than handwriting data, and general
-//! PresentationML content parts expose bounded opaque payloads without
+//! `InkML` exposes structural counts rather than handwriting data, and general
+//! `PresentationML` content parts expose bounded opaque payloads without
 //! interpreting or executing their contents.
 
 pub mod content_parts;

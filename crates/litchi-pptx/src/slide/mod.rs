@@ -3,7 +3,7 @@
 //! The owner is deliberately split by responsibility. [`model`] contains
 //! the borrowed semantic views and the checked [`Key`] selector. [`package`]
 //! resolves package relationships and optional companion parts. [`codec`]
-//! adapts those views to the bounded PresentationML and DrawingML readers
+//! adapts those views to the bounded `PresentationML` and `DrawingML` readers
 //! owned by the validated [`crate::parts::SlidePart`] family. This keeps
 //! package graph traversal and semantic accessors separate without copying or
 //! weakening the existing strict/transitional readers.

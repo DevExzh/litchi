@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::{EXTENSION_URI, NAMESPACE, codec, model::Snapshot, package, transaction};
 use crate::tag::Conformance;
 use litchi_opc::{OpcPackage, PackURI, XmlPart};

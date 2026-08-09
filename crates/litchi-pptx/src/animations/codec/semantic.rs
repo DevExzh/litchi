@@ -1,7 +1,10 @@
 //! Typed animation facade and model-preserving XML operations.
 
-use super::super::model::*;
-use super::validation::*;
+use super::super::model::{
+    DiagramBuildType, Duration, GraphicBuildMode, GraphicChartBuildType, GraphicDiagramBuildType,
+    OleChartBuildType, ParagraphBuildType, Sequence, SequenceContext, TemplateTimeNode, TimingTree,
+};
+use super::validation::{check_xml_size, validate_template_time_node};
 use super::xml::{
     parse_processed_timing, parse_recursive_timing_tree, write_animation_xml, write_timing_child,
 };
@@ -9,6 +12,10 @@ use crate::Result;
 
 impl TemplateTimeNode {
     /// Validate and store one bounded `p:par` template time node.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(xml: &str) -> Result<Self> {
         validate_template_time_node(xml)?;
         Ok(Self {
@@ -17,17 +24,22 @@ impl TemplateTimeNode {
     }
 
     /// Exact validated XML for the root `p:par` node.
+    #[must_use]
     pub fn as_xml(&self) -> &str {
         &self.xml
     }
 }
 
 impl TimingTree {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(xml: &str) -> Result<Self> {
         check_xml_size(xml.len())?;
         let processed = litchi_ooxml_common::mce::process_str(xml)?;
         parse_recursive_timing_tree(&processed)
     }
+    #[must_use]
     pub fn to_xml(&self) -> String {
         if let (Some(xml), Some(roots), Some(opaque)) = (
             &self.source_xml,
@@ -53,6 +65,10 @@ impl TimingTree {
 
 impl Sequence {
     /// Parse timing XML from a slide.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_timing_xml(xml: &str) -> Result<Self> {
         check_xml_size(xml.len())?;
         let xml = litchi_ooxml_common::mce::process_str(xml)?;
@@ -60,11 +76,15 @@ impl Sequence {
         parse_processed_timing(xml.as_bytes(), false)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_slide_xml(xml: &[u8]) -> Result<Self> {
         check_xml_size(xml.len())?;
         parse_processed_timing(xml, true)
     }
     /// Generate timing XML for a slide.
+    #[must_use]
     pub fn to_xml(&self) -> String {
         if let (
             Some(xml),
@@ -147,8 +167,7 @@ impl Sequence {
             };
             xml.push_str(r#"<p:seq concurrent="1" nextAc="seek"><p:cTn"#);
             xml.push_str(&format!(
-                r#" id="{}" dur="indefinite" restart="whenNotActive" nodeType="interactiveSeq""#,
-                tn_id
+                r#" id="{tn_id}" dur="indefinite" restart="whenNotActive" nodeType="interactiveSeq""#
             ));
             tn_id += 1;
             if let Some(event_filter) = event_filter {

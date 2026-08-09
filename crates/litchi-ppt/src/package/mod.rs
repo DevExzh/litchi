@@ -1,4 +1,4 @@
-//! Package implementation for legacy PowerPoint presentations (`.ppt`).
+//! Package implementation for legacy `PowerPoint` presentations (`.ppt`).
 
 mod codec;
 mod model;

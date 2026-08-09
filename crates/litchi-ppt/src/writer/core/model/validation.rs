@@ -37,7 +37,7 @@ impl Writer {
     }
 
     fn validate_smart_tag_references(&self) -> Result<(), WriteError> {
-        let smart_tag_count = u32::try_from(self.smart_tags.len()).map_err(|_| {
+        let smart_tag_count = u32::try_from(self.smart_tags.len()).map_err(|_err| {
             WriteError::InvalidData("PowerPoint smart-tag count exceeds u32".to_string())
         })?;
         for run in self
@@ -100,12 +100,12 @@ impl Writer {
                         ("ANSI font", run.ansi_font_index),
                         ("symbol font", run.symbol_font_index),
                     ] {
-                        if let Some(index) = index {
-                            if usize::from(index) >= font_count {
-                                return Err(WriteError::InvalidData(format!(
-                                    "PowerPoint {owner} paragraph {paragraph_index} run {run_index} references missing {kind} {index}"
-                                )));
-                            }
+                        if let Some(ordinal) = index
+                            && usize::from(ordinal) >= font_count
+                        {
+                            return Err(WriteError::InvalidData(format!(
+                                "PowerPoint {owner} paragraph {paragraph_index} run {run_index} references missing {kind} {ordinal}"
+                            )));
                         }
                     }
                     for (kind, index) in [
@@ -115,11 +115,11 @@ impl Writer {
                         ),
                         ("complex-script font", run.complex_script_font_index),
                     ] {
-                        if let Some(index) = index
-                            && usize::from(index) >= international_font_count
+                        if let Some(ordinal) = index
+                            && usize::from(ordinal) >= international_font_count
                         {
                             return Err(WriteError::InvalidData(format!(
-                                "PowerPoint {owner} paragraph {paragraph_index} run {run_index} references missing {kind} {index}"
+                                "PowerPoint {owner} paragraph {paragraph_index} run {run_index} references missing {kind} {ordinal}"
                             )));
                         }
                     }
@@ -145,23 +145,13 @@ impl Writer {
     }
 }
 
-fn validate_font_index(
-    index: u16,
-    font_count: usize,
-    owner: &str,
-    paragraph_index: usize,
-    kind: &str,
-) -> Result<(), WriteError> {
-    if usize::from(index) >= font_count {
-        return Err(WriteError::InvalidData(format!(
-            "PowerPoint {owner} paragraph {paragraph_index} references missing {kind} font {index}"
-        )));
-    }
-    Ok(())
-}
-
 impl Writer {
     /// Attach a hyperlink to the last shape added on a slide
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the hyperlink ID is not registered, the slide does
+    /// not exist, the slide has no shapes, or the interaction is invalid.
     pub fn set_last_shape_hyperlink(
         &mut self,
         slide: usize,
@@ -177,6 +167,10 @@ impl Writer {
     /// Add or replace one typed click or mouse-over action on the last shape.
     ///
     /// Validation is atomic. Hyperlink references must identify an existing
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     /// writer hyperlink, and a shape can carry at most one action per trigger.
     pub fn set_last_shape_interaction(
         &mut self,
@@ -191,6 +185,11 @@ impl Writer {
     }
 
     /// Add or replace one shape action with explicit record and name limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the interaction fails validation, references an
+    /// unknown hyperlink, the slide does not exist, or the slide has no shapes.
     pub fn set_last_shape_interaction_with_limits(
         &mut self,
         slide: usize,
@@ -210,7 +209,7 @@ impl Writer {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
 
         if let Some(shape) = slide_data.shapes.last_mut() {
             shape.properties.hyperlink_id = None;
@@ -223,12 +222,13 @@ impl Writer {
                 *existing = interaction;
             } else {
                 shape.properties.interactions.push(interaction);
-                shape.properties.interactions.sort_by_key(|interaction| {
-                    match interaction.trigger {
+                shape
+                    .properties
+                    .interactions
+                    .sort_by_key(|entry| match entry.trigger {
                         crate::InteractionTrigger::Click => 0,
                         crate::InteractionTrigger::MouseOver => 1,
-                    }
-                });
+                    });
             }
             Ok(())
         } else {
@@ -237,6 +237,10 @@ impl Writer {
     }
 
     /// Remove one trigger from the last shape, returning whether it was present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the slide does not exist or has no shapes.
     pub fn clear_last_shape_interaction(
         &mut self,
         slide: usize,
@@ -245,7 +249,7 @@ impl Writer {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
         let shape = slide_data
             .shapes
             .last_mut()
@@ -262,6 +266,11 @@ impl Writer {
     }
 
     /// Attach a registered hyperlink to one UTF-16 range in the last shape's text.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the hyperlink ID is not registered, the text range is
+    /// invalid for the shape, the slide does not exist, or the slide has no shapes.
     pub fn set_last_shape_text_hyperlink(
         &mut self,
         slide: usize,
@@ -281,6 +290,10 @@ impl Writer {
 
     /// Add or replace one trigger/range pair on the last shape's text.
     ///
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     /// Text positions are UTF-16 code units. Validation occurs before mutation.
     pub fn set_last_shape_text_interaction(
         &mut self,
@@ -295,6 +308,12 @@ impl Writer {
     }
 
     /// Add or replace a text action with explicit resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the interaction references an unknown hyperlink, the
+    /// slide does not exist, the slide has no shapes, the UTF-16 range is invalid
+    /// for the shape text, or the configured interaction count limit is exceeded.
     pub fn set_last_shape_text_interaction_with_limits(
         &mut self,
         slide: usize,
@@ -315,7 +334,7 @@ impl Writer {
         let slide_data = self
             .slides
             .get(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
         let shape = slide_data
             .shapes
             .last()
@@ -346,16 +365,16 @@ impl Writer {
             ));
         }
 
-        let shape = self
+        let shape_mut = self
             .slides
             .get_mut(slide)
-            .and_then(|slide| slide.shapes.last_mut())
+            .and_then(|target_slide| target_slide.shapes.last_mut())
             .ok_or_else(|| WriteError::InvalidData("No shapes on slide".to_string()))?;
         if let Some(index) = replace_index {
-            shape.properties.text_interactions[index] = interaction;
+            shape_mut.properties.text_interactions[index] = interaction;
         } else {
-            shape.properties.text_interactions.push(interaction);
-            shape.properties.text_interactions.sort_by_key(|value| {
+            shape_mut.properties.text_interactions.push(interaction);
+            shape_mut.properties.text_interactions.sort_by_key(|value| {
                 (
                     value.range.begin(),
                     value.range.end(),
@@ -370,6 +389,10 @@ impl Writer {
     }
 
     /// Remove one trigger/range pair from the last shape.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the slide does not exist or has no shapes.
     pub fn clear_last_shape_text_interaction(
         &mut self,
         slide: usize,
@@ -379,7 +402,7 @@ impl Writer {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
         let shape = slide_data
             .shapes
             .last_mut()
@@ -408,6 +431,11 @@ impl Writer {
     }
 
     /// Set the presentation's slide editing-view preferences, zoom, and guides.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the view fails to serialize or its kind is not the
+    /// slide editing view.
     pub fn set_slide_view_info(&mut self, view: SlideViewInfo) -> Result<(), WriteError> {
         Self::validate_view_info_kind(&view, ViewKind::Slide)?;
         self.slide_view_info = Some(view);
@@ -420,11 +448,17 @@ impl Writer {
     }
 
     /// Return the explicit slide editing-view override, if present.
+    #[must_use]
     pub fn slide_view_info(&self) -> Option<&SlideViewInfo> {
         self.slide_view_info.as_ref()
     }
 
     /// Set the presentation's notes editing-view preferences, zoom, and guides.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the view fails to serialize or its kind is not the
+    /// notes editing view.
     pub fn set_notes_view_info(&mut self, view: SlideViewInfo) -> Result<(), WriteError> {
         Self::validate_view_info_kind(&view, ViewKind::Notes)?;
         self.notes_view_info = Some(view);
@@ -437,7 +471,23 @@ impl Writer {
     }
 
     /// Return the explicit notes editing-view, if present.
+    #[must_use]
     pub fn notes_view_info(&self) -> Option<&SlideViewInfo> {
         self.notes_view_info.as_ref()
     }
+}
+
+fn validate_font_index(
+    index: u16,
+    font_count: usize,
+    owner: &str,
+    paragraph_index: usize,
+    kind: &str,
+) -> Result<(), WriteError> {
+    if usize::from(index) >= font_count {
+        return Err(WriteError::InvalidData(format!(
+            "PowerPoint {owner} paragraph {paragraph_index} references missing {kind} font {index}"
+        )));
+    }
+    Ok(())
 }

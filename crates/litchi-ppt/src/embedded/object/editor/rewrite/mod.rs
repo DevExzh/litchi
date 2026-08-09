@@ -1,4 +1,4 @@
-//! Lossless PowerPoint record rewriting with bounded recursion.
+//! Lossless `PowerPoint` record rewriting with bounded recursion.
 
 pub(super) mod nested;
 pub(super) mod record;

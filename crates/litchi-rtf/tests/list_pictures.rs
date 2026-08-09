@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{ImageType, RtfDocument, RtfWriter};
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
@@ -21,7 +30,7 @@ fn parses_real_libreoffice_picture_bullet_without_cloning_payload() {
     );
     let index = indices[0].unwrap();
     let bullet = document.list_picture_bullets().next().flatten().unwrap();
-    assert!(std::ptr::eq(bullet, &document.pictures()[index]));
+    assert!(std::ptr::eq(bullet, &raw const document.pictures()[index]));
     assert_eq!(bullet.image_type, ImageType::Png);
 
     let output = write(&document);
@@ -62,7 +71,7 @@ fn canonical_roundtrip_preserves_multiple_records_and_empty_legacy_entry() {
     assert_eq!(reparsed.pictures().len(), 2);
     assert_eq!(write(&reparsed), first);
 
-    let empty = RtfDocument::parse(r#"{\rtf1{\*\listtable{\*\listpicture}}}"#).unwrap();
+    let empty = RtfDocument::parse(r"{\rtf1{\*\listtable{\*\listpicture}}}").unwrap();
     assert_eq!(empty.list_table().picture_bullet_count, 1);
     assert!(empty.list_picture_bullets().next().unwrap().is_none());
     let rewritten = write(&empty);
@@ -72,8 +81,7 @@ fn canonical_roundtrip_preserves_multiple_records_and_empty_legacy_entry() {
 
 #[test]
 fn typed_indices_validate_and_clear_only_references() {
-    let mut document =
-        RtfDocument::parse(r#"{\rtf1{\pict\pngblip 89504e470d0a1a0a}Body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1{\pict\pngblip 89504e470d0a1a0a}Body}").unwrap();
     assert_eq!(document.pictures().len(), 1);
     document
         .set_list_picture_bullet_indices(vec![Some(0), None])
@@ -98,16 +106,16 @@ fn typed_indices_validate_and_clear_only_references() {
 #[test]
 fn rejects_hostile_list_picture_grammar() {
     for source in [
-        r#"{\rtf1{\*\listtable{\listpicture}}}"#,
-        r#"{\rtf1{\*\listtable{\*\listpicture1}}}"#,
-        r#"{\rtf1{\*\listtable{\*\listpicture text}}}"#,
-        r#"{\rtf1{\*\listtable{\*\listpicture{\shppict{\pict\pngblip 00}}}}}"#,
-        r#"{\rtf1{\*\listtable{\*\listpicture{\*\shppict1{\pict\pngblip 00}}}}}"#,
-        r#"{\rtf1{\*\listtable{\*\listpicture{\*\shppict}}}}"#,
-        r#"{\rtf1{\*\listtable{\*\listpicture{\*\shppict{\pict}}}}}"#,
-        r#"{\rtf1{\*\listtable{\*\listpicture{\*\shppict{\pict\pngblip 00}{\pict\pngblip 00}}}}}"#,
-        r#"{\rtf1{\*\listtable{\*\listpicture}{\*\listpicture}}}"#,
-        r#"{\rtf1{\*\listpicture{\*\shppict{\pict\pngblip 00}}}}"#,
+        r"{\rtf1{\*\listtable{\listpicture}}}",
+        r"{\rtf1{\*\listtable{\*\listpicture1}}}",
+        r"{\rtf1{\*\listtable{\*\listpicture text}}}",
+        r"{\rtf1{\*\listtable{\*\listpicture{\shppict{\pict\pngblip 00}}}}}",
+        r"{\rtf1{\*\listtable{\*\listpicture{\*\shppict1{\pict\pngblip 00}}}}}",
+        r"{\rtf1{\*\listtable{\*\listpicture{\*\shppict}}}}",
+        r"{\rtf1{\*\listtable{\*\listpicture{\*\shppict{\pict}}}}}",
+        r"{\rtf1{\*\listtable{\*\listpicture{\*\shppict{\pict\pngblip 00}{\pict\pngblip 00}}}}}",
+        r"{\rtf1{\*\listtable{\*\listpicture}{\*\listpicture}}}",
+        r"{\rtf1{\*\listpicture{\*\shppict{\pict\pngblip 00}}}}",
     ] {
         assert!(
             RtfDocument::parse(source).is_err(),

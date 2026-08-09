@@ -1,3 +1,8 @@
+#![allow(
+    clippy::print_stdout,
+    reason = "this command-line example intentionally prints its results"
+)]
+
 //! Render a simple in-memory "document" to Markdown using `ToMarkdown`.
 //!
 //! `litchi-markdown` is format-agnostic: it ships the [`ToMarkdown`] trait and
@@ -11,8 +16,6 @@
 //! ```bash
 //! cargo run -p litchi-markdown --example simple_doc
 //! ```
-use std::fmt::Write as _;
-
 use litchi_core::Result;
 use litchi_markdown::{MarkdownOptions, ToMarkdown};
 
@@ -30,13 +33,16 @@ impl ToMarkdown for MyDoc {
         let mut out = String::with_capacity(256);
 
         // H1 title.
-        writeln!(out, "# {}", self.title).unwrap();
-        writeln!(out).unwrap();
+        out.push_str("# ");
+        out.push_str(&self.title);
+        out.push('\n');
+        out.push('\n');
 
         // Paragraphs separated by blank lines.
         for para in &self.paragraphs {
-            writeln!(out, "{para}").unwrap();
-            writeln!(out).unwrap();
+            out.push_str(para);
+            out.push('\n');
+            out.push('\n');
         }
 
         // Markdown table (assumes first row is the header).
@@ -44,7 +50,9 @@ impl ToMarkdown for MyDoc {
             // Header row.
             out.push('|');
             for cell in header {
-                write!(out, " {cell} |").unwrap();
+                out.push(' ');
+                out.push_str(cell);
+                out.push_str(" |");
             }
             out.push('\n');
 
@@ -59,7 +67,9 @@ impl ToMarkdown for MyDoc {
             for row in body {
                 out.push('|');
                 for cell in row {
-                    write!(out, " {cell} |").unwrap();
+                    out.push(' ');
+                    out.push_str(cell);
+                    out.push_str(" |");
                 }
                 out.push('\n');
             }

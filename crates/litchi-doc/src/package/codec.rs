@@ -1,4 +1,6 @@
-use super::model::{Error, Limits, OpenOptions, Package, ResourceKind, ResourceLimit, Result};
+use super::model::{
+    Error, Limits, OpenOptions, Package, PackageOpenOptions, ResourceKind, ResourceLimit, Result,
+};
 use crate::document::Document;
 use litchi_cfb::{OleError, OleFile};
 use litchi_ole_common::property_set::{
@@ -24,13 +26,22 @@ impl Package<File> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Self::open_with_limits(path, Limits::default())
+        Self::open_with(path, PackageOpenOptions::default())
+    }
+
+    /// Open a `.doc` package using explicit package-open options.
+    ///
+    /// This is the ergonomic bounded alternative to [`Self::open`]. It keeps
+    /// the simple default API intact while making the selected limits visible
+    /// at the call site.
+    pub fn open_with<P: AsRef<Path>>(path: P, options: PackageOpenOptions) -> Result<Self> {
+        let file = File::open(path)?;
+        Package::from_reader_with_limits(file, options.limits())
     }
 
     /// Open a `.doc` package with explicit finite read limits.
     pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: Limits) -> Result<Self> {
-        let file = File::open(path)?;
-        Package::from_reader_with_limits(file, limits)
+        Self::open_with(path, PackageOpenOptions::default().with_limits(limits))
     }
 }
 
@@ -127,7 +138,7 @@ impl<R: Read + Seek> Package<R> {
     }
 
     /// Get the main document using explicit password-to-open options.
-    pub fn document_with_options(&mut self, options: OpenOptions<'_>) -> Result<Document> {
+    pub fn document_with_options(&mut self, options: OpenOptions) -> Result<Document> {
         Document::from_ole_with_options(&mut self.ole, options, self.limits)
     }
 
@@ -143,7 +154,7 @@ impl<R: Read + Seek> Package<R> {
     /// Open the document with password/leniency options and explicit limits.
     pub fn document_with_options_and_limits(
         &mut self,
-        options: OpenOptions<'_>,
+        options: OpenOptions,
         limits: Limits,
     ) -> Result<Document> {
         Document::from_ole_with_options(&mut self.ole, options, limits.constrained_by(self.limits))

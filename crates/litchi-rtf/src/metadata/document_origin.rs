@@ -12,6 +12,9 @@ pub enum HtmlEmailVersion {
 }
 
 impl HtmlEmailVersion {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn from_rtf_value(value: i32) -> RtfResult<Self> {
         if value == 1 {
             Ok(Self::Version1)
@@ -21,6 +24,7 @@ impl HtmlEmailVersion {
             ))
         }
     }
+    #[must_use]
     pub fn rtf_value(self) -> i32 {
         1
     }
@@ -35,6 +39,9 @@ pub enum DocumentAutoFormatType {
 }
 
 impl DocumentAutoFormatType {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn from_rtf_value(value: i32) -> RtfResult<Self> {
         match value {
             0 => Ok(Self::General),
@@ -45,6 +52,7 @@ impl DocumentAutoFormatType {
             )),
         }
     }
+    #[must_use]
     pub fn rtf_value(self) -> i32 {
         match self {
             Self::General => 0,
@@ -61,9 +69,11 @@ pub struct DocumentOriginMetadata {
 }
 
 impl DocumentOriginMetadata {
+    #[must_use]
     pub fn effective_auto_format_type(self) -> DocumentAutoFormatType {
         self.auto_format_type.unwrap_or_default()
     }
+    #[must_use]
     pub fn is_empty(self) -> bool {
         self.origin.is_none() && self.auto_format_type.is_none()
     }

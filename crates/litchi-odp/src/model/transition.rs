@@ -162,12 +162,15 @@ pub struct Style(String);
 
 impl Style {
     /// Parse a transition style defined by ODF 1.0 through 1.2.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(value: impl Into<String>) -> Result<Self> {
-        let value = value.into();
-        if TRANSITION_STYLES.contains(&value.as_str()) {
-            Ok(Self(value))
+        let style = value.into();
+        if TRANSITION_STYLES.contains(&style.as_str()) {
+            Ok(Self(style))
         } else {
-            Err(invalid("presentation:transition-style", &value))
+            Err(invalid("presentation:transition-style", &style))
         }
     }
 
@@ -240,6 +243,10 @@ impl Sound {
 
 /// Complete drawing-page transition configuration for a slide.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[allow(
+    clippy::struct_field_names,
+    reason = "the transition_type field mirrors the ODF presentation:transition-type attribute and the public transition_type() accessor"
+)]
 pub struct Transition {
     pub(crate) transition_type: Option<Type>,
     pub(crate) style: Option<Style>,
@@ -338,14 +345,17 @@ impl Transition {
     }
 
     /// Set the SMIL fade color, validating the ODF color grammar.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_fade_color(&mut self, value: Option<impl Into<String>>) -> Result<&mut Self> {
-        let value = value.map(Into::into);
-        if let Some(color) = value.as_deref()
+        let fade_color = value.map(Into::into);
+        if let Some(color) = fade_color.as_deref()
             && !is_color(color)
         {
             return Err(invalid("smil:fadeColor", color));
         }
-        self.fade_color = value;
+        self.fade_color = fade_color;
         Ok(self)
     }
 
@@ -356,14 +366,17 @@ impl Transition {
     }
 
     /// Set the automatic slide duration, validating its complete lexical form.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_duration(&mut self, value: Option<impl Into<String>>) -> Result<&mut Self> {
-        let value = value.map(Into::into);
-        if let Some(duration) = value.as_deref()
-            && !is_xsd_duration(duration)
+        let duration = value.map(Into::into);
+        if let Some(text) = duration.as_deref()
+            && !is_xsd_duration(text)
         {
-            return Err(invalid("presentation:duration", duration));
+            return Err(invalid("presentation:duration", text));
         }
-        self.duration = value;
+        self.duration = duration;
         Ok(self)
     }
 
@@ -489,6 +502,10 @@ fn invalid(attribute: &str, value: &str) -> Error {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

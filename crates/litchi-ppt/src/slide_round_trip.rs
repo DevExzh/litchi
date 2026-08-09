@@ -1,4 +1,4 @@
-//! Inert PowerPoint 12 direct slide round-trip metadata.
+//! Inert `PowerPoint` 12 direct slide round-trip metadata.
 
 use super::package::{Error, Result};
 use super::records::Record;
@@ -19,23 +19,23 @@ const TIMING_INFO_CONTENT_TYPE: &str =
 const TIMING_INFO_RELATIONSHIP_TYPE: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/timingInfo";
 
-/// Validated embedded ECMA-376 package containing PowerPoint 12 animation timing data.
+/// Validated embedded ECMA-376 package containing `PowerPoint` 12 animation timing data.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AnimationPackage {
     /// Original package bytes retained without modification for lossless round trips.
     pub data: Vec<u8>,
     /// Number of parts in the embedded OPC package.
     pub part_count: usize,
-    /// Package part name of the PresentationML Timing Info part.
+    /// Package part name of the `PresentationML` Timing Info part.
     pub timing_part_name: String,
 }
 
-/// Kind of DrawingML theme stored in a PowerPoint 12 round-trip package.
+/// Kind of `DrawingML` theme stored in a `PowerPoint` 12 round-trip package.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ThemeKind {
-    /// Full DrawingML Theme part with a `theme` root element.
+    /// Full `DrawingML` Theme part with a `theme` root element.
     Theme,
-    /// DrawingML Theme Override part with a `themeOverride` root element.
+    /// `DrawingML` Theme Override part with a `themeOverride` root element.
     ThemeOverride,
 }
 
@@ -63,18 +63,18 @@ pub struct EmbeddedXmlPackage {
     pub xml_part_name: String,
 }
 
-/// XML form stored by a PowerPoint 12 color-mapping atom.
+/// XML form stored by a `PowerPoint` 12 color-mapping atom.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColorMappingKind {
-    /// A DrawingML `clrMap` element containing a complete color mapping.
+    /// A `DrawingML` `clrMap` element containing a complete color mapping.
     Direct,
-    /// A PresentationML override that selects the mapping inherited from the master.
+    /// A `PresentationML` override that selects the mapping inherited from the master.
     MasterOverride,
-    /// A PresentationML override containing an explicit complete color mapping.
+    /// A `PresentationML` override containing an explicit complete color mapping.
     ExplicitOverride,
 }
 
-/// A DrawingML color-scheme slot referenced by a color mapping.
+/// A `DrawingML` color-scheme slot referenced by a color mapping.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColorSchemeIndex {
     /// Dark color 1.
@@ -103,7 +103,7 @@ pub enum ColorSchemeIndex {
     FollowedHyperlink,
 }
 
-/// Complete DrawingML mapping from presentation roles to color-scheme slots.
+/// Complete `DrawingML` mapping from presentation roles to color-scheme slots.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ColorMappingValues {
     /// First background role (`bg1`).
@@ -132,7 +132,7 @@ pub struct ColorMappingValues {
     pub followed_hyperlink: ColorSchemeIndex,
 }
 
-/// Validated PowerPoint 12 color-mapping XML.
+/// Validated `PowerPoint` 12 color-mapping XML.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ColorMapping {
     /// Original UTF-8 XML retained without modification for lossless round trips.
@@ -143,7 +143,7 @@ pub struct ColorMapping {
     pub values: Option<ColorMappingValues>,
 }
 
-/// Reference from a slide to its PowerPoint 12 slide layout.
+/// Reference from a slide to its `PowerPoint` 12 slide layout.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ContentMasterReference {
     /// Record-instance bits retained because MS-PPT does not constrain them for this atom.
@@ -156,28 +156,40 @@ pub struct ContentMasterReference {
     pub unused: u16,
 }
 
-/// PowerPoint 12 round-trip metadata stored directly in a slide container.
+/// `PowerPoint` 12 round-trip metadata stored directly in a slide container.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`SlideRoundTripMetadata12` is the established public API name for slide-level `PowerPoint` 12 round-trip metadata; renaming it would break downstream crates"
+)]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SlideRoundTripMetadata12 {
-    /// Validated embedded PowerPoint 12 theme or theme-override package.
+    /// Validated embedded `PowerPoint` 12 theme or theme-override package.
     pub theme_package: Option<ThemePackage>,
-    /// Validated PowerPoint 12 color-mapping XML.
+    /// Validated `PowerPoint` 12 color-mapping XML.
     pub color_mapping: Option<ColorMapping>,
     /// Identifier of the main master merged into this slide layout.
     pub composite_master_id: Option<u32>,
     /// Reference from this slide to its main master and slide layout.
     pub content_master: Option<ContentMasterReference>,
-    /// Validated embedded PowerPoint 12 animation package.
+    /// Validated embedded `PowerPoint` 12 animation package.
     pub animation_package: Option<AnimationPackage>,
     /// Checksum stored for the animation data.
     pub animation_checksum: Option<u32>,
 }
 
 impl SlideRoundTripMetadata12 {
-    /// Parse direct PowerPoint 12 round-trip records below `root`.
+    /// Parse direct `PowerPoint` 12 round-trip records below `root`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(root: &Record) -> Result<Self> {
         let mut metadata = Self::default();
         for record in &root.children {
+            #[allow(
+                clippy::wildcard_enum_match_arm,
+                reason = "`RecordType` mirrors the full MS-PPT record-type enumeration; records other than the six round-trip atoms are intentionally ignored"
+            )]
             match record.record_type {
                 RecordType::RoundTripTheme12Atom => {
                     if metadata.theme_package.is_some() {
@@ -288,10 +300,10 @@ pub(crate) fn parse_embedded_xml_package(
             "{record_name} contains an invalid ECMA-376 package: {error}"
         ))
     })?;
-    let mut xml_part_name = None;
+    let mut found_part_name = None;
     for part in package.iter_parts() {
         if part.content_type() == expected_content_type {
-            if xml_part_name.is_some() {
+            if found_part_name.is_some() {
                 return Err(Error::Corrupted(format!(
                     "{record_name} package has multiple expected XML parts"
                 )));
@@ -307,7 +319,7 @@ pub(crate) fn parse_embedded_xml_package(
                     part.partname()
                 )));
             }
-            xml_part_name = Some(part.partname().to_string());
+            found_part_name = Some(part.partname().to_string());
         } else if is_xml_content_type(part.content_type()) {
             validate_xml_with(part.blob(), |_, _, _, _| Ok(())).map_err(|error| {
                 Error::Corrupted(format!(
@@ -317,7 +329,7 @@ pub(crate) fn parse_embedded_xml_package(
             })?;
         }
     }
-    let xml_part_name = xml_part_name.ok_or_else(|| {
+    let xml_part_name = found_part_name.ok_or_else(|| {
         Error::Corrupted(format!("{record_name} package has no expected XML part"))
     })?;
     Ok(EmbeddedXmlPackage {
@@ -424,8 +436,8 @@ pub(crate) fn parse_color_mapping(data: &[u8]) -> Result<ColorMapping> {
                 } else {
                     None
                 };
-            if let Some(candidate) = candidate
-                && result.replace(candidate).is_some()
+            if let Some(choice) = candidate
+                && result.replace(choice).is_some()
             {
                 return Err("clrMapOvr contains multiple color-mapping choices".to_string());
             }
@@ -459,8 +471,8 @@ fn parse_color_mapping_values(
     decoder: Decoder,
 ) -> std::result::Result<ColorMappingValues, String> {
     let mut values = [None; 12];
-    for attribute in element.attributes().with_checks(true) {
-        let attribute = attribute.map_err(|error| error.to_string())?;
+    for attribute_result in element.attributes().with_checks(true) {
+        let attribute = attribute_result.map_err(|error| error.to_string())?;
         let index = match attribute.key.as_ref() {
             b"bg1" => 0,
             b"tx1" => 1,
@@ -486,30 +498,44 @@ fn parse_color_mapping_values(
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
             .map_err(|error| error.to_string())?;
-        let value = parse_color_scheme_index(&value)?;
-        if values[index].replace(value).is_some() {
+        let scheme_index = parse_color_scheme_index(&value)?;
+        if values[index].replace(scheme_index).is_some() {
             return Err(format!(
                 "color mapping has duplicate attribute {}",
                 String::from_utf8_lossy(attribute.key.as_ref())
             ));
         }
     }
-    if values.iter().any(Option::is_none) {
+    let [
+        Some(background1),
+        Some(text1),
+        Some(background2),
+        Some(text2),
+        Some(accent1),
+        Some(accent2),
+        Some(accent3),
+        Some(accent4),
+        Some(accent5),
+        Some(accent6),
+        Some(hyperlink),
+        Some(followed_hyperlink),
+    ] = values
+    else {
         return Err("color mapping does not define all 12 required roles".to_string());
-    }
+    };
     Ok(ColorMappingValues {
-        background1: values[0].unwrap(),
-        text1: values[1].unwrap(),
-        background2: values[2].unwrap(),
-        text2: values[3].unwrap(),
-        accent1: values[4].unwrap(),
-        accent2: values[5].unwrap(),
-        accent3: values[6].unwrap(),
-        accent4: values[7].unwrap(),
-        accent5: values[8].unwrap(),
-        accent6: values[9].unwrap(),
-        hyperlink: values[10].unwrap(),
-        followed_hyperlink: values[11].unwrap(),
+        background1,
+        text1,
+        background2,
+        text2,
+        accent1,
+        accent2,
+        accent3,
+        accent4,
+        accent5,
+        accent6,
+        hyperlink,
+        followed_hyperlink,
     })
 }
 
@@ -701,7 +727,13 @@ fn validate_xml_with(
                 return Err("XML document does not have exactly one root element".to_string());
             },
             Event::Eof => return Ok(()),
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }
@@ -738,6 +770,11 @@ fn validate_atom(
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use litchi_opc::constants::relationship_type;
@@ -752,7 +789,7 @@ mod tests {
             instance,
             record_type,
             record_type_raw: record_type.as_u16(),
-            data_length: data.len() as u32,
+            data_length: u32::try_from(data.len()).unwrap(),
             data: data.to_vec(),
             children: Vec::new(),
         }
@@ -849,15 +886,15 @@ mod tests {
             0,
             &u32::MAX.to_le_bytes(),
         );
-        let mut content = Vec::new();
-        content.extend_from_slice(&0u32.to_le_bytes());
-        content.extend_from_slice(&u16::MAX.to_le_bytes());
-        content.extend_from_slice(&0xa55au16.to_le_bytes());
+        let mut content_payload = Vec::new();
+        content_payload.extend_from_slice(&0u32.to_le_bytes());
+        content_payload.extend_from_slice(&u16::MAX.to_le_bytes());
+        content_payload.extend_from_slice(&0xa55au16.to_le_bytes());
         let content = record(
             RecordType::RoundTripContentMasterId12Atom,
             0,
             0x0fff,
-            &content,
+            &content_payload,
         );
 
         let parsed = SlideRoundTripMetadata12::parse(&root(vec![composite, content])).unwrap();
@@ -959,17 +996,20 @@ mod tests {
             ThemeKind::ThemeOverride,
             br#"<a:themeOverride xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/>"#,
         );
-        let parsed = SlideRoundTripMetadata12::parse(&root(vec![record(
+        let override_parsed = SlideRoundTripMetadata12::parse(&root(vec![record(
             RecordType::RoundTripTheme12Atom,
             0,
             0,
             &override_data,
         )]))
         .unwrap();
-        assert_eq!(parsed.theme_package.unwrap().kind, ThemeKind::ThemeOverride);
+        assert_eq!(
+            override_parsed.theme_package.unwrap().kind,
+            ThemeKind::ThemeOverride
+        );
 
         let master_override = br#"<p:clrMapOvr xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:masterClrMapping/></p:clrMapOvr>"#;
-        let parsed = SlideRoundTripMetadata12::parse(&root(vec![record(
+        let master_override_mapping = SlideRoundTripMetadata12::parse(&root(vec![record(
             RecordType::RoundTripColorMapping12Atom,
             0,
             0,
@@ -978,13 +1018,16 @@ mod tests {
         .unwrap()
         .color_mapping
         .unwrap();
-        assert_eq!(parsed.kind, ColorMappingKind::MasterOverride);
-        assert_eq!(parsed.values, None);
+        assert_eq!(
+            master_override_mapping.kind,
+            ColorMappingKind::MasterOverride
+        );
+        assert_eq!(master_override_mapping.values, None);
 
         let explicit_override = format!(
             r#"<p:clrMapOvr xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:overrideClrMapping {COLOR_MAPPING_ATTRIBUTES}/></p:clrMapOvr>"#
         );
-        let parsed = SlideRoundTripMetadata12::parse(&root(vec![record(
+        let explicit_override_mapping = SlideRoundTripMetadata12::parse(&root(vec![record(
             RecordType::RoundTripColorMapping12Atom,
             0,
             0,
@@ -993,8 +1036,11 @@ mod tests {
         .unwrap()
         .color_mapping
         .unwrap();
-        assert_eq!(parsed.kind, ColorMappingKind::ExplicitOverride);
-        assert!(parsed.values.is_some());
+        assert_eq!(
+            explicit_override_mapping.kind,
+            ColorMappingKind::ExplicitOverride
+        );
+        assert!(explicit_override_mapping.values.is_some());
     }
 
     #[test]

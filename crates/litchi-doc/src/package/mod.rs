@@ -7,7 +7,7 @@ pub mod property_set;
 mod tests;
 
 pub use model::{
-    EncryptionKind, Error, Limits, LimitsError, OpenOptions, Package, ResourceKind, ResourceLimit,
-    Result,
+    EncryptionKind, Error, Limits, LimitsError, OpenOptions, Package, PackageOpenOptions, Password,
+    ResourceKind, ResourceLimit, Result,
 };
 pub use property_set::{Commit, Patch, Snapshot, Transaction};

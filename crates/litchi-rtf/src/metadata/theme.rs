@@ -13,6 +13,9 @@ pub struct DocumentTheme<'a> {
 }
 
 impl<'a> DocumentTheme<'a> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(
         data: Cow<'a, [u8]>,
         color_scheme_mapping: Option<Cow<'a, [u8]>>,

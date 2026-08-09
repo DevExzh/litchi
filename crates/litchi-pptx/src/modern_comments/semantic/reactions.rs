@@ -30,6 +30,9 @@ pub struct Instance {
 }
 
 impl Instance {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn validate(&self) -> Result<()> {
         date_time(&self.time)?;
         if !valid_guid(&self.author_id) {
@@ -38,10 +41,10 @@ impl Instance {
                 self.author_id
             )));
         }
-        if let Some(value) = &self.extension_xml {
-            if value.xml.len() > super::super::MAX_BYTES {
-                return Err(invalid("reaction instance extension is too large"));
-            }
+        if let Some(value) = &self.extension_xml
+            && value.xml.len() > super::super::MAX_BYTES
+        {
+            return Err(invalid("reaction instance extension is too large"));
         }
         Ok(())
     }
@@ -56,6 +59,9 @@ pub struct Reaction {
 }
 
 impl Reaction {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn validate(&self) -> Result<()> {
         if self.reaction_type.is_empty()
             || self.reaction_type.len() > super::super::MAX_STRING_BYTES
@@ -80,6 +86,9 @@ pub struct List {
 }
 
 impl List {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn validate(&self) -> Result<()> {
         if self.reactions.len() > MAX_REACTIONS {
             return Err(invalid("reactions exceed implementation limit"));

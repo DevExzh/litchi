@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::*;
 use crate::consts::RecordType;
 use crate::records::Record;
@@ -14,7 +20,7 @@ fn record(
         record_type_raw: record_type.as_u16(),
         version,
         instance,
-        data_length: data.len() as u32,
+        data_length: u32::try_from(data.len()).unwrap(),
         data,
         children,
     }
@@ -51,7 +57,7 @@ fn unknown(raw: u16, data: &[u8]) -> Record {
         record_type_raw: raw,
         version: 0,
         instance: 7,
-        data_length: data.len() as u32,
+        data_length: u32::try_from(data.len()).unwrap(),
         data: data.to_vec(),
         children: Vec::new(),
     }

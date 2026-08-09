@@ -64,6 +64,9 @@ impl Presentation {
     }
 
     /// Open a password-encrypted ODP presentation.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn open_with_password<P: AsRef<Path>>(
         path: P,
         password: impl Into<String>,
@@ -107,10 +110,13 @@ impl Presentation {
     /// Adopt an already validated archive without copying its package bytes.
     pub(crate) fn from_owned_package(package: OwnedPackage) -> Result<Self> {
         Package::from_owned_package(package, ODF_PRESENTATION, BODY_MARKER, "ODP")
-            .map(|package| Self { package })
+            .map(|validated| Self { package: validated })
     }
 
     /// Create a presentation from password-encrypted ODP bytes.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
         Package::from_bytes_with_password(bytes, password, ODF_PRESENTATION, BODY_MARKER, "ODP")
             .map(|package| Self { package })
@@ -120,6 +126,9 @@ impl Presentation {
     ///
     /// This is used for single-pass parsing where the ZIP archive has already
     /// been validated during format detection. It avoids double-parsing.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn from_archive_bytes(bytes: Vec<u8>) -> Result<Self> {
         Self::from_bytes(bytes)
     }
@@ -131,11 +140,17 @@ impl Presentation {
     }
 
     /// Discover embedded charts in presentation drawing order.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn charts(&self) -> Result<crate::charts::Inventory<'_>> {
         self.charts_with(crate::charts::Limits::default())
     }
 
     /// Discover embedded charts with an explicit resource budget.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn charts_with(
         &self,
         limits: crate::charts::Limits,
@@ -144,11 +159,16 @@ impl Presentation {
     }
 
     /// Select one embedded chart by exact frame name or checked position.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn chart<'a, S>(&self, selector: S) -> Result<Option<crate::charts::Chart>>
     where
         S: Into<crate::charts::Selector<'a>>,
     {
-        self.charts()?.get(selector).map(|chart| chart.cloned())
+        self.charts()?
+            .get(selector)
+            .map(Option::<&crate::charts::Chart>::cloned)
     }
 
     /// Borrow the optional validated `styles.xml` snapshot without reparsing it.
@@ -164,6 +184,9 @@ impl Presentation {
     }
 
     /// Get the number of slides in the presentation.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn slide_count(&self) -> Result<usize> {
         let slides = self.slides()?;
         Ok(slides.len())
@@ -172,21 +195,33 @@ impl Presentation {
     /// Get all slides in the presentation.
     ///
     /// Returns a vector of `Slide` objects representing all slides in the document.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn slides(&self) -> Result<Vec<Slide>> {
         Parser::parse_slides_with_styles(self.package.content_xml(), self.package.styles_xml())
     }
 
     /// Inspect inert slide-show settings and ordered custom shows.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn settings(&self) -> Result<Option<Settings>> {
         settings::parse(self.package.content_xml())
     }
 
     /// Inspect inert header, footer, date-time, and page-binding declarations.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn declarations(&self) -> Result<declaration::Collection> {
         declaration::parse(self.package.content_xml())
     }
 
     /// Inspect static page names, IDs, and layout/master references.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn pages(&self) -> Result<page_metadata::Collection> {
         page_metadata::parse(self.package.content_xml())
     }
@@ -195,16 +230,25 @@ impl Presentation {
     ///
     /// Rich annotation bodies are shared with the other ODF family crates;
     /// this facade adds only the presentation-specific page/shape anchor.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn annotations(&self) -> Result<Vec<crate::annotation::Info>> {
         crate::annotation::annotations(self.package.content_xml())
     }
 
     /// Find a uniquely named slide or shape annotation.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn find_annotation(&self, name: &str) -> Result<Option<crate::annotation::Info>> {
         crate::annotation::find(self.package.content_xml(), name)
     }
 
     /// Add an annotation to a page or uniquely named shape atomically.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn add_annotation(
         &mut self,
         anchor: &crate::annotation::Anchor,
@@ -222,6 +266,9 @@ impl Presentation {
     }
 
     /// Replace one annotation body while retaining its existing anchor.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn replace_annotation(
         &mut self,
         index: usize,
@@ -239,6 +286,9 @@ impl Presentation {
     }
 
     /// Remove one annotation atomically.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn remove_annotation(&mut self, index: usize) -> Result<()> {
         let bytes =
             crate::annotation::remove(self.package.package(), self.package.content_xml(), index)?;
@@ -248,6 +298,9 @@ impl Presentation {
     }
 
     /// Inspect named presentation page layouts and their typed placeholders.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn layouts(&self) -> Result<page_layout::Collection> {
         match self.package.styles_xml() {
             Some(styles) => page_layout::parse(styles),
@@ -256,61 +309,79 @@ impl Presentation {
     }
 
     /// Inspect named drawing fill-image resources without resolving style use sites.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn drawing_fill_images(
         &self,
     ) -> Result<litchi_odf_common::drawing::resources::fill_image::Collection> {
         self.package.styles_xml().map_or_else(
-            || Ok(Default::default()),
+            || Ok(litchi_odf_common::drawing::resources::fill_image::Collection::default()),
             litchi_odf_common::drawing::resources::fill_image::parse_drawing_fill_images,
         )
     }
 
     /// Inspect named legacy and SVG drawing gradients without resolving style use sites.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn drawing_gradients(
         &self,
     ) -> Result<litchi_odf_common::drawing::resources::gradient::Collection> {
         self.package.styles_xml().map_or_else(
-            || Ok(Default::default()),
+            || Ok(litchi_odf_common::drawing::resources::gradient::Collection::default()),
             litchi_odf_common::drawing::resources::gradient::parse_drawing_gradients,
         )
     }
 
     /// Inspect named drawing hatch resources without resolving style use sites.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn drawing_hatches(
         &self,
     ) -> Result<litchi_odf_common::drawing::resources::hatch::Collection> {
         self.package.styles_xml().map_or_else(
-            || Ok(Default::default()),
+            || Ok(litchi_odf_common::drawing::resources::hatch::Collection::default()),
             litchi_odf_common::drawing::resources::hatch::parse_drawing_hatches,
         )
     }
 
     /// Inspect named drawing marker resources without resolving style use sites.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn drawing_markers(
         &self,
     ) -> Result<litchi_odf_common::drawing::resources::marker::Collection> {
         self.package.styles_xml().map_or_else(
-            || Ok(Default::default()),
+            || Ok(litchi_odf_common::drawing::resources::marker::Collection::default()),
             litchi_odf_common::drawing::resources::marker::parse_drawing_markers,
         )
     }
 
     /// Inspect named drawing opacity resources without resolving style use sites.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn drawing_opacities(
         &self,
     ) -> Result<litchi_odf_common::drawing::resources::opacity::Collection> {
         self.package.styles_xml().map_or_else(
-            || Ok(Default::default()),
+            || Ok(litchi_odf_common::drawing::resources::opacity::Collection::default()),
             litchi_odf_common::drawing::resources::opacity::parse_drawing_opacities,
         )
     }
 
     /// Inspect named drawing stroke-dash resources without resolving style use sites.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn drawing_stroke_dashes(
         &self,
     ) -> Result<litchi_odf_common::drawing::resources::stroke_dash::Collection> {
         self.package.styles_xml().map_or_else(
-            || Ok(Default::default()),
+            || Ok(litchi_odf_common::drawing::resources::stroke_dash::Collection::default()),
             litchi_odf_common::drawing::resources::stroke_dash::parse_drawing_stroke_dashes,
         )
     }
@@ -322,6 +393,9 @@ impl Presentation {
     /// # Arguments
     ///
     /// * `index` - 0-based index of the slide
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn slide(&self, index: usize) -> Result<Option<Slide>> {
         let slides = self.slides()?;
         Ok(slides.into_iter().nth(index))
@@ -331,6 +405,9 @@ impl Presentation {
     ///
     /// Returns `None` for external links, fragment links, unsafe paths, and
     /// package-relative references whose payload is absent.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn media_data(&self, media: &Reference) -> Result<Option<Vec<u8>>> {
         let Some(path) = media.package_path() else {
             return Ok(None);
@@ -345,6 +422,9 @@ impl Presentation {
     /// Extract all text content from the presentation.
     ///
     /// Returns text from all slides, separated by double newlines.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn text(&self) -> Result<String> {
         let slides = self.slides()?;
         let mut all_text = Vec::new();
@@ -362,16 +442,25 @@ impl Presentation {
     /// Get document metadata.
     ///
     /// Extracts metadata from the meta.xml file.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn metadata(&self) -> Result<Metadata> {
         Ok(self.package.metadata().cloned().unwrap_or_default())
     }
 
     /// Read all inert RDF metadata graphs in package order.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn rdf_graphs(&self) -> Result<Vec<crate::rdf::Graph>> {
         crate::rdf::graphs(self.package.package())
     }
 
     /// Add a graph and atomically replace this snapshot with the rebuilt package.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn add_rdf_graph(
         &mut self,
         preferred_path: Option<&str>,
@@ -383,6 +472,9 @@ impl Presentation {
     }
 
     /// Replace one complete RDF graph and atomically publish the result.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn replace_rdf_graph(&mut self, path: &str, triples: &[crate::rdf::Triple]) -> Result<()> {
         let bytes = crate::rdf::replace_graph(self.package.package(), path, triples)?;
         *self = Self::from_bytes(bytes)?;
@@ -390,6 +482,9 @@ impl Presentation {
     }
 
     /// Remove one RDF graph after validating that no remaining graph references it.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn remove_rdf_graph(&mut self, path: &str) -> Result<()> {
         let bytes = crate::rdf::remove_graph(self.package.package(), path)?;
         *self = Self::from_bytes(bytes)?;
@@ -397,6 +492,9 @@ impl Presentation {
     }
 
     /// Append one triple to an existing graph and return its committed index.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn add_rdf_triple(&mut self, path: &str, triple: &crate::rdf::Triple) -> Result<usize> {
         let index = self
             .rdf_graphs()?
@@ -411,6 +509,9 @@ impl Presentation {
     }
 
     /// Replace one triple while preserving its description subject.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn replace_rdf_triple(
         &mut self,
         path: &str,
@@ -423,6 +524,9 @@ impl Presentation {
     }
 
     /// Remove one triple from a graph.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn remove_rdf_triple(&mut self, path: &str, index: usize) -> Result<()> {
         let bytes = crate::rdf::remove_triple(self.package.package(), path, index)?;
         *self = Self::from_bytes(bytes)?;
@@ -430,6 +534,9 @@ impl Presentation {
     }
 
     /// Move one triple within its RDF description.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn move_rdf_triple(&mut self, path: &str, from: usize, to: usize) -> Result<()> {
         let bytes = crate::rdf::move_triple(self.package.package(), path, from, to)?;
         *self = Self::from_bytes(bytes)?;
@@ -473,6 +580,9 @@ impl Presentation {
     ///
     /// Use [`Self::snapshot`] for source-checked edits, or [`crate::Builder`]
     /// for detached construction.
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let bytes = self.to_bytes()?;
         std::fs::write(path, bytes)?;
@@ -494,6 +604,9 @@ impl Presentation {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         Ok(self.package.as_bytes().to_vec())
     }

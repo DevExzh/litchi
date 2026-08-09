@@ -4,6 +4,9 @@ use super::xml::push_optional_attribute;
 use crate::Slide;
 use litchi_core::xml::escape_xml;
 
+pub(crate) const DEFAULT_DRAWING_PAGE_STYLE_NAME: &str = "dp1";
+pub(crate) const DEFAULT_DRAWING_PAGE_STYLE: &str = r#"<style:style style:name="dp1" style:family="drawing-page"><style:drawing-page-properties/></style:style>"#;
+
 pub(crate) fn slide_style_name(slide: &Slide, index: usize) -> String {
     if slide
         .transition
@@ -15,9 +18,6 @@ pub(crate) fn slide_style_name(slide: &Slide, index: usize) -> String {
         DEFAULT_DRAWING_PAGE_STYLE_NAME.to_string()
     }
 }
-
-pub(crate) const DEFAULT_DRAWING_PAGE_STYLE_NAME: &str = "dp1";
-pub(crate) const DEFAULT_DRAWING_PAGE_STYLE: &str = r#"<style:style style:name="dp1" style:family="drawing-page"><style:drawing-page-properties/></style:style>"#;
 
 pub(crate) fn generate_transition_styles(slides: &[Slide]) -> String {
     let mut output = String::from(DEFAULT_DRAWING_PAGE_STYLE);
@@ -38,17 +38,24 @@ pub(crate) fn push_transition_style(target: &mut String, slide: &Slide, index: u
     push_optional_attribute(
         &mut output,
         "presentation:transition-type",
-        transition.transition_type.map(|value| value.as_str()),
+        transition
+            .transition_type
+            .map(crate::model::transition::Type::as_str),
     );
     push_optional_attribute(
         &mut output,
         "presentation:transition-style",
-        transition.style.as_ref().map(|value| value.as_str()),
+        transition
+            .style
+            .as_ref()
+            .map(crate::model::transition::Style::as_str),
     );
     push_optional_attribute(
         &mut output,
         "presentation:transition-speed",
-        transition.speed.map(|value| value.as_str()),
+        transition
+            .speed
+            .map(crate::model::transition::Speed::as_str),
     );
     push_optional_attribute(&mut output, "smil:type", transition.smil_type.as_deref());
     push_optional_attribute(
@@ -59,7 +66,9 @@ pub(crate) fn push_transition_style(target: &mut String, slide: &Slide, index: u
     push_optional_attribute(
         &mut output,
         "smil:direction",
-        transition.direction.map(|value| value.as_str()),
+        transition
+            .direction
+            .map(crate::model::transition::Direction::as_str),
     );
     push_optional_attribute(
         &mut output,
@@ -82,7 +91,7 @@ pub(crate) fn push_transition_style(target: &mut String, slide: &Slide, index: u
         push_optional_attribute(
             &mut output,
             "xlink:show",
-            sound.show.map(|value| value.as_str()),
+            sound.show.map(crate::model::transition::SoundShow::as_str),
         );
         push_optional_attribute(&mut output, "xml:id", sound.xml_id.as_deref());
         push_optional_attribute(

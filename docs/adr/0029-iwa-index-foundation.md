@@ -1,7 +1,14 @@
-# ADR 0023: Archive-free IWA object-index foundation
+# ADR 0029: Archive-free IWA object-index foundation
 
 - Status: Accepted
 - Date: 2026-08-06
+
+## Historical identifier
+
+This record is canonically ADR 0029.  It was temporarily numbered ADR 0023
+during migration, before that duplicate was corrected.  Historical links or
+review notes using "ADR 0023" for the IWA object-index decision should be
+read as references to this file; ADR 0023 remains the ODF family split record.
 
 ## Context
 

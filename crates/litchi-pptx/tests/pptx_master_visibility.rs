@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_pptx::Package;
 use quick_xml::Reader;
@@ -56,14 +62,8 @@ fn omitted_master_visibility_flags_default_to_true() {
         root_bool(layout.part().part().blob(), "showMasterPhAnim"),
         None
     );
-    assert_eq!(
-        root_bool(slide.part().part().blob(), "showMasterSp").unwrap_or(true),
-        true
-    );
-    assert_eq!(
-        root_bool(layout.part().part().blob(), "showMasterPhAnim").unwrap_or(true),
-        true
-    );
+    assert!(root_bool(slide.part().part().blob(), "showMasterSp").unwrap_or(true));
+    assert!(root_bool(layout.part().part().blob(), "showMasterPhAnim").unwrap_or(true));
 }
 
 fn package_with_visibility(slide_xml: &[u8], layout_xml: &[u8]) -> Package {

@@ -8,4 +8,4 @@ mod model;
 mod package;
 
 pub use facade::{Builder, Database};
-pub use model::{connection, query};
+pub use model::{Catalog, Column, Limits, OwnedCatalog, Table, TableKind, connection, query};

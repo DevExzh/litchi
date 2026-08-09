@@ -13,6 +13,10 @@ use super::validation;
 
 /// Parse a master inventory from a parsed Document record and a persist object
 /// catalog.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse<'a>(
     document: &'a Record,
     objects: &Objects<'a>,
@@ -83,6 +87,12 @@ pub fn parse<'a>(
                 identity.persist().id()
             ))
         })?;
+        #[allow(
+            clippy::wildcard_enum_match_arm,
+            reason = "`RecordType` mirrors the full MS-PPT record-type enumeration; only \
+                      MainMaster and Slide are valid master persist targets and every other \
+                      record type is rejected uniformly"
+        )]
         let kind = match source.record_type {
             RecordType::MainMaster => super::model::Kind::Main,
             RecordType::Slide => super::model::Kind::Title,
@@ -181,9 +191,13 @@ pub fn parse<'a>(
 /// Discover the Document record from the existing Presentation parser and
 /// validate all persist references against its current mapping.
 ///
-/// Parsed persist objects are supplied explicitly because RecordParser exposes
+/// Parsed persist objects are supplied explicitly because `RecordParser` exposes
 /// references but not physical stream offsets. This keeps the owner zero-copy
 /// and lets encrypted/live presentations use the same source contract.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_presentation<'a>(
     presentation: &'a Presentation,
     objects: &Objects<'a>,
@@ -218,7 +232,7 @@ fn validate_children_cover(record: &Record) -> Result<()> {
     Ok(())
 }
 
-fn unknown_document_children<'a>(record: &'a Record) -> Vec<Unknown<'a>> {
+fn unknown_document_children(record: &Record) -> Vec<Unknown<'_>> {
     record
         .children
         .iter()
@@ -231,7 +245,7 @@ fn unknown_document_children<'a>(record: &'a Record) -> Vec<Unknown<'a>> {
         .collect()
 }
 
-fn unknown_children<'a>(record: &'a Record, scope: Scope) -> Vec<Unknown<'a>> {
+fn unknown_children(record: &Record, scope: Scope) -> Vec<Unknown<'_>> {
     record
         .children
         .iter()

@@ -1,4 +1,4 @@
-//! Strict payload codec for PowerPoint 2020 Designer metadata.
+//! Strict payload codec for `PowerPoint` 2020 Designer metadata.
 
 use std::ops::Range;
 
@@ -285,7 +285,7 @@ fn parse(xml: &[u8], limits: Limits, proven_prefix: Option<&[u8]>, root: Root) -
                 }
             },
             Event::Text(text) => {
-                let opaque = frames.iter().any(|frame| *frame == Frame::Opaque);
+                let opaque = frames.contains(&Frame::Opaque);
                 if !opaque && !text.decode().map_err(xml_error)?.trim().is_empty() {
                     return Err(invalid("Designer payload contains non-whitespace text"));
                 }
@@ -294,7 +294,7 @@ fn parse(xml: &[u8], limits: Limits, proven_prefix: Option<&[u8]>, root: Root) -
                 if frames
                     .iter()
                     .any(|frame| matches!(frame, Frame::InnerExtensions | Frame::Opaque)) => {},
-            Event::CData(_) if frames.iter().any(|frame| *frame == Frame::Opaque) => {},
+            Event::CData(_) if frames.contains(&Frame::Opaque) => {},
             Event::Eof => break,
             Event::Decl(_) if frames.is_empty() && !root_closed => {},
             Event::CData(_)
@@ -452,7 +452,7 @@ fn parse_bool(value: &str) -> Result<bool> {
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("Designer XML offset does not fit usize"))
+        .map_err(|_err| invalid("Designer XML offset does not fit usize"))
 }
 
 struct Output {
@@ -523,6 +523,11 @@ fn xml_error(error: impl std::fmt::Display) -> Error {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

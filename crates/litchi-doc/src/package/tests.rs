@@ -33,19 +33,14 @@ fn opens_apache_poi_binary_rc4_document() {
 
     let mut package = Package::open(&path).unwrap();
     assert!(matches!(
-        package.document_with_options(OpenOptions {
-            password: Some("wrong"),
-            ..Default::default()
-        }),
+        package
+            .document_with_options(OpenOptions::default().with_password("wrong".to_owned().into())),
         Err(Error::InvalidPassword)
     ));
 
     let mut package = Package::open(path).unwrap();
     let document = package
-        .document_with_options(OpenOptions {
-            password: Some("tika"),
-            ..Default::default()
-        })
+        .document_with_options(OpenOptions::default().with_password("tika".to_owned().into()))
         .unwrap();
     assert!(!document.text().unwrap().trim().is_empty());
 }
@@ -59,19 +54,14 @@ fn opens_apache_poi_cryptoapi_document() {
 
     let mut package = Package::open(&path).unwrap();
     assert!(matches!(
-        package.document_with_options(OpenOptions {
-            password: Some("wrong"),
-            ..Default::default()
-        }),
+        package
+            .document_with_options(OpenOptions::default().with_password("wrong".to_owned().into())),
         Err(Error::InvalidPassword)
     ));
 
     let mut package = Package::open(path).unwrap();
     let document = package
-        .document_with_options(OpenOptions {
-            password: Some("password"),
-            ..Default::default()
-        })
+        .document_with_options(OpenOptions::default().with_password("password".to_owned().into()))
         .unwrap();
     assert!(!document.text().unwrap().trim().is_empty());
 }

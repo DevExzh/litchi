@@ -4,7 +4,7 @@
 /// Some variants may not be actively used by the parser yet but are included
 /// for completeness and future extensibility.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ControlWord<'a> {
+pub(crate) enum ControlWord<'a> {
     // Document structure
     Rtf(i32),
     Ansi,

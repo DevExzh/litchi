@@ -21,12 +21,14 @@ pub struct SlideReference {
 impl SlideReference {
     /// The stable `p:sldId@id` value.
     #[inline]
+    #[must_use]
     pub fn id(&self) -> u32 {
         self.id
     }
 
     /// The relationship ID used by the presentation part.
     #[inline]
+    #[must_use]
     pub fn relationship_id(&self) -> &str {
         &self.relationship_id
     }
@@ -39,13 +41,21 @@ pub struct PresentationPart<'a> {
 }
 
 impl<'a> PresentationPart<'a> {
-    /// Wrap the package main document after validating its PresentationML type.
+    /// Wrap the package main document after validating its `PresentationML` type.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_package(package: &'a OpcPackage) -> Result<Self> {
         let part = package.main_document_part()?;
         Self::from_part(part)
     }
 
     /// Wrap an already resolved main part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
         if !expected_main_content_type(part.content_type()) {
             return Err(Error::ContentType {
@@ -88,12 +98,21 @@ impl<'a> PresentationPart<'a> {
     }
 
     /// The underlying OPC part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     #[inline]
+    #[must_use]
     pub fn part(&self) -> &'a dyn Part {
         self.part
     }
 
     /// Read the ordered slide references without hydrating slide parts.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn slide_references(&self) -> Result<Vec<SlideReference>> {
         let xml = processed_xml(self.part)?;
         let mut reader = NsReader::from_reader(xml.as_ref());
@@ -135,6 +154,10 @@ impl<'a> PresentationPart<'a> {
     }
 
     /// Read the ordered relationship IDs declared by `p:sldMasterIdLst`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn slide_master_references(&self) -> Result<Vec<String>> {
         let xml = processed_xml(self.part)?;
         let mut reader = NsReader::from_reader(xml.as_ref());
@@ -162,6 +185,10 @@ impl<'a> PresentationPart<'a> {
     }
 
     /// Return the presentation slide size in EMUs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn slide_size(&self) -> Result<(i64, i64)> {
         let xml = processed_xml(self.part)?;
         let mut reader = NsReader::from_reader(xml.as_ref());
@@ -195,6 +222,11 @@ impl<'a> PresentationPart<'a> {
     }
 
     /// Return relationship IDs for the presentation's slide masters.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    #[must_use]
     pub fn slide_master_relationships(&self) -> Vec<String> {
         self.part
             .rels()
@@ -207,6 +239,10 @@ impl<'a> PresentationPart<'a> {
     }
 
     /// Validate that a related part has the expected content type.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn validate_related_part(&self, part: &dyn Part, expected: &str) -> Result<()> {
         validate_content_type(part, expected)
     }

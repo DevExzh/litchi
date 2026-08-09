@@ -1,4 +1,4 @@
-//! OPC graph ownership for inert PresentationML content parts.
+//! OPC graph ownership for inert `PresentationML` content parts.
 
 use super::codec::scan_slide;
 use super::model::{ContentPart, Payload, Relationship, RelationshipMetadata, Target};
@@ -41,6 +41,7 @@ impl Limits {
     };
 
     /// Construct a nonzero finite policy.
+    #[must_use]
     pub const fn new(
         content_parts: usize,
         payload_bytes: usize,
@@ -96,12 +97,16 @@ impl Default for Limits {
     }
 }
 
-/// Load every active `p:contentPart` anchor from one PresentationML slide.
+/// Load every active `p:contentPart` anchor from one `PresentationML` slide.
 ///
 /// The `r:id` on each anchor is checked against the owning slide's actual
 /// relationship collection. Internal targets are copied as opaque bytes and
 /// external targets are retained as URI metadata only; neither target kind is
 /// interpreted, opened, rendered, or executed.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load_slide(
     package: &OpcPackage,
     slide_index: usize,
@@ -183,6 +188,10 @@ pub fn load_slide(
 }
 
 /// Capture a source-checked snapshot of one slide-owned content-part graph.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load_snapshot(
     package: &OpcPackage,
     slide_index: usize,
@@ -202,6 +211,10 @@ pub fn load_snapshot(
 }
 
 /// Apply a source-checked content-part patch atomically to its owning package.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
     let before = patch.before();
     let slide = package.get_part(&before.slide_part_name)?;
@@ -233,6 +246,10 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
 }
 
 /// Apply a committed content-part transaction atomically.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 #[inline]
 pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
     apply_patch(package, commit.patch())
@@ -340,8 +357,7 @@ fn has_inbound_relationship(package: &OpcPackage, target: &PackURI) -> Result<bo
             if !relationship.is_external()
                 && relationship
                     .target_partname()
-                    .map(|value| value.is_equivalent_to(target))
-                    .unwrap_or(false)
+                    .is_ok_and(|value| value.is_equivalent_to(target))
             {
                 return Ok(true);
             }

@@ -1,4 +1,4 @@
-//! PowerPoint (`.ppt`) presentation support.
+//! `PowerPoint` (`.ppt`) presentation support.
 //
 // This module provides parsing of Microsoft PowerPoint presentations
 // in the legacy binary format (.ppt files), which uses OLE2 structured storage.
@@ -52,6 +52,10 @@
 //! ```
 
 #![forbid(unsafe_code)]
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "modules and re-exports are grouped by functional area rather than by item kind"
+)]
 
 mod consts;
 mod officeart_wire;

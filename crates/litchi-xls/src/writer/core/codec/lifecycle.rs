@@ -1,8 +1,8 @@
 use super::super::super::formatting::FormattingManager;
 use super::super::*;
-use crate::EncryptionProfile;
 use crate::encryption::{WriterEncryption, validate_writer_encryption};
 use crate::error::{Error, Result};
+use crate::{EncryptionProfile, WeakEncryptionPolicy};
 use std::collections::HashMap;
 use zeroize::Zeroizing;
 
@@ -73,7 +73,27 @@ impl Writer {
         password: impl Into<String>,
         profile: EncryptionProfile,
     ) -> Result<()> {
-        let password = password.into();
+        if matches!(profile, EncryptionProfile::XorObfuscation) {
+            return Err(Error::WeakEncryptionRequiresExplicitPolicy);
+        }
+        self.configure_password(password.into(), profile)
+    }
+
+    /// Configure legacy BIFF8 XOR obfuscation for subsequent writes.
+    ///
+    /// This is an explicit compatibility downgrade, not encryption suitable
+    /// for protecting data. The policy value makes that decision auditable at
+    /// each authoring call site. Reading existing XOR-obfuscated files does
+    /// not require this policy.
+    pub fn set_xor_obfuscation_password(
+        &mut self,
+        password: impl Into<String>,
+        _policy: WeakEncryptionPolicy,
+    ) -> Result<()> {
+        self.configure_password(password.into(), EncryptionProfile::XorObfuscation)
+    }
+
+    fn configure_password(&mut self, password: String, profile: EncryptionProfile) -> Result<()> {
         validate_writer_encryption(&password, profile)?;
         self.encryption = Some(WriterEncryption {
             password: Zeroizing::new(password),

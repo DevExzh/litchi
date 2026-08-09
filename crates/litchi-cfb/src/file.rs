@@ -1658,6 +1658,11 @@ impl<R: Read + Seek> OleFile<R> {
     }
 
     /// Return a stream's declared length without materializing its contents.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the stream is not found or the path points to a
+    /// non-stream entry.
     pub fn stream_len(&self, path: &[&str]) -> Result<u64, OleError> {
         let entry = self.find_entry(path)?;
         if entry.entry_type != STGTY_STREAM {

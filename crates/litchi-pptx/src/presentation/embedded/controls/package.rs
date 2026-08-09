@@ -57,6 +57,10 @@ impl Limits {
 }
 
 /// Load one slide's bounded control inventory and validate its OPC graph.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load_slide(
     package: &OpcPackage,
     slide_index: usize,
@@ -170,6 +174,11 @@ fn resolve_binary(
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use litchi_opc::PackURI;

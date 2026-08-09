@@ -127,6 +127,8 @@ pub struct Measure {
 }
 
 impl Measure {
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(value: f64, unit: Unit) -> Result<Self> {
         if !value.is_finite() {
             return invalid("presentation measure must be finite");
@@ -167,10 +169,10 @@ impl FromStr for Measure {
             return invalid(format!("invalid presentation measure '{value}'"));
         };
         validate_decimal(number, value)?;
-        let number = number
+        let parsed = number
             .parse::<f64>()
             .map_err(|_err| make_error(format!("invalid presentation measure '{value}'")))?;
-        Self::new(number, unit)
+        Self::new(parsed, unit)
     }
 }
 
@@ -213,6 +215,8 @@ pub struct Layout {
 }
 
 impl Layout {
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(name: impl Into<String>) -> Result<Self> {
         let value = Self {
             name: name.into(),
@@ -223,6 +227,8 @@ impl Layout {
         Ok(value)
     }
 
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> Result<()> {
         validate_ncname(&self.name, "presentation page-layout name")?;
         if let Some(value) = &self.display_name {
@@ -236,6 +242,8 @@ impl Layout {
         Ok(())
     }
 
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn to_xml_fragment(&self) -> Result<String> {
         self.validate()?;
         let mut output = String::with_capacity(160 + self.placeholders.len() * 128);
@@ -256,6 +264,8 @@ impl Collection {
         self.layouts.iter().find(|layout| layout.name == name)
     }
 
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> Result<()> {
         if self.layouts.len() > MAX_LAYOUTS {
             return invalid(format!(
@@ -286,6 +296,9 @@ impl Collection {
     }
 
     /// Serialize a standalone schema-valid `office:styles` fragment.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn to_xml(&self) -> Result<String> {
         self.validate()?;
         let mut output = String::with_capacity(256 + self.layouts.len() * 192);
@@ -323,7 +336,21 @@ enum NamespaceKind {
 
 type Attributes = HashMap<(NamespaceKind, String), String>;
 
+#[derive(Clone, Debug)]
+struct XmlSpan {
+    start: usize,
+    end: usize,
+}
+
+enum StylesSite {
+    Content { insertion: usize },
+    Empty { span: XmlSpan, qname: String },
+}
+
 /// Parse page-layout definitions from an ODF styles or flat-document XML part.
+///
+/// # Errors
+/// Returns an error when the input is malformed or a configured limit is exceeded.
 pub fn parse(xml: &str) -> Result<Collection> {
     if !xml.contains("presentation-page-layout") {
         return Ok(Collection::default());
@@ -410,18 +437,13 @@ pub fn parse(xml: &str) -> Result<Collection> {
                 let frame = stack
                     .pop()
                     .ok_or_else(|| make_error("presentation page-layout XML depth underflow"))?;
-                if active
-                    .as_ref()
-                    .is_some_and(|layout| layout.depth == stack.len())
-                {
+                if let Some(finished) = take_finished_layout(&mut active, stack.len()) {
                     if frame.namespace != NamespaceKind::Style
                         || frame.local != "presentation-page-layout"
                     {
                         return invalid("unexpected presentation page-layout end element");
                     }
-                    layouts
-                        .layouts
-                        .push(active.take().expect("active layout checked").value);
+                    layouts.layouts.push(finished.value);
                 }
             },
             Event::Text(ref text) if active.is_some() => {
@@ -439,7 +461,11 @@ pub fn parse(xml: &str) -> Result<Collection> {
                 return invalid("DTDs and processing instructions are prohibited in page layouts");
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -448,6 +474,14 @@ pub fn parse(xml: &str) -> Result<Collection> {
     }
     layouts.validate()?;
     Ok(layouts)
+}
+
+fn take_finished_layout(active: &mut Option<ActiveLayout>, depth: usize) -> Option<ActiveLayout> {
+    if active.as_ref().is_some_and(|layout| layout.depth == depth) {
+        active.take()
+    } else {
+        None
+    }
 }
 
 fn ensure_location(stack: &[Frame]) -> Result<()> {
@@ -506,20 +540,20 @@ fn take_required(
 fn attributes(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Attributes> {
     let mut result = HashMap::new();
     for attribute in element.attributes() {
-        let attribute = attribute
+        let parsed = attribute
             .map_err(|error| make_error(format!("invalid page-layout attribute: {error}")))?;
-        if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
+        if parsed.key.as_ref() == b"xmlns" || parsed.key.as_ref().starts_with(b"xmlns:") {
             continue;
         }
-        let (resolved, local) = reader.resolver().resolve_attribute(attribute.key);
+        let (resolved, local) = reader.resolver().resolve_attribute(parsed.key);
         let namespace = namespace_kind(&resolved)?;
-        let local = decode_name(local.as_ref(), "attribute")?;
-        let value = attribute
+        let local_name = decode_name(local.as_ref(), "attribute")?;
+        let value = parsed
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
             .map_err(|error| make_error(format!("invalid page-layout attribute value: {error}")))?
             .into_owned();
         validate_text(&value, "presentation page-layout attribute", true)?;
-        if result.insert((namespace, local), value).is_some() {
+        if result.insert((namespace, local_name), value).is_some() {
             return invalid("duplicate expanded presentation page-layout attribute");
         }
     }
@@ -538,12 +572,12 @@ fn reject_attributes(attributes: &Attributes, context: &str) -> Result<()> {
 fn namespace_kind(value: &ResolveResult<'_>) -> Result<NamespaceKind> {
     Ok(match value {
         ResolveResult::Unbound => NamespaceKind::None,
-        ResolveResult::Bound(Namespace(value)) if *value == OFFICE_NS => NamespaceKind::Office,
-        ResolveResult::Bound(Namespace(value)) if *value == STYLE_NS => NamespaceKind::Style,
-        ResolveResult::Bound(Namespace(value)) if *value == PRESENTATION_NS => {
+        ResolveResult::Bound(Namespace(uri)) if *uri == OFFICE_NS => NamespaceKind::Office,
+        ResolveResult::Bound(Namespace(uri)) if *uri == STYLE_NS => NamespaceKind::Style,
+        ResolveResult::Bound(Namespace(uri)) if *uri == PRESENTATION_NS => {
             NamespaceKind::Presentation
         },
-        ResolveResult::Bound(Namespace(value)) if *value == SVG_NS => NamespaceKind::Svg,
+        ResolveResult::Bound(Namespace(uri)) if *uri == SVG_NS => NamespaceKind::Svg,
         ResolveResult::Bound(_) => NamespaceKind::Other,
         ResolveResult::Unknown(prefix) => {
             return invalid(format!(
@@ -564,21 +598,21 @@ fn reject_spoofed_name(namespace: NamespaceKind, local: &str) -> Result<()> {
     Ok(())
 }
 
-#[derive(Clone, Debug)]
-struct XmlSpan {
-    start: usize,
-    end: usize,
-}
-
-enum StylesSite {
-    Content { insertion: usize },
-    Empty { span: XmlSpan, qname: String },
-}
-
 fn event_start(xml: &str, end: usize) -> Result<usize> {
     xml[..end]
         .rfind('<')
         .ok_or_else(|| make_error("invalid page-layout XML event boundary"))
+}
+
+fn take_finished_target(open_target: &mut Option<(usize, usize)>, depth: usize) -> Option<usize> {
+    if open_target
+        .as_ref()
+        .is_some_and(|(target_depth, _)| *target_depth == depth)
+    {
+        open_target.take().map(|(_, target_start)| target_start)
+    } else {
+        None
+    }
 }
 
 fn mutation_sites(xml: &str, name: &str) -> Result<(Option<XmlSpan>, StylesSite)> {
@@ -600,13 +634,14 @@ fn mutation_sites(xml: &str, name: &str) -> Result<(Option<XmlSpan>, StylesSite)
         let namespace = namespace_kind(&resolved)?;
         match event {
             Event::Start(ref element) => {
-                let end = reader.buffer_position() as usize;
+                let end = usize::try_from(reader.buffer_position())
+                    .map_err(|_err| make_error("presentation page-layout XML position overflow"))?;
                 let start = event_start(xml, end)?;
                 let local = decode_name(element.local_name().as_ref(), "element")?;
                 let depth = stack.len() + 1;
                 if namespace == NamespaceKind::Style
                     && local == "presentation-page-layout"
-                    && matches!(stack.last(), Some(Frame { namespace: NamespaceKind::Office, local }) if local == "styles")
+                    && matches!(stack.last(), Some(Frame { namespace: NamespaceKind::Office, local: parent }) if parent == "styles")
                     && parse_layout(&reader, element)?.name == name
                     && (target.is_some() || open_target.replace((depth, start)).is_some())
                 {
@@ -615,12 +650,13 @@ fn mutation_sites(xml: &str, name: &str) -> Result<(Option<XmlSpan>, StylesSite)
                 stack.push(Frame { namespace, local });
             },
             Event::Empty(ref element) => {
-                let end = reader.buffer_position() as usize;
+                let end = usize::try_from(reader.buffer_position())
+                    .map_err(|_err| make_error("presentation page-layout XML position overflow"))?;
                 let start = event_start(xml, end)?;
                 let local = decode_name(element.local_name().as_ref(), "element")?;
                 if namespace == NamespaceKind::Style
                     && local == "presentation-page-layout"
-                    && matches!(stack.last(), Some(Frame { namespace: NamespaceKind::Office, local }) if local == "styles")
+                    && matches!(stack.last(), Some(Frame { namespace: NamespaceKind::Office, local: parent }) if parent == "styles")
                     && parse_layout(&reader, element)?.name == name
                     && (target.replace(XmlSpan { start, end }).is_some() || open_target.is_some())
                 {
@@ -637,14 +673,14 @@ fn mutation_sites(xml: &str, name: &str) -> Result<(Option<XmlSpan>, StylesSite)
                 }
             },
             Event::End(_) => {
-                let end = reader.buffer_position() as usize;
+                let end = usize::try_from(reader.buffer_position())
+                    .map_err(|_err| make_error("presentation page-layout XML position overflow"))?;
                 let start = event_start(xml, end)?;
                 let depth = stack.len();
                 let frame = stack
                     .pop()
                     .ok_or_else(|| make_error("presentation page-layout XML depth underflow"))?;
-                if open_target.is_some_and(|(target_depth, _)| target_depth == depth) {
-                    let (_, target_start) = open_target.take().expect("target depth checked");
+                if let Some(target_start) = take_finished_target(&mut open_target, depth) {
                     if target
                         .replace(XmlSpan {
                             start: target_start,
@@ -666,7 +702,11 @@ fn mutation_sites(xml: &str, name: &str) -> Result<(Option<XmlSpan>, StylesSite)
                 return invalid("DTDs and processing instructions are prohibited in page layouts");
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -680,6 +720,9 @@ fn mutation_sites(xml: &str, name: &str) -> Result<(Option<XmlSpan>, StylesSite)
 }
 
 /// Insert or replace one page-layout definition while preserving unrelated XML bytes.
+///
+/// # Errors
+/// Returns an error when the input is malformed or a configured limit is exceeded.
 pub fn set_xml(xml: &str, layout: &Layout) -> Result<String> {
     layout.validate()?;
     let (target, styles_site) = mutation_sites(xml, &layout.name)?;
@@ -714,6 +757,9 @@ pub fn set_xml(xml: &str, layout: &Layout) -> Result<String> {
 }
 
 /// Remove one page-layout definition while preserving unrelated XML bytes.
+///
+/// # Errors
+/// Returns an error when the input is malformed or a configured limit is exceeded.
 pub fn remove_xml(xml: &str, name: &str) -> Result<String> {
     validate_ncname(name, "presentation page-layout name")?;
     let (target, _) = mutation_sites(xml, name)?;
@@ -840,6 +886,10 @@ fn make_error(message: impl Into<String>) -> Error {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

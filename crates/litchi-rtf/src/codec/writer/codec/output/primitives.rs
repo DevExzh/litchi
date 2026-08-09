@@ -1,19 +1,32 @@
 //! RTF wire primitives and story wrappers.
 
-use super::super::*;
+use super::super::{
+    ASCII_CONTROL_LIMIT, DrawingStoryTextMode, EndnoteRestart, Field, FieldOwner, FieldType,
+    FootnoteRestart, HeaderFooter, HeaderFooterType, Note, NoteNumberingStyle, PageBorders,
+    PageOrientation, Revision, RevisionType, RtfWriter, Section, SectionBreakType,
+    SectionFootnotePlacement, SectionLineNumberRestart, SectionNoteOptions, SectionRendering,
+    Shape, ShapeGroup, StoryDrawing, StoryEvent, TextDirection, VerticalAlignment, Write, field,
+    invalid_story_reference, io,
+};
 
 impl<W: Write> RtfWriter<W> {
     /// Write a control word
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_control_word(&mut self, word: &str, param: Option<i32>) -> io::Result<()> {
         self.write_str("\\")?;
         self.write_str(word)?;
         if let Some(p) = param {
-            write!(self.writer, "{}", p)?;
+            write!(self.writer, "{p}")?;
         }
         Ok(())
     }
 
     /// Write plain text (with proper escaping)
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_text(&mut self, text: &str) -> io::Result<()> {
         for ch in text.chars() {
             match ch {
@@ -49,7 +62,7 @@ impl<W: Write> RtfWriter<W> {
                     write!(self.writer, "\\'{:02x}", c as u32)?;
                 },
                 c if c.is_ascii() => {
-                    write!(self.writer, "{}", c)?;
+                    write!(self.writer, "{c}")?;
                 },
                 c => {
                     // Write Unicode character
@@ -64,25 +77,45 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write a string
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_str(&mut self, s: &str) -> io::Result<()> {
         self.writer.write_all(s.as_bytes())
     }
 
     /// Flush the writer
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn flush(&mut self) -> io::Result<()> {
         self.writer.flush()
     }
 
     /// Write a header or footer
-    pub fn write_header_footer(&mut self, hf: &HeaderFooter) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
+    pub fn write_header_footer(&mut self, hf: &HeaderFooter<'_>) -> io::Result<()> {
         self.write_header_footer_with_fields(hf, &[])
     }
 
     pub(in super::super) fn write_header_footer_with_fields(
         &mut self,
-        hf: &HeaderFooter,
-        fields: &[crate::Field<'_>],
+        hf: &HeaderFooter<'_>,
+        fields: &[Field<'_>],
     ) -> io::Result<()> {
+        enum EventKind<'b, 'a> {
+            Shape(&'b Shape<'a>),
+            Group(&'b ShapeGroup<'a>),
+            Field(&'b Field<'a>),
+            PageBreak,
+        }
+        struct Event<'b, 'a> {
+            offset: usize,
+            kind: EventKind<'b, 'a>,
+        }
+
         self.write_str("{")?;
 
         // Write header/footer type control word
@@ -97,18 +130,8 @@ impl<W: Write> RtfWriter<W> {
             HeaderFooterType::FooterRight => self.write_control_word("footerr", None)?,
         }
 
-        enum EventKind<'b, 'a> {
-            Shape(&'b crate::Shape<'a>),
-            Group(&'b crate::ShapeGroup<'a>),
-            Field(&'b crate::Field<'a>),
-            PageBreak,
-        }
-        struct Event<'b, 'a> {
-            offset: usize,
-            kind: EventKind<'b, 'a>,
-        }
         let story = hf.text();
-        crate::field::validate_story_events(
+        field::validate_story_events(
             &story,
             &hf.shapes,
             &hf.shape_groups,
@@ -121,14 +144,14 @@ impl<W: Write> RtfWriter<W> {
             HeaderFooterType::Header
             | HeaderFooterType::HeaderFirst
             | HeaderFooterType::HeaderLeft
-            | HeaderFooterType::HeaderRight => crate::FieldOwner::Header,
+            | HeaderFooterType::HeaderRight => FieldOwner::Header,
             HeaderFooterType::Footer
             | HeaderFooterType::FooterFirst
             | HeaderFooterType::FooterLeft
-            | HeaderFooterType::FooterRight => crate::FieldOwner::Footer,
+            | HeaderFooterType::FooterRight => FieldOwner::Footer,
         };
         let mut events = Vec::new();
-        events.try_reserve(hf.story_events.len()).map_err(|_| {
+        events.try_reserve(hf.story_events.len()).map_err(|_err| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "RTF header/footer event table exceeds available memory",
@@ -136,14 +159,14 @@ impl<W: Write> RtfWriter<W> {
         })?;
         for story_event in &hf.story_events {
             match *story_event {
-                crate::StoryEvent::Drawing(crate::StoryDrawing::Shape(index)) => {
+                StoryEvent::Drawing(StoryDrawing::Shape(index)) => {
                     let shape = hf.shapes.get(index).ok_or_else(invalid_story_reference)?;
                     events.push(Event {
                         offset: shape.position,
                         kind: EventKind::Shape(shape),
                     });
                 },
-                crate::StoryEvent::Drawing(crate::StoryDrawing::ShapeGroup(index)) => {
+                StoryEvent::Drawing(StoryDrawing::ShapeGroup(index)) => {
                     let group = hf
                         .shape_groups
                         .get(index)
@@ -153,11 +176,11 @@ impl<W: Write> RtfWriter<W> {
                         kind: EventKind::Group(group),
                     });
                 },
-                crate::StoryEvent::Field(reference) => events.push(Event {
+                StoryEvent::Field(reference) => events.push(Event {
                     offset: reference.position,
                     kind: EventKind::Field(fields.get(reference.field_index).filter(|field| field.owner == owner && field.position == reference.position && field.range_end == reference.position).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "RTF header/footer story has an invalid generic-field owner or reference"))?),
                 }),
-                crate::StoryEvent::PageBreak(page_break) => events.push(Event {
+                StoryEvent::PageBreak(page_break) => events.push(Event {
                     offset: page_break.position,
                     kind: EventKind::PageBreak,
                 }),
@@ -238,14 +261,17 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write a footnote or endnote
-    pub fn write_note(&mut self, note: &Note) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
+    pub fn write_note(&mut self, note: &Note<'_>) -> io::Result<()> {
         self.write_note_with_fields(note, &[])
     }
 
     pub(in super::super) fn write_note_with_fields(
         &mut self,
-        note: &Note,
-        fields: &[crate::Field<'_>],
+        note: &Note<'_>,
+        fields: &[Field<'_>],
     ) -> io::Result<()> {
         note.validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
@@ -276,9 +302,9 @@ impl<W: Write> RtfWriter<W> {
             &note.story_events,
             fields,
             if note.is_footnote {
-                crate::FieldOwner::Footnote
+                FieldOwner::Footnote
             } else {
-                crate::FieldOwner::Endnote
+                FieldOwner::Endnote
             },
             DrawingStoryTextMode::Note,
             0,
@@ -290,21 +316,24 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write a hyperlink field
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_hyperlink(&mut self, url: &str, display_text: &str) -> io::Result<()> {
-        let instruction = format!("HYPERLINK {}", crate::field::quoted_field_operand(url));
+        let instruction = format!("HYPERLINK {}", field::quoted_field_operand(url));
         self.write_hyperlink_instruction(&instruction, display_text)
     }
 
     /// Write an internal bookmark hyperlink without exposing raw field syntax.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_internal_hyperlink(
         &mut self,
         bookmark: &str,
         display_text: &str,
     ) -> io::Result<()> {
-        let instruction = format!(
-            "HYPERLINK \\l {}",
-            crate::field::quoted_field_operand(bookmark)
-        );
+        let instruction = format!("HYPERLINK \\l {}", field::quoted_field_operand(bookmark));
         self.write_hyperlink_instruction(&instruction, display_text)
     }
 
@@ -330,7 +359,10 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write a field (generic)
-    pub fn write_field(&mut self, field: &Field) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
+    pub fn write_field(&mut self, field: &Field<'_>) -> io::Result<()> {
         self.write_field_with_fields(field, &[], 0)
     }
 
@@ -339,6 +371,9 @@ impl<W: Write> RtfWriter<W> {
     /// The expression is escaped for the field instruction and emitted with
     /// the empty cached-result group conventionally used for `EQ`. It is never
     /// parsed, calculated, formatted, or rendered by this library.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_equation(&mut self, expression: &str) -> io::Result<()> {
         let field = Field::new_equation(expression)
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
@@ -347,8 +382,8 @@ impl<W: Write> RtfWriter<W> {
 
     pub(in super::super) fn write_field_with_fields(
         &mut self,
-        field: &Field,
-        fields: &[crate::Field<'_>],
+        field: &Field<'_>,
+        fields: &[Field<'_>],
         depth: usize,
     ) -> io::Result<()> {
         if depth > 64 {
@@ -395,7 +430,7 @@ impl<W: Write> RtfWriter<W> {
                 &field.drawing_order,
                 &field.result_events,
                 fields,
-                crate::FieldOwner::FieldResult,
+                FieldOwner::FieldResult,
                 DrawingStoryTextMode::ShapeText,
                 depth,
             )?;
@@ -407,7 +442,10 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write a revision mark (track changes)
-    pub fn write_revision(&mut self, revision: &Revision) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
+    pub fn write_revision(&mut self, revision: &Revision<'_>) -> io::Result<()> {
         revision
             .validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
@@ -435,7 +473,7 @@ impl<W: Write> RtfWriter<W> {
         self.write_control_word(kind, None)?;
         self.write_control_word(author, Some(revision.id))?;
         if let Some(date_value) = revision.date.as_deref() {
-            let packed = date_value.parse::<i32>().map_err(|_| {
+            let packed = date_value.parse::<i32>().map_err(|_err| {
                 io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "RTF revision dates must contain the packed signed DTTM value",
@@ -448,14 +486,17 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write a section with headers and footers
-    pub fn write_section(&mut self, section: &Section) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
+    pub fn write_section(&mut self, section: &Section<'_>) -> io::Result<()> {
         self.write_section_with_fields(section, &[])
     }
 
     pub(in super::super) fn write_section_with_fields(
         &mut self,
-        section: &Section,
-        fields: &[crate::Field<'_>],
+        section: &Section<'_>,
+        fields: &[Field<'_>],
     ) -> io::Result<()> {
         // Write section properties
         self.write_control_word("sectd", None)?;
@@ -463,7 +504,7 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("ds", Some(i32::from(section_style)))?;
         }
         if let Some(section_rsid) = section.properties.section_rsid {
-            self.write_control_word("sectrsid", Some(section_rsid as i32))?;
+            self.write_control_word("sectrsid", Some(section_rsid.cast_signed()))?;
         }
         self.write_revision_metadata("srauth", "srdate", section.properties.revision)?;
         if section.properties.title_page {
@@ -519,8 +560,8 @@ impl<W: Write> RtfWriter<W> {
         if let Some(rendering) = section.properties.rendering {
             self.write_control_word(
                 match rendering {
-                    crate::SectionRendering::Horizontal => "horzsect",
-                    crate::SectionRendering::Vertical => "vertsect",
+                    SectionRendering::Horizontal => "horzsect",
+                    SectionRendering::Vertical => "vertsect",
                 },
                 None,
             )?;
@@ -539,7 +580,13 @@ impl<W: Write> RtfWriter<W> {
         }
         self.write_control_word("colsx", Some(section.properties.columns.default_spacing))?;
         for (index, column) in section.properties.columns.explicit.iter().enumerate() {
-            self.write_control_word("colno", Some((index + 1) as i32))?;
+            let column_number = i32::try_from(index + 1).map_err(|_err| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF column count exceeds the i32 range",
+                )
+            })?;
+            self.write_control_word("colno", Some(column_number))?;
             self.write_control_word("colw", Some(column.width))?;
             if let Some(space) = column.space_after {
                 self.write_control_word("colsr", Some(space))?;
@@ -599,14 +646,14 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("linex", Some(distance))?;
         }
         if let Some(start) = section.properties.line_numbering.start {
-            self.write_control_word("linestarts", Some(start as i32))?;
+            self.write_control_word("linestarts", Some(start.cast_signed()))?;
         }
         if let Some(restart) = section.properties.line_numbering.restart {
             self.write_control_word(
                 match restart {
-                    crate::SectionLineNumberRestart::Section => "linerestart",
-                    crate::SectionLineNumberRestart::Page => "lineppage",
-                    crate::SectionLineNumberRestart::Continuous => "linecont",
+                    SectionLineNumberRestart::Section => "linerestart",
+                    SectionLineNumberRestart::Page => "lineppage",
+                    SectionLineNumberRestart::Continuous => "linecont",
                 },
                 None,
             )?;
@@ -621,7 +668,10 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write canonical section page-border options and edges.
-    pub fn write_page_borders(&mut self, borders: &crate::PageBorders) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
+    pub fn write_page_borders(&mut self, borders: &PageBorders) -> io::Result<()> {
         borders
             .validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
@@ -640,13 +690,13 @@ impl<W: Write> RtfWriter<W> {
         if borders.snap_to_text_borders {
             self.write_control_word("pgbrdrsnap", None)?;
         }
-        for (control, border) in [
+        for (control, side) in [
             ("pgbrdrt", borders.top),
             ("pgbrdrl", borders.left),
             ("pgbrdrb", borders.bottom),
             ("pgbrdrr", borders.right),
         ] {
-            let Some(border) = border else {
+            let Some(border) = side else {
                 continue;
             };
             self.write_control_word(control, None)?;
@@ -669,10 +719,10 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write explicit section-level footnote and endnote overrides.
-    pub fn write_section_note_options(
-        &mut self,
-        options: &crate::SectionNoteOptions,
-    ) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
+    pub fn write_section_note_options(&mut self, options: &SectionNoteOptions) -> io::Result<()> {
         options
             .validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
@@ -682,8 +732,8 @@ impl<W: Write> RtfWriter<W> {
         if let Some(value) = options.footnote_placement {
             self.write_control_word(
                 match value {
-                    crate::SectionFootnotePlacement::BeneathText => "sftntj",
-                    crate::SectionFootnotePlacement::BottomOfPage => "sftnbj",
+                    SectionFootnotePlacement::BeneathText => "sftntj",
+                    SectionFootnotePlacement::BottomOfPage => "sftnbj",
                 },
                 None,
             )?;
@@ -694,9 +744,9 @@ impl<W: Write> RtfWriter<W> {
         if let Some(value) = options.footnote_restart {
             self.write_control_word(
                 match value {
-                    crate::FootnoteRestart::Continuous => "sftnrstcont",
-                    crate::FootnoteRestart::EachSection => "sftnrestart",
-                    crate::FootnoteRestart::EachPage => "sftnrstpg",
+                    FootnoteRestart::Continuous => "sftnrstcont",
+                    FootnoteRestart::EachSection => "sftnrestart",
+                    FootnoteRestart::EachPage => "sftnrstpg",
                 },
                 None,
             )?;
@@ -710,8 +760,8 @@ impl<W: Write> RtfWriter<W> {
         if let Some(value) = options.endnote_restart {
             self.write_control_word(
                 match value {
-                    crate::EndnoteRestart::Continuous => "saftnrstcont",
-                    crate::EndnoteRestart::EachSection => "saftnrestart",
+                    EndnoteRestart::Continuous => "saftnrstcont",
+                    EndnoteRestart::EachSection => "saftnrestart",
                 },
                 None,
             )?;
@@ -723,52 +773,52 @@ impl<W: Write> RtfWriter<W> {
     }
 
     pub(in super::super) fn section_note_numbering_control(
-        style: crate::NoteNumberingStyle,
+        style: NoteNumberingStyle,
         endnote: bool,
     ) -> &'static str {
         match (endnote, style) {
-            (false, crate::NoteNumberingStyle::Arabic) => "sftnnar",
-            (false, crate::NoteNumberingStyle::LowercaseLetter) => "sftnnalc",
-            (false, crate::NoteNumberingStyle::UppercaseLetter) => "sftnnauc",
-            (false, crate::NoteNumberingStyle::LowercaseRoman) => "sftnnrlc",
-            (false, crate::NoteNumberingStyle::UppercaseRoman) => "sftnnruc",
-            (false, crate::NoteNumberingStyle::Chicago) => "sftnnchi",
-            (false, crate::NoteNumberingStyle::KoreanChosung) => "sftnnchosung",
-            (false, crate::NoteNumberingStyle::Circle) => "sftnncnum",
-            (false, crate::NoteNumberingStyle::KanjiDigitless) => "sftnndbnum",
-            (false, crate::NoteNumberingStyle::KanjiWithDigit) => "sftnndbnumd",
-            (false, crate::NoteNumberingStyle::KanjiThree) => "sftnndbnumt",
-            (false, crate::NoteNumberingStyle::KanjiFour) => "sftnndbnumk",
-            (false, crate::NoteNumberingStyle::DoubleByte) => "sftnndbar",
-            (false, crate::NoteNumberingStyle::KoreanGanada) => "sftnnganada",
-            (false, crate::NoteNumberingStyle::ChineseOne) => "sftnngbnum",
-            (false, crate::NoteNumberingStyle::ChineseTwo) => "sftnngbnumd",
-            (false, crate::NoteNumberingStyle::ChineseThree) => "sftnngbnuml",
-            (false, crate::NoteNumberingStyle::ChineseFour) => "sftnngbnumk",
-            (false, crate::NoteNumberingStyle::ZodiacOne) => "sftnnzodiac",
-            (false, crate::NoteNumberingStyle::ZodiacTwo) => "sftnnzodiacd",
-            (false, crate::NoteNumberingStyle::ZodiacThree) => "sftnnzodiacl",
-            (true, crate::NoteNumberingStyle::Arabic) => "saftnnar",
-            (true, crate::NoteNumberingStyle::LowercaseLetter) => "saftnnalc",
-            (true, crate::NoteNumberingStyle::UppercaseLetter) => "saftnnauc",
-            (true, crate::NoteNumberingStyle::LowercaseRoman) => "saftnnrlc",
-            (true, crate::NoteNumberingStyle::UppercaseRoman) => "saftnnruc",
-            (true, crate::NoteNumberingStyle::Chicago) => "saftnnchi",
-            (true, crate::NoteNumberingStyle::KoreanChosung) => "saftnnchosung",
-            (true, crate::NoteNumberingStyle::Circle) => "saftnncnum",
-            (true, crate::NoteNumberingStyle::KanjiDigitless) => "saftnndbnum",
-            (true, crate::NoteNumberingStyle::KanjiWithDigit) => "saftnndbnumd",
-            (true, crate::NoteNumberingStyle::KanjiThree) => "saftnndbnumt",
-            (true, crate::NoteNumberingStyle::KanjiFour) => "saftnndbnumk",
-            (true, crate::NoteNumberingStyle::DoubleByte) => "saftnndbar",
-            (true, crate::NoteNumberingStyle::KoreanGanada) => "saftnnganada",
-            (true, crate::NoteNumberingStyle::ChineseOne) => "saftnngbnum",
-            (true, crate::NoteNumberingStyle::ChineseTwo) => "saftnngbnumd",
-            (true, crate::NoteNumberingStyle::ChineseThree) => "saftnngbnuml",
-            (true, crate::NoteNumberingStyle::ChineseFour) => "saftnngbnumk",
-            (true, crate::NoteNumberingStyle::ZodiacOne) => "saftnnzodiac",
-            (true, crate::NoteNumberingStyle::ZodiacTwo) => "saftnnzodiacd",
-            (true, crate::NoteNumberingStyle::ZodiacThree) => "saftnnzodiacl",
+            (false, NoteNumberingStyle::Arabic) => "sftnnar",
+            (false, NoteNumberingStyle::LowercaseLetter) => "sftnnalc",
+            (false, NoteNumberingStyle::UppercaseLetter) => "sftnnauc",
+            (false, NoteNumberingStyle::LowercaseRoman) => "sftnnrlc",
+            (false, NoteNumberingStyle::UppercaseRoman) => "sftnnruc",
+            (false, NoteNumberingStyle::Chicago) => "sftnnchi",
+            (false, NoteNumberingStyle::KoreanChosung) => "sftnnchosung",
+            (false, NoteNumberingStyle::Circle) => "sftnncnum",
+            (false, NoteNumberingStyle::KanjiDigitless) => "sftnndbnum",
+            (false, NoteNumberingStyle::KanjiWithDigit) => "sftnndbnumd",
+            (false, NoteNumberingStyle::KanjiThree) => "sftnndbnumt",
+            (false, NoteNumberingStyle::KanjiFour) => "sftnndbnumk",
+            (false, NoteNumberingStyle::DoubleByte) => "sftnndbar",
+            (false, NoteNumberingStyle::KoreanGanada) => "sftnnganada",
+            (false, NoteNumberingStyle::ChineseOne) => "sftnngbnum",
+            (false, NoteNumberingStyle::ChineseTwo) => "sftnngbnumd",
+            (false, NoteNumberingStyle::ChineseThree) => "sftnngbnuml",
+            (false, NoteNumberingStyle::ChineseFour) => "sftnngbnumk",
+            (false, NoteNumberingStyle::ZodiacOne) => "sftnnzodiac",
+            (false, NoteNumberingStyle::ZodiacTwo) => "sftnnzodiacd",
+            (false, NoteNumberingStyle::ZodiacThree) => "sftnnzodiacl",
+            (true, NoteNumberingStyle::Arabic) => "saftnnar",
+            (true, NoteNumberingStyle::LowercaseLetter) => "saftnnalc",
+            (true, NoteNumberingStyle::UppercaseLetter) => "saftnnauc",
+            (true, NoteNumberingStyle::LowercaseRoman) => "saftnnrlc",
+            (true, NoteNumberingStyle::UppercaseRoman) => "saftnnruc",
+            (true, NoteNumberingStyle::Chicago) => "saftnnchi",
+            (true, NoteNumberingStyle::KoreanChosung) => "saftnnchosung",
+            (true, NoteNumberingStyle::Circle) => "saftnncnum",
+            (true, NoteNumberingStyle::KanjiDigitless) => "saftnndbnum",
+            (true, NoteNumberingStyle::KanjiWithDigit) => "saftnndbnumd",
+            (true, NoteNumberingStyle::KanjiThree) => "saftnndbnumt",
+            (true, NoteNumberingStyle::KanjiFour) => "saftnndbnumk",
+            (true, NoteNumberingStyle::DoubleByte) => "saftnndbar",
+            (true, NoteNumberingStyle::KoreanGanada) => "saftnnganada",
+            (true, NoteNumberingStyle::ChineseOne) => "saftnngbnum",
+            (true, NoteNumberingStyle::ChineseTwo) => "saftnngbnumd",
+            (true, NoteNumberingStyle::ChineseThree) => "saftnngbnuml",
+            (true, NoteNumberingStyle::ChineseFour) => "saftnngbnumk",
+            (true, NoteNumberingStyle::ZodiacOne) => "saftnnzodiac",
+            (true, NoteNumberingStyle::ZodiacTwo) => "saftnnzodiacd",
+            (true, NoteNumberingStyle::ZodiacThree) => "saftnnzodiacl",
         }
     }
 }

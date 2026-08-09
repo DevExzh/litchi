@@ -1,16 +1,19 @@
-//! ChartEx OPC part boundary and relationship validation.
+//! `ChartEx` OPC part boundary and relationship validation.
 
 use super::super::super::style::package::discover;
-use super::super::model::*;
+use super::super::model::{Document, ExternalDataTarget};
 use super::super::package::Part;
 use super::CONTENT_TYPE;
-use super::limits::*;
-use super::xml::*;
+use super::limits::{IMAGE_REL, OLE_CONTENT_TYPE, OLE_REL, PACKAGE_REL, WORKBOOK_CONTENT_TYPES};
+use super::xml::{invalid, invalid_error, parse_document, validate_id};
 use crate::{Error, Result};
 use litchi_opc::OpcPackage;
 use litchi_opc::part::Part as OpcPart;
 
 impl<'a> Part<'a> {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_part(part: &'a dyn OpcPart) -> Result<Self> {
         if part.content_type() != CONTENT_TYPE {
             return invalid("ChartEx part has the wrong content type");
@@ -18,11 +21,18 @@ impl<'a> Part<'a> {
         Ok(Self { part })
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(&self) -> Result<Document> {
         parse_document(self.part.blob())
     }
 
     /// Parse and validate referenced package resources without opening their bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_in_package(&self, package: &OpcPackage) -> Result<Document> {
         let mut document = self.parse()?;
         if let Some(external) = &document.info.external_data {
@@ -45,6 +55,7 @@ impl<'a> Part<'a> {
         Ok(document)
     }
 
+    #[must_use]
     pub fn part(&self) -> &'a dyn OpcPart {
         self.part
     }
@@ -63,7 +74,7 @@ fn validate_external_data(
     }
     let target_part = package
         .get_part(&target)
-        .map_err(|_| invalid_error(" external data target is missing"))?;
+        .map_err(|_err| invalid_error(" external data target is missing"))?;
     if PACKAGE_REL.contains(&relationship.reltype()) {
         if !WORKBOOK_CONTENT_TYPES.contains(&target_part.content_type()) {
             return invalid(" package relationship targets a non-workbook part");
@@ -96,7 +107,7 @@ fn validate_fallback_image(package: &OpcPackage, part: &dyn OpcPart, id: &str) -
     }
     let target_part = package
         .get_part(&target)
-        .map_err(|_| invalid_error(" fallback image target is missing"))?;
+        .map_err(|_err| invalid_error(" fallback image target is missing"))?;
     if !target_part.content_type().starts_with("image/") {
         return invalid(" fallback image has a non-image content type");
     }

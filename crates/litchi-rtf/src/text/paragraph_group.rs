@@ -22,6 +22,9 @@ pub struct ParagraphGroupProperty {
 }
 
 impl ParagraphGroupProperty {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if self.id == 0 {
             return Err(RtfError::MalformedDocument(
@@ -72,24 +75,30 @@ pub struct ParagraphGroupPropertyTable {
 }
 
 impl ParagraphGroupPropertyTable {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use]
     pub fn entries(&self) -> &[ParagraphGroupProperty] {
         &self.entries
     }
 
+    #[must_use]
     pub fn get(&self, id: u32) -> Option<&ParagraphGroupProperty> {
         id.checked_sub(1)
             .and_then(|index| self.entries.get(index as usize))
     }
 
+    #[must_use]
     pub fn parent_of(&self, id: u32) -> Option<&ParagraphGroupProperty> {
         let parent_id = self.get(id)?.parent_id;
         (parent_id != 0).then(|| self.get(parent_id)).flatten()
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push(&mut self, entry: ParagraphGroupProperty) -> RtfResult<()> {
         if self.entries.len() >= MAX_PARAGRAPH_GROUP_PROPERTIES {
             return Err(RtfError::MalformedDocument(
@@ -105,7 +114,9 @@ impl ParagraphGroupPropertyTable {
         self.entries.push(entry);
         Ok(())
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if self.entries.is_empty() || self.entries.len() > MAX_PARAGRAPH_GROUP_PROPERTIES {
             return Err(RtfError::MalformedDocument(

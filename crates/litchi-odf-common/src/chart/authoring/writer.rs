@@ -7,7 +7,7 @@ use super::model::{
     SeriesSpec, StyleElement, Text,
 };
 use crate::calculation::write;
-use crate::chart::{Class, Dimension, Labels, Position};
+use crate::chart::{ChartClass, Class, Dimension, Labels, Position};
 use litchi_core::{Error, Result};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
@@ -23,7 +23,6 @@ const MAX_EXPANDED_CELLS: u64 = 16_777_216;
 
 impl Definition {
     pub fn validate(&self) -> Result<()> {
-        validate_qname(&self.class, "chart class")?;
         validate_optional_name(self.style_name.as_deref(), "chart style name")?;
         validate_optional_scalar(self.width.as_deref(), "chart width")?;
         validate_optional_scalar(self.height.as_deref(), "chart height")?;
@@ -76,7 +75,7 @@ pub fn serialize_content(definition: &Definition) -> Result<String> {
 
 fn write_definition(out: &mut String, chart: &Definition, ns: &NamespaceMap) -> Result<()> {
     out.push_str("<chart:chart");
-    attr(out, "chart:class", &chart.class)?;
+    attr(out, "chart:class", chart.class.lexical())?;
     opt_attr(out, "chart:style-name", chart.style_name.as_deref())?;
     opt_attr(out, "svg:width", chart.width.as_deref())?;
     opt_attr(out, "svg:height", chart.height.as_deref())?;
@@ -242,7 +241,9 @@ fn write_axis(out: &mut String, value: &AxisSpec, ns: &NamespaceMap) -> Result<(
 fn write_series(out: &mut String, value: &SeriesSpec, ns: &NamespaceMap) -> Result<()> {
     out.push_str("<chart:series");
     opt_attr(out, "xml:id", value.xml_id.as_deref())?;
-    opt_attr(out, "chart:class", value.class.as_deref())?;
+    if let Some(class) = &value.class {
+        attr(out, "chart:class", class.lexical())?;
+    }
     opt_attr(
         out,
         "chart:values-cell-range-address",
@@ -290,7 +291,7 @@ fn write_series(out: &mut String, value: &SeriesSpec, ns: &NamespaceMap) -> Resu
 }
 
 pub fn serialize_axis_fragment(value: &AxisSpec) -> Result<String> {
-    let mut definition = Definition::new("chart:line");
+    let mut definition = Definition::new(ChartClass::line());
     definition.plot_area.axes.push(value.clone());
     definition.validate()?;
     let namespaces = NamespaceMap::for_definition(&definition)?;
@@ -301,12 +302,7 @@ pub fn serialize_axis_fragment(value: &AxisSpec) -> Result<String> {
 }
 
 pub fn serialize_series_fragment(value: &SeriesSpec) -> Result<String> {
-    let mut definition = Definition::new(
-        value
-            .class
-            .clone()
-            .unwrap_or_else(|| "chart:line".to_string()),
-    );
+    let mut definition = Definition::new(value.class.clone().unwrap_or_else(ChartClass::line));
     if let Some(axis) = &value.attached_axis {
         let mut attached = AxisSpec::new(Dimension::Y);
         attached.name = Some(axis.clone());
@@ -591,9 +587,6 @@ fn validate_plot_area(plot: &PlotAreaSpec) -> Result<()> {
         {
             return invalid(format!("duplicate chart series xml:id '{xml_id}'"));
         }
-        if let Some(class) = &series.class {
-            validate_qname(class, "series class")?;
-        }
         validate_optional_range(
             series.values_cell_range_address.as_deref(),
             "series values range",
@@ -807,20 +800,6 @@ fn validate_range(value: &str, kind: &str) -> Result<()> {
     Ok(())
 }
 
-fn validate_qname(value: &str, kind: &str) -> Result<()> {
-    let mut parts = value.split(':');
-    let first = parts.next().unwrap_or_default();
-    let second = parts.next();
-    if first.is_empty() || parts.next().is_some() {
-        return invalid(format!("invalid {kind} '{value}'"));
-    }
-    validate_local_name(first, kind)?;
-    if let Some(second) = second {
-        validate_local_name(second, kind)?;
-    }
-    Ok(())
-}
-
 fn validate_optional_name(value: Option<&str>, kind: &str) -> Result<()> {
     if let Some(value) = value {
         validate_name(value, kind)?;
@@ -864,6 +843,7 @@ fn invalid<T>(message: impl Into<String>) -> Result<T> {
 
 struct NamespaceMap {
     by_uri: BTreeMap<String, String>,
+    aliases: BTreeMap<String, String>,
 }
 impl NamespaceMap {
     fn for_definition(value: &Definition) -> Result<Self> {
@@ -905,10 +885,33 @@ impl NamespaceMap {
                 index += 1;
             }
         }
-        Ok(Self { by_uri })
+        let mut aliases = BTreeMap::new();
+        collect_class_alias(&value.class, &mut aliases)?;
+        for series in &value.plot_area.series {
+            if let Some(class) = &series.class {
+                collect_class_alias(class, &mut aliases)?;
+            }
+        }
+        for (prefix, uri) in &aliases {
+            if let Some((existing_uri, _)) =
+                by_uri.iter().find(|(_, canonical)| *canonical == prefix)
+                && existing_uri != uri
+            {
+                return invalid(format!(
+                    "chart class namespace prefix '{prefix}' conflicts with a standard prefix"
+                ));
+            }
+        }
+        Ok(Self { by_uri, aliases })
     }
     fn declarations(&self) -> impl Iterator<Item = (&str, &str)> {
-        self.by_uri.iter().map(|(u, p)| (p.as_str(), u.as_str()))
+        self.by_uri
+            .iter()
+            .map(|(u, p)| (p.as_str(), u.as_str()))
+            .chain(self.aliases.iter().filter_map(|(prefix, uri)| {
+                (!self.by_uri.values().any(|canonical| canonical == prefix))
+                    .then_some((prefix.as_str(), uri.as_str()))
+            }))
     }
     fn prefix(&self, uri: &str) -> Result<&str> {
         if uri == XML_NAMESPACE {
@@ -918,6 +921,18 @@ impl NamespaceMap {
                 Error::InvalidFormat(format!("unregistered extension namespace '{uri}'"))
             })
         }
+    }
+}
+
+fn collect_class_alias(value: &ChartClass, aliases: &mut BTreeMap<String, String>) -> Result<()> {
+    let Some((prefix, uri)) = value.namespace_alias() else {
+        return Ok(());
+    };
+    match aliases.insert(prefix.to_owned(), uri.to_owned()) {
+        Some(existing) if existing != uri => invalid(format!(
+            "chart class namespace prefix '{prefix}' resolves to multiple URIs"
+        )),
+        _ => Ok(()),
     }
 }
 
@@ -1132,11 +1147,12 @@ fn legend_position(value: Position) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::chart::ChartClass;
     use crate::chart::authoring::model::{EquationSpec, GridSpec};
     use crate::chart::read;
 
     fn sample() -> Definition {
-        let mut chart = Definition::new("chart:line");
+        let mut chart = Definition::new(ChartClass::line());
         chart.title = Some(Text::new("Quarterly revenue"));
         chart.legend = Some(LegendSpec::default());
         let mut x = AxisSpec::new(Dimension::X);
@@ -1225,7 +1241,7 @@ mod tests {
 
     #[test]
     fn extension_namespaces_are_stable_and_retained() {
-        let mut definition = Definition::new("chart:line");
+        let mut definition = Definition::new(ChartClass::line());
         definition.extensions.attributes.push(ExtensionAttribute {
             namespace_uri: Some("urn:z".into()),
             local_name: "zeta".into(),

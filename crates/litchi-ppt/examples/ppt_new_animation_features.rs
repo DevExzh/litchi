@@ -1,13 +1,21 @@
+#![allow(
+    clippy::print_stdout,
+    reason = "this command-line example intentionally prints its results"
+)]
+
 //! Demonstration of new animation features including sounds, after-effects, and more effects.
 //!
 //! This example showcases:
-//! - New animation effects (SpiralIn, BounceIn, etc.)
+//! - New animation effects (`SpiralIn`, `BounceIn`, etc.)
 //! - Built-in sound support (Whoosh, Applause, Chime, etc.)
-//! - After-effects (DimToColor)
+//! - After-effects (`DimToColor`)
 //! - Speed and direction variations
 
 use litchi_ppt::Writer;
-use litchi_ppt::animation::*;
+use litchi_ppt::animation::{
+    AfterEffect, AnimationEffect, AnimationInfo, AnimationSound, AnimationTrigger, BuildInfo,
+    BuildLevel, BuildType, BuiltinSound, EffectDirection, EffectSpeed, IterationType,
+};
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {

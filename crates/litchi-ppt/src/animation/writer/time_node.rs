@@ -1,4 +1,4 @@
-//! Layered writer façade for PowerPoint 2002 timing records.
+//! Layered writer façade for `PowerPoint` 2002 timing records.
 //!
 //! The semantic view, validation rules, and record codecs are private to this
 //! owner. The historical writer entry points remain available through the

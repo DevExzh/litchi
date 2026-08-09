@@ -35,7 +35,11 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Load a source-checked snapshot from one PresentationML slide.
+    /// Load a source-checked snapshot from one `PresentationML` slide.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     #[inline]
     pub fn load(
         package: &OpcPackage,
@@ -46,7 +50,10 @@ impl Snapshot {
         super::package::load_snapshot(package, slide_index, slide, limits)
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "snapshot constructor mirrors the persisted part fields"
+    )]
     pub(crate) fn from_parts(
         slide_index: usize,
         slide_part_name: PackURI,
@@ -95,36 +102,42 @@ impl Snapshot {
 
     /// Zero-based presentation position of the owning slide.
     #[inline]
+    #[must_use]
     pub const fn slide_index(&self) -> usize {
         self.slide_index
     }
 
     /// Absolute OPC part name of the owning slide.
     #[inline]
+    #[must_use]
     pub fn slide_part_name(&self) -> &PackURI {
         &self.slide_part_name
     }
 
-    /// Content parts in active PresentationML order.
+    /// Content parts in active `PresentationML` order.
     #[inline]
+    #[must_use]
     pub fn parts(&self) -> &[ContentPart] {
         &self.parts
     }
 
     /// Alias emphasizing the slide-owned semantic inventory.
     #[inline]
+    #[must_use]
     pub fn content_parts(&self) -> &[ContentPart] {
         self.parts()
     }
 
     /// Exact source slide XML captured by this snapshot.
     #[inline]
+    #[must_use]
     pub fn source_xml(&self) -> &[u8] {
         self.source_xml.as_slice()
     }
 
     /// Compact source revision used for optimistic stale-source checks.
     #[inline]
+    #[must_use]
     pub const fn revision(&self) -> Revision {
         self.revision
     }
@@ -161,23 +174,27 @@ pub struct Transaction {
 impl Transaction {
     /// Borrow the immutable source snapshot used by this edit.
     #[inline]
+    #[must_use]
     pub const fn source(&self) -> &Snapshot {
         &self.source
     }
 
     /// Borrow the currently staged content-part inventory.
     #[inline]
+    #[must_use]
     pub fn parts(&self) -> &[ContentPart] {
         &self.working
     }
 
     /// Alias emphasizing the semantic inventory.
     #[inline]
+    #[must_use]
     pub fn content_parts(&self) -> &[ContentPart] {
         self.parts()
     }
 
     /// Whether the staged graph differs from the source snapshot.
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.working.len() != self.source.parts.len()
             || self
@@ -191,6 +208,10 @@ impl Transaction {
     }
 
     /// Replace one anchor and relationship graph atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace(
         &mut self,
         index: usize,
@@ -209,6 +230,10 @@ impl Transaction {
     }
 
     /// Update only the anchor's relationship ID while preserving raw markup.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_relationship_id(&mut self, index: usize, value: impl Into<String>) -> Result<bool> {
         let value = value.into();
         validation::validate_id(&value, "content-part relationship ID")?;
@@ -226,6 +251,10 @@ impl Transaction {
     }
 
     /// Update the relationship type without rewriting the owning slide XML.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_relationship_type(
         &mut self,
         index: usize,
@@ -245,6 +274,10 @@ impl Transaction {
 
     /// Update the relationship target reference while keeping its target kind
     /// and validating that internal references still name the opaque payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_target_reference(&mut self, index: usize, value: impl Into<String>) -> Result<bool> {
         let value = value.into();
         validation::validate_field(&value, "content-part relationship target")?;
@@ -285,6 +318,10 @@ impl Transaction {
     }
 
     /// Replace the inert target and update its OPC target mode and reference.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_target(&mut self, index: usize, target: Target) -> Result<bool> {
         let mut candidate = self.part(index)?.clone();
         let old_part = candidate
@@ -315,6 +352,10 @@ impl Transaction {
 
     /// Replace internal payload bytes and content type while retaining its
     /// part name, relationship ID, and opaque outbound relationship metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn replace_payload(
         &mut self,
         index: usize,
@@ -343,6 +384,10 @@ impl Transaction {
     }
 
     /// Add one detached content part at an active slide position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn insert(
         &mut self,
         index: usize,
@@ -363,6 +408,10 @@ impl Transaction {
     }
 
     /// Append one detached content part and return its active index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     #[inline]
     pub fn push(&mut self, anchor: Anchor, relationship: Relationship) -> Result<usize> {
         let index = self.working.len();
@@ -371,6 +420,10 @@ impl Transaction {
     }
 
     /// Remove one content part and return its detached semantic value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove(&mut self, index: usize) -> Result<ContentPart> {
         if index >= self.working.len() {
             return Err(Error::IndexOutOfBounds {
@@ -386,6 +439,10 @@ impl Transaction {
     }
 
     /// Commit the detached graph into a reversible source patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn commit(self) -> Result<Commit> {
         self.validate_all()?;
         validate_relationship_collisions(&self.source, &self.working)?;
@@ -408,12 +465,10 @@ impl Transaction {
     }
 
     fn part(&self, index: usize) -> Result<&ContentPart> {
-        self.working
-            .get(index)
-            .ok_or_else(|| Error::IndexOutOfBounds {
-                index,
-                len: self.working.len(),
-            })
+        self.working.get(index).ok_or(Error::IndexOutOfBounds {
+            index,
+            len: self.working.len(),
+        })
     }
 
     fn make_part(
@@ -464,30 +519,35 @@ pub struct Commit {
 impl Commit {
     /// Snapshot expected after publication.
     #[inline]
+    #[must_use]
     pub fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Reversible source patch represented by this commit.
     #[inline]
+    #[must_use]
     pub fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Whether this commit changes any source graph value.
     #[inline]
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         !self.patch.is_empty()
     }
 
     /// Alias used by callers that prefer a verb-style result.
     #[inline]
+    #[must_use]
     pub fn changed(&self) -> bool {
         self.is_changed()
     }
 
     /// Consume the commit and return its patch.
     #[inline]
+    #[must_use]
     pub fn into_patch(self) -> Patch {
         self.patch
     }
@@ -502,25 +562,33 @@ pub struct Patch {
 
 impl Patch {
     /// Snapshot required before this patch can be applied.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     #[inline]
+    #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Snapshot expected after this patch is applied.
     #[inline]
+    #[must_use]
     pub fn after(&self) -> &Snapshot {
         &self.after
     }
 
     /// Whether applying this patch is an exact no-op.
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
     /// Return the inverse patch for immediate restoration.
     #[inline]
+    #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
@@ -529,6 +597,10 @@ impl Patch {
     }
 
     /// Apply this patch through the package's atomic publication boundary.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     #[inline]
     pub fn apply(&self, package: &mut OpcPackage) -> Result<Snapshot> {
         super::package::apply_patch(package, self)
@@ -551,7 +623,7 @@ fn unique_payloads(parts: &[ContentPart]) -> Result<Vec<Payload>> {
         } else {
             total = total
                 .checked_add(payload.bytes().len())
-                .ok_or_else(|| validation::limit_total_payloads())?;
+                .ok_or_else(validation::limit_total_payloads)?;
             if total > validation::MAX_TOTAL_PAYLOAD_BYTES {
                 return Err(validation::limit_total_payloads());
             }

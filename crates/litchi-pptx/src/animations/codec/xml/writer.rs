@@ -1,4 +1,7 @@
-use super::super::super::model::*;
+use super::super::super::model::{
+    ConditionTarget, EffectInstance, NextAction, PreviousAction, TimeCondition, TimingChild,
+    TimingNodeKind, Trigger,
+};
 use super::super::validation::direction_subtype;
 
 pub(super) fn write_animation_xml(
@@ -15,8 +18,7 @@ pub(super) fn write_animation_xml(
     if anim.trigger == Trigger::OnClick {
         if let Some(trigger_shape_id) = interactive_trigger {
             xml.push_str(&format!(
-                r#"<p:cond evt="onClick" delay="0"><p:tgtEl><p:spTgt spid="{}"/></p:tgtEl></p:cond>"#,
-                trigger_shape_id
+                r#"<p:cond evt="onClick" delay="0"><p:tgtEl><p:spTgt spid="{trigger_shape_id}"/></p:tgtEl></p:cond>"#
             ));
         } else {
             xml.push_str(r#"<p:cond delay="indefinite"/>"#);
@@ -169,7 +171,7 @@ pub(super) fn write_timing_child(xml: &mut String, child: &TimingChild) {
             preset.class.as_str()
         ));
         if let Some(subtype) = preset.subtype {
-            xml.push_str(&format!(" presetSubtype=\"{}\"", subtype));
+            xml.push_str(&format!(" presetSubtype=\"{subtype}\""));
         }
     }
     xml.push('>');
@@ -220,13 +222,13 @@ fn write_condition_list(xml: &mut String, name: &str, conditions: &[TimeConditio
                 "><p:tgtEl><p:spTgt spid=\"{id}\"/></p:tgtEl></p:cond>"
             )),
             Some(ConditionTarget::Slide) => {
-                xml.push_str("><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond>")
+                xml.push_str("><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond>");
             },
             Some(ConditionTarget::TimeNode(id)) => {
-                xml.push_str(&format!("><p:tn val=\"{id}\"/></p:cond>"))
+                xml.push_str(&format!("><p:tn val=\"{id}\"/></p:cond>"));
             },
             Some(ConditionTarget::Runtime(value)) => {
-                xml.push_str(&format!("><p:rtn val=\"{}\"/></p:cond>", value.as_str()))
+                xml.push_str(&format!("><p:rtn val=\"{}\"/></p:cond>", value.as_str()));
             },
         }
     }

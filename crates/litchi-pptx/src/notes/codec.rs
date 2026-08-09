@@ -1,4 +1,4 @@
-//! PresentationML notes XML, text projection, and bounded validation codecs.
+//! `PresentationML` notes XML, text projection, and bounded validation codecs.
 
 use super::model::{Conformance, Slide};
 use super::{
@@ -35,16 +35,25 @@ const NOTES_XML_SUFFIX: &str = concat!(
 );
 
 /// Return the deterministic Transitional notes-master producer template.
+#[must_use]
 pub fn master_xml() -> &'static str {
     include_str!("resources/generated/notesMaster.xml")
 }
 
 /// Encode one bounded Transitional plain-text speaker-notes slide.
+///
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn write_text(text: &str) -> Result<Vec<u8>> {
     write_text_with(Conformance::Transitional, text)
 }
 
 /// Encode one bounded plain-text speaker-notes slide in the chosen dialect.
+///
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn write_text_with(conformance: Conformance, text: &str) -> Result<Vec<u8>> {
     if text.len() > MAX_NOTES_XML {
         return Err(Error::Limit {
@@ -92,13 +101,20 @@ pub fn write_text_with(conformance: Conformance, text: &str) -> Result<Vec<u8>> 
     Ok(xml.into_bytes())
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 fn is_xml_char(value: char) -> bool {
     matches!(value, '\u{9}' | '\u{A}' | '\u{D}')
-        || matches!(value as u32, 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF)
+        || matches!(value as u32, 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x1_0000..=0x10_FFFF)
 }
 
 impl Slide {
-    /// Flatten the inert notes XML to its DrawingML text runs.
+    /// Flatten the inert notes XML to its `DrawingML` text runs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn text(&self) -> Result<Option<String>> {
         let processed = process_ooxml(&self.data)?;
         let mut reader = Reader::from_reader(processed.as_ref());
@@ -108,7 +124,7 @@ impl Slide {
         loop {
             match reader.read_event() {
                 Ok(Event::Start(element)) if element.local_name().as_ref() == b"t" => {
-                    in_text = true
+                    in_text = true;
                 },
                 Ok(Event::Text(text)) if in_text => {
                     let decoded = text.decode().map_err(xml_error)?;
@@ -128,7 +144,7 @@ impl Slide {
     }
 }
 
-/// Replace the inert DrawingML text projection without rebuilding the notes
+/// Replace the inert `DrawingML` text projection without rebuilding the notes
 /// document. All markup, namespace declarations, extension branches, and
 /// unrelated runs remain byte-identical; only the contents of existing
 /// `a:t` elements are changed.
@@ -379,7 +395,10 @@ pub(crate) fn scan_xml(
     Ok(scan)
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "element inspector threads one slot per notes-element field"
+)]
 fn inspect_element(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,

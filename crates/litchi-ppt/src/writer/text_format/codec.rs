@@ -1,7 +1,7 @@
-//! Binary encoders for PowerPoint text atoms and style properties.
+//! Binary encoders for `PowerPoint` text atoms and style properties.
 //!
 //! The public builder remains available from this module and the
-//! writer::text_format facade.
+//! `writer::text_format` facade.
 
 use super::semantic::{
     Paragraph, TextAlign, TextColor, TextDirection, TextFontAlign, char_mask, para_mask,
@@ -12,13 +12,14 @@ use super::validation;
 // Text Properties Builder
 // =============================================================================
 
-/// Builder for TextCharsAtom/TextBytesAtom and StyleTextPropAtom
+/// Builder for TextCharsAtom/TextBytesAtom and `StyleTextPropAtom`
 pub struct TextPropsBuilder {
     paragraphs: Vec<Paragraph>,
 }
 
 impl TextPropsBuilder {
     /// Create a new builder
+    #[must_use]
     pub fn new() -> Self {
         Self {
             paragraphs: Vec::new(),
@@ -30,9 +31,10 @@ impl TextPropsBuilder {
         self.paragraphs.push(para);
     }
 
-    /// Build TextCharsAtom (UTF-16LE text), adding CR between paragraphs.
+    /// Build `TextCharsAtom` (UTF-16LE text), adding CR between paragraphs.
     ///
     /// The final paragraph break is implicit and is not stored in the text atom.
+    #[must_use]
     pub fn build_text_chars(&self) -> Vec<u8> {
         let mut data = Vec::new();
         for (i, para) in self.paragraphs.iter().enumerate() {
@@ -50,12 +52,16 @@ impl TextPropsBuilder {
         data
     }
 
-    /// Build StyleTextPropAtom containing paragraph and character formatting
+    /// Build `StyleTextPropAtom` containing paragraph and character formatting
     ///
     /// According to MS-PPT spec:
     /// - Sum of paragraph character counts = total text length + 1
     /// - Sum of character run counts = total text length + 1
     /// - The +1 accounts for an implicit terminating character
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the underlying writer reports an error.
     pub fn build_style_text_prop(&self) -> std::io::Result<Vec<u8>> {
         let mut data = Vec::new();
 
@@ -72,7 +78,7 @@ impl TextPropsBuilder {
         // Each paragraph covers its runs + CR separator (except last paragraph gets +1 for terminator)
         for para in &self.paragraphs {
             let para_text_len = para.runs.iter().try_fold(0u32, |total, run| {
-                let count = u32::try_from(run.text.encode_utf16().count()).map_err(|_| {
+                let count = u32::try_from(run.text.encode_utf16().count()).map_err(|_err| {
                     std::io::Error::new(
                         std::io::ErrorKind::InvalidInput,
                         "PowerPoint text run exceeds the PPT size limit",
@@ -201,7 +207,7 @@ impl TextPropsBuilder {
             }
             if mask & para_mask::BULLET_CHAR != 0 {
                 let bullet = para.bullet_char.unwrap_or('•');
-                let ch = u16::try_from(bullet as u32).map_err(|_| {
+                let ch = u16::try_from(bullet as u32).map_err(|_err| {
                     std::io::Error::new(
                         std::io::ErrorKind::InvalidInput,
                         "PPT bullet characters must fit in one UTF-16 code unit",
@@ -245,7 +251,7 @@ impl TextPropsBuilder {
             }
             if mask & para_mask::TAB_STOPS != 0 {
                 let tab_stops = para.tab_stops.as_deref().unwrap_or_default();
-                let count = u16::try_from(tab_stops.len()).map_err(|_| {
+                let count = u16::try_from(tab_stops.len()).map_err(|_err| {
                     std::io::Error::new(
                         std::io::ErrorKind::InvalidInput,
                         "PPT paragraph has more than 65535 tab stops",
@@ -311,7 +317,7 @@ impl TextPropsBuilder {
                 // Character count for this run
                 // Last run of last paragraph gets +1 for terminator
                 // Last run of non-last paragraph gets +1 for CR separator
-                let run_units = u32::try_from(run.text.encode_utf16().count()).map_err(|_| {
+                let run_units = u32::try_from(run.text.encode_utf16().count()).map_err(|_err| {
                     std::io::Error::new(
                         std::io::ErrorKind::InvalidInput,
                         "PowerPoint text run exceeds the PPT size limit",
@@ -385,8 +391,9 @@ impl TextPropsBuilder {
     }
 
     /// Get total character count
+    #[must_use]
     pub fn total_chars(&self) -> u32 {
-        self.paragraphs.iter().map(|p| p.char_count()).sum()
+        self.paragraphs.iter().map(Paragraph::char_count).sum()
     }
 }
 

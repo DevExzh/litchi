@@ -1,4 +1,4 @@
-//! Round-trip tests for the BIFF8 PhoneticInfo record.
+//! Round-trip tests for the BIFF8 `PhoneticInfo` record.
 
 use litchi_xls::writer::Writer;
 use litchi_xls::{

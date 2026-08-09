@@ -29,6 +29,12 @@ struct DiffLimits {
 }
 
 impl DiffNode {
+    /// Serialize this node as a `Diff10` container record with its children.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the tree exceeds the nesting or record-count
+    /// limits, or if a node fails structural validation.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         let mut count = 0;
         self.encode(0, &mut count)
@@ -57,7 +63,7 @@ impl DiffNode {
             return corrupted("invalid Diff10 record header");
         }
         let payload_len = usize::try_from(read_u32(data, 4)?)
-            .map_err(|_| Error::Corrupted("Diff10 length does not fit usize".to_string()))?;
+            .map_err(|_err| Error::Corrupted("Diff10 length does not fit usize".to_string()))?;
         let total_len = RECORD_HEADER_SIZE
             .checked_add(payload_len)
             .ok_or_else(|| Error::Corrupted("Diff10 length overflow".to_string()))?;
@@ -141,6 +147,12 @@ impl DiffNode {
 }
 
 impl DiffTree10 {
+    /// Parse a strict `DiffTree10Container` record under the default limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the container header, reviewer-name atom, or any
+    /// nested `Diff10` record is malformed or truncated.
     pub fn parse(record: &Record) -> Result<Self> {
         Self::parse_with_limits(
             record,
@@ -149,6 +161,15 @@ impl DiffTree10 {
         )
     }
 
+    /// Parse a strict `DiffTree10Container` record under explicit limits.
+    ///
+    /// The limits are clamped to the supported maximums before parsing.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `max_records` is zero, or if the container header,
+    /// reviewer-name atom, or any nested `Diff10` record is malformed or
+    /// truncated.
     pub fn parse_with_limits(
         record: &Record,
         max_depth: usize,
@@ -184,6 +205,13 @@ impl DiffTree10 {
         })
     }
 
+    /// Serialize this tree as a `DiffTree10Container` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the reviewer name is not a valid
+    /// `PrintableUnicodeString`, if the root node is not a `DocDiff10`
+    /// container, or if a nested node fails structural validation.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         validate_reviewer_name(&self.reviewer_name)?;
         if self.document_diff.diff_type() != DiffType::Document {
@@ -201,6 +229,7 @@ impl DiffTree10 {
 
 impl ReviewingToolbarStates {
     /// Construct reviewing UI state. Reserved bits are emitted as zero.
+    #[must_use]
     pub const fn new(show_reviewing_toolbar: bool, show_reviewing_gallery: bool) -> Self {
         Self {
             show_reviewing_toolbar,
@@ -210,6 +239,10 @@ impl ReviewingToolbarStates {
     }
 
     /// Parse a strict `DocToolbarStates10Atom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(record: &Record) -> Result<Self> {
         validate_atom(record, RecordType::DocToolbarStates10Atom, 1)?;
         let value = record.data[0];
@@ -222,15 +255,18 @@ impl ReviewingToolbarStates {
         })
     }
 
+    #[must_use]
     pub const fn show_reviewing_toolbar(self) -> bool {
         self.show_reviewing_toolbar
     }
 
+    #[must_use]
     pub const fn show_reviewing_gallery(self) -> bool {
         self.show_reviewing_gallery
     }
 
     /// Raw ignored bits retained from an existing record.
+    #[must_use]
     pub const fn ignored_reserved_bits(self) -> u8 {
         self.ignored_reserved_bits
     }
@@ -244,6 +280,7 @@ impl ReviewingToolbarStates {
     }
 
     /// Serialize the exact atom, preserving ignored bits from parsed input.
+    #[must_use]
     pub fn to_record_bytes(self) -> Vec<u8> {
         let value = self.ignored_reserved_bits
             | u8::from(self.show_reviewing_toolbar)
@@ -254,15 +291,20 @@ impl ReviewingToolbarStates {
 
 impl SlideCreationEntry {
     fn parse_payload(payload: &[u8]) -> Self {
-        let slide_id_ref = u32::from_le_bytes(payload[0..4].try_into().expect("fixed payload"));
-        let high = u32::from_le_bytes(payload[4..8].try_into().expect("fixed payload"));
-        let low = u32::from_le_bytes(payload[8..12].try_into().expect("fixed payload"));
+        let slide_id_ref = u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
+        let high = u32::from_le_bytes([payload[4], payload[5], payload[6], payload[7]]);
+        let low = u32::from_le_bytes([payload[8], payload[9], payload[10], payload[11]]);
         Self {
             slide_id_ref,
             file_time: (u64::from(high) << 32) | u64::from(low),
         }
     }
 
+    /// Serialize the fixed-size entry payload.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the low 32 bits of the FILETIME are intentionally written to the final payload word"
+    )]
     fn payload(self) -> [u8; ENTRY_PAYLOAD_SIZE] {
         let mut payload = [0; ENTRY_PAYLOAD_SIZE];
         payload[..4].copy_from_slice(&self.slide_id_ref.to_le_bytes());
@@ -272,6 +314,7 @@ impl SlideCreationEntry {
     }
 
     /// Serialize a strict `SlideListEntry10Atom` record.
+    #[must_use]
     pub fn to_record_bytes(self) -> Vec<u8> {
         encode_record(0, 0, RecordType::SlideListEntry10Atom, &self.payload())
     }
@@ -279,6 +322,14 @@ impl SlideCreationEntry {
 
 impl SlideListTable10 {
     /// Parse a strict container without allocating intermediate child records.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    ///
+    /// # Panics
+    ///
+    /// Panics if internal invariants are violated.
     pub fn parse(record: &Record) -> Result<Self> {
         if record.record_type != RecordType::SlideListTable10
             || record.version != 0x0f
@@ -297,9 +348,14 @@ impl SlideListTable10 {
             RecordType::SlideListTableSize10Atom,
             SIZE_ATOM_PAYLOAD_SIZE,
         )?;
-        let signed_count = i32::from_le_bytes(size_payload.try_into().expect("fixed payload"));
+        let signed_count = i32::from_le_bytes([
+            size_payload[0],
+            size_payload[1],
+            size_payload[2],
+            size_payload[3],
+        ]);
         let count = usize::try_from(signed_count)
-            .map_err(|_| Error::Corrupted("negative slide-list table count".to_string()))?;
+            .map_err(|_err| Error::Corrupted("negative slide-list table count".to_string()))?;
         validate_count(count)?;
         let expected = count
             .checked_mul(ENTRY_RECORD_SIZE)
@@ -325,10 +381,14 @@ impl SlideListTable10 {
     }
 
     /// Serialize the size atom followed by the exact declared entry array.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         validate_count(self.entries.len())?;
         let count = i32::try_from(self.entries.len())
-            .map_err(|_| Error::Corrupted("slide-list table count overflow".to_string()))?;
+            .map_err(|_err| Error::Corrupted("slide-list table count overflow".to_string()))?;
         let capacity = SIZE_ATOM_RECORD_SIZE
             .checked_add(self.entries.len().saturating_mul(ENTRY_RECORD_SIZE))
             .ok_or_else(|| Error::Corrupted("slide-list table size overflow".to_string()))?;
@@ -367,11 +427,15 @@ pub(crate) fn write_review(root: &mut Record, review: &Review, limits: Limits) -
     let payload = encode_payload(review, limits)?;
     let blob = record_at_mut(root, &path)?;
     blob.data_length = u32::try_from(payload.len())
-        .map_err(|_| Error::InvalidFormat("review payload exceeds u32".into()))?;
+        .map_err(|_err| Error::InvalidFormat("review payload exceeds u32".into()))?;
     blob.data = payload;
     Ok(())
 }
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "`RecordType` has hundreds of variants; every record type not owned by the review payload is deliberately retained as an opaque `Unknown` entry"
+)]
 fn parse_payload(data: &[u8], limits: Limits) -> Result<Review> {
     if data.len() > limits.max_bytes {
         return Err(Error::InvalidFormat(
@@ -400,7 +464,7 @@ fn parse_payload(data: &[u8], limits: Limits) -> Result<Review> {
             return corrupted("review payload ends with a truncated record header");
         }
         let length = usize::try_from(read_u32(data, offset + 4)?)
-            .map_err(|_| Error::Corrupted("review record length overflow".into()))?;
+            .map_err(|_err| Error::Corrupted("review record length overflow".into()))?;
         let end = header_end
             .checked_add(length)
             .ok_or_else(|| Error::Corrupted("review record length overflow".into()))?;
@@ -511,7 +575,7 @@ pub(crate) fn encode_document(root: &Record) -> Result<Vec<u8>> {
         ));
     }
     let length = u32::try_from(payload.len())
-        .map_err(|_| Error::InvalidFormat("document-comparison record exceeds u32".into()))?;
+        .map_err(|_err| Error::InvalidFormat("document-comparison record exceeds u32".into()))?;
     let mut bytes = Vec::with_capacity(RECORD_HEADER_SIZE + payload.len());
     bytes.extend_from_slice(&(root.version | (root.instance << 4)).to_le_bytes());
     bytes.extend_from_slice(&root.record_type_raw.to_le_bytes());
@@ -525,12 +589,11 @@ fn find_pp10_blob(root: &Record) -> Result<Option<Vec<usize>>> {
         return corrupted("document-comparison owner requires a DocumentContainer root");
     }
 
-    let doc_info_iter = root
+    let mut doc_info_iter = root
         .children
         .iter()
         .enumerate()
         .filter(|(_, child)| child.record_type == RecordType::DocInfoList);
-    let mut doc_info_iter = doc_info_iter;
     let Some((doc_info_index, doc_info)) = doc_info_iter.next() else {
         return Ok(None);
     };
@@ -538,12 +601,11 @@ fn find_pp10_blob(root: &Record) -> Result<Option<Vec<usize>>> {
         return corrupted("document contains duplicate DocInfoList containers");
     }
 
-    let prog_tags_iter = doc_info
+    let mut prog_tags_iter = doc_info
         .children
         .iter()
         .enumerate()
         .filter(|(_, child)| child.record_type == RecordType::ProgTags);
-    let mut prog_tags_iter = prog_tags_iter;
     let Some((prog_tags_index, prog_tags)) = prog_tags_iter.next() else {
         return Ok(None);
     };
@@ -561,15 +623,14 @@ fn find_pp10_blob(root: &Record) -> Result<Option<Vec<usize>>> {
         }
         let mut blob = None;
         for (child_index, child) in tag.children.iter().enumerate() {
-            if child.record_type == RecordType::BinaryTagData {
-                if blob.replace(child_index).is_some() {
-                    return corrupted("___PPT10 tag contains duplicate BinaryTagData records");
-                }
+            if child.record_type == RecordType::BinaryTagData && blob.replace(child_index).is_some()
+            {
+                return corrupted("___PPT10 tag contains duplicate BinaryTagData records");
             }
         }
-        let blob =
+        let blob_index =
             blob.ok_or_else(|| Error::Corrupted("___PPT10 tag is missing BinaryTagData".into()))?;
-        match_path = Some(vec![doc_info_index, prog_tags_index, tag_index, blob]);
+        match_path = Some(vec![doc_info_index, prog_tags_index, tag_index, blob_index]);
     }
     Ok(match_path)
 }
@@ -621,7 +682,7 @@ fn parse_reviewer_name(data: &[u8]) -> Result<(String, usize)> {
     }
     let (version, instance) = unpack_version_instance(read_u16(data, 0)?);
     let byte_len = usize::try_from(read_u32(data, 4)?)
-        .map_err(|_| Error::Corrupted("reviewer-name length does not fit usize".to_string()))?;
+        .map_err(|_err| Error::Corrupted("reviewer-name length does not fit usize".to_string()))?;
     let total_len = RECORD_HEADER_SIZE
         .checked_add(byte_len)
         .ok_or_else(|| Error::Corrupted("reviewer-name length overflow".to_string()))?;
@@ -639,7 +700,7 @@ fn parse_reviewer_name(data: &[u8]) -> Result<(String, usize)> {
         units.push(u16::from_le_bytes([chunk[0], chunk[1]]));
     }
     let name = String::from_utf16(&units)
-        .map_err(|_| Error::Corrupted("ReviewerNameAtom contains invalid UTF-16".to_string()))?;
+        .map_err(|_err| Error::Corrupted("ReviewerNameAtom contains invalid UTF-16".to_string()))?;
     validate_reviewer_name(&name)?;
     Ok((name, total_len))
 }
@@ -676,7 +737,7 @@ fn child_payload(
         .ok_or_else(|| Error::Corrupted("truncated document-comparison child".to_string()))?;
     let version_instance = u16::from_le_bytes([header[0], header[1]]);
     let raw_type = u16::from_le_bytes([header[2], header[3]]);
-    let length = u32::from_le_bytes(header[4..8].try_into().expect("fixed header"));
+    let length = u32::from_le_bytes([header[4], header[5], header[6], header[7]]);
     if version_instance != 0 || raw_type != kind.as_u16() || length as usize != payload_size {
         return corrupted("document-comparison child has an invalid record header");
     }
@@ -691,6 +752,10 @@ fn encode_record(version: u16, instance: u16, kind: RecordType, payload: &[u8]) 
     encode_record_raw(version, instance, kind.as_u16(), payload)
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "payloads are bounded to the 16 MiB snapshot byte limit enforced by callers, well below u32::MAX"
+)]
 fn encode_record_raw(version: u16, instance: u16, record_type: u16, payload: &[u8]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(RECORD_HEADER_SIZE + payload.len());
     bytes.extend_from_slice(&((instance << 4) | (version & 0xF)).to_le_bytes());

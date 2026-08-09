@@ -1,4 +1,4 @@
-//! PowerPoint 12 slide and master round-trip metadata.
+//! `PowerPoint` 12 slide and master round-trip metadata.
 
 use super::package::{Error, Result};
 use super::records::Record;
@@ -8,6 +8,10 @@ use crate::consts::RecordType;
 ///
 /// MS-PPT stores these flags on main, title, handout, and notes masters. They are defaults for
 /// new slides rather than the resolved visibility of placeholders on an existing slide.
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "each bool maps one-to-one to an independent MS-PPT header/footer inclusion flag; grouping them into enums would misrepresent the on-disk layout and churn the public API"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HeaderFooterDefaults {
     /// Include a date placeholder in the footer of new slides.
@@ -20,7 +24,7 @@ pub struct HeaderFooterDefaults {
     pub include_slide_number: bool,
 }
 
-/// Header or footer placeholder identity retained for PowerPoint 12 round trips.
+/// Header or footer placeholder identity retained for `PowerPoint` 12 round trips.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HeaderFooterPlaceholder {
     /// Master date placeholder (`PT_MasterDate`).
@@ -33,7 +37,7 @@ pub enum HeaderFooterPlaceholder {
     Header,
 }
 
-/// Placeholder identities added by PowerPoint 12 and retained for round trips.
+/// Placeholder identities added by `PowerPoint` 12 and retained for round trips.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NewPlaceholder {
     /// Vertical object placeholder (`PT_VerticalObject`).
@@ -42,16 +46,16 @@ pub enum NewPlaceholder {
     Picture,
 }
 
-/// Application-defined checksums retained for PowerPoint 12 custom-layout round trips.
+/// Application-defined checksums retained for `PowerPoint` 12 custom-layout round trips.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ShapeChecksums {
-    /// Checksum used to detect changes to OfficeArt shape properties.
+    /// Checksum used to detect changes to `OfficeArt` shape properties.
     pub shape: u32,
     /// Checksum used to detect changes to the shape's text body.
     pub text: u32,
 }
 
-/// Inert PowerPoint 12 shape metadata stored in OfficeArt client data.
+/// Inert `PowerPoint` 12 shape metadata stored in `OfficeArt` client data.
 ///
 /// MS-PPT recommends ignoring these compatibility atoms while preserving them. The legacy
 /// `PlaceholderAtom`, when present, remains authoritative for the resolved placeholder type.
@@ -76,6 +80,10 @@ pub struct SlideExtension {
 
 impl SlideExtension {
     /// Discover and parse slide metadata from every `___PPT12` programmable tag below `root`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(root: &Record) -> Result<Self> {
         let mut extension = Self::default();
         for record in root.versioned_binary_tag_records(12)? {
@@ -112,6 +120,11 @@ impl SlideExtension {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -119,7 +132,7 @@ mod tests {
         let mut bytes = Vec::with_capacity(8 + data.len());
         bytes.extend_from_slice(&((instance << 4) | version).to_le_bytes());
         bytes.extend_from_slice(&record_type.to_le_bytes());
-        bytes.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(&u32::try_from(data.len()).unwrap().to_le_bytes());
         bytes.extend_from_slice(data);
         bytes
     }
@@ -129,9 +142,9 @@ mod tests {
             .encode_utf16()
             .flat_map(u16::to_le_bytes)
             .collect();
-        let name = record_bytes(0, 0, RecordType::CString.as_u16(), &name);
+        let name_record = record_bytes(0, 0, RecordType::CString.as_u16(), &name);
         let blob = record_bytes(0, 0, RecordType::BinaryTagData.as_u16(), records);
-        let tag_data = [name, blob].concat();
+        let tag_data = [name_record, blob].concat();
         let tag = record_bytes(0xf, 0, RecordType::ProgBinaryTag.as_u16(), &tag_data);
         let tags = record_bytes(0xf, 0, RecordType::ProgTags.as_u16(), &tag);
         Record::parse(&tags, 0).unwrap().0

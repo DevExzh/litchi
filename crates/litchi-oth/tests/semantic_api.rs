@@ -27,6 +27,10 @@ const SEMANTIC_WHITESPACE_CONTENT: &str = concat!(
     "</office:body></office:document-content>",
 );
 
+const PREFIX_ALIASED_TEXT_WEB: &str = include_str!("fixtures/odf14-text-web.xml");
+const WRONG_FAMILY: &str = include_str!("fixtures/wrong-family.xml");
+const DUPLICATE_BODY: &str = include_str!("fixtures/duplicate-body.xml");
+
 #[test]
 fn focused_modules_are_the_canonical_semantic_api() {
     assert_eq!(Paragraph::new("Welcome").text(), "Welcome");
@@ -78,4 +82,38 @@ fn loaded_template_snapshot_remains_byte_exact() {
     let template = Template::from_bytes(bytes.clone()).unwrap();
     assert_eq!(template.as_bytes(), bytes.as_slice());
     assert_eq!(template.into_bytes(), bytes);
+}
+
+#[test]
+fn local_odf14_fixture_uses_namespace_aware_text_web_contract() {
+    let bytes = Builder::new()
+        .content_xml(PREFIX_ALIASED_TEXT_WEB)
+        .build()
+        .unwrap();
+    let template = Template::from_bytes(bytes).unwrap();
+    let body = template.text_body().unwrap();
+    assert_eq!(body.paragraphs().len(), 1);
+    assert_eq!(body.paragraphs()[0].text(), "prefix-safe text");
+}
+
+#[test]
+fn local_invalid_family_fixtures_fail_before_package_publication() {
+    for xml in [WRONG_FAMILY, DUPLICATE_BODY] {
+        assert!(Builder::new().content_xml(xml).build().is_err());
+    }
+}
+
+#[test]
+fn exact_noop_edit_is_source_checked_and_atomic() {
+    let source = Template::from_bytes(Builder::new().build().unwrap()).unwrap();
+    let alternate =
+        Template::from_bytes(Builder::new().content_xml(COMPACT_CONTENT).build().unwrap()).unwrap();
+    let commit = source.edit().commit();
+    assert_eq!(commit.template().as_bytes(), source.as_bytes());
+    assert_eq!(commit.patch().apply(&source).unwrap(), source.as_bytes());
+    assert!(commit.patch().apply(&alternate).is_err());
+    assert_eq!(
+        commit.patch().inverse().apply(&source).unwrap(),
+        source.as_bytes()
+    );
 }

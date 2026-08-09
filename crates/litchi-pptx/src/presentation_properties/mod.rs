@@ -1,4 +1,4 @@
-//! Canonical layered owner for PresentationML presentation properties.
+//! Canonical layered owner for `PresentationML` presentation properties.
 
 mod codec;
 mod model;

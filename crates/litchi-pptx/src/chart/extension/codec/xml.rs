@@ -1,5 +1,10 @@
-use super::super::model::*;
-use super::limits::*;
+use super::super::model::{
+    Chart, ChartSpaceFormatting, DataSet, Document, ExternalData, Info, PlotArea,
+};
+use super::limits::{
+    CX, MAX_ATTRIBUTES, MAX_DATA_SETS, MAX_DEPTH, MAX_FEATURES, MAX_NODES, MAX_STRING_BYTES,
+    MAX_XML_BYTES, R, R_STRICT,
+};
 use super::semantic::parse_data_graph;
 use crate::{Error, Result};
 use quick_xml::XmlVersion;
@@ -223,7 +228,7 @@ pub(super) fn inspect_start(
                 }
                 let id = required(&attributes, "", "id")?
                     .parse::<u32>()
-                    .map_err(|_| invalid_error("invalid  data ID"))?;
+                    .map_err(|_err| invalid_error("invalid  data ID"))?;
                 if !scan.data_ids.insert(id) || scan.data_ids.len() > MAX_DATA_SETS {
                     return invalid(" data IDs are duplicate or excessive");
                 }
@@ -465,12 +470,12 @@ pub(super) fn one_child<'a>(
 pub(super) fn parse_u32(value: &str, label: &str) -> Result<u32> {
     value
         .parse()
-        .map_err(|_| invalid_error(format!("invalid  {label}")))
+        .map_err(|_err| invalid_error(format!("invalid  {label}")))
 }
 pub(super) fn parse_i32(value: &str, label: &str) -> Result<i32> {
     value
         .parse()
-        .map_err(|_| invalid_error(format!("invalid  {label}")))
+        .map_err(|_err| invalid_error(format!("invalid  {label}")))
 }
 pub(super) fn bounded_optional(node: &MiniNode, name: &str, max: usize) -> Result<Option<String>> {
     optional(&node.attributes, "", name)

@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{RtfDocument, RtfWriter, TablePreferredWidthUnit, TextDirection};
 
 fn write(document: &RtfDocument<'_>) -> String {
@@ -10,7 +19,7 @@ fn write(document: &RtfDocument<'_>) -> String {
 
 #[test]
 fn parses_logical_leading_trailing_widths_bidi_and_canonical_order() {
-    let source = r#"{\rtf1\trowd\ltrrow\trftsWidth2\trwWidth5000\trftsWidthB3\trwWidthB240\trftsWidthA2\trwWidthA1250\cellx900\cellx2100\intbl A\cell B\cell\row\trowd\rtlrow\trftsWidthB2\trwWidthB750\trftsWidthA3\trwWidthA360\cellx1000\cellx2200\intbl C\cell D\cell\row}"#;
+    let source = r"{\rtf1\trowd\ltrrow\trftsWidth2\trwWidth5000\trftsWidthB3\trwWidthB240\trftsWidthA2\trwWidthA1250\cellx900\cellx2100\intbl A\cell B\cell\row\trowd\rtlrow\trftsWidthB2\trwWidthB750\trftsWidthA3\trwWidthA360\cellx1000\cellx2200\intbl C\cell D\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     let rows = document.tables()[0].rows();
     assert_eq!(rows[0].direction(), Some(TextDirection::LeftToRight));
@@ -51,7 +60,7 @@ fn parses_logical_leading_trailing_widths_bidi_and_canonical_order() {
         rows[0]
             .cells()
             .iter()
-            .map(|cell| cell.right_boundary())
+            .map(litchi_rtf::raw::Cell::right_boundary)
             .collect::<Vec<_>>(),
         vec![Some(900), Some(2100)]
     );
@@ -59,7 +68,7 @@ fn parses_logical_leading_trailing_widths_bidi_and_canonical_order() {
         rows[1]
             .cells()
             .iter()
-            .map(|cell| cell.right_boundary())
+            .map(litchi_rtf::raw::Cell::right_boundary)
             .collect::<Vec<_>>(),
         vec![Some(1000), Some(2200)]
     );
@@ -73,7 +82,7 @@ fn parses_logical_leading_trailing_widths_bidi_and_canonical_order() {
 
 #[test]
 fn restores_groups_resets_trowd_and_normalizes_unit_only_defaults() {
-    let source = r#"{\rtf1\trowd{\trftsWidthB3\trwWidthB100\trftsWidthA2\trwWidthA500}\cellx1000\intbl A\cell\row\trowd\trftsWidthB3\trftsWidthA2\cellx1100\intbl B\cell\row\trowd\cellx1200\intbl C\cell\row}"#;
+    let source = r"{\rtf1\trowd{\trftsWidthB3\trwWidthB100\trftsWidthA2\trwWidthA500}\cellx1000\intbl A\cell\row\trowd\trftsWidthB3\trftsWidthA2\cellx1100\intbl B\cell\row\trowd\cellx1200\intbl C\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     let rows = document.tables()[0].rows();
     assert_eq!(rows[0].geometry().leading_invisible_width(), None);
@@ -104,7 +113,7 @@ fn restores_groups_resets_trowd_and_normalizes_unit_only_defaults() {
 
 #[test]
 fn applies_end_defined_nested_widths_and_owned_conversion() {
-    let source = r#"{\rtf1\trowd\cellx5000\intbl\itap2 Inner\nestcell{\*\nesttableprops\itap2\trowd\rtlrow\trftsWidthB3\trwWidthB144\trftsWidthA2\trwWidthA625\cellx700\nestrow}\intbl\itap1\cell\row}"#;
+    let source = r"{\rtf1\trowd\cellx5000\intbl\itap2 Inner\nestcell{\*\nesttableprops\itap2\trowd\rtlrow\trftsWidthB3\trwWidthB144\trftsWidthA2\trwWidthA625\cellx700\nestrow}\intbl\itap1\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     let nested = &document.tables()[0].rows()[0].cells()[0].nested_tables()[0]
         .table
@@ -159,7 +168,7 @@ fn rejects_malformed_duplicate_unpaired_and_out_of_range_controls() {
         let source = format!("{{\\rtf1\\trowd\\{controls}\\cellx1000\\intbl X\\cell\\row}}");
         assert!(RtfDocument::parse(&source).is_err(), "accepted {controls}");
     }
-    assert!(RtfDocument::parse(r#"{\rtf1\trowd\trftsWidthB2\trwWidthB5000\trftsWidthA3\trwWidthA31680\cellx31680\intbl X\cell\row}"#).is_ok());
+    assert!(RtfDocument::parse(r"{\rtf1\trowd\trftsWidthB2\trwWidthB5000\trftsWidthA3\trwWidthA31680\cellx31680\intbl X\cell\row}").is_ok());
 }
 
 #[test]

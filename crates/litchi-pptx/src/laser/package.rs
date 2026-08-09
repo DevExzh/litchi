@@ -15,7 +15,11 @@ const MAX_XML_DEPTH: usize = 128;
 const PML: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";
 const STRICT_PML: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
 
-/// Load bounded traces from one PresentationML slide part.
+/// Load bounded traces from one `PresentationML` slide part.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load_slide_traces(
     slide_index: usize,
     slide: &dyn Part,
@@ -31,6 +35,10 @@ pub fn load_slide_traces(
 }
 
 /// Store one trace in a slide's extension list, preserving its dialect.
+///
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn store_slide_trace(
     package: &mut OpcPackage,
     slide_name: &PackURI,
@@ -115,7 +123,7 @@ fn insert_extension_fragment(xml: &[u8], fragment: &str) -> Result<Vec<u8>> {
 
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::Invalid("slide XML offset overflow".to_owned()))?;
+            .map_err(|_err| Error::Invalid("slide XML offset overflow".to_owned()))?;
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
@@ -170,8 +178,9 @@ fn insert_extension_fragment(xml: &[u8], fragment: &str) -> Result<Vec<u8>> {
                     }
                     empty_ext = Some((
                         start,
-                        usize::try_from(reader.buffer_position())
-                            .map_err(|_| Error::Invalid("slide XML offset overflow".to_owned()))?,
+                        usize::try_from(reader.buffer_position()).map_err(|_err| {
+                            Error::Invalid("slide XML offset overflow".to_owned())
+                        })?,
                     ));
                 }
             },
@@ -303,6 +312,11 @@ fn limit(resource: &'static str, limit: usize) -> Error {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use crate::time::Offset;

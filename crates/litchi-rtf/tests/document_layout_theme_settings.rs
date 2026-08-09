@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{
     DocumentPrintLayoutSettings, DocumentThemeLanguages, LanguageId, RtfDocument, RtfWriter,
 };
@@ -40,14 +49,14 @@ fn parses_flags_and_producer_style_theme_languages() {
 
 #[test]
 fn omission_is_distinct_from_explicit_zero_languages() {
-    let omitted = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let omitted = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     assert!(omitted.print_layout_settings().is_empty());
     assert!(omitted.theme_languages().is_empty());
     let serialized = String::from_utf8(write(&omitted)).unwrap();
     assert!(!serialized.contains("\\themelang"));
 
     let explicit =
-        RtfDocument::parse(r#"{\rtf1\themelang0\themelangfe0\themelangcs0 Body}"#).unwrap();
+        RtfDocument::parse(r"{\rtf1\themelang0\themelangfe0\themelangcs0 Body}").unwrap();
     assert_eq!(explicit.theme_languages().primary.unwrap().value(), 0);
     assert_eq!(explicit.theme_languages().east_asian.unwrap().value(), 0);
     assert_eq!(
@@ -62,7 +71,7 @@ fn omission_is_distinct_from_explicit_zero_languages() {
 
 #[test]
 fn typed_apis_round_trip_in_stable_order_and_clear_without_side_effects() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     document
         .set_print_layout_settings(DocumentPrintLayoutSettings {
             facing_pages: false,
@@ -127,23 +136,23 @@ fn coexists_with_theme_data_grid_and_rendering_metadata() {
 #[test]
 fn rejects_parameters_missing_values_ranges_overflow_and_duplicates() {
     for source in [
-        r#"{\rtf1\gutterprl0 Body}"#,
-        r#"{\rtf1\twoonone1 Body}"#,
-        r#"{\rtf1\themelang Body}"#,
-        r#"{\rtf1\themelang-1 Body}"#,
-        r#"{\rtf1\themelang65536 Body}"#,
-        r#"{\rtf1\themelangfe Body}"#,
-        r#"{\rtf1\themelangfe-1 Body}"#,
-        r#"{\rtf1\themelangfe65536 Body}"#,
-        r#"{\rtf1\themelangcs Body}"#,
-        r#"{\rtf1\themelangcs-1 Body}"#,
-        r#"{\rtf1\themelangcs65536 Body}"#,
-        r#"{\rtf1\themelang99999999999 Body}"#,
-        r#"{\rtf1\gutterprl\gutterprl Body}"#,
-        r#"{\rtf1\twoonone\twoonone Body}"#,
-        r#"{\rtf1\themelang0\themelang1033 Body}"#,
-        r#"{\rtf1\themelangfe0\themelangfe1041 Body}"#,
-        r#"{\rtf1\themelangcs0\themelangcs1025 Body}"#,
+        r"{\rtf1\gutterprl0 Body}",
+        r"{\rtf1\twoonone1 Body}",
+        r"{\rtf1\themelang Body}",
+        r"{\rtf1\themelang-1 Body}",
+        r"{\rtf1\themelang65536 Body}",
+        r"{\rtf1\themelangfe Body}",
+        r"{\rtf1\themelangfe-1 Body}",
+        r"{\rtf1\themelangfe65536 Body}",
+        r"{\rtf1\themelangcs Body}",
+        r"{\rtf1\themelangcs-1 Body}",
+        r"{\rtf1\themelangcs65536 Body}",
+        r"{\rtf1\themelang99999999999 Body}",
+        r"{\rtf1\gutterprl\gutterprl Body}",
+        r"{\rtf1\twoonone\twoonone Body}",
+        r"{\rtf1\themelang0\themelang1033 Body}",
+        r"{\rtf1\themelangfe0\themelangfe1041 Body}",
+        r"{\rtf1\themelangcs0\themelangcs1025 Body}",
     ] {
         assert!(
             RtfDocument::parse(source).is_err(),
@@ -155,16 +164,16 @@ fn rejects_parameters_missing_values_ranges_overflow_and_duplicates() {
 #[test]
 fn rejects_every_starred_grouped_and_late_control() {
     for control in [
-        r#"\gutterprl"#,
-        r#"\twoonone"#,
-        r#"\themelang1033"#,
-        r#"\themelangfe2052"#,
-        r#"\themelangcs1025"#,
+        r"\gutterprl",
+        r"\twoonone",
+        r"\themelang1033",
+        r"\themelangfe2052",
+        r"\themelangcs1025",
     ] {
         for source in [
-            format!(r#"{{\rtf1{{\*{control}}}Body}}"#),
-            format!(r#"{{\rtf1{{{control}}}Body}}"#),
-            format!(r#"{{\rtf1 Body{control}}}"#),
+            format!(r"{{\rtf1{{\*{control}}}Body}}"),
+            format!(r"{{\rtf1{{{control}}}Body}}"),
+            format!(r"{{\rtf1 Body{control}}}"),
         ] {
             assert!(
                 RtfDocument::parse(&source).is_err(),

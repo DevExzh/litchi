@@ -1,6 +1,24 @@
 //! RTF story event and legacy drawing output.
 
-use super::super::*;
+#![allow(
+    clippy::shadow_reuse,
+    clippy::shadow_unrelated,
+    reason = "serialization helpers deliberately rebind a working value as the output is assembled"
+)]
+use super::super::{
+    Annotation, BodyEvent, BodyEventKind, BodyStoryEvent, BookmarkTable, CustomXmlTag,
+    DrawingStoryTextMode, EditableRegion, EmbeddedObject, Field, FieldOwner, FormField,
+    GeneratedListMarker, LegacyCalloutAttachment, LegacyCalloutType, LegacyDrawing,
+    LegacyDrawingArrow, LegacyDrawingArrowFill, LegacyDrawingColor, LegacyDrawingGeometry,
+    LegacyDrawingLineStyle, LegacyDrawingPoint, LegacyDrawingPrimitive, LegacyDrawingProperties,
+    LegacyHorizontalAnchor, LegacyTextBox, LegacyTextDirection, LegacyVerticalAnchor,
+    MAX_EMBEDDED_OBJECTS, MAX_LEGACY_DRAWINGS, MAX_PICTURE_COMPATIBILITY_RECORDS, MathZone,
+    NavigationEntry, Note, ObjectKind, ObjectResultKind, Picture, PictureCompatibilityKind,
+    PictureCompatibilityRecord, PictureShapeProperties, ProtectionRange, Revision, RevisionType,
+    RtfWriter, Section, Shape, ShapeGroup, ShapeGroupInfo, ShapeType, SoftBreakKind, StoryDrawing,
+    StyleBlock, Write, field, form_field, invalid_story_reference, io, navigation_entry, section,
+    take_story_item,
+};
 
 impl<W: Write> RtfWriter<W> {
     pub(in super::super) fn write_annotation_value(
@@ -18,33 +36,40 @@ impl<W: Write> RtfWriter<W> {
         self.write_str("}")
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "the writer threads the full block and markup context through the pipeline"
+    )]
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(in super::super::super) fn write_blocks_with_markup(
         &mut self,
         blocks: &[StyleBlock<'_>],
         body_boundaries: &[crate::story::Boundary],
         bookmarks: &BookmarkTable<'_>,
-        custom_xml_tags: &[crate::CustomXmlTag<'_>],
-        math_zones: &[crate::MathZone<'_>],
-        protection_ranges: &[crate::ProtectionRange<'_>],
-        editable_regions: &[crate::EditableRegion<'_>],
+        custom_xml_tags: &[CustomXmlTag<'_>],
+        math_zones: &[MathZone<'_>],
+        protection_ranges: &[ProtectionRange<'_>],
+        editable_regions: &[EditableRegion<'_>],
         annotations: &[Annotation<'_>],
         notes: &[Note<'_>],
         revisions: &[Revision<'_>],
-        navigation_entries: &[crate::NavigationEntry<'_>],
-        generated_list_markers: &[crate::GeneratedListMarker<'_>],
-        shapes: &[crate::Shape<'_>],
-        shape_groups: &[crate::ShapeGroup<'_>],
-        drawing_order: &[crate::StoryDrawing],
-        picture_compatibility_records: &[crate::PictureCompatibilityRecord],
-        pictures: &[crate::Picture<'_>],
-        objects: &[crate::EmbeddedObject<'_>],
-        legacy_text_boxes: &[crate::LegacyTextBox<'_>],
-        legacy_drawings: &[crate::LegacyDrawing<'_>],
-        form_fields: &[crate::FormField<'_>],
-        fields: &[crate::Field<'_>],
+        navigation_entries: &[NavigationEntry<'_>],
+        generated_list_markers: &[GeneratedListMarker<'_>],
+        shapes: &[Shape<'_>],
+        shape_groups: &[ShapeGroup<'_>],
+        drawing_order: &[StoryDrawing],
+        picture_compatibility_records: &[PictureCompatibilityRecord],
+        pictures: &[Picture<'_>],
+        objects: &[EmbeddedObject<'_>],
+        legacy_text_boxes: &[LegacyTextBox<'_>],
+        legacy_drawings: &[LegacyDrawing<'_>],
+        form_fields: &[FormField<'_>],
+        fields: &[Field<'_>],
         sections: &[Section<'_>],
-        body_story_events: &[crate::BodyStoryEvent],
+        body_story_events: &[BodyStoryEvent],
         opaque_nodes: &[crate::opaque::Node],
     ) -> io::Result<()> {
         if bookmarks.bookmarks().is_empty()
@@ -66,7 +91,7 @@ impl<W: Write> RtfWriter<W> {
             && form_fields.is_empty()
             && fields
                 .iter()
-                .all(|field| !matches!(field.owner, crate::FieldOwner::Body))
+                .all(|field| !matches!(field.owner, FieldOwner::Body))
             && body_story_events.is_empty()
             && opaque_nodes.is_empty()
         {
@@ -114,13 +139,13 @@ impl<W: Write> RtfWriter<W> {
         let event_count = event_count.saturating_add(body_story_events.len());
         let event_count = event_count.saturating_add(opaque_nodes.len());
         let mut events = Vec::new();
-        events.try_reserve(event_count).map_err(|_| {
+        events.try_reserve(event_count).map_err(|_err| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "RTF body event table exceeds available memory",
             )
         })?;
-        if notes.len() > crate::section::MAX_NOTES {
+        if notes.len() > section::MAX_NOTES {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "RTF note count exceeds the safety limit",
@@ -146,7 +171,7 @@ impl<W: Write> RtfWriter<W> {
                 .ok_or_else(|| {
                     io::Error::new(io::ErrorKind::InvalidInput, "RTF note text size overflow")
                 })?;
-            if note_text_bytes > crate::section::MAX_NOTE_TEXT_TOTAL_BYTES {
+            if note_text_bytes > section::MAX_NOTE_TEXT_TOTAL_BYTES {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "RTF note aggregate text exceeds the safety limit",
@@ -170,13 +195,13 @@ impl<W: Write> RtfWriter<W> {
                 "RTF body drawing order is incomplete",
             ));
         }
-        if fields.len() > crate::field::MAX_GENERIC_FIELDS {
+        if fields.len() > field::MAX_GENERIC_FIELDS {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "RTF generic field count exceeds the safety limit",
             ));
         }
-        if objects.len() > crate::object::MAX_EMBEDDED_OBJECTS {
+        if objects.len() > MAX_EMBEDDED_OBJECTS {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "RTF embedded object count exceeds the safety limit",
@@ -214,7 +239,7 @@ impl<W: Write> RtfWriter<W> {
             });
             previous_object_position = Some(object.position);
         }
-        if picture_compatibility_records.len() > crate::MAX_PICTURE_COMPATIBILITY_RECORDS {
+        if picture_compatibility_records.len() > MAX_PICTURE_COMPATIBILITY_RECORDS {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "RTF picture-compatibility record count exceeds the safety limit",
@@ -225,12 +250,10 @@ impl<W: Write> RtfWriter<W> {
             record
                 .validate(&body, pictures.len())
                 .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
-            if previous_picture_record.is_some_and(
-                |previous: &crate::PictureCompatibilityRecord| {
-                    previous.position > record.position
-                        || (previous.position == record.position && previous.kind == record.kind)
-                },
-            ) {
+            if previous_picture_record.is_some_and(|previous: &PictureCompatibilityRecord| {
+                previous.position > record.position
+                    || (previous.position == record.position && previous.kind == record.kind)
+            }) {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "RTF picture-compatibility records are duplicated or out of body order",
@@ -252,14 +275,14 @@ impl<W: Write> RtfWriter<W> {
             });
             previous_picture_record = Some(record);
         }
-        if form_fields.len() > crate::form_field::MAX_FORM_FIELDS {
+        if form_fields.len() > form_field::MAX_FORM_FIELDS {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "RTF form-field count exceeds the safety limit",
             ));
         }
         let mut form_field_bytes = 0usize;
-        let mut form_field_ranges: Vec<&crate::FormField<'_>> = form_fields.iter().collect();
+        let mut form_field_ranges: Vec<&FormField<'_>> = form_fields.iter().collect();
         form_field_ranges.sort_by_key(|field| (field.position, field.range_end));
         let mut previous_form_end = 0usize;
         for field in form_field_ranges {
@@ -300,7 +323,7 @@ impl<W: Write> RtfWriter<W> {
                         "RTF form-field aggregate size overflow",
                     )
                 })?;
-            if form_field_bytes > crate::form_field::MAX_FORM_FIELD_TOTAL_BYTES {
+            if form_field_bytes > form_field::MAX_FORM_FIELD_TOTAL_BYTES {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "RTF form-field aggregate text exceeds the safety limit",
@@ -325,7 +348,7 @@ impl<W: Write> RtfWriter<W> {
             ));
         }
         let mut generated_marker_bytes = 0usize;
-        let mut previous_generated_marker: Option<&crate::GeneratedListMarker<'_>> = None;
+        let mut previous_generated_marker: Option<&GeneratedListMarker<'_>> = None;
         for marker in generated_list_markers {
             marker
                 .validate()
@@ -417,7 +440,7 @@ impl<W: Write> RtfWriter<W> {
             previous_legacy_text_box_position = Some(text_box.position);
         }
 
-        if legacy_drawings.len() > crate::MAX_LEGACY_DRAWINGS {
+        if legacy_drawings.len() > MAX_LEGACY_DRAWINGS {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "RTF legacy drawing count exceeds the safety limit",
@@ -449,7 +472,7 @@ impl<W: Write> RtfWriter<W> {
             previous_legacy_drawing_position = Some(drawing.position);
         }
 
-        if navigation_entries.len() > crate::navigation_entry::MAX_NAVIGATION_ENTRIES {
+        if navigation_entries.len() > navigation_entry::MAX_NAVIGATION_ENTRIES {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "RTF navigation-entry count limit exceeded",
@@ -459,7 +482,7 @@ impl<W: Write> RtfWriter<W> {
         let body_navigation: Vec<bool> = (0..navigation_entries.len())
             .map(|index| {
                 body_story_events.iter().any(|event| {
-                matches!(event, crate::BodyStoryEvent::NavigationEntry(value) if *value == index)
+                matches!(event, BodyStoryEvent::NavigationEntry(value) if *value == index)
             })
             })
             .collect();
@@ -468,9 +491,9 @@ impl<W: Write> RtfWriter<W> {
                 body_story_events.iter().any(|event| {
                     matches!(
                         event,
-                        crate::BodyStoryEvent::RevisionStart(value)
-                            | crate::BodyStoryEvent::RevisionEnd(value)
-                            | crate::BodyStoryEvent::RevisionDeletion(value)
+                        BodyStoryEvent::RevisionStart(value)
+                            | BodyStoryEvent::RevisionEnd(value)
+                            | BodyStoryEvent::RevisionDeletion(value)
                             if *value == index
                     )
                 })
@@ -499,9 +522,7 @@ impl<W: Write> RtfWriter<W> {
                         "navigation-entry size overflow",
                     )
                 })?;
-            if navigation_text_bytes
-                > crate::navigation_entry::MAX_NAVIGATION_ENTRY_TEXT_TOTAL_BYTES
-            {
+            if navigation_text_bytes > navigation_entry::MAX_NAVIGATION_ENTRY_TEXT_TOTAL_BYTES {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "RTF navigation-entry aggregate text limit exceeded",
@@ -578,7 +599,7 @@ impl<W: Write> RtfWriter<W> {
             let mut xml_stack: Vec<usize> = Vec::new();
             for event in body_story_events {
                 match *event {
-                    crate::BodyStoryEvent::CustomXmlOpen(index) => {
+                    BodyStoryEvent::CustomXmlOpen(index) => {
                         if index >= custom_xml_tags.len() {
                             return Err(io::Error::new(
                                 io::ErrorKind::InvalidInput,
@@ -587,7 +608,7 @@ impl<W: Write> RtfWriter<W> {
                         }
                         xml_stack.push(index);
                     },
-                    crate::BodyStoryEvent::CustomXmlClose(index) => {
+                    BodyStoryEvent::CustomXmlClose(index) => {
                         let expected = xml_stack.pop();
                         if expected != Some(index) {
                             return Err(io::Error::new(
@@ -690,7 +711,7 @@ impl<W: Write> RtfWriter<W> {
             let mut region_stack: Vec<usize> = Vec::new();
             for event in body_story_events {
                 match *event {
-                    crate::BodyStoryEvent::EditableRegionStart(index) => {
+                    BodyStoryEvent::EditableRegionStart(index) => {
                         if index >= editable_regions.len() {
                             return Err(io::Error::new(
                                 io::ErrorKind::InvalidInput,
@@ -699,7 +720,7 @@ impl<W: Write> RtfWriter<W> {
                         }
                         region_stack.push(index);
                     },
-                    crate::BodyStoryEvent::EditableRegionEnd(index) => {
+                    BodyStoryEvent::EditableRegionEnd(index) => {
                         let expected = region_stack.pop();
                         if expected != Some(index) {
                             return Err(io::Error::new(
@@ -847,7 +868,7 @@ impl<W: Write> RtfWriter<W> {
         let first_section_is_boundary_scoped = body_story_events.iter().any(|event| {
             matches!(
                 event,
-                crate::BodyStoryEvent::SectionBreak(section_break)
+                BodyStoryEvent::SectionBreak(section_break)
                     if section_break.next_section == Some(0)
             )
         });
@@ -858,36 +879,36 @@ impl<W: Write> RtfWriter<W> {
         };
         for story_event in body_story_events {
             let (position, kind) = match *story_event {
-                crate::BodyStoryEvent::Drawing(crate::StoryDrawing::Shape(index)) => {
+                BodyStoryEvent::Drawing(StoryDrawing::Shape(index)) => {
                     let shape = take_story_item(shapes, &mut saw_shapes, index)?;
                     if shape.is_background {
                         return Err(invalid_story_reference());
                     }
-                    ordered_drawings.push(crate::StoryDrawing::Shape(index));
+                    ordered_drawings.push(StoryDrawing::Shape(index));
                     (shape.position, BodyEventKind::Shape(shape))
                 },
-                crate::BodyStoryEvent::Drawing(crate::StoryDrawing::ShapeGroup(index)) => {
+                BodyStoryEvent::Drawing(StoryDrawing::ShapeGroup(index)) => {
                     let group = take_story_item(shape_groups, &mut saw_groups, index)?;
-                    ordered_drawings.push(crate::StoryDrawing::ShapeGroup(index));
+                    ordered_drawings.push(StoryDrawing::ShapeGroup(index));
                     (group.position, BodyEventKind::ShapeGroup(group))
                 },
-                crate::BodyStoryEvent::Field(index) => {
+                BodyStoryEvent::Field(index) => {
                     let field = take_story_item(fields, &mut saw_fields, index)?;
-                    if !matches!(field.owner, crate::FieldOwner::Body) {
+                    if !matches!(field.owner, FieldOwner::Body) {
                         return Err(invalid_story_reference());
                     }
                     (field.position, BodyEventKind::GenericField(field))
                 },
-                crate::BodyStoryEvent::PageBreak(page_break) => {
+                BodyStoryEvent::PageBreak(page_break) => {
                     (page_break.position, BodyEventKind::PageBreak)
                 },
-                crate::BodyStoryEvent::SoftBreak(soft_break) => {
+                BodyStoryEvent::SoftBreak(soft_break) => {
                     (soft_break.position, BodyEventKind::SoftBreak(soft_break))
                 },
-                crate::BodyStoryEvent::ColumnBreak(column_break) => {
+                BodyStoryEvent::ColumnBreak(column_break) => {
                     (column_break.position, BodyEventKind::ColumnBreak)
                 },
-                crate::BodyStoryEvent::SectionBreak(section_break) => {
+                BodyStoryEvent::SectionBreak(section_break) => {
                     let section = match section_break.next_section {
                         None => None,
                         Some(index) if index == next_section_index => {
@@ -915,12 +936,12 @@ impl<W: Write> RtfWriter<W> {
                     };
                     (section_break.position, BodyEventKind::SectionBreak(section))
                 },
-                crate::BodyStoryEvent::BookmarkStart(index) => {
+                BodyStoryEvent::BookmarkStart(index) => {
                     let bookmark =
                         take_story_item(bookmark_items, &mut saw_bookmark_starts, index)?;
                     (bookmark.position, BodyEventKind::BookmarkStart(bookmark))
                 },
-                crate::BodyStoryEvent::BookmarkEnd(index) => {
+                BodyStoryEvent::BookmarkEnd(index) => {
                     let bookmark = take_story_item(bookmark_items, &mut saw_bookmark_ends, index)?;
                     (
                         bookmark
@@ -935,11 +956,11 @@ impl<W: Write> RtfWriter<W> {
                         BodyEventKind::BookmarkEnd(bookmark),
                     )
                 },
-                crate::BodyStoryEvent::CustomXmlOpen(index) => {
+                BodyStoryEvent::CustomXmlOpen(index) => {
                     let tag = take_story_item(custom_xml_tags, &mut saw_custom_xml_opens, index)?;
                     (tag.position, BodyEventKind::CustomXmlOpen(tag))
                 },
-                crate::BodyStoryEvent::CustomXmlClose(index) => {
+                BodyStoryEvent::CustomXmlClose(index) => {
                     let tag = take_story_item(custom_xml_tags, &mut saw_custom_xml_closes, index)?;
                     (
                         tag.position.checked_add(tag.content.len()).ok_or_else(|| {
@@ -951,16 +972,16 @@ impl<W: Write> RtfWriter<W> {
                         BodyEventKind::CustomXmlClose(tag),
                     )
                 },
-                crate::BodyStoryEvent::MathZone(index) => {
+                BodyStoryEvent::MathZone(index) => {
                     let zone = take_story_item(math_zones, &mut saw_math_zones, index)?;
                     (zone.position, BodyEventKind::MathZone(zone))
                 },
-                crate::BodyStoryEvent::ProtectionRangeStart(index) => {
+                BodyStoryEvent::ProtectionRangeStart(index) => {
                     let range =
                         take_story_item(protection_ranges, &mut saw_protection_starts, index)?;
                     (range.position, BodyEventKind::ProtectionRangeStart(range))
                 },
-                crate::BodyStoryEvent::ProtectionRangeEnd(index) => {
+                BodyStoryEvent::ProtectionRangeEnd(index) => {
                     let range =
                         take_story_item(protection_ranges, &mut saw_protection_ends, index)?;
                     (
@@ -976,12 +997,12 @@ impl<W: Write> RtfWriter<W> {
                         BodyEventKind::ProtectionRangeEnd(range),
                     )
                 },
-                crate::BodyStoryEvent::EditableRegionStart(index) => {
+                BodyStoryEvent::EditableRegionStart(index) => {
                     let region =
                         take_story_item(editable_regions, &mut saw_editable_starts, index)?;
                     (region.position, BodyEventKind::EditableRegionStart(region))
                 },
-                crate::BodyStoryEvent::EditableRegionEnd(index) => {
+                BodyStoryEvent::EditableRegionEnd(index) => {
                     let region = take_story_item(editable_regions, &mut saw_editable_ends, index)?;
                     (
                         region
@@ -996,7 +1017,7 @@ impl<W: Write> RtfWriter<W> {
                         BodyEventKind::EditableRegionEnd(region),
                     )
                 },
-                crate::BodyStoryEvent::AnnotationStart(index) => {
+                BodyStoryEvent::AnnotationStart(index) => {
                     let annotation =
                         take_story_item(annotations, &mut saw_annotation_starts, index)?;
                     (
@@ -1004,22 +1025,22 @@ impl<W: Write> RtfWriter<W> {
                         BodyEventKind::AnnotationStart(annotation),
                     )
                 },
-                crate::BodyStoryEvent::AnnotationEnd(index) => {
+                BodyStoryEvent::AnnotationEnd(index) => {
                     let annotation = take_story_item(annotations, &mut saw_annotation_ends, index)?;
                     (
                         annotation.range_end,
                         BodyEventKind::AnnotationEnd(annotation),
                     )
                 },
-                crate::BodyStoryEvent::Note(index) => {
+                BodyStoryEvent::Note(index) => {
                     let note = take_story_item(notes, &mut saw_notes, index)?;
                     (note.position, BodyEventKind::Note(note))
                 },
-                crate::BodyStoryEvent::Object(index) => {
+                BodyStoryEvent::Object(index) => {
                     let object = take_story_item(objects, &mut saw_objects, index)?;
                     (object.position, BodyEventKind::Object(object, pictures))
                 },
-                crate::BodyStoryEvent::PictureCompatibility(index) => {
+                BodyStoryEvent::PictureCompatibility(index) => {
                     let record = take_story_item(
                         picture_compatibility_records,
                         &mut saw_picture_records,
@@ -1036,51 +1057,51 @@ impl<W: Write> RtfWriter<W> {
                         BodyEventKind::PictureCompatibility(record, picture),
                     )
                 },
-                crate::BodyStoryEvent::FormFieldStart(index) => {
+                BodyStoryEvent::FormFieldStart(index) => {
                     let field = take_story_item(form_fields, &mut saw_form_starts, index)?;
                     (field.position, BodyEventKind::FormFieldStart(field))
                 },
-                crate::BodyStoryEvent::FormFieldEnd(index) => {
+                BodyStoryEvent::FormFieldEnd(index) => {
                     let field = take_story_item(form_fields, &mut saw_form_ends, index)?;
                     (field.range_end, BodyEventKind::FormFieldEnd)
                 },
-                crate::BodyStoryEvent::RevisionStart(index) => {
+                BodyStoryEvent::RevisionStart(index) => {
                     let revision = take_story_item(revisions, &mut saw_revision_starts, index)?;
                     if revision.revision_type != RevisionType::Insertion {
                         return Err(invalid_story_reference());
                     }
                     (revision.position, BodyEventKind::RevisionStart(revision))
                 },
-                crate::BodyStoryEvent::RevisionEnd(index) => {
+                BodyStoryEvent::RevisionEnd(index) => {
                     let revision = take_story_item(revisions, &mut saw_revision_ends, index)?;
                     if revision.revision_type != RevisionType::Insertion {
                         return Err(invalid_story_reference());
                     }
                     (revision.range_end, BodyEventKind::RevisionEnd)
                 },
-                crate::BodyStoryEvent::RevisionDeletion(index) => {
+                BodyStoryEvent::RevisionDeletion(index) => {
                     let revision = take_story_item(revisions, &mut saw_revision_deletions, index)?;
                     if revision.revision_type != RevisionType::Deletion {
                         return Err(invalid_story_reference());
                     }
                     (revision.position, BodyEventKind::RevisionDeletion(revision))
                 },
-                crate::BodyStoryEvent::GeneratedListMarker(index) => {
+                BodyStoryEvent::GeneratedListMarker(index) => {
                     let marker =
                         take_story_item(generated_list_markers, &mut saw_generated_markers, index)?;
                     (marker.position, BodyEventKind::GeneratedListMarker(marker))
                 },
-                crate::BodyStoryEvent::LegacyTextBox(index) => {
+                BodyStoryEvent::LegacyTextBox(index) => {
                     let text_box =
                         take_story_item(legacy_text_boxes, &mut saw_legacy_text_boxes, index)?;
                     (text_box.position, BodyEventKind::LegacyTextBox(text_box))
                 },
-                crate::BodyStoryEvent::LegacyDrawing(index) => {
+                BodyStoryEvent::LegacyDrawing(index) => {
                     let drawing =
                         take_story_item(legacy_drawings, &mut saw_legacy_drawings, index)?;
                     (drawing.position, BodyEventKind::LegacyDrawing(drawing))
                 },
-                crate::BodyStoryEvent::NavigationEntry(index) => {
+                BodyStoryEvent::NavigationEntry(index) => {
                     let entry =
                         take_story_item(navigation_entries, &mut saw_navigation_entries, index)?;
                     (entry.position(), BodyEventKind::NavigationEntry(entry))
@@ -1110,7 +1131,7 @@ impl<W: Write> RtfWriter<W> {
             && saw_fields
                 .iter()
                 .zip(fields)
-                .all(|(seen, field)| !matches!(field.owner, crate::FieldOwner::Body) || *seen)
+                .all(|(seen, field)| !matches!(field.owner, FieldOwner::Body) || *seen)
             && saw_bookmark_starts.iter().all(|seen| *seen)
             && saw_bookmark_ends.iter().all(|seen| *seen)
             && saw_custom_xml_opens.iter().all(|seen| *seen)
@@ -1138,7 +1159,9 @@ impl<W: Write> RtfWriter<W> {
                         _ if !*is_body => true,
                         RevisionType::Insertion => *start && *end && !*deletion,
                         RevisionType::Deletion => *deletion && !*start && !*end,
-                        _ => false,
+                        RevisionType::FormatChange
+                        | RevisionType::MovedFrom
+                        | RevisionType::MovedTo => false,
                     }
                 })
             && saw_generated_markers.iter().all(|seen| *seen)
@@ -1256,7 +1279,7 @@ impl<W: Write> RtfWriter<W> {
     pub(in super::super) fn write_body_event(
         &mut self,
         event: BodyEvent<'_, '_>,
-        fields: &[crate::Field<'_>],
+        fields: &[Field<'_>],
     ) -> io::Result<()> {
         match event.kind {
             BodyEventKind::Shape(shape) => self.write_root_shape(shape),
@@ -1303,10 +1326,10 @@ impl<W: Write> RtfWriter<W> {
             BodyEventKind::GenericField(field) => self.write_field_with_fields(field, fields, 0),
             BodyEventKind::PageBreak => self.write_str("\\page "),
             BodyEventKind::SoftBreak(soft_break) => match soft_break.kind {
-                crate::SoftBreakKind::Page => self.write_str("\\softpage "),
-                crate::SoftBreakKind::Column => self.write_str("\\softcol "),
-                crate::SoftBreakKind::Line => self.write_str("\\softline "),
-                crate::SoftBreakKind::LineHeight(height) => {
+                SoftBreakKind::Page => self.write_str("\\softpage "),
+                SoftBreakKind::Column => self.write_str("\\softcol "),
+                SoftBreakKind::Line => self.write_str("\\softline "),
+                SoftBreakKind::LineHeight(height) => {
                     self.write_control_word("softlheight", Some(height))?;
                     self.write_str(" ")
                 },
@@ -1323,10 +1346,7 @@ impl<W: Write> RtfWriter<W> {
         }
     }
 
-    pub(in super::super) fn write_root_shape(
-        &mut self,
-        shape: &crate::Shape<'_>,
-    ) -> io::Result<()> {
+    pub(in super::super) fn write_root_shape(&mut self, shape: &Shape<'_>) -> io::Result<()> {
         shape
             .validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
@@ -1374,16 +1394,16 @@ impl<W: Write> RtfWriter<W> {
             .any(|property| property.name == "shapeType")
         {
             let shape_type = match shape.shape_type {
-                crate::ShapeType::Rectangle => Some(1),
-                crate::ShapeType::RoundRectangle => Some(2),
-                crate::ShapeType::Ellipse => Some(3),
-                crate::ShapeType::Arc => Some(19),
-                crate::ShapeType::Line => Some(20),
-                crate::ShapeType::PictureFrame => Some(75),
-                crate::ShapeType::TextBox => Some(202),
-                crate::ShapeType::Group => Some(0),
-                crate::ShapeType::Custom(value) => Some(value),
-                crate::ShapeType::Polygon | crate::ShapeType::Unknown => None,
+                ShapeType::Rectangle => Some(1),
+                ShapeType::RoundRectangle => Some(2),
+                ShapeType::Ellipse => Some(3),
+                ShapeType::Arc => Some(19),
+                ShapeType::Line => Some(20),
+                ShapeType::PictureFrame => Some(75),
+                ShapeType::TextBox => Some(202),
+                ShapeType::Group => Some(0),
+                ShapeType::Custom(value) => Some(value),
+                ShapeType::Polygon | ShapeType::Unknown => None,
             };
             if let Some(value) = shape_type {
                 self.write_shape_scalar_property("shapeType", &value.to_string())?;
@@ -1407,54 +1427,29 @@ impl<W: Write> RtfWriter<W> {
         self.write_str("}")
     }
 
-    pub(in super::super) fn write_shape_info(
-        &mut self,
-        info: &[crate::ShapeGroupInfo],
-    ) -> io::Result<()> {
+    pub(in super::super) fn write_shape_info(&mut self, info: &[ShapeGroupInfo]) -> io::Result<()> {
         for info in info {
             match *info {
-                crate::ShapeGroupInfo::ShapeId(value) => {
-                    self.write_control_word("shplid", Some(value))?
+                ShapeGroupInfo::ShapeId(value) => self.write_control_word("shplid", Some(value))?,
+                ShapeGroupInfo::InHeader(value) => {
+                    self.write_control_word("shpfhdr", Some(i32::from(value)))?;
                 },
-                crate::ShapeGroupInfo::InHeader(value) => {
-                    self.write_control_word("shpfhdr", Some(i32::from(value)))?
+                ShapeGroupInfo::HorizontalPage => self.write_control_word("shpbxpage", None)?,
+                ShapeGroupInfo::HorizontalMargin => self.write_control_word("shpbxmargin", None)?,
+                ShapeGroupInfo::HorizontalColumn => self.write_control_word("shpbxcolumn", None)?,
+                ShapeGroupInfo::IgnoreHorizontal => self.write_control_word("shpbxignore", None)?,
+                ShapeGroupInfo::VerticalPage => self.write_control_word("shpbypage", None)?,
+                ShapeGroupInfo::VerticalMargin => self.write_control_word("shpbymargin", None)?,
+                ShapeGroupInfo::VerticalParagraph => self.write_control_word("shpbypara", None)?,
+                ShapeGroupInfo::IgnoreVertical => self.write_control_word("shpbyignore", None)?,
+                ShapeGroupInfo::Wrap(value) => self.write_control_word("shpwr", Some(value))?,
+                ShapeGroupInfo::WrapSide(value) => {
+                    self.write_control_word("shpwrk", Some(value))?;
                 },
-                crate::ShapeGroupInfo::HorizontalPage => {
-                    self.write_control_word("shpbxpage", None)?
+                ShapeGroupInfo::BelowText(value) => {
+                    self.write_control_word("shpfblwtxt", Some(i32::from(value)))?;
                 },
-                crate::ShapeGroupInfo::HorizontalMargin => {
-                    self.write_control_word("shpbxmargin", None)?
-                },
-                crate::ShapeGroupInfo::HorizontalColumn => {
-                    self.write_control_word("shpbxcolumn", None)?
-                },
-                crate::ShapeGroupInfo::IgnoreHorizontal => {
-                    self.write_control_word("shpbxignore", None)?
-                },
-                crate::ShapeGroupInfo::VerticalPage => {
-                    self.write_control_word("shpbypage", None)?
-                },
-                crate::ShapeGroupInfo::VerticalMargin => {
-                    self.write_control_word("shpbymargin", None)?
-                },
-                crate::ShapeGroupInfo::VerticalParagraph => {
-                    self.write_control_word("shpbypara", None)?
-                },
-                crate::ShapeGroupInfo::IgnoreVertical => {
-                    self.write_control_word("shpbyignore", None)?
-                },
-                crate::ShapeGroupInfo::Wrap(value) => {
-                    self.write_control_word("shpwr", Some(value))?
-                },
-                crate::ShapeGroupInfo::WrapSide(value) => {
-                    self.write_control_word("shpwrk", Some(value))?
-                },
-                crate::ShapeGroupInfo::BelowText(value) => {
-                    self.write_control_word("shpfblwtxt", Some(i32::from(value)))?
-                },
-                crate::ShapeGroupInfo::LockAnchor => {
-                    self.write_control_word("shplockanchor", None)?
-                },
+                ShapeGroupInfo::LockAnchor => self.write_control_word("shplockanchor", None)?,
             }
         }
         Ok(())
@@ -1462,20 +1457,20 @@ impl<W: Write> RtfWriter<W> {
 
     pub(in super::super) fn write_object(
         &mut self,
-        object: &crate::EmbeddedObject<'_>,
-        pictures: &[crate::Picture<'_>],
+        object: &EmbeddedObject<'_>,
+        pictures: &[Picture<'_>],
     ) -> io::Result<()> {
         self.write_str("{\\object")?;
         self.write_str(match object.kind {
-            crate::ObjectKind::Embedded => "\\objemb",
-            crate::ObjectKind::Link => "\\objlink",
-            crate::ObjectKind::AutoLink => "\\objautlink",
-            crate::ObjectKind::Html => "\\objhtml",
-            crate::ObjectKind::Subscriber => "\\objsub",
-            crate::ObjectKind::Publisher => "\\objpub",
-            crate::ObjectKind::InstallableCommand => "\\objicemb",
-            crate::ObjectKind::OleControl => "\\objocx",
-            crate::ObjectKind::Unknown => "",
+            ObjectKind::Embedded => "\\objemb",
+            ObjectKind::Link => "\\objlink",
+            ObjectKind::AutoLink => "\\objautlink",
+            ObjectKind::Html => "\\objhtml",
+            ObjectKind::Subscriber => "\\objsub",
+            ObjectKind::Publisher => "\\objpub",
+            ObjectKind::InstallableCommand => "\\objicemb",
+            ObjectKind::OleControl => "\\objocx",
+            ObjectKind::Unknown => "",
         })?;
         if object.link_self {
             self.write_str("\\linkself")?;
@@ -1544,11 +1539,11 @@ impl<W: Write> RtfWriter<W> {
         }
         if let Some(kind) = object.result_kind {
             self.write_str(match kind {
-                crate::ObjectResultKind::Rtf => "\\rsltrtf",
-                crate::ObjectResultKind::Text => "\\rslttxt",
-                crate::ObjectResultKind::Picture => "\\rsltpict",
-                crate::ObjectResultKind::Bitmap => "\\rsltbmp",
-                crate::ObjectResultKind::Html => "\\rslthtml",
+                ObjectResultKind::Rtf => "\\rsltrtf",
+                ObjectResultKind::Text => "\\rslttxt",
+                ObjectResultKind::Picture => "\\rsltpict",
+                ObjectResultKind::Bitmap => "\\rsltbmp",
+                ObjectResultKind::Html => "\\rslthtml",
             })?;
         }
         if !object.class_id.is_empty() {
@@ -1591,12 +1586,12 @@ impl<W: Write> RtfWriter<W> {
 
     pub(in super::super) fn write_picture_compatibility(
         &mut self,
-        kind: crate::PictureCompatibilityKind,
-        picture: &crate::Picture<'_>,
+        kind: PictureCompatibilityKind,
+        picture: &Picture<'_>,
     ) -> io::Result<()> {
         self.write_str(match kind {
-            crate::PictureCompatibilityKind::ShapePicture => "{\\*\\shppict",
-            crate::PictureCompatibilityKind::NonShapePicture => "{\\nonshppict",
+            PictureCompatibilityKind::ShapePicture => "{\\*\\shppict",
+            PictureCompatibilityKind::NonShapePicture => "{\\nonshppict",
         })?;
         self.write_picture(picture)?;
         self.write_str("}")
@@ -1604,7 +1599,7 @@ impl<W: Write> RtfWriter<W> {
 
     pub(in super::super) fn write_picture_shape_properties(
         &mut self,
-        properties: &crate::PictureShapeProperties<'_>,
+        properties: &PictureShapeProperties<'_>,
     ) -> io::Result<()> {
         properties
             .validate()
@@ -1620,7 +1615,10 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write one inert legacy drawing text box.
-    pub fn write_legacy_text_box(&mut self, text_box: &crate::LegacyTextBox<'_>) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
+    pub fn write_legacy_text_box(&mut self, text_box: &LegacyTextBox<'_>) -> io::Result<()> {
         text_box
             .validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
@@ -1629,9 +1627,9 @@ impl<W: Write> RtfWriter<W> {
         if let Some(anchor) = text_box.horizontal_anchor {
             self.write_control_word(
                 match anchor {
-                    crate::LegacyHorizontalAnchor::Page => "dobxpage",
-                    crate::LegacyHorizontalAnchor::Margin => "dobxmargin",
-                    crate::LegacyHorizontalAnchor::Column => "dobxcolumn",
+                    LegacyHorizontalAnchor::Page => "dobxpage",
+                    LegacyHorizontalAnchor::Margin => "dobxmargin",
+                    LegacyHorizontalAnchor::Column => "dobxcolumn",
                 },
                 None,
             )?;
@@ -1639,9 +1637,9 @@ impl<W: Write> RtfWriter<W> {
         if let Some(anchor) = text_box.vertical_anchor {
             self.write_control_word(
                 match anchor {
-                    crate::LegacyVerticalAnchor::Page => "dobypage",
-                    crate::LegacyVerticalAnchor::Margin => "dobymargin",
-                    crate::LegacyVerticalAnchor::Paragraph => "dobypara",
+                    LegacyVerticalAnchor::Page => "dobypage",
+                    LegacyVerticalAnchor::Margin => "dobymargin",
+                    LegacyVerticalAnchor::Paragraph => "dobypara",
                 },
                 None,
             )?;
@@ -1655,11 +1653,11 @@ impl<W: Write> RtfWriter<W> {
         }
         self.write_control_word(
             match text_box.direction {
-                crate::LegacyTextDirection::LeftToRightTopToBottom => "dptxlrtb",
-                crate::LegacyTextDirection::LeftToRightTopToBottomVertical => "dptxlrtbv",
-                crate::LegacyTextDirection::TopToBottomRightToLeft => "dptxtbrl",
-                crate::LegacyTextDirection::TopToBottomRightToLeftVertical => "dptxtbrlv",
-                crate::LegacyTextDirection::BottomToTopLeftToRight => "dptxbtlr",
+                LegacyTextDirection::LeftToRightTopToBottom => "dptxlrtb",
+                LegacyTextDirection::LeftToRightTopToBottomVertical => "dptxlrtbv",
+                LegacyTextDirection::TopToBottomRightToLeft => "dptxtbrl",
+                LegacyTextDirection::TopToBottomRightToLeftVertical => "dptxtbrlv",
+                LegacyTextDirection::BottomToTopLeftToRight => "dptxbtlr",
             },
             None,
         )?;
@@ -1683,7 +1681,7 @@ impl<W: Write> RtfWriter<W> {
             &text_box.drawing_order,
             &text_box.story_events,
             &[],
-            crate::FieldOwner::Other,
+            FieldOwner::Other,
             DrawingStoryTextMode::ShapeText,
             0,
         )?;
@@ -1691,24 +1689,27 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write one inert Word 6/95 drawing destination canonically.
-    pub fn write_legacy_drawing(&mut self, drawing: &crate::LegacyDrawing<'_>) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
+    pub fn write_legacy_drawing(&mut self, drawing: &LegacyDrawing<'_>) -> io::Result<()> {
         drawing
             .validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
         self.write_str("{\\*\\do")?;
         self.write_control_word(
             match drawing.horizontal_anchor {
-                crate::LegacyHorizontalAnchor::Page => "dobxpage",
-                crate::LegacyHorizontalAnchor::Margin => "dobxmargin",
-                crate::LegacyHorizontalAnchor::Column => "dobxcolumn",
+                LegacyHorizontalAnchor::Page => "dobxpage",
+                LegacyHorizontalAnchor::Margin => "dobxmargin",
+                LegacyHorizontalAnchor::Column => "dobxcolumn",
             },
             None,
         )?;
         self.write_control_word(
             match drawing.vertical_anchor {
-                crate::LegacyVerticalAnchor::Page => "dobypage",
-                crate::LegacyVerticalAnchor::Margin => "dobymargin",
-                crate::LegacyVerticalAnchor::Paragraph => "dobypara",
+                LegacyVerticalAnchor::Page => "dobypage",
+                LegacyVerticalAnchor::Margin => "dobymargin",
+                LegacyVerticalAnchor::Paragraph => "dobypara",
             },
             None,
         )?;
@@ -1722,7 +1723,7 @@ impl<W: Write> RtfWriter<W> {
 
     pub(in super::super) fn write_legacy_geometry(
         &mut self,
-        geometry: crate::LegacyDrawingGeometry,
+        geometry: LegacyDrawingGeometry,
     ) -> io::Result<()> {
         self.write_control_word("dpx", Some(geometry.x))?;
         self.write_control_word("dpy", Some(geometry.y))?;
@@ -1732,7 +1733,7 @@ impl<W: Write> RtfWriter<W> {
 
     pub(in super::super) fn write_legacy_point(
         &mut self,
-        point: crate::LegacyDrawingPoint,
+        point: LegacyDrawingPoint,
     ) -> io::Result<()> {
         self.write_control_word("dpptx", Some(point.x))?;
         self.write_control_word("dppty", Some(point.y))
@@ -1740,16 +1741,16 @@ impl<W: Write> RtfWriter<W> {
 
     pub(in super::super) fn write_legacy_drawing_primitive(
         &mut self,
-        primitive: &crate::LegacyDrawingPrimitive<'_>,
+        primitive: &LegacyDrawingPrimitive<'_>,
     ) -> io::Result<()> {
         match primitive {
-            crate::LegacyDrawingPrimitive::Group {
+            LegacyDrawingPrimitive::Group {
                 geometry,
                 children,
                 end_geometry,
             } => {
                 self.write_control_word("dpgroup", None)?;
-                let count = i32::try_from(children.len()).map_err(|_| {
+                let count = i32::try_from(children.len()).map_err(|_err| {
                     io::Error::new(
                         io::ErrorKind::InvalidInput,
                         "legacy drawing child count overflow",
@@ -1763,14 +1764,14 @@ impl<W: Write> RtfWriter<W> {
                 self.write_control_word("dpendgroup", None)?;
                 self.write_legacy_geometry(*end_geometry)
             },
-            crate::LegacyDrawingPrimitive::Callout(callout) => {
+            LegacyDrawingPrimitive::Callout(callout) => {
                 self.write_control_word("dpcallout", None)?;
                 self.write_control_word(
                     match callout.callout_type {
-                        crate::LegacyCalloutType::RightAngle => "dpcotright",
-                        crate::LegacyCalloutType::Single => "dpcotsingle",
-                        crate::LegacyCalloutType::Double => "dpcotdouble",
-                        crate::LegacyCalloutType::Triple => "dpcottriple",
+                        LegacyCalloutType::RightAngle => "dpcotright",
+                        LegacyCalloutType::Single => "dpcotsingle",
+                        LegacyCalloutType::Double => "dpcotdouble",
+                        LegacyCalloutType::Triple => "dpcottriple",
                     },
                     None,
                 )?;
@@ -1798,10 +1799,10 @@ impl<W: Write> RtfWriter<W> {
                 if let Some(attachment) = callout.attachment {
                     self.write_control_word(
                         match attachment {
-                            crate::LegacyCalloutAttachment::Top => "dpcodtop",
-                            crate::LegacyCalloutAttachment::Center => "dpcodcenter",
-                            crate::LegacyCalloutAttachment::Bottom => "dpcodbottom",
-                            crate::LegacyCalloutAttachment::Absolute => "dpcodabs",
+                            LegacyCalloutAttachment::Top => "dpcodtop",
+                            LegacyCalloutAttachment::Center => "dpcodcenter",
+                            LegacyCalloutAttachment::Bottom => "dpcodbottom",
+                            LegacyCalloutAttachment::Absolute => "dpcodabs",
                         },
                         None,
                     )?;
@@ -1816,7 +1817,7 @@ impl<W: Write> RtfWriter<W> {
                 self.write_legacy_drawing_primitive(&callout.text_box)?;
                 self.write_legacy_properties(callout.properties)
             },
-            crate::LegacyDrawingPrimitive::Line {
+            LegacyDrawingPrimitive::Line {
                 start,
                 end,
                 geometry,
@@ -1828,7 +1829,7 @@ impl<W: Write> RtfWriter<W> {
                 self.write_legacy_geometry(*geometry)?;
                 self.write_legacy_properties(*properties)
             },
-            crate::LegacyDrawingPrimitive::Rectangle {
+            LegacyDrawingPrimitive::Rectangle {
                 rounded,
                 geometry,
                 properties,
@@ -1840,7 +1841,7 @@ impl<W: Write> RtfWriter<W> {
                 self.write_legacy_geometry(*geometry)?;
                 self.write_legacy_properties(*properties)
             },
-            crate::LegacyDrawingPrimitive::TextBox {
+            LegacyDrawingPrimitive::TextBox {
                 text_box,
                 properties,
             } => {
@@ -1848,24 +1849,20 @@ impl<W: Write> RtfWriter<W> {
                 if let Some(value) = text_box.margin {
                     self.write_control_word("dptxbxmar", Some(value))?;
                 }
-                if text_box.direction != crate::LegacyTextDirection::LeftToRightTopToBottom {
+                if text_box.direction != LegacyTextDirection::LeftToRightTopToBottom {
                     self.write_control_word(
                         match text_box.direction {
-                            crate::LegacyTextDirection::LeftToRightTopToBottom => "dptxlrtb",
-                            crate::LegacyTextDirection::LeftToRightTopToBottomVertical => {
-                                "dptxlrtbv"
-                            },
-                            crate::LegacyTextDirection::TopToBottomRightToLeft => "dptxtbrl",
-                            crate::LegacyTextDirection::TopToBottomRightToLeftVertical => {
-                                "dptxtbrlv"
-                            },
-                            crate::LegacyTextDirection::BottomToTopLeftToRight => "dptxbtlr",
+                            LegacyTextDirection::LeftToRightTopToBottom => "dptxlrtb",
+                            LegacyTextDirection::LeftToRightTopToBottomVertical => "dptxlrtbv",
+                            LegacyTextDirection::TopToBottomRightToLeft => "dptxtbrl",
+                            LegacyTextDirection::TopToBottomRightToLeftVertical => "dptxtbrlv",
+                            LegacyTextDirection::BottomToTopLeftToRight => "dptxbtlr",
                         },
                         None,
                     )?;
                 }
                 self.write_legacy_text_box_text(text_box)?;
-                self.write_legacy_geometry(crate::LegacyDrawingGeometry {
+                self.write_legacy_geometry(LegacyDrawingGeometry {
                     x: text_box.x.unwrap_or(0),
                     y: text_box.y.unwrap_or(0),
                     width: text_box.width.unwrap_or(0),
@@ -1873,7 +1870,7 @@ impl<W: Write> RtfWriter<W> {
                 })?;
                 self.write_legacy_properties(*properties)
             },
-            crate::LegacyDrawingPrimitive::Ellipse {
+            LegacyDrawingPrimitive::Ellipse {
                 geometry,
                 properties,
             } => {
@@ -1881,7 +1878,7 @@ impl<W: Write> RtfWriter<W> {
                 self.write_legacy_geometry(*geometry)?;
                 self.write_legacy_properties(*properties)
             },
-            crate::LegacyDrawingPrimitive::Polyline {
+            LegacyDrawingPrimitive::Polyline {
                 closed,
                 points,
                 geometry,
@@ -1891,7 +1888,7 @@ impl<W: Write> RtfWriter<W> {
                 if *closed {
                     self.write_control_word("dppolygon", None)?;
                 }
-                let count = i32::try_from(points.len()).map_err(|_| {
+                let count = i32::try_from(points.len()).map_err(|_err| {
                     io::Error::new(
                         io::ErrorKind::InvalidInput,
                         "legacy drawing point count overflow",
@@ -1904,7 +1901,7 @@ impl<W: Write> RtfWriter<W> {
                 self.write_legacy_geometry(*geometry)?;
                 self.write_legacy_properties(*properties)
             },
-            crate::LegacyDrawingPrimitive::Arc {
+            LegacyDrawingPrimitive::Arc {
                 flip_x,
                 flip_y,
                 geometry,
@@ -1925,7 +1922,7 @@ impl<W: Write> RtfWriter<W> {
 
     pub(in super::super) fn write_legacy_text_box_text(
         &mut self,
-        text_box: &crate::LegacyTextBox<'_>,
+        text_box: &LegacyTextBox<'_>,
     ) -> io::Result<()> {
         self.write_str("{\\dptxbxtext ")?;
         self.write_field_story(
@@ -1935,7 +1932,7 @@ impl<W: Write> RtfWriter<W> {
             &text_box.drawing_order,
             &text_box.story_events,
             &[],
-            crate::FieldOwner::Other,
+            FieldOwner::Other,
             DrawingStoryTextMode::ShapeText,
             0,
         )?;
@@ -1949,13 +1946,13 @@ impl<W: Write> RtfWriter<W> {
         green_control: &str,
         blue_control: &str,
         palette_control: &str,
-        color: crate::LegacyDrawingColor,
+        color: LegacyDrawingColor,
     ) -> io::Result<()> {
         match color {
-            crate::LegacyDrawingColor::Gray(value) => {
+            LegacyDrawingColor::Gray(value) => {
                 self.write_control_word(gray, Some(i32::from(value)))
             },
-            crate::LegacyDrawingColor::Rgb {
+            LegacyDrawingColor::Rgb {
                 red,
                 green,
                 blue,
@@ -1975,14 +1972,14 @@ impl<W: Write> RtfWriter<W> {
     pub(in super::super) fn write_legacy_arrow(
         &mut self,
         prefix: &str,
-        arrow: crate::LegacyDrawingArrow,
+        arrow: LegacyDrawingArrow,
     ) -> io::Result<()> {
         self.write_control_word(
             &format!(
                 "{prefix}{}",
                 match arrow.fill {
-                    crate::LegacyDrawingArrowFill::Solid => "sol",
-                    crate::LegacyDrawingArrowFill::Hollow => "hol",
+                    LegacyDrawingArrowFill::Solid => "sol",
+                    LegacyDrawingArrowFill::Hollow => "hol",
                 }
             ),
             None,
@@ -1993,17 +1990,17 @@ impl<W: Write> RtfWriter<W> {
 
     pub(in super::super) fn write_legacy_properties(
         &mut self,
-        properties: crate::LegacyDrawingProperties,
+        properties: LegacyDrawingProperties,
     ) -> io::Result<()> {
         if let Some(line) = properties.line {
             self.write_control_word(
                 match line.style {
-                    crate::LegacyDrawingLineStyle::Solid => "dplinesolid",
-                    crate::LegacyDrawingLineStyle::Hollow => "dplinehollow",
-                    crate::LegacyDrawingLineStyle::Dashed => "dplinedash",
-                    crate::LegacyDrawingLineStyle::Dotted => "dplinedot",
-                    crate::LegacyDrawingLineStyle::DashDot => "dplinedado",
-                    crate::LegacyDrawingLineStyle::DashDotDot => "dplinedadodo",
+                    LegacyDrawingLineStyle::Solid => "dplinesolid",
+                    LegacyDrawingLineStyle::Hollow => "dplinehollow",
+                    LegacyDrawingLineStyle::Dashed => "dplinedash",
+                    LegacyDrawingLineStyle::Dotted => "dplinedot",
+                    LegacyDrawingLineStyle::DashDot => "dplinedado",
+                    LegacyDrawingLineStyle::DashDotDot => "dplinedadodo",
                 },
                 None,
             )?;

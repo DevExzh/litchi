@@ -1,18 +1,8 @@
-//! PPT-specific semantic OfficeArt properties and typed shape inputs.
+//! PPT-specific semantic `OfficeArt` properties and typed shape inputs.
 //!
 //! This layer owns the PPT vocabulary and validated data that the wire
-//! encoder consumes. Shared OfficeArt records remain owned by the
+//! encoder consumes. Shared `OfficeArt` records remain owned by the
 //! litchi-odraw substrate exposed through the facade.
-
-use std::io::Write;
-use zerocopy::IntoBytes as _;
-use zerocopy_derive::{Immutable, IntoBytes, KnownLayout};
-
-use crate::shapes::geometry::{GeometryRect, ShapePathType};
-
-use litchi_odraw::write::{Header, Property, shape_type};
-
-use super::Error;
 
 // =============================================================================
 // Property IDs (MS-ODRAW 2.3.1)
@@ -78,7 +68,7 @@ pub(crate) mod prop_id {
 // PPT-Specific Property Values
 // =============================================================================
 
-/// PPT-specific property values (extends shared prop_value)
+/// PPT-specific property values (extends shared `prop_value`)
 pub(crate) mod ppt_prop_value {
     pub(crate) use litchi_odraw::write::prop_value::*;
 
@@ -109,6 +99,64 @@ pub(crate) mod ppt_prop_value {
 }
 
 // =============================================================================
+// Header Version Constants
+// =============================================================================
+
+/// Escher record header versions
+pub(crate) mod header_version {
+    pub(crate) const CONTAINER: u8 = 0x0F;
+    pub(crate) const SIMPLE: u8 = 0x00;
+    pub(crate) const SPGR: u8 = 0x01;
+    pub(crate) const SP: u8 = 0x02;
+    pub(crate) const OPT: u8 = 0x03;
+    pub(crate) const DG: u8 = 0x00; // instance is drawing_id
+}
+
+use std::io::Write;
+use zerocopy::IntoBytes as _;
+use zerocopy_derive::{Immutable, IntoBytes, KnownLayout};
+
+use crate::shapes::geometry::{GeometryRect, ShapePathType};
+
+use litchi_odraw::write::{Header, Property, shape_type};
+
+use super::Error;
+
+// =============================================================================
+// Default Property Tables
+// =============================================================================
+
+/// Default drawing group properties (8 properties = 48 bytes)
+pub(crate) const DGG_DEFAULT_PROPERTIES: [Property; 8] = [
+    Property::new(prop_id::FILL_COLOR, ppt_prop_value::SCHEME_FILL),
+    Property::new(prop_id::FILL_BACK_COLOR, ppt_prop_value::SCHEME_FILL_BACK),
+    Property::new(prop_id::FILL_BLIP, 0),
+    Property::new(
+        prop_id::NO_FILL_HIT_TEST,
+        ppt_prop_value::LINE_STYLE_DEFAULT,
+    ),
+    Property::new(prop_id::LINE_COLOR, ppt_prop_value::SCHEME_LINE),
+    Property::new(prop_id::LINE_BLIP, 0),
+    Property::new(
+        prop_id::LINE_STYLE_BOOL,
+        ppt_prop_value::LINE_STYLE_BOOL_DEFAULT,
+    ),
+    Property::new(prop_id::SHADOW_COLOR, ppt_prop_value::SCHEME_SHADOW),
+];
+
+/// Background shape properties (8 properties = 48 bytes)
+pub(crate) const BG_SHAPE_PROPERTIES: [Property; 8] = [
+    Property::new(prop_id::FILL_COLOR, ppt_prop_value::BG_FILL_COLOR),
+    Property::new(prop_id::FILL_BACK_COLOR, ppt_prop_value::BG_FILL_BACK_COLOR),
+    Property::new(prop_id::FILL_RECT_RIGHT, ppt_prop_value::SLIDE_WIDTH_EMU),
+    Property::new(prop_id::FILL_RECT_BOTTOM, ppt_prop_value::SLIDE_HEIGHT_EMU),
+    Property::new(prop_id::NO_FILL_HIT_TEST, ppt_prop_value::NO_FILL_HIT_TEST),
+    Property::new(prop_id::LINE_STYLE_BOOL, ppt_prop_value::NO_LINE_DRAW_DASH),
+    Property::new(prop_id::BW_MODE, ppt_prop_value::BW_MODE_AUTO),
+    Property::new(prop_id::BACKGROUND_SHAPE, ppt_prop_value::BACKGROUND_SHAPE),
+];
+
+// =============================================================================
 // Split Menu Colors
 // =============================================================================
 
@@ -129,20 +177,6 @@ impl SplitMenuColors {
         shadow_color: crate::officeart_wire::prop_value::SCHEME_SHADOW,
         color_3d: 0x1000_00F7,
     };
-}
-
-// =============================================================================
-// Header Version Constants
-// =============================================================================
-
-/// Escher record header versions
-pub(crate) mod header_version {
-    pub(crate) const CONTAINER: u8 = 0x0F;
-    pub(crate) const SIMPLE: u8 = 0x00;
-    pub(crate) const SPGR: u8 = 0x01;
-    pub(crate) const SP: u8 = 0x02;
-    pub(crate) const OPT: u8 = 0x03;
-    pub(crate) const DG: u8 = 0x00; // instance is drawing_id
 }
 
 /// Escher record header (8 bytes) - builder-friendly version
@@ -264,36 +298,6 @@ impl EscherSpgrData {
     };
 }
 
-/// Default drawing group properties (8 properties = 48 bytes)
-pub(crate) const DGG_DEFAULT_PROPERTIES: [Property; 8] = [
-    Property::new(prop_id::FILL_COLOR, ppt_prop_value::SCHEME_FILL),
-    Property::new(prop_id::FILL_BACK_COLOR, ppt_prop_value::SCHEME_FILL_BACK),
-    Property::new(prop_id::FILL_BLIP, 0),
-    Property::new(
-        prop_id::NO_FILL_HIT_TEST,
-        ppt_prop_value::LINE_STYLE_DEFAULT,
-    ),
-    Property::new(prop_id::LINE_COLOR, ppt_prop_value::SCHEME_LINE),
-    Property::new(prop_id::LINE_BLIP, 0),
-    Property::new(
-        prop_id::LINE_STYLE_BOOL,
-        ppt_prop_value::LINE_STYLE_BOOL_DEFAULT,
-    ),
-    Property::new(prop_id::SHADOW_COLOR, ppt_prop_value::SCHEME_SHADOW),
-];
-
-/// Background shape properties (8 properties = 48 bytes)
-pub(crate) const BG_SHAPE_PROPERTIES: [Property; 8] = [
-    Property::new(prop_id::FILL_COLOR, ppt_prop_value::BG_FILL_COLOR),
-    Property::new(prop_id::FILL_BACK_COLOR, ppt_prop_value::BG_FILL_BACK_COLOR),
-    Property::new(prop_id::FILL_RECT_RIGHT, ppt_prop_value::SLIDE_WIDTH_EMU),
-    Property::new(prop_id::FILL_RECT_BOTTOM, ppt_prop_value::SLIDE_HEIGHT_EMU),
-    Property::new(prop_id::NO_FILL_HIT_TEST, ppt_prop_value::NO_FILL_HIT_TEST),
-    Property::new(prop_id::LINE_STYLE_BOOL, ppt_prop_value::NO_LINE_DRAW_DASH),
-    Property::new(prop_id::BW_MODE, ppt_prop_value::BW_MODE_AUTO),
-    Property::new(prop_id::BACKGROUND_SHAPE, ppt_prop_value::BACKGROUND_SHAPE),
-];
-
 /// Child anchor with full coordinates (16 bytes)
 #[derive(Debug, Clone, Copy, IntoBytes, Immutable, KnownLayout)]
 #[repr(C)]
@@ -308,7 +312,7 @@ pub(crate) struct ChildAnchor {
 // User Shape Building
 // =============================================================================
 
-/// Owned custom/freeform OfficeArt geometry.
+/// Owned custom/freeform `OfficeArt` geometry.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FreeformGeometry {
     coordinate_space: GeometryRect,
@@ -318,7 +322,8 @@ pub struct FreeformGeometry {
 }
 
 impl FreeformGeometry {
-    /// Create freeform geometry in its internal OfficeArt coordinate space.
+    /// Create freeform geometry in its internal `OfficeArt` coordinate space.
+    #[must_use]
     pub fn new(
         coordinate_space: GeometryRect,
         path_type: ShapePathType,
@@ -334,21 +339,25 @@ impl FreeformGeometry {
     }
 
     /// Return the internal geometry coordinate space.
+    #[must_use]
     pub const fn coordinate_space(&self) -> GeometryRect {
         self.coordinate_space
     }
 
     /// Return how the vertices and segment array define the path.
+    #[must_use]
     pub const fn path_type(&self) -> ShapePathType {
         self.path_type
     }
 
     /// Return the freeform vertices.
+    #[must_use]
     pub fn vertices(&self) -> &[(i32, i32)] {
         &self.vertices
     }
 
     /// Return raw MSOPATHINFO words.
+    #[must_use]
     pub fn segment_info(&self) -> &[u16] {
         &self.segment_info
     }
@@ -372,13 +381,13 @@ impl FreeformGeometry {
                 "freeform geometry requires a known shape path type",
             ));
         }
-        let vertex_count = u16::try_from(self.vertices.len()).map_err(|_| {
+        let vertex_count = u16::try_from(self.vertices.len()).map_err(|_err| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 "freeform geometry exceeds 65535 vertices",
             )
         })?;
-        let segment_count = u16::try_from(self.segment_info.len()).map_err(|_| {
+        let segment_count = u16::try_from(self.segment_info.len()).map_err(|_err| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 "freeform geometry exceeds 65535 segment entries",
@@ -463,9 +472,9 @@ pub(crate) struct UserShapeData {
     pub text: Option<String>,
     /// Rich text paragraphs (with formatting)
     pub paragraphs: Option<Vec<crate::writer::text_format::Paragraph>>,
-    /// PowerPoint 9/10/11 extensions for each rich-text run.
+    /// `PowerPoint` 9/10/11 extensions for each rich-text run.
     pub smart_tag_runs: Option<Vec<crate::writer::smart_tags::ShapeTextExtensionRun>>,
-    /// Text type for TextHeaderAtom (0=Title, 1=Body, 2=Notes, 4=Other)
+    /// Text type for `TextHeaderAtom` (0=Title, 1=Body, 2=Notes, 4=Other)
     pub text_type: u32,
     /// Placeholder type for notes/master shapes (None = not a placeholder)
     pub placeholder_type: Option<u8>,
@@ -479,13 +488,13 @@ pub(crate) struct UserShapeData {
     pub rotation: Option<i32>,
     /// Shape-specific adjustment values, at indices 0 through 9.
     pub adjust_values: Vec<i32>,
-    /// Hyperlink ID (reference to ExObjList)
+    /// Hyperlink ID (reference to `ExObjList`)
     pub hyperlink_id: Option<u32>,
-    /// Hyperlink action type (for InteractiveInfoAtom)
+    /// Hyperlink action type (for `InteractiveInfoAtom`)
     pub hyperlink_action: u8,
-    /// Hyperlink jump type (for InteractiveInfoAtom)
+    /// Hyperlink jump type (for `InteractiveInfoAtom`)
     pub hyperlink_jump: u8,
-    /// Hyperlink type (for InteractiveInfoAtom)
+    /// Hyperlink type (for `InteractiveInfoAtom`)
     pub hyperlink_type: u8,
     /// Typed click and mouse-over interactions.
     ///
@@ -518,8 +527,8 @@ impl Default for UserShapeData {
             shape_type: shape_type::RECTANGLE,
             x: 0,
             y: 0,
-            width: 914400, // 1 inch
-            height: 914400,
+            width: 914_400, // 1 inch
+            height: 914_400,
             fill_color: None,
             fill_type: None,
             fill_opacity: None,

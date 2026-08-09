@@ -1,10 +1,14 @@
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent RTF feature flags stay flat for direct access"
+)]
 /// Passive compatibility requests for Word 2003-era layout behavior.
 ///
 /// These flags are retained for round trips only. This crate does not alter
 /// tables, floating objects, numbering, line breaking, typography, or pagination.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct DocumentWord2003Compatibility {
-    /// `\noafcnsttbl`: do not resize AutoFit tables around floating shapes.
+    /// `\noafcnsttbl`: do not resize `AutoFit` tables around floating shapes.
     pub preserve_autofit_table_width_around_shapes: bool,
     /// `\noindnmbrts`: use hanging indents as numbering tab stops.
     pub use_hanging_indent_as_numbering_tab: bool,
@@ -22,7 +26,7 @@ pub struct DocumentWord2003Compatibility {
     pub split_page_break_paragraph: bool,
     /// `\hwelev`: use fixed-width Hangul syllables.
     pub use_fixed_width_hangul: bool,
-    /// `\afelev`: use legacy AutoFit width expansion.
+    /// `\afelev`: use legacy `AutoFit` width expansion.
     pub use_legacy_autofit_width_expansion: bool,
     /// `\cachedcolbal`: use cached paragraph data for column balancing.
     pub use_cached_column_balancing: bool,
@@ -36,6 +40,7 @@ pub struct DocumentWord2003Compatibility {
 
 impl DocumentWord2003Compatibility {
     /// Return whether every Word 2003 compatibility request was omitted.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         !self.preserve_autofit_table_width_around_shapes
             && !self.use_hanging_indent_as_numbering_tab

@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::super::{
     AnimationInfo, ExtendedTimeNode, TimeNodeAtom, TimeNodeKind, parse_slide_animation_extension,
     write_animation_info, write_extended_time_node,

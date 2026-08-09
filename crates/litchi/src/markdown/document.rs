@@ -125,6 +125,8 @@ impl ToMarkdown for Document {
     fn to_markdown_with_options(&self, options: &MarkdownOptions) -> Result<String> {
         use crate::document::DocumentElement;
 
+        self.validate_markdown_projection()?;
+
         // Write metadata first (must be sequential)
         let metadata_md = if options.include_metadata {
             let mut metadata_writer = MarkdownWriter::new(*options);
@@ -138,6 +140,7 @@ impl ToMarkdown for Document {
         // Extract all document elements (paragraphs and tables) in document order
         let elements = self.elements()?;
         let mut resolved_lists = self.markdown_list_items()?;
+        let mut heading_levels = self.markdown_heading_levels()?;
         if resolved_lists.is_empty() {
             resolved_lists
                 .try_reserve_exact(elements.len())
@@ -151,6 +154,19 @@ impl ToMarkdown for Document {
                 "resolved list metadata is not aligned with document elements".to_owned(),
             ));
         }
+        if heading_levels.is_empty() {
+            heading_levels
+                .try_reserve_exact(elements.len())
+                .map_err(|source| Error::Allocation {
+                    resource: "Markdown heading alignment",
+                    source,
+                })?;
+            heading_levels.resize(elements.len(), None);
+        } else if heading_levels.len() != elements.len() {
+            return Err(Error::InvalidFormat(
+                "heading metadata is not aligned with document elements".to_owned(),
+            ));
+        }
 
         // Decide whether to use parallel or sequential processing
         let content_md = if options.use_parallel && elements.len() >= PARALLEL_THRESHOLD {
@@ -159,11 +175,16 @@ impl ToMarkdown for Document {
             let element_strings: Result<Vec<String>> = elements
                 .par_iter()
                 .zip(resolved_lists.par_iter())
-                .map(|(element, resolved_list)| {
+                .zip(heading_levels.par_iter())
+                .map(|((element, resolved_list), heading_level)| {
                     let mut writer = MarkdownWriter::new(*options);
                     match element {
                         DocumentElement::Paragraph(para) => {
-                            writer.write_paragraph_with_list(para, resolved_list.as_ref())?;
+                            writer.write_paragraph_with_list(
+                                para,
+                                resolved_list.as_ref(),
+                                *heading_level,
+                            )?;
                         },
                         #[cfg(any(
                             feature = "doc",
@@ -198,10 +219,18 @@ impl ToMarkdown for Document {
             let estimated_size = elements.len() * 150; // Rough average
             writer.reserve(estimated_size);
 
-            for (element, resolved_list) in elements.into_iter().zip(resolved_lists.iter()) {
+            for ((element, resolved_list), heading_level) in elements
+                .into_iter()
+                .zip(resolved_lists.iter())
+                .zip(heading_levels.iter())
+            {
                 match element {
                     DocumentElement::Paragraph(para) => {
-                        writer.write_paragraph_with_list(&para, resolved_list.as_ref())?;
+                        writer.write_paragraph_with_list(
+                            &para,
+                            resolved_list.as_ref(),
+                            *heading_level,
+                        )?;
                     },
                     #[cfg(any(
                         feature = "doc",

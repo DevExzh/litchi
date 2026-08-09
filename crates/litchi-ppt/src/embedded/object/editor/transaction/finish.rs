@@ -1,4 +1,4 @@
-//! Emits one append-only PPT UserEdit transaction.
+//! Emits one append-only PPT `UserEdit` transaction.
 
 use super::super::{Editor, Result, mapping, rewrite};
 use crate::package::Error;
@@ -13,7 +13,7 @@ pub(crate) fn finish(mut editor: Editor) -> Result<Vec<u8>> {
         let mut original = Vec::new();
         original
             .try_reserve_exact(editor.original.len())
-            .map_err(|_| Error::AllocationFailed("PowerPoint editor source"))?;
+            .map_err(|_err| Error::AllocationFailed("PowerPoint editor source"))?;
         original.extend_from_slice(&editor.original);
         return Ok(original);
     }
@@ -32,7 +32,7 @@ pub(crate) fn finish(mut editor: Editor) -> Result<Vec<u8>> {
         editor.mappings.insert(
             *id,
             u32::try_from(projected_len)
-                .map_err(|_| Error::Corrupted("PPT stream exceeds u32".into()))?,
+                .map_err(|_err| Error::Corrupted("PPT stream exceeds u32".into()))?,
         );
         projected_len =
             checked_projected_len(projected_len, record.len(), editor.max_output_bytes)?;
@@ -43,7 +43,7 @@ pub(crate) fn finish(mut editor: Editor) -> Result<Vec<u8>> {
         editor.mappings.insert(
             editor.document_persist_id,
             u32::try_from(projected_len)
-                .map_err(|_| Error::Corrupted("PPT stream exceeds u32".into()))?,
+                .map_err(|_err| Error::Corrupted("PPT stream exceeds u32".into()))?,
         );
         projected_len =
             checked_projected_len(projected_len, document.len(), editor.max_output_bytes)?;
@@ -53,20 +53,20 @@ pub(crate) fn finish(mut editor: Editor) -> Result<Vec<u8>> {
     };
 
     let persist_dir_offset = u32::try_from(projected_len)
-        .map_err(|_| Error::Corrupted("PPT stream exceeds u32".into()))?;
+        .map_err(|_err| Error::Corrupted("PPT stream exceeds u32".into()))?;
     projected_len = checked_projected_len(
         projected_len,
         persist_directory_record_len(&editor.mappings)?,
         editor.max_output_bytes,
     )?;
     let new_edit_offset = u32::try_from(projected_len)
-        .map_err(|_| Error::Corrupted("PPT stream exceeds u32".into()))?;
+        .map_err(|_err| Error::Corrupted("PPT stream exceeds u32".into()))?;
     projected_len = checked_projected_len(projected_len, 36, editor.max_output_bytes)?;
 
     let mut appended = Vec::new();
     appended
         .try_reserve_exact(projected_len)
-        .map_err(|_| Error::AllocationFailed("PowerPoint incremental document stream"))?;
+        .map_err(|_err| Error::AllocationFailed("PowerPoint incremental document stream"))?;
     append_checked(&mut appended, &editor.document, editor.max_output_bytes)?;
     for record in editor.staged_storage.values() {
         append_checked(&mut appended, record, editor.max_output_bytes)?;
@@ -122,14 +122,14 @@ fn rewritten_object_list(editor: &Editor) -> Result<Vec<u8>> {
 fn write_package(editor: &Editor, appended: &[u8]) -> Result<Vec<u8>> {
     let mut writer = OleWriter::new();
     for (path, data) in &editor.streams {
-        let data = if path == &editor.document_path {
+        let stream_data = if path == &editor.document_path {
             appended
         } else if path == &editor.current_user_path {
             &editor.current_user
         } else {
             data
         };
-        writer.create_stream(&stream_refs(path), data)?;
+        writer.create_stream(&stream_refs(path), stream_data)?;
     }
     let mut output = BoundedCursor::new(editor.max_output_bytes);
     if let Err(error) = writer.write_to(&mut output) {
@@ -187,7 +187,7 @@ fn append_checked(output: &mut Vec<u8>, bytes: &[u8], maximum: usize) -> Result<
     let projected = checked_projected_len(output.len(), bytes.len(), maximum)?;
     output
         .try_reserve(bytes.len())
-        .map_err(|_| Error::AllocationFailed("PowerPoint incremental document stream"))?;
+        .map_err(|_err| Error::AllocationFailed("PowerPoint incremental document stream"))?;
     output.extend_from_slice(bytes);
     debug_assert_eq!(output.len(), projected);
     Ok(())
@@ -212,6 +212,10 @@ fn persist_directory_record_len(mappings: &BTreeMap<u32, u32>) -> Result<usize> 
         .ok_or_else(|| Error::ResourceLimit("PowerPoint persist directory size overflows".into()))
 }
 
+#[allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "the bounded cursor is grouped directly with its trait implementations"
+)]
 struct BoundedCursor {
     inner: Cursor<Vec<u8>>,
     maximum: usize,
@@ -243,7 +247,7 @@ impl BoundedCursor {
 
 impl Write for BoundedCursor {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        let position = usize::try_from(self.inner.position()).map_err(|_| self.limit_error())?;
+        let position = usize::try_from(self.inner.position()).map_err(|_err| self.limit_error())?;
         let end = position
             .checked_add(bytes.len())
             .ok_or_else(|| self.limit_error())?;
@@ -254,7 +258,7 @@ impl Write for BoundedCursor {
         self.inner
             .get_mut()
             .try_reserve(additional)
-            .map_err(|_| io::Error::other("PowerPoint editor output allocation failed"))?;
+            .map_err(|_err| io::Error::other("PowerPoint editor output allocation failed"))?;
         self.inner.write(bytes)
     }
 
@@ -277,6 +281,11 @@ impl Seek for BoundedCursor {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod bounded_cursor_tests {
     use super::BoundedCursor;
     use std::io::{Seek, SeekFrom, Write};

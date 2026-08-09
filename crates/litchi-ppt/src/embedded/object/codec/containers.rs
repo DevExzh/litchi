@@ -1,4 +1,4 @@
-//! Binary codecs for embedded, linked, and ActiveX object containers.
+//! Binary codecs for embedded, linked, and `ActiveX` object containers.
 
 use super::super::model::{
     ContainerKind, Control, Definition, EmbedPreferences, ExternalObject, LinkInfo, Metadata,
@@ -11,6 +11,14 @@ use crate::package::Result;
 use crate::records::Record;
 
 impl Control {
+    /// Parse an `ExControlContainer` record into an `ActiveX` control
+    /// definition.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the container header, child count, or any child
+    /// record is invalid, or if the carried `ExOleObjAtom` does not describe
+    /// an `ActiveX` control.
     pub fn parse(record: &Record) -> Result<Self> {
         if record.version != 0x0f
             || record.instance != 0
@@ -47,10 +55,22 @@ impl Control {
         })
     }
 
+    /// Serialize as a fully parsed `ExControlContainer` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the control fails to serialize or if the encoded
+    /// record cannot be re-parsed.
     pub fn to_record(&self) -> Result<Record> {
         Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 
+    /// Serialize to the raw bytes of a complete `ExControlContainer` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the carried `ExOleObjAtom` does not describe an
+    /// `ActiveX` control or if any child record fails to serialize.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         if self.object.object_type != ObjectType::ActiveXControl {
             return corrupted("ExControlContainer requires an ActiveX ExOleObjAtom");
@@ -74,14 +94,23 @@ impl Control {
 }
 
 impl Definition {
+    /// Parse an embedded or linked OLE object container record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the container header, record type, child count, or
+    /// any child record is invalid, or if the container type disagrees with
+    /// the carried `ExOleObjAtom`.
     pub fn parse(record: &Record) -> Result<Self> {
         if record.version != 0x0f || record.instance != 0 {
             return corrupted("OLE object container has an invalid header");
         }
-        let expected_type = match record.record_type {
-            RecordType::ExternalOleEmbed => ObjectType::Embedded,
-            RecordType::ExternalOleLink => ObjectType::Linked,
-            _ => return corrupted("OLE object container has an invalid record type"),
+        let expected_type = if record.record_type == RecordType::ExternalOleEmbed {
+            ObjectType::Embedded
+        } else if record.record_type == RecordType::ExternalOleLink {
+            ObjectType::Linked
+        } else {
+            return corrupted("OLE object container has an invalid record type");
         };
         let children = Record::parse_sequence_strict(&record.data, "OLE object container")?;
         if !(2..=6).contains(&children.len()) {
@@ -108,10 +137,22 @@ impl Definition {
         })
     }
 
+    /// Serialize as a fully parsed OLE object container record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the definition fails to serialize or if the
+    /// encoded record cannot be re-parsed.
     pub fn to_record(&self) -> Result<Record> {
         Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 
+    /// Serialize to the raw bytes of a complete OLE object container record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the container type disagrees with the carried
+    /// `ExOleObjAtom` or if any child record fails to serialize.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         let (container_type, expected_type, first) = match self.kind {
             ContainerKind::Embedded(value) => (
@@ -142,6 +183,7 @@ impl Definition {
 }
 
 impl ExternalObject {
+    #[must_use]
     pub fn id(&self) -> u32 {
         match self {
             Self::Object(value) => value.object.id,
@@ -149,6 +191,7 @@ impl ExternalObject {
         }
     }
 
+    #[must_use]
     pub fn persist_id(&self) -> u32 {
         match self {
             Self::Object(value) => value.object.persist_id,
@@ -156,6 +199,12 @@ impl ExternalObject {
         }
     }
 
+    /// Serialize to the raw bytes of the object's container record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying object definition fails to
+    /// serialize.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         match self {
             Self::Object(value) => value.to_record_bytes(),

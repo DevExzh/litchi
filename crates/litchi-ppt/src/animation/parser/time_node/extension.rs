@@ -8,7 +8,11 @@ use crate::consts::RecordType;
 use crate::package::{Error, Result};
 use crate::records::Record;
 
-/// Discover PowerPoint 2002 timing and build records in `BinaryTagData`.
+/// Discover `PowerPoint` 2002 timing and build records in `BinaryTagData`.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_slide_animation_extension(data: &[u8]) -> Result<SlideAnimationExtension> {
     let mut extension = SlideAnimationExtension::default();
     let mut offset = 0usize;
@@ -31,6 +35,10 @@ pub fn parse_slide_animation_extension(data: &[u8]) -> Result<SlideAnimationExte
         {
             linked_shape_array_closed = true;
         }
+        #[allow(
+            clippy::wildcard_enum_match_arm,
+            reason = "`RecordType` spans the full MS-PPT record ID space; records outside the ___PPT10 extension set are skipped"
+        )]
         match record.record_type {
             RecordType::LinkedSlide10Atom => {
                 if extension.linked_slide.is_some() {
@@ -57,7 +65,7 @@ pub fn parse_slide_animation_extension(data: &[u8]) -> Result<SlideAnimationExte
                     ));
                 }
                 let declared_count =
-                    usize::try_from(linked_slide.linked_shape_count()).map_err(|_| {
+                    usize::try_from(linked_slide.linked_shape_count()).map_err(|_err| {
                         Error::InvalidFormat(
                             "LinkedSlide10Atom shape count does not fit this platform".to_string(),
                         )
@@ -120,11 +128,12 @@ pub fn parse_slide_animation_extension(data: &[u8]) -> Result<SlideAnimationExte
             .ok_or_else(|| Error::Corrupted("slide binary tag offset overflow".to_string()))?;
     }
     if let Some(linked_slide) = extension.linked_slide {
-        let declared_count = usize::try_from(linked_slide.linked_shape_count()).map_err(|_| {
-            Error::InvalidFormat(
-                "LinkedSlide10Atom shape count does not fit this platform".to_string(),
-            )
-        })?;
+        let declared_count =
+            usize::try_from(linked_slide.linked_shape_count()).map_err(|_err| {
+                Error::InvalidFormat(
+                    "LinkedSlide10Atom shape count does not fit this platform".to_string(),
+                )
+            })?;
         if extension.linked_shapes.len() != declared_count {
             return Err(Error::InvalidFormat(format!(
                 "LinkedSlide10Atom declares {declared_count} linked shapes but {} were present",

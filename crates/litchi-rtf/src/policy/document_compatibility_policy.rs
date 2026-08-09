@@ -40,11 +40,13 @@ pub struct DocumentCompatibilityPolicy {
 
 impl DocumentCompatibilityPolicy {
     /// Return whether every compatibility policy declaration was omitted.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         !self.reset_options_to_defaults && self.feature_throttle.is_none() && !self.force_upgrade
     }
 
     /// Return the explicit policy or the specification's omission behavior.
+    #[must_use]
     pub fn effective_feature_throttle(&self) -> DocumentFeatureThrottle {
         self.feature_throttle
             .unwrap_or(DocumentFeatureThrottle::CompatibilityLimited)

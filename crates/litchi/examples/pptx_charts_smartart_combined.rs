@@ -71,7 +71,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
     ];
 
-    let charts = vec![
+    let charts = [
         chart(
             ChartType::Column,
             "Quarterly Revenue ($M)",
@@ -156,7 +156,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ),
     ];
 
-    let diagrams = vec![
+    let diagrams = [
         (
             "Executive Summary - Review Process",
             diagram(

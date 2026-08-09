@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 //! Focused regression tests for the PPT writer core.
 
 use super::super::escher::FreeformGeometry;
@@ -11,15 +17,15 @@ use std::io::Cursor;
 fn test_create_writer() {
     let writer = Writer::new();
     assert_eq!(writer.slides.len(), 0);
-    assert_eq!(writer.slide_width, 9144000);
-    assert_eq!(writer.slide_height, 6858000);
+    assert_eq!(writer.slide_width, 9_144_000);
+    assert_eq!(writer.slide_height, 6_858_000);
 }
 
 #[test]
 fn test_create_widescreen() {
     let writer = Writer::new_widescreen();
-    assert_eq!(writer.slide_width, 9144000);
-    assert_eq!(writer.slide_height, 5143500);
+    assert_eq!(writer.slide_width, 9_144_000);
+    assert_eq!(writer.slide_height, 5_143_500);
 }
 
 #[test]
@@ -170,7 +176,7 @@ fn test_rotation_setter_rejects_non_finite_values() {
     writer.add_rectangle(slide, 0, 0, 100, 100).unwrap();
 
     assert!(writer.set_last_shape_rotation(slide, f32::NAN).is_err());
-    assert_eq!(writer.slides[slide].shapes[0].properties.rotation, 0.0);
+    assert!(writer.slides[slide].shapes[0].properties.rotation.abs() < f32::EPSILON);
     assert!(
         writer
             .set_last_shape_text_alignment(slide, TextAlignment::Center)
@@ -413,21 +419,21 @@ fn test_slide_count() {
 
 #[test]
 fn test_default_writer() {
-    let writer: Writer = Default::default();
+    let writer = Writer::default();
     assert_eq!(writer.slide_count(), 0);
-    assert_eq!(writer.slide_width, 9144000);
-    assert_eq!(writer.slide_height, 6858000);
+    assert_eq!(writer.slide_width, 9_144_000);
+    assert_eq!(writer.slide_height, 6_858_000);
 }
 
 #[test]
 fn test_ppt_write_error_display() {
     let io_err = WriteError::Io(std::io::Error::other("test error"));
-    let err_str = format!("{}", io_err);
+    let err_str = format!("{io_err}");
     assert!(err_str.contains("I/O error"));
 
     let data_err = WriteError::InvalidData("bad data".to_string());
-    let err_str = format!("{}", data_err);
-    assert!(err_str.contains("Invalid data"));
+    let data_err_str = format!("{data_err}");
+    assert!(data_err_str.contains("Invalid data"));
 }
 
 #[test]
@@ -465,7 +471,7 @@ fn test_shape_type_variants() {
         ShapeType::Picture,
     ];
     for shape_type in types {
-        let _ = format!("{:?}", shape_type);
+        let _debug_repr = format!("{shape_type:?}");
     }
 }
 
@@ -561,11 +567,11 @@ fn smart_tags_round_trip_through_both_output_paths() {
             .as_nanos()
     ));
     writer.save(&path).unwrap();
-    let mut package = crate::Package::open(&path).unwrap();
-    let presentation = package.presentation().unwrap();
-    assert_eq!(presentation.smart_tags().unwrap(), Some(store));
+    let mut file_package = crate::Package::open(&path).unwrap();
+    let file_presentation = file_package.presentation().unwrap();
+    assert_eq!(file_presentation.smart_tags().unwrap(), Some(store));
     assert_eq!(
-        presentation.shape_programmable_tags().unwrap()[0]
+        file_presentation.shape_programmable_tags().unwrap()[0]
             .programmable_tags
             .powerpoint11()
             .unwrap()
@@ -598,14 +604,14 @@ fn rejects_missing_smart_tag_references() {
         .unwrap();
     assert!(writer.write_to(&mut Cursor::new(Vec::new())).is_err());
 
-    let mut writer = Writer::new();
-    let slide = writer.add_slide().unwrap();
-    let tag = writer
+    let mut empty_writer = Writer::new();
+    let empty_slide = empty_writer.add_slide().unwrap();
+    let tag = empty_writer
         .add_smart_tag(SmartTagDefinition::new("urn:test", "empty"))
         .unwrap();
-    writer
+    empty_writer
         .add_rich_textbox(
-            slide,
+            empty_slide,
             0,
             0,
             100,
@@ -615,7 +621,7 @@ fn rejects_missing_smart_tag_references() {
             ])],
         )
         .unwrap();
-    assert!(writer.write_to(&mut Cursor::new(Vec::new())).is_err());
+    assert!(empty_writer.write_to(&mut Cursor::new(Vec::new())).is_err());
 }
 
 #[test]
@@ -860,12 +866,12 @@ fn test_invalid_operations() {
     assert!(result.is_err());
 
     // Try to add textbox to non-existent slide
-    let result = writer.add_textbox(5, 10, 10, 100, 50, "Test");
-    assert!(result.is_err());
+    let textbox_result = writer.add_textbox(5, 10, 10, 100, 50, "Test");
+    assert!(textbox_result.is_err());
 
     // Try to set notes on non-existent slide
-    let result = writer.set_slide_notes(0, "Notes");
-    assert!(result.is_err());
+    let notes_result = writer.set_slide_notes(0, "Notes");
+    assert!(notes_result.is_err());
 }
 
 #[test]

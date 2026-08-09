@@ -1,4 +1,4 @@
-//! Lossless-bounded PresentationML package facade.
+//! Lossless-bounded `PresentationML` package facade.
 //!
 //! The public package owner is split into a typed semantic facade, OPC graph
 //! lifecycle/serialization, and focused regression tests. Consumers continue

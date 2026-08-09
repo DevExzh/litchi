@@ -1,8 +1,8 @@
 //! Read a legacy Excel `.xls` file and print sheet/cell information.
 //!
 //! Run with:
-//!     cargo run -p litchi-xls --example read_xls
-//!     cargo run -p litchi-xls --example read_xls -- path/to/file.xls
+//!     cargo run -p litchi-xls --example `read_xls`
+//!     cargo run -p litchi-xls --example `read_xls` -- path/to/file.xls
 
 use litchi_core::sheet::{CellValue, WorkbookTrait, Worksheet as _};
 use litchi_xls::Workbook;
@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(1)
         .unwrap_or_else(|| "test-data/ole/xls/Simple.xls".to_string());
 
-    println!("Opening XLS: {}", path);
+    println!("Opening XLS: {path}");
 
     let reader = File::open(&path)?;
     let workbook = Workbook::new(reader)?;
@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let names: Vec<String> = workbook.worksheet_names().to_vec();
     for (idx, name) in names.iter().enumerate() {
-        println!("\n--- Sheet [{}]: \"{}\" ---", idx, name);
+        println!("\n--- Sheet [{idx}]: \"{name}\" ---");
 
         let sheet = workbook.xls_worksheet(idx)?;
         println!(
@@ -33,10 +33,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             sheet.column_count()
         );
         match sheet.dimensions() {
-            Some((min_r, min_c, max_r, max_c)) => println!(
-                "Dimensions : ({}, {}) - ({}, {})",
-                min_r, min_c, max_r, max_c
-            ),
+            Some((min_r, min_c, max_r, max_c)) => {
+                println!("Dimensions : ({min_r}, {min_c}) - ({max_r}, {max_c})")
+            },
             None => println!("Dimensions : <empty>"),
         }
 
@@ -87,12 +86,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn format_value(v: &CellValue) -> String {
     match v {
         CellValue::Empty => "<empty>".to_string(),
-        CellValue::Bool(b) => format!("{}", b),
-        CellValue::Int(i) => format!("{}", i),
-        CellValue::Float(f) => format!("{}", f),
-        CellValue::String(s) => format!("\"{}\"", s),
-        CellValue::DateTime(d) => format!("date({})", d),
-        CellValue::Error(e) => format!("#ERR({})", e),
+        CellValue::Bool(b) => format!("{b}"),
+        CellValue::Int(i) => format!("{i}"),
+        CellValue::Float(f) => format!("{f}"),
+        CellValue::String(s) => format!("\"{s}\""),
+        CellValue::DateTime(d) => format!("date({d})"),
+        CellValue::Error(e) => format!("#ERR({e})"),
         CellValue::Formula { .. } => "<formula>".to_string(),
     }
 }

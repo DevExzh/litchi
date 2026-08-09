@@ -1,4 +1,4 @@
-//! Contextual semantic models for one PowerPoint sound collection.
+//! Contextual semantic models for one `PowerPoint` sound collection.
 
 /// The MS-PPT `SoundBuiltinIdAtom` description domain.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -34,6 +34,7 @@ pub enum BuiltinId {
 
 impl BuiltinId {
     /// Return the native `SoundBuiltinIdAtom` value.
+    #[must_use]
     pub const fn value(self) -> u16 {
         self as u16
     }
@@ -58,7 +59,7 @@ pub struct Sound<'a> {
 /// A validated MS-PPT `SoundCollectionContainer` in source order.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Collection<'a> {
-    /// Positive seed used by PowerPoint for new sound identifiers.
+    /// Positive seed used by `PowerPoint` for new sound identifiers.
     pub sound_id_seed: u32,
     /// Embedded sounds in their native record order.
     pub sounds: Vec<Sound<'a>>,
@@ -66,6 +67,7 @@ pub struct Collection<'a> {
 
 impl<'a> Collection<'a> {
     /// Find a sound by its checked native identifier.
+    #[must_use]
     pub fn get(&self, id: u32) -> Option<&Sound<'a>> {
         self.sounds.iter().find(|sound| sound.id == id)
     }

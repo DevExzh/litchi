@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 //! Round-trip tests for in-content RSID markers:
 //! `\insrsid`, `\delrsid`, `\charrsid`, `\pararsid`, `\sectrsid`, `\tblrsid`.
 
@@ -13,7 +22,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn content_rsid_markers_reach_the_model() {
-    let source = r#"{\rtf1\ansi\sectrsid46 A\insrsid42 B\delrsid43 C\charrsid44 D\pararsid45\par\trowd\tblrsid47\cellx2000\pard\intbl X\cell\row}"#;
+    let source = r"{\rtf1\ansi\sectrsid46 A\insrsid42 B\delrsid43 C\charrsid44 D\pararsid45\par\trowd\tblrsid47\cellx2000\pard\intbl X\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
 
     let blocks = document.blocks();
@@ -32,7 +41,7 @@ fn content_rsid_markers_reach_the_model() {
 
 #[test]
 fn content_rsid_markers_round_trip_through_the_writer() {
-    let source = r#"{\rtf1\ansi\sectrsid46 A\insrsid42 B\delrsid43 C\charrsid44 D\pararsid45\par\trowd\tblrsid47\cellx2000\pard\intbl X\cell\row}"#;
+    let source = r"{\rtf1\ansi\sectrsid46 A\insrsid42 B\delrsid43 C\charrsid44 D\pararsid45\par\trowd\tblrsid47\cellx2000\pard\intbl X\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
 
     let output = write(&document);

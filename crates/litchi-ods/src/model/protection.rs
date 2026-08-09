@@ -256,17 +256,17 @@ fn optional_extension_bool(
     Ok(None)
 }
 
-pub(crate) fn write_spreadsheet_attributes(out: &mut String, value: &Protection) {
+pub fn write_spreadsheet_attributes(out: &mut String, value: &Protection) {
     write_bool_attribute(out, "table:structure-protected", value.structure_protected);
     write_key_attributes(out, &value.key);
 }
 
-pub(crate) fn write_sheet_attributes(out: &mut String, value: &Sheet) {
+pub fn write_sheet_attributes(out: &mut String, value: &Sheet) {
     write_bool_attribute(out, "table:protected", value.protected);
     write_key_attributes(out, &value.key);
 }
 
-pub(crate) fn write_sheet_options(out: &mut String, value: &Options) {
+pub fn write_sheet_options(out: &mut String, value: &Options) {
     if value.is_empty() {
         return;
     }
@@ -290,7 +290,7 @@ pub(crate) fn write_sheet_options(out: &mut String, value: &Options) {
     out.push_str("/>");
 }
 
-pub(crate) fn has_extensions<'a>(
+pub fn has_extensions<'a>(
     spreadsheet: &Protection,
     mut sheets: impl Iterator<Item = &'a Sheet>,
 ) -> bool {

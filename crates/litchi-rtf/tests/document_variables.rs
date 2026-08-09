@@ -1,9 +1,18 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{RtfDocument, RtfWriter};
 
 #[test]
 fn parses_ordered_document_variables_without_body_leakage() {
     let document = RtfDocument::parse(
-        r#"{\rtf1\ansi{\*\docvar {FullName}{Jeff Smith}}{\*\docvar {Unused}{Hello World}}Body}"#,
+        r"{\rtf1\ansi{\*\docvar {FullName}{Jeff Smith}}{\*\docvar {Unused}{Hello World}}Body}",
     )
     .unwrap();
     assert_eq!(document.document_variables().len(), 2);
@@ -51,14 +60,14 @@ fn parses_libreoffice_document_variable_fixtures_when_available() {
 #[test]
 fn rejects_malformed_or_active_document_variable_content() {
     for source in [
-        r#"{\rtf1{\*\docvar{}{value}}}"#,
-        r#"{\rtf1{\*\docvar{name}}}"#,
-        r#"{\rtf1{\*\docvar{name}{value}{extra}}}"#,
-        r#"{\rtf1{\*\docvar{name}{{nested}}}}"#,
-        r#"{\rtf1{\*\docvar{name}{\bin4 abcd}}}"#,
-        r#"{\rtf1{\docvar{name}{value}}}"#,
-        r#"{\rtf1{\b{\*\docvar{name}{value}}}}"#,
-        r#"{\rtf1 Body{\*\docvar{name}{value}}}"#,
+        r"{\rtf1{\*\docvar{}{value}}}",
+        r"{\rtf1{\*\docvar{name}}}",
+        r"{\rtf1{\*\docvar{name}{value}{extra}}}",
+        r"{\rtf1{\*\docvar{name}{{nested}}}}",
+        r"{\rtf1{\*\docvar{name}{\bin4 abcd}}}",
+        r"{\rtf1{\docvar{name}{value}}}",
+        r"{\rtf1{\b{\*\docvar{name}{value}}}}",
+        r"{\rtf1 Body{\*\docvar{name}{value}}}",
     ] {
         assert!(RtfDocument::parse(source).is_err(), "{source}");
     }

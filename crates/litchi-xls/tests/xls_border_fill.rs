@@ -63,7 +63,7 @@ fn reads_poi_fill_fixture() {
     let fill = workbook
         .extended_formats()
         .iter()
-        .map(|xf| xf.fill())
+        .map(litchi_xls::ExtendedFormat::fill)
         .find(|fill| fill.pattern() != FillPattern::None)
         .expect("fixture should contain a patterned fill");
     assert!(fill.foreground_color(palette).is_some());

@@ -12,7 +12,7 @@ use super::records::Record;
 const DEFAULT_MAX_STORED_PROJECT_BYTES: usize = 128 * 1_048_576;
 const DEFAULT_MAX_PROJECT_CFB_BYTES: usize = 256 * 1_048_576;
 
-/// Outer storage encoding used when authoring a PowerPoint VBA project.
+/// Outer storage encoding used when authoring a `PowerPoint` VBA project.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum VbaProjectCompression {
     /// Store the standalone CFB bytes directly.
@@ -22,7 +22,7 @@ pub enum VbaProjectCompression {
     Zlib,
 }
 
-/// Resource limits for loading an embedded PowerPoint VBA project.
+/// Resource limits for loading an embedded `PowerPoint` VBA project.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct VbaProjectLimits {
     /// Maximum zlib or uncompressed bytes stored in `VbaProjectStg`.
@@ -43,7 +43,7 @@ impl Default for VbaProjectLimits {
     }
 }
 
-/// Error returned while resolving or parsing a PowerPoint VBA project.
+/// Error returned while resolving or parsing a `PowerPoint` VBA project.
 #[derive(Debug)]
 pub enum VbaProjectError {
     /// Invalid outer MS-PPT metadata, compression, or persistence.
@@ -97,7 +97,7 @@ pub struct VbaInfo {
     pub runtime_version: u32,
 }
 
-/// Payload-free metadata for a PowerPoint `VbaProjectStg` persist object.
+/// Payload-free metadata for a `PowerPoint` `VbaProjectStg` persist object.
 ///
 /// This descriptor does not expose or decompress the embedded payload.
 /// Callers can opt into bounded CFB/MS-OVBA parsing through
@@ -129,16 +129,16 @@ impl VbaProjectStorage {
                 info.persist_id_ref
             )));
         }
-        if let Some(storage) = storage
-            && storage.kind != StorageKind::VbaProject
+        if let Some(metadata) = storage
+            && metadata.kind != StorageKind::VbaProject
         {
             return Err(Error::Corrupted(format!(
                 "VBAInfoAtom persist ID {} does not reference VBA project storage",
                 info.persist_id_ref
             )));
         }
-        if let Some(storage) = storage
-            && info.has_macros != storage.contains_data
+        if let Some(metadata) = storage
+            && info.has_macros != metadata.contains_data
         {
             return Err(Error::Corrupted(
                 "VBAInfoAtom fHasMacros disagrees with VbaProjectStg payload presence".to_string(),
@@ -146,44 +146,51 @@ impl VbaProjectStorage {
         }
         Ok(Self {
             info,
-            compression: storage.map(|storage| storage.compression),
+            compression: storage.map(|metadata| metadata.compression),
             declared_uncompressed_len: storage
-                .and_then(|storage| storage.declared_uncompressed_len),
-            stored_payload_len: storage.map(|storage| storage.stored_payload_len),
+                .and_then(|metadata| metadata.declared_uncompressed_len),
+            stored_payload_len: storage.map(|metadata| metadata.stored_payload_len),
         })
     }
 
     /// Return the `VBAInfoAtom` metadata that points at this storage.
+    #[must_use]
     pub fn info(&self) -> VbaInfo {
         self.info
     }
 
     /// Return the persisted VBA storage identifier.
+    #[must_use]
     pub fn persist_id_ref(&self) -> u32 {
         self.info.persist_id_ref
     }
 
     /// Whether `VBAInfoAtom` declares that the project storage has data.
+    #[must_use]
     pub fn has_macros(&self) -> bool {
         self.info.has_macros
     }
 
-    /// Return the VBA runtime version recorded by PowerPoint.
+    /// Return the VBA runtime version recorded by `PowerPoint`.
+    #[must_use]
     pub fn runtime_version(&self) -> u32 {
         self.info.runtime_version
     }
 
     /// Whether a non-null VBA project storage record is present.
+    #[must_use]
     pub fn has_persisted_storage(&self) -> bool {
         self.compression.is_some()
     }
 
     /// Return outer-record compression metadata without decompressing data.
+    #[must_use]
     pub fn compression(&self) -> Option<Compression> {
         self.compression
     }
 
     /// Return the stored opaque payload length, excluding a compressed size prefix.
+    #[must_use]
     pub fn stored_payload_len(&self) -> Option<usize> {
         self.stored_payload_len
     }
@@ -192,11 +199,13 @@ impl VbaProjectStorage {
     ///
     /// This is untrusted metadata from the outer record. Bounded project
     /// parsing verifies it against the actual decompressed byte count.
+    #[must_use]
     pub fn declared_uncompressed_len(&self) -> Option<u32> {
         self.declared_uncompressed_len
     }
 
     /// Whether outer metadata declares a compressed VBA project storage.
+    #[must_use]
     pub fn is_compressed(&self) -> bool {
         matches!(self.compression, Some(Compression::Zlib))
     }
@@ -204,6 +213,7 @@ impl VbaProjectStorage {
     /// Whether persisted metadata conservatively indicates macro data.
     ///
     /// This does not inspect project, module, or source-code bytes.
+    #[must_use]
     pub fn may_contain_macro_code(&self) -> bool {
         self.info.has_macros && self.has_persisted_storage()
     }
@@ -211,6 +221,10 @@ impl VbaProjectStorage {
 
 impl VbaInfo {
     /// Parse one complete `VBAInfoContainer`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(record: &Record) -> Result<Self> {
         if record.record_type != RecordType::VBAInfo
             || record.version != 0x0f
@@ -275,6 +289,10 @@ impl VbaInfo {
     }
 
     /// Encode the exact container and atom headers required by MS-PPT.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_record(self) -> Result<Record> {
         self.validate()?;
         let mut atom_data = Vec::with_capacity(12);
@@ -329,11 +347,16 @@ fn read_vba_info_u32(data: &[u8], offset: usize, field: &str) -> Result<u32> {
         .get(offset..end)
         .ok_or_else(|| Error::Corrupted(format!("truncated VBAInfoAtom {field}")))?
         .try_into()
-        .map_err(|_| Error::Corrupted(format!("invalid VBAInfoAtom {field} width")))?;
+        .map_err(|_err| Error::Corrupted(format!("invalid VBAInfoAtom {field} width")))?;
     Ok(u32::from_le_bytes(bytes))
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

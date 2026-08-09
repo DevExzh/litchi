@@ -48,38 +48,47 @@ impl Definition {
         }
     }
 
+    #[must_use]
     pub fn kind(&self) -> Kind {
         self.kind
     }
 
+    #[must_use]
     pub fn mode(&self) -> Mode {
         self.mode
     }
 
+    #[must_use]
     pub fn anchor(&self) -> Frame {
         self.anchor
     }
 
+    #[must_use]
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
     }
 
+    #[must_use]
     pub fn program_id(&self) -> Option<&str> {
         self.program_id.as_deref()
     }
 
+    #[must_use]
     pub fn show_as_icon(&self) -> Option<bool> {
         self.show_as_icon
     }
 
+    #[must_use]
     pub fn preview_size(&self) -> Option<(u32, u32)> {
         self.preview_width.zip(self.preview_height)
     }
 
+    #[must_use]
     pub fn payload(&self) -> Option<&[u8]> {
         self.payload.as_deref()
     }
 
+    #[must_use]
     pub fn target(&self) -> Option<&str> {
         self.target.as_deref()
     }
@@ -89,6 +98,7 @@ impl Definition {
         self
     }
 
+    #[must_use]
     pub fn clear_name(mut self) -> Self {
         self.name = None;
         self
@@ -99,11 +109,13 @@ impl Definition {
         self
     }
 
+    #[must_use]
     pub fn set_show_as_icon(mut self, value: Option<bool>) -> Self {
         self.show_as_icon = value;
         self
     }
 
+    #[must_use]
     pub fn set_preview_size(mut self, value: Option<(u32, u32)>) -> Self {
         self.preview_width = value.map(|value| value.0);
         self.preview_height = value.map(|value| value.1);

@@ -24,6 +24,10 @@ pub struct ChangeCommand {
 
 /// Load every typed modern-comment command while leaving all other change XML
 /// untouched and inert.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load_modern_comment_changes(package: &OpcPackage) -> Result<Vec<ChangeCommand>> {
     let Some(part) = super::super::presentation_properties::metadata::changes::load(package)?
     else {
@@ -50,6 +54,10 @@ pub fn load_modern_comment_changes(package: &OpcPackage) -> Result<Vec<ChangeCom
 /// The callback may edit typed values but cannot add/remove/reorder command
 /// fragments. Such structural edits would risk changing unrelated future
 /// command data and are rejected. No command is interpreted or executed.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn update_modern_comment_changes<F>(package: &mut OpcPackage, update: F) -> Result<bool>
 where
     F: FnOnce(&mut Vec<ChangeCommand>),

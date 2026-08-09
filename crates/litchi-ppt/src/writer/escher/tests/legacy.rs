@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 //! Escher facade and byte-level regression tests.
 
 use super::*;
@@ -120,7 +126,7 @@ fn test_escher_spgr_data() {
 
 #[test]
 fn test_escher_property() {
-    let prop = Property::new(0x0181, 0x00FF0000);
+    let prop = Property::new(0x0181, 0x00FF_0000);
     let bytes = prop.as_bytes();
     assert_eq!(bytes.len(), 6);
 
@@ -128,7 +134,7 @@ fn test_escher_property() {
     let prop_id = u16::from_le_bytes([bytes[0], bytes[1]]);
     let value = u32::from_le_bytes([bytes[2], bytes[3], bytes[4], bytes[5]]);
     assert_eq!(prop_id, 0x0181);
-    assert_eq!(value, 0x00FF0000);
+    assert_eq!(value, 0x00FF_0000);
 }
 
 #[test]
@@ -148,8 +154,8 @@ fn test_user_shape_data_default() {
     assert_eq!(shape.shape_type, shape_type::RECTANGLE);
     assert_eq!(shape.x, 0);
     assert_eq!(shape.y, 0);
-    assert_eq!(shape.width, 914400); // 1 inch in EMUs
-    assert_eq!(shape.height, 914400);
+    assert_eq!(shape.width, 914_400); // 1 inch in EMUs
+    assert_eq!(shape.height, 914_400);
     assert!(!shape.has_shadow);
     assert!(!shape.flip_h);
     assert!(!shape.flip_v);
@@ -191,10 +197,10 @@ fn test_create_dg_container_with_shapes_empty() {
 fn test_create_dg_container_with_shapes_single() {
     let shape = UserShapeData {
         shape_type: shape_type::RECTANGLE,
-        x: 100000,
-        y: 100000,
-        width: 500000,
-        height: 300000,
+        x: 100_000,
+        y: 100_000,
+        width: 500_000,
+        height: 300_000,
         text: Some("Test".to_string()),
         ..Default::default()
     };
@@ -212,23 +218,23 @@ fn test_create_dg_container_with_shapes_multiple() {
             shape_type: shape_type::RECTANGLE,
             x: 0,
             y: 0,
-            width: 100000,
-            height: 100000,
+            width: 100_000,
+            height: 100_000,
             ..Default::default()
         },
         UserShapeData {
             shape_type: shape_type::ELLIPSE,
-            x: 200000,
-            y: 200000,
-            width: 100000,
-            height: 100000,
+            x: 200_000,
+            y: 200_000,
+            width: 100_000,
+            height: 100_000,
             ..Default::default()
         },
         UserShapeData {
             shape_type: shape_type::LINE,
             x: 0,
-            y: 300000,
-            width: 300000,
+            y: 300_000,
+            width: 300_000,
             height: 0,
             ..Default::default()
         },
@@ -241,8 +247,8 @@ fn test_create_dg_container_with_shapes_multiple() {
 fn test_build_shape_properties_rectangle() {
     let shape = UserShapeData {
         shape_type: shape_type::RECTANGLE,
-        fill_color: Some(0x00FF0000),
-        line_color: Some(0x00000000),
+        fill_color: Some(0x00FF_0000),
+        line_color: Some(0x0000_0000),
         ..Default::default()
     };
     let props = build_shape_properties(&shape);
@@ -276,7 +282,7 @@ fn test_build_shape_properties_with_shadow() {
     let shape = UserShapeData {
         shape_type: shape_type::RECTANGLE,
         has_shadow: true,
-        shadow_color: Some(0x00808080),
+        shadow_color: Some(0x0080_8080),
         ..Default::default()
     };
     let props = build_shape_properties(&shape);
@@ -328,7 +334,8 @@ fn test_picture_shape_preserves_rotation_property() {
     let properties = build_shape_properties(&shape);
 
     assert!(properties.iter().any(|property| {
-        property.raw_id() == prop_id::ROTATION && property.value() == (-90i32 * 65536) as u32
+        property.raw_id() == prop_id::ROTATION
+            && property.value() == (-90i32 * 65536).cast_unsigned()
     }));
 }
 
@@ -351,7 +358,7 @@ fn test_shape_properties_preserve_all_ten_adjustments() {
 
     assert_eq!(adjustments.len(), 10);
     assert_eq!(adjustments[0], (0x0147, 0));
-    assert_eq!(adjustments[9], (0x0150, (-900i32) as u32));
+    assert_eq!(adjustments[9], (0x0150, (-900i32).cast_unsigned()));
 }
 
 #[test]
@@ -368,7 +375,7 @@ fn test_user_shape_rejects_more_than_ten_adjustments() {
 fn test_build_shape_properties_with_arrows() {
     let shape = UserShapeData {
         shape_type: shape_type::LINE,
-        line_color: Some(0x00000000),
+        line_color: Some(0x0000_0000),
         line_end_arrow: Some(1), // Triangle arrow
         ..Default::default()
     };
@@ -417,9 +424,9 @@ fn test_shape_properties_preserve_extended_line_style() {
 fn test_build_shape_properties_gradient_fill() {
     let shape = UserShapeData {
         shape_type: shape_type::RECTANGLE,
-        fill_color: Some(0x00FF0000),
+        fill_color: Some(0x00FF_0000),
         fill_type: Some(4), // Shade/gradient
-        fill_back_color: Some(0x0000FF00),
+        fill_back_color: Some(0x0000_FF00),
         fill_angle: Some(0),
         ..Default::default()
     };
@@ -626,9 +633,9 @@ fn typed_interactions_coexist_in_client_data_grammar_order() {
     };
 
     let bytes = create_user_shape_container(45, &shape).unwrap();
-    let (root, consumed) = Record::parse(&bytes, 0).unwrap();
+    let (root_record, consumed) = Record::parse(&bytes, 0).unwrap();
     assert_eq!(consumed, bytes.len());
-    let root = Container::try_new(root).expect("shape container");
+    let root = Container::try_new(root_record).expect("shape container");
     let record = root
         .find(RecordKind::ClientData)
         .unwrap()
@@ -784,10 +791,10 @@ fn test_escher_header_as_bytes() {
 fn test_create_dg_container_with_flip_flags() {
     let shape = UserShapeData {
         shape_type: shape_type::RECTANGLE,
-        x: 100000,
-        y: 100000,
-        width: 500000,
-        height: 300000,
+        x: 100_000,
+        y: 100_000,
+        width: 500_000,
+        height: 300_000,
         flip_h: true,
         flip_v: true,
         ..Default::default()
@@ -800,7 +807,7 @@ fn test_create_dg_container_with_flip_flags() {
 fn test_create_dg_container_with_dash_style() {
     let shape = UserShapeData {
         shape_type: shape_type::LINE,
-        line_color: Some(0x00000000),
+        line_color: Some(0x0000_0000),
         line_dash_style: Some(1), // Dash
         ..Default::default()
     };
@@ -823,9 +830,9 @@ fn test_freeform_geometry_round_trips_through_opt_record() {
     };
 
     let bytes = create_user_shape_container(45, &shape).unwrap();
-    let (root, consumed) = Record::parse(&bytes, 0).expect("shape container record");
+    let (root_record, consumed) = Record::parse(&bytes, 0).expect("shape container record");
     assert_eq!(consumed, bytes.len());
-    let root = Container::try_new(root).expect("shape container");
+    let root = Container::try_new(root_record).expect("shape container");
     let opt = root
         .find(RecordKind::Opt)
         .expect("valid shape container")
@@ -859,7 +866,7 @@ fn test_freeform_geometry_round_trips_through_opt_record() {
 fn test_shape_properties_with_line_width() {
     let shape = UserShapeData {
         shape_type: shape_type::RECTANGLE,
-        line_color: Some(0x00000000),
+        line_color: Some(0x0000_0000),
         line_width: Some(25400), // 2pt in EMUs
         ..Default::default()
     };

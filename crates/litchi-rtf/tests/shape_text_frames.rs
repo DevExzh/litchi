@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use std::borrow::Cow;
 
 use litchi_rtf::{RtfDocument, RtfWriter, Shape, ShapeType};
@@ -20,7 +29,7 @@ fn parses_real_libreoffice_text_frames_and_round_trips_canonically() {
     assert_eq!(producer.shapes()[0].text, "Textbox text.\n");
     assert!(producer.shapes()[0].text_destination_present);
 
-    let mut document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     let shape = Shape::text_box(Cow::Borrowed("Line one\nTabbed\tUnicode 你"));
     document.set_background_shape(shape).unwrap();
     let output = write(&document);
@@ -35,7 +44,7 @@ fn parses_real_libreoffice_text_frames_and_round_trips_canonically() {
 
 #[test]
 fn preserves_empty_presence_and_supports_typed_set_and_clear() {
-    let source = r#"{\rtf1{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 202}}{\shptxt}}}}"#;
+    let source = r"{\rtf1{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 202}}{\shptxt}}}}";
     let document = RtfDocument::parse(source).unwrap();
     assert!(document.shapes()[0].text.is_empty());
     assert!(document.shapes()[0].text_destination_present);
@@ -64,14 +73,14 @@ fn retains_formatting_group_text_but_skips_nested_destinations_inertly() {
 #[test]
 fn rejects_hostile_shape_text_grammar_and_resource_abuse() {
     for source in [
-        r#"{\rtf1{\shptxt x}}"#,
-        r#"{\rtf1{\*\shptxt x}}"#,
-        r#"{\rtf1{\shp{\*\shpinst{\shptxt1 x}}}}"#,
-        r#"{\rtf1{\shp\shptxt x}}"#,
-        r#"{\rtf1{\shp{{\shptxt x}}}}"#,
-        r#"{\rtf1{\shp{\*\shpinst{\shptxt x}{\sp{\sn shapeType}{\sv 202}}}}}"#,
-        r#"{\rtf1{\shp{\*\shpinst{\shptxt one}}{\shptxt two}}}"#,
-        r#"{\rtf1{\shp{\*\shprslt fallback}{\shptxt late}}}"#,
+        r"{\rtf1{\shptxt x}}",
+        r"{\rtf1{\*\shptxt x}}",
+        r"{\rtf1{\shp{\*\shpinst{\shptxt1 x}}}}",
+        r"{\rtf1{\shp\shptxt x}}",
+        r"{\rtf1{\shp{{\shptxt x}}}}",
+        r"{\rtf1{\shp{\*\shpinst{\shptxt x}{\sp{\sn shapeType}{\sv 202}}}}}",
+        r"{\rtf1{\shp{\*\shpinst{\shptxt one}}{\shptxt two}}}",
+        r"{\rtf1{\shp{\*\shprslt fallback}{\shptxt late}}}",
         "{\\rtf1{\\shp{\\*\\shpinst{\\shptxt\\bin1 x}}}}",
     ] {
         assert!(
@@ -80,14 +89,14 @@ fn rejects_hostile_shape_text_grammar_and_resource_abuse() {
         );
     }
 
-    let mut nested = r#"{\rtf1{\shp{\*\shpinst{\shptxt "#.to_string();
+    let mut nested = r"{\rtf1{\shp{\*\shpinst{\shptxt ".to_string();
     nested.push_str(&"{".repeat(65));
     nested.push('x');
     nested.push_str(&"}".repeat(65));
     nested.push_str("}}}");
     assert!(RtfDocument::parse(&nested).is_err());
 
-    let mut document = RtfDocument::parse(r#"{\rtf1}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1}").unwrap();
     let mut shape = Shape::new(ShapeType::TextBox);
     shape.set_text(Cow::Owned("x".repeat(16 * 1_048_576 + 1)));
     assert!(document.set_background_shape(shape).is_err());

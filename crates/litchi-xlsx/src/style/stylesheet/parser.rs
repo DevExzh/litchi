@@ -11,7 +11,8 @@ use quick_xml::reader::NsReader;
 use super::alignment::{Horizontal, Indent, Reading, Rotation, Vertical};
 use super::border::{Color, Dir, Line, Rgb, Side, Tint};
 use super::{
-    Alignment, Border, CellStyle, Fill, Font, NumberFormat, Scheme, Script, Styles, Underline,
+    Alignment, Border, CellStyle, Fill, Font, FontColor, FontColorKind, NumberFormat, Scheme,
+    Script, Styles, Underline,
 };
 use crate::error::{Error, Result};
 use litchi_ooxml_common::xml::unqualified_attribute_value;
@@ -180,7 +181,10 @@ fn parse_number_formats(
             {
                 let id = required_u32(&element, b"numFmtId", decoder, "number-format ID")?;
                 let code = required_string(&element, b"formatCode", decoder, "format code")?;
-                if formats.insert(id, NumberFormat::new(id, code)).is_some() {
+                if formats
+                    .insert(id, NumberFormat::from_raw(id, code))
+                    .is_some()
+                {
                     return Err(invalid(format!("duplicate number-format ID {id}")));
                 }
             },
@@ -275,7 +279,7 @@ fn parse_font(reader: &mut XmlReader<'_>) -> Result<Font> {
                 if is_spreadsheetml_name(namespace, element.name(), b"color") =>
             {
                 mark_property(&mut seen, 64, "font color")?;
-                font.color = parse_color(&element, decoder)?;
+                font.color = Some(parse_font_color(&element, decoder)?);
             },
             Event::Start(element) | Event::Empty(element)
                 if is_spreadsheetml_name(namespace, element.name(), b"charset") =>
@@ -924,6 +928,43 @@ fn parse_color(element: &BytesStart<'_>, decoder: Decoder) -> Result<Option<Stri
     }
 }
 
+fn parse_font_color(element: &BytesStart<'_>, decoder: Decoder) -> Result<FontColor> {
+    let rgb = optional_string(element, b"rgb", decoder)?;
+    let theme = optional_u32(element, b"theme", decoder, "theme color")?;
+    let indexed = optional_u32(element, b"indexed", decoder, "indexed color")?;
+    let automatic = optional_bool(element, b"auto", decoder, "automatic color")?;
+    let specified = usize::from(rgb.is_some())
+        + usize::from(theme.is_some())
+        + usize::from(indexed.is_some())
+        + usize::from(automatic.is_some());
+    if specified > 1 {
+        return Err(invalid("font color has multiple mutually exclusive values"));
+    }
+
+    let tint = optional_f64(element, b"tint", decoder, "font color tint")?
+        .map(Tint::new)
+        .transpose()
+        .map_err(|error| invalid(error.to_string()))?;
+    let kind = if let Some(rgb) = rgb {
+        FontColorKind::Rgb(
+            rgb.parse()
+                .map_err(|error| invalid(format!("invalid font RGB color '{rgb}': {error}")))?,
+        )
+    } else if let Some(theme) = theme {
+        FontColorKind::Theme(theme)
+    } else if let Some(indexed) = indexed {
+        FontColorKind::Indexed(indexed)
+    } else if let Some(automatic) = automatic {
+        FontColorKind::Auto(automatic)
+    } else {
+        FontColorKind::Default
+    };
+    let source_lexical = String::from_utf8_lossy(element.as_ref())
+        .into_owned()
+        .into_boxed_str();
+    Ok(FontColor::parsed(kind, tint, source_lexical))
+}
+
 fn parse_border_color(element: &BytesStart<'_>, decoder: Decoder) -> Result<Option<Color>> {
     let rgb = optional_string(element, b"rgb", decoder)?;
     let theme = optional_u32(element, b"theme", decoder, "theme color")?;
@@ -1203,7 +1244,7 @@ mod tests {
             </s:styleSheet>"#
         );
         let styles = parse_styles(&xml).unwrap();
-        assert_eq!(styles.number_formats[&164].code, "0.00& units");
+        assert_eq!(styles.number_formats[&164].code(), "0.00& units");
         assert_eq!(styles.fonts.len(), 1);
         assert_eq!(styles.fonts[0].name.as_deref(), Some("A & B"));
         assert!(!styles.fonts[0].bold);

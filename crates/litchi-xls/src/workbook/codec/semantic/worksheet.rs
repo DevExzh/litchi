@@ -82,7 +82,7 @@ fn add_cell(
             .map_err(|_| Error::Allocation("tracking duplicate worksheet cells"))?;
         duplicate_cells.insert(position);
     }
-    worksheet.add_cell(cell);
+    worksheet.add_cell(cell)?;
     Ok(())
 }
 
@@ -482,7 +482,7 @@ impl<R: Read + Seek> Workbook<R> {
                     *remaining -= 1;
                 }
                 0x000A => { // EOF - End of worksheet
-                    *worksheet.protection_mut() = protection_collector.finish()?;
+                    *worksheet.protection_mut()? = protection_collector.finish()?;
                     break;
                 }
                 crate::sheet_ext::SHEET_EXT_RECORD_TYPE => { // SheetExt
@@ -596,7 +596,7 @@ impl<R: Read + Seek> Workbook<R> {
                             parsed_dimensions.last_row,
                             parsed_dimensions.first_col,
                             parsed_dimensions.last_col,
-                        );
+                        )?;
                         dimensions = Some(parsed_dimensions);
                     }
                 }
@@ -838,28 +838,28 @@ impl<R: Read + Seek> Workbook<R> {
                 rt if rt == merged_cells::RECORD_TYPE => {
                     let mut ranges = Vec::new();
                     if merged_cells::parse_mergecells_record(record.payload(), &mut ranges).is_ok() {
-                        worksheet.add_merged_cells(&ranges);
+                        worksheet.add_merged_cells(&ranges)?;
                     }
                 }
 
                 // --- AutoFilter (AUTOFILTERINFO 0x009D) ---
                 rt if rt == autofilter::AUTOFILTERINFO_TYPE => {
                     if let Ok(count) = autofilter::parse_autofilterinfo(record.payload()) {
-                        worksheet.set_autofilter_info(count);
+                        worksheet.set_autofilter_info(count)?;
                     }
                 }
 
                 // --- AutoFilter column (AUTOFILTER 0x009E) ---
                 rt if rt == autofilter::AUTOFILTER_TYPE => {
                     if let Ok(col) = autofilter::parse_autofilter(record.payload()) {
-                        worksheet.add_autofilter_column(col);
+                        worksheet.add_autofilter_column(col)?;
                     }
                 }
 
                 // --- Sort (SORT 0x0090) ---
                 rt if rt == autofilter::SORT_TYPE => {
                     if let Ok(info) = autofilter::parse_sort(record.payload()) {
-                        worksheet.set_sort_info(info);
+                        worksheet.set_sort_info(info)?;
                     }
                 }
 
@@ -973,7 +973,7 @@ impl<R: Read + Seek> Workbook<R> {
         }
         worksheet.set_array_formulas(array_formulas);
         for table in pivot_table_collector.finish()? {
-            worksheet.add_pivot_table(table);
+            worksheet.add_pivot_table(table)?;
         }
         worksheet.set_query_tables(query_table_collector.finish());
         sort_data_collector.finish()?;
@@ -998,6 +998,7 @@ impl<R: Read + Seek> Workbook<R> {
         worksheet.set_list_objects(list_object_collector.finish()?);
         worksheet.set_row_block_index(row_block_index_collector.finish());
 
+        worksheet.mark_source_bound();
         Ok(worksheet)
     }
 }

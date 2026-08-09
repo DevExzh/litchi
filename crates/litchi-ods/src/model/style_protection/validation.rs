@@ -7,16 +7,22 @@ use super::model::{
 use litchi_core::{Error, Result};
 use std::collections::HashSet;
 
-pub(crate) fn validate_style_name(name: &str, label: &str) -> Result<()> {
+/// # Errors
+///
+/// Returns an error when a value violates the format or resource constraints.
+pub fn validate_style_name(name: &str, label: &str) -> Result<()> {
     if name.is_empty() {
         return Err(Error::InvalidFormat(format!("{label} must not be empty")));
     }
     check_conditional_attribute_size(label, name)
 }
 
-pub(crate) fn validate_conditional_style_collection(
+/// # Errors
+///
+/// Returns an error when a value violates the format or resource constraints.
+pub fn validate_conditional_style_collection<S: std::hash::BuildHasher>(
     styles: &[ConditionalStyle],
-    common_styles: &HashSet<String>,
+    common_styles: &HashSet<String, S>,
 ) -> Result<()> {
     if styles.len() > MAX_CONDITIONAL_STYLES {
         return Err(Error::InvalidFormat(format!(
@@ -151,7 +157,10 @@ fn validate_xml_prefix(prefix: &str) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn validate_protection_style_collection(styles: &[TableStyle]) -> Result<()> {
+/// # Errors
+///
+/// Returns an error when a value violates the format or resource constraints.
+pub fn validate_protection_style_collection(styles: &[TableStyle]) -> Result<()> {
     if styles.len() > MAX_CONDITIONAL_STYLES {
         return Err(Error::InvalidFormat(format!(
             "document exceeds the {MAX_CONDITIONAL_STYLES} automatic protection style limit"

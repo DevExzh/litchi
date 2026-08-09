@@ -1,4 +1,15 @@
-use super::*;
+#![allow(
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    reason = "decoding steps deliberately rebind a working value as it is refined through the parse pipeline"
+)]
+use super::{
+    ColorRef, ControlWord, Cow, MAX_GROUPS_PER_GROUP, MAX_SHAPE_GROUP_DEPTH, MAX_SHAPE_GROUPS,
+    MAX_SHAPE_PROPERTIES, MAX_SHAPE_PROPERTY_BYTES, MAX_SHAPE_TEXT_BYTES, MAX_SHAPES,
+    MAX_SHAPES_PER_GROUP, Parser, RtfError, RtfResult, Token, control_symbol_text,
+    require_parameterless,
+};
 
 impl<'a> Parser<'a> {
     /// Parse the unique starred root document-background destination.
@@ -427,7 +438,10 @@ impl<'a> Parser<'a> {
         Ok(shape)
     }
 
-    #[allow(clippy::type_complexity)]
+    #[allow(
+        clippy::type_complexity,
+        reason = "shape destination parsers return the full story-content tuple in one result"
+    )]
     pub(super) fn parse_shape_text_destination(
         &mut self,
     ) -> RtfResult<(
@@ -849,7 +863,10 @@ impl<'a> Parser<'a> {
         }
     }
 
-    #[allow(clippy::type_complexity)]
+    #[allow(
+        clippy::type_complexity,
+        reason = "shape destination parsers return the full story-content tuple in one result"
+    )]
     pub(super) fn parse_shape_property_group(
         &mut self,
     ) -> RtfResult<(
@@ -1084,7 +1101,7 @@ impl<'a> Parser<'a> {
                     }
                     self.pos += 1;
                 },
-                _ => self.pos += 1,
+                Token::Control(_) | Token::Binary(_) => self.pos += 1,
             }
             if name.len().saturating_add(value.len()) > MAX_SHAPE_PROPERTY_BYTES {
                 return Err(RtfError::MalformedDocument(
@@ -1158,7 +1175,7 @@ impl<'a> Parser<'a> {
                 Some(Token::Control(ControlWord::ShapeThemeTint(Some(value))))
                     if tint.is_none() =>
                 {
-                    tint = Some(u8::try_from(*value).map_err(|_| {
+                    tint = Some(u8::try_from(*value).map_err(|_err| {
                         RtfError::MalformedDocument(
                             "RTF hsv ctint must be between 0 and 255".to_string(),
                         )
@@ -1168,7 +1185,7 @@ impl<'a> Parser<'a> {
                 Some(Token::Control(ControlWord::ShapeThemeShade(Some(value))))
                     if shade.is_none() =>
                 {
-                    shade = Some(u8::try_from(*value).map_err(|_| {
+                    shade = Some(u8::try_from(*value).map_err(|_err| {
                         RtfError::MalformedDocument(
                             "RTF hsv cshade must be between 0 and 255".to_string(),
                         )
@@ -1395,7 +1412,7 @@ impl<'a> Parser<'a> {
         value
             .parse::<u32>()
             .ok()
-            .or_else(|| value.parse::<i32>().ok().map(|value| value as u32))
+            .or_else(|| value.parse::<i32>().ok().map(i32::cast_unsigned))
     }
 
     pub(super) fn parse_shape_group_destination(
@@ -1680,7 +1697,7 @@ impl<'a> Parser<'a> {
                         "RTF shape group cannot contain direct binary data".to_string(),
                     ));
                 },
-                _ => {
+                Token::Control(_) | Token::Text(_) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF shape group contains misplaced content".to_string(),
                     ));

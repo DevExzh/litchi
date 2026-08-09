@@ -41,6 +41,10 @@ pub enum FontEmbedding {
 /// `OpcPackage` represents an Open Packaging Convention package in memory,
 /// providing access to parts, relationships, and package-level operations.
 /// Uses efficient data structures and minimal cloning for best performance.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "OpcPackage is the established public name for the package module's main type."
+)]
 #[derive(Clone)]
 pub struct OpcPackage {
     /// Package-level relationships
@@ -63,6 +67,7 @@ impl std::fmt::Debug for OpcPackage {
         f.debug_struct("OpcPackage")
             .field("rels", &self.rels)
             .field("parts_count", &self.parts.len())
+            .field("non_part_members", &self.non_part_members)
             .field("save_options", &self.save_options)
             .finish()
     }
@@ -122,11 +127,18 @@ impl OpcPackage {
     ///
     /// let pkg = OpcPackage::open("document.docx").unwrap();
     /// ```
+    ///
+    /// # Errors
+    /// Returns an error if the file cannot be read or is not a valid OPC package.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         Self::open_with_limits(path, ReadLimits::default())
     }
 
     /// Open an OPC package from a file with explicit resource limits.
+    ///
+    /// # Errors
+    /// Returns an error if the file cannot be read, violates `limits`, or is not
+    /// a valid OPC package.
     pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: ReadLimits) -> Result<Self> {
         let owned_reader = OwnedPhysPkgReader::open_with_limits(path, limits)?;
         let phys_reader = owned_reader.reader()?;
@@ -138,11 +150,18 @@ impl OpcPackage {
     ///
     /// # Arguments
     /// * `reader` - A reader that implements Read
+    ///
+    /// # Errors
+    /// Returns an error if the archive cannot be read or is not a valid OPC package.
     pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
         Self::from_reader_with_limits(reader, ReadLimits::default())
     }
 
     /// Load an OPC package from a reader with explicit resource limits.
+    ///
+    /// # Errors
+    /// Returns an error if the archive cannot be read, violates `limits`, or is
+    /// not a valid OPC package.
     pub fn from_reader_with_limits<R: Read>(reader: R, limits: ReadLimits) -> Result<Self> {
         let owned_reader = OwnedPhysPkgReader::from_reader_with_limits(reader, limits)?;
         let phys_reader = owned_reader.reader()?;
@@ -153,11 +172,17 @@ impl OpcPackage {
     /// Move an owned ZIP archive into the package reader.
     ///
     /// This avoids copying the archive buffer before parts are decompressed.
+    ///
+    /// # Errors
+    /// Returns an error if the archive is not a valid OPC package.
     pub fn from_vec(data: Vec<u8>) -> Result<Self> {
         Self::from_vec_with_limits(data, ReadLimits::default())
     }
 
     /// Move an owned ZIP archive into the package reader with explicit limits.
+    ///
+    /// # Errors
+    /// Returns an error if the archive violates `limits` or is not a valid OPC package.
     pub fn from_vec_with_limits(data: Vec<u8>, limits: ReadLimits) -> Result<Self> {
         let owned_reader = OwnedPhysPkgReader::from_bytes_with_limits(data, limits)?;
         let phys_reader = owned_reader.reader()?;
@@ -169,11 +194,17 @@ impl OpcPackage {
     ///
     /// # Arguments
     /// * `data` - The ZIP archive data as a byte slice
+    ///
+    /// # Errors
+    /// Returns an error if the archive is not a valid OPC package.
     pub fn from_bytes(data: &[u8]) -> Result<Self> {
         Self::from_bytes_with_limits(data, ReadLimits::default())
     }
 
     /// Load an OPC package from a byte slice with explicit resource limits.
+    ///
+    /// # Errors
+    /// Returns an error if the archive violates `limits` or is not a valid OPC package.
     pub fn from_bytes_with_limits(data: &[u8], limits: ReadLimits) -> Result<Self> {
         let phys_reader = PhysPkgReader::new_with_limits(data, limits)?;
         let pkg_reader = PackageReader::from_phys_reader(&phys_reader)?;
@@ -239,6 +270,10 @@ impl OpcPackage {
     /// For Word documents, this is the document.xml part.
     /// For Excel, the workbook.xml part.
     /// For `PowerPoint`, the presentation.xml part.
+    ///
+    /// # Errors
+    /// Returns an error if the package has no main-document relationship, has
+    /// more than one, the relationship is external, or the target part is missing.
     pub fn main_document_part(&self) -> Result<&dyn Part> {
         let mut matching = self.rels.iter().filter(|relationship| {
             matches!(
@@ -267,10 +302,13 @@ impl OpcPackage {
     ///
     /// # Arguments
     /// * `partname` - The `PackURI` of the part to retrieve
+    ///
+    /// # Errors
+    /// Returns `OpcError::PartNotFound` if no part with `partname` exists.
     pub fn get_part(&self, partname: &PackURI) -> Result<&dyn Part> {
         if let Some(part) = self.parts.get(partname) {
-            let part: &dyn Part = &**part;
-            return Ok(part);
+            let part_ref: &dyn Part = &**part;
+            return Ok(part_ref);
         }
         self.find_case_insensitive(partname)
             .map(|(_, part)| part)
@@ -295,12 +333,15 @@ impl OpcPackage {
             .iter()
             .find(|(name, _)| name.as_str().eq_ignore_ascii_case(wanted))
             .map(|(name, part)| {
-                let part: &dyn Part = &**part;
-                (name, part)
+                let part_ref: &dyn Part = &**part;
+                (name, part_ref)
             })
     }
 
     /// Get a mutable reference to a part by its partname.
+    ///
+    /// # Errors
+    /// Returns `OpcError::PartNotFound` if no part with `partname` exists.
     pub fn get_part_mut(&mut self, partname: &PackURI) -> Result<&mut dyn Part> {
         // Resolve the stored key first so the borrow of `self.parts` ends before
         // the mutable lookup; see `find_case_insensitive` for why this matches.
@@ -325,6 +366,10 @@ impl OpcPackage {
     ///
     /// # Arguments
     /// * `reltype` - The relationship type URI
+    ///
+    /// # Errors
+    /// Returns an error if no relationship of `reltype` exists or the target
+    /// part is missing.
     pub fn part_by_reltype(&self, reltype: &str) -> Result<&dyn Part> {
         let rel = self.rels.part_with_reltype(reltype)?;
         let partname = rel.target_partname()?;
@@ -341,6 +386,10 @@ impl OpcPackage {
     }
 
     /// Try to add a part without replacing an existing or ambiguous part name.
+    ///
+    /// # Errors
+    /// Returns an error if the part's partname duplicates or conflicts with an
+    /// existing part name; the existing part is left untouched.
     pub fn try_add_part(&mut self, part: Box<dyn Part + Send + Sync>) -> Result<()> {
         let partname = part.partname().clone();
         self.validate_new_part_name(&partname)?;
@@ -349,6 +398,10 @@ impl OpcPackage {
     }
 
     /// Validate that a new part name would not replace or conflict with an existing part.
+    ///
+    /// # Errors
+    /// Returns an error if `partname` duplicates or conflicts with an existing
+    /// part name.
     pub fn validate_new_part_name(&self, partname: &PackURI) -> Result<()> {
         for existing in self.parts.keys() {
             if let Some(conflict) = existing.conflict_with(partname) {
@@ -400,12 +453,20 @@ impl OpcPackage {
     }
 
     /// Verifies every OPC signature with the safe strict policy.
+    ///
+    /// # Errors
+    /// Returns an error if the signature graph is ambiguous or spoofed, or if
+    /// signature verification fails.
     #[cfg(feature = "sign")]
     pub fn signatures(&self) -> crate::sign::Result<Vec<crate::sign::Report>> {
         crate::sign::signatures(self, &litchi_sign::Policy::strict())
     }
 
     /// Verifies every OPC signature with an explicit trust-neutral policy.
+    ///
+    /// # Errors
+    /// Returns an error if the signature graph is ambiguous or spoofed, or if
+    /// signature verification fails.
     #[cfg(feature = "sign")]
     pub fn signatures_with(
         &self,
@@ -415,12 +476,20 @@ impl OpcPackage {
     }
 
     /// Adds a signature while retaining every existing valid signature.
+    ///
+    /// # Errors
+    /// Returns an error if an existing signature is invalid or the new
+    /// signature cannot be created or staged into the package.
     #[cfg(feature = "sign")]
     pub fn sign(&mut self, signer: &litchi_sign::Signer) -> crate::sign::Result<PackURI> {
         crate::sign::sign(self, signer, &litchi_sign::Limits::standard())
     }
 
     /// Adds a signature with explicit authoring resource bounds.
+    ///
+    /// # Errors
+    /// Returns an error if an existing signature is invalid, `limits` are
+    /// exceeded, or the new signature cannot be created or staged into the package.
     #[cfg(feature = "sign")]
     pub fn sign_with(
         &mut self,
@@ -431,12 +500,20 @@ impl OpcPackage {
     }
 
     /// Atomically replaces the validated signature graph with one signature.
+    ///
+    /// # Errors
+    /// Returns an error if the signature graph is invalid or the replacement
+    /// signature cannot be created or staged into the package.
     #[cfg(feature = "sign")]
     pub fn resign(&mut self, signer: &litchi_sign::Signer) -> crate::sign::Result<PackURI> {
         crate::sign::resign(self, signer, &litchi_sign::Limits::standard())
     }
 
     /// Atomically replaces signatures with explicit authoring resource bounds.
+    ///
+    /// # Errors
+    /// Returns an error if the signature graph is invalid, `limits` are exceeded,
+    /// or the replacement signature cannot be created or staged into the package.
     #[cfg(feature = "sign")]
     pub fn resign_with(
         &mut self,
@@ -501,6 +578,10 @@ impl OpcPackage {
     /// # let mut pkg = OpcPackage::new();
     /// let next_image = pkg.next_partname("/word/media/image%d.png");
     /// ```
+    ///
+    /// # Errors
+    /// Returns an error if the template has no `%d` placeholder, a candidate
+    /// partname is invalid, or no free name exists within the bounded search.
     pub fn next_partname(&self, template: &str) -> Result<PackURI> {
         // Find the position of %d in the template for efficient replacement
         let percent_d_pos = template.find("%d").ok_or_else(|| {
@@ -562,6 +643,10 @@ impl OpcPackage {
     /// pkg.save("output.docx")?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    /// Returns an error if the package cannot be serialized or the file cannot
+    /// be written; the destination is left untouched on failure before replacement.
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         crate::pkgwriter::PackageWriter::write(path, self)
     }
@@ -586,6 +671,10 @@ impl OpcPackage {
     /// pkg.to_stream(file)?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    /// Returns an error if the package cannot be serialized or written to the
+    /// stream; the stream may be left incomplete.
     pub fn to_stream<W: Write>(&self, writer: W) -> Result<()> {
         crate::pkgwriter::PackageWriter::write_to_stream(writer, self)
     }
@@ -610,6 +699,12 @@ impl OpcPackage {
         }
         self.parts
             .retain(|_, part| !is_signature_infrastructure(&**part));
+    }
+}
+
+impl Default for OpcPackage {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -668,12 +763,6 @@ fn part_name_conflict_error(
             existing: existing.to_string(),
             candidate: candidate.to_string(),
         },
-    }
-}
-
-impl Default for OpcPackage {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

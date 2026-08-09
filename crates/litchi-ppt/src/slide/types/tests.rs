@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::*;
 use crate::consts::RecordType;
 use crate::odraw::ShapeExt as _;
@@ -33,18 +39,18 @@ fn create_frame_escher_drawing(
         .write(&mut shape_children)
         .unwrap();
     let mut properties = PropertyBuilder::new();
-    properties.add_simple(0x4104, blip_id as i32);
+    properties.add_simple(0x4104, blip_id.cast_signed());
     properties.write(&mut shape_children).unwrap();
     write_client_anchor(&mut shape_children, 10, 20, 210, 120).unwrap();
 
     let mut client_data_children = Vec::new();
-    if let Some(external_object_id) = external_object_id {
+    if let Some(external_object_id_value) = external_object_id {
         write_atom(
             &mut client_data_children,
             0,
             0,
             3009,
-            &external_object_id.to_le_bytes(),
+            &external_object_id_value.to_le_bytes(),
         )
         .unwrap();
     }
@@ -378,7 +384,7 @@ fn create_test_record(record_type: RecordType, data: Vec<u8>, children: Vec<Reco
         record_type_raw: record_type as u16,
         version: 0,
         instance: 0,
-        data_length: data.len() as u32,
+        data_length: u32::try_from(data.len()).unwrap(),
         data,
         children,
     }
@@ -388,7 +394,7 @@ fn record_bytes(version: u16, instance: u16, kind: u16, payload: &[u8]) -> Vec<u
     let mut data = Vec::new();
     data.extend_from_slice(&((instance << 4) | version).to_le_bytes());
     data.extend_from_slice(&kind.to_le_bytes());
-    data.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+    data.extend_from_slice(&u32::try_from(payload.len()).unwrap().to_le_bytes());
     data.extend_from_slice(payload);
     data
 }
@@ -448,11 +454,7 @@ fn create_slide_with_text() -> Record {
 }
 
 // Helper function to create SlideData
-fn create_slide_data<'doc>(
-    record: Record,
-    persist_id: u32,
-    doc_data: &'doc [u8],
-) -> SlideData<'doc> {
+fn create_slide_data(record: Record, persist_id: u32, doc_data: &[u8]) -> SlideData<'_> {
     SlideData::new_for_test(persist_id, 0, record, doc_data)
 }
 
@@ -489,8 +491,8 @@ fn exposes_inert_slide_library_synchronization_metadata() {
         .encode_utf16()
         .flat_map(u16::to_le_bytes)
         .collect();
-    let server = record_bytes(0, 0, 4026, &server);
-    let url = record_bytes(0, 1, 4026, &url);
+    let server_record = record_bytes(0, 0, 4026, &server);
+    let url_record = record_bytes(0, 1, 4026, &url);
     let mut times = Vec::new();
     for fields in [
         [2026u16, 7, 4, 16, 12, 30, 45, 500],
@@ -499,7 +501,7 @@ fn exposes_inert_slide_library_synchronization_metadata() {
         times.extend(fields.into_iter().flat_map(u16::to_le_bytes));
     }
     let atom = record_bytes(0, 0, 0x3715, &times);
-    let container = record_bytes(0x0f, 0, 0x3714, &[server, url, atom].concat());
+    let container = record_bytes(0x0f, 0, 0x3714, &[server_record, url_record, atom].concat());
     let sync = Record::parse(&container, 0).unwrap().0;
     let mut slide_record = create_test_record(RecordType::Slide, Vec::new(), vec![sync]);
     // The owner validates a real SlideContainer root (MS-PPT: container
@@ -508,15 +510,15 @@ fn exposes_inert_slide_library_synchronization_metadata() {
     let doc_data = vec![0u8; 32];
     let slide = Slide::from_slide_data(create_slide_data(slide_record, 256, &doc_data), 1);
 
-    let sync = slide.sync_info().unwrap().unwrap();
-    assert_eq!(sync.server_slide_id().as_str(), "server-id");
+    let sync_info = slide.sync_info().unwrap().unwrap();
+    assert_eq!(sync_info.server_slide_id().as_str(), "server-id");
     assert_eq!(
-        sync.slide_library_url().as_str(),
+        sync_info.slide_library_url().as_str(),
         "http://example.com/library"
     );
-    assert_eq!(sync.server_modified().year(), 2026);
-    assert_eq!(sync.client_inserted().year(), 2025);
-    assert!(std::ptr::eq(sync, slide.sync_info().unwrap().unwrap()));
+    assert_eq!(sync_info.server_modified().year(), 2026);
+    assert_eq!(sync_info.client_inserted().year(), 2025);
+    assert!(std::ptr::eq(sync_info, slide.sync_info().unwrap().unwrap()));
 }
 
 #[test]
@@ -549,11 +551,11 @@ fn exposes_direct_powerpoint12_slide_master_references() {
 
     let metadata = slide.powerpoint12_round_trip_metadata().unwrap();
     assert_eq!(metadata.composite_master_id, Some(17));
-    let content = metadata.content_master.unwrap();
-    assert_eq!(content.record_instance, 7);
-    assert_eq!(content.main_master_id, 23);
-    assert_eq!(content.layout_instance_id, 5);
-    assert_eq!(content.unused, 9);
+    let content_master = metadata.content_master.unwrap();
+    assert_eq!(content_master.record_instance, 7);
+    assert_eq!(content_master.main_master_id, 23);
+    assert_eq!(content_master.layout_instance_id, 5);
+    assert_eq!(content_master.unused, 9);
 }
 
 #[test]
@@ -760,7 +762,7 @@ fn test_multiple_slide_numbers() {
         .into_iter()
         .enumerate()
         .map(|(i, record)| {
-            let slide_data = create_slide_data(record, 100 + i as u32, &doc_data);
+            let slide_data = create_slide_data(record, 100 + u32::try_from(i).unwrap(), &doc_data);
             Slide::from_slide_data(slide_data, i + 1)
         })
         .collect();
@@ -768,7 +770,7 @@ fn test_multiple_slide_numbers() {
     // Verify slide numbers are correctly assigned
     for (i, slide) in slides.iter().enumerate() {
         assert_eq!(slide.slide_number(), i + 1);
-        assert_eq!(slide.persist_id(), 100 + i as u32);
+        assert_eq!(slide.persist_id(), 100 + u32::try_from(i).unwrap());
     }
 }
 
@@ -855,11 +857,11 @@ fn parsed_autoshape_text_is_source_bound_before_exposure() {
 
     let shapes = slide.shapes();
     assert!(shapes.is_ok());
-    let Ok(shapes) = shapes else {
+    let Ok(parsed_shapes) = shapes else {
         return;
     };
-    assert_eq!(shapes.len(), 1);
-    let Some(ShapeEnum::AutoShape(mut autoshape)) = shapes.first().cloned() else {
+    assert_eq!(parsed_shapes.len(), 1);
+    let Some(ShapeEnum::AutoShape(mut autoshape)) = parsed_shapes.first().cloned() else {
         return;
     };
     assert_eq!(

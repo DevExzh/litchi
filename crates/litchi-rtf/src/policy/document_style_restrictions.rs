@@ -1,3 +1,7 @@
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent RTF feature flags stay flat for direct access"
+)]
 /// Passive document-level style and formatting restriction declarations.
 ///
 /// These values preserve RTF metadata only. They do not restrict editing or
@@ -11,13 +15,14 @@ pub struct DocumentStyleRestrictions {
     /// `\stylelockbackcomp`: legacy protection keywords were emitted for
     /// compatibility with older readers.
     pub backward_compatibility: bool,
-    /// `\autofmtoverride`: AutoFormat is permitted to override the declared
+    /// `\autofmtoverride`: `AutoFormat` is permitted to override the declared
     /// style restrictions. This is retained as metadata only.
     pub allow_auto_format_override: bool,
 }
 
 impl DocumentStyleRestrictions {
     /// Return whether no style-restriction declaration was present.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         !self.restrictions_present
             && !self.enforced

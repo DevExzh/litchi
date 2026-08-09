@@ -1,6 +1,7 @@
 use litchi_cfb::{OleError, OleFile};
 use std::fs::File;
 use std::io::{self, Read, Seek};
+use zeroize::Zeroizing;
 
 /// Finite resource limits for legacy Word package and stream ingestion.
 ///
@@ -18,14 +19,20 @@ pub struct Limits {
 impl Default for Limits {
     fn default() -> Self {
         Self {
-            max_package_bytes: 1024 * 1024 * 1024,
-            max_input_bytes: 512 * 1024 * 1024,
-            max_aggregate_input_bytes: 768 * 1024 * 1024,
+            max_package_bytes: Self::DEFAULT_MAX_PACKAGE_BYTES,
+            max_input_bytes: Self::DEFAULT_MAX_INPUT_BYTES,
+            max_aggregate_input_bytes: Self::DEFAULT_MAX_AGGREGATE_INPUT_BYTES,
         }
     }
 }
 
 impl Limits {
+    /// Default outer-package limit used by convenience open operations.
+    pub const DEFAULT_MAX_PACKAGE_BYTES: usize = 128 * 1024 * 1024;
+    /// Default per-stream limit used by convenience open operations.
+    pub const DEFAULT_MAX_INPUT_BYTES: usize = 64 * 1024 * 1024;
+    /// Default aggregate DOC-stream limit used by convenience open operations.
+    pub const DEFAULT_MAX_AGGREGATE_INPUT_BYTES: usize = 96 * 1024 * 1024;
     /// Hard safety ceiling for an outer CFB package.
     pub const MAX_PACKAGE_BYTES: usize = 1024 * 1024 * 1024;
     /// Hard safety ceiling for one DOC-owned input stream.
@@ -318,15 +325,97 @@ const fn min_usize(left: usize, right: usize) -> usize {
     if left < right { left } else { right }
 }
 
+/// An owned password that is cleared on drop and redacted in diagnostics.
+///
+/// This type is intentionally non-`Clone`. Move it into [`OpenOptions`] and
+/// the parser borrows it only for password verification; no decrypted document
+/// state retains the credential.
+pub struct Password(Zeroizing<String>);
+
+impl Password {
+    /// Take ownership of a password without copying its allocation.
+    #[must_use]
+    pub fn new(value: String) -> Self {
+        Self(Zeroizing::new(value))
+    }
+
+    pub(crate) fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl From<String> for Password {
+    fn from(value: String) -> Self {
+        Self::new(value)
+    }
+}
+
+impl std::fmt::Debug for Password {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("Password([REDACTED])")
+    }
+}
+
 /// Options controlling how a legacy Word document is opened.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct OpenOptions<'a> {
-    /// Password used for password-to-open encryption.
-    pub password: Option<&'a str>,
+#[derive(Debug, Default)]
+pub struct OpenOptions {
+    password: Option<Password>,
     /// How non-structural stylesheet defects are treated.
     ///
     /// Defaults to [`crate::Leniency::Strict`], which is the historical behaviour.
     pub leniency: crate::leniency::Leniency,
+}
+
+impl OpenOptions {
+    /// Provide a password-to-open credential through the non-cloneable
+    /// [`Password`] boundary.
+    #[must_use]
+    pub fn with_password(mut self, password: Password) -> Self {
+        self.password = Some(password);
+        self
+    }
+
+    /// Set the stylesheet-defect policy.
+    #[must_use]
+    pub const fn with_leniency(mut self, leniency: crate::leniency::Leniency) -> Self {
+        self.leniency = leniency;
+        self
+    }
+
+    pub(crate) fn password(&self) -> Option<&str> {
+        self.password.as_ref().map(Password::as_str)
+    }
+}
+
+/// Options for opening a DOC CFB package before its document streams are read.
+/// [`Package::open`] remains the concise, bounded default. Use
+/// [`Package::open_with`] when the input contract needs an explicit limit set.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PackageOpenOptions {
+    limits: Limits,
+}
+
+impl Default for PackageOpenOptions {
+    fn default() -> Self {
+        Self {
+            limits: Limits::default(),
+        }
+    }
+}
+
+impl PackageOpenOptions {
+    /// Replace the finite limits used while opening the CFB package.
+    #[must_use]
+    pub const fn with_limits(mut self, limits: Limits) -> Self {
+        self.limits = limits;
+        self
+    }
+
+    /// Return the finite limits selected for this open operation.
+    #[must_use]
+    pub const fn limits(self) -> Limits {
+        self.limits
+    }
 }
 
 /// Password-to-open encryption schemes identified in a DOC file.

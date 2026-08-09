@@ -37,7 +37,7 @@ pub enum DiagramBuildType {
     Custom,
 }
 
-/// Build information for a PowerPoint OLE diagram.
+/// Build information for a `PowerPoint` OLE diagram.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DiagramBuild {
     /// OLE graphic-frame shape receiving the build.
@@ -52,6 +52,7 @@ pub struct DiagramBuild {
 
 impl DiagramBuild {
     /// Construct a diagram build using schema defaults.
+    #[must_use]
     pub const fn new(shape_id: u32, group_id: GroupId) -> Self {
         Self {
             shape_id,
@@ -62,19 +63,21 @@ impl DiagramBuild {
     }
 
     /// Set whether this build appears expanded in animation UIs.
+    #[must_use]
     pub fn with_ui_expand(mut self, expanded: bool) -> Self {
         self.ui_expand = expanded;
         self
     }
 
     /// Set the diagram build mode.
+    #[must_use]
     pub fn with_build_type(mut self, build_type: DiagramBuildType) -> Self {
         self.build_type = build_type;
         self
     }
 }
 
-/// DrawingML diagram build mode used inside `p:bldGraphic/p:bldSub`.
+/// `DrawingML` diagram build mode used inside `p:bldGraphic/p:bldSub`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum GraphicDiagramBuildType {
     /// Schema default: animate all diagram content at once.
@@ -85,7 +88,7 @@ pub enum GraphicDiagramBuildType {
     LevelAtOnce,
 }
 
-/// DrawingML chart build mode used inside `p:bldGraphic/p:bldSub`.
+/// `DrawingML` chart build mode used inside `p:bldGraphic/p:bldSub`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum GraphicChartBuildType {
     /// Schema default: animate all chart content at once.
@@ -114,7 +117,7 @@ pub enum GraphicBuildMode {
     },
 }
 
-/// Build information for a chart or SmartArt graphical frame.
+/// Build information for a chart or `SmartArt` graphical frame.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct GraphicBuild {
     pub shape_id: u32,
@@ -125,6 +128,7 @@ pub struct GraphicBuild {
 }
 
 impl GraphicBuild {
+    #[must_use]
     pub const fn new(shape_id: u32, group_id: GroupId, mode: GraphicBuildMode) -> Self {
         Self {
             shape_id,
@@ -134,10 +138,12 @@ impl GraphicBuild {
         }
     }
 
+    #[must_use]
     pub const fn as_one(shape_id: u32, group_id: GroupId) -> Self {
         Self::new(shape_id, group_id, GraphicBuildMode::AsOne)
     }
 
+    #[must_use]
     pub const fn diagram(shape_id: u32, group_id: GroupId) -> Self {
         Self::new(
             shape_id,
@@ -149,6 +155,7 @@ impl GraphicBuild {
         )
     }
 
+    #[must_use]
     pub const fn chart(shape_id: u32, group_id: GroupId) -> Self {
         Self::new(
             shape_id,
@@ -160,6 +167,7 @@ impl GraphicBuild {
         )
     }
 
+    #[must_use]
     pub fn with_ui_expand(mut self, expanded: bool) -> Self {
         self.ui_expand = expanded;
         self
@@ -191,6 +199,7 @@ pub struct OleChartBuild {
 }
 
 impl OleChartBuild {
+    #[must_use]
     pub const fn new(shape_id: u32, group_id: GroupId) -> Self {
         Self {
             shape_id,
@@ -201,16 +210,19 @@ impl OleChartBuild {
         }
     }
 
+    #[must_use]
     pub fn with_ui_expand(mut self, expanded: bool) -> Self {
         self.ui_expand = expanded;
         self
     }
 
+    #[must_use]
     pub fn with_build_type(mut self, build_type: OleChartBuildType) -> Self {
         self.build_type = build_type;
         self
     }
 
+    #[must_use]
     pub fn with_animate_background(mut self, animate: bool) -> Self {
         self.animate_background = animate;
         self
@@ -226,7 +238,7 @@ pub struct TemplateTimeNode {
 /// Template effects for one paragraph level.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParagraphTemplate {
-    /// PowerPoint paragraph level in the inclusive range `0..=9`.
+    /// `PowerPoint` paragraph level in the inclusive range `0..=9`.
     pub level: u8,
     /// Required single root time node.
     pub time_node: TemplateTimeNode,
@@ -259,6 +271,7 @@ pub struct ParagraphBuild {
 
 impl ParagraphBuild {
     /// Construct a paragraph build reference.
+    #[must_use]
     pub fn new(shape_id: u32, group_id: GroupId) -> Self {
         Self {
             shape_id,
@@ -275,54 +288,63 @@ impl ParagraphBuild {
     }
 
     /// Set whether the build appears expanded in animation UIs.
+    #[must_use]
     pub fn with_ui_expand(mut self, expanded: bool) -> Self {
         self.ui_expand = expanded;
         self
     }
 
     /// Set the paragraph build mode.
+    #[must_use]
     pub fn with_build_type(mut self, build_type: ParagraphBuildType) -> Self {
         self.build_type = build_type;
         self
     }
 
     /// Set the paragraph build level.
+    #[must_use]
     pub fn with_build_level(mut self, level: u32) -> Self {
         self.build_level = level;
         self
     }
 
     /// Set whether the text shape background participates in the animation.
+    #[must_use]
     pub fn with_animate_background(mut self, animate: bool) -> Self {
         self.animate_background = animate;
         self
     }
 
     /// Set automatic background-animation updates.
+    #[must_use]
     pub fn with_auto_update_animate_background(mut self, update: bool) -> Self {
         self.auto_update_animate_background = update;
         self
     }
 
     /// Set reverse paragraph ordering.
+    #[must_use]
     pub fn with_reverse(mut self, reverse: bool) -> Self {
         self.reverse = reverse;
         self
     }
 
     /// Set the automatic advance time.
+    #[must_use]
     pub fn with_auto_advance(mut self, auto_advance: impl Into<Duration>) -> Self {
         self.auto_advance = auto_advance.into();
         self
     }
 
     /// Add template effects for a paragraph level.
+    #[must_use]
     pub fn with_template(mut self, template: ParagraphTemplate) -> Self {
         self.templates.push(template);
         self
     }
 
-    /// Effective PowerPoint auto-advance delay; `indefinite` is interpreted as zero.
+    /// Effective `PowerPoint` auto-advance delay; `indefinite` is interpreted as zero.
+    #[must_use]
     pub const fn powerpoint_auto_advance_milliseconds(&self) -> u32 {
         match self.auto_advance {
             Duration::Finite(value) => value,

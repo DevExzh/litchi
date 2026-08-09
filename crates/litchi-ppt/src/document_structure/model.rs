@@ -34,7 +34,7 @@ impl Limits {
     }
 }
 
-/// Position of the optional PowerPoint 12 custom table-style package.
+/// Position of the optional `PowerPoint` 12 custom table-style package.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CustomTableStylesPlacement {
     BeforeEndDocument,
@@ -46,7 +46,7 @@ pub enum CustomTableStylesPlacement {
 pub struct Master {
     child_index: usize,
     persist_id: u32,
-    master_id: u32,
+    id: u32,
     flags: u32,
 }
 
@@ -60,27 +60,31 @@ impl Master {
         Self {
             child_index,
             persist_id,
-            master_id,
+            id: master_id,
             flags,
         }
     }
 
     /// Position of this reference in the master-list container.
+    #[must_use]
     pub const fn child_index(self) -> usize {
         self.child_index
     }
 
     /// Persist-object identifier of the referenced master container.
+    #[must_use]
     pub const fn persist_id(self) -> u32 {
         self.persist_id
     }
 
     /// Semantic master identifier carried by the reference.
+    #[must_use]
     pub const fn master_id(self) -> u32 {
-        self.master_id
+        self.id
     }
 
     /// The preserved `MasterPersistAtom` flags.
+    #[must_use]
     pub const fn flags(self) -> u32 {
         self.flags
     }
@@ -91,7 +95,7 @@ impl Master {
 pub struct Slide {
     child_index: usize,
     persist_id: u32,
-    slide_id: u32,
+    id: u32,
     flags: u32,
     text_count: u32,
 }
@@ -107,33 +111,38 @@ impl Slide {
         Self {
             child_index,
             persist_id,
-            slide_id,
+            id: slide_id,
             flags,
             text_count,
         }
     }
 
     /// Position of this reference in the slide-list container.
+    #[must_use]
     pub const fn child_index(self) -> usize {
         self.child_index
     }
 
     /// Persist-object identifier of the referenced slide container.
+    #[must_use]
     pub const fn persist_id(self) -> u32 {
         self.persist_id
     }
 
     /// Semantic slide identifier used for source-order selection.
+    #[must_use]
     pub const fn slide_id(self) -> u32 {
-        self.slide_id
+        self.id
     }
 
     /// The preserved `SlidePersistAtom` flags.
+    #[must_use]
     pub const fn flags(self) -> u32 {
         self.flags
     }
 
     /// Number of text placeholders declared by the slide reference.
+    #[must_use]
     pub const fn text_count(self) -> u32 {
         self.text_count
     }
@@ -177,48 +186,56 @@ impl DocumentStructure {
     }
 
     /// Position of the required `DocumentAtom` in source order.
+    #[must_use]
     pub const fn document_atom_child_index(&self) -> usize {
         self.document_atom_child_index
     }
 
     /// Position of the optional master reference list.
+    #[must_use]
     pub const fn master_list_child_index(&self) -> Option<usize> {
         self.master_list_child_index
     }
 
     /// Position of the optional presentation slide reference list.
+    #[must_use]
     pub const fn slide_list_child_index(&self) -> Option<usize> {
         self.slide_list_child_index
     }
 
     /// Position of the optional notes reference list.
+    #[must_use]
     pub const fn notes_list_child_index(&self) -> Option<usize> {
         self.notes_list_child_index
     }
 
     /// Typed master references in their stored order.
+    #[must_use]
     pub fn masters(&self) -> &[Master] {
         &self.masters
     }
 
     /// Typed presentation-slide references in their stored order.
+    #[must_use]
     pub fn slides(&self) -> &[Slide] {
         &self.slides
     }
 
     /// Look up a master by its semantic identifier.
+    #[must_use]
     pub fn master(&self, master_id: u32) -> Option<Master> {
         self.masters
             .iter()
             .copied()
-            .find(|master| master.master_id == master_id)
+            .find(|master| master.id == master_id)
     }
 
     /// Look up a presentation slide by its semantic identifier.
+    #[must_use]
     pub fn slide(&self, slide_id: u32) -> Option<Slide> {
         self.slides
             .iter()
             .copied()
-            .find(|slide| slide.slide_id == slide_id)
+            .find(|slide| slide.id == slide_id)
     }
 }

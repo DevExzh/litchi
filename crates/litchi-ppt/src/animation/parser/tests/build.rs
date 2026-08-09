@@ -1,4 +1,10 @@
-//! PowerPoint 2002 build-list round trips and validation.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
+//! `PowerPoint` 2002 build-list round trips and validation.
 use super::super::*;
 use super::support::*;
 
@@ -50,9 +56,9 @@ fn rejects_malformed_powerpoint_2002_build_lists() {
     let mut truncated = bytes.clone();
     let claimed_length = u32::from_le_bytes(truncated[4..8].try_into().unwrap()) + 1;
     truncated[4..8].copy_from_slice(&claimed_length.to_le_bytes());
-    let (truncated, _) = Record::parse(&truncated, 0).unwrap();
-    assert_eq!(truncated.data_length, claimed_length);
-    assert!(parse_build_list(&truncated).is_err());
+    let (truncated_record, _) = Record::parse(&truncated, 0).unwrap();
+    assert_eq!(truncated_record.data_length, claimed_length);
+    assert!(parse_build_list(&truncated_record).is_err());
 
     let mut malformed = Vec::new();
     let mut wrong_header = valid.clone();

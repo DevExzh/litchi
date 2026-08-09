@@ -14,50 +14,12 @@ const ATOM_DATA_LEN: usize = 52;
 const ATOM_TOTAL_LEN: usize = ATOM_HEADER_LEN + ATOM_DATA_LEN;
 const MAX_CONTAINER_DATA: usize = ATOM_TOTAL_LEN;
 
-fn corrupted(message: impl Into<String>) -> Error {
-    Error::Corrupted(message.into())
-}
-
-fn read_i32(data: &[u8], offset: usize) -> i32 {
-    i32::from_le_bytes(data[offset..offset + 4].try_into().unwrap())
-}
-
-fn read_u16(data: &[u8], offset: usize) -> u16 {
-    u16::from_le_bytes(data[offset..offset + 2].try_into().unwrap())
-}
-
-fn read_u32(data: &[u8], offset: usize) -> u32 {
-    u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap())
-}
-
-fn normalized_ratio(ratio: Ratio) -> (i64, i64) {
-    let numerator = i64::from(ratio.numerator());
-    let denominator = i64::from(ratio.denominator());
-    if denominator < 0 {
-        (-numerator, -denominator)
-    } else {
-        (numerator, denominator)
-    }
-}
-
-fn validate_scale(x: Ratio, y: Ratio) -> Result<()> {
-    let (x_numerator, x_denominator) = normalized_ratio(x);
-    let (y_numerator, y_denominator) = normalized_ratio(y);
-    if x_numerator * y_denominator != y_numerator * x_denominator {
-        return Err(corrupted(
-            "NoZoomViewInfoAtom x and y scale ratios must be equal",
-        ));
-    }
-    if x_numerator * 5 < x_denominator || x_numerator > x_denominator {
-        return Err(corrupted(
-            "NoZoomViewInfoAtom scale must be between 20 and 100 percent",
-        ));
-    }
-    Ok(())
-}
-
 /// The presentation view represented by an outline/sorter view container.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`NonZoomViewKind` is the established public API name; renaming it would break downstream crates"
+)]
 pub enum NonZoomViewKind {
     Outline,
     Sorter,
@@ -95,6 +57,12 @@ pub struct NoZoomViewInfo {
 }
 
 impl NoZoomViewInfo {
+    /// Construct fixed-size atom data after validating the scale ratios.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the x and y scale ratios differ or fall outside 20
+    /// to 100 percent.
     pub fn new(
         x_scale: Ratio,
         y_scale: Ratio,
@@ -116,24 +84,31 @@ impl NoZoomViewInfo {
         })
     }
 
+    #[must_use]
     pub fn x_scale(&self) -> Ratio {
         self.x_scale
     }
+    #[must_use]
     pub fn y_scale(&self) -> Ratio {
         self.y_scale
     }
+    #[must_use]
     pub fn ignored1(&self) -> &[u8; 24] {
         &self.ignored1
     }
+    #[must_use]
     pub fn origin(&self) -> ViewOrigin {
         self.origin
     }
+    #[must_use]
     pub fn ignored2(&self) -> u8 {
         self.ignored2
     }
+    #[must_use]
     pub fn draft_mode(&self) -> bool {
         self.draft_mode
     }
+    #[must_use]
     pub fn ignored3(&self) -> &[u8; 2] {
         &self.ignored3
     }
@@ -147,7 +122,9 @@ impl NoZoomViewInfo {
         }
         let x_scale = Ratio::new(read_i32(data, 0), read_i32(data, 4))?;
         let y_scale = Ratio::new(read_i32(data, 8), read_i32(data, 12))?;
-        let ignored1 = data[16..40].try_into().unwrap();
+        let Ok(ignored1) = <[u8; 24]>::try_from(&data[16..40]) else {
+            return Err(corrupted("NoZoomViewInfoAtom ignored field is truncated"));
+        };
         let origin = ViewOrigin::new(read_i32(data, 40), read_i32(data, 44));
         let draft_mode = match data[49] {
             0 => false,
@@ -158,17 +135,18 @@ impl NoZoomViewInfo {
                 )));
             },
         };
+        let Ok(ignored3) = <[u8; 2]>::try_from(&data[50..52]) else {
+            return Err(corrupted("NoZoomViewInfoAtom ignored field is truncated"));
+        };
         Self::new(
-            x_scale,
-            y_scale,
-            ignored1,
-            origin,
-            data[48],
-            draft_mode,
-            data[50..52].try_into().unwrap(),
+            x_scale, y_scale, ignored1, origin, data[48], draft_mode, ignored3,
         )
     }
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the atom data length is the fixed constant 52, always representable as u32"
+    )]
     fn write_atom(&self, bytes: &mut Vec<u8>) -> Result<()> {
         validate_scale(self.x_scale, self.y_scale)?;
         bytes.extend_from_slice(&0u16.to_le_bytes());
@@ -196,18 +174,25 @@ pub struct OutlineSorterViewInfo {
 }
 
 impl OutlineSorterViewInfo {
+    #[must_use]
     pub const fn new(kind: NonZoomViewKind, view_info: Option<NoZoomViewInfo>) -> Self {
         Self { kind, view_info }
     }
 
+    #[must_use]
     pub fn kind(&self) -> NonZoomViewKind {
         self.kind
     }
+    #[must_use]
     pub fn view_info(&self) -> Option<&NoZoomViewInfo> {
         self.view_info.as_ref()
     }
 
     /// Parse a complete container record, including its eight-byte record header.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() < CONTAINER_HEADER_LEN {
             return Err(corrupted("Truncated outline/sorter view record header"));
@@ -217,7 +202,7 @@ impl OutlineSorterViewInfo {
         let instance = version_instance >> 4;
         let record_type = read_u16(bytes, 2);
         let declared = usize::try_from(read_u32(bytes, 4))
-            .map_err(|_| corrupted("Outline/sorter view length does not fit memory"))?;
+            .map_err(|_err| corrupted("Outline/sorter view length does not fit memory"))?;
         let total = CONTAINER_HEADER_LEN
             .checked_add(declared)
             .ok_or_else(|| corrupted("Outline/sorter view length overflow"))?;
@@ -232,9 +217,15 @@ impl OutlineSorterViewInfo {
         )
     }
 
+    /// Parse an outline/sorter view container from an already-materialized record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the declared length mismatches, the record type is
+    /// unexpected, or the nested `NoZoomViewInfoAtom` is malformed.
     pub fn parse_record(record: &Record) -> Result<Self> {
         let declared = usize::try_from(record.data_length)
-            .map_err(|_| corrupted("Outline/sorter view length does not fit memory"))?;
+            .map_err(|_err| corrupted("Outline/sorter view length does not fit memory"))?;
         if declared != record.data.len() {
             return Err(corrupted("Outline/sorter view declared length mismatch"));
         }
@@ -276,7 +267,7 @@ impl OutlineSorterViewInfo {
         let atom_instance = version_instance >> 4;
         let atom_type = read_u16(data, 2);
         let atom_length = usize::try_from(read_u32(data, 4))
-            .map_err(|_| corrupted("NoZoomViewInfoAtom length does not fit memory"))?;
+            .map_err(|_err| corrupted("NoZoomViewInfoAtom length does not fit memory"))?;
         if atom_version != 0 || atom_instance != 0 || atom_type != VIEW_INFO_ATOM_TYPE {
             return Err(corrupted("Invalid NoZoomViewInfoAtom record header"));
         }
@@ -290,6 +281,14 @@ impl OutlineSorterViewInfo {
     }
 
     /// Serialize a complete container record deterministically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the underlying writer reports an error.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the container payload is empty or the fixed 60-byte atom, always representable as u32"
+    )]
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         let (_, record_type) = self.kind.record_type();
         let data_len = if self.view_info.is_some() {
@@ -316,13 +315,19 @@ pub struct OutlineSorterViewInformation {
 }
 
 impl OutlineSorterViewInformation {
+    #[must_use]
     pub fn outline(&self) -> Option<&OutlineSorterViewInfo> {
         self.outline.as_ref()
     }
+    #[must_use]
     pub fn sorter(&self) -> Option<&OutlineSorterViewInfo> {
         self.sorter.as_ref()
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "only the outline and sorter view containers are collected; every other record type is skipped"
+    )]
     pub(crate) fn parse_records(records: &[&Record]) -> Result<Self> {
         let mut information = Self::default();
         for record in records {
@@ -340,7 +345,64 @@ impl OutlineSorterViewInformation {
     }
 }
 
+fn corrupted(message: impl Into<String>) -> Error {
+    Error::Corrupted(message.into())
+}
+
+fn read_i32(data: &[u8], offset: usize) -> i32 {
+    i32::from_le_bytes([
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+    ])
+}
+
+fn read_u16(data: &[u8], offset: usize) -> u16 {
+    u16::from_le_bytes([data[offset], data[offset + 1]])
+}
+
+fn read_u32(data: &[u8], offset: usize) -> u32 {
+    u32::from_le_bytes([
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+    ])
+}
+
+fn normalized_ratio(ratio: Ratio) -> (i64, i64) {
+    let numerator = i64::from(ratio.numerator());
+    let denominator = i64::from(ratio.denominator());
+    if denominator < 0 {
+        (-numerator, -denominator)
+    } else {
+        (numerator, denominator)
+    }
+}
+
+fn validate_scale(x: Ratio, y: Ratio) -> Result<()> {
+    let (x_numerator, x_denominator) = normalized_ratio(x);
+    let (y_numerator, y_denominator) = normalized_ratio(y);
+    if x_numerator * y_denominator != y_numerator * x_denominator {
+        return Err(corrupted(
+            "NoZoomViewInfoAtom x and y scale ratios must be equal",
+        ));
+    }
+    if x_numerator * 5 < x_denominator || x_numerator > x_denominator {
+        return Err(corrupted(
+            "NoZoomViewInfoAtom scale must be between 20 and 100 percent",
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -389,37 +451,37 @@ mod tests {
 
     #[test]
     fn rejects_malformed_headers_and_lengths() {
-        let mut bytes = POI_OUTLINE;
-        bytes[0] = 0x0f;
-        assert!(OutlineSorterViewInfo::from_bytes(&bytes).is_err());
-        let mut bytes = POI_OUTLINE;
-        bytes[4] = 59;
-        assert!(OutlineSorterViewInfo::from_bytes(&bytes).is_err());
-        let mut bytes = POI_OUTLINE;
-        bytes[8] = 1;
-        assert!(OutlineSorterViewInfo::from_bytes(&bytes).is_err());
-        let mut bytes = POI_OUTLINE;
-        bytes[12] = 51;
-        assert!(OutlineSorterViewInfo::from_bytes(&bytes).is_err());
+        let mut bad_version_bytes = POI_OUTLINE;
+        bad_version_bytes[0] = 0x0f;
+        assert!(OutlineSorterViewInfo::from_bytes(&bad_version_bytes).is_err());
+        let mut bad_length_bytes = POI_OUTLINE;
+        bad_length_bytes[4] = 59;
+        assert!(OutlineSorterViewInfo::from_bytes(&bad_length_bytes).is_err());
+        let mut bad_flags_bytes = POI_OUTLINE;
+        bad_flags_bytes[8] = 1;
+        assert!(OutlineSorterViewInfo::from_bytes(&bad_flags_bytes).is_err());
+        let mut bad_type_bytes = POI_OUTLINE;
+        bad_type_bytes[12] = 51;
+        assert!(OutlineSorterViewInfo::from_bytes(&bad_type_bytes).is_err());
         assert!(OutlineSorterViewInfo::from_bytes(&POI_OUTLINE[..67]).is_err());
     }
 
     #[test]
     fn rejects_invalid_scale_and_boolean_constraints() {
-        let mut bytes = POI_OUTLINE;
-        bytes[20..24].copy_from_slice(&0i32.to_le_bytes());
-        assert!(OutlineSorterViewInfo::from_bytes(&bytes).is_err());
-        let mut bytes = POI_OUTLINE;
-        bytes[16..20].copy_from_slice(&19i32.to_le_bytes());
-        assert!(OutlineSorterViewInfo::from_bytes(&bytes).is_err());
-        let mut bytes = POI_OUTLINE;
-        bytes[16..20].copy_from_slice(&101i32.to_le_bytes());
-        assert!(OutlineSorterViewInfo::from_bytes(&bytes).is_err());
-        let mut bytes = POI_OUTLINE;
-        bytes[24..28].copy_from_slice(&34i32.to_le_bytes());
-        assert!(OutlineSorterViewInfo::from_bytes(&bytes).is_err());
-        let mut bytes = POI_OUTLINE;
-        bytes[65] = 2;
-        assert!(OutlineSorterViewInfo::from_bytes(&bytes).is_err());
+        let mut zero_scale_bytes = POI_OUTLINE;
+        zero_scale_bytes[20..24].copy_from_slice(&0i32.to_le_bytes());
+        assert!(OutlineSorterViewInfo::from_bytes(&zero_scale_bytes).is_err());
+        let mut scale_below_min_bytes = POI_OUTLINE;
+        scale_below_min_bytes[16..20].copy_from_slice(&19i32.to_le_bytes());
+        assert!(OutlineSorterViewInfo::from_bytes(&scale_below_min_bytes).is_err());
+        let mut scale_above_max_bytes = POI_OUTLINE;
+        scale_above_max_bytes[16..20].copy_from_slice(&101i32.to_le_bytes());
+        assert!(OutlineSorterViewInfo::from_bytes(&scale_above_max_bytes).is_err());
+        let mut mismatched_scale_bytes = POI_OUTLINE;
+        mismatched_scale_bytes[24..28].copy_from_slice(&34i32.to_le_bytes());
+        assert!(OutlineSorterViewInfo::from_bytes(&mismatched_scale_bytes).is_err());
+        let mut invalid_bool_bytes = POI_OUTLINE;
+        invalid_bool_bytes[65] = 2;
+        assert!(OutlineSorterViewInfo::from_bytes(&invalid_bool_bytes).is_err());
     }
 }

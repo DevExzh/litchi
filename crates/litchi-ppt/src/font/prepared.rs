@@ -12,6 +12,10 @@ pub(crate) const fn facet_for_style(style: Style) -> Facet {
     }
 }
 
+#[allow(
+    clippy::expect_used,
+    reason = "callers preflight the prepared-font ordinal before staging, so the lookup cannot fail"
+)]
 pub(crate) fn stage_facet(
     collection: &mut FontCollection,
     index: u16,
@@ -47,6 +51,10 @@ pub(crate) fn restore_encoded(
     litchi_fonts::embedding::powerpoint::restore_with(font, encoded, limits)
 }
 
+#[allow(
+    clippy::expect_used,
+    reason = "the facet was staged into this collection by `stage_facet` immediately before rollback, so the owner and facet lookups cannot fail"
+)]
 pub(crate) fn restore_staged(
     font: &mut litchi_fonts::Prepared,
     candidate: &mut FontCollections,
@@ -66,7 +74,7 @@ pub(crate) fn restore_staged(
         .expect("staged prepared facet remains available for rollback");
     let encoded = owner.embedded_fonts.remove(position).data;
     match encoded.try_unwrap_vec() {
-        Ok(encoded) => restore_encoded(font, encoded, limits),
+        Ok(payload) => restore_encoded(font, payload, limits),
         Err(shared) => {
             restore_encoded(font, shared.as_slice().to_vec(), limits)?;
             Err(FontError::EmbeddingFailed(
@@ -77,6 +85,11 @@ pub(crate) fn restore_staged(
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::super::{EotIntent, EotLimits, Facet, PreparedFont, Scope, Snapshot};
     use crate::Writer;
@@ -133,23 +146,23 @@ mod tests {
 
         let source = snapshot();
         let mut transaction = source.edit().unwrap();
-        let before = transaction.fonts().clone();
-        let mut denied = prepared_font(0x0004, Style::Regular, false);
-        let source_program = denied.data.clone();
+        let fonts_before = transaction.fonts().clone();
+        let mut denied_facet = prepared_font(0x0004, Style::Regular, false);
+        let denied_source_program = denied_facet.data.clone();
         assert!(
             transaction
                 .set_prepared_facet(
                     Scope::Base,
                     0,
-                    &mut denied,
+                    &mut denied_facet,
                     EotIntent::Editable,
                     EotLimits::default(),
                 )
                 .is_err()
         );
-        assert_eq!(transaction.fonts(), &before);
+        assert_eq!(transaction.fonts(), &fonts_before);
         assert!(transaction.changes().is_empty());
-        assert_eq!(denied.data, source_program);
+        assert_eq!(denied_facet.data, denied_source_program);
     }
 
     #[test]
@@ -291,16 +304,16 @@ mod tests {
             records.push((*id, offset, strings.len() - offset));
         }
         let mut output = vec![0; string_offset];
-        set_u16(&mut output, 2, values.len() as u16);
-        set_u16(&mut output, 4, string_offset as u16);
+        set_u16(&mut output, 2, u16::try_from(values.len()).unwrap());
+        set_u16(&mut output, 4, u16::try_from(string_offset).unwrap());
         for (index, (id, offset, length)) in records.into_iter().enumerate() {
             let start = 6 + index * 12;
             set_u16(&mut output, start, 3);
             set_u16(&mut output, start + 2, 1);
             set_u16(&mut output, start + 4, 0x0409);
             set_u16(&mut output, start + 6, id);
-            set_u16(&mut output, start + 8, length as u16);
-            set_u16(&mut output, start + 10, offset as u16);
+            set_u16(&mut output, start + 8, u16::try_from(length).unwrap());
+            set_u16(&mut output, start + 10, u16::try_from(offset).unwrap());
         }
         output.extend_from_slice(&strings);
         output
@@ -317,12 +330,16 @@ mod tests {
         }
         let mut output = vec![0; length];
         set_u32(&mut output, 0, 0x0001_0000);
-        set_u16(&mut output, 4, tables.len() as u16);
+        set_u16(&mut output, 4, u16::try_from(tables.len()).unwrap());
         for (index, ((tag, table), offset)) in tables.iter().zip(offsets).enumerate() {
             let record = 12 + index * 16;
             output[record..record + 4].copy_from_slice(*tag);
-            set_u32(&mut output, record + 8, offset as u32);
-            set_u32(&mut output, record + 12, table.len() as u32);
+            set_u32(&mut output, record + 8, u32::try_from(offset).unwrap());
+            set_u32(
+                &mut output,
+                record + 12,
+                u32::try_from(table.len()).unwrap(),
+            );
             output[offset..offset + table.len()].copy_from_slice(table);
         }
         output

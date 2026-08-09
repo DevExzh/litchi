@@ -10,6 +10,10 @@ pub struct Text {
 
 impl Text {
     /// Build a routing-slip string from its printable-ANSI bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn from_ansi_bytes(bytes: Vec<u8>) -> Result<Self> {
         if bytes.contains(&0) {
             return Err(Error::Corrupted(
@@ -25,11 +29,13 @@ impl Text {
     }
 
     /// Borrow the original printable-ANSI bytes.
+    #[must_use]
     pub fn as_ansi_bytes(&self) -> &[u8] {
         &self.bytes
     }
 
     /// Decode the legacy bytes lossily as one-byte characters.
+    #[must_use]
     pub fn to_string_lossy(&self) -> String {
         self.bytes.iter().map(|&byte| char::from(byte)).collect()
     }
@@ -46,6 +52,7 @@ pub struct Address {
 
 impl Address {
     /// Create an address with the specification's conventional undefined byte.
+    #[must_use]
     pub fn new(text: Text) -> Self {
         Self {
             text,
@@ -67,6 +74,10 @@ pub enum CurrentRecipient {
 
 /// The typed document-level routing-slip record.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "each bool mirrors one independent flag bit of the MS-PPT `RoutingSlip` record; they are spec flags, not a state machine"
+)]
 pub struct Slip {
     pub originator: Address,
     pub recipients: Vec<Address>,
@@ -91,6 +102,10 @@ pub struct Slip {
 
 impl Slip {
     /// Create a new routing slip in its pre-routing state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(
         originator: Address,
         recipients: Vec<Address>,

@@ -6,6 +6,10 @@ use crate::package::{Error, Result};
 use crate::records::Record;
 
 /// Find master records in deterministic depth-first order.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn inventory(root: &Record) -> Result<Inventory> {
     let mut entries = Vec::new();
     let mut stack = vec![(Path::root(), root)];
@@ -20,6 +24,12 @@ pub fn inventory(root: &Record) -> Result<Inventory> {
     Ok(Inventory::new(entries))
 }
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "`RecordType` mirrors the full MS-PPT record-type enumeration; only MainMaster, \
+              Handout, Notes, and Slide can be master records and every other record type \
+              yields no master context"
+)]
 fn classify(record: &Record) -> Result<Option<Context>> {
     match record.record_type {
         RecordType::MainMaster => Ok(Some(Context::Main)),

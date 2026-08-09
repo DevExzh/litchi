@@ -13,6 +13,7 @@ pub struct DocumentOutputSettings {
 
 impl DocumentOutputSettings {
     /// Return whether neither passive output flag is present.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         !self.word97_compatibility_marker && !self.postscript_over_text
     }

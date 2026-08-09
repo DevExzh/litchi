@@ -1,8 +1,14 @@
-//! Typed PowerPoint text-run data models and ergonomic constructors.
+//! Typed `PowerPoint` text-run data models and ergonomic constructors.
 
 /// Text formatting properties for a text run.
 ///
-/// Based on Apache POI's TextPropCollection and CharacterPropertyBags.
+/// Based on Apache POI's `TextPropCollection` and `CharacterPropertyBags`.
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "each bool mirrors a distinct `CFStyle` bit flag from MS-PPT (bold, italic, \
+              underline, shadow, embossed); collapsing them into enums would obscure the \
+              one-to-one mapping with the on-disk bit field"
+)]
 #[derive(Debug, Clone, Default)]
 pub struct TextRunFormatting {
     /// Original `CFMasks` value.
@@ -13,9 +19,9 @@ pub struct TextRunFormatting {
     pub font_size: Option<u16>,
     /// Font color (RGB)
     pub font_color: Option<u32>,
-    /// Raw PowerPoint `ColorIndexStruct` value
+    /// Raw `PowerPoint` `ColorIndexStruct` value
     pub font_color_raw: Option<u32>,
-    /// PowerPoint color-scheme index when the color is not direct sRGB
+    /// `PowerPoint` color-scheme index when the color is not direct sRGB
     pub font_scheme_color: Option<u8>,
     /// Bold formatting
     pub bold: bool,
@@ -43,13 +49,13 @@ pub struct TextRunFormatting {
     pub embossed: bool,
     /// Explicit emboss value, or `None` when inherited.
     pub embossed_explicit: Option<bool>,
-    /// PowerPoint 9 additional-property run grouping identifier.
+    /// `PowerPoint` 9 additional-property run grouping identifier.
     pub pp9_run_id: Option<u8>,
     /// Baseline position as a percentage of line height
     pub baseline_position: Option<i16>,
     /// Font name
     pub font_name: Option<String>,
-    /// Zero-based font reference in the PowerPoint font collection
+    /// Zero-based font reference in the `PowerPoint` font collection
     pub font_index: Option<u16>,
     /// East Asian font reference
     pub asian_font_index: Option<u16>,
@@ -116,13 +122,13 @@ pub enum ParagraphTabAlignment {
 /// A paragraph tab stop.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ParagraphTabStop {
-    /// Signed offset in PowerPoint master units.
+    /// Signed offset in `PowerPoint` master units.
     pub position: i16,
     /// How text aligns at the stop.
     pub alignment: ParagraphTabAlignment,
 }
 
-/// Formatting explicitly carried by one PowerPoint paragraph run.
+/// Formatting explicitly carried by one `PowerPoint` paragraph run.
 #[derive(Debug, Clone, Default)]
 pub struct ParagraphRunFormatting {
     /// Original `PFMasks` value.
@@ -186,6 +192,7 @@ impl ParagraphRunFormatting {
     ///
     /// Returns `None` when no bullet character is present or the stored unit is
     /// an unpaired surrogate.
+    #[must_use]
     pub fn bullet_char(&self) -> Option<char> {
         char::from_u32(u32::from(self.bullet_character?))
     }
@@ -206,6 +213,7 @@ pub struct ParagraphRun {
 
 impl ParagraphRun {
     /// Create a paragraph run with explicit formatting.
+    #[must_use]
     pub fn with_formatting(
         text: String,
         start_index: usize,
@@ -223,7 +231,7 @@ impl ParagraphRun {
 
 /// A text run with formatting.
 ///
-/// Based on Apache POI's RichTextRun.
+/// Based on Apache POI's `RichTextRun`.
 ///
 /// # Example
 ///
@@ -256,6 +264,7 @@ pub struct TextRun {
 
 impl TextRun {
     /// Create a new text run.
+    #[must_use]
     pub fn new(text: String, start_index: usize) -> Self {
         let length = text.chars().count();
         Self {
@@ -268,6 +277,7 @@ impl TextRun {
     }
 
     /// Create a text run with formatting.
+    #[must_use]
     pub fn with_formatting(
         text: String,
         start_index: usize,
@@ -285,6 +295,7 @@ impl TextRun {
 
     /// Create a text run with MTEF formula AST.
     #[cfg(feature = "formula")]
+    #[must_use]
     pub fn with_mtef_formula(
         text: String,
         start_index: usize,
@@ -322,15 +333,17 @@ impl TextRun {
     /// Check if this text run contains an MTEF formula.
     ///
     /// Returns true if this run contains a parsed MTEF formula AST.
+    #[must_use]
     pub fn has_mtef_formula(&self) -> bool {
         self.mtef_formula_ast.is_some()
     }
 
     /// Get the MTEF formula AST if this run contains a formula.
     ///
-    /// Returns the parsed MTEF formula as AST nodes if this run contains a MathType equation,
+    /// Returns the parsed MTEF formula as AST nodes if this run contains a `MathType` equation,
     /// None otherwise.
     #[cfg(feature = "formula")]
+    #[must_use]
     pub fn mtef_formula_ast(&self) -> Option<&Vec<litchi_formula::MathNode<'static>>> {
         self.mtef_formula_ast.as_ref()
     }

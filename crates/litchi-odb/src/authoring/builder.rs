@@ -47,5 +47,5 @@ impl Default for Builder {
 }
 
 fn empty_content() -> &'static str {
-    r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:version="1.3"><office:body><office:database/></office:body></office:document-content>"#
+    r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:db="urn:oasis:names:tc:opendocument:xmlns:database:1.0" xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.3"><office:body><office:database><db:data-source><db:connection-data><db:connection-resource xlink:href="" xlink:type="simple"/></db:connection-data></db:data-source></office:database></office:body></office:document-content>"#
 }

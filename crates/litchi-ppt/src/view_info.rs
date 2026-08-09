@@ -10,26 +10,6 @@ const GUIDE_ATOM_TYPE: u16 = 1019;
 const VIEW_INFO_ATOM_TYPE: u16 = 1021;
 const SLIDE_VIEW_INFO_ATOM_TYPE: u16 = 1022;
 
-fn corrupted(message: impl Into<String>) -> Error {
-    Error::Corrupted(message.into())
-}
-
-fn read_i32(data: &[u8], offset: usize) -> i32 {
-    i32::from_le_bytes(data[offset..offset + 4].try_into().unwrap())
-}
-
-fn read_u32(data: &[u8], offset: usize) -> u32 {
-    u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap())
-}
-
-fn strict_bool(value: u8, field: &str) -> Result<bool> {
-    match value {
-        0 => Ok(false),
-        1 => Ok(true),
-        _ => Err(corrupted(format!("{field} is not a bool1"))),
-    }
-}
-
 /// Whether a view-information container applies to slides or notes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ViewKind {
@@ -56,7 +36,7 @@ impl ViewKind {
     }
 }
 
-/// Signed rational number used by PowerPoint view scaling.
+/// Signed rational number used by `PowerPoint` view scaling.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Ratio {
     numerator: i32,
@@ -64,6 +44,11 @@ pub struct Ratio {
 }
 
 impl Ratio {
+    /// Create a scaling ratio, rejecting a zero denominator.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `denominator` is zero.
     pub fn new(numerator: i32, denominator: i32) -> Result<Self> {
         if denominator == 0 {
             return Err(corrupted("PowerPoint ratio denominator must not be zero"));
@@ -74,9 +59,11 @@ impl Ratio {
         })
     }
 
+    #[must_use]
     pub fn numerator(&self) -> i32 {
         self.numerator
     }
+    #[must_use]
     pub fn denominator(&self) -> i32 {
         self.denominator
     }
@@ -100,18 +87,25 @@ pub struct ViewOrigin {
 }
 
 impl ViewOrigin {
+    #[must_use]
     pub const fn new(x: i32, y: i32) -> Self {
         Self { x, y }
     }
+    #[must_use]
     pub fn x(&self) -> i32 {
         self.x
     }
+    #[must_use]
     pub fn y(&self) -> i32 {
         self.y
     }
 }
 
 /// `ZoomViewInfoAtom`, including ignored bytes retained for exact identity.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`ZoomViewInfo` is the established public API name mirroring the MS-PPT `ZoomViewInfoAtom` record; renaming it would break downstream crates"
+)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ZoomViewInfo {
     x_scale: Ratio,
@@ -124,6 +118,12 @@ pub struct ZoomViewInfo {
 }
 
 impl ZoomViewInfo {
+    /// Create zoom scales and a view origin, validating the scale constraints.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either scale falls outside 0.10..=4.0 or the x and
+    /// y scales differ.
     pub fn new(
         x_scale: Ratio,
         y_scale: Ratio,
@@ -143,21 +143,27 @@ impl ZoomViewInfo {
         })
     }
 
+    #[must_use]
     pub fn x_scale(&self) -> Ratio {
         self.x_scale
     }
+    #[must_use]
     pub fn y_scale(&self) -> Ratio {
         self.y_scale
     }
+    #[must_use]
     pub fn origin(&self) -> ViewOrigin {
         self.origin
     }
+    #[must_use]
     pub fn uses_variable_scale(&self) -> bool {
         self.use_variable_scale
     }
+    #[must_use]
     pub fn is_draft_mode(&self) -> bool {
         self.draft_mode
     }
+    #[must_use]
     pub fn ignored_bytes(&self) -> (&[u8; 24], &[u8; 2]) {
         (&self.ignored1, &self.ignored2)
     }
@@ -168,14 +174,16 @@ impl ZoomViewInfo {
         let x_scale = Ratio::new(read_i32(data, 0), read_i32(data, 4))?;
         let y_scale = Ratio::new(read_i32(data, 8), read_i32(data, 12))?;
         validate_zoom_scales(x_scale, y_scale)?;
+        let mut ignored1 = [0u8; 24];
+        ignored1.copy_from_slice(&data[16..40]);
         Ok(Self {
             x_scale,
             y_scale,
-            ignored1: data[16..40].try_into().unwrap(),
+            ignored1,
             origin: ViewOrigin::new(read_i32(data, 40), read_i32(data, 44)),
             use_variable_scale: strict_bool(data[48], "ZoomViewInfoAtom.fUseVarScale")?,
             draft_mode: strict_bool(data[49], "ZoomViewInfoAtom.fDraftMode")?,
-            ignored2: data[50..52].try_into().unwrap(),
+            ignored2: [data[50], data[51]],
         })
     }
 
@@ -196,21 +204,6 @@ impl ZoomViewInfo {
     }
 }
 
-fn validate_zoom_scales(x: Ratio, y: Ratio) -> Result<()> {
-    for ratio in [x, y] {
-        let (numerator, denominator) = ratio.normalized();
-        if numerator <= 0 || numerator * 10 < denominator || numerator > denominator * 4 {
-            return Err(corrupted("ZoomViewInfo scale must be between 0.10 and 4.0"));
-        }
-    }
-    if i64::from(x.numerator) * i64::from(y.denominator)
-        != i64::from(y.numerator) * i64::from(x.denominator)
-    {
-        return Err(corrupted("ZoomViewInfo x and y scales must be equal"));
-    }
-    Ok(())
-}
-
 /// Editing preferences from `SlideViewInfoAtom`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SlideViewPreferences {
@@ -220,6 +213,7 @@ pub struct SlideViewPreferences {
 }
 
 impl SlideViewPreferences {
+    #[must_use]
     pub const fn new(snap_to_grid: bool, snap_to_shape: bool) -> Self {
         Self {
             ignored: 0,
@@ -227,12 +221,15 @@ impl SlideViewPreferences {
             snap_to_shape,
         }
     }
+    #[must_use]
     pub fn snap_to_grid(&self) -> bool {
         self.snap_to_grid
     }
+    #[must_use]
     pub fn snap_to_shape(&self) -> bool {
         self.snap_to_shape
     }
+    #[must_use]
     pub fn ignored_byte(&self) -> u8 {
         self.ignored
     }
@@ -281,6 +278,11 @@ pub struct Guide {
 }
 
 impl Guide {
+    /// Create an alignment guide, validating its master-unit position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `position` lies outside `-15840..=32255`.
     pub fn new(orientation: GuideOrientation, position: i32) -> Result<Self> {
         if !(-15_840..=32_255).contains(&position) {
             return Err(corrupted("GuideAtom position is outside -15840..=32255"));
@@ -290,9 +292,11 @@ impl Guide {
             position,
         })
     }
+    #[must_use]
     pub fn orientation(&self) -> GuideOrientation {
         self.orientation
     }
+    #[must_use]
     pub fn position(&self) -> i32 {
         self.position
     }
@@ -320,6 +324,10 @@ impl Guide {
 }
 
 /// Complete slide or notes `SlideViewInfoContainer`.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`SlideViewInfo` is the established public API name mirroring the MS-PPT `SlideViewInfoContainer` record; renaming it would break downstream crates"
+)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SlideViewInfo {
     kind: ViewKind,
@@ -329,6 +337,11 @@ pub struct SlideViewInfo {
 }
 
 impl SlideViewInfo {
+    /// Assemble a complete view container, validating the guide list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if more than eight guides of one orientation are given.
     pub fn new(
         kind: ViewKind,
         preferences: SlideViewPreferences,
@@ -343,22 +356,32 @@ impl SlideViewInfo {
             guides,
         })
     }
+    #[must_use]
     pub fn kind(&self) -> ViewKind {
         self.kind
     }
+    #[must_use]
     pub fn preferences(&self) -> SlideViewPreferences {
         self.preferences
     }
+    #[must_use]
     pub fn zoom(&self) -> Option<&ZoomViewInfo> {
         self.zoom.as_ref()
     }
+    #[must_use]
     pub fn guides(&self) -> &[Guide] {
         &self.guides
     }
 
+    /// Parse a complete `SlideViewInfoContainer` record, including its child atoms.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the container header, its child atoms, or the guide
+    /// list are malformed or violate the MS-PPT constraints.
     pub fn parse_record(record: &Record) -> Result<Self> {
         let declared = usize::try_from(record.data_length)
-            .map_err(|_| corrupted("SlideViewInfo length does not fit memory"))?;
+            .map_err(|_err| corrupted("SlideViewInfo length does not fit memory"))?;
         if record.record_type != RecordType::SlideViewInfo
             || record.record_type_raw != SLIDE_VIEW_INFO_TYPE
             || record.version != 0xF
@@ -405,6 +428,10 @@ impl SlideViewInfo {
     }
 
     /// Serialize a complete container, preserving every ignored atom byte.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the underlying writer reports an error.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         validate_guides(&self.guides)?;
         let mut data = self.preferences.to_bytes()?;
@@ -423,57 +450,6 @@ impl SlideViewInfo {
     }
 }
 
-fn validate_guides(guides: &[Guide]) -> Result<()> {
-    let horizontal = guides
-        .iter()
-        .filter(|guide| guide.orientation == GuideOrientation::Horizontal)
-        .count();
-    let vertical = guides.len() - horizontal;
-    if horizontal > 8 || vertical > 8 {
-        return Err(corrupted(
-            "SlideViewInfo contains more than eight guides of one orientation",
-        ));
-    }
-    Ok(())
-}
-
-fn validate_atom(
-    record: &Record,
-    record_type: RecordType,
-    raw_type: u16,
-    length: usize,
-    instance: u16,
-) -> Result<()> {
-    let declared = usize::try_from(record.data_length)
-        .map_err(|_| corrupted(format!("PPT atom {raw_type} length does not fit memory")))?;
-    if record.record_type != record_type
-        || record.record_type_raw != raw_type
-        || record.version != 0
-        || record.instance != instance
-        || declared != length
-        || record.data.len() != length
-    {
-        return Err(corrupted(format!(
-            "PPT atom {raw_type} has an invalid header or length"
-        )));
-    }
-    Ok(())
-}
-
-fn record_bytes(version: u16, instance: u16, record_type: u16, data: &[u8]) -> Result<Vec<u8>> {
-    if version > 0xF || instance > 0x0FFF {
-        return Err(corrupted("PPT record version or instance is out of range"));
-    }
-    let length = u32::try_from(data.len())
-        .map_err(|_| corrupted("PPT view record payload exceeds 32-bit length"))?;
-    let mut bytes = Vec::with_capacity(8 + data.len());
-    bytes.extend_from_slice(&(version | instance << 4).to_le_bytes());
-    bytes.extend_from_slice(&record_type.to_le_bytes());
-    bytes.extend_from_slice(&length.to_le_bytes());
-    bytes.extend_from_slice(data);
-    Ok(bytes)
-}
-
 /// Slide and notes view information exposed by a presentation.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SlideViewInformation {
@@ -482,9 +458,11 @@ pub struct SlideViewInformation {
 }
 
 impl SlideViewInformation {
+    #[must_use]
     pub fn slide(&self) -> Option<&SlideViewInfo> {
         self.slide.as_ref()
     }
+    #[must_use]
     pub fn notes(&self) -> Option<&SlideViewInfo> {
         self.notes.as_ref()
     }
@@ -510,7 +488,108 @@ impl SlideViewInformation {
     }
 }
 
+fn corrupted(message: impl Into<String>) -> Error {
+    Error::Corrupted(message.into())
+}
+
+fn read_i32(data: &[u8], offset: usize) -> i32 {
+    i32::from_le_bytes([
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+    ])
+}
+
+fn read_u32(data: &[u8], offset: usize) -> u32 {
+    u32::from_le_bytes([
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+    ])
+}
+
+fn strict_bool(value: u8, field: &str) -> Result<bool> {
+    match value {
+        0 => Ok(false),
+        1 => Ok(true),
+        _ => Err(corrupted(format!("{field} is not a bool1"))),
+    }
+}
+
+fn validate_zoom_scales(x: Ratio, y: Ratio) -> Result<()> {
+    for ratio in [x, y] {
+        let (numerator, denominator) = ratio.normalized();
+        if numerator <= 0 || numerator * 10 < denominator || numerator > denominator * 4 {
+            return Err(corrupted("ZoomViewInfo scale must be between 0.10 and 4.0"));
+        }
+    }
+    if i64::from(x.numerator) * i64::from(y.denominator)
+        != i64::from(y.numerator) * i64::from(x.denominator)
+    {
+        return Err(corrupted("ZoomViewInfo x and y scales must be equal"));
+    }
+    Ok(())
+}
+
+fn validate_guides(guides: &[Guide]) -> Result<()> {
+    let horizontal = guides
+        .iter()
+        .filter(|guide| guide.orientation == GuideOrientation::Horizontal)
+        .count();
+    let vertical = guides.len() - horizontal;
+    if horizontal > 8 || vertical > 8 {
+        return Err(corrupted(
+            "SlideViewInfo contains more than eight guides of one orientation",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_atom(
+    record: &Record,
+    record_type: RecordType,
+    raw_type: u16,
+    length: usize,
+    instance: u16,
+) -> Result<()> {
+    let declared = usize::try_from(record.data_length)
+        .map_err(|_err| corrupted(format!("PPT atom {raw_type} length does not fit memory")))?;
+    if record.record_type != record_type
+        || record.record_type_raw != raw_type
+        || record.version != 0
+        || record.instance != instance
+        || declared != length
+        || record.data.len() != length
+    {
+        return Err(corrupted(format!(
+            "PPT atom {raw_type} has an invalid header or length"
+        )));
+    }
+    Ok(())
+}
+
+fn record_bytes(version: u16, instance: u16, record_type: u16, data: &[u8]) -> Result<Vec<u8>> {
+    if version > 0xF || instance > 0x0FFF {
+        return Err(corrupted("PPT record version or instance is out of range"));
+    }
+    let length = u32::try_from(data.len())
+        .map_err(|_err| corrupted("PPT view record payload exceeds 32-bit length"))?;
+    let mut bytes = Vec::with_capacity(8 + data.len());
+    bytes.extend_from_slice(&(version | instance << 4).to_le_bytes());
+    bytes.extend_from_slice(&record_type.to_le_bytes());
+    bytes.extend_from_slice(&length.to_le_bytes());
+    bytes.extend_from_slice(data);
+    Ok(bytes)
+}
+
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -559,18 +638,18 @@ mod tests {
     fn rejects_malformed_atoms_scales_guides_and_caps() {
         let mut invalid_bool = poi_reference();
         invalid_bool[17] = 2;
-        let (record, _) = Record::parse_strict(&invalid_bool, 0).unwrap();
-        assert!(SlideViewInfo::parse_record(&record).is_err());
+        let (invalid_bool_record, _) = Record::parse_strict(&invalid_bool, 0).unwrap();
+        assert!(SlideViewInfo::parse_record(&invalid_bool_record).is_err());
 
         let mut zero_denominator = poi_reference();
         zero_denominator[31..35].copy_from_slice(&0i32.to_le_bytes());
-        let (record, _) = Record::parse_strict(&zero_denominator, 0).unwrap();
-        assert!(SlideViewInfo::parse_record(&record).is_err());
+        let (zero_denominator_record, _) = Record::parse_strict(&zero_denominator, 0).unwrap();
+        assert!(SlideViewInfo::parse_record(&zero_denominator_record).is_err());
 
         let mut mismatched_scale = poi_reference();
         mismatched_scale[35..39].copy_from_slice(&85i32.to_le_bytes());
-        let (record, _) = Record::parse_strict(&mismatched_scale, 0).unwrap();
-        assert!(SlideViewInfo::parse_record(&record).is_err());
+        let (mismatched_scale_record, _) = Record::parse_strict(&mismatched_scale, 0).unwrap();
+        assert!(SlideViewInfo::parse_record(&mismatched_scale_record).is_err());
 
         assert!(Guide::new(GuideOrientation::Horizontal, 32_256).is_err());
         let nine = vec![Guide::new(GuideOrientation::Horizontal, 0).unwrap(); 9];

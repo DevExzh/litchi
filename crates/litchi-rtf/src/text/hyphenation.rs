@@ -24,6 +24,9 @@ pub struct DocumentHyphenation {
 
 impl DocumentHyphenation {
     /// Validate all explicit numeric settings against parser safety bounds.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if self
             .consecutive_line_limit
@@ -45,6 +48,7 @@ impl DocumentHyphenation {
     }
 
     /// Return whether any hyphenation control is explicitly present.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.automatic.is_none()
             && self.capitalized_words.is_none()

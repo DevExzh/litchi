@@ -2,6 +2,10 @@
 
 //! Safe, structured RTF field-code support.
 
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items stay grouped by RTF feature area rather than by item kind"
+)]
 const MAX_INSTRUCTION_LEN: usize = 65_536;
 const MAX_TOKENS: usize = 256;
 pub(crate) const MAX_GENERIC_FIELDS: usize = 65_536;

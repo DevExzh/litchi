@@ -1,5 +1,20 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{RtfDocument, RtfWriter, ShapeHyperlink};
 use std::borrow::Cow;
+
+const SHAPE_WITH_HYPERLINK: &str = concat!(
+    r#"{\rtf1 A{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 202}}"#,
+    r#"{\sp{\sn hyperlink}{\sv }{\hl {\hlsrc src}{\hlloc http://example.test/x}{\hlfr Click me}}}"#,
+    r#"{\shptxt x}}}B}"#,
+);
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
     let mut output = Vec::new();
@@ -8,12 +23,6 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
         .unwrap();
     output
 }
-
-const SHAPE_WITH_HYPERLINK: &str = concat!(
-    r#"{\rtf1 A{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 202}}"#,
-    r#"{\sp{\sn hyperlink}{\sv }{\hl {\hlsrc src}{\hlloc http://example.test/x}{\hlfr Click me}}}"#,
-    r#"{\shptxt x}}}B}"#,
-);
 
 #[test]
 fn parses_shape_hyperlink_property_and_round_trips() {
@@ -84,25 +93,25 @@ fn typed_validation_requires_at_least_one_string() {
 fn rejects_malformed_shape_hyperlink_groups() {
     let cases = [
         // Empty hl group.
-        r#"{\rtf1{\shp{\*\shpinst{\sp{\sn a}{\sv 1}{\hl }}}}}"#,
+        r"{\rtf1{\shp{\*\shpinst{\sp{\sn a}{\sv 1}{\hl }}}}}",
         // Duplicate string destination.
-        r#"{\rtf1{\shp{\*\shpinst{\sp{\sn a}{\sv 1}{\hl {\hlloc x}{\hlloc y}}}}}}"#,
+        r"{\rtf1{\shp{\*\shpinst{\sp{\sn a}{\sv 1}{\hl {\hlloc x}{\hlloc y}}}}}}",
         // Starred hl destination.
-        r#"{\rtf1{\shp{\*\shpinst{\sp{\sn a}{\sv 1}{\*\hl {\hlloc x}}}}}}"#,
+        r"{\rtf1{\shp{\*\shpinst{\sp{\sn a}{\sv 1}{\*\hl {\hlloc x}}}}}}",
         // hl before the property name.
-        r#"{\rtf1{\shp{\*\shpinst{\sp{\hl {\hlloc x}}{\sn a}{\sv 1}}}}}"#,
+        r"{\rtf1{\shp{\*\shpinst{\sp{\hl {\hlloc x}}{\sn a}{\sv 1}}}}}",
         // Second hl group in one property.
-        r#"{\rtf1{\shp{\*\shpinst{\sp{\sn a}{\sv 1}{\hl {\hlloc x}}{\hl {\hlsrc y}}}}}}"#,
+        r"{\rtf1{\shp{\*\shpinst{\sp{\sn a}{\sv 1}{\hl {\hlloc x}}{\hl {\hlsrc y}}}}}}",
         // Bare string control outside a group.
-        r#"{\rtf1{\shp{\*\shpinst{\sp{\sn a}{\sv 1}\hlloc}}}}"#,
+        r"{\rtf1{\shp{\*\shpinst{\sp{\sn a}{\sv 1}\hlloc}}}}",
         // String destination outside hl.
-        r#"{\rtf1{\shp{\*\shpinst{\sp{\sn a}{\sv 1}{\hlloc x}}}}}"#,
+        r"{\rtf1{\shp{\*\shpinst{\sp{\sn a}{\sv 1}{\hlloc x}}}}}",
         // Unsupported group inside hl.
-        r#"{\rtf1{\shp{\*\shpinst{\sp{\sn a}{\sv 1}{\hl {\sv x}}}}}}"#,
+        r"{\rtf1{\shp{\*\shpinst{\sp{\sn a}{\sv 1}{\hl {\sv x}}}}}}",
         // Ungrouped text inside hl.
-        r#"{\rtf1{\shp{\*\shpinst{\sp{\sn a}{\sv 1}{\hl text}}}}}"#,
+        r"{\rtf1{\shp{\*\shpinst{\sp{\sn a}{\sv 1}{\hl text}}}}}",
         // Unterminated hl group.
-        r#"{\rtf1{\shp{\*\shpinst{\sp{\sn a}{\sv 1}{\hl {\hlloc x}}}}"#,
+        r"{\rtf1{\shp{\*\shpinst{\sp{\sn a}{\sv 1}{\hl {\hlloc x}}}}",
     ];
     for rtf in cases {
         assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");

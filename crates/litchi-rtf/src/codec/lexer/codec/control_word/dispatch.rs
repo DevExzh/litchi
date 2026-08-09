@@ -5,15 +5,21 @@ use crate::codec::error::{RtfError, RtfResult};
 ///
 /// This is the RTF specification's flat control-word dispatch table. Keeping
 /// the entries together makes duplicate and missing mappings auditable.
-#[allow(clippy::too_many_lines)]
-pub(in crate::codec::lexer::codec) fn match_control_word<'a>(
-    word: &'a str,
+#[allow(
+    clippy::too_many_lines,
+    reason = "the RTF specification's flat control-word dispatch table is inherently long; keeping entries together aids auditing"
+)]
+pub(in crate::codec::lexer::codec) fn match_control_word(
+    word: &str,
     param: Option<i32>,
-) -> RtfResult<ControlWord<'a>> {
+) -> RtfResult<ControlWord<'_>> {
     let param_value = param.unwrap_or(1);
     let param_bool = param.unwrap_or(1) != 0;
 
-    #[allow(clippy::match_same_arms)]
+    #[allow(
+        clippy::match_same_arms,
+        reason = "distinct RTF control words may map to equal tokens; keeping one arm per spelling keeps the table auditable"
+    )]
     let control = match word {
         // Document
         "rtf" => ControlWord::Rtf(param_value),

@@ -12,6 +12,10 @@ const ENTRY_BYTES: usize = 44;
 const VARIANT_BYTES: usize = 34;
 const USED_HEADER_FLAGS: u16 = 0x0017;
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`RecolorLimits` is the established public API name for the recolor parsing limits; renaming it would break downstream crates"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RecolorLimits {
     pub max_record_bytes: usize,
@@ -38,6 +42,7 @@ pub struct WideColor {
 }
 
 impl WideColor {
+    #[must_use]
     pub const fn new(red: u16, green: u16, blue: u16) -> Self {
         Self { red, green, blue }
     }
@@ -107,6 +112,10 @@ impl TryFrom<u16> for WmfHatchStyle {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`RecolorBitmapType` is the established public API name mirroring the MS-PPT recolor bitmap-type field; renaming it would break downstream crates"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u16)]
 pub enum RecolorBitmapType {
@@ -129,6 +138,10 @@ impl TryFrom<u16> for RecolorBitmapType {
 }
 
 /// Conditional `lbHatch` representation. Non-hatched brushes retain its ignored value.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`RecolorHatch` is the established public API name for the recolor brush hatch field; renaming it would break downstream crates"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RecolorHatch {
     Hatched(WmfHatchStyle),
@@ -136,6 +149,10 @@ pub enum RecolorHatch {
 }
 
 /// Conditional pattern representation. Non-pattern brushes retain ignored bytes.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`RecolorPattern` is the established public API name for the recolor brush pattern field; renaming it would break downstream crates"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RecolorPattern {
     Pattern {
@@ -148,6 +165,10 @@ pub enum RecolorPattern {
     },
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`RecolorBrush` is the established public API name for the recolor brush structure; renaming it would break downstream crates"
+)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecolorBrush {
     pub style: WmfBrushStyle,
@@ -158,6 +179,10 @@ pub struct RecolorBrush {
     pub pattern: RecolorPattern,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`RecolorSource` is the established public API name for the recolor source variant; renaming it would break downstream crates"
+)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RecolorSource {
     Color {
@@ -168,6 +193,10 @@ pub enum RecolorSource {
     Brush(RecolorBrush),
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`RecolorEntry` is the established public API name mirroring the MS-PPT `RecolorEntryStruct`; renaming it would break downstream crates"
+)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecolorEntry {
     pub do_recolor: bool,
@@ -180,6 +209,14 @@ pub struct RecolorEntry {
     pub source: RecolorSource,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`RecolorInfo` is the established public API name mirroring the MS-PPT `RecolorInfoAtom` record; renaming it would break downstream crates"
+)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "each bool maps one-to-one to an independent flag bit of the MS-PPT `RecolorInfoAtom` header bitfield; grouping them into enums would misrepresent the on-disk layout and churn the public API"
+)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecolorInfo {
     pub should_recolor: bool,
@@ -195,6 +232,13 @@ pub struct RecolorInfo {
 }
 
 impl RecolorInfo {
+    /// Parse a complete `RecolorInfoAtom` record within `limits`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record header is invalid, the declared data
+    /// length disagrees with the payload, or the payload violates `limits` or
+    /// the MS-PPT structure constraints.
     pub fn parse(record: &Record, limits: RecolorLimits) -> Result<Self> {
         if record.record_type != RecordType::RecolorInfoAtom
             || record.record_type_raw != 0x0fe7
@@ -209,6 +253,12 @@ impl RecolorInfo {
         Self::parse_payload(&record.data, limits)
     }
 
+    /// Parse a `RecolorInfoAtom` payload within `limits`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the payload is truncated, exceeds `limits`, or
+    /// violates the MS-PPT entry structure or count constraints.
     pub fn parse_payload(payload: &[u8], limits: RecolorLimits) -> Result<Self> {
         if payload.len() > limits.max_record_bytes {
             return corrupted("RecolorInfoAtom exceeds the record byte limit");
@@ -264,6 +314,12 @@ impl RecolorInfo {
         })
     }
 
+    /// Serialize the payload within `limits`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the entries, counts, or trailing bytes violate
+    /// `limits` or the MS-PPT structure constraints.
     pub fn to_payload(&self, limits: RecolorLimits) -> Result<Vec<u8>> {
         validate(self, limits)?;
         let color_count = self
@@ -290,12 +346,12 @@ impl RecolorInfo {
         output.extend_from_slice(&flags.to_le_bytes());
         output.extend_from_slice(
             &u16::try_from(color_count)
-                .map_err(|_| corrupt("RecolorInfoAtom color count exceeds u16"))?
+                .map_err(|_err| corrupt("RecolorInfoAtom color count exceeds u16"))?
                 .to_le_bytes(),
         );
         output.extend_from_slice(
             &u16::try_from(fill_count)
-                .map_err(|_| corrupt("RecolorInfoAtom fill count exceeds u16"))?
+                .map_err(|_err| corrupt("RecolorInfoAtom fill count exceeds u16"))?
                 .to_le_bytes(),
         );
         write_color(&mut output, self.mono_color);
@@ -306,10 +362,16 @@ impl RecolorInfo {
         Ok(output)
     }
 
+    /// Serialize as a `Record` within `limits`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the value violates `limits` or the serialized
+    /// payload exceeds a 32-bit length.
     pub fn to_record(&self, limits: RecolorLimits) -> Result<Record> {
         let data = self.to_payload(limits)?;
         let data_length = u32::try_from(data.len())
-            .map_err(|_| corrupt("RecolorInfoAtom payload exceeds u32"))?;
+            .map_err(|_err| corrupt("RecolorInfoAtom payload exceeds u32"))?;
         Ok(Record {
             record_type: RecordType::RecolorInfoAtom,
             record_type_raw: 0x0fe7,
@@ -523,6 +585,11 @@ fn corrupted<T>(message: &str) -> Result<T> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -622,11 +689,11 @@ mod tests {
         };
         brush.hatch = RecolorHatch::Ignored(5);
         assert!(value.to_payload(limits()).is_err());
-        let RecolorSource::Brush(brush) = &mut value.entries[1].source else {
+        let RecolorSource::Brush(solid_brush) = &mut value.entries[1].source else {
             unreachable!()
         };
-        brush.style = WmfBrushStyle::Solid;
-        brush.hatch = RecolorHatch::Hatched(WmfHatchStyle::Horizontal);
+        solid_brush.style = WmfBrushStyle::Solid;
+        solid_brush.hatch = RecolorHatch::Hatched(WmfHatchStyle::Horizontal);
         assert!(value.to_payload(limits()).is_err());
     }
 

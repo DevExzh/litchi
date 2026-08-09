@@ -1,5 +1,9 @@
 //! Borrowed semantic text-story views.
 
+#![allow(
+    clippy::shadow_reuse,
+    reason = "builder-style helpers deliberately rebind a working value as it is refined"
+)]
 use crate::types::{
     Alignment, Formatting as RawFormat, Paragraph as RawParagraph, StyleBlock, TextDirection,
     UnderlineStyle,
@@ -59,26 +63,31 @@ impl<'a> Story<'a> {
     }
 
     /// Number of UTF-8 bytes in the visible retained story text.
+    #[must_use]
     pub fn len(self) -> usize {
         text_len(self.blocks)
     }
 
     /// Whether this story contains no retained text bytes.
+    #[must_use]
     pub fn is_empty(self) -> bool {
         self.blocks.iter().all(|block| block.text.is_empty())
     }
 
     /// Lazily traverse logical paragraphs, including explicitly empty ones.
+    #[must_use]
     pub fn paragraphs(self) -> Paragraphs<'a> {
         Paragraphs::new(self)
     }
 
     /// Lazily traverse text runs and structural breaks across the whole story.
+    #[must_use]
     pub fn inlines(self) -> Inlines<'a> {
         Inlines::new(self, 0, self.len(), 0, 0)
     }
 
     /// Lazily traverse only text runs, omitting structural break tokens.
+    #[must_use]
     pub fn runs(self) -> Runs<'a> {
         Runs {
             inlines: self.inlines(),
@@ -86,16 +95,21 @@ impl<'a> Story<'a> {
     }
 
     /// Borrow the font catalog used to resolve this story's runs.
+    #[must_use]
     pub const fn fonts(self) -> crate::font::Catalog<'a> {
         self.fonts
     }
 
     /// Borrow the color palette used to resolve this story's runs.
+    #[must_use]
     pub const fn colors(self) -> crate::color::Palette<'a> {
         self.colors
     }
 
     /// Write flattened plain text without allocating an intermediate string.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the output fails.
     pub fn write_text(self, output: &mut impl fmt::Write) -> fmt::Result {
         for block in self.blocks {
             output.write_str(block.text.as_ref())?;
@@ -104,6 +118,7 @@ impl<'a> Story<'a> {
     }
 
     /// Materialize flattened plain text in a new allocation.
+    #[must_use]
     pub fn to_text(self) -> String {
         self.to_string()
     }
@@ -138,11 +153,13 @@ pub struct Paragraph<'a> {
 
 impl<'a> Paragraph<'a> {
     /// UTF-8 byte length, excluding the terminating paragraph break.
+    #[must_use]
     pub const fn len(self) -> usize {
         self.end.saturating_sub(self.start)
     }
 
     /// Whether the paragraph has no retained text or inline line breaks.
+    #[must_use]
     pub const fn is_empty(self) -> bool {
         self.start == self.end
     }
@@ -151,6 +168,7 @@ impl<'a> Paragraph<'a> {
     ///
     /// Fragmented paragraphs return `None`; use [`Self::write_text`] or
     /// [`Self::to_text`] without guessing whether an allocation is required.
+    #[must_use]
     pub fn as_str(self) -> Option<&'a str> {
         if self.is_empty() {
             return Some("");
@@ -165,6 +183,7 @@ impl<'a> Paragraph<'a> {
     ///
     /// The terminating paragraph break is not part of the iterator. Explicit
     /// line breaks remain visible as [`Inline::Break`].
+    #[must_use]
     pub fn inlines(self) -> Inlines<'a> {
         Inlines::new(
             self.story,
@@ -176,6 +195,7 @@ impl<'a> Paragraph<'a> {
     }
 
     /// Lazily traverse only text runs, omitting inline line-break tokens.
+    #[must_use]
     pub fn runs(self) -> Runs<'a> {
         Runs {
             inlines: self.inlines(),
@@ -183,11 +203,15 @@ impl<'a> Paragraph<'a> {
     }
 
     /// Read the paragraph's local paragraph formatting.
+    #[must_use]
     pub const fn format(self) -> ParagraphFormat<'a> {
         ParagraphFormat { raw: self.format }
     }
 
     /// Write plain paragraph text without allocating an intermediate string.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the output fails.
     pub fn write_text(self, output: &mut impl fmt::Write) -> fmt::Result {
         for inline in self.inlines() {
             match inline {
@@ -200,6 +224,7 @@ impl<'a> Paragraph<'a> {
     }
 
     /// Materialize this paragraph's plain text in a new allocation.
+    #[must_use]
     pub fn to_text(self) -> String {
         self.to_string()
     }
@@ -472,11 +497,13 @@ pub struct Run<'a> {
 
 impl<'a> Run<'a> {
     /// Borrow this run's UTF-8 text.
+    #[must_use]
     pub const fn text(self) -> &'a str {
         self.text
     }
 
     /// Read this run's local character formatting.
+    #[must_use]
     pub const fn format(self) -> Format<'a> {
         Format {
             raw: self.format,
@@ -502,21 +529,25 @@ pub struct Format<'a> {
 
 impl<'a> Format<'a> {
     /// Whether bold formatting is active.
+    #[must_use]
     pub const fn bold(self) -> bool {
         self.raw.bold
     }
 
     /// Whether italic formatting is active.
+    #[must_use]
     pub const fn italic(self) -> bool {
         self.raw.italic
     }
 
     /// The exact local underline style.
+    #[must_use]
     pub const fn underline(self) -> UnderlineStyle {
         self.raw.underline
     }
 
     /// Font size in half-points.
+    #[must_use]
     pub const fn size(self) -> NonZeroU16 {
         self.raw.font_size
     }
@@ -525,16 +556,19 @@ impl<'a> Format<'a> {
     ///
     /// `None` means that the retained reference has no corresponding font-table
     /// definition.
+    #[must_use]
     pub fn font(self) -> Option<crate::font::Font<'a>> {
         self.fonts.resolve(self.raw.font_ref)
     }
 
     /// Resolve the local foreground selection, including automatic color.
+    #[must_use]
     pub fn foreground(self) -> Option<crate::color::Value> {
         self.colors.resolve(self.raw.color_ref)
     }
 
     /// Resolve the explicitly authored character background selection.
+    #[must_use]
     pub fn background(self) -> Option<crate::color::Value> {
         self.raw
             .background_color
@@ -542,6 +576,7 @@ impl<'a> Format<'a> {
     }
 
     /// Resolve the explicitly authored highlight selection.
+    #[must_use]
     pub fn highlight(self) -> Option<crate::color::Value> {
         self.raw
             .highlight_color
@@ -549,6 +584,7 @@ impl<'a> Format<'a> {
     }
 
     /// Resolve the explicitly authored underline color selection.
+    #[must_use]
     pub fn underline_paint(self) -> Option<crate::color::Value> {
         self.raw
             .underline_color
@@ -589,11 +625,13 @@ impl<'a> Format<'a> {
     }
 
     /// Whether the run is hidden text.
+    #[must_use]
     pub const fn hidden(self) -> bool {
         self.raw.hidden
     }
 
     /// Explicit local text direction, if authored.
+    #[must_use]
     pub const fn direction(self) -> Option<TextDirection> {
         self.raw.direction
     }
@@ -607,31 +645,37 @@ pub struct ParagraphFormat<'a> {
 
 impl ParagraphFormat<'_> {
     /// Local paragraph alignment.
+    #[must_use]
     pub const fn alignment(self) -> Alignment {
         self.raw.alignment
     }
 
     /// Explicit local text direction, if authored.
+    #[must_use]
     pub const fn direction(self) -> Option<TextDirection> {
         self.raw.direction
     }
 
     /// Whether the paragraph requests staying on one page.
+    #[must_use]
     pub const fn keep_together(self) -> bool {
         self.raw.keep_together
     }
 
     /// Whether the paragraph requests staying with its successor.
+    #[must_use]
     pub const fn keep_with_next(self) -> bool {
         self.raw.keep_next
     }
 
     /// Whether a page break is requested before this paragraph.
+    #[must_use]
     pub const fn page_break_before(self) -> bool {
         self.raw.page_break_before
     }
 
     /// Optional zero-based outline level.
+    #[must_use]
     pub const fn outline_level(self) -> Option<u8> {
         self.raw.outline_level
     }

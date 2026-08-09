@@ -41,10 +41,15 @@ Office round trips.
 | [0026](0026-ole-directory-metadata-binding.md) | Typed shared OLE CFB directory metadata |
 | [0027](0027-xls-sheet-anchor-ownership.md) | Typed XLS sheet-anchor ownership |
 | [0028](0028-iwa-monolith-exit.md) | Ordered exit of the legacy IWA migration host |
+| [0029](0029-iwa-index-foundation.md) | Archive-free IWA object-index foundation |
 
 The OGraph record retains its original 0025 identity. The later XLS record,
 which duplicated that number, is indexed as 0027; its decision text remains
 unchanged apart from the corrected identifier.
+
+The ODF family record retains its original 0023 identity. The later IWA index
+record, which duplicated that number, is indexed as 0029; its decision text
+remains unchanged apart from the corrected identifier.
 
 ## Decision hierarchy
 

@@ -15,7 +15,7 @@ fn common_exposes_inert_vba_inspection() {
 #[cfg(feature = "pptx")]
 #[test]
 fn pptx_exposes_inert_vba_inspection() {
-    fn name_project(_: Option<litchi::pptx::presentation::embedded::vba::Project<'_>>) {}
+    fn name_project(_: Option<litchi::pptx::presentation::embedded::vba::Project>) {}
     name_project(None);
 }
 

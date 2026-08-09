@@ -21,7 +21,7 @@ pub struct Definition {
     pub metafile: Option<Vec<u8>>,
 }
 
-/// Inert metadata for an `ExControlContainer` ActiveX definition.
+/// Inert metadata for an `ExControlContainer` `ActiveX` definition.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Control {
     pub slide_id: Option<u32>,

@@ -3,6 +3,9 @@
 use std::fmt;
 use std::str::FromStr;
 
+use super::border::Tint;
+use crate::color::Rgb;
+
 /// Error returned when a font property is not an exact SpreadsheetML token.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseError {
@@ -42,6 +45,133 @@ impl fmt::Display for ParseError {
 }
 
 impl std::error::Error for ParseError {}
+
+/// The semantic base value of a SpreadsheetML font color.
+///
+/// Unlike the wire representation, this type cannot contain competing color
+/// bases. The parser keeps the original lexical start tag separately on
+/// [`FontColor`] so callers can retain producer-specific attributes without
+/// exposing an unvalidated string authoring path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FontColorKind {
+    /// No explicit base; the consumer default is used.
+    Default,
+    /// A checked four-byte ARGB value.
+    Rgb(Rgb),
+    /// A theme color index.
+    Theme(u32),
+    /// An indexed palette color.
+    Indexed(u32),
+    /// An explicit automatic-color flag.
+    Auto(bool),
+}
+
+/// A validated SpreadsheetML font color.
+///
+/// Construction uses typed base values and checked [`Tint`] values, making
+/// conflicting `rgb`/`theme`/`indexed`/`auto` states unrepresentable. Parsed
+/// colors additionally retain their original compact lexical start tag for
+/// diagnostics and lossless source inspection; the stylesheet writer emits a
+/// canonical compact color element.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct FontColor {
+    kind: FontColorKind,
+    tint: Option<Tint>,
+    source_lexical: Option<Box<str>>,
+}
+
+impl FontColor {
+    /// Create a color using the consumer default base.
+    #[must_use]
+    pub const fn default_base() -> Self {
+        Self {
+            kind: FontColorKind::Default,
+            tint: None,
+            source_lexical: None,
+        }
+    }
+
+    /// Create a checked ARGB font color.
+    #[must_use]
+    pub const fn rgb(value: Rgb) -> Self {
+        Self {
+            kind: FontColorKind::Rgb(value),
+            tint: None,
+            source_lexical: None,
+        }
+    }
+
+    /// Create a theme-indexed font color.
+    #[must_use]
+    pub const fn theme(index: u32) -> Self {
+        Self {
+            kind: FontColorKind::Theme(index),
+            tint: None,
+            source_lexical: None,
+        }
+    }
+
+    /// Create a palette-indexed font color.
+    #[must_use]
+    pub const fn indexed(index: u32) -> Self {
+        Self {
+            kind: FontColorKind::Indexed(index),
+            tint: None,
+            source_lexical: None,
+        }
+    }
+
+    /// Create an explicit automatic font color.
+    #[must_use]
+    pub const fn automatic() -> Self {
+        Self {
+            kind: FontColorKind::Auto(true),
+            tint: None,
+            source_lexical: None,
+        }
+    }
+
+    /// Attach a checked tint to this color.
+    #[must_use]
+    pub fn with_tint(mut self, tint: Tint) -> Self {
+        self.tint = Some(tint);
+        self.source_lexical = None;
+        self
+    }
+
+    /// Semantic base value.
+    #[must_use]
+    pub const fn kind(&self) -> FontColorKind {
+        self.kind
+    }
+
+    /// Optional checked tint.
+    #[must_use]
+    pub const fn tint(&self) -> Option<Tint> {
+        self.tint
+    }
+
+    /// Original lexical start tag, when this value came from a stylesheet.
+    ///
+    /// This is intentionally inspection-only: writers use the typed value and
+    /// produce compact XML rather than replaying producer formatting.
+    #[must_use]
+    pub fn source_lexical(&self) -> Option<&str> {
+        self.source_lexical.as_deref()
+    }
+
+    pub(crate) fn parsed(
+        kind: FontColorKind,
+        tint: Option<Tint>,
+        source_lexical: Box<str>,
+    ) -> Self {
+        Self {
+            kind,
+            tint,
+            source_lexical: Some(source_lexical),
+        }
+    }
+}
 
 /// Font underline style (`ST_UnderlineValues`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -199,8 +329,8 @@ pub struct Font {
     pub underline: Option<Underline>,
     /// Strike-through flag
     pub strike: bool,
-    /// Font color (RGB hex or theme color reference)
-    pub color: Option<String>,
+    /// Typed font color.
+    pub color: Option<FontColor>,
     /// Font charset
     pub charset: Option<u32>,
     /// Font family (1=Roman, 2=Swiss, 3=Modern, 4=Script, 5=Decorative)
@@ -309,7 +439,7 @@ mod tests {
             italic: false,
             underline: Some(Underline::Single),
             strike: false,
-            color: Some("FF0000".to_string()),
+            color: Some(FontColor::rgb(Rgb::new(0xFF, 0, 0))),
             charset: Some(1),
             family: Some(2),
             scheme: Some(Scheme::Minor),
@@ -321,7 +451,10 @@ mod tests {
         assert!(!font.italic);
         assert_eq!(font.underline, Some(Underline::Single));
         assert!(!font.strike);
-        assert_eq!(font.color, Some("FF0000".to_string()));
+        assert_eq!(
+            font.color.as_ref().map(|color| color.kind()),
+            Some(FontColorKind::Rgb(Rgb::new(0xFF, 0, 0)))
+        );
         assert_eq!(font.charset, Some(1));
         assert_eq!(font.family, Some(2));
         assert_eq!(font.scheme, Some(Scheme::Minor));

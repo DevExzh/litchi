@@ -32,6 +32,9 @@ impl Slide {
     /// Get the title of the slide.
     ///
     /// Returns the slide title if present, None otherwise.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn title(&self) -> Result<Option<&str>> {
         Ok(self.title.as_deref())
     }
@@ -39,6 +42,9 @@ impl Slide {
     /// Get the slide's primary body text.
     ///
     /// Use [`Self::all_text`] to include the title and labeled drawing shapes.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn text(&self) -> Result<&str> {
         Ok(&self.text)
     }
@@ -69,6 +75,9 @@ impl Slide {
     /// Get all shapes on the slide.
     ///
     /// Returns a slice of shapes contained in this slide.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn shapes(&self) -> Result<&[Shape]> {
         Ok(&self.shapes)
     }
@@ -84,6 +93,9 @@ impl Slide {
     /// Get the slide notes.
     ///
     /// Returns speaker notes for this slide if present, None otherwise.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn notes(&self) -> Result<Option<&str>> {
         Ok(self.notes.as_deref())
     }
@@ -116,6 +128,9 @@ impl Slide {
     }
 
     /// Add a schema-defined animation root to the slide.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn add_animation(&mut self, animation: Node) -> Result<()> {
         if !animation.kind().allowed_at_page_root() {
             return Err(litchi_core::Error::InvalidFormat(
@@ -270,20 +285,23 @@ pub struct DrawingAttribute {
 
 impl DrawingAttribute {
     /// Create a drawing attribute after validating its XML local name.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(
         namespace: DrawingAttributeNamespace,
         local_name: impl Into<String>,
         value: impl Into<String>,
     ) -> Result<Self> {
-        let local_name = local_name.into();
-        if !is_xml_local_name(&local_name) {
+        let name = local_name.into();
+        if !is_xml_local_name(&name) {
             return Err(litchi_core::Error::InvalidFormat(format!(
-                "invalid drawing attribute local name '{local_name}'"
+                "invalid drawing attribute local name '{name}'"
             )));
         }
         Ok(Self {
             namespace,
-            local_name,
+            local_name: name,
             value: value.into(),
         })
     }
@@ -397,19 +415,6 @@ impl EnhancedGeometry {
     }
 }
 
-fn is_xml_local_name(value: &str) -> bool {
-    let mut characters = value.chars();
-    characters
-        .next()
-        .is_some_and(|character| character == '_' || character.is_ascii_alphabetic())
-        && characters.all(|character| {
-            character == '_'
-                || character == '-'
-                || character == '.'
-                || character.is_ascii_alphanumeric()
-        })
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Shape {
     /// Shape type (text box, image, frame, etc.)
@@ -492,6 +497,9 @@ impl Shape {
     }
 
     /// Get the text content of the shape.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn text(&self) -> Result<&str> {
         Ok(&self.text)
     }
@@ -573,6 +581,9 @@ impl Shape {
     }
 
     /// Set or remove the exact non-negative stacking index.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_z_index(&mut self, z_index: Option<String>) -> Result<()> {
         if let Some(value) = &z_index {
             validate_z_index(value)?;
@@ -637,6 +648,9 @@ impl Shape {
     }
 
     /// Add an inert event binding, subject to the per-shape safety limit.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn add_event_listener(&mut self, listener: ShapeEventListener) -> Result<()> {
         if self.event_listeners.len() >= 4096 {
             return Err(litchi_core::Error::InvalidFormat(
@@ -649,6 +663,7 @@ impl Shape {
     }
 
     /// Set the image source and mark this shape as a picture.
+    #[must_use]
     pub fn with_image_href(mut self, href: impl Into<String>) -> Self {
         self.shape_type = litchi_core::ShapeType::Picture;
         self.image_href = Some(href.into());
@@ -661,6 +676,19 @@ impl Default for Shape {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn is_xml_local_name(value: &str) -> bool {
+    let mut characters = value.chars();
+    characters
+        .next()
+        .is_some_and(|character| character == '_' || character.is_ascii_alphabetic())
+        && characters.all(|character| {
+            character == '_'
+                || character == '-'
+                || character == '.'
+                || character.is_ascii_alphanumeric()
+        })
 }
 
 pub(crate) fn validate_z_index(value: &str) -> Result<()> {
@@ -678,6 +706,11 @@ pub(crate) fn validate_z_index(value: &str) -> Result<()> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::default_trait_access,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

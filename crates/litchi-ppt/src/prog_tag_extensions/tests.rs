@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::codec::{
     ATOM_VERSION, BROADCAST_DOC_INFO_9, COMMENT_10, CONTAINER_VERSION, COPYRIGHT_INSTANCE,
     ENVELOPE_DATA_9_ATOM, ENVELOPE_FLAGS_9_ATOM, HTML_DOC_INFO_9_ATOM, HTML_PUBLISH_INFO_9,
@@ -12,7 +18,7 @@ fn record_bytes(version: u16, instance: u16, kind: u16, payload: &[u8]) -> Vec<u
     let mut bytes = Vec::with_capacity(8 + payload.len());
     bytes.extend_from_slice(&((instance << 4) | version).to_le_bytes());
     bytes.extend_from_slice(&kind.to_le_bytes());
-    bytes.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+    bytes.extend_from_slice(&u32::try_from(payload.len()).unwrap().to_le_bytes());
     bytes.extend_from_slice(payload);
     bytes
 }

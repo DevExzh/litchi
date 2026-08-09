@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use litchi_pptx::Package;
 use tempfile::NamedTempFile;
 
@@ -22,7 +28,7 @@ fn inserted_slides_keep_position_and_ids_after_round_trip() {
             presentation
                 .slides()
                 .iter()
-                .map(|slide| slide.slide_id())
+                .map(litchi_pptx::MutableSlide::slide_id)
                 .collect::<Vec<_>>(),
             [260, 256, 259, 257, 258, 261]
         );
@@ -36,7 +42,7 @@ fn inserted_slides_keep_position_and_ids_after_round_trip() {
             .slide_references()
             .unwrap()
             .iter()
-            .map(|reference| reference.id())
+            .map(litchi_pptx::parts::SlideReference::id)
             .collect::<Vec<_>>(),
         [260, 256, 259, 257, 258, 261]
     );

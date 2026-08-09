@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 //! Integration tests for PPT table authoring: tables written by `Writer`
 //! must round-trip through the table extraction APIs after save/reopen.
 
@@ -36,12 +42,12 @@ fn authored_2x3_table_round_trips_with_cell_text() {
 
     let shapes = slides[0].shapes().unwrap();
     assert_eq!(shapes.len(), 1);
-    let table = shapes[0].as_table().expect("table group");
-    assert_eq!(table.rows(), 2);
-    assert_eq!(table.columns(), 3);
+    let read_table = shapes[0].as_table().expect("table group");
+    assert_eq!(read_table.rows(), 2);
+    assert_eq!(read_table.columns(), 3);
     for (row, row_texts) in texts.iter().enumerate() {
         for (column, text) in row_texts.iter().enumerate() {
-            assert_eq!(table.cell(row, column), Some(*text));
+            assert_eq!(read_table.cell(row, column), Some(*text));
         }
     }
 }
@@ -120,8 +126,8 @@ fn unicode_cell_text_round_trips() {
     let presentation = package.presentation().unwrap();
     let slides = presentation.slides().unwrap();
     let shapes = slides[0].shapes().unwrap();
-    let table = shapes[0].as_table().expect("table group");
-    assert_eq!(table.cell(0, 0), Some("表格 Zelle"));
+    let read_table = shapes[0].as_table().expect("table group");
+    assert_eq!(read_table.cell(0, 0), Some("表格 Zelle"));
 }
 
 #[test]
@@ -141,10 +147,10 @@ fn custom_cell_dimensions_round_trip_to_bounds() {
     let presentation = package.presentation().unwrap();
     let slides = presentation.slides().unwrap();
     let shapes = slides[0].shapes().unwrap();
-    let table = shapes[0].as_table().expect("table group");
+    let read_table = shapes[0].as_table().expect("table group");
 
     // PPT master units: 8 per point. Table at (72pt, 36pt) -> (576, 288);
     // 200pt x 80pt grid -> 1600 x 640 master units.
-    assert_eq!((table.left(), table.top()), (576, 288));
-    assert_eq!((table.width(), table.height()), (1600, 640));
+    assert_eq!((read_table.left(), read_table.top()), (576, 288));
+    assert_eq!((read_table.width(), read_table.height()), (1600, 640));
 }

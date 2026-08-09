@@ -12,22 +12,32 @@ use crate::records::Record;
 use std::collections::HashSet;
 
 impl UnknownRecord {
+    #[must_use]
     pub fn record_type(&self) -> u16 {
         self.record.record_type_raw
     }
 
+    #[must_use]
     pub fn version(&self) -> u16 {
         self.record.version
     }
 
+    #[must_use]
     pub fn instance(&self) -> u16 {
         self.record.instance
     }
 
+    #[must_use]
     pub fn data(&self) -> &[u8] {
         &self.record.data
     }
 
+    /// Serialize to the raw bytes of the preserved unknown record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record header fields or the payload exceed
+    /// the encodable domain.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         record_bytes_raw(
             self.record.version,
@@ -46,6 +56,17 @@ impl UnknownRecord {
 }
 
 impl Collection {
+    /// Parse the `ExObjList` tree of a `PowerPoint` document record.
+    ///
+    /// Returns `Ok(None)` when the record tree contains no external-object
+    /// list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record tree contains multiple external-object
+    /// lists, if any record header, size, or fixed-width field is invalid, or
+    /// if object IDs violate the seed, uniqueness, or cross-collection
+    /// invariants.
     pub fn parse(root: &Record) -> Result<Option<Self>> {
         let mut lists = Vec::new();
         collect_external_object_lists(root, &mut lists);
@@ -63,11 +84,12 @@ impl Collection {
             return corrupted("ExObjListContainer is missing ExObjListAtom");
         };
         require_atom(atom, 0, 0, RecordType::ExObjListAtom, 4, "ExObjListAtom")?;
-        let signed_seed = i32::from_le_bytes(atom.data[..4].try_into().expect("fixed slice"));
+        let signed_seed =
+            i32::from_le_bytes([atom.data[0], atom.data[1], atom.data[2], atom.data[3]]);
         if signed_seed < 1 {
             return corrupted("ExObjListAtom identifier seed must be positive");
         }
-        let id_seed = signed_seed as u32;
+        let id_seed = signed_seed.cast_unsigned();
         let mut ids = HashSet::new();
         let mut objects = Vec::new();
         let mut unknown_records = Vec::new();
@@ -86,11 +108,10 @@ impl Collection {
                     "external-object list exceeds {MAX_OLE_OBJECTS} OLE objects"
                 ));
             }
-            let object = match child.record_type {
-                RecordType::ExternalOleControl => {
-                    ExternalObject::ActiveXControl(Control::parse(child)?)
-                },
-                _ => ExternalObject::Object(Definition::parse(child)?),
+            let object = if child.record_type == RecordType::ExternalOleControl {
+                ExternalObject::ActiveXControl(Control::parse(child)?)
+            } else {
+                ExternalObject::Object(Definition::parse(child)?)
             };
             let id = object.id();
             if id > id_seed {
@@ -128,22 +149,33 @@ impl Collection {
         }))
     }
 
+    #[must_use]
     pub fn get(&self, id: u32) -> Option<&ExternalObject> {
         self.objects.iter().find(|object| object.id() == id)
     }
 
+    #[must_use]
     pub fn find(&self, id: u32) -> Option<&ExternalObject> {
         self.get(id)
     }
 
+    #[must_use]
     pub fn unknown_records(&self) -> &[UnknownRecord] {
         &self.unknown_records
     }
 
+    /// Serialize the collection to the raw bytes of an `ExObjList` container,
+    /// interleaving preserved unknown records at their original positions.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the collection violates its validation invariants,
+    /// if the identifier seed exceeds the signed-integer domain, or if any
+    /// child record fails to serialize.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         self.validate()?;
         let seed = i32::try_from(self.id_seed)
-            .map_err(|_| Error::Corrupted("ExObjList identifier seed exceeds i32".into()))?;
+            .map_err(|_err| Error::Corrupted("ExObjList identifier seed exceeds i32".into()))?;
         let mut children = record_bytes(0, 0, RecordType::ExObjListAtom, &seed.to_le_bytes())?;
         for object_index in 0..=self.objects.len() {
             for record in self

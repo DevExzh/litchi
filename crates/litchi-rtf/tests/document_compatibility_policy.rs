@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{DocumentCompatibilityPolicy, DocumentFeatureThrottle, RtfDocument, RtfWriter};
 
 fn write(doc: &RtfDocument<'_>) -> String {

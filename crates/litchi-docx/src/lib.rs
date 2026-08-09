@@ -82,7 +82,8 @@ pub use hyperlink::Hyperlink;
 pub use litchi_opc::ReadLimits;
 pub use mail_merge::{
     DataSourceObject, DataType, Destination, FieldMap, FieldMappingType, MainDocumentType,
-    RECIPIENT_CONTENT_TYPE, Recipient, Recipients, Source, Target, parse_settings_mail_merge,
+    RECIPIENT_CONTENT_TYPE, Recipient, Recipients, RelationshipId, Source, Target,
+    parse_settings_mail_merge,
 };
 pub use modern_comments::{
     Comment, Conformance, Extended, Extension, ExtensionList, IdMapping, Metadata, Person,

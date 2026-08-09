@@ -15,6 +15,10 @@ use crate::presentation::embedded::invalid;
 use crate::{Error, Result};
 
 /// Capture one slide-owned OLE graph after validating ownership and targets.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load(
     package: &OpcPackage,
     slide_index: usize,
@@ -58,6 +62,10 @@ pub fn load(
 }
 
 /// Publish a committed OLE graph replacement atomically.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
     let current = load(
         package,
@@ -87,6 +95,9 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
     Ok(resulting)
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
     apply_patch(package, &commit.into_patch())
 }

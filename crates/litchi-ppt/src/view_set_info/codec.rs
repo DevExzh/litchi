@@ -18,23 +18,15 @@ const ATOM_LEN: usize = 20;
 /// Flag bits defined by `NormalViewSetInfo9Atom`.
 const KNOWN_FLAGS: u8 = 0x03;
 
-fn corrupted(message: impl Into<String>) -> Error {
-    Error::Corrupted(message.into())
-}
-
-fn read_i32(data: &[u8], offset: usize) -> i32 {
-    i32::from_le_bytes(data[offset..offset + 4].try_into().expect("length checked"))
-}
-
 impl ViewBarState {
     fn from_byte(value: u8) -> Result<Self> {
         Ok(match value {
             0x00 => Self::Minimized,
             0x01 => Self::Restored,
             0x02 => Self::Maximized,
-            value => {
+            other => {
                 return Err(corrupted(format!(
-                    "NormalViewSetBarStates value {value} is undefined"
+                    "NormalViewSetBarStates value {other} is undefined"
                 )));
             },
         })
@@ -47,24 +39,6 @@ impl ViewBarState {
             Self::Maximized => 0x02,
         }
     }
-}
-
-fn strict_bool(value: u8, name: &str) -> Result<bool> {
-    match value {
-        0 => Ok(false),
-        1 => Ok(true),
-        value => Err(corrupted(format!("{name} must be 0 or 1, got {value}"))),
-    }
-}
-
-fn check_unit_portion(ratio: Ratio, name: &str) -> Result<()> {
-    if ratio.denominator() <= 0 || ratio.numerator() < 0 || ratio.numerator() > ratio.denominator()
-    {
-        return Err(corrupted(format!(
-            "NormalViewSetInfo9Atom {name} must be between 0 and 1"
-        )));
-    }
-    Ok(())
 }
 
 impl NormalViewSetInfo {
@@ -114,9 +88,13 @@ impl NormalViewSetInfo {
 
 impl NormalViewSet {
     /// Parse a complete container record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_record(record: &Record) -> Result<Self> {
         let declared = usize::try_from(record.data_length)
-            .map_err(|_| corrupted("NormalViewSetInfo9 length does not fit memory"))?;
+            .map_err(|_err| corrupted("NormalViewSetInfo9 length does not fit memory"))?;
         if record.record_type != RecordType::NormalViewSetInfo9
             || record.record_type_raw != NORMAL_VIEW_SET_INFO_TYPE
             || record.version != 0xF
@@ -145,6 +123,10 @@ impl NormalViewSet {
     }
 
     /// Serialize the complete container record, including its header.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the underlying writer reports an error.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         let payload = match &self.payload {
             NormalViewSetPayload::Layout(layout) => layout.to_bytes()?,
@@ -153,12 +135,16 @@ impl NormalViewSet {
         let mut data = Vec::with_capacity(8 + payload.len());
         data.extend_from_slice(&0u16.to_le_bytes());
         data.extend_from_slice(&NORMAL_VIEW_SET_INFO_ATOM_TYPE.to_le_bytes());
-        data.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+        let payload_length = u32::try_from(payload.len())
+            .map_err(|_err| corrupted("NormalViewSetInfo9Atom payload exceeds u32"))?;
+        data.extend_from_slice(&payload_length.to_le_bytes());
         data.extend_from_slice(&payload);
         let mut record = Vec::with_capacity(8 + data.len());
         record.extend_from_slice(&(0x0010u16 | 0xF).to_le_bytes());
         record.extend_from_slice(&NORMAL_VIEW_SET_INFO_TYPE.to_le_bytes());
-        record.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        let data_length = u32::try_from(data.len())
+            .map_err(|_err| corrupted("NormalViewSetInfo9 payload exceeds u32"))?;
+        record.extend_from_slice(&data_length.to_le_bytes());
         record.extend_from_slice(&data);
         Ok(record)
     }
@@ -166,9 +152,13 @@ impl NormalViewSet {
 
 impl NotesTextViewInfo {
     /// Parse a complete container record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_record(record: &Record) -> Result<Self> {
         let declared = usize::try_from(record.data_length)
-            .map_err(|_| corrupted("NotesTextViewInfo9 length does not fit memory"))?;
+            .map_err(|_err| corrupted("NotesTextViewInfo9 length does not fit memory"))?;
         if record.record_type != RecordType::NotesTextViewInfo9
             || record.record_type_raw != NOTES_TEXT_VIEW_INFO_TYPE
             || record.version != 0xF
@@ -191,4 +181,35 @@ impl NotesTextViewInfo {
             view_info: NoZoomViewInfo::parse(&atom.data)?,
         })
     }
+}
+
+fn corrupted(message: impl Into<String>) -> Error {
+    Error::Corrupted(message.into())
+}
+
+fn read_i32(data: &[u8], offset: usize) -> i32 {
+    i32::from_le_bytes([
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+    ])
+}
+
+fn strict_bool(value: u8, name: &str) -> Result<bool> {
+    match value {
+        0 => Ok(false),
+        1 => Ok(true),
+        other => Err(corrupted(format!("{name} must be 0 or 1, got {other}"))),
+    }
+}
+
+fn check_unit_portion(ratio: Ratio, name: &str) -> Result<()> {
+    if ratio.denominator() <= 0 || ratio.numerator() < 0 || ratio.numerator() > ratio.denominator()
+    {
+        return Err(corrupted(format!(
+            "NormalViewSetInfo9Atom {name} must be between 0 and 1"
+        )));
+    }
+    Ok(())
 }

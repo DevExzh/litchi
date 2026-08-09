@@ -21,11 +21,13 @@ pub struct Snapshot<'a> {
 
 impl Snapshot<'_> {
     /// Exact current `Workbook` stream bytes.
+    #[must_use]
     pub fn workbook(&self) -> &[u8] {
         self.workbook
     }
 
     /// The one typed Graph chart substream in the workbook.
+    #[must_use]
     pub const fn chart(&self) -> litchi_ograph::chart::Ref<'_> {
         self.chart
     }
@@ -36,11 +38,16 @@ impl Snapshot<'_> {
     /// The returned chart retains its exact source stream. Encoding it
     /// without mutation is therefore lossless; an attempted parsed mutation
     /// reports the neutral model's typed unsafe-edit error.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn semantic_chart(&self) -> Result<SemanticChart> {
         SemanticChart::parse(self.chart, Context::graph()).map_err(Into::into)
     }
 
     /// Whether an edit has been applied since the transaction was opened.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.dirty
     }
@@ -67,15 +74,23 @@ pub struct PackageEditor {
 }
 
 impl PackageEditor {
-    /// Open a validated package with conservative OGraph limits.
+    /// Open a validated package with conservative `OGraph` limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn open(bytes: Vec<u8>) -> Result<Self> {
         Self::with_limits(bytes, Limits::default())
     }
 
     /// Open a validated package under explicit resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
-        let limits = limits.validate()?;
-        let parts = codec::read(&bytes, limits)?;
+        let validated_limits = limits.validate()?;
+        let parts = codec::read(&bytes, validated_limits)?;
         Ok(Self {
             original: Some(bytes),
             workbook: parts.workbook,
@@ -83,34 +98,48 @@ impl PackageEditor {
             ole: parts.ole,
             chart_start: parts.chart_start,
             chart_end: parts.chart_end,
-            limits,
+            limits: validated_limits,
             dirty: false,
         })
     }
 
     /// Resource bounds applied to this transaction.
+    #[must_use]
     pub const fn limits(&self) -> Limits {
         self.limits
     }
 
     /// Whether a chart replacement has been staged.
+    #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.dirty
     }
 
     /// Borrow the current typed, Graph-framed chart stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn chart(&self) -> Result<litchi_ograph::chart::Ref<'_>> {
         self.chart_ref()
     }
 
     /// Validate and own the current chart through the MS-OGRAPH semantic
     /// model without changing transaction state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn semantic_chart(&self) -> Result<SemanticChart> {
         SemanticChart::parse_with(self.chart_ref()?, Context::graph(), self.limits)
             .map_err(Into::into)
     }
 
     /// Capture the current state without copying its bounded buffers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn snapshot(&self) -> Result<Snapshot<'_>> {
         Ok(Snapshot {
             workbook: &self.workbook,
@@ -124,8 +153,12 @@ impl PackageEditor {
     /// The input stream is checked for Graph BIFF framing and the complete
     /// candidate OLE2 package is rebuilt and validated before this editor is
     /// changed. This is a package transaction, not complete native chart
-    /// authoring: the existing OGraph model remains the authority for the
+    /// authoring: the existing `OGraph` model remains the authority for the
     /// supported chart-stream grammar and opaque records remain inert.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace_chart(&mut self, chart: litchi_ograph::chart::Stream) -> Result<()> {
         if chart.kind() != litchi_ograph::chart::Kind::Graph {
             return Err(Error::InvalidFormat(
@@ -173,7 +206,7 @@ impl PackageEditor {
         let mut candidate = Vec::new();
         candidate
             .try_reserve_exact(total)
-            .map_err(|_| litchi_ograph::Error::Allocation {
+            .map_err(|_err| litchi_ograph::Error::Allocation {
                 resource: "edited Workbook bytes",
             })?;
         candidate.extend_from_slice(&self.workbook[..start]);
@@ -203,6 +236,10 @@ impl PackageEditor {
     /// making the stronger semantic path explicit. Untouched parsed charts
     /// replay byte-for-byte; parsed mutations and fresh charts are rejected by
     /// `litchi-ograph` until their opaque-record placement is proven.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace_semantic_chart(&mut self, chart: SemanticChart) -> Result<()> {
         if chart.context().kind() != litchi_ograph::chart::Kind::Graph {
             return Err(Error::InvalidFormat(
@@ -214,6 +251,10 @@ impl PackageEditor {
     }
 
     /// Commit the current transaction into a standalone OLE2 package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn commit(self) -> Result<Vec<u8>> {
         if let Some(original) = self.original {
             return Ok(original);
@@ -227,6 +268,10 @@ impl PackageEditor {
     }
 
     /// Commit alias matching the package writers' move-owned finish pattern.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn finish(self) -> Result<Vec<u8>> {
         self.commit()
     }
@@ -236,8 +281,8 @@ impl PackageEditor {
         let chart = charts
             .next()
             .ok_or_else(|| Error::Corrupted("Graph Workbook has no chart stream".to_string()))??;
-        if let Some(chart) = charts.next() {
-            let _ = chart?;
+        if let Some(extra) = charts.next() {
+            let _ = extra?;
             return Err(Error::Corrupted(
                 "Graph Workbook has more than one chart stream".to_string(),
             ));

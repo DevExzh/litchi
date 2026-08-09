@@ -1,8 +1,8 @@
-//! Typed PowerPoint binary record kinds.
+//! Typed `PowerPoint` binary record kinds.
 
 // PowerPoint Binary File Format (MS-PPT) constants
 
-/// PPT record types (based on POI RecordTypes enum)
+/// PPT record types (based on POI `RecordTypes` enum)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u16)]
 pub enum RecordType {
@@ -28,11 +28,11 @@ pub enum RecordType {
     Environment = 1010,
     /// Font collection container
     FontCollection = 2005,
-    /// PowerPoint 10 international font collection container
+    /// `PowerPoint` 10 international font collection container
     FontCollection10 = 2006,
-    /// PowerPoint 9 picture-bullet collection container
+    /// `PowerPoint` 9 picture-bullet collection container
     BlipCollection9 = 2040,
-    /// PowerPoint 9 picture-bullet atom
+    /// `PowerPoint` 9 picture-bullet atom
     BlipEntity9Atom = 2041,
     /// Slide persist atom record
     SlidePersistAtom = 1011,
@@ -42,7 +42,7 @@ pub enum RecordType {
     SlideListWithText = 4080,
     /// Persist pointer holder record
     PersistPtrHolder = 6001,
-    /// PowerPoint 10 cryptographic session container
+    /// `PowerPoint` 10 cryptographic session container
     CryptSession10Container = 12052,
     /// Slide show slide info atom
     SSSlideInfoAtom = 1017,
@@ -58,11 +58,11 @@ pub enum RecordType {
     PPDrawingGroup = 1035,
     /// PP drawing record
     PPDrawing = 1036,
-    /// PowerPoint 10 square-grid spacing atom
+    /// `PowerPoint` 10 square-grid spacing atom
     GridSpacing10Atom = 1037,
-    /// PowerPoint 12 embedded DrawingML theme package atom
+    /// `PowerPoint` 12 embedded `DrawingML` theme package atom
     RoundTripTheme12Atom = 0x040E,
-    /// PowerPoint 12 DrawingML color mapping XML atom
+    /// `PowerPoint` 12 `DrawingML` color mapping XML atom
     DocRoutingSlipAtom = 0x0406,
     SlideShowDocInfoAtom = 0x0401,
     Summary = 0x0402,
@@ -94,41 +94,41 @@ pub enum RecordType {
     ExternalCdAudioAtom = 0x1012,
     ExternalWavAudioEmbeddedAtom = 0x1013,
     RoundTripColorMapping12Atom = 0x040F,
-    /// PowerPoint 12 notes-master text styles atom
+    /// `PowerPoint` 12 notes-master text styles atom
     RoundTripNotesMasterTextStyles12Atom = 0x0427,
-    /// PowerPoint 12 original main-master identifier atom
+    /// `PowerPoint` 12 original main-master identifier atom
     RoundTripOriginalMainMasterId12Atom = 0x041C,
-    /// PowerPoint 12 composite master identifier atom
+    /// `PowerPoint` 12 composite master identifier atom
     RoundTripCompositeMasterId12Atom = 0x041D,
-    /// PowerPoint 12 embedded content-master slide-layout package atom
+    /// `PowerPoint` 12 embedded content-master slide-layout package atom
     RoundTripContentMasterInfo12Atom = 0x041E,
-    /// PowerPoint 12 round-trip shape identifier atom
+    /// `PowerPoint` 12 round-trip shape identifier atom
     RoundTripShapeId12Atom = 0x041F,
-    /// PowerPoint 12 header/footer placeholder identity atom
+    /// `PowerPoint` 12 header/footer placeholder identity atom
     RoundTripHFPlaceholder12Atom = 0x0420,
-    /// PowerPoint 12 content master identifier atom
+    /// `PowerPoint` 12 content master identifier atom
     RoundTripContentMasterId12Atom = 0x0422,
-    /// PowerPoint 12 embedded main-master text-styles package atom
+    /// `PowerPoint` 12 embedded main-master text-styles package atom
     RoundTripOArtTextStyles12Atom = 0x0423,
-    /// PowerPoint 12 default header and footer flags atom
+    /// `PowerPoint` 12 default header and footer flags atom
     RoundTripHeaderFooterDefaults12Atom = 0x0424,
-    /// PowerPoint 12 document round-trip flags atom
+    /// `PowerPoint` 12 document round-trip flags atom
     RoundTripDocFlags12Atom = 0x0425,
-    /// PowerPoint 12 custom-layout shape and text checksum atom
+    /// `PowerPoint` 12 custom-layout shape and text checksum atom
     RoundTripShapeCheckSumForCustomLayouts12Atom = 0x0426,
-    /// PowerPoint 12 embedded custom table-styles package atom
+    /// `PowerPoint` 12 embedded custom table-styles package atom
     RoundTripCustomTableStyles12Atom = 0x0428,
     /// OE placeholder atom record (placeholder data)
     OEPlaceholderAtom = 3011,
-    /// ShapeFlagsAtom shape-level flags
+    /// `ShapeFlagsAtom` shape-level flags
     ShapeAtom = 0x0BDB,
-    /// ShapeFlags10Atom PowerPoint 2002 shape-level flags
+    /// `ShapeFlags10Atom` `PowerPoint` 2002 shape-level flags
     ShapeFlags10Atom = 0x0BDC,
-    /// PowerPoint 12 new placeholder identity atom
+    /// `PowerPoint` 12 new placeholder identity atom
     RoundTripNewPlaceholderId12Atom = 0x0BDD,
-    /// PowerPoint 12 embedded animation package atom
+    /// `PowerPoint` 12 embedded animation package atom
     RoundTripAnimation12Atom = 0x2B0B,
-    /// PowerPoint 12 animation checksum atom
+    /// `PowerPoint` 12 animation checksum atom
     RoundTripAnimationHash12Atom = 0x2B0D,
     /// Text header atom record
     TextHeaderAtom = 3999,
@@ -140,27 +140,27 @@ pub enum RecordType {
     TextSpecInfoAtom = 4010,
     /// Default text ruler atom record
     DefaultRulerAtom = 4011,
-    /// PowerPoint 9 additional text properties atom record
+    /// `PowerPoint` 9 additional text properties atom record
     StyleTextProp9Atom = 4012,
-    /// PowerPoint 9 master text style atom record
+    /// `PowerPoint` 9 master text style atom record
     TextMasterStyle9Atom = 4013,
-    /// PowerPoint 9 outline text properties container
+    /// `PowerPoint` 9 outline text properties container
     OutlineTextProps9 = 4014,
-    /// PowerPoint 9 outline text properties header atom
+    /// `PowerPoint` 9 outline text properties header atom
     OutlineTextPropsHeader9Atom = 4015,
-    /// PowerPoint 9 default text properties atom
+    /// `PowerPoint` 9 default text properties atom
     TextDefaults9Atom = 4016,
-    /// PowerPoint 10 additional character properties atom
+    /// `PowerPoint` 10 additional character properties atom
     StyleTextProp10Atom = 4017,
-    /// PowerPoint 10 master text style atom record
+    /// `PowerPoint` 10 master text style atom record
     TextMasterStyle10Atom = 4018,
-    /// PowerPoint 10 outline text properties container
+    /// `PowerPoint` 10 outline text properties container
     OutlineTextProps10 = 4019,
-    /// PowerPoint 10 default text properties atom
+    /// `PowerPoint` 10 default text properties atom
     TextDefaults10Atom = 4020,
-    /// PowerPoint 11 outline text properties container
+    /// `PowerPoint` 11 outline text properties container
     OutlineTextProps11 = 4021,
-    /// PowerPoint 11 additional text properties atom
+    /// `PowerPoint` 11 additional text properties atom
     StyleTextProp11Atom = 4022,
     /// Style text prop atom record
     StyleTextPropAtom = 4001,
@@ -178,21 +178,21 @@ pub enum RecordType {
     FontEntityAtom = 4023,
     /// Embedded font data atom record
     FontEmbeddedData = 4024,
-    /// PowerPoint 10 font embedding flags atom
+    /// `PowerPoint` 10 font embedding flags atom
     FontEmbedFlags10Atom = 0x32C8,
-    /// PowerPoint 10 privacy flags atom
+    /// `PowerPoint` 10 privacy flags atom
     FilterPrivacyFlags10Atom = 0x36B0,
-    /// PowerPoint 10 reviewing toolbar and gallery state atom
+    /// `PowerPoint` 10 reviewing toolbar and gallery state atom
     DocToolbarStates10Atom = 0x36B1,
-    /// PowerPoint 10 photo album settings atom
+    /// `PowerPoint` 10 photo album settings atom
     PhotoAlbumInfo10Atom = 0x36B2,
-    /// PowerPoint 11 smart tag store container
+    /// `PowerPoint` 11 smart tag store container
     SmartTagStore11 = 0x36B3,
-    /// PowerPoint 12 slide-library synchronization container
+    /// `PowerPoint` 12 slide-library synchronization container
     RoundTripSlideSyncInfo12 = 0x3714,
-    /// PowerPoint 12 slide-library synchronization timestamps atom
+    /// `PowerPoint` 12 slide-library synchronization timestamps atom
     RoundTripSlideSyncInfoAtom12 = 0x3715,
-    /// CString record
+    /// `CString` record
     CString = 4026,
     /// East Asian line-breaking settings container
     Kinsoku = 4040,
@@ -204,7 +204,7 @@ pub enum RecordType {
     ExternalHyperlink = 4055,
     /// Text-range anchor for the preceding interactive information record
     TextInteractiveInfoAtom = 4063,
-    /// PowerPoint 9 external hyperlink extension container
+    /// `PowerPoint` 9 external hyperlink extension container
     ExternalHyperlink9 = 4068,
     /// Headers footers container record
     HeadersFooters = 4057,
@@ -252,7 +252,7 @@ pub enum RecordType {
     AnimationInfo = 4116,
     /// Animation info atom record
     AnimationInfoAtom = 4081,
-    /// PowerPoint 9 external hyperlink flags atom
+    /// `PowerPoint` 9 external hyperlink flags atom
     ExternalHyperlinkFlagsAtom = 4120,
     /// Build list record
     BuildList = 0x2B02,
@@ -346,7 +346,7 @@ pub enum RecordType {
     TimeAnimationValue = 0xF143,
     /// Shape or sound animation target atom
     VisualShapeAtom = 0x2AFB,
-    /// PowerPoint 10 animation hash atom
+    /// `PowerPoint` 10 animation hash atom
     HashCode10Atom = 0x2B00,
     /// Slide animation target atom
     VisualPageAtom = 0x2B01,
@@ -374,36 +374,35 @@ pub enum RecordType {
     Comment2000 = 12000,
     /// Comment 2000 atom record
     Comment2000Atom = 12001,
-    /// PowerPoint 10 comment author container
+    /// `PowerPoint` 10 comment author container
     CommentIndex10 = 12004,
-    /// PowerPoint 10 comment author index atom
+    /// `PowerPoint` 10 comment author index atom
     CommentIndex10Atom = 12005,
-    /// PowerPoint 10 linked-shape atom
+    /// `PowerPoint` 10 linked-shape atom
     LinkedShape10Atom = 12006,
-    /// PowerPoint 10 linked-slide atom
+    /// `PowerPoint` 10 linked-slide atom
     LinkedSlide10Atom = 12007,
-    /// PowerPoint 10 document-comparison tree container
+    /// `PowerPoint` 10 document-comparison tree container
     DiffTree10 = 0x2EEC,
-    /// PowerPoint 10 document-comparison diff container
+    /// `PowerPoint` 10 document-comparison diff container
     Diff10 = 0x2EED,
-    /// PowerPoint 10 document-comparison diff atom
+    /// `PowerPoint` 10 document-comparison diff atom
     Diff10Atom = 0x2EEE,
-    /// PowerPoint 10 document-comparison slide-list size atom
+    /// `PowerPoint` 10 document-comparison slide-list size atom
     SlideListTableSize10Atom = 0x2EEF,
-    /// PowerPoint 10 document-comparison slide-list entry atom
+    /// `PowerPoint` 10 document-comparison slide-list entry atom
     SlideListEntry10Atom = 0x2EF0,
-    /// PowerPoint 10 document-comparison slide-list table container
+    /// `PowerPoint` 10 document-comparison slide-list table container
     SlideListTable10 = 0x2EF1,
-    /// PowerPoint 10 slide flags atom
+    /// `PowerPoint` 10 slide flags atom
     SlideFlags10Atom = 12010,
-    /// PowerPoint 10 slide creation time atom
+    /// `PowerPoint` 10 slide creation time atom
     SlideTime10Atom = 12011,
 }
 
 impl From<u16> for RecordType {
     fn from(value: u16) -> Self {
         match value {
-            0 => RecordType::Unknown,
             1000 => RecordType::Document,
             1001 => RecordType::DocumentAtom,
             1002 => RecordType::EndDocument,
@@ -620,6 +619,7 @@ impl From<u16> for RecordType {
 
 impl RecordType {
     /// Get the u16 value of this record type
+    #[must_use]
     pub fn as_u16(self) -> u16 {
         self as u16
     }

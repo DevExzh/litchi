@@ -1,11 +1,11 @@
-//! Versioned PowerPoint text-formatting extensions.
+//! Versioned `PowerPoint` text-formatting extensions.
 
 use litchi_core::binary::{read_i16_le, read_u16_le, read_u32_le};
 
 use super::package::{Error, Result};
 use super::records::Record;
 
-/// PowerPoint 9 paragraph extensions from `TextPFException9`.
+/// `PowerPoint` 9 paragraph extensions from `TextPFException9`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TextParagraphExtension9 {
     /// Original `PFMasks` value.
@@ -24,6 +24,10 @@ impl TextParagraphExtension9 {
     /// Parse one `TextPFException9` from the start of `data`.
     ///
     /// Returns the decoded extension and the number of bytes consumed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_prefix(data: &[u8]) -> Result<(Self, usize)> {
         require_bytes(data, 0, 4, "TextPFException9 mask")?;
         let mask = read_u32_le(data, 0).unwrap_or(0);
@@ -96,19 +100,21 @@ impl TextParagraphExtension9 {
     }
 
     /// Effective auto-number scheme, applying the MS-PPT default.
+    #[must_use]
     pub fn effective_auto_number_scheme(&self) -> Option<u16> {
         self.auto_numbered?
             .then_some(self.auto_number_scheme.unwrap_or(0x0003))
     }
 
     /// Effective starting number, applying the MS-PPT default.
+    #[must_use]
     pub fn effective_auto_number_start(&self) -> Option<i16> {
         self.auto_numbered?
             .then_some(self.auto_number_start.unwrap_or(1))
     }
 }
 
-/// PowerPoint 9 character extensions from `TextCFException9`.
+/// `PowerPoint` 9 character extensions from `TextCFException9`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TextCharacterExtension9 {
     /// Original `CFMasks` value.
@@ -149,7 +155,7 @@ impl TextCharacterExtension9 {
     }
 }
 
-/// PowerPoint 9 special information from the `StyleTextProp9` SI subset.
+/// `PowerPoint` 9 special information from the `StyleTextProp9` SI subset.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TextSpecialInfoExtension9 {
     /// Original `TextSIException` mask.
@@ -221,7 +227,7 @@ impl TextSpecialInfoExtension9 {
     }
 }
 
-/// Additional formatting for one PowerPoint 9 text-style run group.
+/// Additional formatting for one `PowerPoint` 9 text-style run group.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TextStyleExtension9Run {
     /// Additional paragraph formatting.
@@ -241,17 +247,23 @@ pub struct TextStyleExtension9 {
 
 impl TextStyleExtension9 {
     /// Parse a complete `StyleTextProp9Atom` payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(data: &[u8]) -> Result<Self> {
         let mut offset = 0usize;
         let mut runs = Vec::new();
         while offset < data.len() {
-            let (paragraph, consumed) = TextParagraphExtension9::parse_prefix(&data[offset..])?;
-            offset += consumed;
-            let (character, consumed) = TextCharacterExtension9::parse_prefix(&data[offset..])?;
-            offset += consumed;
-            let (special_info, consumed) =
+            let (paragraph, paragraph_size) =
+                TextParagraphExtension9::parse_prefix(&data[offset..])?;
+            offset += paragraph_size;
+            let (character, character_size) =
+                TextCharacterExtension9::parse_prefix(&data[offset..])?;
+            offset += character_size;
+            let (special_info, special_info_size) =
                 TextSpecialInfoExtension9::parse_prefix(&data[offset..])?;
-            offset += consumed;
+            offset += special_info_size;
             runs.push(TextStyleExtension9Run {
                 paragraph,
                 character,
@@ -318,12 +330,16 @@ impl TextCharacterExtension10 {
 /// Parsed payload of a `StyleTextProp10Atom`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TextStyleExtension10 {
-    /// Character extensions indexed through PowerPoint 9 `pp10runid` values.
+    /// Character extensions indexed through `PowerPoint` 9 `pp10runid` values.
     pub runs: Vec<TextCharacterExtension10>,
 }
 
 impl TextStyleExtension10 {
     /// Parse a complete `StyleTextProp10Atom` payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(data: &[u8]) -> Result<Self> {
         let mut offset = 0usize;
         let mut runs = Vec::new();
@@ -336,7 +352,7 @@ impl TextStyleExtension10 {
     }
 }
 
-/// Smart-tag information from one PowerPoint 11 `StyleTextProp11` run.
+/// Smart-tag information from one `PowerPoint` 11 `StyleTextProp11` run.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TextSpecialInfoExtension11 {
     /// Original `TextSIException` mask.
@@ -360,9 +376,9 @@ impl TextSpecialInfoExtension11 {
         let mut smart_tag_indices = Vec::new();
         if mask & 0x0200 != 0 {
             require_bytes(data, offset, 4, "StyleTextProp11 smart-tag count")?;
-            let count = read_u32_le(data, offset).unwrap_or(0);
+            let declared_count = read_u32_le(data, offset).unwrap_or(0);
             offset += 4;
-            let count = usize::try_from(count).map_err(|_| {
+            let count = usize::try_from(declared_count).map_err(|_err| {
                 Error::Corrupted("StyleTextProp11 smart-tag count overflow".to_string())
             })?;
             let byte_count = count.checked_mul(4).ok_or_else(|| {
@@ -393,12 +409,16 @@ impl TextSpecialInfoExtension11 {
 /// Parsed payload of a `StyleTextProp11Atom`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TextStyleExtension11 {
-    /// Smart-tag runs indexed through PowerPoint 9 SI `pp10runid` values.
+    /// Smart-tag runs indexed through `PowerPoint` 9 SI `pp10runid` values.
     pub runs: Vec<TextSpecialInfoExtension11>,
 }
 
 impl TextStyleExtension11 {
     /// Parse a complete `StyleTextProp11Atom` payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(data: &[u8]) -> Result<Self> {
         let mut offset = 0usize;
         let mut runs = Vec::new();
@@ -411,7 +431,7 @@ impl TextStyleExtension11 {
     }
 }
 
-/// Additional PowerPoint 9 formatting for one master indent level.
+/// Additional `PowerPoint` 9 formatting for one master indent level.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TextMasterStyleExtension9Level {
     /// Additional paragraph formatting.
@@ -431,6 +451,10 @@ pub struct TextMasterStyleExtension9 {
 
 impl TextMasterStyleExtension9 {
     /// Parse a complete `TextMasterStyle9Atom` payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(data: &[u8], text_type: u16) -> Result<Self> {
         validate_text_type(text_type, "TextMasterStyle9Atom")?;
         require_bytes(data, 0, 2, "TextMasterStyle9Atom level count")?;
@@ -443,10 +467,12 @@ impl TextMasterStyleExtension9 {
         let mut offset = 2usize;
         let mut levels = Vec::with_capacity(level_count as usize);
         for _ in 0..level_count {
-            let (paragraph, consumed) = TextParagraphExtension9::parse_prefix(&data[offset..])?;
-            offset += consumed;
-            let (character, consumed) = TextCharacterExtension9::parse_prefix(&data[offset..])?;
-            offset += consumed;
+            let (paragraph, paragraph_size) =
+                TextParagraphExtension9::parse_prefix(&data[offset..])?;
+            offset += paragraph_size;
+            let (character, character_size) =
+                TextCharacterExtension9::parse_prefix(&data[offset..])?;
+            offset += character_size;
             levels.push(TextMasterStyleExtension9Level {
                 paragraph,
                 character,
@@ -472,6 +498,10 @@ pub struct TextMasterStyleExtension10 {
 
 impl TextMasterStyleExtension10 {
     /// Parse a complete `TextMasterStyle10Atom` payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(data: &[u8], text_type: u16) -> Result<Self> {
         validate_text_type(text_type, "TextMasterStyle10Atom")?;
         require_bytes(data, 0, 2, "TextMasterStyle10Atom level count")?;
@@ -500,14 +530,18 @@ impl TextMasterStyleExtension10 {
 /// Parsed payload of a document-level `TextDefaults9Atom`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TextDefaultsExtension9 {
-    /// Default PowerPoint 9 character formatting.
+    /// Default `PowerPoint` 9 character formatting.
     pub character: TextCharacterExtension9,
-    /// Default PowerPoint 9 paragraph formatting.
+    /// Default `PowerPoint` 9 paragraph formatting.
     pub paragraph: TextParagraphExtension9,
 }
 
 impl TextDefaultsExtension9 {
     /// Parse a complete `TextDefaults9Atom` payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(data: &[u8]) -> Result<Self> {
         let (character, consumed) = TextCharacterExtension9::parse_prefix(data)?;
         let (paragraph, paragraph_size) = TextParagraphExtension9::parse_prefix(&data[consumed..])?;
@@ -526,12 +560,16 @@ impl TextDefaultsExtension9 {
 /// Parsed payload of a document-level `TextDefaults10Atom`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TextDefaultsExtension10 {
-    /// Default PowerPoint 10 character formatting.
+    /// Default `PowerPoint` 10 character formatting.
     pub character: TextCharacterExtension10,
 }
 
 impl TextDefaultsExtension10 {
     /// Parse a complete `TextDefaults10Atom` payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(data: &[u8]) -> Result<Self> {
         let (character, consumed) = TextCharacterExtension10::parse_prefix(data)?;
         if consumed != data.len() {
@@ -543,27 +581,21 @@ impl TextDefaultsExtension10 {
     }
 }
 
-fn validate_text_type(text_type: u16, record: &str) -> Result<()> {
-    if matches!(text_type, 0 | 1 | 2 | 4 | 5 | 6 | 7 | 8) {
-        Ok(())
-    } else {
-        Err(Error::Corrupted(format!(
-            "{record} has an invalid TextTypeEnum instance"
-        )))
-    }
-}
-
 /// Versioned text master styles collected from a PPT record tree.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct VersionedTextMasterStyles {
-    /// PowerPoint 9 paragraph and character master extensions.
+    /// `PowerPoint` 9 paragraph and character master extensions.
     pub powerpoint9: Vec<TextMasterStyleExtension9>,
-    /// PowerPoint 10 character master extensions.
+    /// `PowerPoint` 10 character master extensions.
     pub powerpoint10: Vec<TextMasterStyleExtension10>,
 }
 
 impl VersionedTextMasterStyles {
     /// Collect and parse all versioned master-style atoms below `root`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(root: &Record) -> Result<Self> {
         let mut result = Self::default();
         for record in root.versioned_binary_tag_records(9)? {
@@ -593,14 +625,18 @@ impl VersionedTextMasterStyles {
 /// Versioned document-wide text defaults collected from a PPT record tree.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct VersionedTextDefaults {
-    /// PowerPoint 9 default paragraph and character extensions.
+    /// `PowerPoint` 9 default paragraph and character extensions.
     pub powerpoint9: Option<TextDefaultsExtension9>,
-    /// PowerPoint 10 default character extensions.
+    /// `PowerPoint` 10 default character extensions.
     pub powerpoint10: Option<TextDefaultsExtension10>,
 }
 
 impl VersionedTextDefaults {
     /// Collect and parse document-level text-default atoms below `root`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(root: &Record) -> Result<Self> {
         let mut result = Self::default();
         for record in root.versioned_binary_tag_records(9)? {
@@ -634,6 +670,16 @@ impl VersionedTextDefaults {
             }
         }
         Ok(result)
+    }
+}
+
+fn validate_text_type(text_type: u16, record: &str) -> Result<()> {
+    if matches!(text_type, 0 | 1 | 2 | 4 | 5 | 6 | 7 | 8) {
+        Ok(())
+    } else {
+        Err(Error::Corrupted(format!(
+            "{record} has an invalid TextTypeEnum instance"
+        )))
     }
 }
 
@@ -672,6 +718,11 @@ fn require_bytes(data: &[u8], offset: usize, size: usize, field: &str) -> Result
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -679,7 +730,7 @@ mod tests {
         let mut data = Vec::with_capacity(8 + payload.len());
         data.extend_from_slice(&((instance << 4) | version).to_le_bytes());
         data.extend_from_slice(&record_type.to_le_bytes());
-        data.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+        data.extend_from_slice(&u32::try_from(payload.len()).unwrap().to_le_bytes());
         data.extend_from_slice(payload);
         data
     }
@@ -699,7 +750,7 @@ mod tests {
             record_type_raw: 0x1388,
             version: 0x0f,
             instance: 0,
-            data_length: tag.len() as u32,
+            data_length: u32::try_from(tag.len()).unwrap(),
             data: tag,
             children: Vec::new(),
         }
@@ -916,17 +967,20 @@ mod tests {
         defaults9.extend_from_slice(&0u32.to_le_bytes());
         defaults9.extend_from_slice(&0x0200_0000u32.to_le_bytes());
         defaults9.extend_from_slice(&1i16.to_le_bytes());
-        let defaults9 = TextDefaultsExtension9::parse(&defaults9).unwrap();
-        assert_eq!(defaults9.character.mask, 0);
-        assert_eq!(defaults9.paragraph.auto_numbered, Some(true));
+        let parsed_defaults9 = TextDefaultsExtension9::parse(&defaults9).unwrap();
+        assert_eq!(parsed_defaults9.character.mask, 0);
+        assert_eq!(parsed_defaults9.paragraph.auto_numbered, Some(true));
 
         let mut defaults10 = Vec::new();
         defaults10.extend_from_slice(&0x0200_0000u32.to_le_bytes());
         defaults10.extend_from_slice(&37u16.to_le_bytes());
-        let defaults10 = TextDefaultsExtension10::parse(&defaults10).unwrap();
-        assert_eq!(defaults10.character.complex_script_font_ref, Some(37));
+        let parsed_defaults10 = TextDefaultsExtension10::parse(&defaults10).unwrap();
+        assert_eq!(
+            parsed_defaults10.character.complex_script_font_ref,
+            Some(37)
+        );
 
-        let mut trailing = defaults10.character.mask.to_le_bytes().to_vec();
+        let mut trailing = parsed_defaults10.character.mask.to_le_bytes().to_vec();
         trailing.extend_from_slice(&37u16.to_le_bytes());
         trailing.push(0);
         assert!(TextDefaultsExtension10::parse(&trailing).is_err());

@@ -15,10 +15,10 @@ use crate::presentation_properties::metadata::custom_show::List as ShowList;
 use crate::presentation_properties::metadata::sections::List as SectionList;
 use crate::{Error, Result};
 
+const MAX_SOURCE_BYTES: usize = 8 * 1024 * 1024;
+
 /// Stable fingerprint of the exact presentation XML source bytes.
 pub type Revision = u64;
-
-const MAX_SOURCE_BYTES: usize = 8 * 1024 * 1024;
 
 /// One relationship entry captured from the owning presentation part.
 ///
@@ -56,11 +56,19 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Load and validate the presentation structure graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn load(package: &OpcPackage) -> Result<Self> {
         super::package::load_snapshot(package)
     }
 
     /// Alias for [`Self::load`] emphasizing the source-bound result.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn read(package: &OpcPackage) -> Result<Self> {
         Self::load(package)
     }
@@ -88,60 +96,70 @@ impl Snapshot {
 
     /// Borrow the complete validated presentation graph.
     #[inline]
+    #[must_use]
     pub fn graph(&self) -> &Graph {
         &self.graph
     }
 
     /// Contextual alias for [`Self::graph`].
     #[inline]
+    #[must_use]
     pub fn structure(&self) -> &Graph {
         self.graph()
     }
 
     /// Borrow the resolved, ordered presentation slide references.
     #[inline]
+    #[must_use]
     pub fn slides(&self) -> &[Reference] {
         &self.graph.slides
     }
 
     /// Borrow the typed custom-show catalog.
     #[inline]
+    #[must_use]
     pub fn custom_shows(&self) -> &ShowList {
         &self.graph.custom_shows
     }
 
     /// Borrow the typed section catalog.
     #[inline]
+    #[must_use]
     pub fn sections(&self) -> &SectionList {
         &self.graph.sections
     }
 
-    /// Return the owning PresentationML part name.
+    /// Return the owning `PresentationML` part name.
     #[inline]
+    #[must_use]
     pub fn presentation_part_name(&self) -> &str {
         &self.presentation_part_name
     }
 
-    /// Return the source PresentationML content type.
+    /// Return the source `PresentationML` content type.
     #[inline]
+    #[must_use]
     pub fn presentation_content_type(&self) -> &str {
         &self.presentation_content_type
     }
 
     /// Return the source fingerprint used for stale-source checks.
     #[inline]
+    #[must_use]
     pub const fn revision(&self) -> Revision {
         self.revision
     }
 
     /// Borrow the exact presentation XML captured by this snapshot.
     #[inline]
+    #[must_use]
     pub fn source_xml(&self) -> &[u8] {
         self.source_xml.as_slice()
     }
 
     /// Start an atomic detached edit over custom shows and sections.
     #[inline]
+    #[must_use]
     pub fn edit(&self) -> Transaction {
         Transaction {
             original: self.clone(),
@@ -182,41 +200,51 @@ pub struct Transaction {
 impl Transaction {
     /// Immutable source snapshot used for conflict checks and inverse patches.
     #[inline]
+    #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.original
     }
 
     /// Borrow the currently staged graph.
     #[inline]
+    #[must_use]
     pub fn graph(&self) -> &Graph {
         &self.working
     }
 
     /// Contextual alias for [`Self::graph`].
     #[inline]
+    #[must_use]
     pub fn snapshot(&self) -> &Graph {
         self.graph()
     }
 
     /// Borrow the staged custom-show catalog.
     #[inline]
+    #[must_use]
     pub fn custom_shows(&self) -> &ShowList {
         &self.working.custom_shows
     }
 
     /// Borrow the staged section catalog.
     #[inline]
+    #[must_use]
     pub fn sections(&self) -> &SectionList {
         &self.working.sections
     }
 
     /// Whether the staged semantic graph differs from the captured source.
     #[inline]
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         !codec::equivalent_graph(&self.original.graph, &self.working)
     }
 
     /// Replace the complete typed graph, retaining the source slide topology.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace(&mut self, value: Graph) -> Result<bool> {
         self.validate(&value)?;
         if codec::equivalent_graph(&self.working, &value) {
@@ -227,6 +255,10 @@ impl Transaction {
     }
 
     /// Apply a checked mutation to a cloned graph without partial staging.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn edit(&mut self, edit: impl FnOnce(&mut Graph) -> Result<()>) -> Result<()> {
         let mut candidate = self.working.clone();
         edit(&mut candidate)?;
@@ -236,6 +268,10 @@ impl Transaction {
     }
 
     /// Apply a checked mutation to only the custom-show catalog.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn edit_custom_shows(
         &mut self,
         edit: impl FnOnce(&mut ShowList) -> Result<()>,
@@ -244,6 +280,10 @@ impl Transaction {
     }
 
     /// Apply a checked mutation to only the section catalog.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn edit_sections(
         &mut self,
         edit: impl FnOnce(&mut SectionList) -> Result<()>,
@@ -252,6 +292,10 @@ impl Transaction {
     }
 
     /// Replace the complete custom-show catalog after graph validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_custom_shows(&mut self, value: ShowList) -> Result<bool> {
         let before = self.working.clone();
         self.edit_custom_shows(|shows| {
@@ -262,6 +306,10 @@ impl Transaction {
     }
 
     /// Replace the complete section catalog after graph validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_sections(&mut self, value: SectionList) -> Result<bool> {
         let before = self.working.clone();
         self.edit_sections(|sections| {
@@ -272,6 +320,10 @@ impl Transaction {
     }
 
     /// Validate and consume the edit into a source-checked commit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn commit(self) -> Result<Commit> {
         if !self.is_changed() {
             let patch = Patch::new(self.original.clone(), self.original.clone());
@@ -324,34 +376,40 @@ pub struct Commit {
 impl Commit {
     /// Whether publication changes the exact presentation XML bytes.
     #[inline]
+    #[must_use]
     pub const fn changed(&self) -> bool {
         self.changed
     }
 
     /// Alias for [`Self::changed`].
     #[inline]
+    #[must_use]
     pub const fn is_changed(&self) -> bool {
         self.changed
     }
 
     /// Borrow the projected post-edit snapshot.
     #[inline]
+    #[must_use]
     pub fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrow the reversible source-checked patch.
     #[inline]
+    #[must_use]
     pub fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Consume the commit into its snapshot and patch.
+    #[must_use]
     pub fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
 
     /// Consume the commit into its patch.
+    #[must_use]
     pub fn into_patch(self) -> Patch {
         self.patch
     }
@@ -371,36 +429,42 @@ impl Patch {
 
     /// Source context required before publication.
     #[inline]
+    #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Source context produced by publication.
     #[inline]
+    #[must_use]
     pub fn after(&self) -> &Snapshot {
         &self.after
     }
 
     /// Whether this patch is an exact source no-op.
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
     /// Alias for [`Self::is_empty`].
     #[inline]
+    #[must_use]
     pub fn is_noop(&self) -> bool {
         self.is_empty()
     }
 
     /// Whether this patch changes the presentation source.
     #[inline]
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         !self.is_empty()
     }
 
     /// Return the exact inverse patch without reinterpreting XML.
     #[inline]
+    #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
@@ -410,21 +474,26 @@ impl Patch {
 
     /// Return the source fingerprint required for publication.
     #[inline]
+    #[must_use]
     pub const fn expected_revision(&self) -> Revision {
         self.before.revision
     }
 
     /// Apply this patch atomically after checking the source and relationship topology.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn apply(&self, target: &mut OpcPackage) -> Result<Snapshot> {
         super::package::apply_patch(target, self)
     }
 }
 
 fn fingerprint(bytes: &[u8]) -> Revision {
-    let mut hash = 0xcbf29ce484222325u64;
+    let mut hash = 0xcbf2_9ce4_8422_2325u64;
     for byte in bytes {
         hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(0x100000001b3);
+        hash = hash.wrapping_mul(0x100_0000_01b3);
     }
     hash
 }

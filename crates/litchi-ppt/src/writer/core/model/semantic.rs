@@ -17,6 +17,7 @@ use crate::header_footer::{
     HeaderFooter, HeaderFooterParent, HeaderFooterParentOrdinal, HeaderFooterScope,
 };
 use crate::modify_password::{ModifyPassword, validate_value as validate_modify_password};
+use crate::transition::TransitionInfo;
 use crate::writer::blip::{Id as PictureId, Kind as PictureKind};
 use crate::writer::chart::Chart;
 use crate::writer::comments::SlideComment;
@@ -36,13 +37,15 @@ use zeroize::Zeroizing;
 
 impl Writer {
     /// Create a new PPT writer with standard 4:3 slide dimensions
+    #[must_use]
     pub fn new() -> Self {
-        Self::with_dimensions(9144000, 6858000) // 10" x 7.5" in EMUs
+        Self::with_dimensions(9_144_000, 6_858_000) // 10" x 7.5" in EMUs
     }
 
     /// Create a new PPT writer with widescreen 16:9 dimensions
+    #[must_use]
     pub fn new_widescreen() -> Self {
-        Self::with_dimensions(9144000, 5143500) // 10" x 5.625" in EMUs
+        Self::with_dimensions(9_144_000, 5_143_500) // 10" x 5.625" in EMUs
     }
 
     /// Create a new PPT writer with custom dimensions
@@ -51,6 +54,7 @@ impl Writer {
     ///
     /// * `width` - Slide width in EMUs (914400 EMUs = 1 inch)
     /// * `height` - Slide height in EMUs
+    #[must_use]
     pub fn with_dimensions(width: i32, height: i32) -> Self {
         Self {
             slides: Vec::new(),
@@ -76,18 +80,26 @@ impl Writer {
         }
     }
 
-    /// Protect the generated presentation with CryptoAPI password-to-open encryption.
+    /// Protect the generated presentation with `CryptoAPI` password-to-open encryption.
     ///
     /// Validation is atomic: invalid input leaves any previous setting unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     #[cfg(feature = "encryption")]
     pub fn set_password(
         &mut self,
         password: impl Into<String>,
         profile: EncryptionProfile,
     ) -> Result<(), WriteError> {
-        let password = Zeroizing::new(password.into());
-        validate_writer_password(profile, password.as_str()).map_err(WriteError::InvalidData)?;
-        self.encryption = Some(WriterEncryption { profile, password });
+        let protected_password = Zeroizing::new(password.into());
+        validate_writer_password(profile, protected_password.as_str())
+            .map_err(WriteError::InvalidData)?;
+        self.encryption = Some(WriterEncryption {
+            profile,
+            password: protected_password,
+        });
         Ok(())
     }
 
@@ -99,11 +111,16 @@ impl Writer {
 
     /// Return the configured encryption profile without exposing the password.
     #[cfg(feature = "encryption")]
+    #[must_use]
     pub fn encryption_profile(&self) -> Option<EncryptionProfile> {
         self.encryption.as_ref().map(|value| value.profile)
     }
 
     /// Configure a complete inert VBA project with safe limits and zlib storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     #[cfg(feature = "vba-inspection")]
     pub fn set_vba(&mut self, project: litchi_vba::build::Project) -> Result<(), WriteError> {
         self.set_vba_with(
@@ -117,6 +134,10 @@ impl Writer {
     ///
     /// The inner CFB and optional outer zlib stream are fully serialized before
     /// writer state changes. Module source is never compiled or executed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     #[cfg(feature = "vba-inspection")]
     pub fn set_vba_with(
         &mut self,
@@ -129,6 +150,10 @@ impl Writer {
     }
 
     /// Configure an already validated inert VBA project using zlib storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     #[cfg(feature = "vba-inspection")]
     pub fn put_vba(&mut self, payload: litchi_vba::Payload) -> Result<(), WriteError> {
         self.put_vba_with(payload, crate::VbaProjectCompression::Zlib)
@@ -137,6 +162,10 @@ impl Writer {
     /// Configure an already validated inert VBA project with explicit storage.
     ///
     /// Import standalone CFB bytes through [`litchi_vba::Payload::read`] first.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     #[cfg(feature = "vba-inspection")]
     pub fn put_vba_with(
         &mut self,
@@ -155,7 +184,7 @@ impl Writer {
                 .map_err(|error| WriteError::InvalidData(error.to_string()))?
             },
             crate::VbaProjectCompression::Zlib => {
-                let uncompressed_len = u32::try_from(cfb.len()).map_err(|_| {
+                let uncompressed_len = u32::try_from(cfb.len()).map_err(|_err| {
                     WriteError::InvalidData(
                         "PowerPoint VBA project CFB exceeds the 32-bit size limit".to_string(),
                     )
@@ -187,20 +216,27 @@ impl Writer {
 
     /// Whether a complete VBA project is configured for output.
     #[cfg(feature = "vba-inspection")]
+    #[must_use]
     pub fn has_vba(&self) -> bool {
         self.vba_project.is_some()
     }
 
-    /// Set the inert password required by PowerPoint to modify the presentation.
+    /// Set the inert password required by `PowerPoint` to modify the presentation.
     ///
     /// The secret is stored in zeroizing memory. Password-to-open encryption
     /// must also be configured before the presentation can be written.
     /// Validation is atomic and does not replace an existing valid value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_modify_password(&mut self, password: impl Into<String>) -> Result<(), WriteError> {
-        let password = Zeroizing::new(password.into());
-        validate_modify_password(password.as_str())
+        let protected_password = Zeroizing::new(password.into());
+        validate_modify_password(protected_password.as_str())
             .map_err(|error| WriteError::InvalidData(error.to_string()))?;
-        self.modify_password = Some(WriterModifyPassword { password });
+        self.modify_password = Some(WriterModifyPassword {
+            password: protected_password,
+        });
         Ok(())
     }
 
@@ -209,16 +245,20 @@ impl Writer {
         self.modify_password = None;
     }
 
-    /// Add a document-wide PowerPoint 11 smart tag and return its zero-based index.
+    /// Add a document-wide `PowerPoint` 11 smart tag and return its zero-based index.
     ///
     /// The returned index can be attached to one or more rich-text runs with
     /// [`crate::writer::text_format::TextRun::with_smart_tag`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add_smart_tag(
         &mut self,
         definition: SmartTagDefinition,
     ) -> Result<SmartTagIndex, WriteError> {
         crate::writer::smart_tags::validate_definition(&definition)?;
-        let index = u32::try_from(self.smart_tags.len()).map_err(|_| {
+        let index = u32::try_from(self.smart_tags.len()).map_err(|_err| {
             WriteError::InvalidData("PowerPoint smart-tag count exceeds u32".to_string())
         })?;
         self.smart_tags.push(definition);
@@ -226,16 +266,17 @@ impl Writer {
     }
 
     /// Return the number of document-wide smart tags.
+    #[must_use]
     pub fn smart_tag_count(&self) -> usize {
         self.smart_tags.len()
     }
 
     /// Return the configured value through the redacted typed password model.
+    #[must_use]
     pub fn modify_password(&self) -> Option<ModifyPassword> {
-        self.modify_password.as_ref().map(|value| {
-            ModifyPassword::new(value.password.as_str())
-                .expect("stored modify password was validated before assignment")
-        })
+        self.modify_password
+            .as_ref()
+            .and_then(|value| ModifyPassword::new(value.password.as_str()).ok())
     }
 }
 
@@ -245,6 +286,10 @@ impl Writer {
     /// # Returns
     ///
     /// * `Result<usize, WriteError>` - Slide index or error
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add_slide(&mut self) -> Result<usize, WriteError> {
         let index = self.slides.len();
         self.slides.push(WritableSlide {
@@ -255,6 +300,7 @@ impl Writer {
             notes_page: None,
             comments: Vec::new(),
             timing: None,
+            transition: None,
             header_footer: None,
         });
         Ok(index)
@@ -265,11 +311,14 @@ impl Writer {
     /// # Arguments
     ///
     /// * `index` - Slide index (0-based)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn delete_slide(&mut self, index: usize) -> Result<(), WriteError> {
         if index >= self.slides.len() {
             return Err(WriteError::InvalidData(format!(
-                "Slide {} does not exist",
-                index
+                "Slide {index} does not exist"
             )));
         }
         self.slides.remove(index);
@@ -283,6 +332,10 @@ impl Writer {
     ///
     /// * `from_index` - Current slide index
     /// * `to_index` - New slide index
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn move_slide(&mut self, from_index: usize, to_index: usize) -> Result<(), WriteError> {
         if from_index >= self.slides.len() || to_index >= self.slides.len() {
             return Err(WriteError::InvalidData("Invalid slide index".to_string()));
@@ -319,12 +372,17 @@ impl Writer {
 
 impl Writer {
     /// Set presentation-wide header/footer defaults for ordinary slides.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_presentation_header_footer(
         &mut self,
         value: HeaderFooter,
     ) -> Result<(), WriteError> {
-        let value = Self::validated_header_footer(value, HeaderFooterScope::PresentationSlides)?;
-        self.presentation_header_footer = Some(value);
+        let validated =
+            Self::validated_header_footer(value, HeaderFooterScope::PresentationSlides)?;
+        self.presentation_header_footer = Some(validated);
         Ok(())
     }
 
@@ -334,17 +392,22 @@ impl Writer {
     }
 
     /// Return presentation-wide header/footer defaults for ordinary slides.
+    #[must_use]
     pub fn presentation_header_footer(&self) -> Option<&HeaderFooter> {
         self.presentation_header_footer.as_ref()
     }
 
     /// Set presentation-wide header/footer defaults for notes pages and handouts.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_notes_and_handouts_header_footer(
         &mut self,
         value: HeaderFooter,
     ) -> Result<(), WriteError> {
-        let value = Self::validated_header_footer(value, HeaderFooterScope::NotesAndHandouts)?;
-        self.notes_and_handouts_header_footer = Some(value);
+        let validated = Self::validated_header_footer(value, HeaderFooterScope::NotesAndHandouts)?;
+        self.notes_and_handouts_header_footer = Some(validated);
         Ok(())
     }
 
@@ -354,20 +417,25 @@ impl Writer {
     }
 
     /// Return presentation-wide header/footer defaults for notes pages and handouts.
+    #[must_use]
     pub fn notes_and_handouts_header_footer(&self) -> Option<&HeaderFooter> {
         self.notes_and_handouts_header_footer.as_ref()
     }
 
     /// Set the header/footer defaults attached directly to the main master.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_main_master_header_footer(&mut self, value: HeaderFooter) -> Result<(), WriteError> {
-        let value = Self::validated_header_footer(
+        let validated = Self::validated_header_footer(
             value,
             HeaderFooterScope::Local {
                 parent: HeaderFooterParent::MainMaster,
                 parent_ordinal: HeaderFooterParentOrdinal::new(0),
             },
         )?;
-        self.main_master_header_footer = Some(value);
+        self.main_master_header_footer = Some(validated);
         Ok(())
     }
 
@@ -377,11 +445,16 @@ impl Writer {
     }
 
     /// Return the header/footer defaults attached directly to the main master.
+    #[must_use]
     pub fn main_master_header_footer(&self) -> Option<&HeaderFooter> {
         self.main_master_header_footer.as_ref()
     }
 
     /// Set a header/footer override attached directly to one slide.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_slide_header_footer(
         &mut self,
         slide: usize,
@@ -389,37 +462,44 @@ impl Writer {
     ) -> Result<(), WriteError> {
         if slide >= self.slides.len() {
             return Err(WriteError::InvalidData(format!(
-                "Slide {} does not exist",
-                slide
+                "Slide {slide} does not exist"
             )));
         }
-        let value = Self::validated_header_footer(
+        let validated = Self::validated_header_footer(
             value,
             HeaderFooterScope::Local {
                 parent: HeaderFooterParent::Slide,
                 parent_ordinal: HeaderFooterParentOrdinal::new(slide),
             },
         )?;
-        self.slides[slide].header_footer = Some(value);
+        self.slides[slide].header_footer = Some(validated);
         Ok(())
     }
 
     /// Remove a header/footer override attached directly to one slide.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn clear_slide_header_footer(&mut self, slide: usize) -> Result<(), WriteError> {
-        let slide = self
+        let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
-        slide.header_footer = None;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
+        slide_data.header_footer = None;
         Ok(())
     }
 
     /// Return the header/footer override attached directly to one slide.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn slide_header_footer(&self, slide: usize) -> Result<Option<&HeaderFooter>, WriteError> {
         self.slides
             .get(slide)
-            .map(|slide| slide.header_footer.as_ref())
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))
+            .map(|slide_data| slide_data.header_footer.as_ref())
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))
     }
 
     /// Add a text box to a slide
@@ -432,6 +512,10 @@ impl Writer {
     /// * `width` - Width (in points)
     /// * `height` - Height (in points)
     /// * `text` - Text content
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add_textbox(
         &mut self,
         slide: usize,
@@ -444,7 +528,7 @@ impl Writer {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
 
         let shape = WritableShape {
             properties: ShapeProperties {
@@ -474,6 +558,10 @@ impl Writer {
     /// * `width` - Width (in points)
     /// * `height` - Height (in points)
     /// * `paragraphs` - Rich text paragraphs with formatting
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add_rich_textbox(
         &mut self,
         slide: usize,
@@ -486,7 +574,7 @@ impl Writer {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
 
         let shape = WritableShape {
             properties: ShapeProperties {
@@ -517,6 +605,10 @@ impl Writer {
     /// * `y` - Y position (in points)
     /// * `width` - Width (in points)
     /// * `height` - Height (in points)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add_rectangle(
         &mut self,
         slide: usize,
@@ -529,6 +621,10 @@ impl Writer {
     }
 
     /// Add an ellipse (oval) shape to a slide
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add_ellipse(
         &mut self,
         slide: usize,
@@ -544,7 +640,14 @@ impl Writer {
     ///
     /// The anchor is specified in points. Geometry vertices and segment words
     /// use the internal coordinate space declared by `geometry`.
-    #[allow(clippy::too_many_arguments)]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "parameters mirror the shape's distinct placement and style properties"
+    )]
     pub fn add_freeform(
         &mut self,
         slide: usize,
@@ -558,7 +661,14 @@ impl Writer {
     }
 
     /// Add a styled custom/freeform shape to a slide.
-    #[allow(clippy::too_many_arguments)]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "parameters mirror the shape's distinct placement and style properties"
+    )]
     pub fn add_styled_freeform(
         &mut self,
         slide: usize,
@@ -573,7 +683,7 @@ impl Writer {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
 
         slide_data.shapes.push(WritableShape {
             properties: ShapeProperties {
@@ -600,6 +710,10 @@ impl Writer {
     /// * `slide` - Slide index
     /// * `x1`, `y1` - Start point (in points)
     /// * `x2`, `y2` - End point (in points)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add_line(
         &mut self,
         slide: usize,
@@ -611,7 +725,7 @@ impl Writer {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
 
         let x = x1.min(x2);
         let y = y1.min(y2);
@@ -645,6 +759,10 @@ impl Writer {
     /// * `slide` - Slide index
     /// * `x1`, `y1` - Start point (in points)
     /// * `x2`, `y2` - End point (arrow head location, in points)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add_arrow_line(
         &mut self,
         slide: usize,
@@ -656,7 +774,7 @@ impl Writer {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
 
         let x = x1.min(x2);
         let y = y1.min(y2);
@@ -699,7 +817,7 @@ impl Writer {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
 
         let shape = WritableShape {
             properties: ShapeProperties {
@@ -726,7 +844,14 @@ impl Writer {
     /// * `x`, `y` - Position (in points)
     /// * `width`, `height` - Size (in points)
     /// * `style` - Visual style (fill, line, shadow)
-    #[allow(clippy::too_many_arguments)]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "parameters mirror the shape's distinct placement and style properties"
+    )]
     pub fn add_styled_shape(
         &mut self,
         slide: usize,
@@ -745,7 +870,7 @@ impl Writer {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
 
         let shape = WritableShape {
             properties: ShapeProperties {
@@ -768,7 +893,7 @@ impl Writer {
 
     /// Add a table to a slide
     ///
-    /// The table is emitted as an OfficeArt table group (group shape with
+    /// The table is emitted as an `OfficeArt` table group (group shape with
     /// one rectangle cell shape per grid position), readable through the
     /// table extraction APIs after save/reopen.
     ///
@@ -777,6 +902,10 @@ impl Writer {
     /// * `slide` - Slide index
     /// * `x`, `y` - Position of the table's top-left corner (in points)
     /// * `table` - Table grid, cell texts, and dimensions (see [`Table`])
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add_table(
         &mut self,
         slide: usize,
@@ -787,7 +916,7 @@ impl Writer {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
 
         slide_data.tables.push(PositionedTable {
             x: pt_to_emu_i32(x),
@@ -811,6 +940,14 @@ impl Writer {
     /// * `x`, `y` - Position (in points)
     /// * `width`, `height` - Size (in points)
     /// * `chart` - The chart definition (kind, title, categories, series)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "callers pass an owned chart definition, which binary chart authoring will consume once implemented"
+    )]
     pub fn add_chart(
         &mut self,
         slide: usize,
@@ -825,18 +962,18 @@ impl Writer {
                 "chart frame dimensions must be positive".to_string(),
             ));
         }
-        let x = pt_to_emu_i32(x);
-        let y = pt_to_emu_i32(y);
-        let width = pt_to_emu_i32(width);
-        let height = pt_to_emu_i32(height);
-        x.checked_add(width).ok_or_else(|| {
+        let x_emu = pt_to_emu_i32(x);
+        let y_emu = pt_to_emu_i32(y);
+        let width_emu = pt_to_emu_i32(width);
+        let height_emu = pt_to_emu_i32(height);
+        x_emu.checked_add(width_emu).ok_or_else(|| {
             WriteError::InvalidData("chart frame horizontal extent is too large".to_string())
         })?;
-        y.checked_add(height).ok_or_else(|| {
+        y_emu.checked_add(height_emu).ok_or_else(|| {
             WriteError::InvalidData("chart frame vertical extent is too large".to_string())
         })?;
         chart.validate()?;
-        let total: usize = self.slides.iter().map(|slide| slide.charts.len()).sum();
+        let total: usize = self.slides.iter().map(|entry| entry.charts.len()).sum();
         if total >= crate::writer::chart::MAX_CHART_OBJECTS {
             return Err(WriteError::InvalidData(format!(
                 "presentation exceeds {} chart objects",
@@ -845,7 +982,7 @@ impl Writer {
         }
         self.slides
             .get(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
         Err(litchi_ograph::Error::UnsupportedAuthoring {
             reason: "PPT chart creation requires the complete Office-compatible BIFF chart grammar",
         }
@@ -862,6 +999,10 @@ impl Writer {
     /// * `x`, `y` - Position (in points)
     /// * `width`, `height` - Size (in points)
     /// * `image_data` - Raw image bytes (JPEG, PNG, etc.)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add_picture(
         &mut self,
         slide: usize,
@@ -873,8 +1014,7 @@ impl Writer {
     ) -> Result<(), WriteError> {
         if slide >= self.slides.len() {
             return Err(WriteError::InvalidData(format!(
-                "Slide {} does not exist",
-                slide
+                "Slide {slide} does not exist"
             )));
         }
         // Add picture to BLIP store
@@ -883,7 +1023,7 @@ impl Writer {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
 
         let shape = WritableShape {
             properties: ShapeProperties {
@@ -904,7 +1044,14 @@ impl Writer {
     }
 
     /// Add a picture with explicit type
-    #[allow(clippy::too_many_arguments)]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "parameters mirror the shape's distinct placement and style properties"
+    )]
     pub fn add_picture_as(
         &mut self,
         slide: usize,
@@ -917,8 +1064,7 @@ impl Writer {
     ) -> Result<(), WriteError> {
         if slide >= self.slides.len() {
             return Err(WriteError::InvalidData(format!(
-                "Slide {} does not exist",
-                slide
+                "Slide {slide} does not exist"
             )));
         }
         let blip_id = self.add_picture_data_as(image_data, kind)?;
@@ -926,7 +1072,7 @@ impl Writer {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
 
         let shape = WritableShape {
             properties: ShapeProperties {
@@ -950,11 +1096,19 @@ impl Writer {
     ///
     /// Use the returned index with [`FillStyle::picture`] to create a picture
     /// or texture fill without adding a picture-frame shape.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add_picture_data(&mut self, image_data: Vec<u8>) -> Result<PictureId, WriteError> {
         self.blip_store.add(image_data).map_err(WriteError::Io)
     }
 
     /// Register explicitly typed picture data and return its checked ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add_picture_data_as(
         &mut self,
         image_data: Vec<u8>,
@@ -976,6 +1130,10 @@ impl Writer {
 
 impl Writer {
     /// Set the rotation of the last shape on a slide, in degrees.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_last_shape_rotation(
         &mut self,
         slide: usize,
@@ -989,7 +1147,7 @@ impl Writer {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
         let shape = slide_data
             .shapes
             .last_mut()
@@ -998,7 +1156,11 @@ impl Writer {
         Ok(())
     }
 
-    /// Set one of the ten OfficeArt adjustment values on the last shape.
+    /// Set one of the ten `OfficeArt` adjustment values on the last shape.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_last_shape_adjustment(
         &mut self,
         slide: usize,
@@ -1013,7 +1175,7 @@ impl Writer {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
         let shape = slide_data
             .shapes
             .last_mut()
@@ -1026,6 +1188,10 @@ impl Writer {
     }
 
     /// Set horizontal alignment for all text in the last shape on a slide.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_last_shape_text_alignment(
         &mut self,
         slide: usize,
@@ -1034,7 +1200,7 @@ impl Writer {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
         let shape = slide_data
             .shapes
             .last_mut()
@@ -1046,9 +1212,9 @@ impl Writer {
         }
         shape.properties.alignment = alignment;
         if let Some(paragraphs) = &mut shape.properties.paragraphs {
-            let alignment = TextAlign::from(alignment);
+            let text_align = TextAlign::from(alignment);
             for paragraph in paragraphs {
-                paragraph.alignment = alignment;
+                paragraph.alignment = text_align;
             }
         }
         Ok(())
@@ -1064,6 +1230,10 @@ impl Writer {
     }
 
     /// Atomically add a legacy writer font to the base collection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add_font_checked(&mut self, font: FontEntity) -> Result<u16, WriteError> {
         self.add_font_model(FontScope::Base, font.into())
     }
@@ -1073,6 +1243,10 @@ impl Writer {
     /// The collection is serialized before publication, enforcing the 129-font
     /// limit, exact UTF-16 face-name rules, reserved authoring bits, facet order,
     /// and aggregate embedded-font limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add_font_model(&mut self, scope: FontScope, font: Font) -> Result<u16, WriteError> {
         let mut candidate = self
             .fonts
@@ -1098,6 +1272,10 @@ impl Writer {
     }
 
     /// Atomically add or replace one inert EOT facet.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_embedded_font(
         &mut self,
         scope: FontScope,
@@ -1121,11 +1299,15 @@ impl Writer {
         Ok(replaced)
     }
 
-    /// Prepare and atomically publish one inert PowerPoint EOT font facet.
+    /// Prepare and atomically publish one inert `PowerPoint` EOT font facet.
     ///
     /// The facet is derived from `font.style`. This validates the actual
     /// OpenType `OS/2.fsType`, enforces the explicit document intent and EOT
     /// bounds, and never installs, loads, renders, or executes the font.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     #[cfg(feature = "fonts")]
     pub fn set_prepared_font(
         &mut self,
@@ -1147,6 +1329,10 @@ impl Writer {
 
     /// Prepare and atomically publish an inert EOT facet under explicit PPT
     /// record and aggregate-font limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     #[cfg(feature = "fonts")]
     pub fn set_prepared_font_with_limits(
         &mut self,
@@ -1186,14 +1372,14 @@ impl Writer {
             |error| WriteError::InvalidData(format!("font preparation failed: {error}")),
         )?;
         let replaced = crate::font::prepared::stage_facet(&mut collection, index, facet, data);
-        let current = collection
-            .get_mut(index)
-            .expect("font ordinal was checked before EOT encoding");
-        current.embedded_subset = subsetted;
+        let staged = collection.get_mut(index).ok_or_else(|| {
+            WriteError::InvalidData(format!("unknown PowerPoint font ordinal {index}"))
+        })?;
+        staged.embedded_subset = subsetted;
         if subsetted {
-            current.font_flags |= 1;
+            staged.font_flags |= 1;
         } else {
-            current.font_flags &= !1;
+            staged.font_flags &= !1;
         }
         let mut candidate = self.fonts.clone();
         match scope {
@@ -1215,10 +1401,12 @@ impl Writer {
             }
             return Err(WriteError::InvalidData(error.to_string()));
         }
-        let serialized = candidate
-            .collection(scope)
-            .expect("staged collection remains available")
-            .to_record_bytes_with_limits(ppt_limits);
+        let Some(staged_collection) = candidate.collection(scope) else {
+            return Err(WriteError::InvalidData(
+                "staged font collection is missing after publication".to_string(),
+            ));
+        };
+        let serialized = staged_collection.to_record_bytes_with_limits(ppt_limits);
         if let Err(error) = serialized {
             if let Err(restore) = crate::font::prepared::restore_staged(
                 font,
@@ -1238,7 +1426,11 @@ impl Writer {
         Ok(replaced)
     }
 
-    /// Set or clear the PowerPoint 10 document-wide embedding flags.
+    /// Set or clear the `PowerPoint` 10 document-wide embedding flags.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_font_embedding_flags(
         &mut self,
         flags: Option<FontEmbeddingFlags>,
@@ -1253,6 +1445,7 @@ impl Writer {
     }
 
     /// Return the complete inert font catalog configured for fresh output.
+    #[must_use]
     pub const fn font_collections(&self) -> &FontCollections {
         &self.fonts
     }
@@ -1263,11 +1456,15 @@ impl Writer {
     ///
     /// * `slide` - Slide index
     /// * `notes` - Notes text
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_slide_notes(&mut self, slide: usize, notes: &str) -> Result<(), WriteError> {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
 
         slide_data.notes = Some(notes.to_string());
         Ok(())
@@ -1279,6 +1476,10 @@ impl Writer {
     ///
     /// * `slide` - Slide index
     /// * `notes_page` - Full notes page with formatting
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_notes_page(
         &mut self,
         slide: usize,
@@ -1287,7 +1488,7 @@ impl Writer {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
 
         slide_data.notes_page = Some(notes_page);
         Ok(())
@@ -1300,6 +1501,10 @@ impl Writer {
     /// * `slide` - Slide index
     /// * `shape_index` - Shape index on the slide (0-based)
     /// * `animation` - Animation info to attach to the shape
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_shape_animation(
         &mut self,
         slide: usize,
@@ -1309,12 +1514,11 @@ impl Writer {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
 
         let shape = slide_data.shapes.get_mut(shape_index).ok_or_else(|| {
             WriteError::InvalidData(format!(
-                "Shape {} does not exist on slide {}",
-                shape_index, slide
+                "Shape {shape_index} does not exist on slide {slide}"
             ))
         })?;
 
@@ -1323,21 +1527,24 @@ impl Writer {
     }
 
     /// Get number of pictures in the presentation
+    #[must_use]
     pub fn picture_count(&self) -> usize {
         self.blip_store.len()
     }
 
     /// Get number of hyperlinks in the presentation
+    #[must_use]
     pub fn hyperlink_count(&self) -> usize {
         self.hyperlinks.len()
     }
 
     /// Get number of fonts in the presentation
+    #[must_use]
     pub fn font_count(&self) -> usize {
         self.fonts.base_font_count()
     }
 
-    /// Get the number of PowerPoint 10 international fonts.
+    /// Get the number of `PowerPoint` 10 international fonts.
     pub fn international_font_count(&self) -> usize {
         self.fonts
             .international
@@ -1349,6 +1556,10 @@ impl Writer {
     ///
     /// Validation is atomic. The returned non-zero writer-local ID can be
     /// passed to [`crate::Interaction::with_sound_reference`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add_embedded_sound(
         &mut self,
         name: impl Into<String>,
@@ -1365,8 +1576,11 @@ impl Writer {
             .next_sound_resource_id
             .checked_add(1)
             .ok_or_else(|| WriteError::InvalidData("sound resource ID overflow".to_string()))?;
-        let id = std::num::NonZeroU32::new(self.next_sound_resource_id)
-            .expect("writer sound IDs start above zero");
+        let Some(id) = std::num::NonZeroU32::new(self.next_sound_resource_id) else {
+            return Err(WriteError::InvalidData(
+                "sound resource ID must be non-zero".to_string(),
+            ));
+        };
         let sound_type = crate::animation::SoundType::Embedded {
             name: name.into(),
             data,
@@ -1384,6 +1598,10 @@ impl Writer {
     }
 
     /// Atomically replace one explicitly registered embedded sound.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace_embedded_sound(
         &mut self,
         id: std::num::NonZeroU32,
@@ -1392,8 +1610,7 @@ impl Writer {
     ) -> Result<(), WriteError> {
         if !self.sound_resources.contains_key(&id.get()) {
             return Err(WriteError::InvalidData(format!(
-                "sound resource {} does not exist",
-                id
+                "sound resource {id} does not exist"
             )));
         }
         let sound_type = crate::animation::SoundType::Embedded {
@@ -1419,6 +1636,7 @@ impl Writer {
     }
 
     /// Number of explicitly registered embedded sound resources.
+    #[must_use]
     pub fn embedded_sound_count(&self) -> usize {
         self.sound_resources.len()
     }
@@ -1429,11 +1647,15 @@ impl Writer {
     ///
     /// * `slide` - Slide index (0-based)
     /// * `comment` - The comment to add
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add_comment(&mut self, slide: usize, comment: SlideComment) -> Result<(), WriteError> {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
         slide_data.comments.push(comment);
         Ok(())
     }
@@ -1444,6 +1666,10 @@ impl Writer {
     ///
     /// * `slide` - Slide index (0-based)
     /// * `timing` - Timing configuration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_slide_timing(
         &mut self,
         slide: usize,
@@ -1452,8 +1678,46 @@ impl Writer {
         let slide_data = self
             .slides
             .get_mut(slide)
-            .ok_or_else(|| WriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
         slide_data.timing = Some(timing);
+        Ok(())
+    }
+
+    /// Set the slide transition effect.
+    ///
+    /// The transition owns the slide's `SSSlideInfoAtom` record (MS-PPT 2.6.6),
+    /// so per-slide timing set via [`Writer::set_slide_timing`] is emitted only
+    /// for slides without a transition; a hidden-slide flag is preserved either
+    /// way.
+    ///
+    /// Transition sounds are refused: the create-side writer only builds the
+    /// `SoundCollection` from shape and animation references, so a transition
+    /// `soundIdRef` would dangle.
+    ///
+    /// # Arguments
+    ///
+    /// * `slide` - Slide index (0-based)
+    /// * `transition` - Transition configuration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the slide does not exist or the transition carries a
+    /// sound.
+    pub fn set_slide_transition(
+        &mut self,
+        slide: usize,
+        transition: TransitionInfo,
+    ) -> Result<(), WriteError> {
+        if transition.sound.is_some() {
+            return Err(WriteError::InvalidData(
+                "transition sounds are not supported by the create-side writer".to_string(),
+            ));
+        }
+        let slide_data = self
+            .slides
+            .get_mut(slide)
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
+        slide_data.transition = Some(transition);
         Ok(())
     }
 
@@ -1467,6 +1731,7 @@ impl Writer {
     }
 
     /// Get the number of custom shows.
+    #[must_use]
     pub fn custom_show_count(&self) -> usize {
         self.custom_shows.len()
     }
@@ -1484,6 +1749,7 @@ impl Writer {
     }
 
     /// Get the number of slides
+    #[must_use]
     pub fn slide_count(&self) -> usize {
         self.slides.len()
     }
@@ -1497,6 +1763,10 @@ impl Default for Writer {
 
 fn default_font_collections() -> FontCollections {
     let mut base = FontCollection::new(FontScope::Base);
+    #[allow(
+        clippy::expect_used,
+        reason = "the built-in Arial font satisfies every collection invariant and a fresh collection has capacity"
+    )]
     base.try_push(FontEntity::arial().into())
         .expect("the built-in Arial font is valid");
     FontCollections {

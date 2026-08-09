@@ -109,8 +109,8 @@ pub use hyperlink::Hyperlink;
 pub use image::{Image, ImageError};
 pub use leniency::{Leniency, StylesheetDefect, ToleranceReport, ToleratedDefect};
 pub use package::{
-    EncryptionKind, Error, Limits, LimitsError, OpenOptions, Package, ResourceKind, ResourceLimit,
-    Result,
+    EncryptionKind, Error, Limits, LimitsError, OpenOptions, Package, PackageOpenOptions, Password,
+    ResourceKind, ResourceLimit, Result,
 };
 pub use paragraph::{Paragraph, Run};
 pub use parts::associated_strings::{AssociatedStringSlot, DocumentAssociatedStrings};

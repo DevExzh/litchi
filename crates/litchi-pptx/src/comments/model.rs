@@ -1,4 +1,4 @@
-//! Semantic values for PresentationML legacy comments.
+//! Semantic values for `PresentationML` legacy comments.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Conformance {
@@ -74,11 +74,13 @@ impl Comment {
         }
     }
 
+    #[must_use]
     pub fn with_date_time(mut self, value: impl Into<String>) -> Self {
         self.date_time = Some(value.into());
         self
     }
 
+    #[must_use]
     pub fn with_index(mut self, value: u32) -> Self {
         self.index = value;
         self

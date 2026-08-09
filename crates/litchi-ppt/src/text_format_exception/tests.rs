@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::codec::*;
 use super::model::{TextCFException, TextPFException};
 use crate::consts::RecordType;
@@ -13,7 +19,7 @@ fn cf_record(data: &[u8]) -> Record {
         record_type_raw: TEXT_CF_EXCEPTION_TYPE,
         version: 0,
         instance: 0,
-        data_length: data.len() as u32,
+        data_length: u32::try_from(data.len()).unwrap(),
         data: data.to_vec(),
         children: Vec::new(),
     }
@@ -25,7 +31,7 @@ fn pf_record(data: &[u8]) -> Record {
         record_type_raw: TEXT_PF_EXCEPTION_TYPE,
         version: 0,
         instance: 0,
-        data_length: data.len() as u32,
+        data_length: u32::try_from(data.len()).unwrap(),
         data: data.to_vec(),
         children: Vec::new(),
     }
@@ -131,21 +137,21 @@ fn rejects_malformed_cf_exception() {
     payload.extend_from_slice(&0i16.to_le_bytes());
     assert!(TextCFException::parse_record(&cf_record(&payload)).is_err());
     // fontSize above the maximum.
-    let mut payload = CF_MASK_SIZE.to_le_bytes().to_vec();
-    payload.extend_from_slice(&4001i16.to_le_bytes());
-    assert!(TextCFException::parse_record(&cf_record(&payload)).is_err());
+    let mut payload_size_max = CF_MASK_SIZE.to_le_bytes().to_vec();
+    payload_size_max.extend_from_slice(&4001i16.to_le_bytes());
+    assert!(TextCFException::parse_record(&cf_record(&payload_size_max)).is_err());
     // position above the maximum.
-    let mut payload = CF_MASK_POSITION.to_le_bytes().to_vec();
-    payload.extend_from_slice(&101i16.to_le_bytes());
-    assert!(TextCFException::parse_record(&cf_record(&payload)).is_err());
+    let mut payload_position_max = CF_MASK_POSITION.to_le_bytes().to_vec();
+    payload_position_max.extend_from_slice(&101i16.to_le_bytes());
+    assert!(TextCFException::parse_record(&cf_record(&payload_position_max)).is_err());
     // Invalid color index byte.
-    let mut payload = CF_MASK_COLOR.to_le_bytes().to_vec();
-    payload.extend_from_slice(&[0, 0, 0, 0x08]);
-    assert!(TextCFException::parse_record(&cf_record(&payload)).is_err());
+    let mut payload_color_index = CF_MASK_COLOR.to_le_bytes().to_vec();
+    payload_color_index.extend_from_slice(&[0, 0, 0, 0x08]);
+    assert!(TextCFException::parse_record(&cf_record(&payload_color_index)).is_err());
     // Trailing bytes after a complete structure.
-    let mut payload = 0u32.to_le_bytes().to_vec();
-    payload.push(0);
-    assert!(TextCFException::parse_record(&cf_record(&payload)).is_err());
+    let mut payload_trailing = 0u32.to_le_bytes().to_vec();
+    payload_trailing.push(0);
+    assert!(TextCFException::parse_record(&cf_record(&payload_trailing)).is_err());
     // Nonzero instance.
     let mut record = cf_record(&0u32.to_le_bytes());
     record.instance = 1;
@@ -258,53 +264,53 @@ fn rejects_malformed_pf_exception() {
     payload.extend_from_slice(&0x0080_0000u32.to_le_bytes());
     assert!(TextPFException::parse_record(&pf_record(&payload)).is_err());
     // BulletFlags reserved bits.
-    let mut payload = 0u16.to_le_bytes().to_vec();
-    payload.extend_from_slice(&PF_MASK_HAS_BULLET.to_le_bytes());
-    payload.extend_from_slice(&0x0010u16.to_le_bytes());
-    assert!(TextPFException::parse_record(&pf_record(&payload)).is_err());
+    let mut payload_flags_reserved = 0u16.to_le_bytes().to_vec();
+    payload_flags_reserved.extend_from_slice(&PF_MASK_HAS_BULLET.to_le_bytes());
+    payload_flags_reserved.extend_from_slice(&0x0010u16.to_le_bytes());
+    assert!(TextPFException::parse_record(&pf_record(&payload_flags_reserved)).is_err());
     // NUL bullet character.
-    let mut payload = 0u16.to_le_bytes().to_vec();
-    payload.extend_from_slice(&PF_MASK_BULLET_CHAR.to_le_bytes());
-    payload.extend_from_slice(&0u16.to_le_bytes());
-    assert!(TextPFException::parse_record(&pf_record(&payload)).is_err());
+    let mut payload_nul_bullet = 0u16.to_le_bytes().to_vec();
+    payload_nul_bullet.extend_from_slice(&PF_MASK_BULLET_CHAR.to_le_bytes());
+    payload_nul_bullet.extend_from_slice(&0u16.to_le_bytes());
+    assert!(TextPFException::parse_record(&pf_record(&payload_nul_bullet)).is_err());
     // Invalid alignment value.
-    let mut payload = 0u16.to_le_bytes().to_vec();
-    payload.extend_from_slice(&PF_MASK_ALIGN.to_le_bytes());
-    payload.extend_from_slice(&7u16.to_le_bytes());
-    assert!(TextPFException::parse_record(&pf_record(&payload)).is_err());
+    let mut payload_bad_align = 0u16.to_le_bytes().to_vec();
+    payload_bad_align.extend_from_slice(&PF_MASK_ALIGN.to_le_bytes());
+    payload_bad_align.extend_from_slice(&7u16.to_le_bytes());
+    assert!(TextPFException::parse_record(&pf_record(&payload_bad_align)).is_err());
     // lineSpacing above the maximum percentage.
-    let mut payload = 0u16.to_le_bytes().to_vec();
-    payload.extend_from_slice(&PF_MASK_LINE_SPACING.to_le_bytes());
-    payload.extend_from_slice(&13201i16.to_le_bytes());
-    assert!(TextPFException::parse_record(&pf_record(&payload)).is_err());
+    let mut payload_spacing_max = 0u16.to_le_bytes().to_vec();
+    payload_spacing_max.extend_from_slice(&PF_MASK_LINE_SPACING.to_le_bytes());
+    payload_spacing_max.extend_from_slice(&13201i16.to_le_bytes());
+    assert!(TextPFException::parse_record(&pf_record(&payload_spacing_max)).is_err());
     // Truncated tab stops.
-    let mut payload = 0u16.to_le_bytes().to_vec();
-    payload.extend_from_slice(&PF_MASK_TAB_STOPS.to_le_bytes());
-    payload.extend_from_slice(&2u16.to_le_bytes());
-    payload.extend_from_slice(&[0; 4]);
-    assert!(TextPFException::parse_record(&pf_record(&payload)).is_err());
+    let mut payload_truncated_tabs = 0u16.to_le_bytes().to_vec();
+    payload_truncated_tabs.extend_from_slice(&PF_MASK_TAB_STOPS.to_le_bytes());
+    payload_truncated_tabs.extend_from_slice(&2u16.to_le_bytes());
+    payload_truncated_tabs.extend_from_slice(&[0; 4]);
+    assert!(TextPFException::parse_record(&pf_record(&payload_truncated_tabs)).is_err());
     // Invalid tab-stop type.
-    let mut payload = 0u16.to_le_bytes().to_vec();
-    payload.extend_from_slice(&PF_MASK_TAB_STOPS.to_le_bytes());
-    payload.extend_from_slice(&1u16.to_le_bytes());
-    payload.extend_from_slice(&0i16.to_le_bytes());
-    payload.extend_from_slice(&4u16.to_le_bytes());
-    assert!(TextPFException::parse_record(&pf_record(&payload)).is_err());
+    let mut payload_bad_tab_type = 0u16.to_le_bytes().to_vec();
+    payload_bad_tab_type.extend_from_slice(&PF_MASK_TAB_STOPS.to_le_bytes());
+    payload_bad_tab_type.extend_from_slice(&1u16.to_le_bytes());
+    payload_bad_tab_type.extend_from_slice(&0i16.to_le_bytes());
+    payload_bad_tab_type.extend_from_slice(&4u16.to_le_bytes());
+    assert!(TextPFException::parse_record(&pf_record(&payload_bad_tab_type)).is_err());
     // PFWrapFlags reserved bits.
-    let mut payload = 0u16.to_le_bytes().to_vec();
-    payload.extend_from_slice(&PF_MASK_CHAR_WRAP.to_le_bytes());
-    payload.extend_from_slice(&0x0008u16.to_le_bytes());
-    assert!(TextPFException::parse_record(&pf_record(&payload)).is_err());
+    let mut payload_wrap_reserved = 0u16.to_le_bytes().to_vec();
+    payload_wrap_reserved.extend_from_slice(&PF_MASK_CHAR_WRAP.to_le_bytes());
+    payload_wrap_reserved.extend_from_slice(&0x0008u16.to_le_bytes());
+    assert!(TextPFException::parse_record(&pf_record(&payload_wrap_reserved)).is_err());
     // Invalid text direction.
-    let mut payload = 0u16.to_le_bytes().to_vec();
-    payload.extend_from_slice(&PF_MASK_TEXT_DIRECTION.to_le_bytes());
-    payload.extend_from_slice(&2u16.to_le_bytes());
-    assert!(TextPFException::parse_record(&pf_record(&payload)).is_err());
+    let mut payload_bad_direction = 0u16.to_le_bytes().to_vec();
+    payload_bad_direction.extend_from_slice(&PF_MASK_TEXT_DIRECTION.to_le_bytes());
+    payload_bad_direction.extend_from_slice(&2u16.to_le_bytes());
+    assert!(TextPFException::parse_record(&pf_record(&payload_bad_direction)).is_err());
     // Trailing bytes after a complete structure.
-    let mut payload = 0u16.to_le_bytes().to_vec();
-    payload.extend_from_slice(&0u32.to_le_bytes());
-    payload.push(0);
-    assert!(TextPFException::parse_record(&pf_record(&payload)).is_err());
+    let mut payload_trailing = 0u16.to_le_bytes().to_vec();
+    payload_trailing.extend_from_slice(&0u32.to_le_bytes());
+    payload_trailing.push(0);
+    assert!(TextPFException::parse_record(&pf_record(&payload_trailing)).is_err());
     // Nonzero version.
     let mut record = pf_record(&[0; 6]);
     record.version = 0xF;

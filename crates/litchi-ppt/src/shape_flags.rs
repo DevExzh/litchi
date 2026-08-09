@@ -1,4 +1,4 @@
-//! Shape-level Boolean flags stored in OfficeArt `ClientData`.
+//! Shape-level Boolean flags stored in `OfficeArt` `ClientData`.
 //!
 //! Implements MS-PPT sections 2.7.3, 2.7.5, and 2.7.6. All retained
 //! client-data records remain inert and are serialized byte-for-byte.
@@ -13,7 +13,7 @@ const OFFICEART_CLIENT_DATA_TYPE: u16 = 0xf011;
 /// Resource limits for shape-flag client-data projection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ShapeFlagLimits {
-    /// Maximum OfficeArt `ClientData` payload size.
+    /// Maximum `OfficeArt` `ClientData` payload size.
     pub max_client_data_bytes: usize,
     /// Maximum number of direct PPT records in `ClientData`.
     pub max_client_data_records: usize,
@@ -40,12 +40,20 @@ pub struct ShapeFlags {
 
 impl ShapeFlags {
     /// Parse a complete `RT_ShapeAtom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(record: &Record) -> Result<Self> {
         validate_atom_record(record, RecordType::ShapeAtom, "ShapeFlagsAtom")?;
         Self::parse_payload(&record.data)
     }
 
     /// Parse the one-byte `ShapeFlagsAtom` payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_payload(data: &[u8]) -> Result<Self> {
         if data.len() != 1 {
             return corrupted("ShapeFlagsAtom payload must be exactly one byte");
@@ -59,11 +67,13 @@ impl ShapeFlags {
     }
 
     /// Serialize the one-byte atom payload.
+    #[must_use]
     pub fn to_payload(self) -> [u8; 1] {
         [u8::from(self.always_on_top)]
     }
 
     /// Build a generic PPT atom record.
+    #[must_use]
     pub fn to_record(self) -> Record {
         let data = self.to_payload().to_vec();
         Record {
@@ -78,12 +88,17 @@ impl ShapeFlags {
     }
 
     /// Serialize a complete `ShapeFlagsAtom` record.
+    #[must_use]
     pub fn to_bytes(self) -> Vec<u8> {
         encode_record(0, 0, RecordType::ShapeAtom.as_u16(), &self.to_payload())
     }
 }
 
 /// MS-PPT 2.7.6 `ShapeFlags10Atom`.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`ShapeFlags10` is the established public API name mirroring the MS-PPT `ShapeFlags10Atom` record; renaming it would break downstream crates"
+)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ShapeFlags10 {
     /// Whether the shape is a picture in the presentation's photo album.
@@ -92,12 +107,20 @@ pub struct ShapeFlags10 {
 
 impl ShapeFlags10 {
     /// Parse a complete `RT_ShapeFlags10Atom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(record: &Record) -> Result<Self> {
         validate_atom_record(record, RecordType::ShapeFlags10Atom, "ShapeFlags10Atom")?;
         Self::parse_payload(&record.data)
     }
 
     /// Parse the one-byte `ShapeFlags10Atom` payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_payload(data: &[u8]) -> Result<Self> {
         if data.len() != 1 {
             return corrupted("ShapeFlags10Atom payload must be exactly one byte");
@@ -111,11 +134,13 @@ impl ShapeFlags10 {
     }
 
     /// Serialize the one-byte atom payload.
+    #[must_use]
     pub fn to_payload(self) -> [u8; 1] {
         [if self.is_photo_album_picture { 0x04 } else { 0 }]
     }
 
     /// Build a generic PPT atom record.
+    #[must_use]
     pub fn to_record(self) -> Record {
         let data = self.to_payload().to_vec();
         Record {
@@ -130,6 +155,7 @@ impl ShapeFlags10 {
     }
 
     /// Serialize a complete `ShapeFlags10Atom` record.
+    #[must_use]
     pub fn to_bytes(self) -> Vec<u8> {
         encode_record(
             0,
@@ -140,12 +166,12 @@ impl ShapeFlags10 {
     }
 }
 
-/// Typed optional flag prefix projected from one OfficeArt `ClientData` record.
+/// Typed optional flag prefix projected from one `OfficeArt` `ClientData` record.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ShapeFlagProjection {
-    /// PowerPoint 97 shape flags.
+    /// `PowerPoint` 97 shape flags.
     pub flags: Option<ShapeFlags>,
-    /// PowerPoint 2002 shape flags.
+    /// `PowerPoint` 2002 shape flags.
     pub flags10: Option<ShapeFlags10>,
     trailing_records: Vec<Vec<u8>>,
 }
@@ -153,7 +179,7 @@ pub struct ShapeFlagProjection {
 /// Slide-level shape flag result.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShapeFlagEntry {
-    /// OfficeArt shape identifier.
+    /// `OfficeArt` shape identifier.
     pub shape_id: u32,
     /// Typed flag projection for the shape.
     pub projection: ShapeFlagProjection,
@@ -164,14 +190,18 @@ pub struct ShapeFlagEntry {
 pub struct PresentationShapeFlagEntry {
     /// One-based slide number.
     pub slide_number: usize,
-    /// OfficeArt shape identifier.
+    /// `OfficeArt` shape identifier.
     pub shape_id: u32,
     /// Typed flag projection for the shape.
     pub projection: ShapeFlagProjection,
 }
 
 impl ShapeFlagProjection {
-    /// Parse a complete OfficeArt `ClientData` record, including its header.
+    /// Parse a complete `OfficeArt` `ClientData` record, including its header.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_officeart_client_data(data: &[u8], limits: ShapeFlagLimits) -> Result<Self> {
         if data.len() < 8 {
             return corrupted("Truncated OfficeArt ClientData record header");
@@ -179,7 +209,7 @@ impl ShapeFlagProjection {
         let version_instance = u16::from_le_bytes([data[0], data[1]]);
         let record_type = u16::from_le_bytes([data[2], data[3]]);
         let length = usize::try_from(u32::from_le_bytes([data[4], data[5], data[6], data[7]]))
-            .map_err(|_| Error::Corrupted("OfficeArt ClientData size overflow".into()))?;
+            .map_err(|_err| Error::Corrupted("OfficeArt ClientData size overflow".into()))?;
         if version_instance & 0x000f != 0x000f
             || version_instance >> 4 != 0
             || record_type != OFFICEART_CLIENT_DATA_TYPE
@@ -192,7 +222,11 @@ impl ShapeFlagProjection {
         Self::parse_client_data_payload(&data[8..], limits)
     }
 
-    /// Parse the direct PPT-record sequence inside OfficeArt `ClientData`.
+    /// Parse the direct PPT-record sequence inside `OfficeArt` `ClientData`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_client_data_payload(data: &[u8], limits: ShapeFlagLimits) -> Result<Self> {
         check_limit(
             data.len(),
@@ -253,16 +287,22 @@ impl ShapeFlagProjection {
     }
 
     /// Whether either defined shape-flag atom is present.
+    #[must_use]
     pub fn has_flags(&self) -> bool {
         self.flags.is_some() || self.flags10.is_some()
     }
 
     /// Raw later client-data records retained for lossless serialization.
+    #[must_use]
     pub fn trailing_records(&self) -> &[Vec<u8>] {
         &self.trailing_records
     }
 
-    /// Serialize the PPT-record payload of OfficeArt `ClientData`.
+    /// Serialize the PPT-record payload of `OfficeArt` `ClientData`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_client_data_payload(&self, limits: ShapeFlagLimits) -> Result<Vec<u8>> {
         let record_count = usize::from(self.flags.is_some())
             .checked_add(usize::from(self.flags10.is_some()))
@@ -294,7 +334,11 @@ impl ShapeFlagProjection {
         Ok(output)
     }
 
-    /// Serialize a complete OfficeArt `ClientData` record.
+    /// Serialize a complete `OfficeArt` `ClientData` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_officeart_client_data(&self, limits: ShapeFlagLimits) -> Result<Vec<u8>> {
         let payload = self.to_client_data_payload(limits)?;
         Ok(encode_record(0x0f, 0, OFFICEART_CLIENT_DATA_TYPE, &payload))
@@ -333,7 +377,7 @@ fn split_records(data: &[u8], max_records: usize) -> Result<Vec<Vec<u8>>> {
             data[offset + 6],
             data[offset + 7],
         ]))
-        .map_err(|_| Error::Corrupted("ClientData record size overflow".into()))?;
+        .map_err(|_err| Error::Corrupted("ClientData record size overflow".into()))?;
         let end = header_end
             .checked_add(length)
             .ok_or_else(|| Error::Corrupted("ClientData record end overflow".into()))?;
@@ -346,6 +390,10 @@ fn split_records(data: &[u8], max_records: usize) -> Result<Vec<Vec<u8>>> {
     Ok(records)
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "every payload serialized here originates from a PPT record whose on-disk length field is a u32, so the length always fits u32"
+)]
 fn encode_record(version: u16, instance: u16, record_type: u16, data: &[u8]) -> Vec<u8> {
     let mut output = Vec::with_capacity(8usize.saturating_add(data.len()));
     output.extend_from_slice(&((instance << 4) | version).to_le_bytes());
@@ -368,6 +416,11 @@ fn corrupted<T>(message: impl Into<String>) -> Result<T> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

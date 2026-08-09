@@ -102,6 +102,10 @@ impl ShapeExt for Shape<'_> {
             visit_host_record(&mut records)?;
             let (record, consumed) =
                 crate::records::Record::parse_strict(client_data.data(), offset)?;
+            #[allow(
+                clippy::wildcard_enum_match_arm,
+                reason = "`RecordType` spans the full MS-PPT record ID space; only the four round-trip atoms carry shape metadata, every other record is skipped"
+            )]
             match record.record_type {
                 RecordType::RoundTripHFPlaceholder12Atom => {
                     if metadata.header_footer.is_some() {
@@ -261,22 +265,30 @@ impl ShapeExt for Shape<'_> {
     }
 }
 
-/// Parse every complete OfficeArt drawing in a PowerPoint host stream.
+/// Parse every complete `OfficeArt` drawing in a `PowerPoint` host stream.
 ///
 /// A PPT `PPDrawing` payload can concatenate drawing containers. Each root is
 /// still parsed exactly: malformed records and trailing partial records are
 /// returned as errors instead of being ignored.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse(data: &[u8]) -> Result<Vec<Shape<'_>>> {
     parse_drawing(data).map(Drawing::into_shapes)
 }
 
-/// Parse a PowerPoint OfficeArt stream while retaining its validated root
+/// Parse a `PowerPoint` `OfficeArt` stream while retaining its validated root
 /// records beside the typed shape projection.
 ///
 /// A `PPDrawing` payload may concatenate drawing containers. Every complete
 /// root is retained in source order, including direct records that the typed
 /// shape view does not model. The existing resource ceilings still apply to
 /// root traversal and shape parsing.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_drawing(data: &[u8]) -> Result<Drawing<'_>> {
     let mut roots = Vec::new();
     let mut shapes = Vec::new();
@@ -294,6 +306,10 @@ pub fn parse_drawing(data: &[u8]) -> Result<Drawing<'_>> {
 }
 
 /// Project a shape's group-relative or PPT client anchor into checked bounds.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn anchor(shape: &Shape<'_>) -> Result<Option<Anchor>> {
     if let Some(anchor) = shape.anchor() {
         return Anchor::new(anchor.left, anchor.top, anchor.right, anchor.bottom).map(Some);
@@ -309,11 +325,15 @@ pub fn anchor(shape: &Shape<'_>) -> Result<Option<Anchor>> {
     {
         return Err(corrupted("Invalid PowerPoint OfficeArtClientAnchor header"));
     }
-    let anchor = crate::client_anchor::Data::parse(anchor.data())?;
-    Anchor::new(anchor.left(), anchor.top(), anchor.right(), anchor.bottom()).map(Some)
+    let parsed = crate::client_anchor::Data::parse(anchor.data())?;
+    Anchor::new(parsed.left(), parsed.top(), parsed.right(), parsed.bottom()).map(Some)
 }
 
-/// Extract all PPT textbox text from an OfficeArt drawing.
+/// Extract all PPT textbox text from an `OfficeArt` drawing.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn text_from_drawing(data: &[u8]) -> Result<String> {
     let mut offset = 0usize;
     let mut records = 0u32;
@@ -328,7 +348,11 @@ pub fn text_from_drawing(data: &[u8]) -> Result<String> {
     Ok(text)
 }
 
-/// Decode the PPT records contained by one OfficeArt ClientTextbox atom.
+/// Decode the PPT records contained by one `OfficeArt` `ClientTextbox` atom.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn text_from_textbox(textbox: &Record<'_>) -> Result<Option<String>> {
     validate_host_record(textbox, CLIENT_TEXTBOX_RAW_KIND, "ClientTextbox")?;
     if textbox.data().is_empty() {
@@ -341,7 +365,7 @@ pub fn text_from_textbox(textbox: &Record<'_>) -> Result<Option<String>> {
     Ok((!text.is_empty()).then_some(text))
 }
 
-/// Returns a shape's header-validated PowerPoint textbox record.
+/// Returns a shape's header-validated `PowerPoint` textbox record.
 pub(crate) fn textbox<'data>(shape: &Shape<'data>) -> Result<Option<Record<'data>>> {
     let Some(textbox) = host_record(shape, RecordKind::ClientTextbox)? else {
         return Ok(None);
@@ -359,8 +383,8 @@ fn placeholder(shape: &Shape<'_>) -> Result<Option<Placeholder>> {
     validate_host_record(&client_data, CLIENT_DATA_RAW_KIND, "ClientData")?;
     let mut records = RawRecords::new(client_data.data());
     let mut found = None;
-    for record in &mut records {
-        let record = record?;
+    for raw in &mut records {
+        let record = raw?;
         if record.kind == PLACEHOLDER_ATOM {
             if record.data.len() < 8 {
                 return Err(corrupted("PlaceholderAtom is shorter than eight bytes"));
@@ -370,13 +394,13 @@ fn placeholder(shape: &Shape<'_>) -> Result<Option<Placeholder>> {
                     "Shape ClientData contains multiple PlaceholderAtom records",
                 ));
             }
-            let position: [u8; 4] = record.data[..4]
+            let position_bytes: [u8; 4] = record.data[..4]
                 .try_into()
-                .map_err(|_| corrupted("PlaceholderAtom position is not four bytes"))?;
-            let position = i32::from_le_bytes(position);
-            let position = match position {
+                .map_err(|_err| corrupted("PlaceholderAtom position is not four bytes"))?;
+            let position_raw = i32::from_le_bytes(position_bytes);
+            let position = match position_raw {
                 -1 => None,
-                position => Some(u16::try_from(position).map_err(|_| {
+                index => Some(u16::try_from(index).map_err(|_err| {
                     corrupted("PlaceholderAtom position is outside the supported range")
                 })?),
             };
@@ -407,8 +431,8 @@ fn frame(shape: &Shape<'_>) -> Result<Frame> {
     let mut action_kind = None;
     let mut host_records = 0;
     let mut records = RawRecords::new(client_data.data());
-    for record in &mut records {
-        let record = record?;
+    for raw in &mut records {
+        let record = raw?;
         visit_host_record(&mut host_records)?;
         match record.kind {
             EX_OBJ_REF_ATOM => {
@@ -424,8 +448,8 @@ fn frame(shape: &Shape<'_>) -> Result<Frame> {
             },
             INTERACTIVE_INFO => {
                 let mut children = RawRecords::new(record.data);
-                for child in &mut children {
-                    let child = child?;
+                for raw_child in &mut children {
+                    let child = raw_child?;
                     visit_host_record(&mut host_records)?;
                     if child.kind != INTERACTIVE_INFO_ATOM {
                         continue;
@@ -438,8 +462,8 @@ fn frame(shape: &Shape<'_>) -> Result<Frame> {
                         ACTION_MEDIA => Some(FrameKind::Media),
                         _ => None,
                     };
-                    if let Some(kind) = kind
-                        && action_kind.replace(kind).is_some()
+                    if let Some(frame_kind) = kind
+                        && action_kind.replace(frame_kind).is_some()
                     {
                         return Err(corrupted(
                             "Shape ClientData contains duplicate frame actions",
@@ -456,7 +480,7 @@ fn frame(shape: &Shape<'_>) -> Result<Frame> {
     Ok(frame)
 }
 
-fn text_from_container<'data>(container: &Container<'data>, text: &mut String) -> Result<()> {
+fn text_from_container(container: &Container<'_>, text: &mut String) -> Result<()> {
     const MAX_RECORDS: usize = 1_000_000;
     const MAX_DEPTH: usize = 256;
 
@@ -518,11 +542,11 @@ pub(super) fn text_from_ppt_records(data: &[u8], text: &mut String) -> Result<()
     let mut pending = vec![RawRecords::new(data)];
     let mut visited = 0usize;
     while let Some(records) = pending.last_mut() {
-        let Some(record) = records.next() else {
+        let Some(raw) = records.next() else {
             pending.pop();
             continue;
         };
-        let record = record?;
+        let record = raw?;
         visited = visited
             .checked_add(1)
             .ok_or_else(|| corrupted("ClientTextbox traversal count overflow"))?;
@@ -542,15 +566,15 @@ pub(super) fn text_from_ppt_records(data: &[u8], text: &mut String) -> Result<()
             },
             _ => None,
         };
-        if let Some(decoded) = decoded {
-            let decoded = decoded.trim();
-            if decoded.is_empty() {
+        if let Some(piece) = decoded {
+            let trimmed = piece.trim();
+            if trimmed.is_empty() {
                 continue;
             }
             if !text.is_empty() && !text.ends_with('\n') {
                 text.push('\n');
             }
-            text.push_str(decoded);
+            text.push_str(trimmed);
         }
     }
     Ok(())

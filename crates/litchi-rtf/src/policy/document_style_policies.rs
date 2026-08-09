@@ -1,3 +1,7 @@
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent RTF feature flags stay flat for direct access"
+)]
 /// Passive document style and theme-editing policies.
 ///
 /// These values are retained for round-tripping only. This crate does not
@@ -17,6 +21,7 @@ pub struct DocumentStylePolicies {
 
 impl DocumentStylePolicies {
     /// Return whether all three policy flags were omitted.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         !self.update_styles_from_template
             && !self.lock_theme

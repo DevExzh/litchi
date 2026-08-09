@@ -1,39 +1,45 @@
-//! Typed values for the bounded TemplateNameAtom payload.
+//! Typed values for the bounded `TemplateNameAtom` payload.
 
 use crate::package::{Error, Result};
 
 /// The protocol maximum for TemplateNameAtom.recLen from [MS-PPT] §2.5.18.
 pub const MAX_NAME_BYTES: usize = 4_168;
 
-/// A validated UTF-16 design name carried by a TemplateNameAtom.
+/// A validated UTF-16 design name carried by a `TemplateNameAtom`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Name(String);
 
 impl Name {
-    /// Create a name under the exact TemplateNameAtom byte bound.
+    /// Create a name under the exact `TemplateNameAtom` byte bound.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(value: impl Into<String>) -> Result<Self> {
-        let value = value.into();
-        validate_units(value.encode_utf16().count())?;
-        if value.encode_utf16().any(|unit| unit == 0) {
+        let name = value.into();
+        validate_units(name.encode_utf16().count())?;
+        if name.encode_utf16().any(|unit| unit == 0) {
             return Err(Error::InvalidFormat(
                 "TemplateNameAtom authoring value contains a NUL".into(),
             ));
         }
-        Ok(Self(value))
+        Ok(Self(name))
     }
 
     /// Borrow the decoded design name.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
     /// Consume the value and return its decoded text.
+    #[must_use]
     pub fn into_string(self) -> String {
         self.0
     }
 
     pub(super) fn from_wire(bytes: &[u8]) -> Result<Self> {
-        if bytes.len() % 2 != 0 {
+        if !bytes.len().is_multiple_of(2) {
             return Err(Error::Corrupted(
                 "TemplateNameAtom payload length must be even".into(),
             ));
@@ -52,7 +58,7 @@ impl Name {
             .position(|unit| *unit == 0)
             .unwrap_or(units.len());
         let value = String::from_utf16(&units[..length])
-            .map_err(|_| Error::Corrupted("TemplateNameAtom contains invalid UTF-16".into()))?;
+            .map_err(|_err| Error::Corrupted("TemplateNameAtom contains invalid UTF-16".into()))?;
         Ok(Self(value))
     }
 
@@ -67,7 +73,7 @@ impl Name {
         let mut bytes = Vec::new();
         bytes
             .try_reserve_exact(units.len() * 2)
-            .map_err(|_| Error::InvalidFormat("TemplateNameAtom allocation failed".into()))?;
+            .map_err(|_err| Error::InvalidFormat("TemplateNameAtom allocation failed".into()))?;
         for unit in units {
             bytes.extend_from_slice(&unit.to_le_bytes());
         }

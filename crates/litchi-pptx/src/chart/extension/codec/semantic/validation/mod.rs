@@ -1,4 +1,4 @@
-//! ChartEx XML graph parsing and semantic validation.
+//! `ChartEx` XML graph parsing and semantic validation.
 
 mod axes;
 mod chart;
@@ -7,14 +7,49 @@ mod drawing;
 mod geography;
 mod primitives;
 
-use super::super::super::model::*;
-use super::super::limits::*;
-use super::super::xml::*;
+use super::super::super::model::{
+    Axis, AxisScaling, AxisTitle, AxisUnit, AxisUnits, AxisUnitsLabel, Binning, BinningChoice,
+    Chart, ChartSpaceFormatting, ChartTitle, ClosedSide, ColorKind, ColorPosition, DataLabel,
+    DataLabelPosition, DataLabelVisibility, DataLabels, DataPoint, DataSet, Dimension,
+    DoubleOrAutomatic, DrawingPayload, ElementVisibility, FormatOverride, Formula,
+    FormulaDirection, GeoAddress, GeoCache, GeoCacheEntry, GeoChildEntitiesQuery,
+    GeoChildEntitiesQueryResult, GeoClear, GeoData, GeoDataEntityQuery, GeoDataEntityQueryResult,
+    GeoDataPointQuery, GeoDataPointToEntityQuery, GeoDataPointToEntityQueryResult, GeoEntity,
+    GeoEntityType, GeoHierarchyEntity, GeoLocation, GeoLocationQuery, GeoLocationQueryResult,
+    GeoMappingLevel, GeoParentEntitiesQueryResult, GeoPolygon, GeoProjection, Geography, Gridlines,
+    HeaderFooter, LayoutProperties, Legend, NumberFormat, NumericDimensionType, NumericLevel,
+    NumericPoint, Offset, PageMargins, PageOrientation, PageSetup, ParentLabelLayout, PlotArea,
+    PlotAreaRegion, PlotSurface, PositionAlignment, PrintSettings, QuartileMethod,
+    RegionLabelLayout, SeriesDataReference, SeriesLayout, SidePosition, SolidColor,
+    StringDimensionType, StringLevel, StringPoint, Text, TickLabels, TickMarkType, TickMarks,
+    ValueColorPositions, ValueColors,
+};
+use super::super::limits::{
+    A, A_STRICT, CX, MAX_ATTRIBUTION_LEN, MAX_AXES, MAX_AXIS_REFS_PER_SERIES, MAX_CULTURE_NAME_LEN,
+    MAX_DATA_LABELS, MAX_FORMAT_OVERRIDES, MAX_FORMULA_BYTES, MAX_GEO_BINARY_BYTES,
+    MAX_GEO_CACHE_ENTRIES, MAX_GEO_POLYGON_DATA_LEN, MAX_GEO_RESULTS, MAX_GEO_STRING_LEN,
+    MAX_LABEL_TEXT_BYTES, MAX_LEVELS_PER_DIMENSION, MAX_POINTS_PER_LEVEL, MAX_PRINT_TEXT_BYTES,
+    MAX_SERIES, MAX_SERIES_POINTS, MAX_SUBTOTALS,
+};
+use super::super::xml::{
+    MiniNode, bounded_optional, invalid, invalid_error, limit, one_child, optional, parse_bool,
+    parse_i32, parse_mini_tree, parse_u32, reject_unknown, required, valid_xml_double,
+};
 use super::model::ParsedDataGraph;
 use crate::Result;
 use std::collections::HashSet;
 
-use self::{axes::*, chart::*, data::*, drawing::*, geography::*, primitives::*};
+use self::{
+    axes::{parse_axis, parse_layout_properties, parse_plot_surface},
+    chart::{offset_feature_allowed, parse_chart, parse_chart_space_formatting, parse_offset},
+    data::{parse_chart_data, parse_formula, validate_series_point_references},
+    drawing::{parse_drawing_payload, parse_number_format, parse_series, parse_shared_text},
+    geography::parse_geography,
+    primitives::{
+        bounded_required, parse_double_or_auto, parse_nonnegative_or_auto, parse_positive_or_auto,
+        parse_statistics, parse_subtotals, require_empty_content, require_empty_element,
+    },
+};
 
 pub(in crate::chart::extension::codec) fn parse_data_graph(
     xml: &[u8],
@@ -70,7 +105,7 @@ pub(in crate::chart::extension::codec) fn parse_data_graph(
                 plot_shape_properties = Some(parse_drawing_payload(child, "plotArea spPr")?);
             },
             "extLst" if singleton_seen.insert(child.name.as_str()) => {
-                plot_has_extension_list = true
+                plot_has_extension_list = true;
             },
             _ => return invalid("duplicate  plotArea child"),
         }

@@ -30,10 +30,10 @@ pub(super) fn validate_owner_content_type(content_type: &str) -> Result<()> {
     }
 }
 
-pub(super) fn validate_staged_anchor<'k>(
+pub(super) fn validate_staged_anchor(
     owner: &dyn OpcPart,
     xml: &[u8],
-    key: crate::shape::Key<'k>,
+    key: crate::shape::Key<'_>,
     expected_id: Option<&str>,
 ) -> Result<()> {
     validate_owner_content_type(owner.content_type())?;
@@ -187,12 +187,13 @@ pub(super) fn bump_nodes(nodes: &mut usize) -> Result<()> {
 }
 
 pub(super) fn offset_u32(offset: usize) -> Result<u32> {
-    u32::try_from(offset).map_err(|_| crate::tag::invalid("shape-tag XML offset does not fit u32"))
+    u32::try_from(offset)
+        .map_err(|_err| crate::tag::invalid("shape-tag XML offset does not fit u32"))
 }
 
 pub(super) fn xml_position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| crate::tag::invalid("shape-tag XML offset does not fit usize"))
+        .map_err(|_err| crate::tag::invalid("shape-tag XML offset does not fit usize"))
 }
 
 pub(super) fn xml_error(error: impl std::fmt::Display) -> Error {

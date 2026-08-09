@@ -98,7 +98,7 @@ fn picture_flags(properties: &Props<'_>) -> Result<Option<Flags>> {
             reason: "picture flags must be a simple property",
         });
     }
-    Ok(Some(Flags::from_raw(property.raw_value() as u32)?))
+    Ok(Some(Flags::from_raw(property.raw_value().cast_unsigned())?))
 }
 
 pub(super) fn name_bytes<'data>(property: &Prop<'data>) -> Result<Option<&'data [u8]>> {
@@ -115,7 +115,7 @@ pub(super) fn name_bytes<'data>(property: &Prop<'data>) -> Result<Option<&'data 
             validate_name(raw)?;
             Ok(Some(raw))
         },
-        _ => Err(Error::MalformedProperties {
+        Value::Simple(_) | Value::Array(_) => Err(Error::MalformedProperties {
             reason: "picture name is not a scalar Unicode payload",
         }),
     }

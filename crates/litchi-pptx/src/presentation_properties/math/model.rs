@@ -1,4 +1,4 @@
-//! Package-independent values for the PresentationML math extension.
+//! Package-independent values for the `PresentationML` math extension.
 
 use crate::{Error, Result};
 
@@ -75,6 +75,7 @@ pub struct Properties {
 
 impl Properties {
     /// Construct an empty math-properties snapshot.
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             binary_break: None,
@@ -83,18 +84,24 @@ impl Properties {
     }
 
     /// Set the binary-operator wrapping policy.
+    #[must_use]
     pub const fn with_binary_break(mut self, value: BinaryBreak) -> Self {
         self.binary_break = Some(value);
         self
     }
 
     /// Set the binary-subtraction wrapping policy.
+    #[must_use]
     pub const fn with_binary_subtraction_break(mut self, value: BinarySubtractionBreak) -> Self {
         self.binary_subtraction_break = Some(value);
         self
     }
 
     /// Validate the package-independent math snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn validate(&self) -> Result<()> {
         // The enums are closed over the schema lexical domains. Keeping this
         // method explicit gives future revisions a validation seam without

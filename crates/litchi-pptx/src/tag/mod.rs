@@ -1,4 +1,4 @@
-//! Inert PresentationML programmable tags and owner relationship discovery.
+//! Inert `PresentationML` programmable tags and owner relationship discovery.
 //!
 //! Names are selected semantically and values are always inert strings. The
 //! module never interprets a value as XML, a path, a command, or a relationship
@@ -23,7 +23,7 @@ const STRICT_TAG_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relation
 const REL_TEXT: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const STRICT_REL_TEXT: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
 
-/// Content type of a PresentationML programmable-tag part.
+/// Content type of a `PresentationML` programmable-tag part.
 pub const CONTENT_TYPE: &str =
     "application/vnd.openxmlformats-officedocument.presentationml.tags+xml";
 

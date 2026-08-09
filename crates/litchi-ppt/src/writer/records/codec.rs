@@ -20,6 +20,10 @@ use litchi_core::unit::emu_u32_to_ppt_master_u32;
 use super::validation::validate_complete_record;
 
 /// Create a document container record
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn create_document_container(slides: &[Vec<u8>]) -> Result<Vec<u8>, Error> {
     let mut builder = RecordBuilder::new(0x0F, 0, record_type::DOCUMENT);
 
@@ -31,7 +35,11 @@ pub fn create_document_container(slides: &[Vec<u8>]) -> Result<Vec<u8>, Error> {
     builder.build()
 }
 
-/// Create a MainMaster container aligned with POI's empty.ppt structure.
+/// Create a `MainMaster` container aligned with POI's empty.ppt structure.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn create_main_master_container(ppdrawing: &[u8]) -> Result<Vec<u8>, Error> {
     let mut builder = RecordBuilder::new(0x0F, 0, record_type::MAIN_MASTER);
 
@@ -162,8 +170,12 @@ pub fn create_main_master_container(ppdrawing: &[u8]) -> Result<Vec<u8>, Error> 
     builder.build()
 }
 
-/// Create a SlideListWithText (instance=MASTER) containing SlidePersistAtom entries for masters.
-/// Each entry is (persist_id_ref, slide_identifier).
+/// Create a `SlideListWithText` (instance=MASTER) containing `SlidePersistAtom` entries for masters.
+/// Each entry is (`persist_id_ref`, `slide_identifier`).
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn create_slide_list_with_text_master(entries: &[(u32, u32)]) -> Result<Vec<u8>, Error> {
     let mut builder = RecordBuilder::new(0x0F, 1, record_type::SLIDE_LIST_WITH_TEXT);
 
@@ -183,24 +195,28 @@ pub fn create_slide_list_with_text_master(entries: &[(u32, u32)]) -> Result<Vec<
     builder.build()
 }
 
-/// Create a DocumentAtom record with minimal fields.
+/// Create a `DocumentAtom` record with minimal fields.
 ///
 /// The input slide dimensions are specified in EMUs (as used by the writer
 /// API) and converted into PPT "master units" (576 units per inch) to
-/// match the values written by LibreOffice and PowerPoint.
+/// match the values written by `LibreOffice` and `PowerPoint`.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn create_document_atom(
-    slide_size_x_master: u32,
-    slide_size_y_master: u32,
-    _slide_count: u32,
-    _notes_count: u32,
-    _master_count: u32,
+    slide_size_width_master: u32,
+    slide_size_height_master: u32,
+    slide_count: u32,
+    notes_count: u32,
+    master_count: u32,
 ) -> Result<Vec<u8>, Error> {
     create_document_atom_with_font_embedding(
-        slide_size_x_master,
-        slide_size_y_master,
-        _slide_count,
-        _notes_count,
-        _master_count,
+        slide_size_width_master,
+        slide_size_height_master,
+        slide_count,
+        notes_count,
+        master_count,
         false,
     )
 }
@@ -211,8 +227,8 @@ pub fn create_document_atom(
 /// `false` value. Fresh writers use this variant after validating the complete
 /// font catalog, so the flag cannot disagree with emitted embedded faces.
 pub(crate) fn create_document_atom_with_font_embedding(
-    slide_size_x_master: u32,
-    slide_size_y_master: u32,
+    slide_size_width_master: u32,
+    slide_size_height_master: u32,
     _slide_count: u32,
     _notes_count: u32,
     _master_count: u32,
@@ -222,15 +238,15 @@ pub(crate) fn create_document_atom_with_font_embedding(
     let mut builder = RecordBuilder::new(0x01, 0, record_type::DOCUMENT_ATOM);
     let mut data = Vec::with_capacity(40);
 
-    let slide_w_mu = emu_u32_to_ppt_master_u32(slide_size_x_master);
-    let slide_h_mu = emu_u32_to_ppt_master_u32(slide_size_y_master);
+    let slide_width_mu = emu_u32_to_ppt_master_u32(slide_size_width_master);
+    let slide_height_mu = emu_u32_to_ppt_master_u32(slide_size_height_master);
 
     // slideSize (width, height)
-    data.extend_from_slice(&slide_w_mu.to_le_bytes());
-    data.extend_from_slice(&slide_h_mu.to_le_bytes());
+    data.extend_from_slice(&slide_width_mu.to_le_bytes());
+    data.extend_from_slice(&slide_height_mu.to_le_bytes());
     // notesSize - POI uses (height, width) for portrait orientation
-    data.extend_from_slice(&slide_h_mu.to_le_bytes()); // notesSizeX = height
-    data.extend_from_slice(&slide_w_mu.to_le_bytes()); // notesSizeY = width
+    data.extend_from_slice(&slide_height_mu.to_le_bytes()); // notesSizeX = height
+    data.extend_from_slice(&slide_width_mu.to_le_bytes()); // notesSizeY = width
     // serverZoom ratio 5:10 per POI empty.ppt
     data.extend_from_slice(&5u32.to_le_bytes()); // serverZoomFrom
     data.extend_from_slice(&10u32.to_le_bytes()); // serverZoomTo
@@ -251,6 +267,10 @@ pub(crate) fn create_document_atom_with_font_embedding(
 }
 
 /// Create a slide container record
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn create_slide_container(_slide_id: u32, text: &str) -> Result<Vec<u8>, Error> {
     let mut builder = RecordBuilder::new(0x0F, 0, record_type::SLIDE);
 
@@ -280,7 +300,11 @@ pub fn create_slide_container(_slide_id: u32, text: &str) -> Result<Vec<u8>, Err
     builder.build()
 }
 
-/// Wrap an Escher DggContainer blob into a PPDrawingGroup PPT record.
+/// Wrap an Escher `DggContainer` blob into a `PPDrawingGroup` PPT record.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn wrap_dgg_into_ppdrawing_group(dgg_blob: &[u8]) -> Result<Vec<u8>, Error> {
     // Align with POI: version 0x0F (container) but payload is raw Escher DGG data
     let mut builder = RecordBuilder::new(0x0F, 0, record_type::PP_DRAWING_GROUP);
@@ -288,14 +312,22 @@ pub fn wrap_dgg_into_ppdrawing_group(dgg_blob: &[u8]) -> Result<Vec<u8>, Error> 
     builder.build()
 }
 
-/// Wrap an Escher DgContainer blob (plus any following Escher children) into a PPDrawing PPT record.
+/// Wrap an Escher `DgContainer` blob (plus any following Escher children) into a `PPDrawing` PPT record.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn wrap_dg_into_ppdrawing(dg_blob_and_children: &[u8]) -> Result<Vec<u8>, Error> {
     let mut builder = RecordBuilder::new(0x0F, 0, record_type::PP_DRAWING);
     builder.write_data(dg_blob_and_children);
     builder.build()
 }
 
-/// Create a minimal Environment container with an empty FontCollection child.
+/// Create a minimal Environment container with an empty `FontCollection` child.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn create_environment_minimal() -> Result<Vec<u8>, Error> {
     let mut fc = RecordBuilder::new(0x0F, 0, record_type::FONT_COLLECTION);
     let mut fea = RecordBuilder::new(0x00, 0, record_type::FONT_ENTITY_ATOM);
@@ -363,8 +395,12 @@ pub(crate) fn create_environment_with_font_collection(
     env.build()
 }
 
-/// Create a SlideListWithText (instance=SLIDES) containing SlidePersistAtom entries.
-/// Each entry is (persist_id_ref, slide_identifier).
+/// Create a `SlideListWithText` (instance=SLIDES) containing `SlidePersistAtom` entries.
+/// Each entry is (`persist_id_ref`, `slide_identifier`).
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn create_slide_list_with_text_slides(entries: &[(u32, u32)]) -> Result<Vec<u8>, Error> {
     let mut builder = RecordBuilder::new(0x0F, 0, record_type::SLIDE_LIST_WITH_TEXT);
 
@@ -384,8 +420,12 @@ pub fn create_slide_list_with_text_slides(entries: &[(u32, u32)]) -> Result<Vec<
     builder.build()
 }
 
-/// Create a SlideListWithText (instance=NOTES) containing SlidePersistAtom entries for notes.
-/// Each entry is (persist_id_ref, notes_identifier).
+/// Create a `SlideListWithText` (instance=NOTES) containing `SlidePersistAtom` entries for notes.
+/// Each entry is (`persist_id_ref`, `notes_identifier`).
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn create_slide_list_with_text_notes(entries: &[(u32, u32)]) -> Result<Vec<u8>, Error> {
     let mut builder = RecordBuilder::new(0x0F, 2, record_type::SLIDE_LIST_WITH_TEXT); // instance=2 for NOTES
 
@@ -405,7 +445,11 @@ pub fn create_slide_list_with_text_notes(entries: &[(u32, u32)]) -> Result<Vec<u
     builder.build()
 }
 
-/// Create a DocInfo List container with optional typed slide and notes editing views.
+/// Create a `DocInfo` List container with optional typed slide and notes editing views.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn create_docinfo_list_container(
     slide_view_info: Option<&SlideViewInfo>,
     notes_view_info: Option<&SlideViewInfo>,
@@ -418,7 +462,7 @@ pub fn create_docinfo_list_container(
     )
 }
 
-/// Create a DocInfo List and append validated `ProgBinaryTag` records to its
+/// Create a `DocInfo` List and append validated `ProgBinaryTag` records to its
 /// single `DocProgTagsContainer`.
 pub(crate) fn create_docinfo_list_container_with_binary_tags<'a>(
     slide_view_info: Option<&SlideViewInfo>,
@@ -436,11 +480,11 @@ pub(crate) fn create_docinfo_list_container_with_binary_tags<'a>(
     )
 }
 
-/// Create one DocInfo list whose single `DocProgTagsContainer` owns the
+/// Create one `DocInfo` list whose single `DocProgTagsContainer` owns the
 /// canonical `___PPT10` payload and every additional versioned binary tag.
 ///
-/// PowerPoint 10 font records are appended to the existing document extension
-/// payload rather than authored as a duplicate tag or duplicate ProgTags
+/// `PowerPoint` 10 font records are appended to the existing document extension
+/// payload rather than authored as a duplicate tag or duplicate `ProgTags`
 /// owner. Only the two font record kinds permitted by MS-PPT are accepted.
 pub(crate) fn create_docinfo_list_container_with_extensions<'a, 'b>(
     slide_view_info: Option<&SlideViewInfo>,
@@ -563,12 +607,10 @@ fn complete_record_type(record: &[u8]) -> Result<u16, Error> {
             "PowerPoint extension record is truncated",
         ));
     }
-    let payload_len = usize::try_from(u32::from_le_bytes(
-        record[4..8]
-            .try_into()
-            .expect("fixed four-byte record length"),
-    ))
-    .map_err(|_| Error::new(std::io::ErrorKind::InvalidInput, "record length overflows"))?;
+    let payload_len = usize::try_from(u32::from_le_bytes([
+        record[4], record[5], record[6], record[7],
+    ]))
+    .map_err(|_err| Error::new(std::io::ErrorKind::InvalidInput, "record length overflows"))?;
     if payload_len.checked_add(8) != Some(record.len()) {
         return Err(Error::new(
             std::io::ErrorKind::InvalidInput,
@@ -578,18 +620,30 @@ fn complete_record_type(record: &[u8]) -> Result<u16, Error> {
     Ok(u16::from_le_bytes([record[2], record[3]]))
 }
 
-/// Create the historical minimal DocInfo List with a default slide view.
+/// Create the historical minimal `DocInfo` List with a default slide view.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn create_docinfo_list_container_minimal() -> Result<Vec<u8>, Error> {
     create_docinfo_list_container(None, None)
 }
 
-/// Create an EndDocument record.
+/// Create an `EndDocument` record.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn create_end_document() -> Result<Vec<u8>, Error> {
     let builder = RecordBuilder::new(0x00, 0, record_type::END_DOCUMENT);
     builder.build()
 }
 
 /// Create a text chars atom (for Unicode text)
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn create_text_atom(text: &str) -> Result<Vec<u8>, Error> {
     let mut builder = RecordBuilder::new(0x00, 0, record_type::TEXT_CHARS_ATOM);
 

@@ -1,4 +1,4 @@
-//! Package-independent WebVTT track values.
+//! Package-independent `WebVTT` track values.
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Header {
@@ -126,7 +126,7 @@ pub struct Track {
     pub target: Target,
 }
 
-/// The location where PowerPoint renders a caption track.
+/// The location where `PowerPoint` renders a caption track.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DisplayLocation {
     /// Render the track over the media object.
@@ -157,7 +157,7 @@ impl DisplayLocation {
 /// The relationship target selected by a typed caption reference.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CaptionTarget {
-    /// An inert internal WebVTT part. Its payload is never decoded by the
+    /// An inert internal `WebVTT` part. Its payload is never decoded by the
     /// metadata owner and remains owned by the OPC package.
     Internal {
         part_name: String,
@@ -174,7 +174,7 @@ pub struct Caption {
     pub id: String,
     /// Required human-readable label.
     pub label: String,
-    /// Optional DrawingML text-language identifier.
+    /// Optional `DrawingML` text-language identifier.
     pub language: Option<String>,
     /// Effective relationship target. Both authored relationship attributes
     /// remain available through the package-bound source state.
@@ -199,7 +199,7 @@ impl TracksInfo {
     }
 }
 
-/// Stable contextual identity of a media picture in a PresentationML slide.
+/// Stable contextual identity of a media picture in a `PresentationML` slide.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MediaKey {
     pub slide_part_name: String,

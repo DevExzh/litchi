@@ -24,15 +24,19 @@ pub struct Change {
 }
 
 impl Change {
+    #[must_use]
     pub const fn kind(&self) -> ChangeKind {
         self.kind
     }
+    #[must_use]
     pub const fn scope(&self) -> Option<Scope> {
         self.scope
     }
+    #[must_use]
     pub const fn index(&self) -> Option<u16> {
         self.index
     }
+    #[must_use]
     pub const fn facet(&self) -> Option<Facet> {
         self.facet
     }
@@ -47,28 +51,39 @@ pub struct Transaction {
 }
 
 impl Transaction {
-    pub(crate) fn new(source: Snapshot) -> Result<Self> {
-        Ok(Self {
+    pub(crate) fn new(source: Snapshot) -> Self {
+        Self {
             fonts: source.fonts.clone(),
             document: source.document_record.clone(),
             source,
             changes: Vec::new(),
-        })
+        }
     }
 
+    #[must_use]
     pub const fn source(&self) -> &Snapshot {
         &self.source
     }
+    #[must_use]
     pub const fn fonts(&self) -> &FontCollections {
         &self.fonts
     }
+    #[must_use]
     pub fn changes(&self) -> &[Change] {
         &self.changes
     }
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         !self.changes.is_empty()
     }
 
+    /// Stage a replacement of the font at `index` in the collection for
+    /// `scope`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the collection is absent, `index` is unknown, or
+    /// the result violates the source limits.
     pub fn replace_font(&mut self, scope: Scope, index: u16, font: Font) -> Result<()> {
         if self
             .fonts
@@ -94,6 +109,13 @@ impl Transaction {
         Ok(())
     }
 
+    /// Stage an append of `font` to the collection for `scope`, returning its
+    /// new ordinal.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the collection is absent, the format font limit
+    /// would be exceeded, or the result violates the source limits.
     pub fn append_font(&mut self, scope: Scope, font: Font) -> Result<u16> {
         let mut candidate = self.fonts.clone();
         let index = candidate
@@ -111,6 +133,13 @@ impl Transaction {
         Ok(index)
     }
 
+    /// Stage a validated EOT facet on the font at `index` in the collection
+    /// for `scope`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the collection is absent, `index` is unknown,
+    /// `data` fails EOT validation, or the result violates the source limits.
     pub fn set_facet(
         &mut self,
         scope: Scope,
@@ -118,22 +147,22 @@ impl Transaction {
         facet: Facet,
         data: impl Into<super::SharedFontData>,
     ) -> Result<()> {
-        let data = data.into();
+        let payload = data.into();
         if self
             .fonts
             .collection(scope)
             .ok_or_else(|| missing_collection(scope))?
             .get(index)
             .and_then(|font| font.facet(facet))
-            .is_some_and(|old| old.bytes() == data.as_ref())
+            .is_some_and(|old| old.bytes() == payload.as_ref())
         {
             return Ok(());
         }
         let mut candidate = self.fonts.clone();
         candidate
             .collection_mut(scope)
-            .expect("font collection was checked before candidate cloning")
-            .set_facet(index, facet, data)?;
+            .ok_or_else(|| missing_collection(scope))?
+            .set_facet(index, facet, payload)?;
         candidate.validate_with_limits(self.source.limits.fonts)?;
         self.fonts = candidate;
         self.changes.push(Change {
@@ -147,8 +176,14 @@ impl Transaction {
 
     /// Prepare and stage one inert EOT facet without loading or executing it.
     ///
-    /// The PowerPoint facet is derived from `font.style`. License, intent, and
+    /// The `PowerPoint` facet is derived from `font.style`. License, intent, and
     /// EOT-limit failures happen before the transaction model is mutated.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the collection or font ordinal is absent, the
+    /// prepared font cannot be encoded or rolled back, or the result violates
+    /// the source limits.
     #[cfg(feature = "fonts")]
     pub fn set_prepared_facet(
         &mut self,
@@ -195,14 +230,14 @@ impl Transaction {
             .collection_mut(scope)
             .ok_or_else(|| Error::InvalidFormat(format!("{scope:?} font collection is absent")))?;
         super::prepared::stage_facet(collection, index, facet, data);
-        let current = collection
-            .get_mut(index)
-            .expect("font ordinal was checked before EOT encoding");
-        current.embedded_subset = subsetted;
+        let staged = collection.get_mut(index).ok_or_else(|| {
+            Error::InvalidFormat(format!("unknown {scope:?} font ordinal {index}"))
+        })?;
+        staged.embedded_subset = subsetted;
         if subsetted {
-            current.font_flags |= 1;
+            staged.font_flags |= 1;
         } else {
-            current.font_flags &= !1;
+            staged.font_flags &= !1;
         }
         if let Err(error) = candidate.validate_with_limits(self.source.limits.fonts) {
             super::prepared::restore_staged(font, &mut candidate, scope, index, facet, limits)
@@ -213,10 +248,10 @@ impl Transaction {
                 })?;
             return Err(error);
         }
-        let serialized = candidate
+        let staged_collection = candidate
             .collection(scope)
-            .expect("staged collection remains available")
-            .to_record_bytes_with_limits(self.source.limits.fonts);
+            .ok_or_else(|| Error::InvalidFormat(format!("{scope:?} font collection is absent")))?;
+        let serialized = staged_collection.to_record_bytes_with_limits(self.source.limits.fonts);
         if let Err(error) = serialized {
             super::prepared::restore_staged(font, &mut candidate, scope, index, facet, limits)
                 .map_err(|restore| {
@@ -245,6 +280,13 @@ impl Transaction {
         Ok(())
     }
 
+    /// Stage removal of `facet` from the font at `index` in the collection
+    /// for `scope`, returning whether a facet was removed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the collection is absent, `index` is unknown, or
+    /// the result violates the source limits.
     pub fn remove_facet(&mut self, scope: Scope, index: u16, facet: Facet) -> Result<bool> {
         let mut candidate = self.fonts.clone();
         let removed = candidate
@@ -256,7 +298,9 @@ impl Transaction {
             let font = candidate
                 .collection_mut(scope)
                 .and_then(|collection| collection.get_mut(index))
-                .expect("removed facet owner remains in its collection");
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!("unknown {scope:?} font ordinal {index}"))
+                })?;
             if font.embedded_fonts.is_empty() {
                 font.embedded_subset = false;
                 font.font_flags &= !1;
@@ -273,6 +317,11 @@ impl Transaction {
         Ok(removed)
     }
 
+    /// Stage document-wide embedding flags.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the result violates the source limits.
     pub fn set_embedding_flags(&mut self, flags: Option<FontEmbeddingFlags>) -> Result<()> {
         if self.fonts.embedding_flags == flags {
             return Ok(());
@@ -291,6 +340,10 @@ impl Transaction {
     }
 
     /// Removal is refused until every base and PP10 reference can be proven and remapped.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_font(&mut self, _scope: Scope, _index: u16) -> Result<Font> {
         Err(Error::InvalidFormat(
             "font removal requires a complete base and PP10 reference remap".into(),
@@ -298,12 +351,24 @@ impl Transaction {
     }
 
     /// Reordering is refused until every base and PP10 reference can be proven and remapped.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn reorder_fonts(&mut self, _scope: Scope, _order: &[u16]) -> Result<()> {
         Err(Error::InvalidFormat(
             "font reordering requires a complete base and PP10 reference remap".into(),
         ))
     }
 
+    /// Publish the staged changes as an incremental patch and return the
+    /// resulting commit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the publication budget is exceeded, the live owner
+    /// changed during staging, serialization fails, or the published candidate
+    /// fails its semantic reopen.
     pub fn commit(mut self) -> Result<Commit> {
         if self.changes.is_empty() {
             let revision = self.source.revision();
@@ -385,11 +450,60 @@ impl Transaction {
         Ok(Commit { snapshot, patch })
     }
 
+    /// Consume the transaction, publishing its staged changes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error under the same conditions as [`Self::commit`].
     pub fn finish(self) -> Result<Commit> {
         self.commit()
     }
+    #[must_use]
     pub fn rollback(self) -> Snapshot {
         self.source
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Commit {
+    snapshot: Snapshot,
+    patch: Patch,
+}
+
+impl Commit {
+    #[must_use]
+    pub const fn snapshot(&self) -> &Snapshot {
+        &self.snapshot
+    }
+    #[must_use]
+    pub const fn patch(&self) -> &Patch {
+        &self.patch
+    }
+    #[must_use]
+    pub const fn fonts(&self) -> &FontCollections {
+        self.snapshot.fonts()
+    }
+    /// Revert the committed patch against an exact current snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `current` is neither this commit's snapshot nor
+    /// its exact base source.
+    pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
+        self.patch.undo(current)
+    }
+    /// Re-apply the committed patch against an exact current snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `current` is neither the base source nor the exact
+    /// already-applied target of the patch.
+    pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
+        self.patch.redo(current)
+    }
+    #[must_use]
+    pub fn into_parts(self) -> (Snapshot, Patch) {
+        (self.snapshot, self.patch)
     }
 }
 
@@ -426,54 +540,28 @@ fn collections_have_embedded_fonts(fonts: &FontCollections) -> bool {
 }
 
 fn synchronize_save_with_fonts(document: &mut Record, expected: bool) -> Result<()> {
-    let mut position = None;
+    let mut document_atom_position = None;
     for (index, child) in document.children.iter().enumerate() {
         if child.record_type != crate::RecordType::DocumentAtom {
             continue;
         }
-        if position.replace(index).is_some() {
+        if document_atom_position.replace(index).is_some() {
             return Err(Error::Corrupted(
                 "live DocumentContainer contains multiple DocumentAtom records".into(),
             ));
         }
     }
-    let position = position.ok_or_else(|| {
+    let Some(position) = document_atom_position else {
+        return Err(Error::Corrupted(
+            "live DocumentContainer is missing its DocumentAtom".into(),
+        ));
+    };
+    let record = document.children.get_mut(position).ok_or_else(|| {
         Error::Corrupted("live DocumentContainer is missing its DocumentAtom".into())
     })?;
-    let record = document
-        .children
-        .get_mut(position)
-        .expect("DocumentAtom position was selected from this vector");
     let atom = crate::document_atom::DocumentAtom::parse(record)?;
     if atom.save_with_fonts != expected {
         record.data[36] = u8::from(expected);
     }
     Ok(())
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
-
-impl Commit {
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-    pub const fn fonts(&self) -> &FontCollections {
-        self.snapshot.fonts()
-    }
-    pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
-        self.patch.undo(current)
-    }
-    pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
-        self.patch.redo(current)
-    }
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
 }

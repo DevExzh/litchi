@@ -442,10 +442,10 @@ fn classify_start(
         Kind::Other => Kind::Other,
     };
 
-    if let Kind::NvPr = kind {
-        if nv_pr.is_some() {
-            return Err(invalid("designer shape has duplicate p:nvPr elements"));
-        }
+    if let Kind::NvPr = kind
+        && nv_pr.is_some()
+    {
+        return Err(invalid("designer shape has duplicate p:nvPr elements"));
     }
     Ok(kind)
 }
@@ -666,7 +666,7 @@ fn mark_other(frame: &mut Frame) {
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("designer XML offset does not fit usize"))
+        .map_err(|_err| invalid("designer XML offset does not fit usize"))
 }
 
 fn frame_close_start(end: usize, xml: &[u8]) -> usize {

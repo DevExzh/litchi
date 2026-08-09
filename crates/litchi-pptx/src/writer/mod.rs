@@ -1,4 +1,4 @@
-//! Layered mutable PresentationML authoring.
+//! Layered mutable `PresentationML` authoring.
 
 pub mod presentation;
 pub mod shape;

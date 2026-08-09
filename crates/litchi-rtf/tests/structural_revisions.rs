@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 //! Round-trip tests for structural revision metadata: `\prauthN`/`\prdateN`,
 //! `\srauthN`/`\srdateN`, `\trauthN`/`\trdateN`, and the `\clins`, `\cldel`,
 //! `\clmrgd` cell revision markers with their author/DTTM companions.
@@ -19,14 +28,14 @@ fn metadata(author: i32, date: i32) -> RevisionMetadata {
 
 #[test]
 fn paragraph_revision_metadata_round_trips() {
-    let source = r#"{\rtf1\ansi\prauth2\prdate1199059860 Revised paragraph\par}"#;
+    let source = r"{\rtf1\ansi\prauth2\prdate1199059860 Revised paragraph\par}";
     let document = RtfDocument::parse(source).unwrap();
     let block = document
         .blocks()
         .iter()
         .find(|block| block.text.contains("Revised"))
         .expect("paragraph block");
-    assert_eq!(block.paragraph.revision, metadata(2, 1199059860));
+    assert_eq!(block.paragraph.revision, metadata(2, 1_199_059_860));
 
     let first = write(&document);
     assert!(first.contains("\\prauth2"), "missing prauth in {first}");
@@ -40,13 +49,13 @@ fn paragraph_revision_metadata_round_trips() {
         .iter()
         .find(|block| block.text.contains("Revised"))
         .expect("paragraph block");
-    assert_eq!(block.paragraph.revision, metadata(2, 1199059860));
+    assert_eq!(block.paragraph.revision, metadata(2, 1_199_059_860));
     assert_eq!(first, write(&reparsed));
 }
 
 #[test]
 fn paragraph_revision_metadata_resets_with_pard() {
-    let source = r#"{\rtf1\ansi\prauth1\prdate42 One\par\pard Two\par}"#;
+    let source = r"{\rtf1\ansi\prauth1\prdate42 One\par\pard Two\par}";
     let document = RtfDocument::parse(source).unwrap();
     let two = document
         .blocks()
@@ -63,11 +72,11 @@ fn negative_paragraph_revision_author_is_rejected() {
 
 #[test]
 fn section_revision_metadata_round_trips() {
-    let source = r#"{\rtf1\ansi\sectd\srauth3\srdate-1501115711 Body\par}"#;
+    let source = r"{\rtf1\ansi\sectd\srauth3\srdate-1501115711 Body\par}";
     let document = RtfDocument::parse(source).unwrap();
     assert_eq!(
         document.sections()[0].properties.revision,
-        metadata(3, -1501115711)
+        metadata(3, -1_501_115_711)
     );
 
     let first = write(&document);
@@ -79,14 +88,14 @@ fn section_revision_metadata_round_trips() {
     let reparsed = RtfDocument::parse(&first).unwrap();
     assert_eq!(
         reparsed.sections()[0].properties.revision,
-        metadata(3, -1501115711)
+        metadata(3, -1_501_115_711)
     );
     assert_eq!(first, write(&reparsed));
 }
 
 #[test]
 fn table_row_revision_metadata_round_trips() {
-    let source = r#"{\rtf1\trowd\trauth4\trdate777 \cellx1000\intbl A\cell\row\trowd\cellx1000\intbl B\cell\row}"#;
+    let source = r"{\rtf1\trowd\trauth4\trdate777 \cellx1000\intbl A\cell\row\trowd\cellx1000\intbl B\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     let rows = document.tables()[0].rows();
     assert_eq!(rows[0].revision(), metadata(4, 777));

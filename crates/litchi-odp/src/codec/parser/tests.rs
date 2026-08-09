@@ -1,3 +1,10 @@
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    clippy::let_underscore_must_use,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 //! Regression tests for the ODP XML parser owner.
 
 use super::{Parser, model::ShapeBuilder};

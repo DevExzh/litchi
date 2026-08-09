@@ -1,7 +1,7 @@
 use super::directory::{SlideDirectory, SlideDirectoryEntry};
 use super::notes::{NoteDescriptor, NotesIndex};
 use crate::consts::RecordType;
-/// SlideFactory - Creates slides from persist mapping with zero-copy parsing.
+/// `SlideFactory` - Creates slides from persist mapping with zero-copy parsing.
 ///
 /// High-performance implementation using lifetimes to avoid data copying.
 use crate::package::{Error, RecordLimits, Result};
@@ -16,6 +16,10 @@ use once_cell::unsync::OnceCell;
 /// - Zero-copy: Borrows from original document data
 /// - Lazy evaluation: Slides created on-demand via iterator
 /// - Minimal allocations: Direct slice access
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`SlideFactory` is the established public API name re-exported as `slide::SlideFactory`; renaming it would break downstream crates"
+)]
 pub struct SlideFactory<'doc> {
     /// Reference to the complete document stream data
     doc_data: &'doc [u8],
@@ -29,6 +33,7 @@ pub struct SlideFactory<'doc> {
 impl<'doc> SlideFactory<'doc> {
     /// Create a new slide factory.
     #[inline]
+    #[must_use]
     pub fn new(
         doc_data: &'doc [u8],
         persist_mapping: &'doc PersistMapping,
@@ -62,7 +67,7 @@ impl<'doc> SlideFactory<'doc> {
         self.slide_directory
             .entries()
             .iter()
-            .map(|entry| entry.persist_id())
+            .map(SlideDirectoryEntry::persist_id)
             .collect()
     }
 
@@ -70,12 +75,16 @@ impl<'doc> SlideFactory<'doc> {
     ///
     /// # Performance
     ///
-    /// - Zero-copy: Returns SlideData borrowing from doc_data
+    /// - Zero-copy: Returns `SlideData` borrowing from `doc_data`
     /// - No intermediate buffers
     /// - Direct record parsing at offset
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_slide(&self, persist_id: u32) -> Result<SlideData<'doc>> {
         let offset = self.persist_mapping.get_offset(persist_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("No offset found for persist_id {}", persist_id))
+            Error::InvalidFormat(format!("No offset found for persist_id {persist_id}"))
         })?;
 
         let entry = self
@@ -95,18 +104,17 @@ impl<'doc> SlideFactory<'doc> {
         offset: u32,
         entry: &SlideDirectoryEntry,
     ) -> Result<SlideData<'doc>> {
-        let offset = offset as usize;
+        let offset_usize = offset as usize;
 
-        if offset + 8 > self.doc_data.len() {
+        if offset_usize + 8 > self.doc_data.len() {
             return Err(Error::Corrupted(format!(
-                "Offset {} exceeds document length",
-                offset
+                "Offset {offset_usize} exceeds document length"
             )));
         }
 
         // Parse the Slide record at this offset
         let (record, _consumed) =
-            Record::parse_with_limits(self.doc_data, offset, self.record_limits)?;
+            Record::parse_with_limits(self.doc_data, offset_usize, self.record_limits)?;
 
         if record.record_type != RecordType::Slide {
             return Err(Error::InvalidFormat(format!(
@@ -132,7 +140,7 @@ impl<'doc> SlideFactory<'doc> {
             slide_list_text: entry.list_text().to_string(),
             outline_text_interactions: entry.outline_text_interactions().to_vec(),
             outline_text_refs: entry.outline_text_refs().to_vec(),
-            offset,
+            offset: offset_usize,
             record,
             doc_data: self.doc_data,
             note_descriptor,
@@ -163,11 +171,11 @@ impl<'doc> SlideFactory<'doc> {
 pub struct SlideData<'doc> {
     /// Persist ID for this slide
     pub persist_id: u32,
-    /// Stable SlideId from SlidePersistAtom.
+    /// Stable `SlideId` from `SlidePersistAtom`.
     pub slide_id: u32,
-    /// Text records associated with this slide in SlideListWithText.
+    /// Text records associated with this slide in `SlideListWithText`.
     pub(crate) slide_list_text: String,
-    /// Range-anchored actions from SlideListWithText text bodies.
+    /// Range-anchored actions from `SlideListWithText` text bodies.
     pub(crate) outline_text_interactions: Vec<crate::TextBodyInteractions>,
     pub(crate) outline_text_refs: Vec<crate::OutlineTextRef>,
     /// Byte offset in document stream
@@ -181,36 +189,41 @@ pub struct SlideData<'doc> {
 }
 
 impl<'doc> SlideData<'doc> {
-    /// Get the SlideAtom child record containing layout/master info.
+    /// Get the `SlideAtom` child record containing layout/master info.
     #[inline]
+    #[must_use]
     pub fn slide_atom(&self) -> Option<&Record> {
         self.record.find_child(RecordType::SlideAtom)
     }
 
-    /// Get the PPDrawing child record containing shapes.
+    /// Get the `PPDrawing` child record containing shapes.
     #[inline]
+    #[must_use]
     pub fn ppdrawing(&self) -> Option<&Record> {
         self.record.find_child(RecordType::PPDrawing)
     }
 
     /// Check if this slide has drawing data (shapes).
     #[inline]
+    #[must_use]
     pub fn has_shapes(&self) -> bool {
         self.ppdrawing().is_some()
     }
 
     /// Get reference to document data for advanced parsing.
     #[inline]
+    #[must_use]
     pub fn doc_data(&self) -> &'doc [u8] {
         self.doc_data
     }
 
-    /// Create a SlideData instance for testing purposes.
+    /// Create a `SlideData` instance for testing purposes.
     ///
     /// # Note
     ///
     /// This is only available in test builds.
     #[cfg(test)]
+    #[must_use]
     pub fn new_for_test(
         persist_id: u32,
         offset: usize,
@@ -233,6 +246,11 @@ impl<'doc> SlideData<'doc> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

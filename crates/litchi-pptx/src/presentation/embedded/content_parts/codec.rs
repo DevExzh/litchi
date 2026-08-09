@@ -1,4 +1,4 @@
-//! Bounded, namespace-aware codec for PresentationML content-part anchors.
+//! Bounded, namespace-aware codec for `PresentationML` content-part anchors.
 
 use super::super::{
     MAX_ATTRIBUTE_BYTES, MAX_XML_ATTRIBUTES, MAX_XML_BYTES, MAX_XML_DEPTH, increment_nodes,
@@ -69,9 +69,9 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Anchor>> {
             .into_owned();
         let after = position(&reader)?;
         let resolver = reader.resolver().clone();
-        let (namespace, event) = resolver.resolve_event(event);
+        let (namespace, resolved_event) = resolver.resolve_event(event);
 
-        match event {
+        match resolved_event {
             Event::Start(element) => {
                 increment_nodes(&mut nodes)?;
                 validate_attributes(&element)?;
@@ -127,7 +127,6 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Anchor>> {
                     if anchors.len() >= maximum {
                         return Err(limit("content-part count", maximum));
                     }
-                    let resolver = reader.resolver().clone();
                     let relationship_id = relationship_id(&element, reader.decoder(), &resolver)?;
                     anchors.push(Anchor {
                         relationship_id,
@@ -471,10 +470,10 @@ pub(crate) fn shape_tree_insertion(source: &[u8]) -> Result<usize> {
                     validate_root(&namespace, element.name(), root_seen)?;
                     root_seen = true;
                 }
-                if is_presentationml_name(&namespace, element.name(), b"spTree") {
-                    if tree_depth.replace(child_depth).is_some() {
-                        return Err(invalid("content-part slide has multiple shape trees"));
-                    }
+                if is_presentationml_name(&namespace, element.name(), b"spTree")
+                    && tree_depth.replace(child_depth).is_some()
+                {
+                    return Err(invalid("content-part slide has multiple shape trees"));
                 }
                 depth = child_depth;
             },
@@ -717,7 +716,7 @@ fn validate_attributes(element: &BytesStart<'_>) -> Result<()> {
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("content-part XML offset does not fit usize"))
+        .map_err(|_err| invalid("content-part XML offset does not fit usize"))
 }
 
 fn is_content_part(namespace: &ResolveResult<'_>, name: quick_xml::name::QName<'_>) -> bool {

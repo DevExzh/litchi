@@ -1,4 +1,4 @@
-//! Typed, lossless PresentationML zoom metadata.
+//! Typed, lossless `PresentationML` zoom metadata.
 //!
 //! The owner is deliberately contextual: it edits only the zoom
 //! `mc:AlternateContent` entries of one slide XML part while preserving the
@@ -17,6 +17,10 @@ pub use model::{
 };
 
 /// Read a lossless zoom owner from a complete slide or shape-tree XML value.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 #[inline]
 pub fn read(xml: &[u8]) -> crate::Result<Owner> {
     Owner::read(xml)

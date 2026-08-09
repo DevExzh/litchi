@@ -1,4 +1,4 @@
-//! Built-in PresentationML producer templates.
+//! Built-in `PresentationML` producer templates.
 //!
 //! These assets are deliberately owned by the format crate. Package
 //! orchestration can therefore construct a valid document without depending

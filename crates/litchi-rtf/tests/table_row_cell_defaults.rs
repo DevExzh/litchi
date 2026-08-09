@@ -1,8 +1,17 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{BorderStyle, RtfDocument, RtfWriter, TableDistanceUnit, TablePreferredWidthUnit};
 
 #[test]
 fn parses_row_cell_defaults_and_resets_per_row() {
-    let source = r#"{\rtf1\trowd\tsbrdrt\brdrs\brdrw20\brdrcf2\tsbrdrh\brdrdot\brdrw10\tscellpaddl100\tscellpaddfl3\tscellspct20\tscellspcft3\tscellwidth2500\tscellwidthfts2\cellx2500\intbl A\cell\row\trowd\tscellpaddr40\tscellpaddfr3\cellx2500\intbl B\cell\row}"#;
+    let source = r"{\rtf1\trowd\tsbrdrt\brdrs\brdrw20\brdrcf2\tsbrdrh\brdrdot\brdrw10\tscellpaddl100\tscellpaddfl3\tscellspct20\tscellspcft3\tscellwidth2500\tscellwidthfts2\cellx2500\intbl A\cell\row\trowd\tscellpaddr40\tscellpaddfr3\cellx2500\intbl B\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     let rows = document.tables()[0].rows();
 
@@ -40,12 +49,12 @@ fn parses_row_cell_defaults_and_resets_per_row() {
 fn parses_default_cell_width_units() {
     for (source, unit, value) in [
         (
-            r#"{\rtf1\trowd\tscellwidthfts1\cellx1000\intbl A\cell\row}"#,
+            r"{\rtf1\trowd\tscellwidthfts1\cellx1000\intbl A\cell\row}",
             TablePreferredWidthUnit::Auto,
             None,
         ),
         (
-            r#"{\rtf1\trowd\tscellwidth1440\tscellwidthfts3\cellx1440\intbl A\cell\row}"#,
+            r"{\rtf1\trowd\tscellwidth1440\tscellwidthfts3\cellx1440\intbl A\cell\row}",
             TablePreferredWidthUnit::Twips,
             Some(1440),
         ),
@@ -63,7 +72,7 @@ fn parses_default_cell_width_units() {
 #[test]
 fn writer_round_trips_deterministically() {
     let document = RtfDocument::parse(
-        r#"{\rtf1\trowd\tsbrdrb\brdrs\brdrw30\brdrcf1\brsp4\tsbrdrv\brdrdash\brdrw10\tscellpaddl57\tscellpaddfl3\tscellspcb12\tscellspcfb3\tscellwidth1000\tscellwidthfts2\cellx2000\intbl Cell\cell\row}"#,
+        r"{\rtf1\trowd\tsbrdrb\brdrs\brdrw30\brdrcf1\brsp4\tsbrdrv\brdrdash\brdrw10\tscellpaddl57\tscellpaddfl3\tscellspcb12\tscellspcfb3\tscellwidth1000\tscellwidthfts2\cellx2000\intbl Cell\cell\row}",
     )
     .unwrap();
     let mut first = Vec::new();
@@ -91,24 +100,23 @@ fn writer_round_trips_deterministically() {
 #[test]
 fn rejects_malformed_default_controls() {
     for source in [
-        r#"{\rtf1\trowd\tscellpaddl X}"#,
-        r#"{\rtf1\trowd\tscellpaddl-1 X}"#,
-        r#"{\rtf1\trowd\tscellpaddl31681 X}"#,
-        r#"{\rtf1\trowd\tscellpaddfl1 X}"#,
-        r#"{\rtf1\trowd\tscellspcft9 X}"#,
-        r#"{\rtf1\trowd\tscellwidth X}"#,
-        r#"{\rtf1\trowd\tscellwidth2500\cellx1000\intbl A\cell\row}"#,
-        r#"{\rtf1\trowd\tscellwidthfts2\cellx1000\intbl A\cell\row}"#,
-        r#"{\rtf1\trowd\tscellwidthfts4 X}"#,
-        r#"{\rtf1\trowd\tscellwidth100\tscellwidthfts2\tscellwidthfts3 X}"#,
-        r#"{\rtf1\trowd\tscellwidth100\tscellwidth200\tscellwidthfts3 X}"#,
-        r#"{\rtf1\trowd\tsbrdrt\brdrw20 X}"#,
-        r#"{\rtf1\trowd\tsbrdrt\brdrs\brdrw80 X}"#,
+        r"{\rtf1\trowd\tscellpaddl X}",
+        r"{\rtf1\trowd\tscellpaddl-1 X}",
+        r"{\rtf1\trowd\tscellpaddl31681 X}",
+        r"{\rtf1\trowd\tscellpaddfl1 X}",
+        r"{\rtf1\trowd\tscellspcft9 X}",
+        r"{\rtf1\trowd\tscellwidth X}",
+        r"{\rtf1\trowd\tscellwidth2500\cellx1000\intbl A\cell\row}",
+        r"{\rtf1\trowd\tscellwidthfts2\cellx1000\intbl A\cell\row}",
+        r"{\rtf1\trowd\tscellwidthfts4 X}",
+        r"{\rtf1\trowd\tscellwidth100\tscellwidthfts2\tscellwidthfts3 X}",
+        r"{\rtf1\trowd\tscellwidth100\tscellwidth200\tscellwidthfts3 X}",
+        r"{\rtf1\trowd\tsbrdrt\brdrw20 X}",
+        r"{\rtf1\trowd\tsbrdrt\brdrs\brdrw80 X}",
     ] {
         assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
     }
     assert!(
-        RtfDocument::parse(r#"{\rtf1{\*\unknown\tscellpaddl-1\tscellwidthfts9 bad}Visible}"#)
-            .is_ok()
+        RtfDocument::parse(r"{\rtf1{\*\unknown\tscellpaddl-1\tscellwidthfts9 bad}Visible}").is_ok()
     );
 }

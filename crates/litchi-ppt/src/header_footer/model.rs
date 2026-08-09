@@ -1,8 +1,8 @@
-//! Semantic PowerPoint header/footer metadata.
+//! Semantic `PowerPoint` header/footer metadata.
 
 use crate::package::{Error, Result};
 
-/// A validated PowerPoint datetime format identifier.
+/// A validated `PowerPoint` datetime format identifier.
 ///
 /// Values 0 through 12 are the ordinary locale-dependent formats. Value 13
 /// is permitted by `HeadersFootersAtom`, although producers are advised not to
@@ -17,6 +17,10 @@ impl DateTimeFormatId {
     pub const MAX: u8 = 13;
 
     /// Construct a validated format identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(value: u8) -> Result<Self> {
         if value > Self::MAX {
             return Err(Error::Corrupted(
@@ -28,6 +32,7 @@ impl DateTimeFormatId {
 
     /// Return the on-disk identifier.
     #[inline]
+    #[must_use]
     pub const fn get(self) -> u8 {
         self.0
     }
@@ -69,12 +74,14 @@ pub struct HeaderFooterParentOrdinal(pub(super) usize);
 impl HeaderFooterParentOrdinal {
     /// Construct an ordinal from a zero-based parent index.
     #[inline]
+    #[must_use]
     pub const fn new(value: usize) -> Self {
         Self(value)
     }
 
     /// Return the zero-based ordinal.
     #[inline]
+    #[must_use]
     pub const fn get(self) -> usize {
         self.0
     }
@@ -91,12 +98,18 @@ pub enum HeaderFooterScope {
     Local {
         /// Kind of direct parent.
         parent: HeaderFooterParent,
-        /// Parent ordinal in PowerPoint record order.
+        /// Parent ordinal in `PowerPoint` record order.
         parent_ordinal: HeaderFooterParentOrdinal,
     },
 }
 
 /// Display options stored by `HeadersFootersAtom`.
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "each bool maps one-to-one to an independent flag bit of the MS-PPT \
+              `HeadersFootersAtom` bitfield; grouping them into enums would misrepresent \
+              the on-disk layout and churn the public API"
+)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct HeaderFooterOptions {
     /// Locale-dependent datetime format identifier.
@@ -119,7 +132,7 @@ pub struct HeaderFooterOptions {
 /// Text derived from inert header/footer placeholder shapes.
 ///
 /// Office 2007 can save binary presentations with visible header/footer text
-/// in placeholders while leaving the corresponding CString atoms absent. This
+/// in placeholders while leaving the corresponding `CString` atoms absent. This
 /// view is kept separate so record-local serialization remains lossless.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct HeaderFooterDisplayText {
@@ -144,7 +157,7 @@ pub struct ScopedHeaderFooterDisplayText {
     pub text: HeaderFooterDisplayText,
 }
 
-/// Typed, inert metadata from one PowerPoint header/footer container.
+/// Typed, inert metadata from one `PowerPoint` header/footer container.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HeaderFooter {
     /// Container scope and parent association.
@@ -158,13 +171,14 @@ pub struct HeaderFooter {
     /// Optional footer text.
     pub footer: Option<String>,
     /// Optional text derived from inert placeholders. This is never serialized
-    /// into the record-local CString fields.
+    /// into the record-local `CString` fields.
     pub placeholder_display: Option<HeaderFooterDisplayText>,
 }
 
 impl HeaderFooter {
     /// Return visible custom-date text, preferring an attached Office 2007
-    /// placeholder and otherwise using the stored UserDateAtom.
+    /// placeholder and otherwise using the stored `UserDateAtom`.
+    #[must_use]
     pub fn display_user_date(&self) -> Option<&str> {
         self.placeholder_display
             .as_ref()
@@ -173,7 +187,8 @@ impl HeaderFooter {
     }
 
     /// Return visible header text, preferring an attached Office 2007
-    /// placeholder and otherwise using the stored HeaderAtom.
+    /// placeholder and otherwise using the stored `HeaderAtom`.
+    #[must_use]
     pub fn display_header(&self) -> Option<&str> {
         self.placeholder_display
             .as_ref()
@@ -182,7 +197,8 @@ impl HeaderFooter {
     }
 
     /// Return visible footer text, preferring an attached Office 2007
-    /// placeholder and otherwise using the stored FooterAtom.
+    /// placeholder and otherwise using the stored `FooterAtom`.
+    #[must_use]
     pub fn display_footer(&self) -> Option<&str> {
         self.placeholder_display
             .as_ref()
@@ -200,22 +216,25 @@ pub struct HeaderFooters {
 }
 
 impl HeaderFooters {
-    /// Return entries in PowerPoint record order.
+    /// Return entries in `PowerPoint` record order.
     #[inline]
+    #[must_use]
     pub fn entries(&self) -> &[HeaderFooter] {
         &self.entries
     }
 
-    /// Return placeholder-derived displays in physical PowerPoint record order.
+    /// Return placeholder-derived displays in physical `PowerPoint` record order.
     ///
     /// Unlike [`Self::entries`], these values are not necessarily backed by a
     /// local `RT_HeadersFooters` record and cannot be serialized as one.
     #[inline]
+    #[must_use]
     pub fn placeholder_displays(&self) -> &[ScopedHeaderFooterDisplayText] {
         &self.placeholder_displays
     }
 
     /// Return placeholder-derived display text for an exact scope.
+    #[must_use]
     pub fn placeholder_display(
         &self,
         scope: HeaderFooterScope,
@@ -227,6 +246,7 @@ impl HeaderFooters {
     }
 
     /// Return the presentation-wide ordinary-slide defaults, if present.
+    #[must_use]
     pub fn presentation_slides(&self) -> Option<&HeaderFooter> {
         self.entries
             .iter()
@@ -234,6 +254,7 @@ impl HeaderFooters {
     }
 
     /// Return the presentation-wide notes/handout defaults, if present.
+    #[must_use]
     pub fn notes_and_handouts(&self) -> Option<&HeaderFooter> {
         self.entries
             .iter()

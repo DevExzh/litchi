@@ -740,7 +740,7 @@ fn append(output: &mut String, value: &str) -> Result<()> {
 
 pub(super) fn xml_char(value: char) -> bool {
     matches!(value, '\u{9}' | '\u{A}' | '\u{D}')
-        || matches!(value as u32, 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF)
+        || matches!(value as u32, 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x1_0000..=0x10_FFFF)
 }
 
 fn checked_depth(depth: usize) -> Result<usize> {
@@ -767,5 +767,5 @@ fn bump_node(nodes: &mut usize) -> Result<()> {
 
 fn xml_position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("table-style XML offset exceeds usize"))
+        .map_err(|_err| invalid("table-style XML offset exceeds usize"))
 }

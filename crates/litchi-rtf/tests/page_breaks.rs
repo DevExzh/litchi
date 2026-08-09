@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{BodyStoryEvent, CellStoryEvent, RtfDocument, RtfWriter, StoryEvent};
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
@@ -16,7 +25,7 @@ fn has_page(events: &[StoryEvent], position: usize) -> bool {
 
 #[test]
 fn body_page_is_zero_width_ordered_and_round_trips_canonically() {
-    let document = RtfDocument::parse(r#"{\rtf1\ansi A\page B}"#).unwrap();
+    let document = RtfDocument::parse(r"{\rtf1\ansi A\page B}").unwrap();
     assert_eq!(document.text(), "AB");
     assert!(matches!(
         document.body_story_events(),
@@ -68,7 +77,7 @@ fn visible_story_owners_preserve_page_events() {
 
 #[test]
 fn table_and_nested_table_page_events_round_trip_in_place() {
-    let source = r#"{\rtf1\trowd\cellx5000\intbl\itap1 Before\page After \intbl\itap2 Inner\page Tail\nestcell{\*\nesttableprops\itap2\trowd\cellx1000\nestrow}{\nonesttables\par}\intbl\itap1 End\cell\row}"#;
+    let source = r"{\rtf1\trowd\cellx5000\intbl\itap1 Before\page After \intbl\itap2 Inner\page Tail\nestcell{\*\nesttableprops\itap2\trowd\cellx1000\nestrow}{\nonesttables\par}\intbl\itap1 End\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     let outer = &document.tables()[0].rows()[0].cells()[0];
     assert!(
@@ -106,15 +115,15 @@ fn table_and_nested_table_page_events_round_trip_in_place() {
 #[test]
 fn rejects_parameters_and_non_story_destinations_but_skips_unknown_groups() {
     for source in [
-        r#"{\rtf1 A\page1 B}"#,
-        r#"{\rtf1{\header A\page-1 B}x}"#,
-        r#"{\rtf1{\stylesheet{\s0\page Normal;}}x}"#,
-        r#"{\rtf1{\*\defchp\page}x}"#,
+        r"{\rtf1 A\page1 B}",
+        r"{\rtf1{\header A\page-1 B}x}",
+        r"{\rtf1{\stylesheet{\s0\page Normal;}}x}",
+        r"{\rtf1{\*\defchp\page}x}",
     ] {
         assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
     }
 
-    let document = RtfDocument::parse(r#"{\rtf1 A{\*\unknown\page1 ignored}B}"#).unwrap();
+    let document = RtfDocument::parse(r"{\rtf1 A{\*\unknown\page1 ignored}B}").unwrap();
     assert_eq!(document.text(), "AB");
     assert!(document.page_breaks().next().is_none());
 }

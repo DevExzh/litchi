@@ -16,7 +16,7 @@ pub(super) fn diagram_builds(record: &Record, limits: Limits) -> Result<Vec<Buil
     let mut builds = Vec::new();
     builds
         .try_reserve(record.children.len().min(limits.max_diagrams))
-        .map_err(|_| allocation("diagram build inventory"))?;
+        .map_err(|_err| allocation("diagram build inventory"))?;
     let mut identities = HashSet::new();
 
     for child in &record.children {
@@ -91,7 +91,7 @@ pub(super) fn validate_build_list(record: &Record) -> Result<()> {
 /// Validate the structural envelope needed by the source-preserving editor.
 ///
 /// Unlike the read-only inventory validator, this deliberately does not
-/// reject future or host-specific BuildList children.  They are outside the
+/// reject future or host-specific `BuildList` children.  They are outside the
 /// semantic edit surface but remain byte-for-byte inert in the transaction.
 pub(super) fn validate_edit_build_list(record: &Record, limits: EditLimits) -> Result<()> {
     if record.record_type != RecordType::BuildList
@@ -141,7 +141,7 @@ pub(super) fn validate_edit_build_list(record: &Record, limits: EditLimits) -> R
 pub(super) fn shape_ids(drawing: &Drawing<'_>, maximum: usize) -> Result<Vec<u32>> {
     let mut ids = HashSet::new();
     ids.try_reserve(drawing.shapes().len().min(maximum))
-        .map_err(|_| allocation("diagram shape index"))?;
+        .map_err(|_err| allocation("diagram shape index"))?;
     for shape in drawing.shapes() {
         collect_shape_ids_bounded(shape, &mut ids, maximum)?;
     }
@@ -212,7 +212,7 @@ fn collect_shape<'data>(
     }
     shapes
         .try_reserve(1)
-        .map_err(|_| allocation("associated shape references"))?;
+        .map_err(|_err| allocation("associated shape references"))?;
     shapes.push(ShapeRef::new(shape.id()));
 
     add_payload(
@@ -280,7 +280,7 @@ fn add_payload<'data>(
     }
     payloads
         .try_reserve(1)
-        .map_err(|_| allocation("diagram payload references"))?;
+        .map_err(|_err| allocation("diagram payload references"))?;
     payloads.push(Payload::new(shape_id, kind, record));
     Ok(())
 }

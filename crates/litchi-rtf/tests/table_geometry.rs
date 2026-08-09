@@ -1,6 +1,15 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{
     RtfDocument, RtfWriter, TableCellMergeRole, TableIndentUnit, TablePreferredWidthUnit,
-    TableRowHeight,
+    TableRowGeometry, TableRowHeight,
 };
 
 fn write(document: &RtfDocument<'_>) -> String {
@@ -11,7 +20,7 @@ fn write(document: &RtfDocument<'_>) -> String {
 
 #[test]
 fn parses_owned_geometry_widths_height_semantics_and_canonical_round_trip() {
-    let source = r#"{\rtf1\trowd\trgaph108\trleft-108\trrh240\trftsWidth2\trwWidth2500\trautofit1\tblind-120\tblindtype1\clftsWidth3\clwWidth900\clmgf\cellx900\clftsWidth2\clwWidth2500\clmrg\cellx2100\intbl A\cell B\cell\row\trowd\trrh-300\trftsWidth1\trautofit0\tblind0\tblindtype2\clftsWidth0\clwWidth0\cellx1200\intbl C\cell\row}"#;
+    let source = r"{\rtf1\trowd\trgaph108\trleft-108\trrh240\trftsWidth2\trwWidth2500\trautofit1\tblind-120\tblindtype1\clftsWidth3\clwWidth900\clmgf\cellx900\clftsWidth2\clwWidth2500\clmrg\cellx2100\intbl A\cell B\cell\row\trowd\trrh-300\trftsWidth1\trautofit0\tblind0\tblindtype2\clftsWidth0\clwWidth0\cellx1200\intbl C\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     let rows = document.tables()[0].rows();
     let geometry = rows[0].geometry();
@@ -59,7 +68,7 @@ fn parses_owned_geometry_widths_height_semantics_and_canonical_round_trip() {
 
 #[test]
 fn restores_groups_resets_trowd_and_snapshots_width_at_each_cellx() {
-    let source = r#"{\rtf1\trowd{\trgaph200\trleft300\trrh400\trftsWidth3\trwWidth1000\trautofit1\tblind100\tblindtype1\clftsWidth3\clwWidth400}\cellx1000\intbl A\cell\row\trowd\trgaph50\clftsWidth3\clwWidth600\cellx1000\clftsWidth2\clwWidth1250\cellx2000\intbl B\cell C\cell\row\trowd\cellx900\intbl D\cell\row}"#;
+    let source = r"{\rtf1\trowd{\trgaph200\trleft300\trrh400\trftsWidth3\trwWidth1000\trautofit1\tblind100\tblindtype1\clftsWidth3\clwWidth400}\cellx1000\intbl A\cell\row\trowd\trgaph50\clftsWidth3\clwWidth600\cellx1000\clftsWidth2\clwWidth1250\cellx2000\intbl B\cell C\cell\row\trowd\cellx900\intbl D\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     let rows = document.tables()[0].rows();
     assert_eq!(rows[0].geometry().half_gap_twips(), None);
@@ -74,13 +83,13 @@ fn restores_groups_resets_trowd_and_snapshots_width_at_each_cellx() {
         rows[1].cells()[1].preferred_width().unwrap().value(),
         Some(1250)
     );
-    assert_eq!(rows[2].geometry(), Default::default());
+    assert_eq!(rows[2].geometry(), TableRowGeometry::default());
     assert_eq!(rows[2].cells()[0].preferred_width(), None);
 }
 
 #[test]
 fn applies_geometry_to_end_defined_nested_rows() {
-    let source = r#"{\rtf1\trowd\cellx5000\intbl\itap2 A\nestcell\intbl\itap2 B\nestcell{\*\nesttableprops\itap2\trowd\trgaph40\trleft-20\trrh-180\trftsWidth3\trwWidth1700\trautofit1\tblind-10\tblindtype1\clftsWidth3\clwWidth700\cellx700\clftsWidth2\clwWidth2500\cellx1700\nestrow}\intbl\itap1\cell\row}"#;
+    let source = r"{\rtf1\trowd\cellx5000\intbl\itap2 A\nestcell\intbl\itap2 B\nestcell{\*\nesttableprops\itap2\trowd\trgaph40\trleft-20\trrh-180\trftsWidth3\trwWidth1700\trautofit1\tblind-10\tblindtype1\clftsWidth3\clwWidth700\cellx700\clftsWidth2\clwWidth2500\cellx1700\nestrow}\intbl\itap1\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     let nested = &document.tables()[0].rows()[0].cells()[0].nested_tables()[0].table;
     let row = &nested.rows()[0];
@@ -150,12 +159,11 @@ fn rejects_missing_invalid_unpaired_and_out_of_range_controls() {
         let source = format!("{{\\rtf1\\trowd\\{controls}\\cellx1000\\intbl X\\cell\\row}}");
         assert!(RtfDocument::parse(&source).is_err(), "accepted {controls}");
     }
-    let defaulted =
-        RtfDocument::parse(r#"{\rtf1\trowd\tblind\cellx1000\intbl X\cell\row}"#).unwrap();
+    let defaulted = RtfDocument::parse(r"{\rtf1\trowd\tblind\cellx1000\intbl X\cell\row}").unwrap();
     let indent = defaulted.tables()[0].rows()[0].geometry().indent().unwrap();
     assert_eq!(indent.unit(), TableIndentUnit::Twips);
     assert_eq!(indent.value(), 0);
-    assert!(RtfDocument::parse(r#"{\rtf1\trowd\trrh0\trgaph31680\trleft-31680\trftsWidth2\trwWidth5000\tblind-5000\tblindtype3\clftsWidth3\clwWidth31680\cellx31680\intbl X\cell\row}"#).is_ok());
+    assert!(RtfDocument::parse(r"{\rtf1\trowd\trrh0\trgaph31680\trleft-31680\trftsWidth2\trwWidth5000\tblind-5000\tblindtype3\clftsWidth3\clwWidth31680\cellx31680\intbl X\cell\row}").is_ok());
 }
 
 #[test]
@@ -166,7 +174,7 @@ fn parses_real_libreoffice_geometry_fixture() {
     let rows = document
         .tables()
         .iter()
-        .flat_map(|table| table.rows())
+        .flat_map(litchi_rtf::raw::Table::rows)
         .collect::<Vec<_>>();
     assert!(
         rows.iter()
@@ -212,7 +220,7 @@ fn parses_real_libreoffice_geometry_fixture() {
         reparsed
             .tables()
             .iter()
-            .flat_map(|table| table.rows())
+            .flat_map(litchi_rtf::raw::Table::rows)
             .any(|row| row.geometry().height() == TableRowHeight::Exact(240))
     );
 }

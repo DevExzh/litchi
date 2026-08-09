@@ -11,9 +11,17 @@ use crate::{Error, Record, RecordKind};
 fn opt_record(payload: &[u8], opaque: &[u8]) -> Vec<u8> {
     let mut data = Vec::new();
     data.extend_from_slice(&(0x8000_u16 | Id::FillShadeColors.raw()).to_le_bytes());
-    data.extend_from_slice(&(payload.len() as i32).to_le_bytes());
+    data.extend_from_slice(
+        &i32::try_from(payload.len())
+            .expect("payload length fits in i32")
+            .to_le_bytes(),
+    );
     data.extend_from_slice(&(0x8000_u16 | 0x0600).to_le_bytes());
-    data.extend_from_slice(&(opaque.len() as i32).to_le_bytes());
+    data.extend_from_slice(
+        &i32::try_from(opaque.len())
+            .expect("opaque length fits in i32")
+            .to_le_bytes(),
+    );
     data.extend_from_slice(payload);
     data.extend_from_slice(opaque);
     data
@@ -106,7 +114,9 @@ fn rejects_bad_width_range_order_and_amplification() {
         })
     ));
 
-    let count = (MAX_STOPS as u16).saturating_add(1);
+    let count = u16::try_from(MAX_STOPS)
+        .expect("bound fits in u16")
+        .saturating_add(1);
     let mut too_many = Vec::new();
     too_many.extend_from_slice(&count.to_le_bytes());
     too_many.extend_from_slice(&count.to_le_bytes());

@@ -7,8 +7,17 @@
 //! - `codec` owns PPT-specific record assembly.
 //! - `tests` exercises the facade and its byte-level contracts.
 
-/// Error type for PPT operations.
-pub(crate) type Error = std::io::Error;
+/// PPT-specific record types embedded in Escher.
+pub(crate) mod ppt_record_type {
+    /// `OEPlaceholderAtom`.
+    pub(crate) const OE_PLACEHOLDER_ATOM: u16 = 0x0BC3;
+}
+
+mod codec;
+mod model;
+mod semantic;
+#[cfg(test)]
+mod tests;
 
 // Shared OfficeArt wire vocabulary. The record grammar itself remains owned by
 // the format-neutral OfficeArt substrate. The aliases are PPT-internal facade
@@ -18,18 +27,6 @@ pub(crate) use litchi_odraw::write::{
     COMPLEX as PROPERTY_FLAG_COMPLEX, Property as EscherProperty, Sp as EscherSpData, record_type,
     shape_type,
 };
-
-/// PPT-specific record types embedded in Escher.
-pub(crate) mod ppt_record_type {
-    /// OEPlaceholderAtom.
-    pub(crate) const OE_PLACEHOLDER_ATOM: u16 = 0x0BC3;
-}
-
-mod codec;
-mod model;
-mod semantic;
-#[cfg(test)]
-mod tests;
 
 pub use model::FreeformGeometry;
 
@@ -55,3 +52,6 @@ pub(crate) use codec::{
     create_dg_container_with_group, create_dg_container_with_tables, create_group_shape_container,
     create_user_shape_container,
 };
+
+/// Error type for PPT operations.
+pub(crate) type Error = std::io::Error;

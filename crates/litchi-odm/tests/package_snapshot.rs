@@ -6,8 +6,7 @@
 use litchi_odf_common::core::PackageWriter;
 use litchi_odm::Master;
 
-const CONTENT: &str =
-    include_str!("../../litchi-odt/tests/fixtures/libreoffice-master-document-content.xml");
+const CONTENT: &str = include_str!("fixtures/libreoffice-master-document-content.xml");
 
 #[test]
 fn real_master_document_xml_and_auxiliary_entries_remain_exact_and_opaque() {

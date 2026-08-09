@@ -44,19 +44,23 @@ pub(crate) fn parse(bytes: &[u8], limits: Limits) -> Result<Record> {
     Ok(record)
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "the timestamp payload is exactly 32 bytes and the container payload is bounded to 64 MiB by `encode_children`, so both lengths fit in u32"
+)]
 pub(crate) fn encode_sync(value: &Synchronization) -> Result<Record> {
     let server = atom(0, value.server_slide_id().wire()?);
     let url = atom(1, value.slide_library_url().wire()?);
-    let mut timestamps = Vec::with_capacity(32);
-    value.server_modified().write_wire(&mut timestamps);
-    value.client_inserted().write_wire(&mut timestamps);
+    let mut timestamp_bytes = Vec::with_capacity(32);
+    value.server_modified().write_wire(&mut timestamp_bytes);
+    value.client_inserted().write_wire(&mut timestamp_bytes);
     let timestamps = Record {
         record_type: RecordType::RoundTripSlideSyncInfoAtom12,
         record_type_raw: RecordType::RoundTripSlideSyncInfoAtom12.as_u16(),
         version: 0,
         instance: 0,
-        data_length: timestamps.len() as u32,
-        data: timestamps,
+        data_length: timestamp_bytes.len() as u32,
+        data: timestamp_bytes,
         children: Vec::new(),
     };
     let children = vec![server, url, timestamps];
@@ -72,6 +76,15 @@ pub(crate) fn encode_sync(value: &Synchronization) -> Result<Record> {
     })
 }
 
+struct Encoder {
+    limits: Limits,
+    records: usize,
+}
+
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "wire payloads are validated to at most MAX_TEXT_BYTES (16 KiB), well below u32::MAX"
+)]
 fn atom(instance: u16, data: Vec<u8>) -> Record {
     Record {
         record_type: RecordType::CString,
@@ -82,19 +95,6 @@ fn atom(instance: u16, data: Vec<u8>) -> Record {
         data,
         children: Vec::new(),
     }
-}
-
-fn children(record: &Record) -> Result<Vec<Record>> {
-    validation::validate_sync_record(record)?;
-    if !record.children.is_empty() {
-        return Ok(record.children.clone());
-    }
-    Record::parse_sequence_strict(&record.data, "RoundTripSlideSyncInfo12")
-}
-
-struct Encoder {
-    limits: Limits,
-    records: usize,
 }
 
 impl Encoder {
@@ -137,17 +137,25 @@ impl Encoder {
             return invalid("PPT record exceeds the byte limit");
         }
         let length = u32::try_from(payload.len())
-            .map_err(|_| Error::InvalidFormat("PPT record payload exceeds u32".into()))?;
+            .map_err(|_err| Error::InvalidFormat("PPT record payload exceeds u32".into()))?;
         let mut bytes = Vec::new();
         bytes
             .try_reserve_exact(total)
-            .map_err(|_| Error::InvalidFormat("PPT record allocation failed".into()))?;
+            .map_err(|_err| Error::InvalidFormat("PPT record allocation failed".into()))?;
         bytes.extend_from_slice(&(record.version | (record.instance << 4)).to_le_bytes());
         bytes.extend_from_slice(&record.record_type_raw.to_le_bytes());
         bytes.extend_from_slice(&length.to_le_bytes());
         bytes.extend_from_slice(&payload);
         Ok(bytes)
     }
+}
+
+fn children(record: &Record) -> Result<Vec<Record>> {
+    validation::validate_sync_record(record)?;
+    if !record.children.is_empty() {
+        return Ok(record.children.clone());
+    }
+    Record::parse_sequence_strict(&record.data, "RoundTripSlideSyncInfo12")
 }
 
 fn encode_children(children: &[Record], limits: Limits) -> Result<Vec<u8>> {

@@ -1,10 +1,10 @@
-//! PowerPoint text-run record-tree orchestration and read views.
+//! `PowerPoint` text-run record-tree orchestration and read views.
 
 use super::model::{ParagraphRun, TextRun};
 
-/// Text run extractor for PowerPoint slides.
+/// Text run extractor for `PowerPoint` slides.
 ///
-/// Based on Apache POI's TextRun, StyleTextPropAtom, and related classes.
+/// Based on Apache POI's `TextRun`, `StyleTextPropAtom`, and related classes.
 pub struct TextRunExtractor {
     /// Full text content
     pub(super) text: String,
@@ -18,6 +18,7 @@ pub struct TextRunExtractor {
 
 impl TextRunExtractor {
     /// Create a new text run extractor.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             text: String::new(),
@@ -28,21 +29,25 @@ impl TextRunExtractor {
     }
 
     /// Get the full extracted text.
+    #[must_use]
     pub fn text(&self) -> &str {
         &self.text
     }
 
     /// Get all text runs.
+    #[must_use]
     pub fn runs(&self) -> &[TextRun] {
         &self.runs
     }
 
     /// Get paragraph-level formatting runs.
+    #[must_use]
     pub fn paragraph_runs(&self) -> &[ParagraphRun] {
         &self.paragraph_runs
     }
 
     /// Get the number of runs.
+    #[must_use]
     pub fn run_count(&self) -> usize {
         self.runs.len()
     }

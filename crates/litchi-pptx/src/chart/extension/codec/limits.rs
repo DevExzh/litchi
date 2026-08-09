@@ -1,4 +1,4 @@
-//! Shared ChartEx resource and namespace policy.
+//! Shared `ChartEx` resource and namespace policy.
 
 pub(super) const CX: &str = "http://schemas.microsoft.com/office/drawing/2014/chartex";
 pub(super) const A: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";

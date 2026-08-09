@@ -1,12 +1,18 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{
     AssociatedCharacterBaseline, AssociatedCharacterFormatting, AssociatedUnderlineStyle,
     LanguageId, RtfDocument, RtfWriter,
 };
 
-fn associated_for<'a>(
-    document: &'a RtfDocument<'a>,
-    text: &str,
-) -> litchi_rtf::AssociatedCharacterFormatting {
+fn associated_for<'a>(document: &'a RtfDocument<'a>, text: &str) -> AssociatedCharacterFormatting {
     document
         .blocks()
         .iter()
@@ -95,49 +101,49 @@ fn parses_inherits_resets_and_writes_associated_character_formatting() {
 #[test]
 fn rejects_unbounded_or_missing_associated_values_but_keeps_field_code_inert() {
     for source in [
-        r#"{\rtf1\af X}"#,
-        r#"{\rtf1\af-1 X}"#,
-        r#"{\rtf1\af65536 X}"#,
-        r#"{\rtf1\afs X}"#,
-        r#"{\rtf1\afs0 X}"#,
-        r#"{\rtf1\afs-1 X}"#,
-        r#"{\rtf1\afs65536 X}"#,
-        r#"{\rtf1\alang X}"#,
-        r#"{\rtf1\alang-1 X}"#,
-        r#"{\rtf1\alang65536 X}"#,
-        r#"{\rtf1\ab2 X}"#,
-        r#"{\rtf1\ai-1 X}"#,
-        r#"{\rtf1\acaps2 X}"#,
-        r#"{\rtf1\acf X}"#,
-        r#"{\rtf1\acf-1 X}"#,
-        r#"{\rtf1\acf65536 X}"#,
-        r#"{\rtf1\adn X}"#,
-        r#"{\rtf1\adn-1 X}"#,
-        r#"{\rtf1\adn31681 X}"#,
-        r#"{\rtf1\aexpnd X}"#,
-        r#"{\rtf1\aexpnd-31681 X}"#,
-        r#"{\rtf1\aexpnd31681 X}"#,
-        r#"{\rtf1\aoutl2 X}"#,
-        r#"{\rtf1\ascaps2 X}"#,
-        r#"{\rtf1\ashad2 X}"#,
-        r#"{\rtf1\astrike2 X}"#,
-        r#"{\rtf1\aul2 X}"#,
-        r#"{\rtf1\auld0 X}"#,
-        r#"{\rtf1\auldb1 X}"#,
-        r#"{\rtf1\aulnone0 X}"#,
-        r#"{\rtf1\aulw1 X}"#,
-        r#"{\rtf1\aup X}"#,
-        r#"{\rtf1\aup-1 X}"#,
-        r#"{\rtf1\aup31681 X}"#,
-        r#"{\rtf1{\*\defchp\adn1\aup2}X}"#,
-        r#"{\rtf1{\*\defchp\aul\aulnone}X}"#,
-        r#"{\rtf1{\stylesheet{\s0\af-1 Bad;}}Body}"#,
+        r"{\rtf1\af X}",
+        r"{\rtf1\af-1 X}",
+        r"{\rtf1\af65536 X}",
+        r"{\rtf1\afs X}",
+        r"{\rtf1\afs0 X}",
+        r"{\rtf1\afs-1 X}",
+        r"{\rtf1\afs65536 X}",
+        r"{\rtf1\alang X}",
+        r"{\rtf1\alang-1 X}",
+        r"{\rtf1\alang65536 X}",
+        r"{\rtf1\ab2 X}",
+        r"{\rtf1\ai-1 X}",
+        r"{\rtf1\acaps2 X}",
+        r"{\rtf1\acf X}",
+        r"{\rtf1\acf-1 X}",
+        r"{\rtf1\acf65536 X}",
+        r"{\rtf1\adn X}",
+        r"{\rtf1\adn-1 X}",
+        r"{\rtf1\adn31681 X}",
+        r"{\rtf1\aexpnd X}",
+        r"{\rtf1\aexpnd-31681 X}",
+        r"{\rtf1\aexpnd31681 X}",
+        r"{\rtf1\aoutl2 X}",
+        r"{\rtf1\ascaps2 X}",
+        r"{\rtf1\ashad2 X}",
+        r"{\rtf1\astrike2 X}",
+        r"{\rtf1\aul2 X}",
+        r"{\rtf1\auld0 X}",
+        r"{\rtf1\auldb1 X}",
+        r"{\rtf1\aulnone0 X}",
+        r"{\rtf1\aulw1 X}",
+        r"{\rtf1\aup X}",
+        r"{\rtf1\aup-1 X}",
+        r"{\rtf1\aup31681 X}",
+        r"{\rtf1{\*\defchp\adn1\aup2}X}",
+        r"{\rtf1{\*\defchp\aul\aulnone}X}",
+        r"{\rtf1{\stylesheet{\s0\af-1 Bad;}}Body}",
     ] {
         assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
     }
 
     let inert =
-        RtfDocument::parse(r#"{\rtf1{\field{\*\fldinst TEST \af-1\afs0\alang-1}{\fldrslt X}}}"#)
+        RtfDocument::parse(r"{\rtf1{\field{\*\fldinst TEST \af-1\afs0\alang-1}{\fldrslt X}}}")
             .unwrap();
     assert_eq!(inert.fields().len(), 1);
     assert!(
@@ -177,7 +183,7 @@ fn associated_mutation_validates_and_clears_exact_state() {
 #[test]
 fn parses_specification_association_examples() {
     let document = RtfDocument::parse(
-        r#"{\rtf1{\ltrch\af2\ab\aul\rtlch First}{\rtlch\af5\ab\ai\ltrch Second}}"#,
+        r"{\rtf1{\ltrch\af2\ab\aul\rtlch First}{\rtlch\af5\ab\ai\ltrch Second}}",
     )
     .unwrap();
     let first = associated_for(&document, "First");

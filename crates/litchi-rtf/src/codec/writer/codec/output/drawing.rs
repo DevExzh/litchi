@@ -1,14 +1,18 @@
 //! RTF drawing and shape output.
 
-use super::super::*;
+use super::super::{
+    DrawingStoryTextMode, Field, FieldOwner, RtfWriter, Shape, ShapeGroup, ShapeGroupChild,
+    ShapeGroupInfo, ShapeProperty, ShapeResult, ShapeThemeColor, ShapeType, StoryDrawing,
+    StoryEvent, Write, field, invalid_story_reference, io,
+};
 
 impl<W: Write> RtfWriter<W> {
     /// Write the unique inert document-background shape destination.
     pub(in super::super) fn write_document_background(
         &mut self,
-        shape: Option<&crate::Shape<'_>>,
+        background: Option<&Shape<'_>>,
     ) -> io::Result<()> {
-        let Some(shape) = shape else {
+        let Some(shape) = background else {
             return Ok(());
         };
         let right = shape
@@ -53,7 +57,7 @@ impl<W: Write> RtfWriter<W> {
             && !shape
                 .info
                 .iter()
-                .any(|info| matches!(info, crate::ShapeGroupInfo::BelowText(_)))
+                .any(|info| matches!(info, ShapeGroupInfo::BelowText(_)))
         {
             self.write_control_word("shpfblwtxt", Some(1))?;
         }
@@ -61,21 +65,21 @@ impl<W: Write> RtfWriter<W> {
             && !shape
                 .info
                 .iter()
-                .any(|info| matches!(info, crate::ShapeGroupInfo::LockAnchor))
+                .any(|info| matches!(info, ShapeGroupInfo::LockAnchor))
         {
             self.write_control_word("shplockanchor", None)?;
         }
         let shape_type = match shape.shape_type {
-            crate::ShapeType::Rectangle => Some(1),
-            crate::ShapeType::RoundRectangle => Some(2),
-            crate::ShapeType::Ellipse => Some(3),
-            crate::ShapeType::Arc => Some(19),
-            crate::ShapeType::Line => Some(20),
-            crate::ShapeType::PictureFrame => Some(75),
-            crate::ShapeType::TextBox => Some(202),
-            crate::ShapeType::Group => Some(0),
-            crate::ShapeType::Custom(value) => Some(value),
-            crate::ShapeType::Polygon | crate::ShapeType::Unknown => None,
+            ShapeType::Rectangle => Some(1),
+            ShapeType::RoundRectangle => Some(2),
+            ShapeType::Ellipse => Some(3),
+            ShapeType::Arc => Some(19),
+            ShapeType::Line => Some(20),
+            ShapeType::PictureFrame => Some(75),
+            ShapeType::TextBox => Some(202),
+            ShapeType::Group => Some(0),
+            ShapeType::Custom(value) => Some(value),
+            ShapeType::Polygon | ShapeType::Unknown => None,
         };
         if let Some(value) = shape_type {
             self.write_shape_scalar_property("shapeType", &value.to_string())?;
@@ -102,10 +106,7 @@ impl<W: Write> RtfWriter<W> {
         self.write_str("}}")
     }
 
-    pub(in super::super) fn write_shape_text(
-        &mut self,
-        shape: &crate::Shape<'_>,
-    ) -> io::Result<()> {
+    pub(in super::super) fn write_shape_text(&mut self, shape: &Shape<'_>) -> io::Result<()> {
         self.write_str("{\\shptxt ")?;
         if let Some(background_color) = shape
             .text_formatting
@@ -120,27 +121,30 @@ impl<W: Write> RtfWriter<W> {
             &shape.text_drawing_order,
             &shape.text_story_events,
             &[],
-            crate::FieldOwner::Other,
+            FieldOwner::Other,
             DrawingStoryTextMode::ShapeText,
             0,
         )?;
         self.write_str("}")
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "the writer threads the full drawing context through the pipeline"
+    )]
     pub(in super::super) fn write_field_story(
         &mut self,
         text: &str,
-        shapes: &[crate::Shape<'_>],
-        shape_groups: &[crate::ShapeGroup<'_>],
-        drawing_order: &[crate::StoryDrawing],
-        story_events: &[crate::StoryEvent],
-        fields: &[crate::Field<'_>],
-        owner: crate::FieldOwner,
+        shapes: &[Shape<'_>],
+        shape_groups: &[ShapeGroup<'_>],
+        drawing_order: &[StoryDrawing],
+        story_events: &[StoryEvent],
+        fields: &[Field<'_>],
+        owner: FieldOwner,
         mode: DrawingStoryTextMode,
         depth: usize,
     ) -> io::Result<()> {
-        crate::field::validate_story_events(
+        field::validate_story_events(
             text,
             shapes,
             shape_groups,
@@ -152,20 +156,20 @@ impl<W: Write> RtfWriter<W> {
         let mut start = 0usize;
         for event in story_events {
             let offset = match *event {
-                crate::StoryEvent::Drawing(crate::StoryDrawing::Shape(index)) => {
+                StoryEvent::Drawing(StoryDrawing::Shape(index)) => {
                     shapes
                         .get(index)
                         .ok_or_else(invalid_story_reference)?
                         .position
                 },
-                crate::StoryEvent::Drawing(crate::StoryDrawing::ShapeGroup(index)) => {
+                StoryEvent::Drawing(StoryDrawing::ShapeGroup(index)) => {
                     shape_groups
                         .get(index)
                         .ok_or_else(invalid_story_reference)?
                         .position
                 },
-                crate::StoryEvent::Field(field) => field.position,
-                crate::StoryEvent::PageBreak(page_break) => page_break.position,
+                StoryEvent::Field(field) => field.position,
+                StoryEvent::PageBreak(page_break) => page_break.position,
             };
             let fragment = text.get(start..offset).ok_or_else(|| {
                 io::Error::new(
@@ -175,17 +179,17 @@ impl<W: Write> RtfWriter<W> {
             })?;
             self.write_drawing_story_fragment(fragment, mode)?;
             match *event {
-                crate::StoryEvent::Drawing(crate::StoryDrawing::Shape(index)) => {
+                StoryEvent::Drawing(StoryDrawing::Shape(index)) => {
                     let shape = shapes.get(index).ok_or_else(invalid_story_reference)?;
-                    self.write_root_shape(shape)?
+                    self.write_root_shape(shape)?;
                 },
-                crate::StoryEvent::Drawing(crate::StoryDrawing::ShapeGroup(index)) => {
+                StoryEvent::Drawing(StoryDrawing::ShapeGroup(index)) => {
                     let group = shape_groups
                         .get(index)
                         .ok_or_else(invalid_story_reference)?;
-                    self.write_shape_group(group, true)?
+                    self.write_shape_group(group, true)?;
                 },
-                crate::StoryEvent::Field(reference) => {
+                StoryEvent::Field(reference) => {
                     let field = fields
                         .get(reference.field_index)
                         .filter(|field| {
@@ -204,7 +208,7 @@ impl<W: Write> RtfWriter<W> {
                     })?;
                     self.write_field_with_fields(field, fields, nested_depth)?;
                 },
-                crate::StoryEvent::PageBreak(_) => self.write_str("\\page ")?,
+                StoryEvent::PageBreak(_) => self.write_str("\\page ")?,
             }
             start = offset;
         }
@@ -259,7 +263,7 @@ impl<W: Write> RtfWriter<W> {
 
     pub(in super::super) fn write_shape_result(
         &mut self,
-        result: &crate::ShapeResult<'_>,
+        result: &ShapeResult<'_>,
     ) -> io::Result<()> {
         result
             .validate()
@@ -271,7 +275,7 @@ impl<W: Write> RtfWriter<W> {
 
     pub(in super::super) fn write_shape_group(
         &mut self,
-        group: &crate::ShapeGroup<'_>,
+        group: &ShapeGroup<'_>,
         root: bool,
     ) -> io::Result<()> {
         if root {
@@ -312,48 +316,26 @@ impl<W: Write> RtfWriter<W> {
         self.write_control_word("shpz", Some(group.geometry.z_order))?;
         for info in &group.info {
             match *info {
-                crate::ShapeGroupInfo::ShapeId(value) => {
-                    self.write_control_word("shplid", Some(value))?
+                ShapeGroupInfo::ShapeId(value) => self.write_control_word("shplid", Some(value))?,
+                ShapeGroupInfo::InHeader(value) => {
+                    self.write_control_word("shpfhdr", Some(i32::from(value)))?;
                 },
-                crate::ShapeGroupInfo::InHeader(value) => {
-                    self.write_control_word("shpfhdr", Some(i32::from(value)))?
+                ShapeGroupInfo::HorizontalPage => self.write_control_word("shpbxpage", None)?,
+                ShapeGroupInfo::HorizontalMargin => self.write_control_word("shpbxmargin", None)?,
+                ShapeGroupInfo::HorizontalColumn => self.write_control_word("shpbxcolumn", None)?,
+                ShapeGroupInfo::IgnoreHorizontal => self.write_control_word("shpbxignore", None)?,
+                ShapeGroupInfo::VerticalPage => self.write_control_word("shpbypage", None)?,
+                ShapeGroupInfo::VerticalMargin => self.write_control_word("shpbymargin", None)?,
+                ShapeGroupInfo::VerticalParagraph => self.write_control_word("shpbypara", None)?,
+                ShapeGroupInfo::IgnoreVertical => self.write_control_word("shpbyignore", None)?,
+                ShapeGroupInfo::Wrap(value) => self.write_control_word("shpwr", Some(value))?,
+                ShapeGroupInfo::WrapSide(value) => {
+                    self.write_control_word("shpwrk", Some(value))?;
                 },
-                crate::ShapeGroupInfo::HorizontalPage => {
-                    self.write_control_word("shpbxpage", None)?
+                ShapeGroupInfo::BelowText(value) => {
+                    self.write_control_word("shpfblwtxt", Some(i32::from(value)))?;
                 },
-                crate::ShapeGroupInfo::HorizontalMargin => {
-                    self.write_control_word("shpbxmargin", None)?
-                },
-                crate::ShapeGroupInfo::HorizontalColumn => {
-                    self.write_control_word("shpbxcolumn", None)?
-                },
-                crate::ShapeGroupInfo::IgnoreHorizontal => {
-                    self.write_control_word("shpbxignore", None)?
-                },
-                crate::ShapeGroupInfo::VerticalPage => {
-                    self.write_control_word("shpbypage", None)?
-                },
-                crate::ShapeGroupInfo::VerticalMargin => {
-                    self.write_control_word("shpbymargin", None)?
-                },
-                crate::ShapeGroupInfo::VerticalParagraph => {
-                    self.write_control_word("shpbypara", None)?
-                },
-                crate::ShapeGroupInfo::IgnoreVertical => {
-                    self.write_control_word("shpbyignore", None)?
-                },
-                crate::ShapeGroupInfo::Wrap(value) => {
-                    self.write_control_word("shpwr", Some(value))?
-                },
-                crate::ShapeGroupInfo::WrapSide(value) => {
-                    self.write_control_word("shpwrk", Some(value))?
-                },
-                crate::ShapeGroupInfo::BelowText(value) => {
-                    self.write_control_word("shpfblwtxt", Some(i32::from(value)))?
-                },
-                crate::ShapeGroupInfo::LockAnchor => {
-                    self.write_control_word("shplockanchor", None)?
-                },
+                ShapeGroupInfo::LockAnchor => self.write_control_word("shplockanchor", None)?,
             }
         }
         for property in &group.properties {
@@ -361,23 +343,23 @@ impl<W: Write> RtfWriter<W> {
         }
         for child in &group.child_order {
             match *child {
-                crate::ShapeGroupChild::Shape(index) => {
+                ShapeGroupChild::Shape(index) => {
                     let shape = group.shapes.get(index).ok_or_else(|| {
                         io::Error::new(
                             io::ErrorKind::InvalidInput,
                             "RTF shape group references a missing child shape",
                         )
                     })?;
-                    self.write_grouped_shape(shape)?
+                    self.write_grouped_shape(shape)?;
                 },
-                crate::ShapeGroupChild::Group(index) => {
-                    let child = group.groups.get(index).ok_or_else(|| {
+                ShapeGroupChild::Group(index) => {
+                    let child_group = group.groups.get(index).ok_or_else(|| {
                         io::Error::new(
                             io::ErrorKind::InvalidInput,
                             "RTF shape group references a missing child group",
                         )
                     })?;
-                    self.write_shape_group(child, false)?
+                    self.write_shape_group(child_group, false)?;
                 },
             }
         }
@@ -388,10 +370,7 @@ impl<W: Write> RtfWriter<W> {
         self.write_str("}")
     }
 
-    pub(in super::super) fn write_grouped_shape(
-        &mut self,
-        shape: &crate::Shape<'_>,
-    ) -> io::Result<()> {
+    pub(in super::super) fn write_grouped_shape(&mut self, shape: &Shape<'_>) -> io::Result<()> {
         if shape.result.is_some() || !shape.instruction_present {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -429,7 +408,7 @@ impl<W: Write> RtfWriter<W> {
             && !shape
                 .info
                 .iter()
-                .any(|info| matches!(info, crate::ShapeGroupInfo::BelowText(_)))
+                .any(|info| matches!(info, ShapeGroupInfo::BelowText(_)))
         {
             self.write_control_word("shpfblwtxt", Some(1))?;
         }
@@ -437,7 +416,7 @@ impl<W: Write> RtfWriter<W> {
             && !shape
                 .info
                 .iter()
-                .any(|info| matches!(info, crate::ShapeGroupInfo::LockAnchor))
+                .any(|info| matches!(info, ShapeGroupInfo::LockAnchor))
         {
             self.write_control_word("shplockanchor", None)?;
         }
@@ -447,16 +426,16 @@ impl<W: Write> RtfWriter<W> {
             .any(|property| property.name == "shapeType")
         {
             let shape_type = match shape.shape_type {
-                crate::ShapeType::Rectangle => Some(1),
-                crate::ShapeType::RoundRectangle => Some(2),
-                crate::ShapeType::Ellipse => Some(3),
-                crate::ShapeType::Arc => Some(19),
-                crate::ShapeType::Line => Some(20),
-                crate::ShapeType::PictureFrame => Some(75),
-                crate::ShapeType::TextBox => Some(202),
-                crate::ShapeType::Group => Some(0),
-                crate::ShapeType::Custom(value) => Some(value),
-                crate::ShapeType::Polygon | crate::ShapeType::Unknown => None,
+                ShapeType::Rectangle => Some(1),
+                ShapeType::RoundRectangle => Some(2),
+                ShapeType::Ellipse => Some(3),
+                ShapeType::Arc => Some(19),
+                ShapeType::Line => Some(20),
+                ShapeType::PictureFrame => Some(75),
+                ShapeType::TextBox => Some(202),
+                ShapeType::Group => Some(0),
+                ShapeType::Custom(value) => Some(value),
+                ShapeType::Polygon | ShapeType::Unknown => None,
             };
             if let Some(value) = shape_type {
                 self.write_shape_scalar_property("shapeType", &value.to_string())?;
@@ -496,7 +475,7 @@ impl<W: Write> RtfWriter<W> {
 
     pub(in super::super) fn write_shape_property(
         &mut self,
-        property: &crate::ShapeProperty<'_>,
+        property: &ShapeProperty<'_>,
     ) -> io::Result<()> {
         property
             .validate()
@@ -519,16 +498,16 @@ impl<W: Write> RtfWriter<W> {
             self.write_str("{\\*\\hsv")?;
             self.write_control_word(
                 match theme.color {
-                    crate::ShapeThemeColor::Accent1 => "caccentone",
-                    crate::ShapeThemeColor::Accent2 => "caccenttwo",
-                    crate::ShapeThemeColor::Accent3 => "caccentthree",
-                    crate::ShapeThemeColor::Accent4 => "caccentfour",
-                    crate::ShapeThemeColor::Accent5 => "caccentfive",
-                    crate::ShapeThemeColor::Accent6 => "caccentsix",
-                    crate::ShapeThemeColor::Background1 => "cbackgroundone",
-                    crate::ShapeThemeColor::Background2 => "cbackgroundtwo",
-                    crate::ShapeThemeColor::Text1 => "ctextone",
-                    crate::ShapeThemeColor::Text2 => "ctexttwo",
+                    ShapeThemeColor::Accent1 => "caccentone",
+                    ShapeThemeColor::Accent2 => "caccenttwo",
+                    ShapeThemeColor::Accent3 => "caccentthree",
+                    ShapeThemeColor::Accent4 => "caccentfour",
+                    ShapeThemeColor::Accent5 => "caccentfive",
+                    ShapeThemeColor::Accent6 => "caccentsix",
+                    ShapeThemeColor::Background1 => "cbackgroundone",
+                    ShapeThemeColor::Background2 => "cbackgroundtwo",
+                    ShapeThemeColor::Text1 => "ctextone",
+                    ShapeThemeColor::Text2 => "ctexttwo",
                 },
                 None,
             )?;

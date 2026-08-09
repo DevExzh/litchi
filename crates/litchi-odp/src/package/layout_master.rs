@@ -41,23 +41,25 @@ pub struct MasterPage {
 }
 
 impl MasterPage {
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn new(name: impl Into<String>, page_layout_name: impl Into<String>) -> Result<Self> {
-        let name = name.into();
-        let page_layout_name = page_layout_name.into();
-        validate_name(&name, "master page name")?;
-        validate_name(&page_layout_name, "page layout name")?;
+        let master_name = name.into();
+        let layout_name = page_layout_name.into();
+        validate_name(&master_name, "master page name")?;
+        validate_name(&layout_name, "page layout name")?;
         Ok(Self {
             master_page: SharedMasterPage {
-                name: name.clone(),
+                name: master_name.clone(),
                 display_name: None,
-                page_layout_name: Some(page_layout_name),
+                page_layout_name: Some(layout_name),
                 drawing_style_name: None,
                 next_style_name: None,
                 regions: Vec::new(),
                 children: Vec::new(),
                 xml: format!(
                     "<style:master-page xmlns:style=\"{STYLE}\" style:name=\"{}\"/>",
-                    escape_attr(&name)
+                    escape_attr(&master_name)
                 ),
             },
             page_layout_name: None,
@@ -72,6 +74,8 @@ impl MasterPage {
         &self.master_page.name
     }
 
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn validate(&self) -> Result<()> {
         self.fragment().map(|_| ())
     }
@@ -99,8 +103,8 @@ impl MasterPage {
             (self.footer_name.as_deref(), "footer declaration name"),
             (self.date_time_name.as_deref(), "date-time declaration name"),
         ] {
-            if let Some(value) = value {
-                validate_name(value, context)?;
+            if let Some(name) = value {
+                validate_name(name, context)?;
             }
         }
         Ok(())
@@ -178,10 +182,14 @@ impl MasterPage {
 }
 
 impl Presentation {
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn master_pages(&self) -> Result<Vec<MasterPage>> {
         masters_from_xml(required_styles(self)?)
     }
 
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn add_layout(&mut self, layout: &Layout) -> Result<()> {
         layout.validate()?;
         let styles = required_styles(self)?.to_string();
@@ -193,10 +201,13 @@ impl Presentation {
                 layout.name
             ));
         }
-        let styles = set_page_layout_xml(&styles, layout)?;
-        self.commit_design(styles, self.content_xml().to_string())
+        let updated_styles = set_page_layout_xml(&styles, layout)?;
+        let content = self.content_xml().to_string();
+        self.commit_design(&updated_styles, &content)
     }
 
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn replace_page_layout(&mut self, layout: &Layout) -> Result<()> {
         layout.validate()?;
         let styles = required_styles(self)?.to_string();
@@ -208,10 +219,13 @@ impl Presentation {
                 layout.name
             ));
         }
-        let styles = set_page_layout_xml(&styles, layout)?;
-        self.commit_design(styles, self.content_xml().to_string())
+        let updated_styles = set_page_layout_xml(&styles, layout)?;
+        let content = self.content_xml().to_string();
+        self.commit_design(&updated_styles, &content)
     }
 
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn remove_page_layout(&mut self, name: &str, replacement: Option<&str>) -> Result<()> {
         validate_name(name, "presentation page layout name")?;
         if replacement == Some(name) {
@@ -245,9 +259,11 @@ impl Presentation {
             replacement,
         )?;
         styles = remove_page_layout_xml(&styles, name)?;
-        self.commit_design(styles, content)
+        self.commit_design(&styles, &content)
     }
 
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn reorder_layouts(&mut self, names: &[String]) -> Result<()> {
         let styles = reorder(
             required_styles(self)?,
@@ -257,19 +273,25 @@ impl Presentation {
             "name",
             names,
         )?;
-        self.commit_design(styles, self.content_xml().to_string())
+        let content = self.content_xml().to_string();
+        self.commit_design(&styles, &content)
     }
 
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn add_master_page(&mut self, master: &MasterPage) -> Result<()> {
         let fragment = master.fragment()?;
         let styles = required_styles(self)?.to_string();
         if definitions(&styles, STYLE, "master-page", STYLE, "name")?.contains_key(master.name()) {
             return invalid(format!("master page '{}' already exists", master.name()));
         }
-        let styles = insert_child(&styles, OFFICE, "master-styles", &fragment)?;
-        self.commit_design(styles, self.content_xml().to_string())
+        let updated_styles = insert_child(&styles, OFFICE, "master-styles", &fragment)?;
+        let content = self.content_xml().to_string();
+        self.commit_design(&updated_styles, &content)
     }
 
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn replace_master_page(&mut self, master: &MasterPage) -> Result<()> {
         let fragment = master.fragment()?;
         let styles = required_styles(self)?.to_string();
@@ -277,10 +299,13 @@ impl Presentation {
         let span = masters
             .get(master.name())
             .ok_or_else(|| error(format!("master page '{}' does not exist", master.name())))?;
-        let styles = replace_range(&styles, span.start, span.end, &fragment)?;
-        self.commit_design(styles, self.content_xml().to_string())
+        let updated_styles = replace_range(&styles, span.start, span.end, &fragment)?;
+        let content = self.content_xml().to_string();
+        self.commit_design(&updated_styles, &content)
     }
 
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn remove_master_page(&mut self, name: &str, replacement: Option<&str>) -> Result<()> {
         validate_name(name, "master page name")?;
         if replacement == Some(name) {
@@ -318,9 +343,11 @@ impl Presentation {
             .get(name)
             .ok_or_else(|| error("master disappeared during staging"))?;
         styles = replace_range(&styles, span.start, span.end, "")?;
-        self.commit_design(styles, content)
+        self.commit_design(&styles, &content)
     }
 
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn reorder_master_pages(&mut self, names: &[String]) -> Result<()> {
         let styles = reorder(
             required_styles(self)?,
@@ -330,9 +357,12 @@ impl Presentation {
             "name",
             names,
         )?;
-        self.commit_design(styles, self.content_xml().to_string())
+        let content = self.content_xml().to_string();
+        self.commit_design(&styles, &content)
     }
 
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn assign_slide_master_page(
         &mut self,
         slide_index: usize,
@@ -353,9 +383,12 @@ impl Presentation {
             slide_index,
             &[Change::new(DRAW, "master-page-name", master_name, "draw")],
         )?;
-        self.commit_design(required_styles(self)?.to_string(), content)
+        let styles = required_styles(self)?.to_string();
+        self.commit_design(&styles, &content)
     }
 
+    /// # Errors
+    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn assign_slide_page_layout(
         &mut self,
         slide_index: usize,
@@ -387,11 +420,12 @@ impl Presentation {
                 "presentation",
             )],
         )?;
-        self.commit_design(required_styles(self)?.to_string(), content)
+        let styles = required_styles(self)?.to_string();
+        self.commit_design(&styles, &content)
     }
 
-    pub(crate) fn commit_design(&mut self, styles: String, content: String) -> Result<()> {
-        validate_references(&styles, &content)?;
+    pub(crate) fn commit_design(&mut self, styles: &str, content: &str) -> Result<()> {
+        validate_references(styles, content)?;
         let package = self.owned_package().package()?;
         let mut writer = PackageWriter::new();
         writer.set_mimetype(package.mimetype())?;
@@ -409,12 +443,6 @@ impl Presentation {
     }
 }
 
-fn required_styles(presentation: &Presentation) -> Result<&str> {
-    presentation
-        .styles_xml()
-        .ok_or_else(|| error("ODP package has no styles.xml"))
-}
-
 #[derive(Clone, Debug)]
 struct Attribute {
     qname: String,
@@ -422,6 +450,12 @@ struct Attribute {
     local: String,
     raw: String,
     value: String,
+}
+
+fn required_styles(presentation: &Presentation) -> Result<&str> {
+    presentation
+        .styles_xml()
+        .ok_or_else(|| error("ODP package has no styles.xml"))
 }
 
 #[derive(Clone, Debug)]
@@ -476,13 +510,13 @@ fn scan(xml: &str) -> Result<Vec<Span>> {
             .map_err(|e| error(format!("invalid ODF XML: {e}")))?;
         match event {
             Event::Start(element) => {
-                let namespace = resolve_namespace(&namespace)?;
-                let index = push_span(source, &reader, &mut spans, namespace, &element, false)?;
+                let resolved = resolve_namespace(&namespace)?;
+                let index = push_span(source, &reader, &mut spans, resolved, &element, false)?;
                 open.push(index);
             },
             Event::Empty(element) => {
-                let namespace = resolve_namespace(&namespace)?;
-                push_span(source, &reader, &mut spans, namespace, &element, true)?;
+                let resolved = resolve_namespace(&namespace)?;
+                push_span(source, &reader, &mut spans, resolved, &element, true)?;
             },
             Event::End(_) => {
                 let index = open
@@ -492,7 +526,13 @@ fn scan(xml: &str) -> Result<Vec<Span>> {
                     .map_err(|_err| error("XML position overflow"))?;
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -543,15 +583,15 @@ fn attributes(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Vec<
     let mut result = Vec::new();
     let mut expanded = HashSet::new();
     for raw in element.attributes().with_checks(true) {
-        let raw = raw.map_err(|e| error(format!("invalid ODF attribute: {e}")))?;
-        let qname = decode(raw.key.as_ref(), "attribute qualified name")?;
-        let (namespace, local) = reader.resolver().resolve_attribute(raw.key);
-        let namespace = resolve_namespace(&namespace)?;
-        let local = decode(local.as_ref(), "attribute local name")?;
-        if !qname.starts_with("xmlns") && !expanded.insert((namespace.clone(), local.clone())) {
+        let attribute = raw.map_err(|e| error(format!("invalid ODF attribute: {e}")))?;
+        let qname = decode(attribute.key.as_ref(), "attribute qualified name")?;
+        let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+        let resolved = resolve_namespace(&namespace)?;
+        let local_name = decode(local.as_ref(), "attribute local name")?;
+        if !qname.starts_with("xmlns") && !expanded.insert((resolved.clone(), local_name.clone())) {
             return invalid(format!("duplicate expanded XML attribute '{qname}'"));
         }
-        let value = raw
+        let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
             .map_err(|e| error(format!("invalid ODF attribute value: {e}")))?
             .into_owned();
@@ -560,9 +600,9 @@ fn attributes(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Vec<
         }
         result.push(Attribute {
             qname,
-            namespace,
-            local,
-            raw: decode(raw.value.as_ref(), "attribute value")?,
+            namespace: resolved,
+            local: local_name,
+            raw: decode(attribute.value.as_ref(), "attribute value")?,
             value,
         });
     }
@@ -639,8 +679,7 @@ fn render_start(span: &Span, changes: &[Change<'_>]) -> Result<String> {
         let prefix = if span.namespace.as_deref() == Some(change.namespace) {
             span.qname
                 .split_once(':')
-                .map(|(p, _)| p.to_string())
-                .unwrap_or_else(|| change.prefix.to_string())
+                .map_or_else(|| change.prefix.to_string(), |(p, _)| p.to_string())
         } else if let Some(prefix) = old_prefixes.get(change.namespace) {
             prefix.clone()
         } else {
@@ -811,9 +850,9 @@ fn rewrite_attr(
     };
     let mut edits = Vec::new();
     for span in &spans {
-        if filter
-            .is_some_and(|(ns, local)| span.namespace.as_deref() != Some(ns) || span.local != local)
-        {
+        if filter.is_some_and(|(filter_ns, filter_local)| {
+            span.namespace.as_deref() != Some(filter_ns) || span.local != filter_local
+        }) {
             continue;
         }
         if attr(span, namespace, local) == Some(old) {
@@ -1085,10 +1124,10 @@ fn global_refs(
 }
 
 fn require(value: Option<&str>, names: &HashSet<String>, context: &str) -> Result<()> {
-    let Some(value) = value else { return Ok(()) };
-    validate_name(value, context)?;
-    if !names.contains(value) {
-        return invalid(format!("{context} references missing name '{value}'"));
+    let Some(name) = value else { return Ok(()) };
+    validate_name(name, context)?;
+    if !names.contains(name) {
+        return invalid(format!("{context} references missing name '{name}'"));
     }
     Ok(())
 }

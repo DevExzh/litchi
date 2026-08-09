@@ -121,7 +121,10 @@ impl DataType {
     }
 }
 
-pub(crate) fn parse_database_ranges(xml: &str) -> Result<Vec<Range>> {
+/// # Errors
+///
+/// Returns an error when the input is malformed or exceeds the parser's resource limits.
+pub fn parse_database_ranges(xml: &str) -> Result<Vec<Range>> {
     if xml.len() > 64 * 1_048_576 {
         return Err(Error::InvalidFormat(
             "database-range XML exceeds 64 MiB".to_string(),
@@ -248,10 +251,10 @@ fn database_range_from_start(reader: &NsReader<&[u8]>, element: &BytesStart<'_>)
     })
 }
 
-pub(crate) fn parse_source_sql(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
-) -> Result<Source> {
+/// # Errors
+///
+/// Returns an error when the input is malformed or exceeds the parser's resource limits.
+pub fn parse_source_sql(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Source> {
     let parse_statement = optional_bool(reader, element, b"parse-sql-statement")?
         .or(optional_bool(reader, element, b"parse-sql-statements")?);
     Ok(Source::Sql {
@@ -261,10 +264,10 @@ pub(crate) fn parse_source_sql(
     })
 }
 
-pub(crate) fn parse_source_table(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
-) -> Result<Source> {
+/// # Errors
+///
+/// Returns an error when the input is malformed or exceeds the parser's resource limits.
+pub fn parse_source_table(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Source> {
     Ok(Source::Table {
         database_name: required_attr(reader, element, b"database-name")?,
         table_name: optional_attr(reader, element, b"database-table-name")?
@@ -273,17 +276,20 @@ pub(crate) fn parse_source_table(
     })
 }
 
-pub(crate) fn parse_source_query(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
-) -> Result<Source> {
+/// # Errors
+///
+/// Returns an error when the input is malformed or exceeds the parser's resource limits.
+pub fn parse_source_query(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Source> {
     Ok(Source::Query {
         database_name: required_attr(reader, element, b"database-name")?,
         query_name: required_attr(reader, element, b"query-name")?,
     })
 }
 
-pub(crate) fn parse_filter(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Filter> {
+/// # Errors
+///
+/// Returns an error when the input is malformed or exceeds the parser's resource limits.
+pub fn parse_filter(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Filter> {
     let target_range_address = optional_attr(reader, start, b"target-range-address")?;
     let condition_source = optional_attr(reader, start, b"condition-source")?
         .map(|value| ConditionSource::parse(&value))
@@ -552,7 +558,10 @@ fn parse_subtotal_rule(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> 
     Ok(rule)
 }
 
-pub(crate) fn write_database_ranges(output: &mut String, ranges: &[Range]) -> Result<()> {
+/// # Errors
+///
+/// Returns an error when the value cannot be serialized.
+pub fn write_database_ranges(output: &mut String, ranges: &[Range]) -> Result<()> {
     validate_database_range_collection(ranges)?;
     if ranges.is_empty() {
         return Ok(());
@@ -566,7 +575,14 @@ pub(crate) fn write_database_ranges(output: &mut String, ranges: &[Range]) -> Re
     Ok(())
 }
 
-pub(crate) fn write_database_range_fragment(range: &Range) -> Result<String> {
+/// # Errors
+///
+/// Returns an error when the value cannot be serialized.
+///
+/// # Panics
+///
+/// Panics if the internally generated wrapper element is missing; this is an internal invariant that always holds.
+pub fn write_database_range_fragment(range: &Range) -> Result<String> {
     range.validate()?;
     let mut output = String::with_capacity(512);
     output.push_str(
@@ -645,7 +661,7 @@ fn write_database_range(output: &mut String, range: &Range) {
     output.push_str("</table:database-range>");
 }
 
-pub(crate) fn write_database_source(output: &mut String, source: &Source) {
+pub fn write_database_source(output: &mut String, source: &Source) {
     match source {
         Source::Sql {
             database_name,
@@ -677,7 +693,7 @@ pub(crate) fn write_database_source(output: &mut String, source: &Source) {
     output.push_str("/>");
 }
 
-pub(crate) fn write_filter(output: &mut String, filter: &Filter) {
+pub fn write_filter(output: &mut String, filter: &Filter) {
     output.push_str("<table:filter");
     attr(
         output,

@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{DocumentGenerator, RtfDocument, RtfWriter};
 use std::borrow::Cow;
 use std::fs;
@@ -13,13 +22,13 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 #[test]
 fn parses_unicode_generator_as_inert_provenance_and_round_trips() {
     let document =
-        RtfDocument::parse(r#"{\rtf1\ansi{\*\generator Acme \u20320? 1.0;}Visible}"#).unwrap();
+        RtfDocument::parse(r"{\rtf1\ansi{\*\generator Acme \u20320? 1.0;}Visible}").unwrap();
     assert_eq!(document.text(), "Visible");
     assert_eq!(document.generator().unwrap().value, "Acme 你 1.0");
 
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
-    assert!(serialized.contains(r#"{\*\generator Acme \u20320? 1.0;}"#));
+    assert!(serialized.contains(r"{\*\generator Acme \u20320? 1.0;}"));
     let reparsed = RtfDocument::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.generator(), document.generator());
@@ -27,7 +36,7 @@ fn parses_unicode_generator_as_inert_provenance_and_round_trips() {
 
 #[test]
 fn mutation_validates_and_clear_preserves_body() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     document
         .set_generator(DocumentGenerator::new(Cow::Borrowed("Litchi 1.0")).unwrap())
         .unwrap();
@@ -43,18 +52,18 @@ fn mutation_validates_and_clear_preserves_body() {
 #[test]
 fn rejects_duplicate_or_active_generator_destinations() {
     let cases = [
-        r#"{\rtf1{\generator Direct;}Body}"#,
-        r#"{\rtf1{\*\generator One;}{\*\generator Two;}Body}"#,
-        r#"{\rtf1{\*\generator ;}Body}"#,
-        r#"{\rtf1{\*\generator A{nested};}Body}"#,
-        r#"{\rtf1{\*\generator A\b B;}Body}"#,
-        r#"{\rtf1{\*\generator\bin2 xx}Body}"#,
+        r"{\rtf1{\generator Direct;}Body}",
+        r"{\rtf1{\*\generator One;}{\*\generator Two;}Body}",
+        r"{\rtf1{\*\generator ;}Body}",
+        r"{\rtf1{\*\generator A{nested};}Body}",
+        r"{\rtf1{\*\generator A\b B;}Body}",
+        r"{\rtf1{\*\generator\bin2 xx}Body}",
     ];
     for rtf in cases {
         assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");
     }
 
-    let oversized = format!(r#"{{\rtf1{{\*\generator {};}}}}"#, "x".repeat(65_537));
+    let oversized = format!(r"{{\rtf1{{\*\generator {};}}}}", "x".repeat(65_537));
     assert!(RtfDocument::parse(&oversized).is_err());
     assert!(DocumentGenerator::new(Cow::Borrowed("\n")).is_err());
 }

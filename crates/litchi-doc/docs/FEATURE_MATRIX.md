@@ -30,6 +30,33 @@ projects, [MS-OSHARED] for shared Office metadata, and [MS-ODRAW] for binary Off
 The implementation owner is crates/litchi-doc/src/; litchi-cfb, litchi-sign, and
 shared Office codecs are counted only where the DOC API exposes them.
 
+## Read limits and defaults
+
+`Package::open`, `Package::from_reader`, and `Package::from_ole_file` use
+`Limits::default()`: 128 MiB for the outer CFB package, 64 MiB for each
+DOC-owned input stream, and 96 MiB for the aggregate of `WordDocument`, the
+selected table stream, and optional `Data` stream. Separate 1 GiB/512 MiB/768
+MiB hard ceilings bound explicitly requested values accepted by
+`Limits::try_new` and its checked builder methods.
+
+`Package::open` uses those finite defaults; `Package::open_with` accepts a
+`PackageOpenOptions` value for ergonomic explicit limits without replacing the
+minimal API. `Package::{open,from_reader,from_ole_file}_with_limits` remains
+available for direct limit passing. `document_with_limits` and
+`document_with_options_and_limits` combine their supplied limits component by
+component with those package limits, retaining the stricter value in each
+dimension. Limit failures are structured `Error::ResourceLimit` values with
+the exceeded resource kind, observed size, configured limit, and a stream path
+when applicable. These limits govern package and main DOC-stream ingestion;
+individual typed codecs can impose additional format-specific bounds.
+
+Password-to-open input is owned by non-cloneable, zeroizing `Password` and is
+supplied through `OpenOptions::with_password`; it is redacted in diagnostics.
+`Document::text` preserves stored source text. Accepted, rejected, and combined
+revision projections are intentionally unavailable: DOC lacks a lossless,
+source-bound main-story revision commit path, so exposing those names would
+overstate semantics.
+
 ## Core Word binary document model
 
 | Feature | Status | Read | Write | Notes |
@@ -108,7 +135,7 @@ shared Office codecs are counted only where the DOC API exposes them.
 
 ## Implementation map
 
-- crates/litchi-doc/src/package.rs owns DOC opening, OLE access, encryption selection, properties, signatures, custom XML, and macro/storage access.
-- crates/litchi-doc/src/document.rs, paragraph.rs, table.rs, section.rs, sprm.rs, parts/, and writer/ own CP/text, PLC, FKP, style/list, story, and formatting behavior.
-- crates/litchi-doc/src/parts/fields/, revisions.rs, mail_merge/, route_slip/, captions/, command_bars/, envelope/, structured_tags.rs, ole_controls/, smart_tags.rs, document_properties*.rs, and PLC helpers provide bounded metadata codecs; `route_slip/` and `captions/` layer binary codecs, validation, package editors, snapshot transactions, and contextual facades, while `envelope/` layers the typed message body over its FIB owner.
-- crates/litchi-doc/src/shapes.rs, image.rs, equation.rs, embedded_object.rs, and vba.rs own payload-oriented OfficeArt, picture, MTEF, OLE, and VBA support.
+- `src/package/{codec,model,property_set}.rs` owns DOC package opening, OLE access, package limits, encryption selection, properties, signatures, custom XML, and macro/storage access.
+- `src/document/{codec,mod}.rs`, `src/paragraph/`, `src/table.rs`, `src/section/`, `src/sprm.rs`, `src/sprm_operations/`, `src/parts/`, and `src/writer/` own CP/text, PLC, FKP, style/list, story, and formatting behavior.
+- The contextual metadata codecs live under `src/parts/`, with the corresponding facade modules in `src/lib.rs`; `src/route_slip.rs` layers route-slip codecs, validation, package editors, snapshot transactions, and its contextual facade. Envelope metadata is implemented by `src/parts/envelope/` over its FIB owner.
+- `src/shape/`, `src/image.rs`, `src/equation.rs`, `src/embedded_object/`, and `src/vba.rs` own payload-oriented OfficeArt, picture, MTEF, OLE, and VBA support.

@@ -1,4 +1,4 @@
-//! PowerPoint 10 document metadata and privacy settings.
+//! `PowerPoint` 10 document metadata and privacy settings.
 
 use super::package::{Error, Result};
 use super::records::Record;
@@ -8,10 +8,10 @@ use litchi_opc::constants::content_type;
 
 const DRAWINGML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
 
-/// Square-grid spacing stored by a PowerPoint 10 document extension.
+/// Square-grid spacing stored by a `PowerPoint` 10 document extension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct GridSpacing {
-    /// Horizontal and vertical spacing in PowerPoint grid units.
+    /// Horizontal and vertical spacing in `PowerPoint` grid units.
     pub grid_units: i32,
 }
 
@@ -39,7 +39,7 @@ pub enum PhotoAlbumFrameShape {
     Plaque,
 }
 
-/// PowerPoint 10 photo-album display preferences.
+/// `PowerPoint` 10 photo-album display preferences.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PhotoAlbumSettings {
     /// Whether pictures are displayed as grayscale graphics.
@@ -56,6 +56,10 @@ pub struct PhotoAlbumSettings {
 
 /// Metadata and privacy settings stored in the `___PPT10` document extension.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`DocumentProperties10` is the established public API name; renaming it would break downstream crates"
+)]
 pub struct DocumentProperties10 {
     /// Optional copyright notice.
     pub copyright: Option<String>,
@@ -78,6 +82,10 @@ pub struct DocumentProperties10 {
 
 /// Document-level settings stored in the `___PPT12` extension.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`DocumentProperties12` is the established public API name; renaming it would break downstream crates"
+)]
 pub struct DocumentProperties12 {
     /// Whether pictures are automatically compressed when the presentation is saved.
     ///
@@ -87,17 +95,21 @@ pub struct DocumentProperties12 {
     pub custom_table_styles: Option<CustomTableStyles>,
 }
 
-/// PowerPoint 12 custom table styles stored directly in the Document container.
+/// `PowerPoint` 12 custom table styles stored directly in the Document container.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CustomTableStyles {
     /// Record version retained because MS-PPT recommends, but does not require, version zero.
     pub record_version: u16,
-    /// Validated package containing the DrawingML `tblStyleLst` part.
+    /// Validated package containing the `DrawingML` `tblStyleLst` part.
     pub package: EmbeddedXmlPackage,
 }
 
 impl DocumentProperties10 {
     /// Discover and parse document properties from every `___PPT10` programmable tag below `root`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(root: &Record) -> Result<Self> {
         let mut properties = Self::default();
         for record in root.versioned_binary_tag_records(10)? {
@@ -171,6 +183,10 @@ impl DocumentProperties10 {
 
 impl DocumentProperties12 {
     /// Discover and parse document properties from every `___PPT12` programmable tag below `root`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(root: &Record) -> Result<Self> {
         let mut properties = Self::default();
         for record in &root.children {
@@ -252,7 +268,7 @@ fn parse_document_string(record: &Record, instance: u16, name: &str) -> Result<S
         units.push(unit);
     }
     String::from_utf16(&units)
-        .map_err(|_| Error::Corrupted(format!("{name} contains invalid UTF-16")))
+        .map_err(|_err| Error::Corrupted(format!("{name} contains invalid UTF-16")))
 }
 
 fn parse_privacy_flags(record: &Record) -> Result<bool> {
@@ -289,10 +305,10 @@ fn parse_grid_spacing(record: &Record) -> Result<GridSpacing> {
             "GridSpacing10Atom has an invalid record header or size".to_string(),
         ));
     }
-    let x = i32::from_le_bytes(record.data[0..4].try_into().map_err(|_| {
+    let x = i32::from_le_bytes(record.data[0..4].try_into().map_err(|_err| {
         Error::Corrupted("GridSpacing10Atom horizontal value is truncated".to_string())
     })?);
-    let y = i32::from_le_bytes(record.data[4..8].try_into().map_err(|_| {
+    let y = i32::from_le_bytes(record.data[4..8].try_into().map_err(|_err| {
         Error::Corrupted("GridSpacing10Atom vertical value is truncated".to_string())
     })?);
     if !(0x0000_5ab8..=0x0012_0000).contains(&x) || x != y {
@@ -351,6 +367,11 @@ fn parse_photo_album(record: &Record) -> Result<PhotoAlbumSettings> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use crate::Package;
@@ -361,7 +382,7 @@ mod tests {
         let mut data = Vec::new();
         data.extend_from_slice(&((instance << 4) | version).to_le_bytes());
         data.extend_from_slice(&kind.to_le_bytes());
-        data.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+        data.extend_from_slice(&u32::try_from(payload.len()).unwrap().to_le_bytes());
         data.extend_from_slice(payload);
         data
     }
@@ -382,7 +403,7 @@ mod tests {
             record_type_raw: 0x1388,
             version: 0x0f,
             instance: 0,
-            data_length: tag.len() as u32,
+            data_length: u32::try_from(tag.len()).unwrap(),
             data: tag,
             children: Vec::new(),
         }
@@ -432,7 +453,7 @@ mod tests {
             record_type_raw: RecordType::RoundTripCustomTableStyles12Atom.as_u16(),
             version,
             instance,
-            data_length: data.len() as u32,
+            data_length: u32::try_from(data.len()).unwrap(),
             data: data.to_vec(),
             children: Vec::new(),
         }
@@ -548,13 +569,13 @@ mod tests {
     #[test]
     fn parses_powerpoint12_document_flags_and_isolates_versions() {
         let flags = record_bytes(0, 0, 0x0425, &[1]);
-        let properties =
+        let ppt12_properties =
             DocumentProperties12::parse(&root(vec![prog_tags_record(12, &flags)])).unwrap();
-        assert_eq!(properties.compress_pictures_on_save, Some(true));
+        assert_eq!(ppt12_properties.compress_pictures_on_save, Some(true));
 
-        let properties =
+        let ppt11_properties =
             DocumentProperties12::parse(&root(vec![prog_tags_record(11, &flags)])).unwrap();
-        assert_eq!(properties.compress_pictures_on_save, None);
+        assert_eq!(ppt11_properties.compress_pictures_on_save, None);
     }
 
     #[test]

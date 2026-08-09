@@ -1,4 +1,4 @@
-//! Shape-owned PresentationML programmable-tag attachments.
+//! Shape-owned `PresentationML` programmable-tag attachments.
 //!
 //! A shape tag list is anchored below the selected shape's application
 //! non-visual properties. The relationship itself remains owned by the
@@ -43,10 +43,14 @@ const MAX_RELATIONSHIP_ID_BYTES: usize = 4_096;
 
 /// Load the optional programmable-tag list attached to one semantic shape.
 ///
-/// `owner` is the containing slide-like PresentationML part. The selected
+/// `owner` is the containing slide-like `PresentationML` part. The selected
 /// shape may be a regular shape, picture, connector, graphic frame, group, or
 /// a child at any bounded nested-group depth. The shape-tree root itself is not
 /// a user shape and is never selected.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load<'k>(
     package: &OpcPackage,
     owner: &PackURI,
@@ -69,6 +73,10 @@ pub fn load<'k>(
 /// another preserved raw anchor uses the same relationship ID, or any other
 /// package edge reaches the target part, replacement forks the selected
 /// attachment.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn put<'k>(
     package: &mut OpcPackage,
     owner: &PackURI,
@@ -218,6 +226,10 @@ pub fn put<'k>(
 /// untouched. The relationship remains while another preserved raw anchor
 /// uses its ID, and the target part is collected only after the package graph
 /// proves it orphaned.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn remove<'k>(
     package: &mut OpcPackage,
     owner: &PackURI,
@@ -281,16 +293,13 @@ pub fn remove<'k>(
     Ok(Some(attached.source.into_list()))
 }
 
-fn selected_layout<'k>(owner: &dyn OpcPart, key: crate::shape::Key<'k>) -> Result<Layout> {
+fn selected_layout(owner: &dyn OpcPart, key: crate::shape::Key<'_>) -> Result<Layout> {
     validate_owner_content_type(owner.content_type())?;
     let span = selected_raw_span(owner.blob(), key)?;
     scan_layout(owner.blob(), span)
 }
 
-pub(crate) fn selected_raw_span<'k>(
-    xml: &[u8],
-    key: crate::shape::Key<'k>,
-) -> Result<Range<usize>> {
+pub(crate) fn selected_raw_span(xml: &[u8], key: crate::shape::Key<'_>) -> Result<Range<usize>> {
     let scene = crate::shape::read(xml)?;
     let shape = scene.shape(key)?;
     let family = selected_family(shape)?;
@@ -750,7 +759,10 @@ fn structural_text_parent(node: &Node) -> bool {
     )
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "node start threads one slot per parsed tag-node field"
+)]
 fn start_node(
     reader: &NsReader<&[u8]>,
     xml: &[u8],
@@ -834,7 +846,10 @@ fn start_node(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "node finish threads one slot per parsed tag-node field"
+)]
 fn finish_node(
     xml: &[u8],
     node: Node,

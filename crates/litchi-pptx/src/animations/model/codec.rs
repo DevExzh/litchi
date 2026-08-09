@@ -1,4 +1,4 @@
-//! PresentationML wire conversions for the semantic animation model.
+//! `PresentationML` wire conversions for the semantic animation model.
 
 use super::super::codec::{
     MAX_NORMALIZED_TIME_DECIMALS, MAX_TIME_FILTER_BYTES, MAX_TIME_FILTER_POINTS,
@@ -265,11 +265,11 @@ impl NormalizedTime {
         }
         let numerator = fraction
             .parse::<u64>()
-            .map_err(|_| invalid("normalized time decimal overflows"))?;
+            .map_err(|_err| invalid("normalized time decimal overflows"))?;
         let scale = 10u64
             .checked_pow(
                 u32::try_from(fraction.len())
-                    .map_err(|_| invalid("normalized time precision overflows"))?,
+                    .map_err(|_err| invalid("normalized time precision overflows"))?,
             )
             .ok_or_else(|| invalid("normalized time scale overflows"))?;
         Ok(Self::normalized(numerator, scale))

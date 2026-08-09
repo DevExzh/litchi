@@ -10,10 +10,6 @@ use super::records::record::Record;
 use crate::consts::RecordType;
 use crate::package::{Error, Result};
 
-fn corrupted(message: impl Into<String>) -> Error {
-    Error::Corrupted(message.into())
-}
-
 /// Largest valid `DateTimeMCAtom` format identifier (MS-PPT 2.9.50);
 /// `HeadersFootersAtom` permits 13 but metacharacters do not.
 const MAX_METACHAR_FORMAT_ID: u8 = 12;
@@ -57,24 +53,32 @@ pub struct TextMetachar {
 
 impl TextMetachar {
     /// Position of the metacharacter in the corresponding text.
+    #[must_use]
     pub const fn position(&self) -> u32 {
         self.position
     }
 
     /// The placeholder kind.
+    #[must_use]
     pub const fn kind(&self) -> MetacharKind {
         self.kind
     }
 
     /// `DateTimeMCAtom` format identifier, when this is a date/time atom.
+    #[must_use]
     pub const fn datetime_format(&self) -> Option<DateTimeFormatId> {
         self.datetime_format
     }
 
     /// `RTFDateTimeMCAtom` format string, when this is an RTF date/time atom.
+    #[must_use]
     pub fn rtf_format(&self) -> Option<&str> {
         self.rtf_format.as_deref()
     }
+}
+
+fn corrupted(message: impl Into<String>) -> Error {
+    Error::Corrupted(message.into())
 }
 
 fn read_position(data: &[u8], record_type: RecordType) -> Result<u32> {
@@ -83,9 +87,7 @@ fn read_position(data: &[u8], record_type: RecordType) -> Result<u32> {
             "{record_type:?} is truncated below its position field"
         )));
     }
-    Ok(u32::from_le_bytes(
-        data[..4].try_into().expect("length checked"),
-    ))
+    Ok(u32::from_le_bytes([data[0], data[1], data[2], data[3]]))
 }
 
 /// Parse the metacharacter atoms of one text body, in record order.
@@ -111,6 +113,10 @@ pub(crate) fn metachars_from_records<'a>(
             }
             continue;
         }
+        #[allow(
+            clippy::wildcard_enum_match_arm,
+            reason = "`RecordType` mirrors the full MS-PPT record-type enumeration; records that are not metacharacter atoms are skipped"
+        )]
         let metachar = match record.record_type {
             RecordType::SlideNumberMCAtom
             | RecordType::GenericDateMCAtom
@@ -122,6 +128,10 @@ pub(crate) fn metachars_from_records<'a>(
                         record.record_type
                     )));
                 }
+                #[allow(
+                    clippy::wildcard_enum_match_arm,
+                    reason = "the enclosing match arm restricts `record.record_type` to the four position-only metachar atoms, so the fallback arm is exactly `FooterMCAtom`"
+                )]
                 let kind = match record.record_type {
                     RecordType::SlideNumberMCAtom => MetacharKind::SlideNumber,
                     RecordType::GenericDateMCAtom => MetacharKind::GenericDate,
@@ -179,6 +189,11 @@ pub(crate) fn metachars_from_records<'a>(
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use crate::consts::RecordType;
@@ -189,7 +204,7 @@ mod tests {
             instance: 0,
             record_type,
             record_type_raw: record_type as u16,
-            data_length: data.len() as u32,
+            data_length: u32::try_from(data.len()).unwrap(),
             data: data.to_vec(),
             children: Vec::new(),
         }

@@ -19,7 +19,7 @@ pub(super) struct Parts {
     pub(super) chart_end: usize,
 }
 
-/// Validate a standalone OGraph package and copy its logical root streams.
+/// Validate a standalone `OGraph` package and copy its logical root streams.
 pub(super) fn read(bytes: &[u8], limits: Limits) -> Result<Parts> {
     let package = PackageRef::with_limits(bytes, limits)?;
     let workbook = package.workbook()?;
@@ -30,7 +30,7 @@ pub(super) fn read(bytes: &[u8], limits: Limits) -> Result<Parts> {
             resource: "chart substream",
         },
     )?;
-    let workbook = workbook.into_bytes();
+    let workbook_bytes = workbook.into_bytes();
 
     let mut cfb = OleFile::open(Cursor::new(bytes))?;
     let comp_obj = package
@@ -47,7 +47,7 @@ pub(super) fn read(bytes: &[u8], limits: Limits) -> Result<Parts> {
         .transpose()?;
 
     Ok(Parts {
-        workbook,
+        workbook: workbook_bytes,
         comp_obj,
         ole,
         chart_start,
@@ -55,7 +55,7 @@ pub(super) fn read(bytes: &[u8], limits: Limits) -> Result<Parts> {
     })
 }
 
-/// Rebuild and revalidate the exact standalone OGraph root topology.
+/// Rebuild and revalidate the exact standalone `OGraph` root topology.
 pub(super) fn write(
     workbook: &[u8],
     comp_obj: Option<&[u8]>,
@@ -64,11 +64,11 @@ pub(super) fn write(
 ) -> Result<Vec<u8>> {
     let mut writer = OleWriter::new();
     writer.create_stream(&[WORKBOOK], workbook)?;
-    if let Some(comp_obj) = comp_obj {
-        writer.create_stream(&[COMP_OBJ], comp_obj)?;
+    if let Some(comp_obj_bytes) = comp_obj {
+        writer.create_stream(&[COMP_OBJ], comp_obj_bytes)?;
     }
-    if let Some(ole) = ole {
-        writer.create_stream(&[OLE], ole)?;
+    if let Some(ole_bytes) = ole {
+        writer.create_stream(&[OLE], ole_bytes)?;
     }
 
     let mut output = Cursor::new(Vec::new());

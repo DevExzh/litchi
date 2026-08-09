@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+    ControlWord, Cow, Destination, MAX_OBJECT_DATA_BYTES, MAX_OBJECT_TEXT_BYTES, Parser, RtfError,
+    RtfResult, Token, control_symbol_text,
+};
 
 impl<'a> Parser<'a> {
     /// Parse an `object` destination without activating or updating its content.
@@ -459,7 +462,7 @@ impl<'a> Parser<'a> {
                         "RTF object modifier has an invalid parameter".to_string(),
                     ));
                 },
-                _ => self.pos += 1,
+                Token::Control(_) | Token::Text(_) | Token::Binary(_) => self.pos += 1,
             }
         }
         Err(RtfError::UnexpectedEof)
@@ -557,7 +560,7 @@ impl<'a> Parser<'a> {
                     text.push_str(&self.decode_transport_text(value)?);
                     self.pos += 1;
                 },
-                _ => self.pos += 1,
+                Token::Control(_) | Token::Binary(_) => self.pos += 1,
             }
             if text.len() > MAX_OBJECT_TEXT_BYTES {
                 return Err(RtfError::MalformedDocument(
@@ -593,7 +596,7 @@ impl<'a> Parser<'a> {
                     text.push_str(&self.decode_transport_text(value)?);
                     self.pos += 1;
                 },
-                _ => self.pos += 1,
+                Token::Control(_) | Token::Binary(_) => self.pos += 1,
             }
             if text.len() > MAX_OBJECT_TEXT_BYTES {
                 return Err(RtfError::MalformedDocument(
@@ -604,6 +607,10 @@ impl<'a> Parser<'a> {
         Err(RtfError::UnexpectedEof)
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn parse_object_time_destination(&mut self) -> RtfResult<crate::RtfTimestamp> {
         self.pos += 2; // opening brace and ignorable marker
         if !matches!(
@@ -705,7 +712,7 @@ impl<'a> Parser<'a> {
                     }
                     self.pos += 1;
                 },
-                _ => self.pos += 1,
+                Token::Control(_) => self.pos += 1,
             }
         }
         Err(RtfError::UnexpectedEof)

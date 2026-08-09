@@ -1,5 +1,9 @@
 //! Error types for RTF parsing.
 
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items stay grouped by RTF feature area rather than by item kind"
+)]
 use std::fmt;
 use std::hash::{BuildHasher, Hash};
 
@@ -15,10 +19,10 @@ pub(crate) fn try_reserve_additional<T>(
     let requested = values
         .len()
         .saturating_add(additional)
-        .saturating_mul(std::mem::size_of::<T>());
+        .saturating_mul(size_of::<T>());
     values
         .try_reserve(additional)
-        .map_err(|_| RtfError::AllocationFailed {
+        .map_err(|_err| RtfError::AllocationFailed {
             resource,
             requested,
         })
@@ -44,10 +48,10 @@ where
     let requested = values
         .len()
         .saturating_add(additional)
-        .saturating_mul(std::mem::size_of::<T>());
+        .saturating_mul(size_of::<T>());
     values
         .try_reserve(additional)
-        .map_err(|_| RtfError::AllocationFailed {
+        .map_err(|_err| RtfError::AllocationFailed {
             resource,
             requested,
         })
@@ -92,13 +96,13 @@ pub enum RtfError {
 impl fmt::Display for RtfError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            RtfError::LexerError(msg) => write!(f, "RTF Lexer Error: {}", msg),
-            RtfError::ParserError(msg) => write!(f, "RTF Parser Error: {}", msg),
-            RtfError::InvalidStructure(msg) => write!(f, "Invalid RTF structure: {}", msg),
-            RtfError::InvalidUnicode(msg) => write!(f, "Invalid unicode: {}", msg),
+            RtfError::LexerError(msg) => write!(f, "RTF Lexer Error: {msg}"),
+            RtfError::ParserError(msg) => write!(f, "RTF Parser Error: {msg}"),
+            RtfError::InvalidStructure(msg) => write!(f, "Invalid RTF structure: {msg}"),
+            RtfError::InvalidUnicode(msg) => write!(f, "Invalid unicode: {msg}"),
             RtfError::UnexpectedEof => write!(f, "Unexpected end of input"),
-            RtfError::InvalidControlWord(msg) => write!(f, "Invalid control word: {}", msg),
-            RtfError::MalformedDocument(msg) => write!(f, "Malformed RTF document: {}", msg),
+            RtfError::InvalidControlWord(msg) => write!(f, "Invalid control word: {msg}"),
+            RtfError::MalformedDocument(msg) => write!(f, "Malformed RTF document: {msg}"),
             RtfError::LimitExceeded {
                 resource,
                 observed,
@@ -128,6 +132,6 @@ impl From<std::str::Utf8Error> for RtfError {
 
 impl From<std::num::ParseIntError> for RtfError {
     fn from(err: std::num::ParseIntError) -> Self {
-        RtfError::ParserError(format!("Integer parsing error: {}", err))
+        RtfError::ParserError(format!("Integer parsing error: {err}"))
     }
 }

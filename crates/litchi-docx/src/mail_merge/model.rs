@@ -15,6 +15,41 @@ pub(super) const MAX_RECIPIENTS: usize = 1_000_000;
 pub(super) const MAX_UNIQUE_TAG_BYTES: usize = 1024 * 1024;
 pub(super) const MAX_ATTRIBUTES_PER_NODE: usize = 256;
 
+/// Validated, opaque OPC relationship identifier for a mail-merge target.
+///
+/// Raw relationship IDs are package plumbing, not semantic vocabulary
+/// (ADR-0004). The mail-merge model retains them as inert tokens; this checked
+/// newtype is the only form in which one can be handed back to
+/// [`crate::Package::mail_merge_target`] for target resolution.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct RelationshipId(String);
+
+impl RelationshipId {
+    /// Validate a raw relationship ID, rejecting empty and oversized values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the value is empty or exceeds the bounded
+    /// relationship-ID length.
+    pub fn new(value: impl Into<String>) -> Result<Self> {
+        let id = value.into();
+        if id.is_empty() || id.len() > MAX_RELATIONSHIP_ID_BYTES {
+            return Err(invalid("invalid mail-merge relationship id length"));
+        }
+        Ok(Self(id))
+    }
+
+    pub(crate) fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for RelationshipId {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
 pub(super) fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }

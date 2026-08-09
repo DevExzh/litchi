@@ -3,7 +3,7 @@
 use super::data::CachedTable;
 use super::extensions::Extensions;
 use crate::calculation::Settings;
-use crate::chart::{Class, Dimension, Labels, Position};
+use crate::chart::{ChartClass, Class, Dimension, Labels, Position};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Text {
@@ -118,7 +118,7 @@ pub struct RegressionSpec {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SeriesSpec {
     pub xml_id: Option<String>,
-    pub class: Option<String>,
+    pub class: Option<ChartClass>,
     pub values_cell_range_address: Option<String>,
     pub label_cell_address: Option<String>,
     pub attached_axis: Option<String>,
@@ -178,7 +178,7 @@ pub struct PlotAreaSpec {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Definition {
-    pub class: String,
+    pub class: ChartClass,
     pub style_name: Option<String>,
     pub width: Option<String>,
     pub height: Option<String>,
@@ -194,9 +194,9 @@ pub struct Definition {
 }
 
 impl Definition {
-    pub fn new(class: impl Into<String>) -> Self {
+    pub fn new(class: ChartClass) -> Self {
         Self {
-            class: class.into(),
+            class,
             style_name: None,
             width: None,
             height: None,

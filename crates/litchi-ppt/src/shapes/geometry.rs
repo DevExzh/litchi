@@ -16,6 +16,10 @@ use litchi_odraw::prop::{Array, Id, Props};
 /// In Escher format, geometry is defined by left, top, right, bottom coordinates
 /// in master units (typically 1/576 inch).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`GeometryRect` is the established public API name; renaming it would break downstream crates"
+)]
 pub struct GeometryRect {
     /// Left coordinate
     pub left: i32,
@@ -30,6 +34,7 @@ pub struct GeometryRect {
 impl GeometryRect {
     /// Create a new geometry rectangle.
     #[inline]
+    #[must_use]
     pub const fn new(left: i32, top: i32, right: i32, bottom: i32) -> Self {
         Self {
             left,
@@ -41,64 +46,27 @@ impl GeometryRect {
 
     /// Get width in master units.
     #[inline]
+    #[must_use]
     pub const fn width(&self) -> i32 {
         self.right - self.left
     }
 
     /// Get height in master units.
     #[inline]
+    #[must_use]
     pub const fn height(&self) -> i32 {
         self.bottom - self.top
     }
 
     /// Get center point (x, y).
     #[inline]
+    #[must_use]
     pub const fn center(&self) -> (i32, i32) {
         (
             self.left + (self.width() / 2),
             self.top + (self.height() / 2),
         )
     }
-}
-
-/// Extract geometry rectangle from Escher properties.
-///
-/// Geometry properties define the internal coordinate space of the shape.
-/// These are different from the shape's position/size which is in the anchor.
-///
-/// # Arguments
-///
-/// * `props` - Parsed Escher properties from Opt record
-///
-/// # Returns
-///
-/// `Some(GeometryRect)` if all geometry properties are present, `None` otherwise
-///
-/// # Performance
-///
-/// - Direct property access (no iteration)
-/// - Early return on missing properties
-/// - No allocations
-///
-/// # Example
-///
-/// ```ignore
-/// use litchi_odraw::prop::Props;
-/// use litchi_ppt::shapes::geometry::extract_geometry_rect;
-///
-/// let props = Props::parse(&opt_record)?;
-/// if let Some(geom) = extract_geometry_rect(&props) {
-///     println!("Geometry: {}x{}", geom.width(), geom.height());
-/// }
-/// ```
-#[inline]
-pub fn extract_geometry_rect<'data>(props: &Props<'data>) -> Option<GeometryRect> {
-    let left = props.get_coord(Id::GeomLeft)?;
-    let top = props.get_coord(Id::GeomTop)?;
-    let right = props.get_coord(Id::GeomRight)?;
-    let bottom = props.get_coord(Id::GeomBottom)?;
-
-    Some(GeometryRect::new(left, top, right, bottom))
 }
 
 /// Shape path types from MS-ODRAW specification.
@@ -119,12 +87,12 @@ pub enum ShapePathType {
     /// Path connectivity is defined by the segment-info array.
     Complex = 4,
     /// Unknown path type
-    Unknown = 0xFFFFFFFF,
+    Unknown = 0xFFFF_FFFF,
 }
 
 impl From<i32> for ShapePathType {
     fn from(value: i32) -> Self {
-        match value as u32 {
+        match value.cast_unsigned() {
             0 => Self::Lines,
             1 => Self::LinesClosed,
             2 => Self::Curves,
@@ -133,27 +101,6 @@ impl From<i32> for ShapePathType {
             _ => Self::Unknown,
         }
     }
-}
-
-/// Extract shape path type from Escher properties.
-///
-/// The shape path determines how the shape's geometry is rendered.
-///
-/// # Arguments
-///
-/// * `props` - Parsed Escher properties
-///
-/// # Returns
-///
-/// The shape path type, or `None` if not specified
-///
-/// # Performance
-///
-/// - Single property lookup
-/// - No allocations
-#[inline]
-pub fn extract_shape_path<'data>(props: &Props<'data>) -> Option<ShapePathType> {
-    props.get_int(Id::ShapePath).map(ShapePathType::from)
 }
 
 /// Vertex data for complex shapes.
@@ -184,6 +131,7 @@ impl<'data> VertexData<'data> {
     ///
     /// `Some(VertexData)` if data is valid, `None` otherwise
     #[inline]
+    #[must_use]
     pub fn new(data: &'data [u8]) -> Option<Self> {
         if data.is_empty() || !data.len().is_multiple_of(8) {
             return None;
@@ -196,11 +144,12 @@ impl<'data> VertexData<'data> {
         })
     }
 
-    /// Create vertex data from an OfficeArt IMsoArray.
+    /// Create vertex data from an `OfficeArt` `IMsoArray`.
     ///
-    /// Besides full 8-byte POINT records, OfficeArt permits `cbElem =
+    /// Besides full 8-byte POINT records, `OfficeArt` permits `cbElem =
     /// 0xFFF0`, which stores each point as two signed 16-bit coordinates.
     #[inline]
+    #[must_use]
     pub fn from_array(array: &Array<'data>) -> Option<Self> {
         let element_size = array.element_size();
         if !matches!(element_size, 4 | 8) {
@@ -221,6 +170,7 @@ impl<'data> VertexData<'data> {
 
     /// Get number of vertices.
     #[inline]
+    #[must_use]
     pub const fn count(&self) -> usize {
         self.count
     }
@@ -240,6 +190,7 @@ impl<'data> VertexData<'data> {
     /// - Direct offset calculation
     /// - No bounds checking in release builds (debug has assertions)
     #[inline]
+    #[must_use]
     pub fn get(&self, index: usize) -> Option<(i32, i32)> {
         if index >= self.count {
             return None;
@@ -276,6 +227,68 @@ impl<'data> VertexData<'data> {
     pub fn iter(&self) -> impl Iterator<Item = (i32, i32)> + '_ {
         (0..self.count).filter_map(move |i| self.get(i))
     }
+}
+
+/// Extract geometry rectangle from Escher properties.
+///
+/// Geometry properties define the internal coordinate space of the shape.
+/// These are different from the shape's position/size which is in the anchor.
+///
+/// # Arguments
+///
+/// * `props` - Parsed Escher properties from Opt record
+///
+/// # Returns
+///
+/// `Some(GeometryRect)` if all geometry properties are present, `None` otherwise
+///
+/// # Performance
+///
+/// - Direct property access (no iteration)
+/// - Early return on missing properties
+/// - No allocations
+///
+/// # Example
+///
+/// ```ignore
+/// use litchi_odraw::prop::Props;
+/// use litchi_ppt::shapes::geometry::extract_geometry_rect;
+///
+/// let props = Props::parse(&opt_record)?;
+/// if let Some(geom) = extract_geometry_rect(&props) {
+///     println!("Geometry: {}x{}", geom.width(), geom.height());
+/// }
+/// ```
+#[inline]
+#[must_use]
+pub fn extract_geometry_rect(props: &Props<'_>) -> Option<GeometryRect> {
+    let left = props.get_coord(Id::GeomLeft)?;
+    let top = props.get_coord(Id::GeomTop)?;
+    let right = props.get_coord(Id::GeomRight)?;
+    let bottom = props.get_coord(Id::GeomBottom)?;
+
+    Some(GeometryRect::new(left, top, right, bottom))
+}
+
+/// Extract shape path type from Escher properties.
+///
+/// The shape path determines how the shape's geometry is rendered.
+///
+/// # Arguments
+///
+/// * `props` - Parsed Escher properties
+///
+/// # Returns
+///
+/// The shape path type, or `None` if not specified
+///
+/// # Performance
+///
+/// - Single property lookup
+/// - No allocations
+#[inline]
+pub fn extract_shape_path(props: &Props<'_>) -> Option<ShapePathType> {
+    props.get_int(Id::ShapePath).map(ShapePathType::from)
 }
 
 /// Extract vertices from Escher properties.
@@ -339,6 +352,7 @@ pub fn extract_vertices<'data>(props: &Props<'data>) -> Option<VertexData<'data>
 /// - Zero-copy via borrow
 /// - Single property lookup
 #[inline]
+#[must_use]
 pub fn extract_segment_info<'data>(props: &Props<'data>) -> Option<&'data [u8]> {
     if let Some(array) = props.get_array(Id::SegmentInfo) {
         let data = array.raw_data().get(6..)?;
@@ -349,6 +363,11 @@ pub fn extract_segment_info<'data>(props: &Props<'data>) -> Option<&'data [u8]> 
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

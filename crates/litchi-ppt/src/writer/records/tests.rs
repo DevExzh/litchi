@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::*;
 
 #[test]
@@ -70,7 +76,7 @@ fn test_record_builder_empty() {
 
 #[test]
 fn test_create_document_atom() {
-    let atom = create_document_atom(9144000, 6858000, 1, 0, 0).unwrap();
+    let atom = create_document_atom(9_144_000, 6_858_000, 1, 0, 0).unwrap();
     assert!(!atom.is_empty());
     assert!(atom.len() >= 48); // Header + 40 bytes data
 }
@@ -85,7 +91,7 @@ fn test_create_main_master_container() {
 
 #[test]
 fn test_create_slide_container() {
-    let container = create_slide_container(0x80000000, "").unwrap();
+    let container = create_slide_container(0x8000_0000, "").unwrap();
     assert!(!container.is_empty());
     assert!(container.len() > 8);
 }
@@ -200,9 +206,9 @@ fn test_record_type_constants() {
 fn test_record_builder_multiple_children() {
     let mut parent = RecordBuilder::new(0x0F, 0, record_type::DOCUMENT);
 
-    for i in 0..5 {
-        let mut child = RecordBuilder::new(0x00, i as u16, record_type::DOCUMENT_ATOM);
-        child.write_data(&[i as u8; 10]);
+    for i in 0..5u8 {
+        let mut child = RecordBuilder::new(0x00, u16::from(i), record_type::DOCUMENT_ATOM);
+        child.write_data(&[i; 10]);
         parent.write_child(&child.build().unwrap());
     }
 

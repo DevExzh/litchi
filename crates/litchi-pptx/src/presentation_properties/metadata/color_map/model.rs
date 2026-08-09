@@ -1,8 +1,8 @@
-//! Package-independent PresentationML color-map values.
+//! Package-independent `PresentationML` color-map values.
 
 use crate::shape::theme::{Color as ThemeColor, Palette, Slot as ThemeSlot};
 
-/// A role that can be mapped by a PresentationML color map.
+/// A role that can be mapped by a `PresentationML` color map.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Slot {
     Background1,
@@ -20,7 +20,7 @@ pub enum Slot {
 }
 
 impl Slot {
-    /// Every color slot in its PresentationML source order.
+    /// Every color slot in its `PresentationML` source order.
     pub const ALL: [Self; 12] = [
         Self::Background1,
         Self::Text1,
@@ -36,7 +36,8 @@ impl Slot {
         Self::FollowedHyperlink,
     ];
 
-    /// Return the unqualified PresentationML attribute name.
+    /// Return the unqualified `PresentationML` attribute name.
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Background1 => "bg1",
@@ -55,7 +56,7 @@ impl Slot {
     }
 }
 
-/// A color role defined by a DrawingML theme.
+/// A color role defined by a `DrawingML` theme.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Role {
     Dark1,
@@ -73,7 +74,8 @@ pub enum Role {
 }
 
 impl Role {
-    /// Return the DrawingML theme color name.
+    /// Return the `DrawingML` theme color name.
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Dark1 => "dk1",
@@ -92,7 +94,7 @@ impl Role {
     }
 }
 
-/// A complete PresentationML color map.
+/// A complete `PresentationML` color map.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Map {
     pub(crate) background1: Role,
@@ -110,7 +112,8 @@ pub struct Map {
 }
 
 impl Map {
-    /// Return the theme color role mapped from a PresentationML color slot.
+    /// Return the theme color role mapped from a `PresentationML` color slot.
+    #[must_use]
     pub const fn color(&self, slot: Slot) -> Role {
         match slot {
             Slot::Background1 => self.background1,
@@ -147,12 +150,14 @@ impl Map {
     }
 
     /// Return a copy with one mapped color role changed.
+    #[must_use]
     pub const fn with_color(mut self, slot: Slot, role: Role) -> Self {
         self.set_color(slot, role);
         self
     }
 
-    /// Resolve a mapped presentation slot against a typed DrawingML palette.
+    /// Resolve a mapped presentation slot against a typed `DrawingML` palette.
+    #[must_use]
     pub fn resolve<'a>(&self, palette: &'a Palette, slot: Slot) -> Option<&'a ThemeColor> {
         palette.color(match self.color(slot) {
             Role::Dark1 => ThemeSlot::Dark1,

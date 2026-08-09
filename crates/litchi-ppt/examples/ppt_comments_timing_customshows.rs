@@ -1,3 +1,8 @@
+#![allow(
+    clippy::print_stdout,
+    reason = "this command-line example intentionally prints its results"
+)]
+
 // Example: Generate PPT files demonstrating comments, slide timings, and custom shows.
 // Open the generated files in PowerPoint to verify each feature.
 

@@ -12,7 +12,7 @@ impl UnknownRecord {
             return corrupted("unknown ExObjList record has an invalid source slot");
         }
         let expected_length = usize::try_from(self.record.data_length)
-            .map_err(|_| Error::Corrupted("unknown ExObjList record size overflows".into()))?;
+            .map_err(|_err| Error::Corrupted("unknown ExObjList record size overflows".into()))?;
         if expected_length != self.record.data.len() {
             return corrupted("unknown ExObjList record has inconsistent payload length");
         }
@@ -21,6 +21,13 @@ impl UnknownRecord {
 }
 
 impl Collection {
+    /// Validate the collection's seed, ID, and unknown-record invariants.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the identifier seed or any object ID is out of
+    /// range, if object IDs are duplicated, if the object count exceeds the
+    /// limit, or if a preserved unknown record is inconsistent.
     pub fn validate(&self) -> Result<()> {
         validate_collection(self.id_seed, &self.objects)?;
         for record in &self.unknown_records {
@@ -29,6 +36,12 @@ impl Collection {
         Ok(())
     }
 
+    /// Validate that every object's persist ID is present in `mapping`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any object references a persist ID that has no
+    /// offset in the mapping.
     pub fn validate_persist_mapping(&self, mapping: &PersistMapping) -> Result<()> {
         for object in &self.objects {
             let id = object.persist_id();

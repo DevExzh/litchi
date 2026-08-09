@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use litchi_opc::PackURI;
 use litchi_opc::part::BlobPart;
 use litchi_pptx::Error;
@@ -243,7 +249,7 @@ fn package_tag_crud_edits_only_the_active_raw_mce_branch() {
     assert!(after_put.contains(
         r#"<mc:Choice xmlns:x="urn:litchi:test:unsupported" Requires="x"><p:custDataLst><!--inactive-branch--><p:tags r:id="rIdInactiveTags"/>"#
     ));
-    assert!(after_put.contains(r#"<p:custDataLst><!--active-branch--><p:tags "#));
+    assert!(after_put.contains(r"<p:custDataLst><!--active-branch--><p:tags "));
     assert_eq!(after_put.matches("<p:tags ").count(), 2);
 
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
@@ -267,7 +273,7 @@ fn package_tag_crud_edits_only_the_active_raw_mce_branch() {
     assert!(after_remove.contains(
         r#"<mc:Choice xmlns:x="urn:litchi:test:unsupported" Requires="x"><p:custDataLst><!--inactive-branch--><p:tags r:id="rIdInactiveTags"/>"#
     ));
-    assert!(after_remove.contains(r#"<p:custDataLst><!--active-branch--></p:custDataLst>"#));
+    assert!(after_remove.contains(r"<p:custDataLst><!--active-branch--></p:custDataLst>"));
     assert_eq!(after_remove.matches("<p:tags ").count(), 1);
     assert!(reopened.opc().unwrap().get_part(&inactive_part).is_ok());
     assert!(

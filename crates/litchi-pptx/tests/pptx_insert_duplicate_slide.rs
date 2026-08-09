@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use litchi_pptx::Package;
 use tempfile::NamedTempFile;
 
@@ -29,7 +35,7 @@ fn duplicated_slide_takes_requested_position_after_round_trip() {
             .slide_references()
             .unwrap()
             .iter()
-            .map(|reference| reference.id())
+            .map(litchi_pptx::parts::SlideReference::id)
             .collect::<Vec<_>>(),
         [256, 257, 259, 258]
     );

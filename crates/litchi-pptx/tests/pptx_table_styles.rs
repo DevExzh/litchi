@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::part::BlobPart;
 use litchi_opc::{PackURI, PackageWriter};
@@ -57,7 +63,7 @@ fn slide_tables_report_style_switches_and_references() {
 
     let mut found = Vec::new();
     for slide in presentation.slides().unwrap() {
-        for shape in slide.shapes().unwrap().iter() {
+        for shape in &slide.shapes().unwrap() {
             if let Shape::Table(shape) = shape {
                 let table = Table::from_graphic_frame(shape.common().xml().unwrap()).unwrap();
                 let properties = table.properties().unwrap().unwrap();

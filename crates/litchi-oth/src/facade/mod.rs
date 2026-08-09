@@ -1,9 +1,23 @@
 //! Concise family entry points.
 
-use litchi_core::{Metadata, Result};
+use litchi_core::{Error, Metadata, Result};
 use std::path::Path;
 
 pub use crate::authoring::Builder;
+
+/// A read-only semantic text-web body projection.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TextBody {
+    paragraphs: Vec<crate::paragraph::Paragraph>,
+}
+
+impl TextBody {
+    /// Returns projected paragraph character data in document order.
+    #[must_use]
+    pub fn paragraphs(&self) -> &[crate::paragraph::Paragraph] {
+        &self.paragraphs
+    }
+}
 
 /// Immutable document snapshot.
 pub struct Template {
@@ -62,6 +76,26 @@ impl Template {
         self.package.files()
     }
 
+    /// Projects inert paragraph character data from the validated text body.
+    ///
+    /// Fields, links, scripts, forms, resources, and embedded objects are not
+    /// evaluated, followed, activated, or otherwise executed.
+    pub fn text_body(&self) -> Result<TextBody> {
+        self.package
+            .paragraphs()
+            .map(|paragraphs| TextBody { paragraphs })
+    }
+
+    /// Starts an exact-byte, failure-atomic no-op edit transaction.
+    ///
+    /// The current OTH authoring surface creates new packages only. This seam
+    /// gives callers a source-checked commit and patch lifecycle without
+    /// pretending unsupported mutations exist.
+    #[must_use]
+    pub fn edit(&self) -> Edit<'_> {
+        Edit { source: self }
+    }
+
     /// Consumes the snapshot and returns the raw package bytes.
     #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
@@ -69,19 +103,69 @@ impl Template {
     }
 }
 
-#[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "test code panics on failure; unwrap keeps assertions concise"
-)]
-mod tests {
-    use super::{Builder, Template};
+/// A detached no-op edit over one exact template snapshot.
+pub struct Edit<'a> {
+    source: &'a Template,
+}
 
-    #[test]
-    fn builder_opens_as_validated_snapshot() {
-        let bytes = Builder::new().build().unwrap();
-        let document = Template::from_bytes(bytes).unwrap();
-        assert!(document.content_xml().contains("<office:text"));
-        assert!(!document.as_bytes().is_empty());
+impl<'a> Edit<'a> {
+    /// Publishes an exact no-op commit without mutating the source snapshot.
+    #[must_use]
+    pub fn commit(self) -> Commit<'a> {
+        Commit {
+            template: self.source,
+            patch: Patch {
+                expected_source: self.source.as_bytes(),
+            },
+        }
+    }
+}
+
+/// An exact no-op commit over a validated template snapshot.
+pub struct Commit<'a> {
+    template: &'a Template,
+    patch: Patch<'a>,
+}
+
+impl<'a> Commit<'a> {
+    /// Returns the committed immutable template snapshot.
+    #[must_use]
+    pub const fn template(&self) -> &'a Template {
+        self.template
+    }
+
+    /// Returns the source-checked exact no-op patch.
+    #[must_use]
+    pub const fn patch(&self) -> &Patch<'a> {
+        &self.patch
+    }
+}
+
+/// A source-checked patch that preserves exact package bytes.
+pub struct Patch<'a> {
+    expected_source: &'a [u8],
+}
+
+impl Patch<'_> {
+    /// Applies this patch only to a byte-identical template source.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed invalid-format error when the immutable source differs.
+    pub fn apply<'a>(&self, source: &'a Template) -> Result<&'a [u8]> {
+        if source.as_bytes() != self.expected_source {
+            return Err(Error::InvalidFormat(
+                "OTH patch source does not match its expected snapshot".to_string(),
+            ));
+        }
+        Ok(source.as_bytes())
+    }
+
+    /// Returns this exact no-op patch as its own inverse.
+    #[must_use]
+    pub const fn inverse(&self) -> Self {
+        Self {
+            expected_source: self.expected_source,
+        }
     }
 }

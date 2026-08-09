@@ -1,4 +1,4 @@
-//! Package-independent values for PresentationML slide synchronization.
+//! Package-independent values for `PresentationML` slide synchronization.
 
 use chrono::NaiveDate;
 use litchi_opc::PackURI;
@@ -55,6 +55,10 @@ pub struct DateTime {
 
 impl DateTime {
     /// Parse and validate an `xsd:dateTime` lexical form.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(value: &str) -> Result<Self> {
         let digits = |text: &str, label: &str| -> Result<u32> {
             if text.is_empty() || !text.bytes().all(|byte| byte.is_ascii_digit()) {
@@ -63,7 +67,7 @@ impl DateTime {
                 )));
             }
             text.parse::<u32>()
-                .map_err(|_| invalid(format!("slide synchronization {label} is out of range")))
+                .map_err(|_err| invalid(format!("slide synchronization {label} is out of range")))
         };
         let (date, rest) = value.split_once('T').ok_or_else(|| {
             invalid("slide synchronization timestamp is missing the 'T' separator")
@@ -83,9 +87,9 @@ impl DateTime {
             return Err(invalid("slide synchronization date has trailing fields"));
         }
         let month = u8::try_from(month)
-            .map_err(|_| invalid("slide synchronization month is out of range"))?;
-        let day =
-            u8::try_from(day).map_err(|_| invalid("slide synchronization day is out of range"))?;
+            .map_err(|_err| invalid("slide synchronization month is out of range"))?;
+        let day = u8::try_from(day)
+            .map_err(|_err| invalid("slide synchronization day is out of range"))?;
         if NaiveDate::from_ymd_opt(year as i32, month.into(), day.into()).is_none() {
             return Err(invalid("slide synchronization date is not a calendar day"));
         }
@@ -113,10 +117,10 @@ impl DateTime {
                                 "slide synchronization time zone has trailing fields",
                             ));
                         }
-                        let hours = u8::try_from(hours).map_err(|_| {
+                        let hours = u8::try_from(hours).map_err(|_err| {
                             invalid("slide synchronization time-zone hours are out of range")
                         })?;
-                        let minutes = u8::try_from(minutes).map_err(|_| {
+                        let minutes = u8::try_from(minutes).map_err(|_err| {
                             invalid("slide synchronization time-zone minutes are out of range")
                         })?;
                         if hours > MAX_TIMEZONE_HOURS
@@ -159,11 +163,11 @@ impl DateTime {
             return Err(invalid("slide synchronization time has trailing fields"));
         }
         let hour = u8::try_from(hour)
-            .map_err(|_| invalid("slide synchronization hour is out of range"))?;
+            .map_err(|_err| invalid("slide synchronization hour is out of range"))?;
         let minute = u8::try_from(minute)
-            .map_err(|_| invalid("slide synchronization minute is out of range"))?;
+            .map_err(|_err| invalid("slide synchronization minute is out of range"))?;
         let second = u8::try_from(second)
-            .map_err(|_| invalid("slide synchronization second is out of range"))?;
+            .map_err(|_err| invalid("slide synchronization second is out of range"))?;
         if hour > 23 || minute > 59 || second > 59 {
             return Err(invalid("slide synchronization time of day is out of range"));
         }
@@ -179,7 +183,8 @@ impl DateTime {
         })
     }
 
-    /// Serialize in canonical PresentationML `xsd:dateTime` form.
+    /// Serialize in canonical `PresentationML` `xsd:dateTime` form.
+    #[must_use]
     pub fn to_lexical(&self) -> String {
         let mut out = format!(
             "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}",
@@ -234,6 +239,7 @@ impl Properties {
     }
 
     /// Retain an opaque extension-list marker when authoring a replacement.
+    #[must_use]
     pub const fn with_extension_list(mut self, present: bool) -> Self {
         self.has_extension_list = present;
         self

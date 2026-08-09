@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use litchi_pptx::shape::{LookupError, Scene};
 
 const LOCAL_SHAPE_XML: &[u8] =
@@ -11,7 +17,7 @@ fn slide_shapes_use_names_first_with_checked_numeric_fallback() {
             .placeholders()
             .filter_map(|shape| shape
                 .placeholder()
-                .and_then(|placeholder| placeholder.kind()))
+                .and_then(litchi_pptx::shape::Placeholder::kind))
             .collect::<Vec<_>>(),
         ["title", "body"]
     );

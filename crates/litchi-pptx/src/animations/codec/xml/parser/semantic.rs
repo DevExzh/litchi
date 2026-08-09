@@ -1,10 +1,22 @@
 use super::super::super::super::invalid;
-use super::super::super::super::model::*;
+use super::super::super::super::model::{
+    DiagramBuild, DiagramBuildType, Duration, Effect, EffectInstance, EventFilter, Fill,
+    GraphicBuild, GraphicBuildMode, GraphicChartBuildType, GraphicDiagramBuildType, GroupId,
+    OleChartBuild, OleChartBuildType, ParagraphBuild, ParagraphBuildType, ParagraphTemplate,
+    Repeat, Restart, Sequence, SequenceContext, Speed, SyncBehavior, TemplateTimeNode, TimeFilter,
+};
 use super::super::semantic::{
     PendingAnimation, PendingGraphicBuild, PendingParagraphTemplate, TimeNodeFrame,
     parse_sequence_context, trigger,
 };
-use super::validation::*;
+use super::validation::{
+    DIAGRAM_NS, MAX_ANIMATION_BUILDS, MAX_ANIMATIONS, MAX_PARAGRAPH_TEMPLATES,
+    MAX_PRESERVED_TIMING_BYTES, MAX_TEMPLATE_TIME_NODE_BYTES, TimingValue, attribute,
+    check_attribute_count, direction_from_subtype, is_chartml_name, is_drawingml_name,
+    is_known_ole_chart_program_id, is_namespace_name, is_presentationml_name,
+    parse_build_auto_advance, parse_group_id, parse_progress, parse_shape_id, parse_timing_value,
+    parse_xml_bool,
+};
 use crate::{Error, Result};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::BytesStart;
@@ -97,7 +109,10 @@ impl TimingParser {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "parser frame carries one slot per XML element field"
+    )]
     pub(super) fn start(
         &mut self,
         namespace: &ResolveResult<'_>,
@@ -156,8 +171,7 @@ impl TimingParser {
             self.graphic_frame_has_ole_object = true;
             self.graphic_frame_has_ole_chart = attribute(element, b"progId", decoder)?
                 .as_deref()
-                .map(is_known_ole_chart_program_id)
-                .unwrap_or(true);
+                .is_none_or(is_known_ole_chart_program_id);
         }
 
         if self.require_valid_targets
@@ -388,7 +402,7 @@ impl TimingParser {
                 .map(|value| {
                     value
                         .parse::<u8>()
-                        .map_err(|_| invalid("invalid paragraph template level"))
+                        .map_err(|_err| invalid("invalid paragraph template level"))
                 })
                 .transpose()?
                 .unwrap_or(0);
@@ -477,7 +491,7 @@ impl TimingParser {
                         .map(|value| {
                             value
                                 .parse::<u32>()
-                                .map_err(|_| invalid("invalid paragraph build level"))
+                                .map_err(|_err| invalid("invalid paragraph build level"))
                         })
                         .transpose()?
                         .unwrap_or(1);
@@ -702,7 +716,7 @@ impl TimingParser {
                 }
                 let preset_id = preset_id
                     .parse::<u32>()
-                    .map_err(|_| invalid("invalid animation preset ID"))?;
+                    .map_err(|_err| invalid("invalid animation preset ID"))?;
                 let preset_class = attribute(element, b"presetClass", decoder)?
                     .unwrap_or_else(|| "entr".to_string());
                 if !matches!(
@@ -715,7 +729,7 @@ impl TimingParser {
                     .map(|value| {
                         value
                             .parse::<u32>()
-                            .map_err(|_| invalid("invalid animation preset subtype"))
+                            .map_err(|_err| invalid("invalid animation preset subtype"))
                     })
                     .transpose()?
                     .unwrap_or(0);
@@ -748,7 +762,7 @@ impl TimingParser {
                     .map(|value| {
                         let value = value
                             .parse::<i32>()
-                            .map_err(|_| invalid("invalid animation speed percentage"))?;
+                            .map_err(|_err| invalid("invalid animation speed percentage"))?;
                         Speed::new(value)
                     })
                     .transpose()?;
@@ -790,7 +804,7 @@ impl TimingParser {
                     })
                     .unwrap_or(0);
                 let order = u32::try_from(self.sequence.len() + 1)
-                    .map_err(|_| invalid("animation order exceeds u32"))?;
+                    .map_err(|_err| invalid("animation order exceeds u32"))?;
                 let effect = Effect::from_preset_parts(&preset_class, preset_id);
                 self.pending.push(PendingAnimation {
                     depth,
@@ -1082,7 +1096,7 @@ impl TimingParser {
                 return Err(invalid("paragraph template time node exceeds safety limit"));
             }
             let raw = std::str::from_utf8(raw)
-                .map_err(|_| invalid("paragraph template time node is not UTF-8"))?;
+                .map_err(|_err| invalid("paragraph template time node is not UTF-8"))?;
             let build = self
                 .sequence
                 .paragraph_builds
@@ -1114,24 +1128,21 @@ impl TimingParser {
                     && !self.shape_ids.contains(trigger_shape_id)
                 {
                     return Err(invalid(format!(
-                        "interactive animation trigger {} is not a shape on the current slide",
-                        trigger_shape_id
+                        "interactive animation trigger {trigger_shape_id} is not a shape on the current slide"
                     )));
                 }
             }
             for (_, shape_id, _) in &self.build_pairs {
                 if !self.shape_ids.contains(shape_id) {
                     return Err(invalid(format!(
-                        "animation build target {} is not a shape on the current slide",
-                        shape_id
+                        "animation build target {shape_id} is not a shape on the current slide"
                     )));
                 }
             }
             for (kind, shape_id, _) in &self.build_pairs {
                 if *kind == 2 && !self.ole_diagram_shape_ids.contains(shape_id) {
                     return Err(invalid(format!(
-                        "diagram build target {} is not an OLE graphic-frame shape",
-                        shape_id
+                        "diagram build target {shape_id} is not an OLE graphic-frame shape"
                     )));
                 }
             }
@@ -1172,7 +1183,7 @@ impl TimingParser {
                 return Err(invalid("preserved timing subtree exceeds safety limit"));
             }
             let raw =
-                std::str::from_utf8(raw).map_err(|_| invalid("timing subtree is not UTF-8"))?;
+                std::str::from_utf8(raw).map_err(|_err| invalid("timing subtree is not UTF-8"))?;
             self.sequence.source_animations =
                 Some(self.sequence.animations.clone().into_boxed_slice());
             self.sequence.source_paragraph_builds =
@@ -1183,8 +1194,8 @@ impl TimingParser {
                 Some(self.sequence.graphic_builds.clone().into_boxed_slice());
             self.sequence.source_ole_chart_builds =
                 Some(self.sequence.ole_chart_builds.clone().into_boxed_slice());
-            let slide_xml =
-                std::str::from_utf8(xml).map_err(|_| invalid("slide timing XML is not UTF-8"))?;
+            let slide_xml = std::str::from_utf8(xml)
+                .map_err(|_err| invalid("slide timing XML is not UTF-8"))?;
             let timing_tree = super::wire::parse_recursive_timing_tree(slide_xml)?;
             self.sequence.source_timing_tree = Some(Box::new(timing_tree.clone()));
             self.sequence.timing_tree = Some(timing_tree);

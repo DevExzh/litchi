@@ -1,4 +1,4 @@
-//! Round-trip tests for the BIFF8 SheetExt record (sheet tab color).
+//! Round-trip tests for the BIFF8 `SheetExt` record (sheet tab color).
 
 use litchi_xls::Workbook;
 use litchi_xls::writer::Writer;

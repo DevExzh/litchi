@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{DocumentPrivacyPolicies, RtfDocument, RtfWriter};
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
@@ -32,7 +41,7 @@ fn parses_both_privacy_requests_without_removing_metadata_or_body() {
 fn parses_each_request_independently() {
     for (name, personal, date_time) in [("rempersonalinfo", true, false), ("remdttm", false, true)]
     {
-        let source = format!(r#"{{\rtf1\{name} Body}}"#);
+        let source = format!(r"{{\rtf1\{name} Body}}");
         let document = RtfDocument::parse(&source).unwrap();
         assert_eq!(
             document.privacy_policies().remove_personal_information,
@@ -48,7 +57,7 @@ fn parses_each_request_independently() {
 
 #[test]
 fn omission_is_false_and_serializes_nothing() {
-    let document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     assert!(document.privacy_policies().is_empty());
     let serialized = String::from_utf8(write(&document)).unwrap();
     assert!(!serialized.contains("rempersonalinfo"));
@@ -57,7 +66,7 @@ fn omission_is_false_and_serializes_nothing() {
 
 #[test]
 fn typed_api_round_trips_in_specification_order_and_clears_passively() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     document.set_privacy_policies(DocumentPrivacyPolicies {
         remove_personal_information: true,
         remove_date_time_information: true,
@@ -89,17 +98,17 @@ fn parses_bundled_libreoffice_privacy_policy_producer_fixture() {
 fn rejects_parameters_duplicates_starred_grouped_and_late_requests() {
     for name in ["rempersonalinfo", "remdttm"] {
         for suffix in ["0", "1", "-1", "2147483647", "99999999999"] {
-            let source = format!(r#"{{\rtf1\{name}{suffix} Body}}"#);
+            let source = format!(r"{{\rtf1\{name}{suffix} Body}}");
             assert!(
                 RtfDocument::parse(&source).is_err(),
                 "accepted malformed {source}"
             );
         }
         for source in [
-            format!(r#"{{\rtf1\{name}\{name} Body}}"#),
-            format!(r#"{{\rtf1{{\*\{name}}}Body}}"#),
-            format!(r#"{{\rtf1{{\{name}}}Body}}"#),
-            format!(r#"{{\rtf1 Body\{name}}}"#),
+            format!(r"{{\rtf1\{name}\{name} Body}}"),
+            format!(r"{{\rtf1{{\*\{name}}}Body}}"),
+            format!(r"{{\rtf1{{\{name}}}Body}}"),
+            format!(r"{{\rtf1 Body\{name}}}"),
         ] {
             assert!(
                 RtfDocument::parse(&source).is_err(),

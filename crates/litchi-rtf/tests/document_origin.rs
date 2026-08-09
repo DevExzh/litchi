@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{
     DocumentAutoFormatType, DocumentOrigin, DocumentOriginMetadata, HtmlEmailVersion, RtfDocument,
     RtfWriter,
@@ -13,17 +22,17 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_plain_text_and_both_documented_html_origin_forms() {
-    let text = RtfDocument::parse(r#"{\rtf1\fromtext\deff0 Body}"#).unwrap();
+    let text = RtfDocument::parse(r"{\rtf1\fromtext\deff0 Body}").unwrap();
     assert_eq!(
         text.origin_metadata().origin,
         Some(DocumentOrigin::PlainTextEmail)
     );
-    let html = RtfDocument::parse(r#"{\rtf1\fromhtml\deff0 Body}"#).unwrap();
+    let html = RtfDocument::parse(r"{\rtf1\fromhtml\deff0 Body}").unwrap();
     assert_eq!(
         html.origin_metadata().origin,
         Some(DocumentOrigin::HtmlEmail { version: None })
     );
-    let html1 = RtfDocument::parse(r#"{\rtf1\fromhtml1\deff0 Body}"#).unwrap();
+    let html1 = RtfDocument::parse(r"{\rtf1\fromhtml1\deff0 Body}").unwrap();
     assert_eq!(
         html1.origin_metadata().origin,
         Some(DocumentOrigin::HtmlEmail {
@@ -36,10 +45,10 @@ fn parses_plain_text_and_both_documented_html_origin_forms() {
 #[test]
 fn parses_all_document_types_and_parameterless_default() {
     for (source, expected) in [
-        (r#"{\rtf1\doctype Body}"#, DocumentAutoFormatType::General),
-        (r#"{\rtf1\doctype0 Body}"#, DocumentAutoFormatType::General),
-        (r#"{\rtf1\doctype1 Body}"#, DocumentAutoFormatType::Letter),
-        (r#"{\rtf1\doctype2 Body}"#, DocumentAutoFormatType::Email),
+        (r"{\rtf1\doctype Body}", DocumentAutoFormatType::General),
+        (r"{\rtf1\doctype0 Body}", DocumentAutoFormatType::General),
+        (r"{\rtf1\doctype1 Body}", DocumentAutoFormatType::Letter),
+        (r"{\rtf1\doctype2 Body}", DocumentAutoFormatType::Email),
     ] {
         let document = RtfDocument::parse(source).unwrap();
         assert_eq!(document.origin_metadata().auto_format_type, Some(expected));
@@ -48,7 +57,7 @@ fn parses_all_document_types_and_parameterless_default() {
             expected
         );
     }
-    let omitted = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let omitted = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     assert_eq!(omitted.origin_metadata().auto_format_type, None);
     assert_eq!(
         omitted.origin_metadata().effective_auto_format_type(),
@@ -58,7 +67,7 @@ fn parses_all_document_types_and_parameterless_default() {
 
 #[test]
 fn writer_places_origin_before_default_font_and_round_trips_typed_api() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     document.set_origin_metadata(DocumentOriginMetadata {
         origin: Some(DocumentOrigin::HtmlEmail {
             version: Some(HtmlEmailVersion::Version1),
@@ -98,23 +107,23 @@ fn origin_and_classification_coexist_independently_with_root_metadata() {
 #[test]
 fn rejects_invalid_versions_types_conflicts_starred_grouped_and_late_forms() {
     for source in [
-        r#"{\rtf1\fromtext0 Body}"#,
-        r#"{\rtf1\fromhtml0 Body}"#,
-        r#"{\rtf1\fromhtml2 Body}"#,
-        r#"{\rtf1\fromhtml-1 Body}"#,
-        r#"{\rtf1\fromtext\fromhtml1 Body}"#,
-        r#"{\rtf1\fromhtml1\fromhtml1 Body}"#,
-        r#"{\rtf1\doctype-1 Body}"#,
-        r#"{\rtf1\doctype3 Body}"#,
-        r#"{\rtf1\doctype1\doctype2 Body}"#,
-        r#"{\rtf1{\*\fromtext}Body}"#,
-        r#"{\rtf1{\*\fromhtml1}Body}"#,
-        r#"{\rtf1{\*\doctype2}Body}"#,
-        r#"{\rtf1{\fromtext}Body}"#,
-        r#"{\rtf1{\doctype2}Body}"#,
-        r#"{\rtf1{\fonttbl{\f0 Arial;}}\fromtext Body}"#,
-        r#"{\rtf1 Body\fromtext}"#,
-        r#"{\rtf1 Body\doctype2}"#,
+        r"{\rtf1\fromtext0 Body}",
+        r"{\rtf1\fromhtml0 Body}",
+        r"{\rtf1\fromhtml2 Body}",
+        r"{\rtf1\fromhtml-1 Body}",
+        r"{\rtf1\fromtext\fromhtml1 Body}",
+        r"{\rtf1\fromhtml1\fromhtml1 Body}",
+        r"{\rtf1\doctype-1 Body}",
+        r"{\rtf1\doctype3 Body}",
+        r"{\rtf1\doctype1\doctype2 Body}",
+        r"{\rtf1{\*\fromtext}Body}",
+        r"{\rtf1{\*\fromhtml1}Body}",
+        r"{\rtf1{\*\doctype2}Body}",
+        r"{\rtf1{\fromtext}Body}",
+        r"{\rtf1{\doctype2}Body}",
+        r"{\rtf1{\fonttbl{\f0 Arial;}}\fromtext Body}",
+        r"{\rtf1 Body\fromtext}",
+        r"{\rtf1 Body\doctype2}",
     ] {
         assert!(
             RtfDocument::parse(source).is_err(),

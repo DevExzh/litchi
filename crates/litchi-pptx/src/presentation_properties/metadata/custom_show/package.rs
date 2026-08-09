@@ -10,11 +10,19 @@ use super::wire;
 use crate::{Error, Result};
 
 /// Load the validated custom-show list, returning an empty list when absent.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load(package: &OpcPackage) -> Result<List> {
     Ok(load_snapshot(package)?.list().clone())
 }
 
 /// Atomically store a typed custom-show list.
+///
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn store(package: &mut OpcPackage, value: &List) -> Result<()> {
     let snapshot = load_snapshot(package)?;
     let mut transaction = snapshot.edit();
@@ -25,6 +33,10 @@ pub fn store(package: &mut OpcPackage, value: &List) -> Result<()> {
 }
 
 /// Capture the owning presentation XML and all relationship context.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load_snapshot(package: &OpcPackage) -> Result<Snapshot> {
     let presentation = package.main_document_part()?;
     let located = wire::locate(package)?;
@@ -37,6 +49,10 @@ pub fn load_snapshot(package: &OpcPackage) -> Result<Snapshot> {
 }
 
 /// Apply a previously committed patch after a complete source check.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
     let current = load_snapshot(package)?;
     if !current.same_source(patch.before()) {
@@ -69,11 +85,23 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
 }
 
 /// Apply a committed edit atomically.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "public API consumes the commit to signal it has been applied"
+)]
 pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
     apply_patch(package, commit.patch())
 }
 
 /// Remove all typed custom shows while retaining opaque custom-show XML.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn remove(package: &mut OpcPackage) -> Result<Option<List>> {
     let before = load_snapshot(package)?;
     if before.list().is_empty() {

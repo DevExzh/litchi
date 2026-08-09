@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use litchi_ppt::{HeaderFooterParent, HeaderFooterScope, Package};
 use std::path::PathBuf;
 

@@ -20,6 +20,10 @@ use std::collections::HashSet;
 ///
 /// This is the low-level package-writer seam. It validates the complete graph
 /// and returns exact producer relationship fields without copying catalog XML.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn link(package: &OpcPackage) -> Result<Option<Link<'_>>> {
     let graph = inspect_graph(package)?;
     let Some(attachment) = graph.attachment else {
@@ -38,6 +42,10 @@ pub fn link(package: &OpcPackage) -> Result<Option<Link<'_>>> {
 }
 
 /// Validate the package graph and return its presentation conformance.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn conformance(package: &OpcPackage) -> Result<Conformance> {
     Ok(inspect_graph(package)?.conformance)
 }
@@ -47,6 +55,10 @@ pub fn conformance(package: &OpcPackage) -> Result<Conformance> {
 ///
 /// This is intended for package writers that need to preserve the optional
 /// attachment while rebuilding the presentation part.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn present(package: &OpcPackage) -> Result<bool> {
     Ok(link(package)?.is_some())
 }
@@ -55,6 +67,10 @@ pub fn present(package: &OpcPackage) -> Result<bool> {
 ///
 /// The returned list copies the bounded part payload exactly once so it can
 /// outlive the package borrow and later move unchanged bytes through [`put`].
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load(package: &OpcPackage) -> Result<Option<List>> {
     let graph = inspect_graph(package)?;
     let Some(attachment) = graph.attachment else {
@@ -72,6 +88,10 @@ pub fn load(package: &OpcPackage) -> Result<Option<List>> {
 /// Loaded, unedited catalogs retain exact producer bytes. A byte-identical
 /// load→put is a signature-preserving no-op; changed XML moves into a staged
 /// part only after conformance, topology, and relationship checks succeed.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn put(package: &mut OpcPackage, list: List) -> Result<bool> {
     let graph = inspect_graph(package)?;
     if list.conformance != graph.conformance {
@@ -118,6 +138,10 @@ pub fn put(package: &mut OpcPackage, list: List) -> Result<bool> {
 /// Absence is an idempotent, signature-preserving `Ok(None)`. A catalog with
 /// any unexpected inbound edge is rejected before either relationship or part
 /// is changed.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn remove(package: &mut OpcPackage) -> Result<Option<List>> {
     let graph = inspect_graph(package)?;
     let Some(attachment) = graph.attachment else {

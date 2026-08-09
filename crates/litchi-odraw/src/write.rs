@@ -298,6 +298,10 @@ pub enum Container {
 
 impl Container {
     /// Creates a lossless future container while rejecting known kinds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `raw` is rejected by [`Ext::new`].
     pub fn unknown(raw: u16) -> io::Result<Self> {
         Ext::new(raw).map(Self::Unknown)
     }
@@ -355,11 +359,19 @@ impl Header {
     }
 
     /// Constructs a typed atom header with the kind's required version.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `instance` exceeds twelve bits.
     pub fn atom(instance: u16, kind: Atom, len: u32) -> io::Result<Self> {
         Self::from_parts(kind.checked_version()?, instance, kind.raw(), len)
     }
 
     /// Constructs a version-15 typed container header.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `instance` exceeds twelve bits.
     pub fn container(instance: u16, kind: Container, len: u32) -> io::Result<Self> {
         Self::from_parts(0x0F, instance, kind.raw(), len)
     }
@@ -487,7 +499,189 @@ impl Property {
     }
 }
 
+/// Input accepted by the raw property-table builder.
+pub trait PropertyKey {
+    /// Returns the exact property identifier, including any wire flags.
+    fn raw(self) -> u16;
+}
+
+impl PropertyKey for Id {
+    fn raw(self) -> u16 {
+        Id::raw(self)
+    }
+}
+
+impl PropertyKey for u16 {
+    fn raw(self) -> u16 {
+        self
+    }
+}
+
+#[derive(Debug)]
+enum BuiltValue<'data> {
+    Simple(i32),
+    Blip(i32),
+    Complex(Cow<'data, [u8]>),
+}
+
+/// Move-or-borrow builder for an `OfficeArt` Opt property table.
+///
+/// Owned complex values are moved into the builder and borrowed values retain
+/// their input lifetime. The builder deliberately does not implement `Clone`,
+/// preventing an accidental deep copy of owned complex property bytes.
+#[derive(Debug, Default)]
+pub struct PropertyBuilder<'data> {
+    properties: Vec<(u16, BuiltValue<'data>)>,
+}
+
+impl<'data> PropertyBuilder<'data> {
+    /// Creates an empty property table.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            properties: Vec::new(),
+        }
+    }
+
+    /// Appends a simple property.
+    pub fn add_simple<K: PropertyKey>(&mut self, id: K, value: i32) -> &mut Self {
+        self.properties.push((id.raw(), BuiltValue::Simple(value)));
+        self
+    }
+
+    /// Appends a BLIP-store identifier property.
+    pub fn add_blip_id<K: PropertyKey>(&mut self, id: K, value: i32) -> &mut Self {
+        self.properties.push((id.raw(), BuiltValue::Blip(value)));
+        self
+    }
+
+    /// Appends a complex property by borrowing a slice or moving an owned vector.
+    pub fn add_complex<K, D>(&mut self, id: K, data: D) -> &mut Self
+    where
+        K: PropertyKey,
+        D: Into<Cow<'data, [u8]>>,
+    {
+        self.properties
+            .push((id.raw(), BuiltValue::Complex(data.into())));
+        self
+    }
+
+    /// Returns the exact encoded record size after checked arithmetic.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the encoded record size overflows `usize` or if a
+    /// complex property exceeds `i32::MAX` bytes.
+    pub fn size(&self) -> io::Result<usize> {
+        let headers = self
+            .properties
+            .len()
+            .checked_mul(6)
+            .ok_or_else(|| invalid_input("property-header size overflow"))?;
+        let base = 8_usize
+            .checked_add(headers)
+            .ok_or_else(|| invalid_input("property record size overflow"))?;
+        self.properties
+            .iter()
+            .try_fold(base, |size, (_, value)| match value {
+                BuiltValue::Complex(data) => {
+                    i32::try_from(data.len())
+                        .map_err(|_err| invalid_input("complex property exceeds i32::MAX"))?;
+                    size.checked_add(data.len())
+                        .ok_or_else(|| invalid_input("property data size overflow"))
+                },
+                BuiltValue::Simple(_) | BuiltValue::Blip(_) => Ok(size),
+            })
+    }
+
+    /// Encodes the complete Opt record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the property count exceeds twelve bits, if a complex
+    /// property exceeds `i32::MAX` bytes, if the record size overflows, or if
+    /// writing to `writer` fails.
+    pub fn write<W: Write>(&self, writer: &mut W) -> io::Result<()> {
+        let count = u16::try_from(self.properties.len())
+            .map_err(|_err| invalid_input("too many OfficeArt properties"))?;
+        if count > 0x0FFF {
+            return Err(invalid_input("property count exceeds twelve bits"));
+        }
+        let total = self.size()?;
+        let body_len = total
+            .checked_sub(8)
+            .ok_or_else(|| invalid_input("property record size underflow"))?;
+        atom_header(
+            writer,
+            count,
+            Atom::Opt,
+            wire_len(body_len, "property payload")?,
+        )?;
+
+        for (id, value) in &self.properties {
+            let (raw_id, raw_value) = match value {
+                BuiltValue::Simple(simple) => (*id, *simple),
+                BuiltValue::Blip(blip) => (*id | BLIP_ID, *blip),
+                BuiltValue::Complex(data) => {
+                    let len = i32::try_from(data.len())
+                        .map_err(|_err| invalid_input("complex property exceeds i32::MAX"))?;
+                    (*id | COMPLEX, len)
+                },
+            };
+            writer.write_all(&raw_id.to_le_bytes())?;
+            writer.write_all(&raw_value.to_le_bytes())?;
+        }
+        for (_, value) in &self.properties {
+            if let BuiltValue::Complex(data) = value {
+                writer.write_all(data)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Builder for one `OfficeArt` shape atom.
+#[derive(Debug, Clone, Copy)]
+pub struct ShapeBuilder {
+    kind: Native,
+    id: u32,
+    flags: Flags,
+}
+
+impl ShapeBuilder {
+    /// Creates a shape builder with no flags.
+    pub fn new<K: Into<Native>>(kind: K, id: u32) -> Self {
+        Self {
+            kind: kind.into(),
+            id,
+            flags: Flags::empty(),
+        }
+    }
+
+    /// Sets typed shape flags.
+    #[must_use]
+    pub fn with_flags<F: Into<Flags>>(mut self, flags: F) -> Self {
+        self.flags = flags.into();
+        self
+    }
+
+    /// Encodes the shape atom.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if writing to `writer` fails.
+    pub fn write<W: Write>(&self, writer: &mut W) -> io::Result<()> {
+        atom_header(writer, self.kind.raw(), Atom::Sp, 8)?;
+        writer.write_all(Sp::new(self.id, self.flags).as_bytes())
+    }
+}
+
 /// Writes one typed atom header without its payload.
+///
+/// # Errors
+///
+/// Returns an error if `instance` exceeds twelve bits or if writing to
+/// `writer` fails.
 pub fn atom_header<W: Write>(
     writer: &mut W,
     instance: u16,
@@ -498,6 +692,10 @@ pub fn atom_header<W: Write>(
 }
 
 /// Writes a raw `OfficeArt` record header for producer-specific replay helpers.
+///
+/// # Errors
+///
+/// Returns an error if writing to `writer` fails.
 pub fn raw_header<W: Write>(
     writer: &mut W,
     version: u8,
@@ -509,6 +707,11 @@ pub fn raw_header<W: Write>(
 }
 
 /// Writes a raw version-15 container without interpreting its child records.
+///
+/// # Errors
+///
+/// Returns an error if `children` exceeds the 32-bit record length limit or if
+/// writing to `writer` fails.
 pub fn raw_container<W: Write>(
     writer: &mut W,
     instance: u16,
@@ -526,6 +729,11 @@ pub fn raw_container<W: Write>(
 }
 
 /// Writes a raw `OfficeArt` atom without interpreting its record kind.
+///
+/// # Errors
+///
+/// Returns an error if `data` exceeds the 32-bit record length limit or if
+/// writing to `writer` fails.
 pub fn raw_atom<W: Write>(
     writer: &mut W,
     version: u8,
@@ -548,6 +756,11 @@ pub fn raw_atom<W: Write>(
 /// This is intended for streaming formats such as BIFF that split one
 /// container across multiple host records. Prefer [`container`] when the full
 /// child sequence is already available so it can be validated before output.
+///
+/// # Errors
+///
+/// Returns an error if `instance` exceeds twelve bits or if writing to
+/// `writer` fails.
 pub fn container_header<W: Write>(
     writer: &mut W,
     instance: u16,
@@ -558,6 +771,11 @@ pub fn container_header<W: Write>(
 }
 
 /// Writes a container after validating its complete child-record sequence.
+///
+/// # Errors
+///
+/// Returns an error if `children` is not a valid child-record sequence, if its
+/// length exceeds the 32-bit record limit, or if writing to `writer` fails.
 pub fn container<W: Write>(
     writer: &mut W,
     instance: u16,
@@ -571,6 +789,11 @@ pub fn container<W: Write>(
 }
 
 /// Writes an atom with the version required by its typed kind.
+///
+/// # Errors
+///
+/// Returns an error if `data` exceeds the 32-bit record length limit or if
+/// writing to `writer` fails.
 pub fn atom<W: Write>(writer: &mut W, instance: u16, kind: Atom, data: &[u8]) -> io::Result<()> {
     atom_header(
         writer,
@@ -665,168 +888,11 @@ fn validate_record(
     Ok(())
 }
 
-#[derive(Debug)]
-enum BuiltValue<'data> {
-    Simple(i32),
-    Blip(i32),
-    Complex(Cow<'data, [u8]>),
-}
-
-/// Input accepted by the raw property-table builder.
-pub trait PropertyKey {
-    /// Returns the exact property identifier, including any wire flags.
-    fn raw(self) -> u16;
-}
-
-impl PropertyKey for Id {
-    fn raw(self) -> u16 {
-        Id::raw(self)
-    }
-}
-
-impl PropertyKey for u16 {
-    fn raw(self) -> u16 {
-        self
-    }
-}
-
-/// Move-or-borrow builder for an `OfficeArt` Opt property table.
-///
-/// Owned complex values are moved into the builder and borrowed values retain
-/// their input lifetime. The builder deliberately does not implement `Clone`,
-/// preventing an accidental deep copy of owned complex property bytes.
-#[derive(Debug, Default)]
-pub struct PropertyBuilder<'data> {
-    properties: Vec<(u16, BuiltValue<'data>)>,
-}
-
-impl<'data> PropertyBuilder<'data> {
-    /// Creates an empty property table.
-    #[must_use]
-    pub const fn new() -> Self {
-        Self {
-            properties: Vec::new(),
-        }
-    }
-
-    /// Appends a simple property.
-    pub fn add_simple<K: PropertyKey>(&mut self, id: K, value: i32) -> &mut Self {
-        self.properties.push((id.raw(), BuiltValue::Simple(value)));
-        self
-    }
-
-    /// Appends a BLIP-store identifier property.
-    pub fn add_blip_id<K: PropertyKey>(&mut self, id: K, value: i32) -> &mut Self {
-        self.properties.push((id.raw(), BuiltValue::Blip(value)));
-        self
-    }
-
-    /// Appends a complex property by borrowing a slice or moving an owned vector.
-    pub fn add_complex<K, D>(&mut self, id: K, data: D) -> &mut Self
-    where
-        K: PropertyKey,
-        D: Into<Cow<'data, [u8]>>,
-    {
-        self.properties
-            .push((id.raw(), BuiltValue::Complex(data.into())));
-        self
-    }
-
-    /// Returns the exact encoded record size after checked arithmetic.
-    pub fn size(&self) -> io::Result<usize> {
-        let headers = self
-            .properties
-            .len()
-            .checked_mul(6)
-            .ok_or_else(|| invalid_input("property-header size overflow"))?;
-        let base = 8_usize
-            .checked_add(headers)
-            .ok_or_else(|| invalid_input("property record size overflow"))?;
-        self.properties
-            .iter()
-            .try_fold(base, |size, (_, value)| match value {
-                BuiltValue::Complex(data) => {
-                    i32::try_from(data.len())
-                        .map_err(|_err| invalid_input("complex property exceeds i32::MAX"))?;
-                    size.checked_add(data.len())
-                        .ok_or_else(|| invalid_input("property data size overflow"))
-                },
-                BuiltValue::Simple(_) | BuiltValue::Blip(_) => Ok(size),
-            })
-    }
-
-    /// Encodes the complete Opt record.
-    pub fn write<W: Write>(&self, writer: &mut W) -> io::Result<()> {
-        let count = u16::try_from(self.properties.len())
-            .map_err(|_err| invalid_input("too many OfficeArt properties"))?;
-        if count > 0x0FFF {
-            return Err(invalid_input("property count exceeds twelve bits"));
-        }
-        let total = self.size()?;
-        let body_len = total
-            .checked_sub(8)
-            .ok_or_else(|| invalid_input("property record size underflow"))?;
-        atom_header(
-            writer,
-            count,
-            Atom::Opt,
-            wire_len(body_len, "property payload")?,
-        )?;
-
-        for (id, value) in &self.properties {
-            let (raw_id, raw_value) = match value {
-                BuiltValue::Simple(value) => (*id, *value),
-                BuiltValue::Blip(value) => (*id | BLIP_ID, *value),
-                BuiltValue::Complex(data) => {
-                    let len = i32::try_from(data.len())
-                        .map_err(|_err| invalid_input("complex property exceeds i32::MAX"))?;
-                    (*id | COMPLEX, len)
-                },
-            };
-            writer.write_all(&raw_id.to_le_bytes())?;
-            writer.write_all(&raw_value.to_le_bytes())?;
-        }
-        for (_, value) in &self.properties {
-            if let BuiltValue::Complex(data) = value {
-                writer.write_all(data)?;
-            }
-        }
-        Ok(())
-    }
-}
-
-/// Builder for one `OfficeArt` shape atom.
-#[derive(Debug, Clone, Copy)]
-pub struct ShapeBuilder {
-    kind: Native,
-    id: u32,
-    flags: Flags,
-}
-
-impl ShapeBuilder {
-    /// Creates a shape builder with no flags.
-    pub fn new<K: Into<Native>>(kind: K, id: u32) -> Self {
-        Self {
-            kind: kind.into(),
-            id,
-            flags: Flags::empty(),
-        }
-    }
-
-    /// Sets typed shape flags.
-    pub fn with_flags<F: Into<Flags>>(mut self, flags: F) -> Self {
-        self.flags = flags.into();
-        self
-    }
-
-    /// Encodes the shape atom.
-    pub fn write<W: Write>(&self, writer: &mut W) -> io::Result<()> {
-        atom_header(writer, self.kind.raw(), Atom::Sp, 8)?;
-        writer.write_all(Sp::new(self.id, self.flags).as_bytes())
-    }
-}
-
 /// Writes a four-coordinate child anchor.
+///
+/// # Errors
+///
+/// Returns an error if writing to `writer` fails.
 pub fn child_anchor<W: Write>(
     writer: &mut W,
     left: i32,
@@ -839,6 +905,10 @@ pub fn child_anchor<W: Write>(
 }
 
 /// Writes a shape-group coordinate-space atom.
+///
+/// # Errors
+///
+/// Returns an error if writing to `writer` fails.
 pub fn spgr<W: Write>(
     writer: &mut W,
     left: i32,
@@ -851,6 +921,10 @@ pub fn spgr<W: Write>(
 }
 
 /// Writes a drawing atom.
+///
+/// # Errors
+///
+/// Returns an error if writing to `writer` fails.
 pub fn dg<W: Write>(writer: &mut W, shapes: u32, last_shape_id: u32) -> io::Result<()> {
     atom_header(writer, 0, Atom::Dg, 8)?;
     writer.write_all(&shapes.to_le_bytes())?;
@@ -912,13 +986,17 @@ mod tests {
 
         match &builder.properties[1].1 {
             BuiltValue::Complex(Cow::Owned(data)) => assert_eq!(data.as_ptr(), moved_pointer),
-            value => panic!("expected moved complex bytes, got {value:?}"),
+            value @ (BuiltValue::Simple(_) | BuiltValue::Blip(_) | BuiltValue::Complex(_)) => {
+                panic!("expected moved complex bytes, got {value:?}");
+            },
         }
         match &builder.properties[2].1 {
             BuiltValue::Complex(Cow::Borrowed(data)) => {
                 assert!(core::ptr::eq(data.as_ptr(), borrowed.as_ptr()));
             },
-            value => panic!("expected borrowed complex bytes, got {value:?}"),
+            value @ (BuiltValue::Simple(_) | BuiltValue::Blip(_) | BuiltValue::Complex(_)) => {
+                panic!("expected borrowed complex bytes, got {value:?}");
+            },
         }
 
         let mut bytes = Vec::new();
@@ -957,9 +1035,9 @@ mod tests {
         assert_eq!(root.kind(), RecordKind::SpContainer);
         assert_eq!(root.version(), 0x0F);
         assert_eq!(consumed, bytes.len());
-        let (child, _) = Record::parse(root.data(), 0).expect("parse child");
-        assert_eq!(child.kind(), RecordKind::ClientData);
-        assert_eq!(child.version(), 0);
+        let (child_record, _) = Record::parse(root.data(), 0).expect("parse child");
+        assert_eq!(child_record.kind(), RecordKind::ClientData);
+        assert_eq!(child_record.version(), 0);
     }
 
     #[test]

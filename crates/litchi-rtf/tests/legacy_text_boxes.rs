@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{
     LegacyHorizontalAnchor, LegacyTextDirection, LegacyVerticalAnchor, RtfDocument, RtfWriter,
 };
@@ -51,28 +60,28 @@ fn parses_typed_legacy_text_box_and_round_trips_canonically() {
 #[test]
 fn rejects_misplaced_malformed_active_and_binary_legacy_text_boxes() {
     let malformed = [
-        r#"{\rtf1{\do\dptxbx{\dptxbxtext x}}}"#,
-        r#"{\rtf1{\dptxbxtext x}}"#,
-        r#"{\rtf1{\*\dptxbxtext x}}"#,
-        r#"{\rtf1{\header{\*\do\dptxbx{\dptxbxtext x}}}Body}"#,
-        r#"{\rtf1{\*\do\dptxbx}}"#,
-        r#"{\rtf1{\*\do{\dptxbxtext x}\dptxbx}}"#,
-        r#"{\rtf1{\*\do\dptxbx\dptxbx{\dptxbxtext x}}}"#,
-        r#"{\rtf1{\*\do\dptxbx{\dptxbxtext x}{\dptxbxtext y}}}"#,
-        r#"{\rtf1{\*\do\dobxpage\dobxmargin\dptxbx{\dptxbxtext x}}}"#,
-        r#"{\rtf1{\*\do\dptxbx\dpx1\dpx2{\dptxbxtext x}}}"#,
-        r#"{\rtf1{\*\do\dptxbx\dptxtbrl\dptxbtlr{\dptxbxtext x}}}"#,
-        r#"{\rtf1{\*\do\dptxbx\dpxsize0{\dptxbxtext x}}}"#,
-        r#"{\rtf1{\*\do\dptxbx\dpysize-1{\dptxbxtext x}}}"#,
-        r#"{\rtf1{\*\do\dptxbx\dptxbxmar-1{\dptxbxtext x}}}"#,
-        r#"{\rtf1{\*\do\dptxbx{\dptxbxtext}}}"#,
-        r#"{\rtf1{\*\do\dptxbx{\dptxbxtext{\field danger}}}}"#,
-        r#"{\rtf1{\*\do\dptxbx{\dptxbxtext{\object danger}}}}"#,
-        r#"{\rtf1{\*\do\dptxbx{\dptxbxtext{\pict 00}}}}"#,
-        r#"{\rtf1{\*\do\dptxbx{\dptxbxtext{\shp danger}}}}"#,
-        r#"{\rtf1{\*\do\dptxbx{\dptxbxtext{\formfield danger}}}}"#,
-        r#"{\rtf1{\*\do\dptxbx{\dptxbxtext\bin2 xx}}}"#,
-        r#"{\rtf1{\*\do\dptxbx\bin2 xx{\dptxbxtext x}}}"#,
+        r"{\rtf1{\do\dptxbx{\dptxbxtext x}}}",
+        r"{\rtf1{\dptxbxtext x}}",
+        r"{\rtf1{\*\dptxbxtext x}}",
+        r"{\rtf1{\header{\*\do\dptxbx{\dptxbxtext x}}}Body}",
+        r"{\rtf1{\*\do\dptxbx}}",
+        r"{\rtf1{\*\do{\dptxbxtext x}\dptxbx}}",
+        r"{\rtf1{\*\do\dptxbx\dptxbx{\dptxbxtext x}}}",
+        r"{\rtf1{\*\do\dptxbx{\dptxbxtext x}{\dptxbxtext y}}}",
+        r"{\rtf1{\*\do\dobxpage\dobxmargin\dptxbx{\dptxbxtext x}}}",
+        r"{\rtf1{\*\do\dptxbx\dpx1\dpx2{\dptxbxtext x}}}",
+        r"{\rtf1{\*\do\dptxbx\dptxtbrl\dptxbtlr{\dptxbxtext x}}}",
+        r"{\rtf1{\*\do\dptxbx\dpxsize0{\dptxbxtext x}}}",
+        r"{\rtf1{\*\do\dptxbx\dpysize-1{\dptxbxtext x}}}",
+        r"{\rtf1{\*\do\dptxbx\dptxbxmar-1{\dptxbxtext x}}}",
+        r"{\rtf1{\*\do\dptxbx{\dptxbxtext}}}",
+        r"{\rtf1{\*\do\dptxbx{\dptxbxtext{\field danger}}}}",
+        r"{\rtf1{\*\do\dptxbx{\dptxbxtext{\object danger}}}}",
+        r"{\rtf1{\*\do\dptxbx{\dptxbxtext{\pict 00}}}}",
+        r"{\rtf1{\*\do\dptxbx{\dptxbxtext{\shp danger}}}}",
+        r"{\rtf1{\*\do\dptxbx{\dptxbxtext{\formfield danger}}}}",
+        r"{\rtf1{\*\do\dptxbx{\dptxbxtext\bin2 xx}}}",
+        r"{\rtf1{\*\do\dptxbx\bin2 xx{\dptxbxtext x}}}",
     ];
     for source in malformed {
         assert!(
@@ -82,7 +91,7 @@ fn rejects_misplaced_malformed_active_and_binary_legacy_text_boxes() {
     }
 
     let oversized = format!(
-        r#"{{\rtf1{{\*\do\dptxbx{{\dptxbxtext {}}}}}}}"#,
+        r"{{\rtf1{{\*\do\dptxbx{{\dptxbxtext {}}}}}}}",
         "x".repeat(1_048_577)
     );
     assert!(RtfDocument::parse(&oversized).is_err());
@@ -90,7 +99,7 @@ fn rejects_misplaced_malformed_active_and_binary_legacy_text_boxes() {
 
 #[test]
 fn rejects_malformed_non_text_legacy_drawings() {
-    assert!(RtfDocument::parse(r#"{\rtf1 A{\*\do\dpline\dpx1}B}"#).is_err());
+    assert!(RtfDocument::parse(r"{\rtf1 A{\*\do\dpline\dpx1}B}").is_err());
 }
 
 fn isolated_drawing(fixture: &[u8]) -> Vec<u8> {

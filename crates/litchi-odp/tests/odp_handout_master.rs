@@ -22,11 +22,13 @@ fn package(styles: &str) -> Vec<u8> {
 }
 
 fn styles_xml(include_layout: bool, handout: &str) -> String {
-    let layout = include_layout.then(|| {
-        format!(
-            r#"<style:presentation-page-layout style:name="handout-layout"><presentation:placeholder presentation:object="handout" svg:x="0cm" svg:y="0cm" svg:width="1cm" svg:height="1cm"/></style:presentation-page-layout>"#
-        )
-    }).unwrap_or_default();
+    let layout = if include_layout {
+        {
+            r#"<style:presentation-page-layout style:name="handout-layout"><presentation:placeholder presentation:object="handout" svg:x="0cm" svg:y="0cm" svg:width="1cm" svg:height="1cm"/></style:presentation-page-layout>"#.to_string()
+        }
+    } else {
+        Default::default()
+    };
     format!(
         r#"<office:document-styles xmlns:office="{OFFICE}" xmlns:style="{STYLE}" xmlns:draw="{DRAW}" xmlns:presentation="{PRESENTATION}" xmlns:svg="{SVG}"><office:styles>{layout}</office:styles><office:automatic-styles><style:page-layout style:name="physical"/><style:style style:name="drawing" style:family="drawing-page"/></office:automatic-styles><office:master-styles>{handout}</office:master-styles></office:document-styles>"#
     )

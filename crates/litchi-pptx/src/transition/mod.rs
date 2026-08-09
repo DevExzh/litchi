@@ -1,4 +1,4 @@
-//! Slide-transition values and their bounded PresentationML codec.
+//! Slide-transition values and their bounded `PresentationML` codec.
 //!
 //! Effect-specific payloads make invalid direction combinations
 //! unrepresentable. The common path is concise:
@@ -33,6 +33,11 @@ pub use reader::{Limits, read, read_with};
 pub use writer::{write, write_to};
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use crate::Error;
@@ -156,7 +161,7 @@ mod tests {
             assert!(matches!(read(xml.as_bytes()), Err(Error::Invalid(_))));
         }
 
-        let xml = transition_xml(r#"<p:fade/>"#).replacen(
+        let xml = transition_xml(r"<p:fade/>").replacen(
             "<p:transition>",
             r#"<p:transition advTm="2147483648">"#,
             1,
@@ -166,7 +171,7 @@ mod tests {
 
     #[test]
     fn rejects_unit_suffix_on_integer_timed_advance() {
-        let xml = transition_xml(r#"<p:fade/>"#).replacen(
+        let xml = transition_xml(r"<p:fade/>").replacen(
             "<p:transition>",
             r#"<p:transition advTm="750ms">"#,
             1,
@@ -176,7 +181,7 @@ mod tests {
             Err(Error::Invalid(message)) if message.contains("automatic-advance delay")
         ));
 
-        let xml = transition_xml(r#"<p:fade/>"#).replacen(
+        let xml = transition_xml(r"<p:fade/>").replacen(
             "<p:transition>",
             r#"<p:transition advTm="2147483647">"#,
             1,

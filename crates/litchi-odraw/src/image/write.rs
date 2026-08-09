@@ -32,6 +32,11 @@ pub struct BlipBuilder<'data> {
 
 impl<'data> BlipBuilder<'data> {
     /// Creates a bitmap BLIP from borrowed or moved encoded bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `kind` is not a bitmap kind (JPEG, CMYK JPEG, PNG,
+    /// DIB, or TIFF).
     pub fn bitmap(kind: Kind, data: impl Into<Cow<'data, [u8]>>) -> io::Result<Self> {
         if !matches!(
             kind,
@@ -39,12 +44,12 @@ impl<'data> BlipBuilder<'data> {
         ) {
             return Err(invalid("bitmap builder requires a bitmap kind"));
         }
-        let data = data.into();
-        let uid = digest(&data);
+        let data_cow = data.into();
+        let uid = digest(&data_cow);
         Ok(Self {
             kind,
             flavor: JpegFlavor::Original,
-            data,
+            data: data_cow,
             uid,
             tag: 0xFF,
             bounds: Rect::default(),
@@ -58,6 +63,10 @@ impl<'data> BlipBuilder<'data> {
     /// The writer emits the specification's `0xFE` no-compression marker. A
     /// codec may compress beforehand, but compressed writer input is excluded
     /// here so raw DEFLATE cannot accidentally be labeled as RFC1950 data.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `kind` is not a metafile kind (EMF, WMF, or PICT).
     pub fn meta(
         kind: Kind,
         data: impl Into<Cow<'data, [u8]>>,
@@ -67,12 +76,12 @@ impl<'data> BlipBuilder<'data> {
         if !kind.is_meta() {
             return Err(invalid("metafile builder requires EMF, WMF, or PICT"));
         }
-        let data = data.into();
-        let uid = digest(&data);
+        let data_cow = data.into();
+        let uid = digest(&data_cow);
         Ok(Self {
             kind,
             flavor: JpegFlavor::Original,
-            data,
+            data: data_cow,
             uid,
             tag: 0xFF,
             bounds,
@@ -89,6 +98,10 @@ impl<'data> BlipBuilder<'data> {
     }
 
     /// Selects the exact JPEG record-type flavor.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if this BLIP's kind is not JPEG or CMYK JPEG.
     pub fn jpeg_flavor(mut self, flavor: JpegFlavor) -> io::Result<Self> {
         if !matches!(self.kind, Kind::Jpeg | Kind::CmykJpeg) {
             return Err(invalid("JPEG flavor can only be set on a JPEG BLIP"));
@@ -123,6 +136,11 @@ impl<'data> BlipBuilder<'data> {
     }
 
     /// Returns the complete record size including its eight-byte header.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the BLIP file data length or total body length
+    /// exceeds `u32`.
     pub fn wire_len(&self) -> io::Result<u32> {
         self.body_len()?
             .checked_add(8)
@@ -178,6 +196,11 @@ impl<'data> BlipBuilder<'data> {
     }
 
     /// Streams this BLIP record without copying its file data.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the BLIP kind has no writable record type, if a
+    /// length exceeds `u32`, or if the writer fails.
     pub fn write<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         record_write::atom_header(writer, self.instance()?, self.atom()?, self.body_len()?)?;
         let uid = self.uid();
@@ -265,6 +288,7 @@ impl<'data> EntryBuilder<'data> {
     }
 
     /// Sets an optional Unicode name from borrowed or moved text.
+    #[must_use]
     pub fn name(mut self, name: impl Into<Cow<'data, str>>) -> Self {
         self.name = Some(name.into());
         self
@@ -363,6 +387,11 @@ impl<'data> StoreBuilder<'data> {
     }
 
     /// Moves one configured FBSE into the store and returns its checked ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the entry fails validation, if its name exceeds the
+    /// encodable length, or if the entry count overflows `usize` or `u32`.
     pub fn push(&mut self, entry: EntryBuilder<'data>) -> io::Result<Id> {
         entry.validate()?;
         let next = self
@@ -378,11 +407,21 @@ impl<'data> StoreBuilder<'data> {
     }
 
     /// Adds an embedded BLIP.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the entry fails validation or the entry count
+    /// overflows; see [`Self::push`].
     pub fn add_embedded(&mut self, blip: BlipBuilder<'data>) -> io::Result<Id> {
         self.push(EntryBuilder::embedded(blip))
     }
 
     /// Adds a delay-loaded BLIP.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the entry fails validation or the entry count
+    /// overflows; see [`Self::push`].
     pub fn add_delayed(&mut self, blip: BlipBuilder<'data>) -> io::Result<Id> {
         self.push(EntryBuilder::delayed(blip))
     }
@@ -420,6 +459,11 @@ impl<'data> StoreBuilder<'data> {
     }
 
     /// Streams the `BStore` container. Delayed payloads are not copied here.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the entry count exceeds 4095, if a length or offset
+    /// computation exceeds `u32`, or if the writer fails.
     pub fn write_store<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         let count = u16::try_from(self.entries.len())
             .map_err(|_err| invalid("BStore entry count exceeds u16"))?;
@@ -442,6 +486,11 @@ impl<'data> StoreBuilder<'data> {
     }
 
     /// Streams the headerless `BStoreDelay` sequence.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a length computation exceeds `u32` or if the writer
+    /// fails.
     pub fn write_delay<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         self.delay_body_len()?;
         for entry in &self.entries {
@@ -454,6 +503,11 @@ impl<'data> StoreBuilder<'data> {
 }
 
 /// Copies a parsed BLIP while retaining its exact record type and instance.
+///
+/// # Errors
+///
+/// Returns an error if the record kind is not a known BLIP atom, or if the
+/// writer fails.
 pub fn copy<W: Write>(writer: &mut W, blip: &super::Blip<'_>) -> io::Result<()> {
     let record = blip.record();
     let atom = match record.raw_kind() {
@@ -503,48 +557,48 @@ pub fn digest(data: &[u8]) -> Uid {
 }
 
 fn compress(state: &mut [u32; 4], block: &[u8; 64]) {
-    let mut x = [0u32; 16];
-    for (word, bytes) in x.iter_mut().zip(block.chunks_exact(4)) {
+    let mut words = [0u32; 16];
+    for (word, bytes) in words.iter_mut().zip(block.chunks_exact(4)) {
         *word = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
     }
-    let [mut a, mut b, mut c, mut d] = *state;
+    let [mut aa, mut bb, mut cc, mut dd] = *state;
     macro_rules! round {
         ($f:expr, $k:expr, [$($index:expr),*], [$($shift:expr),*]) => {{
             let indices = [$($index),*];
             let shifts = [$($shift),*];
             for (step, (&index, &shift)) in indices.iter().zip(&shifts).enumerate() {
                 let value = match step & 3 {
-                    0 => a.wrapping_add($f(b, c, d)).wrapping_add(x[index]).wrapping_add($k).rotate_left(shift),
-                    1 => d.wrapping_add($f(a, b, c)).wrapping_add(x[index]).wrapping_add($k).rotate_left(shift),
-                    2 => c.wrapping_add($f(d, a, b)).wrapping_add(x[index]).wrapping_add($k).rotate_left(shift),
-                    _ => b.wrapping_add($f(c, d, a)).wrapping_add(x[index]).wrapping_add($k).rotate_left(shift),
+                    0 => aa.wrapping_add($f(bb, cc, dd)).wrapping_add(words[index]).wrapping_add($k).rotate_left(shift),
+                    1 => dd.wrapping_add($f(aa, bb, cc)).wrapping_add(words[index]).wrapping_add($k).rotate_left(shift),
+                    2 => cc.wrapping_add($f(dd, aa, bb)).wrapping_add(words[index]).wrapping_add($k).rotate_left(shift),
+                    _ => bb.wrapping_add($f(cc, dd, aa)).wrapping_add(words[index]).wrapping_add($k).rotate_left(shift),
                 };
-                match step & 3 { 0 => a = value, 1 => d = value, 2 => c = value, _ => b = value }
+                match step & 3 { 0 => aa = value, 1 => dd = value, 2 => cc = value, _ => bb = value }
             }
         }};
     }
     round!(
-        |x: u32, y: u32, z: u32| (x & y) | (!x & z),
+        |left: u32, mid: u32, right: u32| (left & mid) | (!left & right),
         0,
         [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
         [3, 7, 11, 19, 3, 7, 11, 19, 3, 7, 11, 19, 3, 7, 11, 19]
     );
     round!(
-        |x: u32, y: u32, z: u32| (x & y) | (x & z) | (y & z),
+        |left: u32, mid: u32, right: u32| (left & mid) | (left & right) | (mid & right),
         0x5A82_7999,
         [0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15],
         [3, 5, 9, 13, 3, 5, 9, 13, 3, 5, 9, 13, 3, 5, 9, 13]
     );
     round!(
-        |x: u32, y: u32, z: u32| x ^ y ^ z,
+        |left: u32, mid: u32, right: u32| left ^ mid ^ right,
         0x6ED9_EBA1,
         [0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15],
         [3, 9, 11, 15, 3, 9, 11, 15, 3, 9, 11, 15, 3, 9, 11, 15]
     );
-    state[0] = state[0].wrapping_add(a);
-    state[1] = state[1].wrapping_add(b);
-    state[2] = state[2].wrapping_add(c);
-    state[3] = state[3].wrapping_add(d);
+    state[0] = state[0].wrapping_add(aa);
+    state[1] = state[1].wrapping_add(bb);
+    state[2] = state[2].wrapping_add(cc);
+    state[3] = state[3].wrapping_add(dd);
 }
 
 fn invalid(error: impl Into<String>) -> io::Error {

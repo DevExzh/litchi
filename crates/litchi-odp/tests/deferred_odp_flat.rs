@@ -69,8 +69,8 @@ fn flat_transaction_edits_one_slide_and_is_reversible() {
 #[test]
 fn flat_transaction_preserves_self_closing_direct_notes() {
     let document = NOTES.replace(
-        r#"<presentation:notes><draw:frame><draw:text-box><text:p>Remember to breathe</text:p></draw:text-box></draw:frame></presentation:notes>"#,
-        r#"<presentation:notes/>"#,
+        r"<presentation:notes><draw:frame><draw:text-box><text:p>Remember to breathe</text:p></draw:text-box></draw:frame></presentation:notes>",
+        r"<presentation:notes/>",
     );
     let source = FlatPresentation::from_bytes(document.into_bytes())
         .unwrap()

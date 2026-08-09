@@ -20,8 +20,7 @@ const TABLE_STYLE: &str = "{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}";
 fn main() -> Result<()> {
     let directory = std::env::args_os()
         .nth(1)
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("target/office-owner-smoke"));
+        .map_or_else(|| PathBuf::from("target/office-owner-smoke"), PathBuf::from);
     std::fs::create_dir_all(&directory)?;
 
     let destination = directory.join("table-style-owner.pptx");

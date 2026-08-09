@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{
     MAX_SECTION_COLUMNS, RtfDocument, RtfWriter, Section, SectionColumn, SectionColumns,
 };
@@ -37,8 +46,7 @@ fn parses_variable_columns_with_group_inheritance_and_round_trips_canonically() 
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(
-        serialized
-            .contains(r#"\cols2\linebetcol\colsx720\colno1\colw3000\colsr240\colno2\colw4000"#)
+        serialized.contains(r"\cols2\linebetcol\colsx720\colno1\colw3000\colsr240\colno2\colw4000")
     );
     let reparsed = RtfDocument::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.sections()[0].properties.columns, *columns);
@@ -109,18 +117,18 @@ fn public_builders_and_writer_enforce_column_bounds() {
 #[test]
 fn rejects_malformed_or_incomplete_explicit_column_sequences() {
     for source in [
-        r#"{\rtf1\cols0 X}"#,
-        r#"{\rtf1\cols65 X}"#,
-        r#"{\rtf1\cols2\colno X}"#,
-        r#"{\rtf1\cols2\colw100 X}"#,
-        r#"{\rtf1\cols2\colno2\colw100 X}"#,
-        r#"{\rtf1\cols2\colno1\colw X}"#,
-        r#"{\rtf1\cols2\colno1\colw0 X}"#,
-        r#"{\rtf1\cols2\colno1\colw100\colw200 X}"#,
-        r#"{\rtf1\cols2\colno1\colsr20\colw100 X}"#,
-        r#"{\rtf1\cols2\colno1\colw100\colsr-1 X}"#,
-        r#"{\rtf1\cols2\colno1\colw100 X}"#,
-        r#"{\rtf1\cols2\colno1{\colno2}\colw100\colno2\colw200 X}"#,
+        r"{\rtf1\cols0 X}",
+        r"{\rtf1\cols65 X}",
+        r"{\rtf1\cols2\colno X}",
+        r"{\rtf1\cols2\colw100 X}",
+        r"{\rtf1\cols2\colno2\colw100 X}",
+        r"{\rtf1\cols2\colno1\colw X}",
+        r"{\rtf1\cols2\colno1\colw0 X}",
+        r"{\rtf1\cols2\colno1\colw100\colw200 X}",
+        r"{\rtf1\cols2\colno1\colsr20\colw100 X}",
+        r"{\rtf1\cols2\colno1\colw100\colsr-1 X}",
+        r"{\rtf1\cols2\colno1\colw100 X}",
+        r"{\rtf1\cols2\colno1{\colno2}\colw100\colno2\colw200 X}",
     ] {
         assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
     }

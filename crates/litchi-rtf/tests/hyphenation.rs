@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{DocumentHyphenation, RtfDocument, RtfWriter};
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
@@ -11,7 +20,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 #[test]
 fn parses_all_document_hyphenation_controls_and_round_trips() {
     let document =
-        RtfDocument::parse(r#"{\rtf1\ansi\hyphhotz425\hyphconsec3\hyphcaps0\hyphauto Body}"#)
+        RtfDocument::parse(r"{\rtf1\ansi\hyphhotz425\hyphconsec3\hyphcaps0\hyphauto Body}")
             .unwrap();
     assert_eq!(
         *document.hyphenation(),
@@ -31,7 +40,7 @@ fn parses_all_document_hyphenation_controls_and_round_trips() {
 
 #[test]
 fn typed_api_preserves_absence_and_explicit_defaults() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     assert!(document.hyphenation().is_empty());
     document
         .set_hyphenation(DocumentHyphenation {
@@ -51,7 +60,7 @@ fn typed_api_preserves_absence_and_explicit_defaults() {
 #[test]
 fn numeric_controls_round_trip_the_complete_rtf_nonnegative_range() {
     for value in [0, 1, 425, i32::MAX as u32] {
-        let mut document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+        let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
         document
             .set_hyphenation(DocumentHyphenation {
                 consecutive_line_limit: Some(value),
@@ -68,17 +77,17 @@ fn numeric_controls_round_trip_the_complete_rtf_nonnegative_range() {
 #[test]
 fn rejects_bad_values_duplicates_and_non_root_or_late_placement() {
     for source in [
-        r#"{\rtf1\hyphauto2 Body}"#,
-        r#"{\rtf1\hyphcaps-1 Body}"#,
-        r#"{\rtf1\hyphconsec Body}"#,
-        r#"{\rtf1\hyphconsec-1 Body}"#,
-        r#"{\rtf1\hyphconsec2147483648 Body}"#,
-        r#"{\rtf1\hyphhotz Body}"#,
-        r#"{\rtf1\hyphhotz-1 Body}"#,
-        r#"{\rtf1\hyphhotz2147483648 Body}"#,
-        r#"{\rtf1\hyphauto1\hyphauto0 Body}"#,
-        r#"{\rtf1{\hyphauto1 nested}Body}"#,
-        r#"{\rtf1 Body\hyphauto1}"#,
+        r"{\rtf1\hyphauto2 Body}",
+        r"{\rtf1\hyphcaps-1 Body}",
+        r"{\rtf1\hyphconsec Body}",
+        r"{\rtf1\hyphconsec-1 Body}",
+        r"{\rtf1\hyphconsec2147483648 Body}",
+        r"{\rtf1\hyphhotz Body}",
+        r"{\rtf1\hyphhotz-1 Body}",
+        r"{\rtf1\hyphhotz2147483648 Body}",
+        r"{\rtf1\hyphauto1\hyphauto0 Body}",
+        r"{\rtf1{\hyphauto1 nested}Body}",
+        r"{\rtf1 Body\hyphauto1}",
     ] {
         assert!(
             RtfDocument::parse(source).is_err(),
@@ -88,10 +97,10 @@ fn rejects_bad_values_duplicates_and_non_root_or_late_placement() {
 
     for control in ["hyphauto1", "hyphcaps0", "hyphconsec3", "hyphhotz425"] {
         for source in [
-            format!(r#"{{\rtf1\{control}\{control} Body}}"#),
-            format!(r#"{{\rtf1{{\*\{control}}}Body}}"#),
-            format!(r#"{{\rtf1{{\{control}}}Body}}"#),
-            format!(r#"{{\rtf1 Body\{control}}}"#),
+            format!(r"{{\rtf1\{control}\{control} Body}}"),
+            format!(r"{{\rtf1{{\*\{control}}}Body}}"),
+            format!(r"{{\rtf1{{\{control}}}Body}}"),
+            format!(r"{{\rtf1 Body\{control}}}"),
         ] {
             assert!(
                 RtfDocument::parse(&source).is_err(),

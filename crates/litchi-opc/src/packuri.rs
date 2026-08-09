@@ -1,3 +1,9 @@
+/// The package pseudo-partname, representing the package itself
+pub const PACKAGE_URI: &str = "/";
+
+/// The URI for the `[Content_Types].xml` part.
+pub const CONTENT_TYPES_URI: &str = "/[Content_Types].xml";
+
 /// Provides the `PackURI` value type and utilities for working with package URIs.
 ///
 /// A `PackURI` represents a part name within an OPC package, following the URI format
@@ -29,64 +35,73 @@ impl PackURI {
     /// # Returns
     /// * `Ok(PackURI)` if the URI is valid
     /// * `Err` if the URI is not a canonical, fragment-free package path
+    ///
+    /// # Errors
+    /// Returns an error message if `uri` is not a canonical, fragment-free
+    /// package path (for example a missing leading slash, dot segments,
+    /// unencoded spaces, or invalid percent-encoding).
     pub fn new<S: Into<String>>(uri: S) -> Result<Self, String> {
-        let uri = uri.into();
-        if !uri.starts_with('/') {
-            return Err(format!("PackURI must begin with slash, got '{uri}'"));
+        let candidate = uri.into();
+        if !candidate.starts_with('/') {
+            return Err(format!("PackURI must begin with slash, got '{candidate}'"));
         }
-        if uri == "/" {
-            return Ok(PackURI { uri });
+        if candidate == "/" {
+            return Ok(PackURI { uri: candidate });
         }
-        if uri == CONTENT_TYPES_URI {
-            return Ok(PackURI { uri });
+        if candidate == CONTENT_TYPES_URI {
+            return Ok(PackURI { uri: candidate });
         }
-        if uri.ends_with('/') {
-            return Err(format!("PackURI must not end with slash, got '{uri}'"));
-        }
-        if uri.contains("//") {
+        if candidate.ends_with('/') {
             return Err(format!(
-                "PackURI must not contain empty segments, got '{uri}'"
+                "PackURI must not end with slash, got '{candidate}'"
             ));
         }
-        if uri.contains('\\') {
-            return Err(format!("PackURI must use forward slashes, got '{uri}'"));
-        }
-        if uri.contains(['?', '#']) {
+        if candidate.contains("//") {
             return Err(format!(
-                "PackURI must not contain a query or fragment, got '{uri}'"
+                "PackURI must not contain empty segments, got '{candidate}'"
             ));
         }
-        if uri
+        if candidate.contains('\\') {
+            return Err(format!(
+                "PackURI must use forward slashes, got '{candidate}'"
+            ));
+        }
+        if candidate.contains(['?', '#']) {
+            return Err(format!(
+                "PackURI must not contain a query or fragment, got '{candidate}'"
+            ));
+        }
+        if candidate
             .chars()
             .any(|character| character.is_control() || character == ' ')
         {
             return Err(format!(
-                "PackURI spaces and control characters must be percent-encoded, got '{uri}'"
+                "PackURI spaces and control characters must be percent-encoded, got '{candidate}'"
             ));
         }
-        if uri
+        if candidate
             .split('/')
             .skip(1)
             .any(|part| matches!(part, "." | ".."))
         {
             return Err(format!(
-                "PackURI must not contain dot segments, got '{uri}'"
+                "PackURI must not contain dot segments, got '{candidate}'"
             ));
         }
-        Self::validate_percent_encoding(&uri)?;
-        for segment in uri.split('/').skip(1) {
+        Self::validate_percent_encoding(&candidate)?;
+        for segment in candidate.split('/').skip(1) {
             if segment.ends_with('.') {
                 return Err(format!(
-                    "PackURI segments must not end with a dot, got '{uri}'"
+                    "PackURI segments must not end with a dot, got '{candidate}'"
                 ));
             }
             if !segment.as_bytes().iter().any(|byte| *byte != b'.') {
                 return Err(format!(
-                    "PackURI segments must contain a non-dot character, got '{uri}'"
+                    "PackURI segments must contain a non-dot character, got '{candidate}'"
                 ));
             }
         }
-        Ok(PackURI { uri })
+        Ok(PackURI { uri: candidate })
     }
 
     /// Create a `PackURI` from a relative reference and a base URI.
@@ -97,6 +112,11 @@ impl PackURI {
     /// # Arguments
     /// * `base_uri` - The base URI to resolve from
     /// * `relative_ref` - The relative reference to resolve
+    ///
+    /// # Errors
+    /// Returns an error message if `relative_ref` is empty, absolute, uses
+    /// backslashes, contains a query or fragment, escapes the package root,
+    /// or does not otherwise resolve to a canonical package path.
     pub fn from_rel_ref(base_uri: &str, relative_ref: &str) -> Result<Self, String> {
         if relative_ref.is_empty() {
             return Err("Relationship target must not be empty".to_string());
@@ -267,6 +287,10 @@ impl PackURI {
     /// Get the `PackURI` of the .rels part corresponding to this `PackURI`.
     ///
     /// For example, "/word/_rels/document.xml.rels" for "/word/document.xml".
+    ///
+    /// # Errors
+    /// Returns an error message if the constructed `.rels` URI is not a valid
+    /// `PackURI`.
     pub fn rels_uri(&self) -> Result<PackURI, String> {
         let filename = self.filename();
         let base_uri = self.base_uri();
@@ -394,6 +418,18 @@ impl PackURI {
     }
 }
 
+impl std::fmt::Display for PackURI {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.uri)
+    }
+}
+
+impl AsRef<str> for PackURI {
+    fn as_ref(&self) -> &str {
+        &self.uri
+    }
+}
+
 fn is_unreserved(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~')
 }
@@ -433,24 +469,6 @@ fn hex_value(byte: u8) -> u8 {
         _ => 0,
     }
 }
-
-impl std::fmt::Display for PackURI {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.uri)
-    }
-}
-
-impl AsRef<str> for PackURI {
-    fn as_ref(&self) -> &str {
-        &self.uri
-    }
-}
-
-/// The package pseudo-partname, representing the package itself
-pub const PACKAGE_URI: &str = "/";
-
-/// The URI for the `[Content_Types].xml` part.
-pub const CONTENT_TYPES_URI: &str = "/[Content_Types].xml";
 
 #[cfg(test)]
 mod tests {
@@ -559,8 +577,8 @@ mod tests {
         let uri = PackURI::new("/ppt/slides/slide21.xml").unwrap();
         assert_eq!(uri.idx(), Some(21));
 
-        let uri = PackURI::new("/ppt/presentation.xml").unwrap();
-        assert_eq!(uri.idx(), None);
+        let presentation = PackURI::new("/ppt/presentation.xml").unwrap();
+        assert_eq!(presentation.idx(), None);
     }
 
     #[test]

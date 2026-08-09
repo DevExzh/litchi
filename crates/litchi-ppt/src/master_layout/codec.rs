@@ -4,6 +4,11 @@ use super::model::Limits;
 use crate::package::{Error, Result};
 use crate::records::Record;
 
+struct Encoder {
+    limits: Limits,
+    records: usize,
+}
+
 /// Parse exactly one complete PPT record without resynchronizing over corrupt
 /// bytes. The parent remains free to retain a source snapshot when this fails.
 pub(super) fn parse(bytes: &[u8], limits: Limits) -> Result<Record> {
@@ -22,11 +27,6 @@ pub(super) fn parse(bytes: &[u8], limits: Limits) -> Result<Record> {
 pub(super) fn encode(root: &Record, limits: Limits) -> Result<Vec<u8>> {
     let mut encoder = Encoder { limits, records: 0 };
     encoder.record(root, 1)
-}
-
-struct Encoder {
-    limits: Limits,
-    records: usize,
 }
 
 impl Encoder {
@@ -71,7 +71,7 @@ impl Encoder {
             payload
         };
         let length = u32::try_from(payload.len())
-            .map_err(|_| Error::InvalidFormat("PPT record payload exceeds u32".into()))?;
+            .map_err(|_err| Error::InvalidFormat("PPT record payload exceeds u32".into()))?;
         let total = payload
             .len()
             .checked_add(8)
@@ -81,9 +81,9 @@ impl Encoder {
         }
 
         let mut bytes = Vec::new();
-        bytes
-            .try_reserve_exact(total)
-            .map_err(|_| Error::InvalidFormat("master-layout record allocation failed".into()))?;
+        bytes.try_reserve_exact(total).map_err(|_err| {
+            Error::InvalidFormat("master-layout record allocation failed".into())
+        })?;
         bytes.extend_from_slice(&(record.version | (record.instance << 4)).to_le_bytes());
         bytes.extend_from_slice(&record.record_type_raw.to_le_bytes());
         bytes.extend_from_slice(&length.to_le_bytes());
@@ -111,7 +111,7 @@ pub(super) fn materialize(record: &mut Record, limits: Limits) -> Result<()> {
 pub(super) fn sync(record: &mut Record, limits: Limits) -> Result<()> {
     if record.children.is_empty() {
         record.data_length = u32::try_from(record.data.len())
-            .map_err(|_| Error::InvalidFormat("PPT record payload exceeds u32".into()))?;
+            .map_err(|_err| Error::InvalidFormat("PPT record payload exceeds u32".into()))?;
         return Ok(());
     }
     for child in &mut record.children {
@@ -119,7 +119,7 @@ pub(super) fn sync(record: &mut Record, limits: Limits) -> Result<()> {
     }
     let payload = encode_children(&record.children, limits)?;
     record.data_length = u32::try_from(payload.len())
-        .map_err(|_| Error::InvalidFormat("PPT container payload exceeds u32".into()))?;
+        .map_err(|_err| Error::InvalidFormat("PPT container payload exceeds u32".into()))?;
     record.data = payload;
     Ok(())
 }
@@ -141,7 +141,7 @@ fn encode_children(children: &[Record], limits: Limits) -> Result<Vec<u8>> {
 }
 
 /// The subset of container records that can contain a navigable child path.
-/// OfficeArt drawing payloads are deliberately opaque here; their own owner
+/// `OfficeArt` drawing payloads are deliberately opaque here; their own owner
 /// remains responsible for `[MS-ODRAW]` editing.
 pub(super) const fn is_container(raw: u16) -> bool {
     matches!(

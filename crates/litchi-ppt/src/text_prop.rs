@@ -1,6 +1,6 @@
-/// Text property parsing for PowerPoint StyleTextPropAtom.
+/// Text property parsing for `PowerPoint` `StyleTextPropAtom`.
 ///
-/// Based on Apache POI's TextPropCollection and TextProp classes.
+/// Based on Apache POI's `TextPropCollection` and `TextProp` classes.
 /// This module handles the complex structure of text styling in PPT files.
 use litchi_core::binary::{read_i16_le, read_i32_le, read_u16_le, read_u32_le};
 
@@ -8,7 +8,7 @@ use super::package::{Error, Result};
 
 /// Text property definition.
 ///
-/// Based on Apache POI's TextProp. Each property has a size, mask, and value.
+/// Based on Apache POI's `TextProp`. Each property has a size, mask, and value.
 #[derive(Debug, Clone)]
 pub struct TextProp {
     /// Name of the property
@@ -23,6 +23,7 @@ pub struct TextProp {
 
 impl TextProp {
     /// Create a new text property.
+    #[must_use]
     pub fn new(name: &'static str, size: usize, mask: u32) -> Self {
         Self {
             name,
@@ -34,6 +35,10 @@ impl TextProp {
 }
 
 /// Text property collection type.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`TextPropType` is the established public API name; renaming it would break downstream crates"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextPropType {
     /// Paragraph properties
@@ -42,10 +47,10 @@ pub enum TextPropType {
     Character,
 }
 
-/// A raw tab stop from a PowerPoint paragraph property run.
+/// A raw tab stop from a `PowerPoint` paragraph property run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TextTabStop {
-    /// Signed offset in PowerPoint master units.
+    /// Signed offset in `PowerPoint` master units.
     pub position: i16,
     /// Raw `TextTabTypeEnum` value.
     pub alignment: u16,
@@ -53,7 +58,11 @@ pub struct TextTabStop {
 
 /// Collection of text properties for a run of characters.
 ///
-/// Based on Apache POI's TextPropCollection.
+/// Based on Apache POI's `TextPropCollection`.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`TextPropCollection` is the established public API name; renaming it would break downstream crates"
+)]
 #[derive(Debug, Clone)]
 pub struct TextPropCollection {
     /// Number of characters this styling applies to
@@ -72,6 +81,7 @@ pub struct TextPropCollection {
 
 impl TextPropCollection {
     /// Create a new text property collection.
+    #[must_use]
     pub fn new(characters_covered: u32, prop_type: TextPropType) -> Self {
         Self {
             characters_covered,
@@ -84,11 +94,13 @@ impl TextPropCollection {
     }
 
     /// Find a property by name.
+    #[must_use]
     pub fn find_by_name(&self, name: &str) -> Option<&TextProp> {
         self.properties.iter().find(|p| p.name == name)
     }
 
     /// Get a property value by name.
+    #[must_use]
     pub fn get_value(&self, name: &str) -> Option<i32> {
         self.find_by_name(name).map(|p| p.value)
     }
@@ -129,8 +141,8 @@ pub fn parse_paragraph_properties(
             }
 
             let value = match size {
-                2 if signed => read_i16_le(data, *offset).unwrap_or(0) as i32,
-                2 => read_u16_le(data, *offset).unwrap_or(0) as i32,
+                2 if signed => i32::from(read_i16_le(data, *offset).unwrap_or(0)),
+                2 => i32::from(read_u16_le(data, *offset).unwrap_or(0)),
                 4 => read_i32_le(data, *offset).unwrap_or(0),
                 _ => 0,
             };
@@ -142,12 +154,13 @@ pub fn parse_paragraph_properties(
         }
     }
 
-    if (mask & 0x100000) != 0 {
+    if (mask & 0x10_0000) != 0 {
         if *offset + 2 > data.len() {
             *offset = data.len();
             return (props, tab_stops);
         }
-        let count = read_u16_le(data, *offset).unwrap_or(0) as usize;
+        let tab_stop_count = read_u16_le(data, *offset).unwrap_or(0);
+        let count = usize::from(tab_stop_count);
         let Some(size) = count.checked_mul(4).and_then(|size| size.checked_add(2)) else {
             *offset = data.len();
             return (props, tab_stops);
@@ -156,8 +169,8 @@ pub fn parse_paragraph_properties(
             *offset = data.len();
             return (props, tab_stops);
         }
-        let mut prop = TextProp::new("tabStops", size, 0x100000);
-        prop.value = count as i32;
+        let mut prop = TextProp::new("tabStops", size, 0x10_0000);
+        prop.value = i32::from(tab_stop_count);
         props.push(prop);
         let mut tab_offset = *offset + 2;
         for _ in 0..count {
@@ -173,7 +186,7 @@ pub fn parse_paragraph_properties(
     let trailing_defs = [
         ("fontAlignment", 2, 0x10000),
         ("wrapFlags", 2, 0xE0000),
-        ("textDirection", 2, 0x200000),
+        ("textDirection", 2, 0x20_0000),
     ];
 
     for (name, size, prop_mask) in trailing_defs {
@@ -184,7 +197,7 @@ pub fn parse_paragraph_properties(
             }
 
             let value = match size {
-                2 => read_u16_le(data, *offset).unwrap_or(0) as i32,
+                2 => i32::from(read_u16_le(data, *offset).unwrap_or(0)),
                 4 => read_i32_le(data, *offset).unwrap_or(0),
                 _ => 0,
             };
@@ -209,9 +222,9 @@ pub fn parse_character_properties(data: &[u8], offset: &mut usize, mask: u32) ->
     let prop_defs = [
         ("char.flags", 2, 0xFFFF, false), // bold, italic, underline, etc.
         ("font.index", 2, 0x10000, false),
-        ("asian.font.index", 2, 0x200000, false),
-        ("ansi.font.index", 2, 0x400000, false),
-        ("symbol.font.index", 2, 0x800000, false),
+        ("asian.font.index", 2, 0x20_0000, false),
+        ("ansi.font.index", 2, 0x40_0000, false),
+        ("symbol.font.index", 2, 0x80_0000, false),
         ("font.size", 2, 0x20000, true),
         ("font.color", 4, 0x40000, false),
         ("superscript", 2, 0x80000, true),
@@ -225,8 +238,8 @@ pub fn parse_character_properties(data: &[u8], offset: &mut usize, mask: u32) ->
             }
 
             let value = match size {
-                2 if signed => read_i16_le(data, *offset).unwrap_or(0) as i32,
-                2 => read_u16_le(data, *offset).unwrap_or(0) as i32,
+                2 if signed => i32::from(read_i16_le(data, *offset).unwrap_or(0)),
+                2 => i32::from(read_u16_le(data, *offset).unwrap_or(0)),
                 4 => read_i32_le(data, *offset).unwrap_or(0),
                 _ => 0,
             };
@@ -241,10 +254,11 @@ pub fn parse_character_properties(data: &[u8], offset: &mut usize, mask: u32) ->
     props
 }
 
-/// Parse StyleTextPropAtom data.
+/// Parse `StyleTextPropAtom` data.
 ///
-/// Based on Apache POI's StyleTextPropAtom parsing logic.
-/// Returns (paragraph_styles, character_styles).
+/// Based on Apache POI's `StyleTextPropAtom` parsing logic.
+/// Returns (`paragraph_styles`, `character_styles`).
+#[must_use]
 pub fn parse_style_text_prop_atom(
     data: &[u8],
     text_length: usize,
@@ -337,12 +351,16 @@ pub fn parse_style_text_prop_atom(
 /// Unlike [`parse_style_text_prop_atom`], this rejects zero-length runs,
 /// truncated property payloads, coverage beyond or below `text_length + 1`,
 /// and unexplained trailing bytes.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_style_text_prop_atom_strict(
     data: &[u8],
     text_length: usize,
 ) -> Result<(Vec<TextPropCollection>, Vec<TextPropCollection>)> {
     let style_length = u32::try_from(text_length)
-        .map_err(|_| Error::Corrupted("StyleTextPropAtom text length exceeds u32".to_string()))?
+        .map_err(|_err| Error::Corrupted("StyleTextPropAtom text length exceeds u32".to_string()))?
         .checked_add(1)
         .ok_or_else(|| Error::Corrupted("StyleTextPropAtom text length overflow".to_string()))?;
     let mut paragraph_styles = Vec::new();
@@ -445,7 +463,11 @@ pub(crate) fn paragraph_property_size(data: &[u8], offset: usize, mask: u32) -> 
         let count = read_u16_le(data, offset + size).unwrap_or(0) as usize;
         size = size
             .checked_add(2)
-            .and_then(|size| count.checked_mul(4).and_then(|tabs| size.checked_add(tabs)))
+            .and_then(|total| {
+                count
+                    .checked_mul(4)
+                    .and_then(|tabs| total.checked_add(tabs))
+            })
             .ok_or_else(|| Error::Corrupted("TabStops size overflow".to_string()))?;
     }
     if mask & 0x0001_0000 != 0 {
@@ -501,6 +523,7 @@ pub(crate) fn require_style_bytes(
 /// - Bit 2: Underline
 /// - Bit 4: Shadow
 /// - Bit 8: Embossed
+#[must_use]
 pub fn extract_char_flags(flags: i32) -> (bool, bool, bool) {
     let bold = (flags & 0x0001) != 0;
     let italic = (flags & 0x0002) != 0;
@@ -509,6 +532,11 @@ pub fn extract_char_flags(flags: i32) -> (bool, bool, bool) {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -534,10 +562,10 @@ mod tests {
         assert!(italic);
         assert!(underline);
 
-        let (bold, italic, underline) = extract_char_flags(0x0001);
-        assert!(bold);
-        assert!(!italic);
-        assert!(!underline);
+        let (bold_flag, italic_flag, underline_flag) = extract_char_flags(0x0001);
+        assert!(bold_flag);
+        assert!(!italic_flag);
+        assert!(!underline_flag);
     }
 
     #[test]

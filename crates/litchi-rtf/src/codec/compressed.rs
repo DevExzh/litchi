@@ -8,6 +8,15 @@
 //! Compressed RTF is commonly used in email attachments and other scenarios
 //! where file size reduction is important.
 
+#![allow(
+    clippy::shadow_reuse,
+    clippy::shadow_unrelated,
+    reason = "decoding steps deliberately rebind a working value as it is refined through the parse pipeline"
+)]
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items stay grouped by RTF feature area rather than by item kind"
+)]
 use super::error::{RtfError, RtfResult};
 use zerocopy::{FromBytes, IntoBytes};
 use zerocopy_derive::{
@@ -24,7 +33,7 @@ const UNCOMPRESSED_SIGNATURE: &[u8; 4] = b"MELA";
 const HEADER_SIZE: usize = 16;
 
 /// Header bytes counted by `COMPSIZE` in addition to the content bytes.
-const COUNTED_HEADER_SIZE: usize = HEADER_SIZE - std::mem::size_of::<u32>();
+const COUNTED_HEADER_SIZE: usize = HEADER_SIZE - size_of::<u32>();
 
 /// Default finite ceiling for a decompressed compressed-RTF payload (256 MiB).
 pub const DEFAULT_MAX_DECOMPRESSED_RTF_BYTES: usize = 256 * 1_048_576;
@@ -66,7 +75,7 @@ fn reserve_exact_bytes(
 ) -> RtfResult<()> {
     output
         .try_reserve_exact(capacity)
-        .map_err(|_| allocation_failed(resource, capacity))
+        .map_err(|_err| allocation_failed(resource, capacity))
 }
 
 fn extend_bytes(output: &mut Vec<u8>, bytes: &[u8], resource: &'static str) -> RtfResult<()> {
@@ -76,7 +85,7 @@ fn extend_bytes(output: &mut Vec<u8>, bytes: &[u8], resource: &'static str) -> R
         .ok_or_else(|| codec_invariant("output size overflow"))?;
     output
         .try_reserve(bytes.len())
-        .map_err(|_| allocation_failed(resource, requested))?;
+        .map_err(|_err| allocation_failed(resource, requested))?;
     output.extend_from_slice(bytes);
     Ok(())
 }
@@ -93,11 +102,13 @@ pub struct DecompressionLimits {
 
 impl DecompressionLimits {
     /// Create a limit profile with a caller-selected output ceiling.
+    #[must_use]
     pub const fn new(max_output_bytes: usize) -> Self {
         Self { max_output_bytes }
     }
 
     /// Maximum number of bytes the decoder may produce.
+    #[must_use]
     pub const fn max_output_bytes(self) -> usize {
         self.max_output_bytes
     }
@@ -164,6 +175,7 @@ impl CompressedRtfHeader {
 }
 
 /// Detect if data is compressed RTF
+#[must_use]
 pub fn is_compressed_rtf(data: &[u8]) -> bool {
     data.get(8..12).is_some_and(|signature| {
         signature == COMPRESSED_SIGNATURE || signature == UNCOMPRESSED_SIGNATURE
@@ -189,9 +201,12 @@ pub fn decompress(data: &[u8]) -> RtfResult<Vec<u8>> {
 }
 
 /// Decompress compressed RTF with an explicit finite output budget.
+///
+/// # Errors
+/// Returns an error when the input is malformed or a configured limit is exceeded.
 pub fn decompress_with_limits(data: &[u8], limits: DecompressionLimits) -> RtfResult<Vec<u8>> {
     let (header, contents) = parse_frame(data)?;
-    let raw_size = usize::try_from(header.get_raw_size()).map_err(|_| {
+    let raw_size = usize::try_from(header.get_raw_size()).map_err(|_err| {
         RtfError::InvalidStructure("RTF RAWSIZE is not representable on this target".to_string())
     })?;
     if raw_size > limits.max_output_bytes {
@@ -221,10 +236,10 @@ fn parse_frame(data: &[u8]) -> RtfResult<(CompressedRtfHeader, &[u8])> {
             data.len()
         ))
     })?;
-    let header = *<CompressedRtfHeader as FromBytes>::ref_from_bytes(bytes).map_err(|_| {
+    let header = *<CompressedRtfHeader as FromBytes>::ref_from_bytes(bytes).map_err(|_err| {
         RtfError::InvalidStructure("failed to parse compressed-RTF header".to_string())
     })?;
-    let compressed_size = usize::try_from(header.get_compressed_size()).map_err(|_| {
+    let compressed_size = usize::try_from(header.get_compressed_size()).map_err(|_err| {
         RtfError::InvalidStructure("RTF COMPSIZE is not representable on this target".to_string())
     })?;
     if compressed_size < COUNTED_HEADER_SIZE {
@@ -307,7 +322,7 @@ fn decompress_lzfu(
                     )
                 })?
                 .try_into()
-                .map_err(|_| {
+                .map_err(|_err| {
                     RtfError::InvalidStructure(
                         "invalid compressed-RTF dictionary reference".to_string(),
                     )
@@ -505,12 +520,12 @@ impl EncodeDictionary {
     fn new() -> RtfResult<Self> {
         let ring = DecodeDictionary::new();
         let position_bytes = POSITION_BUCKETS
-            .checked_mul(std::mem::size_of::<[u64; POSITION_WORDS]>())
+            .checked_mul(size_of::<[u64; POSITION_WORDS]>())
             .ok_or_else(|| codec_invariant("encoder position-table size overflow"))?;
         let mut positions = Vec::new();
         positions
             .try_reserve_exact(POSITION_BUCKETS)
-            .map_err(|_| allocation_failed("compressed RTF position table", position_bytes))?;
+            .map_err(|_err| allocation_failed("compressed RTF position table", position_bytes))?;
         positions.resize(POSITION_BUCKETS, [0; POSITION_WORDS]);
         for (offset, &byte) in INIT_DICT.iter().enumerate() {
             let words = positions
@@ -677,7 +692,7 @@ fn next_position(
         }
         if word != 0 {
             let bit = usize::try_from(word.trailing_zeros())
-                .map_err(|_| codec_invariant("position bit cannot be represented"))?;
+                .map_err(|_err| codec_invariant("position bit cannot be represented"))?;
             let found = word_start
                 .checked_add(bit)
                 .ok_or_else(|| codec_invariant("position result overflow"))?;
@@ -696,11 +711,14 @@ fn next_position(
 /// # Arguments
 ///
 /// * `data` - Uncompressed RTF data
-/// * `compress` - If true, use LZFu compression; if false, store uncompressed
+/// * `compress` - If true, use `LZFu` compression; if false, store uncompressed
 ///
 /// # Returns
 ///
 /// Compressed RTF data with header
+///
+/// # Errors
+/// Returns an error when the input is malformed or a configured limit is exceeded.
 pub fn compress(data: &[u8], compress: bool) -> RtfResult<Vec<u8>> {
     if compress {
         compress_lzfu(data)
@@ -709,7 +727,7 @@ pub fn compress(data: &[u8], compress: bool) -> RtfResult<Vec<u8>> {
     }
 }
 
-/// Compress data using LZFu algorithm
+/// Compress data using `LZFu` algorithm
 fn compress_lzfu(data: &[u8]) -> RtfResult<Vec<u8>> {
     checked_u32_size(data.len(), "uncompressed RTF")?;
     let mut dictionary = EncodeDictionary::new()?;
@@ -780,17 +798,17 @@ fn dictionary_reference(offset: usize, length: usize) -> RtfResult<[u8; 2]> {
             "dictionary match length {length} is not representable in compressed RTF"
         )));
     }
-    let offset = u16::try_from(offset).map_err(|_| {
+    let offset = u16::try_from(offset).map_err(|_err| {
         RtfError::InvalidStructure("compressed-RTF dictionary offset overflow".to_string())
     })?;
-    let encoded_length = u16::try_from(length.saturating_sub(2)).map_err(|_| {
+    let encoded_length = u16::try_from(length.saturating_sub(2)).map_err(|_err| {
         RtfError::InvalidStructure("compressed-RTF match length overflow".to_string())
     })?;
     Ok(((offset << 4) | encoded_length).to_be_bytes())
 }
 
 fn checked_u32_size(value: usize, description: &str) -> RtfResult<u32> {
-    u32::try_from(value).map_err(|_| {
+    u32::try_from(value).map_err(|_err| {
         RtfError::InvalidStructure(format!(
             "{description} size {value} exceeds the compressed-RTF 32-bit wire limit"
         ))
@@ -827,11 +845,20 @@ fn crc32(data: &[u8]) -> RtfResult<u32> {
     let mut digest = crc_fast::Digest::new_with_init_state(crc_fast::CrcAlgorithm::Crc32IsoHdlc, 0);
     digest.update(data);
     u32::try_from(digest.finalize() ^ u64::from(u32::MAX))
-        .map_err(|_| RtfError::InvalidStructure("compressed-RTF CRC32 overflow".to_string()))
+        .map_err(|_err| RtfError::InvalidStructure("compressed-RTF CRC32 overflow".to_string()))
 }
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
+    #![allow(
+        clippy::cast_possible_truncation,
+        reason = "test PRNG fixtures intentionally truncate wide state into bytes"
+    )]
     use super::*;
 
     const SPEC_RAW: &[u8] = b"{\\rtf1\\ansi\\ansicpg1252\\pard hello world}\r\n";
@@ -1105,7 +1132,7 @@ mod tests {
             for replacement in [0x00, 0x01, 0x7f, 0xff] {
                 let mut mutated = SPEC_COMPRESSED.to_vec();
                 mutated[index] = replacement;
-                let _ = decompress(&mutated);
+                drop(decompress(&mutated));
             }
         }
     }

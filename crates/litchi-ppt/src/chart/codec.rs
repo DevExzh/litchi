@@ -45,7 +45,7 @@ pub(super) fn decode(storage: Storage, limits: Limits) -> Result<Vec<u8>> {
                 Error::Corrupted("compressed chart storage is missing its size".into())
             })?;
             let declared = usize::try_from(uncompressed_len)
-                .map_err(|_| Error::Corrupted("chart storage size exceeds usize".into()))?;
+                .map_err(|_err| Error::Corrupted("chart storage size exceeds usize".into()))?;
             check_limit("chart package bytes", declared, limits.max_package_bytes)?;
             let capacity = declared
                 .checked_add(1)
@@ -53,7 +53,7 @@ pub(super) fn decode(storage: Storage, limits: Limits) -> Result<Vec<u8>> {
             let mut bytes = Vec::new();
             bytes
                 .try_reserve_exact(capacity)
-                .map_err(|_| litchi_ograph::Error::Allocation {
+                .map_err(|_err| litchi_ograph::Error::Allocation {
                     resource: "PPT chart package bytes",
                 })?;
             flate2::read::ZlibDecoder::new(storage.stored_bytes())
@@ -67,7 +67,7 @@ pub(super) fn decode(storage: Storage, limits: Limits) -> Result<Vec<u8>> {
     }
 }
 
-/// Encode a replacement OLE payload with the same PowerPoint storage envelope
+/// Encode a replacement OLE payload with the same `PowerPoint` storage envelope
 /// as the source object. The compressed form receives the new payload length
 /// required by `ExOleObjStg`; its zlib bytes remain inert and are never opened
 /// here.
@@ -76,7 +76,7 @@ pub(super) fn encode_storage(bytes: Vec<u8>, compression: Compression) -> Result
         Compression::Uncompressed => Storage::uncompressed(StorageKind::OleObject, bytes),
         Compression::Zlib => {
             let declared = u32::try_from(bytes.len())
-                .map_err(|_| Error::Corrupted("chart package exceeds u32 size".into()))?;
+                .map_err(|_err| Error::Corrupted("chart package exceeds u32 size".into()))?;
             let mut encoder =
                 flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
             encoder.write_all(&bytes)?;

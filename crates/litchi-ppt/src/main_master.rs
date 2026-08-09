@@ -1,4 +1,4 @@
-//! PowerPoint 12 round-trip metadata attached to main master slides.
+//! `PowerPoint` 12 round-trip metadata attached to main master slides.
 
 use super::package::{Error, Result};
 use super::records::Record;
@@ -12,37 +12,52 @@ use litchi_opc::constants::content_type;
 const PRESENTATIONML_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/presentationml/2006/main";
 
-/// Position of a PowerPoint 12 main-master text-style package in the container schema.
+/// Position of a `PowerPoint` 12 main-master text-style package in the container schema.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "the `MainMaster` prefix is the established public API naming for this \
+              module's types; renaming it would break downstream crates"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MainMasterTextStylesSource {
     /// Optional direct field before the main master's drawing.
     Direct,
-    /// Member of the PowerPoint 12 round-trip array after the drawing.
+    /// Member of the `PowerPoint` 12 round-trip array after the drawing.
     RoundTripArray,
 }
 
-/// Embedded slide layout associated with a PowerPoint 12 main master.
+/// Embedded slide layout associated with a `PowerPoint` 12 main master.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ContentMasterInfo {
     /// Record-instance bits retained because MS-PPT does not constrain them.
     pub record_instance: u16,
-    /// Validated package containing the PresentationML `sldLayout` part.
+    /// Validated package containing the `PresentationML` `sldLayout` part.
     pub package: EmbeddedXmlPackage,
 }
 
-/// Embedded text styles associated with a PowerPoint 12 main master.
+/// Embedded text styles associated with a `PowerPoint` 12 main master.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "the `MainMaster` prefix is the established public API naming for this \
+              module's types; renaming it would break downstream crates"
+)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MainMasterTextStyles {
     /// Schema position from which this package was read.
     pub source: MainMasterTextStylesSource,
-    /// Validated package containing the PresentationML `txStyles` part.
+    /// Validated package containing the `PresentationML` `txStyles` part.
     pub package: EmbeddedXmlPackage,
 }
 
-/// PowerPoint 12 round-trip metadata stored on one main master slide.
+/// `PowerPoint` 12 round-trip metadata stored on one main master slide.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "the `MainMaster` prefix is the established public API naming for this \
+              module's types; renaming it would break downstream crates"
+)]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct MainMasterMetadata12 {
-    /// Original PresentationML slide-master identifier.
+    /// Original `PresentationML` slide-master identifier.
     pub original_main_master_id: Option<u32>,
     /// Validated embedded theme or theme-override package.
     pub theme_package: Option<ThemePackage>,
@@ -61,7 +76,11 @@ pub struct MainMasterMetadata12 {
 }
 
 impl MainMasterMetadata12 {
-    /// Parse PowerPoint 12 round-trip records from one `MainMaster` container.
+    /// Parse `PowerPoint` 12 round-trip records from one `MainMaster` container.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(root: &Record) -> Result<Self> {
         if root.record_type != RecordType::MainMaster {
             return Err(Error::Corrupted(
@@ -77,6 +96,12 @@ impl MainMasterMetadata12 {
                 seen_drawing = true;
                 continue;
             }
+            #[allow(
+                clippy::wildcard_enum_match_arm,
+                reason = "`RecordType` mirrors the full MS-PPT record-type enumeration; only \
+                          the round-trip metadata atoms are interpreted and every other record \
+                          is ignored"
+            )]
             match record.record_type {
                 RecordType::RoundTripOArtTextStyles12Atom => {
                     let (source, seen) = if seen_drawing {
@@ -227,6 +252,11 @@ fn read_u32(record: &Record) -> u32 {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use crate::Package;
@@ -239,7 +269,7 @@ mod tests {
             instance,
             record_type,
             record_type_raw: record_type.as_u16(),
-            data_length: data.len() as u32,
+            data_length: u32::try_from(data.len()).unwrap(),
             data: data.to_vec(),
             children: Vec::new(),
         }

@@ -1,10 +1,19 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{DefaultFormattingDestination, ParagraphWrapping, RtfDocument, RtfWriter};
 
-const PRODUCER: &str = r#"{\rtf1\ansi\adeff7\deff2\stshfdbch31505\stshfloch31506\stshfhich31507\stshfbi31508
+const PRODUCER: &str = r"{\rtf1\ansi\adeff7\deff2\stshfdbch31505\stshfloch31506\stshfhich31507\stshfbi31508
 {\fonttbl{\f2 Arial;}}
 {\*\defpap\qj\li120\ri240\sa200\sl276\slmult1\nowidctlpar\wrapdefault\aspalpha\aspnum\faauto\adjustright\rin0\lin0\itap0}
 {\*\defchp\f2\fs22\lang1033\langfe1041\langnp1033\langfenp1041\kerning2\loch\af31506\hich\af31507\dbch\af31505}
-Body}"#;
+Body}";
 
 #[test]
 fn parses_preserves_order_and_round_trips_defaults_inertly() {
@@ -79,23 +88,23 @@ fn parses_real_producer_default_destinations() {
 #[test]
 fn rejects_malformed_default_formatting() {
     let malformed = [
-        r#"{\rtf1\deff X}"#,
-        r#"{\rtf1\adeff-1 X}"#,
-        r#"{\rtf1\deff0\deff1 X}"#,
-        r#"{\rtf1{\defchp\fs22}X}"#,
-        r#"{\rtf1{\*\defchp1\fs22}X}"#,
-        r#"{\rtf1{\*\defchp\fs0}X}"#,
-        r#"{\rtf1{\*\defchp\fs22\fs24}X}"#,
-        r#"{\rtf1{\*\defchp\loch}X}"#,
-        r#"{\rtf1{\*\defchp\loch\af}X}"#,
-        r#"{\rtf1{\*\defchp\ql}X}"#,
-        r#"{\rtf1{\*\defchp{\field X}}X}"#,
-        r#"{\rtf1{\*\defpap\b}X}"#,
-        r#"{\rtf1{\*\defpap\li100\li200}X}"#,
-        r#"{\rtf1{\*\defpap\tqc}X}"#,
-        r#"{\rtf1{\*\defpap\itap33}X}"#,
-        r#"{\rtf1{\*\defpap}{\*\defpap}X}"#,
-        r#"{\rtf1 X{\*\defchp\fs22}}"#,
+        r"{\rtf1\deff X}",
+        r"{\rtf1\adeff-1 X}",
+        r"{\rtf1\deff0\deff1 X}",
+        r"{\rtf1{\defchp\fs22}X}",
+        r"{\rtf1{\*\defchp1\fs22}X}",
+        r"{\rtf1{\*\defchp\fs0}X}",
+        r"{\rtf1{\*\defchp\fs22\fs24}X}",
+        r"{\rtf1{\*\defchp\loch}X}",
+        r"{\rtf1{\*\defchp\loch\af}X}",
+        r"{\rtf1{\*\defchp\ql}X}",
+        r"{\rtf1{\*\defchp{\field X}}X}",
+        r"{\rtf1{\*\defpap\b}X}",
+        r"{\rtf1{\*\defpap\li100\li200}X}",
+        r"{\rtf1{\*\defpap\tqc}X}",
+        r"{\rtf1{\*\defpap\itap33}X}",
+        r"{\rtf1{\*\defpap}{\*\defpap}X}",
+        r"{\rtf1 X{\*\defchp\fs22}}",
     ];
     for source in malformed {
         assert!(

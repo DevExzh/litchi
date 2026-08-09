@@ -121,7 +121,23 @@ pub(super) fn validate_time_property(property: &TimeNodeProperty) -> Result<()> 
                 "media volume out of range".to_string(),
             ))
         },
-        _ => Ok(()),
+        TimeNodeProperty::DisplayHidden(_)
+        | TimeNodeProperty::MasterRelation(_)
+        | TimeNodeProperty::SubType
+        | TimeNodeProperty::EffectId(_)
+        | TimeNodeProperty::EffectDirection(_)
+        | TimeNodeProperty::EffectType(_)
+        | TimeNodeProperty::AfterEffect(_)
+        | TimeNodeProperty::SlideCount(_)
+        | TimeNodeProperty::TimeFilter(_)
+        | TimeNodeProperty::EventFilter(_)
+        | TimeNodeProperty::HideWhenStopped(_)
+        | TimeNodeProperty::GroupId(_)
+        | TimeNodeProperty::EffectNodeType(_)
+        | TimeNodeProperty::PlaceholderNode(_)
+        | TimeNodeProperty::MediaVolume(_)
+        | TimeNodeProperty::MediaMute(_)
+        | TimeNodeProperty::ZoomToFullScreen(_) => Ok(()),
     }
 }
 

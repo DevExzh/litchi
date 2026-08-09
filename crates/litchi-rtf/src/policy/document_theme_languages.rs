@@ -14,6 +14,7 @@ pub struct DocumentThemeLanguages {
 
 impl DocumentThemeLanguages {
     /// Return whether all theme-language controls were omitted.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.primary.is_none() && self.east_asian.is_none() && self.complex_script.is_none()
     }

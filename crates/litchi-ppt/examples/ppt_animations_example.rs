@@ -1,12 +1,20 @@
+#![allow(
+    clippy::print_stdout,
+    reason = "this command-line example intentionally prints its results"
+)]
+
 //! Example demonstrating PPT animations with various effects
 //!
 //! This example creates a PPT file with multiple slides showcasing different
 //! animation effects including entrance, emphasis, and exit animations.
 //!
-//! Run with: cargo run --example ppt_animations_example
+//! Run with: cargo run --example `ppt_animations_example`
 
 use litchi_ppt::Writer;
-use litchi_ppt::animation::*;
+use litchi_ppt::animation::{
+    AnimationEffect, AnimationInfo, AnimationTrigger, BuildInfo, BuildLevel, BuildType,
+    EffectDirection, EffectSpeed,
+};
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {

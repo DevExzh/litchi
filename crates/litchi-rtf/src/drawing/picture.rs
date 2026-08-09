@@ -13,12 +13,16 @@ use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 
 pub(crate) const MAX_PICTURE_WRITE_BYTES: usize = 64 * 1_048_576;
-/// Maximum number of scalar OfficeArt properties on one inline picture.
+/// Maximum number of scalar `OfficeArt` properties on one inline picture.
 pub const MAX_PICTURE_SHAPE_PROPERTIES: usize = 4_096;
 /// Maximum aggregate name/value bytes on one inline picture.
 pub const MAX_PICTURE_SHAPE_PROPERTY_BYTES: usize = 1024 * 1024;
 
-/// Ordered OfficeArt properties from a picture's starred `picprop` destination.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
+/// Ordered `OfficeArt` properties from a picture's starred `picprop` destination.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct PictureShapeProperties<'a> {
     /// Optional producer shape identifier (`shplid`)
@@ -29,6 +33,9 @@ pub struct PictureShapeProperties<'a> {
 
 impl PictureShapeProperties<'_> {
     /// Validate the normative nonempty property list and resource bounds.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if self.properties.is_empty() || self.properties.len() > MAX_PICTURE_SHAPE_PROPERTIES {
             return Err(RtfError::MalformedDocument(
@@ -83,6 +90,10 @@ impl PictureShapeProperties<'_> {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Inert identity metadata attached to one RTF picture payload.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct PictureIdentity<'a> {
@@ -95,6 +106,9 @@ pub struct PictureIdentity<'a> {
 }
 
 impl PictureIdentity<'_> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if self.units_per_inch == Some(0) {
             return Err(RtfError::MalformedDocument(
@@ -144,6 +158,10 @@ pub enum ImageType {
     Unknown,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Passive crop distances in twips from the four source-picture edges.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct PictureCrop {
@@ -153,6 +171,10 @@ pub struct PictureCrop {
     pub bottom: Option<i32>,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Passive legacy bitmap header controls carried by a `pict` destination.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct PictureBitmapMetadata {
@@ -220,7 +242,7 @@ pub struct Picture<'a> {
     pub data: Cow<'a, [u8]>,
     /// Optional cache/source identity metadata.
     pub identity: Option<PictureIdentity<'a>>,
-    /// Optional inline OfficeArt property destination (`picprop`)
+    /// Optional inline `OfficeArt` property destination (`picprop`)
     pub shape_properties: Option<PictureShapeProperties<'a>>,
     /// Picture width (in twips, 1/1440 inch)
     pub width: Option<i32>,
@@ -245,6 +267,7 @@ pub struct Picture<'a> {
 impl<'a> Picture<'a> {
     /// Create a new picture with minimal information.
     #[inline]
+    #[must_use]
     pub fn new(image_type: ImageType, data: Cow<'a, [u8]>) -> Self {
         Self {
             image_type,
@@ -265,10 +288,14 @@ impl<'a> Picture<'a> {
 
     /// Get the image data as a byte slice.
     #[inline]
+    #[must_use]
     pub fn data(&self) -> &[u8] {
         &self.data
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if self.data.is_empty() || self.data.len() > MAX_PICTURE_WRITE_BYTES {
             return Err(RtfError::MalformedDocument(
@@ -307,6 +334,7 @@ impl<'a> Picture<'a> {
 
     /// Get the computed width in twips, considering scaling.
     #[inline]
+    #[must_use]
     pub fn computed_width(&self) -> Option<i32> {
         self.goal_width.or(self.width).map(|w| match self.scale_x {
             Some(scale) => (w * scale) / 100,
@@ -316,6 +344,7 @@ impl<'a> Picture<'a> {
 
     /// Get the computed height in twips, considering scaling.
     #[inline]
+    #[must_use]
     pub fn computed_height(&self) -> Option<i32> {
         self.goal_height
             .or(self.height)
@@ -331,8 +360,10 @@ impl<'a> Picture<'a> {
     ///
     /// * `dpi` - Dots per inch (typically 96 for screen, 72 for print)
     #[inline]
+    #[must_use]
     pub fn width_pixels(&self, dpi: u32) -> Option<u32> {
-        self.computed_width().map(|tw| (tw as u32 * dpi) / 1440)
+        self.computed_width()
+            .map(|tw| (tw.cast_unsigned() * dpi) / 1440)
     }
 
     /// Convert height from twips to pixels at given DPI.
@@ -341,8 +372,10 @@ impl<'a> Picture<'a> {
     ///
     /// * `dpi` - Dots per inch (typically 96 for screen, 72 for print)
     #[inline]
+    #[must_use]
     pub fn height_pixels(&self, dpi: u32) -> Option<u32> {
-        self.computed_height().map(|tw| (tw as u32 * dpi) / 1440)
+        self.computed_height()
+            .map(|tw| (tw.cast_unsigned() * dpi) / 1440)
     }
 }
 
@@ -355,6 +388,7 @@ impl<'a> Picture<'a> {
 /// # Returns
 ///
 /// Detected image type or Unknown
+#[must_use]
 pub fn detect_image_type(data: &[u8]) -> ImageType {
     if data.is_empty() {
         return ImageType::Unknown;

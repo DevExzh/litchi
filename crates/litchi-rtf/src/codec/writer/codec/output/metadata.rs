@@ -1,9 +1,23 @@
 //! RTF metadata and destination output.
 
-use super::super::*;
+#![allow(
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    reason = "serialization helpers deliberately rebind a working value as the output is assembled"
+)]
+use super::super::{
+    Annotation, AnnotationType, Bookmark, CustomXmlTag, DocumentInfo, DocumentProtection,
+    DocumentVariable, DrawingStoryTextMode, FieldOwner, HashSet, MathElement, MathElementRole,
+    MathObject, MathProperties, MathPropertyName, MathRun, MathStructure, MathStructureChild,
+    MathStructureKind, MathZone, MathZoneKind, ProtectionRange, RtfTimestamp, RtfWriter,
+    UserProperty, Write, document_variable, io, user_property,
+};
 
 impl<W: Write> RtfWriter<W> {
     /// Write the standard RTF document-information destination.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_info(&mut self, info: &DocumentInfo<'_>) -> io::Result<()> {
         let has_info = info.title.is_some()
             || info.subject.is_some()
@@ -84,7 +98,7 @@ impl<W: Write> RtfWriter<W> {
 
     pub(in super::super) fn write_protection_controls(
         &mut self,
-        protection: &crate::DocumentProtection<'_>,
+        protection: &DocumentProtection<'_>,
     ) -> io::Result<()> {
         for (control, value) in [
             ("formprot", protection.forms),
@@ -154,7 +168,7 @@ impl<W: Write> RtfWriter<W> {
         value: Option<u32>,
     ) -> io::Result<()> {
         if let Some(value) = value {
-            self.write_control_word(control, Some(value as i32))?;
+            self.write_control_word(control, Some(value.cast_signed()))?;
         }
         Ok(())
     }
@@ -171,20 +185,20 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write the canonical starred RTF user-properties destination.
-    pub fn write_user_properties(
-        &mut self,
-        properties: &[crate::UserProperty<'_>],
-    ) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
+    pub fn write_user_properties(&mut self, properties: &[UserProperty<'_>]) -> io::Result<()> {
         if properties.is_empty() {
             return Ok(());
         }
-        if properties.len() > crate::user_property::MAX_USER_PROPERTIES {
+        if properties.len() > user_property::MAX_USER_PROPERTIES {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "RTF user-property count limit exceeded",
             ));
         }
-        let mut names = std::collections::HashSet::with_capacity(properties.len());
+        let mut names = HashSet::with_capacity(properties.len());
         let mut aggregate = 0usize;
         for property in properties {
             property
@@ -203,7 +217,7 @@ impl<W: Write> RtfWriter<W> {
                 .ok_or_else(|| {
                     io::Error::new(io::ErrorKind::InvalidInput, "user-property size overflow")
                 })?;
-            if aggregate > crate::user_property::MAX_USER_PROPERTY_TEXT_BYTES {
+            if aggregate > user_property::MAX_USER_PROPERTY_TEXT_BYTES {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "RTF user-property aggregate text limit exceeded",
@@ -237,11 +251,14 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write ordered standard RTF document-variable destinations.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_document_variables(
         &mut self,
-        variables: &[crate::DocumentVariable<'_>],
+        variables: &[DocumentVariable<'_>],
     ) -> io::Result<()> {
-        if variables.len() > crate::document_variable::MAX_DOCUMENT_VARIABLES {
+        if variables.len() > document_variable::MAX_DOCUMENT_VARIABLES {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "RTF document-variable count limit exceeded",
@@ -261,7 +278,7 @@ impl<W: Write> RtfWriter<W> {
                         "document-variable size overflow",
                     )
                 })?;
-            if aggregate > crate::document_variable::MAX_DOCUMENT_VARIABLE_TEXT_BYTES {
+            if aggregate > document_variable::MAX_DOCUMENT_VARIABLE_TEXT_BYTES {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "RTF document-variable aggregate text limit exceeded",
@@ -290,7 +307,7 @@ impl<W: Write> RtfWriter<W> {
                 character if character.is_ascii() => write!(self.writer, "{character}")?,
                 character => {
                     for unit in character.encode_utf16(&mut [0; 2]).iter().copied() {
-                        self.write_control_word("u", Some(i32::from(unit as i16)))?;
+                        self.write_control_word("u", Some(i32::from(unit.cast_signed())))?;
                         self.write_str("?")?;
                     }
                 },
@@ -300,6 +317,9 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write a bookmark start destination.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_bookmark_start(&mut self, bookmark: &Bookmark<'_>) -> io::Result<()> {
         if bookmark.name.is_empty() {
             return Err(io::Error::new(
@@ -320,6 +340,9 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write a bookmark end destination.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_bookmark_end(&mut self, name: &str) -> io::Result<()> {
         if name.is_empty() {
             return Err(io::Error::new(
@@ -335,13 +358,16 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write a custom XML tag open destination and its inert attributes.
-    pub fn write_custom_xml_open(&mut self, tag: &crate::CustomXmlTag<'_>) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
+    pub fn write_custom_xml_open(&mut self, tag: &CustomXmlTag<'_>) -> io::Result<()> {
         tag.validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
         self.write_str("{")?;
         self.write_control_word("xmlopen", None)?;
         if let Some(namespace) = tag.namespace {
-            self.write_control_word("xmlns", Some(namespace as i32))?;
+            self.write_control_word("xmlns", Some(namespace.cast_signed()))?;
         }
         self.write_str(" ")?;
         self.write_destination_text(tag.name.as_ref())?;
@@ -361,7 +387,10 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write a custom XML tag close destination.
-    pub fn write_custom_xml_close(&mut self, tag: &crate::CustomXmlTag<'_>) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
+    pub fn write_custom_xml_close(&mut self, tag: &CustomXmlTag<'_>) -> io::Result<()> {
         if tag.name.is_empty() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -376,10 +405,13 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write a protection-exception range marker destination.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_protection_range_marker(
         &mut self,
         control: &str,
-        range: &crate::ProtectionRange<'_>,
+        range: &ProtectionRange<'_>,
     ) -> io::Result<()> {
         range
             .validate()
@@ -391,7 +423,7 @@ impl<W: Write> RtfWriter<W> {
         self.write_str("}")
     }
 
-    pub(in super::super) fn math_structure_control(kind: crate::MathStructureKind) -> &'static str {
+    pub(in super::super) fn math_structure_control(kind: MathStructureKind) -> &'static str {
         use crate::MathStructureKind as K;
         match kind {
             K::Accent => "macc",
@@ -417,7 +449,7 @@ impl<W: Write> RtfWriter<W> {
     }
 
     pub(in super::super) fn math_structure_properties_control(
-        kind: crate::MathStructureKind,
+        kind: MathStructureKind,
     ) -> &'static str {
         use crate::MathStructureKind as K;
         match kind {
@@ -443,7 +475,7 @@ impl<W: Write> RtfWriter<W> {
         }
     }
 
-    pub(in super::super) fn math_element_control(role: crate::MathElementRole) -> &'static str {
+    pub(in super::super) fn math_element_control(role: MathElementRole) -> &'static str {
         use crate::MathElementRole as R;
         match role {
             R::Element => "me",
@@ -457,7 +489,7 @@ impl<W: Write> RtfWriter<W> {
         }
     }
 
-    pub(in super::super) fn math_property_control(name: crate::MathPropertyName) -> &'static str {
+    pub(in super::super) fn math_property_control(name: MathPropertyName) -> &'static str {
         use crate::MathPropertyName as N;
         match name {
             N::Type => "mtype",
@@ -512,14 +544,17 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write an inert math zone destination.
-    pub fn write_math_zone(&mut self, zone: &crate::MathZone<'_>) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
+    pub fn write_math_zone(&mut self, zone: &MathZone<'_>) -> io::Result<()> {
         zone.validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
         self.write_str("{")?;
         self.write_control_word(
             match zone.kind {
-                crate::MathZoneKind::Inline => "mmath",
-                crate::MathZoneKind::Display => "mmathPara",
+                MathZoneKind::Inline => "mmath",
+                MathZoneKind::Display => "mmathPara",
             },
             None,
         )?;
@@ -534,17 +569,17 @@ impl<W: Write> RtfWriter<W> {
 
     pub(in super::super) fn write_math_object(
         &mut self,
-        object: &crate::MathObject<'_>,
+        object: &MathObject<'_>,
     ) -> io::Result<()> {
         match object {
-            crate::MathObject::Structure(structure) => self.write_math_structure(structure),
-            crate::MathObject::Run(run) => self.write_math_run(run),
+            MathObject::Structure(structure) => self.write_math_structure(structure),
+            MathObject::Run(run) => self.write_math_run(run),
         }
     }
 
     pub(in super::super) fn write_math_structure(
         &mut self,
-        structure: &crate::MathStructure<'_>,
+        structure: &MathStructure<'_>,
     ) -> io::Result<()> {
         self.write_str("{")?;
         self.write_control_word(Self::math_structure_control(structure.kind), None)?;
@@ -556,8 +591,8 @@ impl<W: Write> RtfWriter<W> {
         }
         for child in &structure.children {
             match child {
-                crate::MathStructureChild::Element(element) => self.write_math_element(element)?,
-                crate::MathStructureChild::MatrixRow(row) => {
+                MathStructureChild::Element(element) => self.write_math_element(element)?,
+                MathStructureChild::MatrixRow(row) => {
                     self.write_str("{")?;
                     self.write_control_word("mmr", None)?;
                     for cell in &row.cells {
@@ -572,7 +607,7 @@ impl<W: Write> RtfWriter<W> {
 
     pub(in super::super) fn write_math_element(
         &mut self,
-        element: &crate::MathElement<'_>,
+        element: &MathElement<'_>,
     ) -> io::Result<()> {
         self.write_str("{")?;
         self.write_control_word(Self::math_element_control(element.role), None)?;
@@ -586,7 +621,7 @@ impl<W: Write> RtfWriter<W> {
         self.write_str("}")
     }
 
-    pub(in super::super) fn write_math_run(&mut self, run: &crate::MathRun<'_>) -> io::Result<()> {
+    pub(in super::super) fn write_math_run(&mut self, run: &MathRun<'_>) -> io::Result<()> {
         self.write_str("{")?;
         self.write_control_word("mr", None)?;
         if let Some(properties) = &run.properties {
@@ -603,7 +638,7 @@ impl<W: Write> RtfWriter<W> {
     pub(in super::super) fn write_math_properties_group(
         &mut self,
         destination: &str,
-        properties: &crate::MathProperties<'_>,
+        properties: &MathProperties<'_>,
     ) -> io::Result<()> {
         properties
             .validate()
@@ -639,6 +674,9 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write an annotation range-start destination.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_annotation_start(&mut self, annotation: &Annotation<'_>) -> io::Result<()> {
         if !annotation.has_reference {
             return Ok(());
@@ -651,6 +689,9 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write an annotation range end, author metadata, and inert comment body.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_annotation_end(&mut self, annotation: &Annotation<'_>) -> io::Result<()> {
         if annotation.annotation_type != AnnotationType::Comment {
             return Err(io::Error::new(
@@ -687,7 +728,7 @@ impl<W: Write> RtfWriter<W> {
             &annotation.drawing_order,
             &annotation.story_events,
             &[],
-            crate::FieldOwner::Other,
+            FieldOwner::Other,
             DrawingStoryTextMode::Destination,
             0,
         )?;

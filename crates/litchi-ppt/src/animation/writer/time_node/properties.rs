@@ -16,6 +16,10 @@ use std::collections::HashSet;
 use crate::animation::types::{has_valid_time_effect_properties, is_valid_time_filter};
 
 /// Serialize a typed `TimePropertyList4TimeNodeContainer`.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
 pub fn write_time_node_property_list(
     list: &TimeNodePropertyList,
     context: TimePropertyListContext,
@@ -31,7 +35,7 @@ pub fn write_time_node_property_list(
     let mut children = Vec::new();
     for property in &list.properties {
         validate_time_property(property)?;
-        let (id, data) = encode_time_node_property(property)?;
+        let (id, data) = encode_time_node_property(property);
         if !seen.insert(id) {
             return Err(Error::InvalidFormat(format!(
                 "duplicate time property {id:#X}"
@@ -39,7 +43,7 @@ pub fn write_time_node_property_list(
         }
         validate_time_property_context(id, context)?;
         validate_event_filter(property, has_interactive_sequence)?;
-        let length = u32::try_from(data.len()).map_err(|_| {
+        let length = u32::try_from(data.len()).map_err(|_err| {
             Error::InvalidFormat("time property exceeds 4 GiB record limit".to_string())
         })?;
         children.extend(super::super::support::create_record_header(
@@ -53,7 +57,7 @@ pub fn write_time_node_property_list(
     super::super::support::wrap_record(RecordType::TimePropertyList, 0x0F, 0, children)
 }
 
-fn encode_time_node_property(property: &TimeNodeProperty) -> Result<(u16, Vec<u8>)> {
+fn encode_time_node_property(property: &TimeNodeProperty) -> (u16, Vec<u8>) {
     let integer = |value: i32| {
         let mut data = vec![1];
         data.extend(value.to_le_bytes());
@@ -66,7 +70,7 @@ fn encode_time_node_property(property: &TimeNodeProperty) -> Result<(u16, Vec<u8
         data.extend(value.encode_utf16().flat_map(u16::to_le_bytes));
         data
     };
-    Ok(match property {
+    match property {
         TimeNodeProperty::DisplayHidden(value) => (0x02, integer(i32::from(*value))),
         TimeNodeProperty::MasterRelation(value) => (
             0x05,
@@ -117,10 +121,15 @@ fn encode_time_node_property(property: &TimeNodeProperty) -> Result<(u16, Vec<u8
         },
         TimeNodeProperty::MediaMute(value) => (0x17, boolean(*value)),
         TimeNodeProperty::ZoomToFullScreen(value) => (0x1A, boolean(*value)),
-    })
+    }
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

@@ -4,7 +4,7 @@
 
 use super::records::{RecordBuilder, record_type};
 
-/// DocumentAtom builder per MS-PPT section 2.4.2
+/// `DocumentAtom` builder per MS-PPT section 2.4.2
 ///
 /// Creates a 40-byte payload with:
 /// - slideSize (8 bytes): Slide dimensions in master units
@@ -15,9 +15,22 @@ use super::records::{RecordBuilder, record_type};
 /// - firstSlideNumber (2 bytes)
 /// - slideSizeType (2 bytes)
 /// - fSaveWithFonts, fOmitTitlePlace, fRightToLeft, fShowComments (4 bytes)
+///
+/// # Panics
+///
+/// Panics if internal invariants are violated.
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "`emu * 576 / 914_400` is at most about 2.7 million for any `u32` EMU value, so it always fits `u32`"
+)]
+#[allow(
+    clippy::expect_used,
+    reason = "`RecordBuilder::build` only fails when writing the header to its in-memory `Vec`, which cannot fail; changing this infallible public API to return `Result` would break callers"
+)]
+#[must_use]
 pub fn build_document_atom(slide_width_emu: u32, slide_height_emu: u32) -> Vec<u8> {
     // Convert EMU to master units (576 units per inch, 914400 EMUs per inch)
-    let to_master = |emu: u32| -> u32 { ((emu as u64 * 576) / 914_400) as u32 };
+    let to_master = |emu: u32| -> u32 { ((u64::from(emu) * 576) / 914_400) as u32 };
 
     let slide_w = to_master(slide_width_emu);
     let slide_h = to_master(slide_height_emu);
@@ -60,7 +73,7 @@ pub fn build_document_atom(slide_width_emu: u32, slide_height_emu: u32) -> Vec<u
     builder.build().expect("DocumentAtom build")
 }
 
-/// SlideAtom builder per MS-PPT section 2.5.2
+/// `SlideAtom` builder per MS-PPT section 2.5.2
 ///
 /// Creates a 24-byte payload with:
 /// - geom (4 bytes): Slide layout geometry
@@ -69,6 +82,15 @@ pub fn build_document_atom(slide_width_emu: u32, slide_height_emu: u32) -> Vec<u
 /// - notesIdRef (4 bytes): Notes slide persist ID  
 /// - slideFlags (2 bytes)
 /// - unused (2 bytes)
+///
+/// # Panics
+///
+/// Panics if internal invariants are violated.
+#[allow(
+    clippy::expect_used,
+    reason = "`RecordBuilder::build` only fails when writing the header to its in-memory `Vec`, which cannot fail; changing this infallible public API to return `Result` would break callers"
+)]
+#[must_use]
 pub fn build_slide_atom(master_id_ref: u32, notes_id_ref: u32) -> Vec<u8> {
     let mut data = Vec::with_capacity(24);
 
@@ -95,7 +117,7 @@ pub fn build_slide_atom(master_id_ref: u32, notes_id_ref: u32) -> Vec<u8> {
     builder.build().expect("SlideAtom build")
 }
 
-/// SlidePersistAtom builder per MS-PPT section 2.4.14.5
+/// `SlidePersistAtom` builder per MS-PPT section 2.4.14.5
 ///
 /// Creates a 20-byte payload with:
 /// - persistIdRef (4 bytes)
@@ -103,6 +125,15 @@ pub fn build_slide_atom(master_id_ref: u32, notes_id_ref: u32) -> Vec<u8> {
 /// - numberTexts (4 bytes)
 /// - slideId (4 bytes)
 /// - reserved (4 bytes)
+///
+/// # Panics
+///
+/// Panics if internal invariants are violated.
+#[allow(
+    clippy::expect_used,
+    reason = "`RecordBuilder::build` only fails when writing the header to its in-memory `Vec`, which cannot fail; changing this infallible public API to return `Result` would break callers"
+)]
+#[must_use]
 pub fn build_slide_persist_atom(persist_id_ref: u32, slide_id: u32, has_shapes: bool) -> Vec<u8> {
     let mut data = Vec::with_capacity(20);
 
@@ -127,9 +158,18 @@ pub fn build_slide_persist_atom(persist_id_ref: u32, slide_id: u32, has_shapes: 
     builder.build().expect("SlidePersistAtom build")
 }
 
-/// ColorSchemeAtom builder per MS-PPT section 2.4.17
+/// `ColorSchemeAtom` builder per MS-PPT section 2.4.17
 ///
 /// Creates a 32-byte payload with 8 RGBX colors
+///
+/// # Panics
+///
+/// Panics if internal invariants are violated.
+#[allow(
+    clippy::expect_used,
+    reason = "`RecordBuilder::build` only fails when writing the header to its in-memory `Vec`, which cannot fail; changing this infallible public API to return `Result` would break callers"
+)]
+#[must_use]
 pub fn build_color_scheme_atom(instance: u16, colors: &[u32; 8]) -> Vec<u8> {
     let mut data = Vec::with_capacity(32);
     for color in colors {
@@ -142,32 +182,47 @@ pub fn build_color_scheme_atom(instance: u16, colors: &[u32; 8]) -> Vec<u8> {
 }
 
 /// Default color scheme (white background, black text)
+#[must_use]
 pub fn default_color_scheme() -> [u32; 8] {
     [
-        0x00FFFFFF, // background
-        0x00000000, // text and lines
-        0x00808080, // shadows
-        0x00000000, // title text
-        0x00E3E0BB, // fills
-        0x00993333, // accent
-        0x00999900, // accent and hyperlink
-        0x000099CC, // accent and followed hyperlink
+        0x00FF_FFFF, // background
+        0x0000_0000, // text and lines
+        0x0080_8080, // shadows
+        0x0000_0000, // title text
+        0x00E3_E0BB, // fills
+        0x0099_3333, // accent
+        0x0099_9900, // accent and hyperlink
+        0x0000_99CC, // accent and followed hyperlink
     ]
 }
 
-/// EndDocumentAtom builder per MS-PPT section 2.4.13
+/// `EndDocumentAtom` builder per MS-PPT section 2.4.13
+///
+/// # Panics
+///
+/// Panics if internal invariants are violated.
+#[allow(
+    clippy::expect_used,
+    reason = "`RecordBuilder::build` only fails when writing the header to its in-memory `Vec`, which cannot fail; changing this infallible public API to return `Result` would break callers"
+)]
+#[must_use]
 pub fn build_end_document_atom() -> Vec<u8> {
     let builder = RecordBuilder::new(0x00, 0, record_type::END_DOCUMENT);
     builder.build().expect("EndDocumentAtom build")
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_document_atom_size() {
-        let atom = build_document_atom(9144000, 6858000);
+        let atom = build_document_atom(9_144_000, 6_858_000);
         // 8 bytes header + 40 bytes data = 48 bytes
         assert_eq!(atom.len(), 48);
     }
@@ -175,11 +230,11 @@ mod tests {
     #[test]
     fn test_document_atom_different_sizes() {
         // Standard 4:3
-        let atom1 = build_document_atom(9144000, 6858000);
+        let atom1 = build_document_atom(9_144_000, 6_858_000);
         assert_eq!(atom1.len(), 48);
 
         // Widescreen 16:9
-        let atom2 = build_document_atom(12192000, 6858000);
+        let atom2 = build_document_atom(12_192_000, 6_858_000);
         assert_eq!(atom2.len(), 48);
 
         // Verify record type in header
@@ -189,7 +244,7 @@ mod tests {
 
     #[test]
     fn test_document_atom_content() {
-        let atom = build_document_atom(9144000, 6858000);
+        let atom = build_document_atom(9_144_000, 6_858_000);
 
         // Verify header version (should be 1 for DocumentAtom)
         let ver_inst = u16::from_le_bytes([atom[0], atom[1]]);
@@ -207,7 +262,7 @@ mod tests {
 
     #[test]
     fn test_slide_atom_size() {
-        let atom = build_slide_atom(0x80000000, 0);
+        let atom = build_slide_atom(0x8000_0000, 0);
         // 8 bytes header + 24 bytes data = 32 bytes
         assert_eq!(atom.len(), 32);
     }
@@ -215,11 +270,11 @@ mod tests {
     #[test]
     fn test_slide_atom_variations() {
         // With master reference only
-        let atom1 = build_slide_atom(0x80000000, 0);
+        let atom1 = build_slide_atom(0x8000_0000, 0);
         assert_eq!(atom1.len(), 32);
 
         // With notes reference
-        let atom2 = build_slide_atom(0x80000000, 257);
+        let atom2 = build_slide_atom(0x8000_0000, 257);
         assert_eq!(atom2.len(), 32);
 
         // Verify header version (should be 2 for SlideAtom)
@@ -230,7 +285,7 @@ mod tests {
 
     #[test]
     fn test_slide_atom_content_structure() {
-        let atom = build_slide_atom(0x80000000, 0);
+        let atom = build_slide_atom(0x8000_0000, 0);
 
         // Record type
         let rec_type = u16::from_le_bytes([atom[2], atom[3]]);
@@ -246,7 +301,7 @@ mod tests {
 
         // masterIdRef at offset 20
         let master_id = u32::from_le_bytes([atom[20], atom[21], atom[22], atom[23]]);
-        assert_eq!(master_id, 0x80000000);
+        assert_eq!(master_id, 0x8000_0000);
 
         // flags at offset 28
         let flags = u16::from_le_bytes([atom[28], atom[29]]);
@@ -332,16 +387,16 @@ mod tests {
         assert_eq!(colors.len(), 8);
 
         // Background color (white)
-        assert_eq!(colors[0], 0x00FFFFFF);
+        assert_eq!(colors[0], 0x00FF_FFFF);
 
         // Text and lines color (black)
-        assert_eq!(colors[1], 0x00000000);
+        assert_eq!(colors[1], 0x0000_0000);
 
         // Shadows (gray)
-        assert_eq!(colors[2], 0x00808080);
+        assert_eq!(colors[2], 0x0080_8080);
 
         // Title text (black)
-        assert_eq!(colors[3], 0x00000000);
+        assert_eq!(colors[3], 0x0000_0000);
     }
 
     #[test]
@@ -362,7 +417,7 @@ mod tests {
     fn test_document_atom_conversion() {
         // EMU to master units conversion
         // 914400 EMUs = 1 inch = 576 master units
-        let atom = build_document_atom(914400, 914400);
+        let atom = build_document_atom(914_400, 914_400);
 
         // After conversion, should be 576x576 master units
         let slide_w = u32::from_le_bytes([atom[8], atom[9], atom[10], atom[11]]);

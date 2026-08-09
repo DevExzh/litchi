@@ -1,9 +1,9 @@
 //! ODS row and column structural metadata.
 
 use litchi_core::{Error, Result, xml::escape_xml};
-pub(crate) const MAX_EXPANDED_ROWS_PER_SHEET: usize = 1_048_576;
-pub(crate) const MAX_EXPANDED_COLUMNS_PER_SHEET: usize = 1_048_576;
-pub(crate) const MAX_TABLE_STRUCTURE_DEPTH: usize = 256;
+pub const MAX_EXPANDED_ROWS_PER_SHEET: usize = 1_048_576;
+pub const MAX_EXPANDED_COLUMNS_PER_SHEET: usize = 1_048_576;
+pub const MAX_TABLE_STRUCTURE_DEPTH: usize = 256;
 
 /// Visibility state shared by ODF table rows and columns.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -18,7 +18,10 @@ pub enum Visibility {
 }
 
 impl Visibility {
-    pub(crate) fn parse(value: &str) -> Result<Self> {
+    /// # Errors
+    ///
+    /// Returns an error when the input is malformed or exceeds the parser's resource limits.
+    pub fn parse(value: &str) -> Result<Self> {
         match value {
             "visible" => Ok(Self::Visible),
             "collapse" => Ok(Self::Collapse),
@@ -29,7 +32,8 @@ impl Visibility {
         }
     }
 
-    pub(crate) fn as_str(self) -> &'static str {
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
         match self {
             Self::Visible => "visible",
             Self::Collapse => "collapse",
@@ -105,11 +109,17 @@ impl PrintSettings {
     }
 }
 
-pub(crate) fn validate_sheet_print_settings(settings: &PrintSettings) -> Result<()> {
+/// # Errors
+///
+/// Returns an error when a value violates the format or resource constraints.
+pub fn validate_sheet_print_settings(settings: &PrintSettings) -> Result<()> {
     validate_cell_range_addresses(&settings.ranges)
 }
 
-pub(crate) fn write_sheet_formatting_attributes(
+/// # Errors
+///
+/// Returns an error when the value cannot be serialized.
+pub fn write_sheet_formatting_attributes(
     out: &mut String,
     style: &Style,
     print: &PrintSettings,
@@ -266,7 +276,7 @@ pub enum Structure {
 }
 
 #[derive(Clone, Copy)]
-pub(crate) enum TableStructureAxis {
+pub enum TableStructureAxis {
     Rows,
     Columns,
 }
@@ -287,7 +297,14 @@ impl TableStructureAxis {
     }
 }
 
-pub(crate) fn write_table_structure(
+/// # Errors
+///
+/// Returns an error when the value cannot be serialized.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "the codec entry point keeps its historical element-qualified name"
+)]
+pub fn write_table_structure(
     out: &mut String,
     structure: &[Structure],
     total: usize,
@@ -314,7 +331,14 @@ pub(crate) fn write_table_structure(
     Ok(())
 }
 
-pub(crate) fn validate_table_structure(
+/// # Errors
+///
+/// Returns an error when a value violates the format or resource constraints.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "the codec entry point keeps its historical element-qualified name"
+)]
+pub fn validate_table_structure(
     structure: &[Structure],
     axis: TableStructureAxis,
 ) -> Result<usize> {
@@ -420,7 +444,7 @@ fn ensure_structure_depth(depth: usize) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn write_columns(out: &mut String, columns: &[Column]) {
+pub fn write_columns(out: &mut String, columns: &[Column]) {
     let mut start = 0usize;
     while start < columns.len() {
         let column = &columns[start];
@@ -458,7 +482,7 @@ pub(crate) fn write_columns(out: &mut String, columns: &[Column]) {
     }
 }
 
-pub(crate) fn write_row_attributes(
+pub fn write_row_attributes(
     out: &mut String,
     style_name: Option<&str>,
     default_cell_style_name: Option<&str>,

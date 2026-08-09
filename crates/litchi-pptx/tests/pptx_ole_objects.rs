@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use litchi_opc::constants::{
     content_type::{OFC_OLE_OBJECT, OFC_PACKAGE},
     relationship_type::{OLE_OBJECT, PACKAGE},

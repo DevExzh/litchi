@@ -1,4 +1,4 @@
-//! Typed PowerPoint Open XML documents.
+//! Typed `PowerPoint` Open XML documents.
 //!
 //! The crate is being extracted one semantic capability at a time. The
 //! backgrounds module owns package-independent slide-background values and
@@ -42,6 +42,13 @@ pub mod tag;
 pub mod time;
 pub mod transition;
 pub mod view_properties;
+/// Inert Office Add-in and persisted task-pane metadata.
+///
+/// This module exposes the bounded MS-OWEXML value model used by
+/// [`Package::task_panes`]. Add-ins are retained as document data only:
+/// external references, bindings, and snapshots are never contacted or
+/// executed.
+pub mod web;
 pub mod writer;
 
 pub(crate) mod resources;

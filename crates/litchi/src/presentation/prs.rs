@@ -109,7 +109,7 @@ impl Presentation {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         #[cfg(feature = "pptx")]
         {
-            return Self::open_with_limits(path, crate::pptx::ReadLimits::default());
+            Self::open_with_limits(path, crate::pptx::ReadLimits::default())
         }
 
         #[cfg(not(feature = "pptx"))]
@@ -172,7 +172,7 @@ impl Presentation {
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         #[cfg(feature = "pptx")]
         {
-            return Self::from_bytes_with_limits(bytes, crate::pptx::ReadLimits::default());
+            Self::from_bytes_with_limits(bytes, crate::pptx::ReadLimits::default())
         }
 
         #[cfg(not(feature = "pptx"))]
@@ -276,7 +276,10 @@ impl Presentation {
                 })
             },
             // Handle mismatched formats
-            #[allow(unreachable_patterns)]
+            #[allow(
+                unreachable_patterns,
+                reason = "match arms are feature-gated; the fallback is unreachable when every format feature is enabled"
+            )]
             _ => Err(Error::InvalidFormat(
                 "Detected format is not a presentation format or feature not enabled".to_string(),
             )),

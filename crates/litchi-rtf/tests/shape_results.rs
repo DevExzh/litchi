@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{LegacyDrawingPrimitive, RtfDocument, RtfWriter, Shape, ShapeType};
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
@@ -25,7 +34,7 @@ fn parses_real_libreoffice_legacy_shape_result_and_round_trips_canonically() {
         LegacyDrawingPrimitive::Line { .. }
     ));
 
-    let mut document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     let mut shape = Shape::new(ShapeType::Line);
     shape.result = Some(result.clone());
     document.set_background_shape(shape).unwrap();
@@ -43,7 +52,7 @@ fn parses_real_libreoffice_legacy_shape_result_and_round_trips_canonically() {
 #[test]
 fn accepts_text_only_producer_result_without_leaking_or_misrepresenting_it() {
     let document = RtfDocument::parse(
-        r#"{\rtf1 A{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 1}}}{\shprslt\par\pard fallback}}B}"#,
+        r"{\rtf1 A{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 1}}}{\shprslt\par\pard fallback}}B}",
     )
     .unwrap();
     assert_eq!(document.text(), "AB");
@@ -53,15 +62,15 @@ fn accepts_text_only_producer_result_without_leaking_or_misrepresenting_it() {
 #[test]
 fn rejects_hostile_shape_result_grammar() {
     for source in [
-        r#"{\rtf1{\*\shprslt{\*\do\dobxpage\dobypage\dodhgt0\dpline\dpptx0\dppty0\dpptx1\dppty1\dpx0\dpy0\dpxsize1\dpysize1}}}"#,
-        r#"{\rtf1{\shprslt text}}"#,
-        r#"{\rtf1{\shp{\*\shprslt1{\*\do\dobxpage\dobypage\dodhgt0\dpline\dpptx0\dppty0\dpptx1\dppty1\dpx0\dpy0\dpxsize1\dpysize1}}}}"#,
-        r#"{\rtf1{\shp\shprslt text}}"#,
-        r#"{\rtf1{\shpgrp{\shp{\*\shprslt{\*\do\dobxpage\dobypage\dodhgt0\dpline\dpptx0\dppty0\dpptx1\dppty1\dpx0\dpy0\dpxsize1\dpysize1}}}}}"#,
-        r#"{\rtf1{\shp{\*\shprslt{\*\do\dobxpage\dobypage\dodhgt0\dpline\dpptx0\dppty0\dpptx1\dppty1\dpx0\dpy0\dpxsize1\dpysize1}}{\*\shprslt text}}}"#,
-        r#"{\rtf1{\shp{\*\shprslt{\do\dobxpage\dobypage\dodhgt0\dpline\dpptx0\dppty0\dpptx1\dppty1\dpx0\dpy0\dpxsize1\dpysize1}}}}"#,
-        r#"{\rtf1{\shp{\*\shprslt{\*\do\dobxpage\dobypage\dodhgt0\dpline\dpptx0\dppty0\dpptx1\dppty1\dpx0\dpy0\dpxsize1\dpysize1} trailing}}}"#,
-        r#"{\rtf1{\shp{\*\shprslt{\*\do\dobxpage\dobypage\dodhgt0\dpline\dpptx0\dppty0\dpptx1\dppty1\dpx0\dpy0\dpxsize1\dpysize1}}{\sp{\sn x}{\sv 1}}}}"#,
+        r"{\rtf1{\*\shprslt{\*\do\dobxpage\dobypage\dodhgt0\dpline\dpptx0\dppty0\dpptx1\dppty1\dpx0\dpy0\dpxsize1\dpysize1}}}",
+        r"{\rtf1{\shprslt text}}",
+        r"{\rtf1{\shp{\*\shprslt1{\*\do\dobxpage\dobypage\dodhgt0\dpline\dpptx0\dppty0\dpptx1\dppty1\dpx0\dpy0\dpxsize1\dpysize1}}}}",
+        r"{\rtf1{\shp\shprslt text}}",
+        r"{\rtf1{\shpgrp{\shp{\*\shprslt{\*\do\dobxpage\dobypage\dodhgt0\dpline\dpptx0\dppty0\dpptx1\dppty1\dpx0\dpy0\dpxsize1\dpysize1}}}}}",
+        r"{\rtf1{\shp{\*\shprslt{\*\do\dobxpage\dobypage\dodhgt0\dpline\dpptx0\dppty0\dpptx1\dppty1\dpx0\dpy0\dpxsize1\dpysize1}}{\*\shprslt text}}}",
+        r"{\rtf1{\shp{\*\shprslt{\do\dobxpage\dobypage\dodhgt0\dpline\dpptx0\dppty0\dpptx1\dppty1\dpx0\dpy0\dpxsize1\dpysize1}}}}",
+        r"{\rtf1{\shp{\*\shprslt{\*\do\dobxpage\dobypage\dodhgt0\dpline\dpptx0\dppty0\dpptx1\dppty1\dpx0\dpy0\dpxsize1\dpysize1} trailing}}}",
+        r"{\rtf1{\shp{\*\shprslt{\*\do\dobxpage\dobypage\dodhgt0\dpline\dpptx0\dppty0\dpptx1\dppty1\dpx0\dpy0\dpxsize1\dpysize1}}{\sp{\sn x}{\sv 1}}}}",
     ] {
         assert!(
             RtfDocument::parse(source).is_err(),
@@ -72,13 +81,13 @@ fn rejects_hostile_shape_result_grammar() {
 
 #[test]
 fn enforces_typed_nested_position_invariant() {
-    let source = r#"{\rtf1{\shp{\*\shprslt{\*\do\dobxpage\dobypage\dodhgt0\dpline\dpptx0\dppty0\dpptx1\dppty1\dpx0\dpy0\dpxsize1\dpysize1}}}}"#;
+    let source = r"{\rtf1{\shp{\*\shprslt{\*\do\dobxpage\dobypage\dodhgt0\dpline\dpptx0\dppty0\dpptx1\dppty1\dpx0\dpy0\dpxsize1\dpysize1}}}}";
     let document = RtfDocument::parse(source).unwrap();
     let mut result = document.shapes()[0].result.clone().unwrap();
     result.drawing.position = 1;
     assert!(result.validate().is_err());
 
-    let mut target = RtfDocument::parse(r#"{\rtf1}"#).unwrap();
+    let mut target = RtfDocument::parse(r"{\rtf1}").unwrap();
     let mut shape = Shape::new(ShapeType::Line);
     shape.result = Some(result);
     assert!(target.set_background_shape(shape).is_err());

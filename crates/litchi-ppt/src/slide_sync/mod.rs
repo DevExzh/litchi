@@ -1,4 +1,4 @@
-//! Layered PowerPoint 12 slide-library synchronization owner.
+//! Layered `PowerPoint` 12 slide-library synchronization owner.
 //!
 //! The owner keeps the binary record graph and the synchronization vocabulary
 //! separate. [`Snapshot`] captures one complete slide record, while

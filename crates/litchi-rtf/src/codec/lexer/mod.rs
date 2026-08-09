@@ -8,4 +8,4 @@ mod codec;
 #[cfg(test)]
 mod tests;
 
-pub use codec::{CharacterSet, ControlWord, Lexer, Token};
+pub(crate) use codec::{ControlWord, Lexer, Token};

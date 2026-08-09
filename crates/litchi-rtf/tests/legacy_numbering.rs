@@ -1,10 +1,19 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{LegacyNumberingAlignment, LegacyNumberingFormat, RtfDocument, RtfWriter};
 
-const SYNTHETIC: &str = r#"{\rtf1\ansi\ansicpg1250
+const SYNTHETIC: &str = r"{\rtf1\ansi\ansicpg1250
 {\*\pnseclvl1\pnucrm\pnqc\pnstart3\pnindent720\pnsp144\pnhang\pnprev\pnf2
 {\pntxtb \'8a(}{\pntxta )\u20320?}}
 {\*\pnseclvl2\pndec\pnstart1\pnindent360{\pntxta .}}
-Body}"#;
+Body}";
 
 #[test]
 fn parses_decodes_and_round_trips_legacy_section_numbering() {
@@ -40,14 +49,14 @@ fn parses_decodes_and_round_trips_legacy_section_numbering() {
 #[test]
 fn rejects_malformed_legacy_section_numbering() {
     let malformed = [
-        r#"{\rtf1{\pnseclvl1\pndec}}"#,
-        r#"{\rtf1{\*\pnseclvl0\pndec}}"#,
-        r#"{\rtf1{\*\pnseclvl1\pndec}{\*\pnseclvl1\pndec}}"#,
-        r#"{\rtf1{\*\pnseclvl2\pndec}{\*\pnseclvl1\pndec}}"#,
-        r#"{\rtf1{\*\pnseclvl1\pnstart1}}"#,
-        r#"{\rtf1{\*\pnseclvl1\pndec{\pntxta X}{\pntxta Y}}}"#,
-        r#"{\rtf1{\*\pnseclvl1\pndec{\pntxta {\field X}}}}"#,
-        r#"{\rtf1 Body{\*\pnseclvl1\pndec}}"#,
+        r"{\rtf1{\pnseclvl1\pndec}}",
+        r"{\rtf1{\*\pnseclvl0\pndec}}",
+        r"{\rtf1{\*\pnseclvl1\pndec}{\*\pnseclvl1\pndec}}",
+        r"{\rtf1{\*\pnseclvl2\pndec}{\*\pnseclvl1\pndec}}",
+        r"{\rtf1{\*\pnseclvl1\pnstart1}}",
+        r"{\rtf1{\*\pnseclvl1\pndec{\pntxta X}{\pntxta Y}}}",
+        r"{\rtf1{\*\pnseclvl1\pndec{\pntxta {\field X}}}}",
+        r"{\rtf1 Body{\*\pnseclvl1\pndec}}",
     ];
     for source in malformed {
         assert!(

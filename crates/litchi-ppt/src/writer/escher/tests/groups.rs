@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::*;
 
 use crate::writer::shapes::shape_type;
@@ -7,7 +13,7 @@ use litchi_odraw::{Container, Parser, RecordKind};
 fn nested_group_emits_ms_odraw_shape_topology_and_ids() {
     let child = UserShapeData {
         shape_type: shape_type::RECTANGLE,
-        fill_color: Some(0x0000FF00),
+        fill_color: Some(0x0000_FF00),
         ..Default::default()
     };
     let nested_child = GroupShape::nested(

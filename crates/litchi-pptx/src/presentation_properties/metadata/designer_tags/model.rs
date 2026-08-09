@@ -19,30 +19,35 @@ pub struct Binding {
 impl Binding {
     /// Return the presentation relationship ID stored on `p:sldId`.
     #[inline]
+    #[must_use]
     pub fn relationship_id(&self) -> &str {
         &self.relationship_id
     }
 
     /// Return the relationship type exactly as stored in the OPC graph.
     #[inline]
+    #[must_use]
     pub fn relationship_type(&self) -> &str {
         &self.relationship_type
     }
 
     /// Return the relationship target exactly as stored in the OPC graph.
     #[inline]
+    #[must_use]
     pub fn relationship_target(&self) -> &str {
         &self.relationship_target
     }
 
     /// Return the normalized related slide-part name.
     #[inline]
+    #[must_use]
     pub fn part_name(&self) -> &str {
         &self.part_name
     }
 
     /// Return the related slide-part content type.
     #[inline]
+    #[must_use]
     pub fn part_content_type(&self) -> &str {
         &self.part_content_type
     }
@@ -68,12 +73,20 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Load one stable slide-ID owner under safe default bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     #[inline]
     pub fn load(package: &litchi_opc::OpcPackage, slide_id: u32) -> Result<Self> {
         super::load_snapshot(package, slide_id)
     }
 
     /// Load one stable slide-ID owner under caller-supplied bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     #[inline]
     pub fn load_with_limits(
         package: &litchi_opc::OpcPackage,
@@ -85,29 +98,37 @@ impl Snapshot {
 
     /// Return the stable `p:sldId/@id` key.
     #[inline]
+    #[must_use]
     pub const fn slide_id(&self) -> u32 {
         self.slide_id
     }
 
     /// Return the validated relationship/part binding.
     #[inline]
+    #[must_use]
     pub fn binding(&self) -> &Binding {
         &self.binding
     }
 
     /// Return the number of matching outer extension entries.
     #[inline]
+    #[must_use]
     pub fn occurrence_count(&self) -> usize {
         self.occurrences.len()
     }
 
     /// Iterate over every matching extension in source order.
     #[inline]
+    #[must_use]
     pub fn occurrences(&self) -> impl ExactSizeIterator<Item = &Tags> {
         self.occurrences.iter()
     }
 
     /// Return the optional singular tag list, refusing duplicate extensions.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn tags(&self) -> Result<Option<&Tags>> {
         match self.occurrences.as_slice() {
             [] => Ok(None),
@@ -118,17 +139,23 @@ impl Snapshot {
 
     /// Borrow the exact owning presentation XML captured by this snapshot.
     #[inline]
+    #[must_use]
     pub fn source_xml(&self) -> &[u8] {
         self.source_xml.as_slice()
     }
 
     /// Return the selected-host revision used for optimistic stale checks.
     #[inline]
+    #[must_use]
     pub const fn revision(&self) -> super::Revision {
         self.revision
     }
 
     /// Consume this source-bound snapshot into an isolated edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn edit(self) -> Result<Edit> {
         if self.occurrences.len() > 1 {
             return Err(ambiguous(self.occurrences.len()));

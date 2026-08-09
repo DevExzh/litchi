@@ -1,11 +1,10 @@
-use super::*;
+use super::{
+    Bump, ColorTable, ControlWord, Cow, DrawingStoryCapture, FontTable, HashMap, ParseLimits,
+    ParsedDocument, Parser, Range, RefCell, RtfError, RtfResult, SmallVec, State, Token,
+    control_symbol_text,
+};
 
 impl<'a> Parser<'a> {
-    /// Create a new parser.
-    pub fn new(tokens: &'a [Token<'a>], arena: &'a Bump) -> Self {
-        Self::new_inner(tokens, None, None, arena, ParseLimits::default())
-    }
-
     pub(crate) fn new_with_source(
         tokens: &'a [Token<'a>],
         token_spans: &'a [Range<usize>],
@@ -235,13 +234,12 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse the token stream into a document.
-    pub fn parse(mut self) -> RtfResult<ParsedDocument<'a>> {
+    pub(crate) fn parse(mut self) -> RtfResult<ParsedDocument<'a>> {
         // Validate document structure
-        if self.tokens.is_empty() {
-            return Err(RtfError::MalformedDocument(
-                "Empty token stream".to_string(),
-            ));
-        }
+        #[allow(
+            clippy::struct_excessive_bools,
+            reason = "independent RTF feature flags stay flat for direct access"
+        )]
         #[derive(Clone, Copy)]
         struct NoteGuardContext {
             body_flow: bool,
@@ -252,6 +250,11 @@ impl<'a> Parser<'a> {
             inert_section_format: bool,
         }
 
+        if self.tokens.is_empty() {
+            return Err(RtfError::MalformedDocument(
+                "Empty token stream".to_string(),
+            ));
+        }
         let mut contexts: Vec<NoteGuardContext> = Vec::new();
         for (index, token) in self.tokens.iter().enumerate() {
             match token {
@@ -438,7 +441,7 @@ impl<'a> Parser<'a> {
                             .to_string(),
                     ));
                 },
-                _ => {},
+                Token::Control(_) | Token::Text(_) | Token::Binary(_) => {},
             }
         }
 

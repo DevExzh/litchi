@@ -467,7 +467,8 @@ pub(super) fn bump_graph_link(scanned: &mut usize) -> Result<()> {
 }
 
 pub(super) fn xml_position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position()).map_err(|_| invalid("tag-owner XML offset overflow"))
+    usize::try_from(reader.buffer_position())
+        .map_err(|_err| invalid("tag-owner XML offset overflow"))
 }
 
 pub(super) fn bump_owner_node(nodes: &mut usize) -> Result<()> {

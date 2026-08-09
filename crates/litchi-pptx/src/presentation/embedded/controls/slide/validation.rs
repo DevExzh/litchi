@@ -1,4 +1,4 @@
-//! Shared bounds for detached ActiveX control transactions.
+//! Shared bounds for detached `ActiveX` control transactions.
 
 use super::super::{MAX_BINARY_BYTES, MAX_SLIDE_XML_BYTES};
 use crate::presentation::embedded::{MAX_ATTRIBUTE_BYTES, invalid, limit};

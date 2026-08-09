@@ -95,6 +95,9 @@ impl Default for PageBorder {
 }
 
 impl PageBorder {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if self.width > 75 {
             return invalid("RTF page-border width must be in 0..=75 twips");
@@ -164,6 +167,7 @@ impl PageBorders {
             && !self.surround_footer
             && !self.snap_to_text_borders
     }
+    #[must_use]
     pub fn get(&self, side: PageBorderSide) -> Option<&PageBorder> {
         match side {
             PageBorderSide::Top => self.top.as_ref(),
@@ -180,6 +184,7 @@ impl PageBorders {
             PageBorderSide::Right => &mut self.right,
         } = Some(border);
     }
+    #[must_use]
     pub fn option_value(&self) -> i32 {
         let applies = match self.applies_to {
             PageBorderAppliesTo::AllSectionPages => 0,
@@ -197,6 +202,9 @@ impl PageBorders {
                 PageBorderOffset::Page => 32,
             }
     }
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_option_value(&mut self, value: i32) -> RtfResult<()> {
         if !(0..=255).contains(&value) || value & !0x2b != 0 {
             return invalid("RTF pgbrdropt contains reserved or out-of-range bits");
@@ -220,6 +228,9 @@ impl PageBorders {
         };
         Ok(())
     }
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         for border in [self.top, self.left, self.bottom, self.right]
             .into_iter()

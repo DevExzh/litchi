@@ -1,6 +1,6 @@
 //! Document information extracted from PPT Document records.
 //!
-//! Based on POI's Document and DocumentAtom record parsing.
+//! Based on POI's Document and `DocumentAtom` record parsing.
 
 /// Information extracted from a Document record.
 #[derive(Debug, Clone, Default)]
@@ -21,6 +21,6 @@ pub struct DocumentInfo {
     pub handout_master_persist_id_ref: u32,
     /// Whether the document has an Environment record
     pub has_environment: bool,
-    /// Whether the document has a PPDrawingGroup record
+    /// Whether the document has a `PPDrawingGroup` record
     pub has_drawing_group: bool,
 }

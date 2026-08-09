@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{FormFieldType, RtfDocument, RtfWriter};
 
 const SYNTHETIC: &str = concat!(
@@ -44,28 +53,28 @@ fn parses_typed_properties_and_round_trips_inertly() {
 
 fn wrap_formfield(properties: &str) -> String {
     format!(
-        r#"{{\rtf1{{\field{{\*\fldinst FORMTEXT{{\*\formfield{{{properties}}}}}}}}}{{\fldrslt x}}}}}}"#
+        r"{{\rtf1{{\field{{\*\fldinst FORMTEXT{{\*\formfield{{{properties}}}}}}}}}{{\fldrslt x}}}}}}"
     )
 }
 
 #[test]
 fn rejects_wrong_order_kind_bounds_duplicates_and_active_content() {
     let malformed = [
-        r#"\fftype0\ffmaxlen-1"#,
-        r#"\fftype0\ffmaxlen65536"#,
-        r#"\fftype0\ffmaxlen1\ffmaxlen2"#,
-        r#"\fftype0\ffprot\ffprot0"#,
-        r#"\fftype0\ffrecalc\ffrecalc0"#,
-        r#"\fftype0\ffsize"#,
-        r#"\fftype1\ffmaxlen4"#,
-        r#"\fftype1{\*\ffformat x}"#,
-        r#"\fftype1{\*\ffdeftext x}"#,
-        r#"\fftype2\ffhaslistbox{\*\ffl x}\ffsize"#,
-        r#"\fftype0{\*\ffformat x}{\*\ffformat y}"#,
-        r#"\fftype0{\ffformat x}"#,
-        r#"\fftype0{\*\ffformat{\field danger}}"#,
-        r#"\fftype0{\*\ffdeftext{\object danger}}"#,
-        r#"\fftype0{\*\ffformat\bin2 xx}"#,
+        r"\fftype0\ffmaxlen-1",
+        r"\fftype0\ffmaxlen65536",
+        r"\fftype0\ffmaxlen1\ffmaxlen2",
+        r"\fftype0\ffprot\ffprot0",
+        r"\fftype0\ffrecalc\ffrecalc0",
+        r"\fftype0\ffsize",
+        r"\fftype1\ffmaxlen4",
+        r"\fftype1{\*\ffformat x}",
+        r"\fftype1{\*\ffdeftext x}",
+        r"\fftype2\ffhaslistbox{\*\ffl x}\ffsize",
+        r"\fftype0{\*\ffformat x}{\*\ffformat y}",
+        r"\fftype0{\ffformat x}",
+        r"\fftype0{\*\ffformat{\field danger}}",
+        r"\fftype0{\*\ffdeftext{\object danger}}",
+        r"\fftype0{\*\ffformat\bin2 xx}",
     ];
     for properties in malformed {
         let source = wrap_formfield(properties);
@@ -75,7 +84,7 @@ fn rejects_wrong_order_kind_bounds_duplicates_and_active_content() {
         );
     }
 
-    let unstarred = r#"{\rtf1{\field{\*\fldinst FORMTEXT{\formfield{\fftype0}}}{\fldrslt x}}}"#;
+    let unstarred = r"{\rtf1{\field{\*\fldinst FORMTEXT{\formfield{\fftype0}}}{\fldrslt x}}}";
     assert!(RtfDocument::parse(unstarred).is_err());
 }
 
@@ -118,7 +127,7 @@ fn parses_bundled_libreoffice_extended_formfield() {
         cursor = end;
     };
     let group = std::str::from_utf8(&fixture[start..end]).unwrap();
-    let source = format!(r#"{{\rtf1\ansi{{\field{{\*\fldinst FORMTEXT{group}}}{{\fldrslt x}}}}}}"#);
+    let source = format!(r"{{\rtf1\ansi{{\field{{\*\fldinst FORMTEXT{group}}}{{\fldrslt x}}}}}}");
     let document = RtfDocument::parse(&source).unwrap();
     let field = &document.form_fields()[0];
     assert_eq!(field.field_type, FormFieldType::Text);

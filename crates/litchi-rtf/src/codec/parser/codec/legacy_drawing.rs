@@ -1,9 +1,16 @@
-use super::*;
+use super::{
+    ControlWord, Cow, Destination, LegacyPropertiesBuilder, LegacySimpleKind, LegacyTextBoxBuilder,
+    Parser, RtfError, RtfResult, Token, control_symbol_text, require_parameterless,
+};
 
 impl<'a> Parser<'a> {
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn apply_legacy_text_box_control(
         builder: &mut LegacyTextBoxBuilder,
-        control: &ControlWord,
+        control: &ControlWord<'_>,
     ) -> RtfResult<bool> {
         macro_rules! set_once {
             ($slot:expr, $value:expr, $name:literal) => {{
@@ -111,7 +118,7 @@ impl<'a> Parser<'a> {
                         )
                     })?;
                     let text_box = crate::LegacyTextBox {
-                        text: Cow::Borrowed(self.arena.alloc_str(&text) as &str),
+                        text: Cow::Borrowed(self.arena.alloc_str(&text)),
                         shapes: std::mem::take(&mut builder.shapes).into_iter().collect(),
                         shape_groups: std::mem::take(&mut builder.shape_groups)
                             .into_iter()
@@ -434,7 +441,7 @@ impl<'a> Parser<'a> {
                     Some(matches!(control, ControlWord::LegacyTextBox))
                 },
                 Token::CloseBrace => Some(false),
-                _ => None,
+                Token::OpenBrace | Token::Control(_) | Token::Text(_) | Token::Binary(_) => None,
             })
             .unwrap_or(false)
     }
@@ -498,7 +505,7 @@ impl<'a> Parser<'a> {
                     "vertical anchor",
                 )?,
                 Some(Token::Control(ControlWord::LegacyDrawingHeight(value))) => {
-                    Self::set_legacy_once(&mut z_order, *value, "z-order")?
+                    Self::set_legacy_once(&mut z_order, *value, "z-order")?;
                 },
                 Some(Token::Control(ControlWord::LegacyDrawingLock)) => {
                     if locked {
@@ -672,7 +679,11 @@ impl<'a> Parser<'a> {
                 })
             },
             Token::Control(ControlWord::LegacyTextBox) => self.parse_nested_legacy_text_box(),
-            _ => Err(Self::legacy_error("expected a drawing primitive")),
+            Token::OpenBrace
+            | Token::CloseBrace
+            | Token::Control(_)
+            | Token::Text(_)
+            | Token::Binary(_) => Err(Self::legacy_error("expected a drawing primitive")),
         }
     }
 
@@ -683,7 +694,7 @@ impl<'a> Parser<'a> {
         self.skip_legacy_whitespace();
         let declared = match self.tokens.get(self.pos) {
             Some(Token::Control(ControlWord::LegacyDrawingCount(value))) if *value > 0 => {
-                usize::try_from(*value).map_err(|_| Self::legacy_error("invalid dpcount"))?
+                usize::try_from(*value).map_err(|_err| Self::legacy_error("invalid dpcount"))?
             },
             _ => return Err(Self::legacy_error("dpgroup lacks positive dpcount")),
         };
@@ -698,7 +709,7 @@ impl<'a> Parser<'a> {
                     break;
                 },
                 Some(Token::Control(control)) if Self::legacy_primitive_start(control) => {
-                    children.push(self.parse_legacy_primitive(depth + 1)?)
+                    children.push(self.parse_legacy_primitive(depth + 1)?);
                 },
                 Some(_) => return Err(Self::legacy_error("invalid content in dpgroup")),
                 None => return Err(RtfError::UnexpectedEof),
@@ -729,7 +740,7 @@ impl<'a> Parser<'a> {
         self.skip_legacy_whitespace();
         let count = match self.tokens.get(self.pos) {
             Some(Token::Control(ControlWord::LegacyDrawingCount(value))) => usize::try_from(*value)
-                .map_err(|_| Self::legacy_error("invalid polyline point count"))?,
+                .map_err(|_err| Self::legacy_error("invalid polyline point count"))?,
             _ => return Err(Self::legacy_error("dppolyline lacks dppolycount")),
         };
         if count == 0 || count > crate::MAX_LEGACY_DRAWING_POINTS {
@@ -839,11 +850,11 @@ impl<'a> Parser<'a> {
         }
         let geometry = self.parse_legacy_geometry()?;
         let properties = self.parse_legacy_properties_until_boundary()?;
-        let text = text.ok_or_else(|| Self::legacy_error("text box lacks dptxbxtext"))?;
-        self.legacy_text_box_text_bytes =
-            self.legacy_text_box_text_bytes
-                .checked_add(text.len())
-                .ok_or_else(|| Self::legacy_error("text-box text size overflow"))?;
+        let box_text = text.ok_or_else(|| Self::legacy_error("text box lacks dptxbxtext"))?;
+        self.legacy_text_box_text_bytes = self
+            .legacy_text_box_text_bytes
+            .checked_add(box_text.len())
+            .ok_or_else(|| Self::legacy_error("text-box text size overflow"))?;
         if self.legacy_text_box_text_bytes > crate::legacy_text_box::MAX_LEGACY_TEXT_BOX_TOTAL_BYTES
         {
             return Err(Self::legacy_error(
@@ -851,7 +862,7 @@ impl<'a> Parser<'a> {
             ));
         }
         let text_box = crate::LegacyTextBox {
-            text: Cow::Borrowed(self.arena.alloc_str(&text)),
+            text: Cow::Borrowed(self.arena.alloc_str(&box_text)),
             shapes,
             shape_groups,
             drawing_order,
@@ -898,12 +909,12 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Some(Token::Control(ControlWord::LegacyCalloutAngle(value))) => {
-                    let value = u8::try_from(*value)
-                        .map_err(|_| Self::legacy_error("invalid callout angle"))?;
-                    if !matches!(value, 0 | 30 | 45 | 60 | 90) {
+                    let parsed_angle = u8::try_from(*value)
+                        .map_err(|_err| Self::legacy_error("invalid callout angle"))?;
+                    if !matches!(parsed_angle, 0 | 30 | 45 | 60 | 90) {
                         return Err(Self::legacy_error("invalid callout angle"));
                     }
-                    Self::set_legacy_once(&mut angle, value, "callout angle")?;
+                    Self::set_legacy_once(&mut angle, parsed_angle, "callout angle")?;
                     self.pos += 1;
                 },
                 Some(Token::Control(ControlWord::LegacyCalloutAttachment(value))) => {

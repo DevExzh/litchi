@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::codec::{add_anchor, load, put, remove, remove_anchor, scan_layout, selected_raw_span};
 use super::validation::P14;
 use crate::tag::Tag;

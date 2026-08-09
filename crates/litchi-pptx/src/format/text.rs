@@ -1,6 +1,6 @@
 //! Text run styling values used by shape writers.
 
-/// Optional styling applied to one PresentationML text run.
+/// Optional styling applied to one `PresentationML` text run.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TextFormat {
     /// Font family.

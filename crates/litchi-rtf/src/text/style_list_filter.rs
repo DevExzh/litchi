@@ -12,6 +12,9 @@ pub enum DocumentStyleSortMethod {
 }
 
 impl DocumentStyleSortMethod {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn from_rtf_value(value: i32) -> RtfResult<Self> {
         match value {
             0 => Ok(Self::Name),
@@ -25,6 +28,7 @@ impl DocumentStyleSortMethod {
         }
     }
 
+    #[must_use]
     pub fn rtf_value(self) -> i32 {
         self as i32
     }
@@ -60,7 +64,9 @@ impl DocumentStyleListFilter {
     pub const ALTERNATE_STYLE_NAMES: Self = Self(0x8000, false);
 
     const RESERVED_BITS: u16 = 0x0010;
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn from_bits(bits: u16) -> RtfResult<Self> {
         if bits & Self::RESERVED_BITS != 0 {
             return Err(RtfError::MalformedDocument(
@@ -74,18 +80,25 @@ impl DocumentStyleListFilter {
         Self(bits, bits & Self::RESERVED_BITS != 0)
     }
 
+    #[must_use]
     pub fn bits(self) -> u16 {
         self.0
     }
+    #[must_use]
     pub fn is_empty(self) -> bool {
         self.0 == 0
     }
+    #[must_use]
     pub fn contains(self, filter: Self) -> bool {
         self.0 & filter.0 == filter.0
     }
+    #[must_use]
     pub fn union(self, filter: Self) -> Self {
         Self(self.0 | filter.0, false)
     }
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(self) -> RtfResult<()> {
         Self::from_bits(self.0).map(|_| ())
     }

@@ -13,6 +13,10 @@ use crate::{Error, Result};
 const PRESENTATION_PART: &str = "/ppt/presentation.xml";
 
 /// Load a singular optional tag list under safe default bounds.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load(package: &OpcPackage, slide_id: u32) -> Result<Option<Tags>> {
     let snapshot = load_snapshot(package, slide_id)?;
     snapshot
@@ -22,11 +26,19 @@ pub fn load(package: &OpcPackage, slide_id: u32) -> Result<Option<Tags>> {
 }
 
 /// Load a source-bound inventory under safe default bounds.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load_snapshot(package: &OpcPackage, slide_id: u32) -> Result<Snapshot> {
     load_snapshot_with_limits(package, slide_id, Limits::default())
 }
 
 /// Load a source-bound inventory under caller-supplied bounds.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load_snapshot_with_limits(
     package: &OpcPackage,
     slide_id: u32,
@@ -65,6 +77,10 @@ pub fn load_snapshot_with_limits(
 }
 
 /// Store a singular tag list atomically and return the previous value.
+///
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn store(package: &mut OpcPackage, slide_id: u32, value: &Tags) -> Result<Option<Tags>> {
     let limits = Limits::default();
     let value = codec::clone_tags(value, limits)?;
@@ -80,6 +96,10 @@ pub fn store(package: &mut OpcPackage, slide_id: u32, value: &Tags) -> Result<Op
 }
 
 /// Remove a singular tag list atomically and return the previous value.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn remove(package: &mut OpcPackage, slide_id: u32) -> Result<Option<Tags>> {
     let snapshot = load_snapshot(package, slide_id)?;
     let previous = snapshot
@@ -96,6 +116,10 @@ pub fn remove(package: &mut OpcPackage, slide_id: u32) -> Result<Option<Tags>> {
 }
 
 /// Apply a committed edit atomically.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
     apply_patch(package, commit.patch())
 }
@@ -105,6 +129,10 @@ pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot
 /// Reordering sibling `p:sldId` elements is allowed because the source check
 /// is scoped to the selected host. Deletion, rebinding, duplicate identity,
 /// and concurrent edits of that host are refused.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
     let current = load_snapshot_with_limits(package, patch.before.slide_id, patch.before.limits)?;
     if current.presentation_part_name != patch.before.presentation_part_name
@@ -222,7 +250,7 @@ fn revision(
     part_name: &str,
     content_type: &str,
 ) -> super::Revision {
-    let mut hash = 0xcbf29ce484222325u64;
+    let mut hash = 0xcbf2_9ce4_8422_2325u64;
     for bytes in [
         host,
         slide_id.to_le_bytes().as_slice(),
@@ -236,7 +264,7 @@ fn revision(
     ] {
         for byte in bytes {
             hash ^= u64::from(*byte);
-            hash = hash.wrapping_mul(0x100000001b3);
+            hash = hash.wrapping_mul(0x100_0000_01b3);
         }
     }
     hash

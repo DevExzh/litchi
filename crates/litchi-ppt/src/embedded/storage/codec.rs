@@ -8,7 +8,10 @@ use crate::records::Record;
 use super::model::{Compression, Kind, MAX_DECLARED_BYTES, MAX_STORED_BYTES, Ref, Storage};
 use super::snapshot::{Metadata, Snapshot};
 
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "resolver retained for pending embedded-storage call sites"
+)]
 impl<'a> Ref<'a> {
     /// Resolve one strict `ExOleObjStg` record directly from presentation bytes.
     pub(crate) fn parse_at(document: &'a [u8], offset: usize, kind: Kind) -> Result<Self> {
@@ -26,7 +29,7 @@ impl<'a> Ref<'a> {
         let stored_len = usize::try_from(u32::from_le_bytes([
             header[4], header[5], header[6], header[7],
         ]))
-        .map_err(|_| Error::Corrupted("ExOleObjStg size exceeds usize".into()))?;
+        .map_err(|_err| Error::Corrupted("ExOleObjStg size exceeds usize".into()))?;
         if version != 0 || record_type != RecordType::ExternalOleObjectStg.as_u16() {
             return corrupted("persisted storage is not a strict ExOleObjStg record");
         }
@@ -100,42 +103,44 @@ impl<'a> Ref<'a> {
                 let declared = self.declared_uncompressed_len.ok_or_else(|| {
                     Error::Corrupted("compressed ExOleObjStg is missing its size".into())
                 })?;
-                let declared = usize::try_from(declared).map_err(|_| {
+                let declared_len = usize::try_from(declared).map_err(|_err| {
                     Error::Corrupted(
                         "compressed ExOleObjStg size does not fit in memory".to_string(),
                     )
                 })?;
-                if declared > maximum {
+                if declared_len > maximum {
                     return corrupted(format!(
-                        "compressed ExOleObjStg declares {declared} bytes above the {maximum}-byte output limit"
+                        "compressed ExOleObjStg declares {declared_len} bytes above the {maximum}-byte output limit"
                     ));
                 }
                 let read_limit = maximum.checked_add(1).ok_or_else(|| {
                     Error::Corrupted("ExOleObjStg output limit overflows".to_string())
                 })?;
-                let read_limit = u64::try_from(read_limit)
-                    .map_err(|_| Error::Corrupted("ExOleObjStg output limit exceeds u64".into()))?;
+                let read_limit_u64 = u64::try_from(read_limit).map_err(|_err| {
+                    Error::Corrupted("ExOleObjStg output limit exceeds u64".into())
+                })?;
                 let decoder = flate2::read::ZlibDecoder::new(self.data);
-                let mut limited = decoder.take(read_limit);
-                let mut output = Vec::with_capacity(declared.min(64 * 1024));
+                let mut limited = decoder.take(read_limit_u64);
+                let mut output = Vec::with_capacity(declared_len.min(64 * 1024));
                 limited.read_to_end(&mut output).map_err(|error| {
                     Error::Corrupted(format!("invalid ExOleObjStg zlib payload: {error}"))
                 })?;
-                let decoder = limited.into_inner();
+                let finished_decoder = limited.into_inner();
                 if output.len() > maximum {
                     return corrupted(format!(
                         "decompressed ExOleObjStg exceeds the {maximum}-byte output limit"
                     ));
                 }
-                if output.len() != declared {
+                if output.len() != declared_len {
                     return corrupted(format!(
-                        "ExOleObjStg decompressed to {} bytes instead of declared {declared}",
+                        "ExOleObjStg decompressed to {} bytes instead of declared {declared_len}",
                         output.len()
                     ));
                 }
-                let stored_len = u64::try_from(self.data.len())
-                    .map_err(|_| Error::Corrupted("ExOleObjStg stored size exceeds u64".into()))?;
-                if decoder.total_in() != stored_len {
+                let stored_len = u64::try_from(self.data.len()).map_err(|_err| {
+                    Error::Corrupted("ExOleObjStg stored size exceeds u64".into())
+                })?;
+                if finished_decoder.total_in() != stored_len {
                     return corrupted("ExOleObjStg zlib payload has trailing bytes");
                 }
                 Ok(Cow::Owned(output))
@@ -146,11 +151,19 @@ impl<'a> Ref<'a> {
 
 impl Storage {
     /// Parse an embedded OLE-object storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(record: &Record) -> Result<Self> {
         Self::parse_as(record, Kind::OleObject)
     }
 
     /// Parse a persisted storage using its referencing record's kind.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_as(record: &Record, kind: Kind) -> Result<Self> {
         if record.version != 0
             || record.record_type_raw != RecordType::ExternalOleObjectStg.as_u16()
@@ -187,6 +200,10 @@ impl Storage {
     }
 
     /// Return the uncompressed structured-storage bytes with an explicit cap.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn decompressed_bytes(&self, maximum: usize) -> Result<Vec<u8>> {
         Ref {
             kind: self.kind,
@@ -199,18 +216,30 @@ impl Storage {
     }
 
     /// Encode the complete `ExOleObjStg` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_record(&self) -> Result<Record> {
         Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 
     /// Encode the complete record without an intermediate parsed view.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         self.snapshot().to_record_bytes()
     }
 }
 
-impl<'a> Snapshot<'a> {
+impl Snapshot<'_> {
     /// Encode the complete `ExOleObjStg` record represented by this view.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_record_bytes(self) -> Result<Vec<u8>> {
         let (instance, declared) = match self.compression() {
             Compression::Uncompressed => (0u16, None),
@@ -225,25 +254,30 @@ impl<'a> Snapshot<'a> {
         if data_len > MAX_STORED_BYTES {
             return corrupted("ExOleObjStg exceeds 128 MiB stored data");
         }
-        if let Some(declared) = declared {
-            if declared > MAX_DECLARED_BYTES {
-                return corrupted("compressed ExOleObjStg declares more than 256 MiB");
-            }
+        if let Some(declared_len) = declared
+            && declared_len > MAX_DECLARED_BYTES
+        {
+            return corrupted("compressed ExOleObjStg declares more than 256 MiB");
         }
         let length = u32::try_from(data_len)
-            .map_err(|_| Error::Corrupted("ExOleObjStg payload exceeds u32".into()))?;
+            .map_err(|_err| Error::Corrupted("ExOleObjStg payload exceeds u32".into()))?;
         let mut bytes = Vec::with_capacity(self.record_len());
         bytes.extend_from_slice(&(instance << 4).to_le_bytes());
         bytes.extend_from_slice(&RecordType::ExternalOleObjectStg.as_u16().to_le_bytes());
         bytes.extend_from_slice(&length.to_le_bytes());
-        if let Some(declared) = declared {
-            bytes.extend_from_slice(&declared.to_le_bytes());
+        if let Some(declared_len) = declared {
+            bytes.extend_from_slice(&declared_len.to_le_bytes());
         }
         bytes.extend_from_slice(self.stored_bytes());
         Ok(bytes)
     }
 
-    /// Parse the encoded view as a complete PowerPoint record.
+    /// Parse the encoded view as a complete `PowerPoint` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the view fails to serialize or if the encoded
+    /// record cannot be re-parsed.
     pub fn to_record(self) -> Result<Record> {
         Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }

@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::{Snapshot, apply_patch, load};
 use crate::presentation::embedded::controls::{
     BINARY_CONTENT_TYPE, BINARY_RELATIONSHIP, CONTROL_RELATIONSHIP, DESCRIPTOR_CONTENT_TYPE, Limits,
@@ -13,9 +19,7 @@ const BINARY: &str = "/ppt/activeX/activeX1.bin";
 
 fn package(mce: bool) -> OpcPackage {
     let controls = if mce {
-        format!(
-            r#"<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Choice Requires="v" xmlns:v="urn:schemas-microsoft-com:vml"><p:control name="ChoiceName" r:id="rIdControl" showAsIcon="0" imgW="10" imgH="20"/></mc:Choice><mc:Fallback><p:control name="FallbackName" r:id="rIdControl" showAsIcon="0" imgW="10" imgH="20"/></mc:Fallback></mc:AlternateContent>"#
-        )
+        r#"<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Choice Requires="v" xmlns:v="urn:schemas-microsoft-com:vml"><p:control name="ChoiceName" r:id="rIdControl" showAsIcon="0" imgW="10" imgH="20"/></mc:Choice><mc:Fallback><p:control name="FallbackName" r:id="rIdControl" showAsIcon="0" imgW="10" imgH="20"/></mc:Fallback></mc:AlternateContent>"#.to_string()
     } else {
         r#"<p:control name="OldName" r:id="rIdControl" showAsIcon="0" imgW="10" imgH="20"><x:opaque xmlns:x="urn:opaque">retain</x:opaque></p:control>"#.into()
     };

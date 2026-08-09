@@ -23,16 +23,28 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Load the presentation's extended-guide owner from an OPC package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn load(package: &OpcPackage) -> Result<Self> {
         super::package::load_snapshot(package)
     }
 
     /// Alias for [`Self::load`] emphasizing the source-bound result.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn read(package: &OpcPackage) -> Result<Self> {
         Self::load(package)
     }
 
     /// Parse an exact presentation XML source into a detached snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_xml(source_xml: &[u8]) -> Result<Self> {
         Self::from_wire(String::new(), String::new(), Arc::new(source_xml.to_vec()))
     }
@@ -57,42 +69,49 @@ impl Snapshot {
 
     /// Borrow the complete typed extended-guide value.
     #[inline]
+    #[must_use]
     pub fn guides(&self) -> &Guides {
         &self.guides
     }
 
     /// Alias emphasizing the semantic guide catalog.
     #[inline]
+    #[must_use]
     pub fn value(&self) -> &Guides {
         self.guides()
     }
 
     /// Return the owning presentation part name.
     #[inline]
+    #[must_use]
     pub fn presentation_part_name(&self) -> &str {
         &self.presentation_part_name
     }
 
     /// Return the source presentation content type.
     #[inline]
+    #[must_use]
     pub fn presentation_content_type(&self) -> &str {
         &self.presentation_content_type
     }
 
     /// Return the fingerprint used for stale-source checks.
     #[inline]
+    #[must_use]
     pub const fn revision(&self) -> Revision {
         self.revision
     }
 
     /// Borrow the exact presentation XML captured by this snapshot.
     #[inline]
+    #[must_use]
     pub fn source_xml(&self) -> &[u8] {
         self.source_xml.as_slice()
     }
 
     /// Start an atomic detached edit over the typed guide value.
     #[inline]
+    #[must_use]
     pub fn edit(&self) -> Transaction {
         Transaction {
             original: self.clone(),
@@ -122,35 +141,44 @@ pub struct Transaction {
 impl Transaction {
     /// Borrow the immutable source snapshot used by this edit.
     #[inline]
+    #[must_use]
     pub const fn source(&self) -> &Snapshot {
         &self.original
     }
 
     /// Borrow the currently staged guide value.
     #[inline]
+    #[must_use]
     pub fn guides(&self) -> &Guides {
         &self.working
     }
 
     /// Alias for [`Self::guides`].
     #[inline]
+    #[must_use]
     pub fn snapshot(&self) -> &Guides {
         self.guides()
     }
 
     /// Borrow one currently staged owner list.
     #[inline]
+    #[must_use]
     pub fn list(&self, kind: ListKind) -> Option<&List> {
         self.working.list(kind)
     }
 
     /// Return whether the staged typed value differs from the source.
     #[inline]
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.original.guides != self.working
     }
 
     /// Replace both owner lists after validating IDs, bounds, and opaque XML.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace(&mut self, value: Guides) -> Result<bool> {
         codec::validate_value(&value)?;
         if self.working == value {
@@ -161,6 +189,10 @@ impl Transaction {
     }
 
     /// Apply a checked mutation to the complete guide value atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn edit(&mut self, operation: impl FnOnce(&mut Guides) -> Result<()>) -> Result<()> {
         let mut candidate = self.working.clone();
         operation(&mut candidate)?;
@@ -170,6 +202,10 @@ impl Transaction {
     }
 
     /// Replace one slide or notes guide list, retaining all other metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_list(&mut self, kind: ListKind, value: Option<List>) -> Result<bool> {
         let mut candidate = self.working.clone();
         set_list(&mut candidate, kind, value);
@@ -182,6 +218,10 @@ impl Transaction {
     }
 
     /// Apply a checked mutation to one existing owner list atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn edit_list(
         &mut self,
         kind: ListKind,
@@ -197,6 +237,10 @@ impl Transaction {
     }
 
     /// Append one guide, creating the selected owner list when needed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn push(&mut self, kind: ListKind, guide: Guide) -> Result<()> {
         self.insert(
             kind,
@@ -206,6 +250,10 @@ impl Transaction {
     }
 
     /// Insert one guide before a checked source-order index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn insert(&mut self, kind: ListKind, index: usize, guide: Guide) -> Result<()> {
         let mut candidate = self.working.clone();
         let list = list_mut_or_create(&mut candidate, kind);
@@ -219,6 +267,10 @@ impl Transaction {
     }
 
     /// Replace one guide while preserving its source-order position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace_guide(&mut self, kind: ListKind, index: usize, guide: Guide) -> Result<bool> {
         let mut candidate = self.working.clone();
         let list = list_mut(&mut candidate, kind)
@@ -238,6 +290,10 @@ impl Transaction {
     }
 
     /// Apply a checked mutation to one guide without partial staging.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn edit_guide(
         &mut self,
         kind: ListKind,
@@ -259,6 +315,10 @@ impl Transaction {
     }
 
     /// Change one guide's native ID after checking list uniqueness.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_id(&mut self, kind: ListKind, index: usize, id: u32) -> Result<()> {
         self.edit_guide(kind, index, |guide| {
             guide.id = id;
@@ -267,6 +327,10 @@ impl Transaction {
     }
 
     /// Remove one guide by source-order index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove(&mut self, kind: ListKind, index: usize) -> Result<Guide> {
         let mut candidate = self.working.clone();
         let list = list_mut(&mut candidate, kind)
@@ -281,6 +345,10 @@ impl Transaction {
     }
 
     /// Remove one guide by its validated native ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_id(&mut self, kind: ListKind, id: u32) -> Result<Option<Guide>> {
         let Some(list) = self.list(kind) else {
             return Ok(None);
@@ -292,6 +360,10 @@ impl Transaction {
     }
 
     /// Move one guide to another checked position in the same owner list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn move_guide(&mut self, kind: ListKind, from: usize, to: usize) -> Result<bool> {
         let mut candidate = self.working.clone();
         let list = list_mut(&mut candidate, kind)
@@ -310,11 +382,19 @@ impl Transaction {
     }
 
     /// Clear one owner list while retaining the other list and its source data.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn clear(&mut self, kind: ListKind) -> Result<bool> {
         self.set_list(kind, None)
     }
 
     /// Validate and consume this edit into a source-checked commit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn commit(self) -> Result<Commit> {
         if !self.is_changed() {
             let patch = Patch::new(self.original.clone(), self.original.clone());
@@ -360,29 +440,34 @@ pub struct Commit {
 impl Commit {
     /// Whether publication changes the exact presentation bytes.
     #[inline]
+    #[must_use]
     pub const fn changed(&self) -> bool {
         self.changed
     }
 
     /// Alias for [`Self::changed`].
     #[inline]
+    #[must_use]
     pub const fn is_changed(&self) -> bool {
         self.changed
     }
 
     /// Borrow the projected post-edit snapshot.
     #[inline]
+    #[must_use]
     pub fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrow the reversible source-checked patch.
     #[inline]
+    #[must_use]
     pub fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Consume the commit into its patch.
+    #[must_use]
     pub fn into_patch(self) -> Patch {
         self.patch
     }
@@ -402,29 +487,34 @@ impl Patch {
 
     /// Source context required before publication.
     #[inline]
+    #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Source context produced by publication.
     #[inline]
+    #[must_use]
     pub fn after(&self) -> &Snapshot {
         &self.after
     }
 
     /// Whether this patch is an exact no-op.
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
     /// Alias for [`Self::is_empty`] with mutation-oriented naming.
     #[inline]
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         !self.is_empty()
     }
 
     /// Return the exact inverse patch.
+    #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
@@ -434,16 +524,25 @@ impl Patch {
 
     /// Return the source fingerprint required for publication.
     #[inline]
+    #[must_use]
     pub const fn expected_revision(&self) -> Revision {
         self.before.revision
     }
 
     /// Apply this patch atomically to an OPC package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn apply(&self, target: &mut OpcPackage) -> Result<Snapshot> {
         super::package::apply_patch(target, self)
     }
 
     /// Apply this patch atomically to an owned presentation XML buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn apply_xml(&self, target: &mut Vec<u8>) -> Result<Snapshot> {
         if target.as_slice() != self.before.source_xml() {
             return Err(invalid("extended-guide source is stale"));
@@ -488,10 +587,10 @@ fn list_mut_or_create(value: &mut Guides, kind: ListKind) -> &mut List {
 }
 
 fn fingerprint(bytes: &[u8]) -> Revision {
-    let mut hash = 0xcbf29ce484222325u64;
+    let mut hash = 0xcbf2_9ce4_8422_2325u64;
     for byte in bytes {
         hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(0x100000001b3);
+        hash = hash.wrapping_mul(0x100_0000_01b3);
     }
     hash
 }

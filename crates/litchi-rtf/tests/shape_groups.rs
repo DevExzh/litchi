@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use std::borrow::Cow;
 
 use litchi_rtf::{
@@ -60,7 +69,7 @@ fn typed_group_writes_nested_children() {
         &[ShapeGroupChild::Shape(0), ShapeGroupChild::Group(0)]
     );
 
-    let mut document = RtfDocument::parse(r#"{\rtf1}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1}").unwrap();
     document.push_shape_group(root).unwrap();
     let serialized = write_document(&document);
     let reparsed = RtfDocument::parse(&serialized).unwrap();
@@ -75,13 +84,13 @@ fn typed_group_writes_nested_children() {
 #[test]
 fn rejects_hostile_group_grammar_and_typed_order_abuse() {
     let malformed = [
-        r#"{\rtf1{\shpgrp1{\*\shpinst}}}"#,
-        r#"{\rtf1{\*\shpgrp{\*\shpinst}}}"#,
-        r#"{\rtf1{\shpgrp}}"#,
-        r#"{\rtf1{\shpgrp{\shpinst}}}"#,
-        r#"{\rtf1{\shpgrp{\*\shpinst}{\*\shpinst}}}"#,
-        r#"{\rtf1{\shpgrp{\sp{\sn x}{\sv 1}}{\*\shpinst}}}"#,
-        r#"{\rtf1{\shpgrp{\*\shpinst{\shpgrp{\*\shpinst}{\*\shprslt{\*\do}}}}}}"#,
+        r"{\rtf1{\shpgrp1{\*\shpinst}}}",
+        r"{\rtf1{\*\shpgrp{\*\shpinst}}}",
+        r"{\rtf1{\shpgrp}}",
+        r"{\rtf1{\shpgrp{\shpinst}}}",
+        r"{\rtf1{\shpgrp{\*\shpinst}{\*\shpinst}}}",
+        r"{\rtf1{\shpgrp{\sp{\sn x}{\sv 1}}{\*\shpinst}}}",
+        r"{\rtf1{\shpgrp{\*\shpinst{\shpgrp{\*\shpinst}{\*\shprslt{\*\do}}}}}}",
         "{\\rtf1{\\shpgrp{\\*\\shpinst\\bin1 x}}}",
     ];
     for source in malformed {
@@ -91,6 +100,6 @@ fn rejects_hostile_group_grammar_and_typed_order_abuse() {
     let mut group = ShapeGroup::new();
     group.add_shape(Shape::new(ShapeType::Rectangle)).unwrap();
     group.child_order.push(ShapeGroupChild::Shape(0));
-    let mut document = RtfDocument::parse(r#"{\rtf1}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1}").unwrap();
     assert!(document.push_shape_group(group).is_err());
 }

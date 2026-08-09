@@ -1,4 +1,4 @@
-//! Layered, inert PowerPoint laser-trace support.
+//! Layered, inert `PowerPoint` laser-trace support.
 //!
 //! The semantic point/trace values live in [`model`], XML scanning and
 //! serialization live in [`codec`], and OPC slide mutation lives in [`package`].

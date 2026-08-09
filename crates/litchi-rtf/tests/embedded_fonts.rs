@@ -1,11 +1,20 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{EmbeddedFontFormat, FontPage, RtfDocument, RtfWriter};
 
-const SYNTHETIC: &str = r#"{\rtf1\ansi\uc1
+const SYNTHETIC: &str = r"{\rtf1\ansi\uc1
 {\fonttbl
 {\f0\fswiss\fcharset0{\*\fontemb\fttruetype{\*\fontfile\cpg1252 arial.ttf} 00010000abCDef42}Arial;}
 {\f1\fnil{\*\fontemb\ftnil{\*\fontfile symbol.fon}}Symbol;}
 {\f2\fmodern Courier New;}}
-\f0 Body}"#;
+\f0 Body}";
 
 #[test]
 fn parses_decodes_and_round_trips_embedded_fonts() {
@@ -46,7 +55,7 @@ fn parses_decodes_and_round_trips_embedded_fonts() {
 
 #[test]
 fn accepts_fontemb_without_ignorable_destination_marker() {
-    let source = r#"{\rtf1{\fonttbl{\f0\fnil{\fontemb\fttruetype{\fontfile times.ttf}}Times;}}}"#;
+    let source = r"{\rtf1{\fonttbl{\f0\fnil{\fontemb\fttruetype{\fontfile times.ttf}}Times;}}}";
     let doc = RtfDocument::parse(source).unwrap();
     let embedded = doc.font_table().get(0).unwrap().embedded.as_ref().unwrap();
     assert_eq!(embedded.format, EmbeddedFontFormat::TrueType);
@@ -55,8 +64,8 @@ fn accepts_fontemb_without_ignorable_destination_marker() {
 
 #[test]
 fn fontfile_code_page_decodes_name_independently_from_the_header() {
-    let source = r#"{\rtf1\ansi\ansicpg1252
-{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg932 \'82\'a0.ttf}}Arial;}}}"#;
+    let source = r"{\rtf1\ansi\ansicpg1252
+{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg932 \'82\'a0.ttf}}Arial;}}}";
     let doc = RtfDocument::parse(source).unwrap();
     let embedded = doc.font_table().get(0).unwrap().embedded.as_ref().unwrap();
 
@@ -68,28 +77,28 @@ fn fontfile_code_page_decodes_name_independently_from_the_header() {
 fn rejects_malformed_embedded_fonts() {
     let malformed = [
         // Duplicate fontemb destination in one font entry.
-        r#"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil}{\*\fontemb\ftnil}Arial;}}}"#,
+        r"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil}{\*\fontemb\ftnil}Arial;}}}",
         // Duplicate embedded font format keyword.
-        r#"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\fttruetype\ftnil}Arial;}}}"#,
+        r"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\fttruetype\ftnil}Arial;}}}",
         // Odd number of hexadecimal digits.
-        r#"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\fttruetype 001}Arial;}}}"#,
+        r"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\fttruetype 001}Arial;}}}",
         // Non-hexadecimal payload character.
-        r#"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\fttruetype 00zz}Arial;}}}"#,
+        r"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\fttruetype 00zz}Arial;}}}",
         // Duplicate fontfile destination.
-        r#"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile a.ttf}{\*\fontfile b.ttf}}Arial;}}}"#,
+        r"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile a.ttf}{\*\fontfile b.ttf}}Arial;}}}",
         // Empty fontfile name.
-        r#"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile }}Arial;}}}"#,
+        r"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile }}Arial;}}}",
         // Duplicate fontfile code page.
-        r#"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg1252\cpg1250 a.ttf}}Arial;}}}"#,
+        r"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg1252\cpg1250 a.ttf}}Arial;}}}",
         // Out-of-range fontfile code page.
-        r#"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg70000 a.ttf}}Arial;}}}"#,
+        r"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg70000 a.ttf}}Arial;}}}",
         // Wide and unsupported fontfile code pages.
-        r#"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg1200 a.ttf}}Arial;}}}"#,
-        r#"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg65000 a.ttf}}Arial;}}}"#,
+        r"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg1200 a.ttf}}Arial;}}}",
+        r"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg65000 a.ttf}}Arial;}}}",
         // Nested group inside the fontfile name destination.
-        r#"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile {\field X}}}Arial;}}}"#,
+        r"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile {\field X}}}Arial;}}}",
         // Unterminated fontemb destination.
-        r#"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil"#,
+        r"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil",
     ];
     for source in malformed {
         assert!(

@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{BodyStoryEvent, CellStoryEvent, RtfDocument, RtfWriter};
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
@@ -10,7 +19,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn body_column_is_zero_width_ordered_and_round_trips_canonically() {
-    let document = RtfDocument::parse(r#"{\rtf1\ansi A\column B}"#).unwrap();
+    let document = RtfDocument::parse(r"{\rtf1\ansi A\column B}").unwrap();
     assert_eq!(document.text(), "AB");
     assert!(matches!(
         document.body_story_events(),
@@ -28,7 +37,7 @@ fn body_column_is_zero_width_ordered_and_round_trips_canonically() {
 
 #[test]
 fn table_and_nested_table_column_events_round_trip_in_place() {
-    let source = r#"{\rtf1\trowd\cellx5000\intbl\itap1 Before\column After \intbl\itap2 Inner\column Tail\nestcell{\*\nesttableprops\itap2\trowd\cellx1000\nestrow}{\nonesttables\par}\intbl\itap1 End\cell\row}"#;
+    let source = r"{\rtf1\trowd\cellx5000\intbl\itap1 Before\column After \intbl\itap2 Inner\column Tail\nestcell{\*\nesttableprops\itap2\trowd\cellx1000\nestrow}{\nonesttables\par}\intbl\itap1 End\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     let outer = &document.tables()[0].rows()[0].cells()[0];
     assert!(
@@ -63,7 +72,7 @@ fn table_and_nested_table_column_events_round_trip_in_place() {
 
 #[test]
 fn document_column_breaks_can_be_pushed_and_cleared() {
-    let mut document = RtfDocument::parse(r#"{\rtf1\ansi AB}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1\ansi AB}").unwrap();
     document.push_column_break(1).unwrap();
     assert!(matches!(
         document.column_breaks().next(),
@@ -76,7 +85,7 @@ fn document_column_breaks_can_be_pushed_and_cleared() {
 
 #[test]
 fn rejects_parameters_in_the_body() {
-    assert!(RtfDocument::parse(r#"{\rtf1 A\column1 B}"#).is_err());
+    assert!(RtfDocument::parse(r"{\rtf1 A\column1 B}").is_err());
 }
 
 #[test]

@@ -151,6 +151,11 @@ impl<'data> Name<'data> {
     }
 
     /// Decodes the checked name into an owned Rust string.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::MalformedProperties` when the name is not valid
+    /// UTF-16.
     pub fn text(self) -> Result<String> {
         let units = self
             .raw

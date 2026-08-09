@@ -1,4 +1,4 @@
-//! Lossless XML codec for PresentationML zoom alternate-content entries.
+//! Lossless XML codec for `PresentationML` zoom alternate-content entries.
 
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
@@ -145,7 +145,7 @@ pub(crate) fn read_owner(xml: &[u8]) -> Result<Owner> {
 
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::Invalid("zoom XML offset exceeds usize".into()))?;
+            .map_err(|_err| Error::Invalid("zoom XML offset exceeds usize".into()))?;
         let decoder = reader.decoder();
         let (namespace, event) = {
             let (namespace, event) = reader
@@ -154,7 +154,7 @@ pub(crate) fn read_owner(xml: &[u8]) -> Result<Owner> {
             (resolved_namespace(namespace)?, event.into_owned())
         };
         let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::Invalid("zoom XML offset exceeds usize".into()))?;
+            .map_err(|_err| Error::Invalid("zoom XML offset exceeds usize".into()))?;
 
         match event {
             Event::Start(element) => {
@@ -180,7 +180,7 @@ pub(crate) fn read_owner(xml: &[u8]) -> Result<Owner> {
                         .map(|(key, value)| (key.clone(), value.clone())),
                 );
                 let local = String::from_utf8(element.local_name().as_ref().to_vec())
-                    .map_err(|_| Error::Invalid("zoom XML element name is not UTF-8".into()))?;
+                    .map_err(|_err| Error::Invalid("zoom XML element name is not UTF-8".into()))?;
                 let parent = stack.last().map(|value| value.kind);
                 let kind = classify_owner_frame(&namespace, &local, parent);
                 if kind == FrameKind::Owner {
@@ -245,7 +245,7 @@ pub(crate) fn read_owner(xml: &[u8]) -> Result<Owner> {
                         .map(|(key, value)| (key.clone(), value.clone())),
                 );
                 let local = String::from_utf8(element.local_name().as_ref().to_vec())
-                    .map_err(|_| Error::Invalid("zoom XML element name is not UTF-8".into()))?;
+                    .map_err(|_err| Error::Invalid("zoom XML element name is not UTF-8".into()))?;
                 let parent = stack.last().map(|value| value.kind);
                 let kind = classify_owner_frame(&namespace, &local, parent);
                 if kind == FrameKind::Owner {
@@ -284,7 +284,7 @@ pub(crate) fn read_owner(xml: &[u8]) -> Result<Owner> {
                     .pop()
                     .ok_or_else(|| Error::Invalid("unexpected zoom XML closing element".into()))?;
                 let local = String::from_utf8(element.local_name().as_ref().to_vec())
-                    .map_err(|_| Error::Invalid("zoom XML element name is not UTF-8".into()))?;
+                    .map_err(|_err| Error::Invalid("zoom XML element name is not UTF-8".into()))?;
                 if frame.namespace != namespace || frame.local != local {
                     return Err(Error::Invalid("mismatched zoom XML closing element".into()));
                 }
@@ -393,7 +393,7 @@ fn is_dml_namespace(namespace: &str) -> bool {
 fn resolved_namespace(value: ResolveResult<'_>) -> Result<String> {
     match value {
         ResolveResult::Bound(Namespace(namespace)) => String::from_utf8(namespace.to_vec())
-            .map_err(|_| Error::Invalid("zoom XML namespace is not UTF-8".into())),
+            .map_err(|_err| Error::Invalid("zoom XML namespace is not UTF-8".into())),
         ResolveResult::Unbound => Ok(String::new()),
         ResolveResult::Unknown(prefix) => Err(Error::Invalid(format!(
             "zoom XML prefix '{}' is unbound",
@@ -416,7 +416,7 @@ fn apply_namespace_declarations(
         } else if let Some(prefix) = name.strip_prefix(b"xmlns:") {
             Some(
                 String::from_utf8(prefix.to_vec())
-                    .map_err(|_| Error::Invalid("zoom namespace prefix is not UTF-8".into()))?,
+                    .map_err(|_err| Error::Invalid("zoom namespace prefix is not UTF-8".into()))?,
             )
         } else {
             None
@@ -622,14 +622,14 @@ fn parse_slide(
     expect(object, SLIDE_NS, "sldZmObj")?;
     let slide_id = required(object, "", "sldId")?
         .parse::<u32>()
-        .map_err(|_| Error::Invalid("slide zoom has an invalid sldId".into()))?;
+        .map_err(|_err| Error::Invalid("slide zoom has an invalid sldId".into()))?;
     validate_slide_id(slide_id)?;
     let creation_id = object
         .unqualified("cId")
         .map(|value| {
             value
                 .parse::<u32>()
-                .map_err(|_| Error::Invalid("slide zoom has an invalid cId".into()))
+                .map_err(|_err| Error::Invalid("slide zoom has an invalid cId".into()))
         })
         .transpose()?;
     let (properties, extension_xml) = parse_object(dom, object, SLIDE_NS)?;
@@ -754,7 +754,7 @@ fn parse_object(
         properties,
         children
             .get(1)
-            .map(|value| dom.slice(&value.range).map(|xml| xml.to_vec()))
+            .map(|value| dom.slice(&value.range).map(<[u8]>::to_vec))
             .transpose()?,
     ))
 }
@@ -806,7 +806,7 @@ fn parse_dom(raw: &[u8], inherited: &HashMap<String, String>) -> Result<Dom> {
     let mut xml = Vec::with_capacity(raw.len().saturating_add(512));
     xml.extend_from_slice(b"<z:root xmlns:z=\"urn:litchi:pptx:zoom:wrapper\"");
     let mut declarations = inherited.iter().collect::<Vec<_>>();
-    declarations.sort_by(|(left, _), (right, _)| left.cmp(right));
+    declarations.sort_by_key(|(left, _)| *left);
     for (prefix, uri) in declarations {
         if prefix == "xml" || prefix == "xmlns" || prefix == "z" {
             continue;
@@ -831,7 +831,7 @@ fn parse_dom(raw: &[u8], inherited: &HashMap<String, String>) -> Result<Dom> {
     let mut nodes = 0usize;
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::Invalid("zoom DOM offset exceeds usize".into()))?;
+            .map_err(|_err| Error::Invalid("zoom DOM offset exceeds usize".into()))?;
         let decoder = reader.decoder();
         let (namespace, event) = {
             let (namespace, event) = reader
@@ -840,7 +840,7 @@ fn parse_dom(raw: &[u8], inherited: &HashMap<String, String>) -> Result<Dom> {
             (resolved_namespace(namespace)?, event.into_owned())
         };
         let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::Invalid("zoom DOM offset exceeds usize".into()))?;
+            .map_err(|_err| Error::Invalid("zoom DOM offset exceeds usize".into()))?;
         match event {
             Event::Start(element) => {
                 nodes += 1;
@@ -874,7 +874,7 @@ fn parse_dom(raw: &[u8], inherited: &HashMap<String, String>) -> Result<Dom> {
                     Error::Invalid("zoom DOM has an unexpected closing tag".into())
                 })?;
                 let local = String::from_utf8(element.local_name().as_ref().to_vec())
-                    .map_err(|_| Error::Invalid("zoom DOM element name is not UTF-8".into()))?;
+                    .map_err(|_err| Error::Invalid("zoom DOM element name is not UTF-8".into()))?;
                 if frame.namespace != namespace || frame.local != local {
                     return Err(Error::Invalid(
                         "zoom DOM has mismatched closing tags".into(),
@@ -887,17 +887,17 @@ fn parse_dom(raw: &[u8], inherited: &HashMap<String, String>) -> Result<Dom> {
                 restore_namespace_declarations(&mut namespaces, changes);
             },
             Event::Text(text) => {
-                if !text.as_ref().iter().all(u8::is_ascii_whitespace) {
-                    if let Some(frame) = frames.last_mut() {
-                        frame.text = true;
-                    }
+                if !text.as_ref().iter().all(u8::is_ascii_whitespace)
+                    && let Some(frame) = frames.last_mut()
+                {
+                    frame.text = true;
                 }
             },
             Event::CData(text) => {
-                if !text.as_ref().iter().all(u8::is_ascii_whitespace) {
-                    if let Some(frame) = frames.last_mut() {
-                        frame.text = true;
-                    }
+                if !text.as_ref().iter().all(u8::is_ascii_whitespace)
+                    && let Some(frame) = frames.last_mut()
+                {
+                    frame.text = true;
                 }
             },
             Event::GeneralRef(_) => {
@@ -960,7 +960,7 @@ fn dom_frame(
     namespaces: &HashMap<String, String>,
 ) -> Result<DomFrame> {
     let local = String::from_utf8(element.local_name().as_ref().to_vec())
-        .map_err(|_| Error::Invalid("zoom DOM element name is not UTF-8".into()))?;
+        .map_err(|_err| Error::Invalid("zoom DOM element name is not UTF-8".into()))?;
     let mut attrs = Vec::new();
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
@@ -1019,12 +1019,12 @@ fn resolve_attribute_lexically(
         None => (&[][..], raw),
     };
     let local = String::from_utf8(local.to_vec())
-        .map_err(|_| Error::Invalid("zoom DOM attribute name is not UTF-8".into()))?;
+        .map_err(|_err| Error::Invalid("zoom DOM attribute name is not UTF-8".into()))?;
     if prefix.is_empty() {
         return Ok((String::new(), local));
     }
     let prefix = String::from_utf8(prefix.to_vec())
-        .map_err(|_| Error::Invalid("zoom DOM attribute prefix is not UTF-8".into()))?;
+        .map_err(|_err| Error::Invalid("zoom DOM attribute prefix is not UTF-8".into()))?;
     let namespace = namespaces
         .get(&prefix)
         .cloned()
@@ -1081,14 +1081,14 @@ fn parse_bool(value: Option<&str>, default: bool, field: &str) -> Result<bool> {
 }
 
 fn parse_percentage(value: Option<&str>, default: i32, field: &str) -> Result<Percentage> {
-    let value = value.unwrap_or_else(|| {
+    let value = value.unwrap_or({
         // This branch returns a string only for the two schema defaults and
         // avoids allocating a temporary during ordinary parsing.
         if default == 0 { "0" } else { "100000" }
     });
     let value = value
         .parse::<i32>()
-        .map_err(|_| Error::Invalid(format!("invalid zoom {field} value '{value}'")))?;
+        .map_err(|_err| Error::Invalid(format!("invalid zoom {field} value '{value}'")))?;
     Ok(Percentage::new(value))
 }
 
@@ -1411,7 +1411,7 @@ pub(crate) fn write_zoom(value: &Zoom, owner: &Owner) -> Result<Vec<u8>> {
                 write!(&mut xml, " cId=\"{creation_id}\"")
                     .map_err(|error| Error::Xml(error.to_string()))?;
             }
-            xml.push_str(">");
+            xml.push('>');
             write_properties(&mut xml, &value.properties)?;
             if let Some(extension) = &value.extension_xml {
                 push_utf8(&mut xml, extension, "slide zoom extension")?;
@@ -1425,7 +1425,7 @@ pub(crate) fn write_zoom(value: &Zoom, owner: &Owner) -> Result<Vec<u8>> {
             for item in &value.items {
                 xml.push_str("<psuz:summaryZmObj sectionId=\"");
                 xml.push_str(&escape_xml(&item.section_id));
-                xml.push_str("\"");
+                xml.push('"');
                 if !item.title.is_empty() {
                     xml.push_str(" title=\"");
                     xml.push_str(&escape_xml(&item.title));
@@ -1553,7 +1553,7 @@ fn write_namespace_profile(xml: &mut String, profile: &Profile) -> Result<()> {
 
 fn push_utf8(xml: &mut String, value: &[u8], field: &str) -> Result<()> {
     let value = std::str::from_utf8(value)
-        .map_err(|_| Error::Invalid(format!("{field} is not UTF-8 XML")))?;
+        .map_err(|_err| Error::Invalid(format!("{field} is not UTF-8 XML")))?;
     xml.push_str(value);
     Ok(())
 }

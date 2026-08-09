@@ -1,8 +1,4 @@
 //! Immutable spreadsheet-domain vocabulary.
-#![allow(
-    dead_code,
-    reason = "model codecs are retained for the package parser migration"
-)]
 
 pub mod conditional_format;
 pub mod consolidation;

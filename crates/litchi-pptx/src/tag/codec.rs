@@ -1,6 +1,13 @@
-use super::model::*;
+use super::model::{
+    Conformance, List, Tag, ensure_list_budget, list_wire_len_parts, raw, tag_wire_len_parts,
+    validate_structure, validate_unique_names,
+};
 use super::package::process_pptx_ooxml;
-use super::*;
+use super::{
+    Error, MAX_PART_BYTES, MAX_TAGS, MAX_TEXT_BYTES, PML, PML_TEXT, ROOT_CHILDREN_OPEN, ROOT_CLOSE,
+    ROOT_EMPTY_CLOSE, ROOT_OPEN, Result, STRICT, STRICT_TEXT, TAG_CLOSE, TAG_OPEN, XML_DECL,
+    allocation, invalid,
+};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
@@ -8,6 +15,10 @@ use quick_xml::reader::NsReader;
 use std::collections::HashSet;
 
 /// Parse one bounded Strict or Transitional tag-list part.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse(xml: &[u8]) -> Result<List> {
     parse_profiled(xml).map(|(list, _)| list)
 }
@@ -170,6 +181,10 @@ pub(crate) fn parse_profiled(xml: &[u8]) -> Result<(List, Conformance)> {
 }
 
 /// Encode one detached list without interpreting any retained value.
+///
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn write(value: &List, conformance: Conformance) -> Result<Vec<u8>> {
     validate_structure(value)?;
     validate_unique_names(value)?;

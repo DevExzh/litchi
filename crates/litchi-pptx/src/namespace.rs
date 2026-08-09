@@ -1,4 +1,4 @@
-//! PresentationML namespace and relationship decoding helpers.
+//! `PresentationML` namespace and relationship decoding helpers.
 
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use quick_xml::encoding::Decoder;
@@ -13,7 +13,7 @@ pub(crate) const PRESENTATIONML_NAMESPACE: &[u8] =
 pub(crate) const STRICT_PRESENTATIONML_NAMESPACE: &[u8] =
     b"http://purl.oclc.org/ooxml/presentationml/main";
 
-/// Return whether a resolved XML name belongs to PresentationML.
+/// Return whether a resolved XML name belongs to `PresentationML`.
 pub(crate) fn is_presentationml_name(
     namespace: &ResolveResult<'_>,
     name: QName<'_>,
@@ -45,7 +45,7 @@ pub(crate) fn relationship_attribute_value(
     )?)
 }
 
-/// Read the optional producer-visible `p:cSld@name` from a PresentationML part.
+/// Read the optional producer-visible `p:cSld@name` from a `PresentationML` part.
 pub(crate) fn presentation_name(xml_bytes: &[u8]) -> Result<Option<String>> {
     let mut reader = NsReader::from_reader(xml_bytes);
     loop {

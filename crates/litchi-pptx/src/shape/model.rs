@@ -18,33 +18,37 @@ pub struct Span {
 impl Span {
     /// Byte offset from the beginning of the processed owner XML.
     #[inline]
+    #[must_use]
     pub const fn start(self) -> u32 {
         self.start
     }
 
     /// Length of this element, including its start and end tags.
     #[inline]
+    #[must_use]
     pub const fn len(self) -> u32 {
         self.len
     }
 
     /// Whether the element occupies no bytes.
     #[inline]
+    #[must_use]
     pub const fn is_empty(self) -> bool {
         self.len == 0
     }
 
     /// Exclusive byte end, checked for arithmetic overflow.
     #[inline]
+    #[must_use]
     pub const fn end(self) -> Option<u32> {
         self.start.checked_add(self.len)
     }
 
     pub(super) fn range(self, owner_len: usize) -> Result<Range<usize>> {
         let start = usize::try_from(self.start)
-            .map_err(|_| Error::Invalid("shape offset does not fit usize".into()))?;
+            .map_err(|_err| Error::Invalid("shape offset does not fit usize".into()))?;
         let len = usize::try_from(self.len)
-            .map_err(|_| Error::Invalid("shape length does not fit usize".into()))?;
+            .map_err(|_err| Error::Invalid("shape length does not fit usize".into()))?;
         let end = start
             .checked_add(len)
             .ok_or_else(|| Error::Invalid("shape byte span overflows usize".into()))?;
@@ -82,24 +86,28 @@ impl Bounds {
 
     /// Left edge in EMUs.
     #[inline]
+    #[must_use]
     pub const fn x(self) -> i64 {
         self.x
     }
 
     /// Top edge in EMUs.
     #[inline]
+    #[must_use]
     pub const fn y(self) -> i64 {
         self.y
     }
 
     /// Width in EMUs.
     #[inline]
+    #[must_use]
     pub const fn width(self) -> i64 {
         self.width
     }
 
     /// Height in EMUs.
     #[inline]
+    #[must_use]
     pub const fn height(self) -> i64 {
         self.height
     }
@@ -139,12 +147,14 @@ impl<'a> Placeholder<'a> {
     /// `None` preserves the schema-defaulted spelling instead of inventing a
     /// token that was not present in the owner XML.
     #[inline]
+    #[must_use]
     pub const fn kind(self) -> Option<&'a str> {
         self.kind
     }
 
     /// Placeholder index. OOXML defaults an omitted index to zero.
     #[inline]
+    #[must_use]
     pub const fn index(self) -> u32 {
         self.index
     }
@@ -192,16 +202,25 @@ pub struct Common<'a> {
 impl<'a> Common<'a> {
     /// Zero-based pre-order position in the owning scene.
     #[inline]
+    #[must_use]
     pub const fn index(self) -> usize {
         self.index
     }
 
     /// Checked span in the processed owner XML.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn span(self) -> Result<Span> {
         Ok(self.record.span)
     }
 
     /// Exact borrowed element XML without a per-shape copy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn xml(self) -> Result<&'a [u8]> {
         let range = self.record.span.range(self.xml.len())?;
         self.xml
@@ -210,6 +229,7 @@ impl<'a> Common<'a> {
     }
 
     /// Decoded producer name from `cNvPr`.
+    #[must_use]
     pub fn name(self) -> Option<&'a str> {
         self.record.name?.get(self.strings)
     }
@@ -218,16 +238,19 @@ impl<'a> Common<'a> {
     ///
     /// Semantic selectors should normally use [`name`](Self::name) or a
     /// checked pre-order position instead.
+    #[must_use]
     pub fn id(self) -> Option<u32> {
         self.record.id
     }
 
     /// Complete local transform bounds when explicitly present.
+    #[must_use]
     pub fn bounds(self) -> Option<Bounds> {
         self.record.bounds
     }
 
     /// Placeholder metadata when declared by the shape.
+    #[must_use]
     pub fn placeholder(self) -> Option<Placeholder<'a>> {
         let value = self.record.placeholder?;
         Some(Placeholder {
@@ -236,15 +259,17 @@ impl<'a> Common<'a> {
         })
     }
 
-    /// Decoded DrawingML text captured in full-owner namespace context.
+    /// Decoded `DrawingML` text captured in full-owner namespace context.
     ///
-    /// `None` distinguishes shapes with no DrawingML text from an explicitly
+    /// `None` distinguishes shapes with no `DrawingML` text from an explicitly
     /// empty text body.
+    #[must_use]
     pub fn text(self) -> Option<&'a str> {
         self.record.text?.get(self.strings)
     }
 
     /// Qualified source element name, useful for an unknown extension shape.
+    #[must_use]
     pub fn source_name(self) -> Option<&'a str> {
         self.record.source_name?.get(self.strings)
     }
@@ -294,11 +319,13 @@ pub struct Group<'a>(pub(super) Common<'a>);
 impl<'a> Group<'a> {
     /// Borrow the properties common to all shape kinds.
     #[inline]
+    #[must_use]
     pub const fn common(self) -> Common<'a> {
         self.0
     }
 
     /// Iterate direct children in source order.
+    #[must_use]
     pub fn shapes(self) -> Shapes<'a> {
         let first = self.0.index.saturating_add(1);
         let end = self.0.record.subtree_end as usize;
@@ -314,7 +341,7 @@ impl<'a> Group<'a> {
     }
 }
 
-/// One semantic PresentationML shape.
+/// One semantic `PresentationML` shape.
 ///
 /// The enum carries a typed view rather than requiring users to compare a
 /// separate numeric or discriminator value.
@@ -352,6 +379,7 @@ impl<'a> Shape<'a> {
     }
 
     /// Borrow the properties common to every variant.
+    #[must_use]
     pub const fn common(self) -> Common<'a> {
         match self {
             Self::Auto(value) => value.0,
@@ -368,37 +396,48 @@ impl<'a> Shape<'a> {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     #[inline]
     pub fn span(self) -> Result<Span> {
         self.common().span()
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     #[inline]
     pub fn xml(self) -> Result<&'a [u8]> {
         self.common().xml()
     }
 
     #[inline]
+    #[must_use]
     pub fn name(self) -> Option<&'a str> {
         self.common().name()
     }
 
     #[inline]
+    #[must_use]
     pub fn id(self) -> Option<u32> {
         self.common().id()
     }
 
     #[inline]
+    #[must_use]
     pub fn bounds(self) -> Option<Bounds> {
         self.common().bounds()
     }
 
     #[inline]
+    #[must_use]
     pub fn placeholder(self) -> Option<Placeholder<'a>> {
         self.common().placeholder()
     }
 
     #[inline]
+    #[must_use]
     pub fn text(self) -> Option<&'a str> {
         self.common().text()
     }

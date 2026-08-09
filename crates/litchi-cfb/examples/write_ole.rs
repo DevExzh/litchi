@@ -20,17 +20,20 @@
 #[cfg(feature = "write")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     use std::fs::File;
+    use std::io::Write as _;
     use std::path::PathBuf;
 
     use litchi_cfb::{OleFile, OleWriter, is_ole_file};
 
-    let out_path: PathBuf = std::env::args()
-        .nth(1)
-        .map(PathBuf::from)
-        .unwrap_or_else(|| std::env::temp_dir().join("litchi-cfb-demo.ole"));
+    let mut out = std::io::stdout();
 
-    println!("=== litchi-cfb: write_ole ===");
-    println!("Output file: {}", out_path.display());
+    let out_path: PathBuf = std::env::args().nth(1).map_or_else(
+        || std::env::temp_dir().join("litchi-cfb-demo.ole"),
+        PathBuf::from,
+    );
+
+    writeln!(out, "=== litchi-cfb: write_ole ===")?;
+    writeln!(out, "Output file: {}", out_path.display())?;
 
     // Build a tiny container: one top-level storage with one stream inside,
     // plus a top-level stream alongside it.
@@ -43,10 +46,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     writer.save(&out_path)?;
-    println!(
+    writeln!(
+        out,
         "Wrote CFB file: {} bytes",
         std::fs::metadata(&out_path)?.len()
-    );
+    )?;
 
     // Round-trip verify: re-open and list.
     // `is_ole_file` checks both the magic *and* a minimum size, so read a
@@ -61,14 +65,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     assert!(is_ole_file(&head), "output is not a valid CFB file");
 
     let mut ole = OleFile::open(File::open(&out_path)?)?;
-    println!("\nStreams in re-opened file:");
+    writeln!(out, "\nStreams in re-opened file:")?;
     for path in ole.list_streams() {
         let refs: Vec<&str> = path.iter().map(String::as_str).collect();
         let data = ole.open_stream(&refs)?;
-        println!("  /{} ({} bytes)", path.join("/"), data.len());
+        writeln!(out, "  /{} ({} bytes)", path.join("/"), data.len())?;
     }
 
-    println!("\nDone.");
+    writeln!(out, "\nDone.")?;
     Ok(())
 }
 

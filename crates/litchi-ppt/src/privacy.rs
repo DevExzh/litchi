@@ -1,4 +1,4 @@
-//! PowerPoint 10 document privacy metadata from MS-PPT 2.4.8.
+//! `PowerPoint` 10 document privacy metadata from MS-PPT 2.4.8.
 
 use crate::consts::RecordType;
 
@@ -12,6 +12,10 @@ const FILTER_PRIVACY_FLAGS_RECORD_TYPE: u16 = 0x36b0;
 /// Reading this flag has no side effects. In particular, the library does not
 /// remove metadata merely because the preference is enabled.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`PrivacySettings` is the established public API name; renaming it would break downstream crates"
+)]
 pub struct PrivacySettings {
     /// Remove personally identifiable information when the producer saves.
     pub remove_personally_identifiable_information_on_save: bool,
@@ -19,6 +23,11 @@ pub struct PrivacySettings {
 
 impl PrivacySettings {
     /// Parse one strict `FilterPrivacyFlags10Atom`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record header or size is invalid or reserved
+    /// bits are set.
     pub fn parse(record: &Record) -> Result<Self> {
         if record.record_type_raw != FILTER_PRIVACY_FLAGS_RECORD_TYPE
             || record.version != 0
@@ -29,7 +38,12 @@ impl PrivacySettings {
                 "FilterPrivacyFlags10Atom has an invalid record header or size".to_string(),
             ));
         }
-        let flags = u32::from_le_bytes(record.data[0..4].try_into().unwrap());
+        let flags = u32::from_le_bytes([
+            record.data[0],
+            record.data[1],
+            record.data[2],
+            record.data[3],
+        ]);
         if flags & !1 != 0 {
             return Err(Error::Corrupted(
                 "FilterPrivacyFlags10Atom has nonzero reserved bits".to_string(),
@@ -57,7 +71,8 @@ impl PrivacySettings {
         Self::parse(record).map(Some)
     }
 
-    /// Encode the exact PowerPoint 10 atom.
+    /// Encode the exact `PowerPoint` 10 atom.
+    #[must_use]
     pub fn to_record(self) -> Record {
         let flags = u32::from(self.remove_personally_identifiable_information_on_save);
         Record {
@@ -73,6 +88,11 @@ impl PrivacySettings {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

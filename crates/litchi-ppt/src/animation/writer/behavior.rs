@@ -17,6 +17,10 @@ use crate::consts::RecordType;
 use crate::package::{Error, Result};
 
 /// Serialize the common behavior information shared by extended animation behaviors.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
 pub fn write_time_behavior(behavior: &TimeBehavior) -> Result<Vec<u8>> {
     let mut children = write_time_behavior_atom(&behavior.atom);
     if let Some(attribute_names) = &behavior.attribute_names {
@@ -30,6 +34,7 @@ pub fn write_time_behavior(behavior: &TimeBehavior) -> Result<Vec<u8>> {
 }
 
 /// Serialize an exact 16-byte `TimeBehaviorAtom` payload.
+#[must_use]
 pub fn write_time_behavior_atom(atom: &TimeBehaviorAtom) -> Vec<u8> {
     let mut data = Vec::with_capacity(16);
     let flags = u32::from(atom.additive.is_some()) | (u32::from(atom.attribute_names_used) << 2);
@@ -50,6 +55,10 @@ pub fn write_time_behavior_atom(atom: &TimeBehaviorAtom) -> Vec<u8> {
 }
 
 /// Serialize an exact generic property-animation behavior container.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
 pub fn write_time_animate_behavior(animate: &TimeAnimateBehavior) -> Result<Vec<u8>> {
     validate_animate_behavior(animate)?;
     let mut children = write_time_animate_behavior_atom(&animate.atom);
@@ -57,8 +66,8 @@ pub fn write_time_animate_behavior(animate: &TimeAnimateBehavior) -> Result<Vec<
         children.extend(write_time_animation_value_list(values)?);
     }
     for (instance, value) in [(1, &animate.by), (2, &animate.from), (3, &animate.to)] {
-        if let Some(value) = value {
-            append_time_variant(&mut children, instance, encode_time_variant_string(value))?;
+        if let Some(text) = value {
+            append_time_variant(&mut children, instance, encode_time_variant_string(text))?;
         }
     }
     children.extend(write_time_behavior(&animate.behavior)?);
@@ -66,6 +75,7 @@ pub fn write_time_animate_behavior(animate: &TimeAnimateBehavior) -> Result<Vec<
 }
 
 /// Serialize an exact `TimeAnimateBehaviorAtom`.
+#[must_use]
 pub fn write_time_animate_behavior_atom(atom: &TimeAnimateBehaviorAtom) -> Vec<u8> {
     let mode = atom.calculation_mode.map_or(1u32, |mode| match mode {
         TimeAnimateCalculationMode::Discrete => 0,
@@ -91,6 +101,10 @@ pub fn write_time_animate_behavior_atom(atom: &TimeAnimateBehaviorAtom) -> Vec<u
 }
 
 /// Serialize a generic animation keyframe list.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
 pub fn write_time_animation_value_list(list: &TimeAnimationValueList) -> Result<Vec<u8>> {
     let mut children = Vec::new();
     for entry in &list.entries {
@@ -111,6 +125,10 @@ pub fn write_time_animation_value_list(list: &TimeAnimationValueList) -> Result<
 }
 
 /// Serialize an exact `TimeAnimationValueAtom`.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
 pub fn write_time_animation_value_atom(time: i32) -> Result<Vec<u8>> {
     if time != -1000 && !(0..=1000).contains(&time) {
         return Err(Error::InvalidFormat(
@@ -124,18 +142,18 @@ pub fn write_time_animation_value_atom(time: i32) -> Result<Vec<u8>> {
 
 fn encode_generic_time_variant(value: &TimeVariantValue) -> Vec<u8> {
     match value {
-        TimeVariantValue::Boolean(value) => vec![0, u8::from(*value)],
-        TimeVariantValue::Integer(value) => {
+        TimeVariantValue::Boolean(flag) => vec![0, u8::from(*flag)],
+        TimeVariantValue::Integer(integer) => {
             let mut data = vec![1];
-            data.extend(value.to_le_bytes());
+            data.extend(integer.to_le_bytes());
             data
         },
-        TimeVariantValue::Float(value) => {
+        TimeVariantValue::Float(float) => {
             let mut data = vec![2];
-            data.extend(value.to_le_bytes());
+            data.extend(float.to_le_bytes());
             data
         },
-        TimeVariantValue::String(value) => encode_time_variant_string(value),
+        TimeVariantValue::String(text) => encode_time_variant_string(text),
     }
 }
 
@@ -211,6 +229,10 @@ fn validate_animate_behavior(animate: &TimeAnimateBehavior) -> Result<()> {
 }
 
 /// Serialize an exact color behavior container.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
 pub fn write_time_color_behavior(behavior: &TimeColorBehavior) -> Result<Vec<u8>> {
     validate_color_behavior(&behavior.atom, &behavior.behavior)?;
     let mut children = write_time_color_behavior_atom(&behavior.atom)?;
@@ -219,6 +241,10 @@ pub fn write_time_color_behavior(behavior: &TimeColorBehavior) -> Result<Vec<u8>
 }
 
 /// Serialize an exact `TimeColorBehaviorAtom`.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
 pub fn write_time_color_behavior_atom(atom: &TimeColorBehaviorAtom) -> Result<Vec<u8>> {
     if atom.from.is_some() && atom.by.is_none() && atom.to.is_none() {
         return Err(Error::InvalidFormat(
@@ -363,6 +389,10 @@ fn validate_color_behavior(atom: &TimeColorBehaviorAtom, behavior: &TimeBehavior
 }
 
 /// Serialize an exact image-effect behavior container.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
 pub fn write_time_effect_behavior(effect: &TimeEffectBehavior) -> Result<Vec<u8>> {
     validate_effect_behavior(effect)?;
     let mut children = write_time_effect_behavior_atom(&effect.atom);
@@ -390,6 +420,7 @@ pub fn write_time_effect_behavior(effect: &TimeEffectBehavior) -> Result<Vec<u8>
 }
 
 /// Serialize an exact `TimeEffectBehaviorAtom`.
+#[must_use]
 pub fn write_time_effect_behavior_atom(atom: &TimeEffectBehaviorAtom) -> Vec<u8> {
     let flags = u32::from(atom.transition.is_some())
         | (u32::from(atom.filter_used) << 1)
@@ -442,6 +473,10 @@ fn validate_effect_behavior(effect: &TimeEffectBehavior) -> Result<()> {
 }
 
 /// Serialize an exact motion-path behavior container.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
 pub fn write_time_motion_behavior(motion: &TimeMotionBehavior) -> Result<Vec<u8>> {
     validate_motion_behavior(motion)?;
     let mut children = write_time_motion_behavior_atom(&motion.atom)?;
@@ -458,6 +493,10 @@ pub fn write_time_motion_behavior(motion: &TimeMotionBehavior) -> Result<Vec<u8>
 }
 
 /// Serialize an exact `TimeMotionBehaviorAtom`.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
 pub fn write_time_motion_behavior_atom(atom: &TimeMotionBehaviorAtom) -> Result<Vec<u8>> {
     if atom.from.is_some() && atom.by.is_none() && atom.to.is_none() {
         return Err(Error::InvalidFormat(
@@ -573,7 +612,7 @@ pub(super) fn append_time_variant(
     data: Vec<u8>,
 ) -> Result<()> {
     let length = u32::try_from(data.len())
-        .map_err(|_| Error::InvalidFormat("time variant exceeds 4 GiB".to_string()))?;
+        .map_err(|_err| Error::InvalidFormat("time variant exceeds 4 GiB".to_string()))?;
     children.extend(create_record_header(
         RecordType::TimeVariant,
         0,
@@ -585,6 +624,10 @@ pub(super) fn append_time_variant(
 }
 
 /// Serialize a typed `TimePropertyList4TimeBehavior` record.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
 pub fn write_time_behavior_property_list(list: &TimeBehaviorPropertyList) -> Result<Vec<u8>> {
     let mut seen = std::collections::HashSet::with_capacity(list.properties.len());
     let mut children = Vec::new();
@@ -595,7 +638,7 @@ pub fn write_time_behavior_property_list(list: &TimeBehaviorPropertyList) -> Res
                 "duplicate time behavior property {id:#X}"
             )));
         }
-        let length = u32::try_from(data.len()).map_err(|_| {
+        let length = u32::try_from(data.len()).map_err(|_err| {
             Error::InvalidFormat("time behavior property exceeds 4 GiB".to_string())
         })?;
         children.extend(create_record_header(RecordType::TimeVariant, 0, id, length));
@@ -661,8 +704,9 @@ fn write_time_string_list(names: &[String]) -> Result<Vec<u8>> {
     let mut children = Vec::new();
     for name in names {
         let data = encode_time_variant_string(name);
-        let length = u32::try_from(data.len())
-            .map_err(|_| Error::InvalidFormat("time attribute name exceeds 4 GiB".to_string()))?;
+        let length = u32::try_from(data.len()).map_err(|_err| {
+            Error::InvalidFormat("time attribute name exceeds 4 GiB".to_string())
+        })?;
         children.extend(create_record_header(RecordType::TimeVariant, 0, 0, length));
         children.extend(data);
     }
@@ -677,6 +721,10 @@ pub(super) fn encode_time_variant_string(value: &str) -> Vec<u8> {
 }
 
 /// Serialize a `ClientVisualElementContainer` animation target.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
 pub fn write_time_visual_element(target: &TimeVisualElement) -> Result<Vec<u8>> {
     let atom = match target {
         TimeVisualElement::Page => {

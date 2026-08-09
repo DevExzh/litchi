@@ -1,4 +1,4 @@
-//! Namespace-aware PresentationML timing XML codec facade.
+//! Namespace-aware `PresentationML` timing XML codec facade.
 ///
 /// The implementation is layered by responsibility:
 /// - [`parser`] owns bounded event-stream decoding and recursive timing-tree parsing.

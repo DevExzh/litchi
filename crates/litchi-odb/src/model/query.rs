@@ -5,6 +5,7 @@
 pub struct Query {
     name: String,
     command: String,
+    escape_processing: Option<bool>,
 }
 
 impl Query {
@@ -12,6 +13,15 @@ impl Query {
         Self {
             name: name.into(),
             command: command.into(),
+            escape_processing: None,
+        }
+    }
+
+    pub(crate) fn parsed(name: String, command: String, escape_processing: Option<bool>) -> Self {
+        Self {
+            name,
+            command,
+            escape_processing,
         }
     }
 
@@ -25,5 +35,14 @@ impl Query {
     #[must_use]
     pub fn command(&self) -> &str {
         &self.command
+    }
+
+    /// Returns the ODF escape-processing declaration, if the producer stored one.
+    ///
+    /// This metadata is descriptive only. Litchi never parses, connects to, or
+    /// executes the command.
+    #[must_use]
+    pub const fn escape_processing(&self) -> Option<bool> {
+        self.escape_processing
     }
 }

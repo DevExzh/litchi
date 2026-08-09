@@ -1,4 +1,4 @@
-//! Borrowed, semantic PresentationML shape scenes.
+//! Borrowed, semantic `PresentationML` shape scenes.
 //!
 //! [`Scene`] indexes the full owner XML once, preserving inherited namespace
 //! aliases and markup-compatibility branch selection. Shape XML is exposed by
@@ -38,18 +38,31 @@ pub use model::{
 pub use reader::{Key, Limits, LookupError, Scene};
 
 /// Read a borrowed-by-default scene with conservative finite limits.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 #[inline]
 pub fn read(xml: &[u8]) -> crate::Result<Scene<'_>> {
     Scene::read(xml)
 }
 
 /// Read a scene using explicit finite limits.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 #[inline]
 pub fn read_with(xml: &[u8], limits: Limits) -> crate::Result<Scene<'_>> {
     Scene::read_with(xml, limits)
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

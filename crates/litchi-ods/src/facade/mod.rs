@@ -248,6 +248,12 @@ impl Spreadsheet {
         )
     }
 
+    /// Inspect inert conditional-format, sparkline, hyperlink, and in-table
+    /// drawing source metadata without evaluating or dereferencing it.
+    pub fn source_features(&self) -> Result<crate::source_features::Snapshot> {
+        crate::source_features::Snapshot::parse(self.package.content_xml())
+    }
+
     /// Discover package, inline, missing, and inert linked embedded objects.
     pub fn embedded_objects(&self) -> Result<Vec<crate::embedded::Object>> {
         let package = self.package.package().package()?;

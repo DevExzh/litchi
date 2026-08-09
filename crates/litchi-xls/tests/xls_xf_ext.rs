@@ -1,4 +1,4 @@
-//! Round-trip tests for the BIFF8 XFExt record (formatting extensions).
+//! Round-trip tests for the BIFF8 `XFExt` record (formatting extensions).
 
 use litchi_xls::writer::Writer;
 use litchi_xls::{ExtProp, FullColorExt, FullColorType, Workbook, XfExt};

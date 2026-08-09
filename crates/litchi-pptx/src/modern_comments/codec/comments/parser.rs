@@ -209,7 +209,10 @@ pub(super) fn parse_comment_list(xml: &[u8]) -> Result<List> {
     Ok(value)
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "parser frame carries one slot per comment child element"
+)]
 fn child_frame(
     comments: &mut Vec<Comment>,
     reply_count: &mut usize,
@@ -292,10 +295,10 @@ fn child_frame(
                 let attributes = known_attributes(element, decoder, &["x", "y"])?;
                 let x = required(&attributes, "x")?
                     .parse::<i64>()
-                    .map_err(|_| invalid("invalid modern comment x coordinate"))?;
+                    .map_err(|_err| invalid("invalid modern comment x coordinate"))?;
                 let y = required(&attributes, "y")?
                     .parse::<i64>()
-                    .map_err(|_| invalid("invalid modern comment y coordinate"))?;
+                    .map_err(|_err| invalid("invalid modern comment y coordinate"))?;
                 comments[*index].position = Some(Position { x, y });
                 Ok(FrameKind::Position)
             } else if namespace == P188 && local == "replyLst" {
@@ -532,16 +535,16 @@ fn attach_raw(
             xml,
         }),
         RawKind::TextBody(RawOwner::Comment(comment)) => {
-            comments[comment].text_body_xml = Some(xml)
+            comments[comment].text_body_xml = Some(xml);
         },
         RawKind::Extension(RawOwner::Comment(comment)) => {
-            comments[comment].extension_xml = Some(xml)
+            comments[comment].extension_xml = Some(xml);
         },
         RawKind::TextBody(RawOwner::Reply(comment, reply)) => {
-            comments[comment].replies[reply].text_body_xml = Some(xml)
+            comments[comment].replies[reply].text_body_xml = Some(xml);
         },
         RawKind::Extension(RawOwner::Reply(comment, reply)) => {
-            comments[comment].replies[reply].extension_xml = Some(xml)
+            comments[comment].replies[reply].extension_xml = Some(xml);
         },
     }
     Ok(())

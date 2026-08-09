@@ -3,28 +3,28 @@
 //! Programmatically constructs the MainMaster PPDrawing record structure
 //! including all placeholder shapes and their properties.
 
-use super::escher::{ShapeFlags, record_type as escher_rt};
-use crate::PlaceholderKind;
-
 // =============================================================================
 // PPT Record Types
 // =============================================================================
 
-/// PPT record types used in PPDrawing
+/// PPT record types used in `PPDrawing`
 pub mod ppt_record_type {
-    /// PPDrawing container
+    /// `PPDrawing` container
     pub const PPDRAWING: u16 = 0x040C;
-    /// OEPlaceholderAtom (MS-PPT 2.9.39)
+    /// `OEPlaceholderAtom` (MS-PPT 2.9.39)
     pub const OE_PLACEHOLDER_ATOM: u16 = 0x0BC3;
-    /// RoundTripProgIdCString
+    /// `RoundTripProgIdCString`
     pub const ROUND_TRIP_PROGID: u16 = 0x0F9F;
-    /// RoundTripTextSpecAtom
+    /// `RoundTripTextSpecAtom`
     pub const ROUND_TRIP_TEXT_SPEC: u16 = 0x0FA8;
-    /// RoundTripStyleTextPropAtom
+    /// `RoundTripStyleTextPropAtom`
     pub const ROUND_TRIP_STYLE_TEXT_PROP: u16 = 0x0FA2;
-    /// RoundTripHFPlaceholder
+    /// `RoundTripHFPlaceholder`
     pub const ROUND_TRIP_HF_PLACEHOLDER: u16 = 0x0FAA;
 }
+
+use super::escher::{ShapeFlags, record_type as escher_rt};
+use crate::PlaceholderKind;
 
 // Shape flags are imported from super::escher::ShapeFlags
 
@@ -64,7 +64,7 @@ pub mod drawing_counts {
     pub const MASTER_SHAPE_COUNT: u32 = 7; // 1 group + 5 placeholders + 1 background
     pub const MASTER_BASE_SPID: u32 = 0x0400;
     pub const MASTER_BG_SPID: u32 = 0x0401; // Background shape ID (group + 1)
-    /// spidCur - next available shape ID (base + shape_count)
+    /// spidCur - next available shape ID (base + `shape_count`)
     pub const MASTER_SPID_CUR: u32 = 0x0407; // 0x0400 + 7 = 1031
 }
 
@@ -101,12 +101,13 @@ pub mod anchor {
 // MasterPPDrawingBuilder
 // =============================================================================
 
-/// Builder for the master slide PPDrawing record
+/// Builder for the master slide `PPDrawing` record
 pub struct MasterPPDrawingBuilder {
     data: Vec<u8>,
 }
 
 impl MasterPPDrawingBuilder {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             data: Vec::with_capacity(1300),
@@ -115,7 +116,7 @@ impl MasterPPDrawingBuilder {
 
     /// Write an Escher header
     fn write_escher_header(&mut self, version: u8, instance: u16, rec_type: u16, length: u32) {
-        let ver_inst = (version as u16) | ((instance & 0x0FFF) << 4);
+        let ver_inst = u16::from(version) | ((instance & 0x0FFF) << 4);
         self.data.extend_from_slice(&ver_inst.to_le_bytes());
         self.data.extend_from_slice(&rec_type.to_le_bytes());
         self.data.extend_from_slice(&length.to_le_bytes());
@@ -129,28 +130,32 @@ impl MasterPPDrawingBuilder {
         self.data.extend_from_slice(&length.to_le_bytes());
     }
 
-    /// Build EscherDg record (drawing info)
+    /// Build `EscherDg` record (drawing info)
     fn build_escher_dg(&mut self, shape_count: u32, last_spid: u32) {
         self.write_escher_header(0x10, 0, escher_rt::DG, 8);
         self.data.extend_from_slice(&shape_count.to_le_bytes());
         self.data.extend_from_slice(&last_spid.to_le_bytes());
     }
 
-    /// Build EscherSpgr record (shape group coordinates)
+    /// Build `EscherSpgr` record (shape group coordinates)
     fn build_escher_spgr(&mut self) {
         self.write_escher_header(0x01, 0, escher_rt::SPGR, 16);
         // Bounding rect: left, top, right, bottom (all zeros for patriarch)
         self.data.extend_from_slice(&[0u8; 16]);
     }
 
-    /// Build EscherSp record (shape)
+    /// Build `EscherSp` record (shape)
     fn build_escher_sp(&mut self, instance: u16, spid: u32, flags: u32) {
         self.write_escher_header(0x02, instance, escher_rt::SP, 8);
         self.data.extend_from_slice(&spid.to_le_bytes());
         self.data.extend_from_slice(&flags.to_le_bytes());
     }
 
-    /// Build EscherOpt record with properties
+    /// Build `EscherOpt` record with properties
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Escher property tables in this builder hold at most a dozen entries, so `len * 6` is bounded far below u32::MAX"
+    )]
     fn build_escher_opt(&mut self, instance: u16, props: &[(u16, u32)]) {
         let length = (props.len() * 6) as u32;
         self.write_escher_header(0x03, instance, escher_rt::OPT, length);
@@ -160,7 +165,7 @@ impl MasterPPDrawingBuilder {
         }
     }
 
-    /// Build ClientAnchor record
+    /// Build `ClientAnchor` record
     fn build_client_anchor(&mut self, left: u16, top: u16, right: u16, bottom: u16) {
         self.write_escher_header(0x00, 0, escher_rt::CLIENT_ANCHOR, 8);
         self.data.extend_from_slice(&top.to_le_bytes());
@@ -169,12 +174,12 @@ impl MasterPPDrawingBuilder {
         self.data.extend_from_slice(&bottom.to_le_bytes());
     }
 
-    /// Build ClientData record (empty wrapper)
+    /// Build `ClientData` record (empty wrapper)
     fn build_client_data(&mut self, content_len: u32) {
         self.write_escher_header(0x0F, 0, escher_rt::CLIENT_DATA, content_len);
     }
 
-    /// Build OEPlaceholderAtom
+    /// Build `OEPlaceholderAtom`
     fn build_oe_placeholder(&mut self, position: u32, kind: PlaceholderKind, size: u8) {
         self.write_ppt_header(ppt_record_type::OE_PLACEHOLDER_ATOM, 8);
         self.data.extend_from_slice(&position.to_le_bytes());
@@ -183,7 +188,11 @@ impl MasterPPDrawingBuilder {
         self.data.extend_from_slice(&[0x00, 0x00]); // unused
     }
 
-    /// Build RoundTrip text records for a placeholder
+    /// Build `RoundTrip` text records for a placeholder
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "placeholder text is a fixed short master string, so its byte length always fits u32"
+    )]
     fn build_roundtrip_text(&mut self, text: &[u8], text_spec_value: u8, style_level_count: u32) {
         // RoundTripProgIdCString (empty)
         self.write_ppt_header(ppt_record_type::ROUND_TRIP_PROGID, 4);
@@ -218,7 +227,11 @@ impl MasterPPDrawingBuilder {
         }
     }
 
-    /// Build the group patriarch SpContainer
+    /// Build the group patriarch `SpContainer`
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the patriarch container holds two small fixed Escher records, so its length always fits u32"
+    )]
     fn build_group_patriarch(&mut self) -> usize {
         let start = self.data.len();
         // SpContainer header (will be patched)
@@ -239,7 +252,11 @@ impl MasterPPDrawingBuilder {
         start
     }
 
-    /// Build background SpContainer (outside SpgrContainer, per POI)
+    /// Build background `SpContainer` (outside `SpgrContainer`, per POI)
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the background container holds a fixed 8-entry property table and one shape record, so its length and property count always fit u32/u16"
+    )]
     fn build_background_sp_container(&mut self) {
         let start = self.data.len();
         // SpContainer header (will be patched)
@@ -255,14 +272,14 @@ impl MasterPPDrawingBuilder {
 
         // Background EscherOpt properties (per POI PPDrawing.create())
         let bg_props = [
-            (escher_prop::FILL_COLOR, 0x08000000),        // fillColor
-            (escher_prop::FILL_BACK_COLOR, 0x08000005),   // fillBackColor
-            (escher_prop::FILL_RECT_RIGHT, 0x0099A040),   // fillRectRight (10064960)
-            (escher_prop::FILL_RECT_BOTTOM, 0x0076BE60),  // fillRectBottom (7782016)
-            (escher_prop::NO_FILL_HIT_TEST, 0x00120012),  // noFillHitTest
-            (escher_prop::LINE_NO_DRAW_DASH, 0x00080000), // lineNoDrawDash
-            (escher_prop::BW_MODE, 0x00000009),           // bwMode
-            (escher_prop::BACKGROUND_SHAPE, 0x00010001),  // fBackground
+            (escher_prop::FILL_COLOR, 0x0800_0000),        // fillColor
+            (escher_prop::FILL_BACK_COLOR, 0x0800_0005),   // fillBackColor
+            (escher_prop::FILL_RECT_RIGHT, 0x0099_A040),   // fillRectRight (10064960)
+            (escher_prop::FILL_RECT_BOTTOM, 0x0076_BE60),  // fillRectBottom (7782016)
+            (escher_prop::NO_FILL_HIT_TEST, 0x0012_0012),  // noFillHitTest
+            (escher_prop::LINE_NO_DRAW_DASH, 0x0008_0000), // lineNoDrawDash
+            (escher_prop::BW_MODE, 0x0000_0009),           // bwMode
+            (escher_prop::BACKGROUND_SHAPE, 0x0001_0001),  // fBackground
         ];
         self.build_escher_opt(bg_props.len() as u16, &bg_props);
 
@@ -272,7 +289,11 @@ impl MasterPPDrawingBuilder {
         self.data[start + 4..start + 8].copy_from_slice(&len_bytes);
     }
 
-    /// Build a placeholder SpContainer
+    /// Build a placeholder `SpContainer`
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "placeholder containers hold a small fixed set of Escher records, so their lengths and property counts always fit u32/u16"
+    )]
     fn build_placeholder_container(
         &mut self,
         spid: u32,
@@ -321,17 +342,22 @@ impl MasterPPDrawingBuilder {
 
         // Patch ClientData length
         let client_content_len = (self.data.len() - client_content_start) as u32;
-        let len_bytes = client_content_len.to_le_bytes();
-        self.data[client_data_start + 4..client_data_start + 8].copy_from_slice(&len_bytes);
+        let client_len_bytes = client_content_len.to_le_bytes();
+        self.data[client_data_start + 4..client_data_start + 8].copy_from_slice(&client_len_bytes);
 
         // Patch SpContainer length
         let content_len = (self.data.len() - content_start) as u32;
-        let len_bytes = content_len.to_le_bytes();
-        self.data[start + 4..start + 8].copy_from_slice(&len_bytes);
+        let container_len_bytes = content_len.to_le_bytes();
+        self.data[start + 4..start + 8].copy_from_slice(&container_len_bytes);
         start
     }
 
-    /// Build the complete master PPDrawing
+    /// Build the complete master `PPDrawing`
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the whole master PPDrawing is a fixed ~1.3 KB structure, so every container length always fits u32"
+    )]
+    #[must_use]
     pub fn build(mut self) -> Vec<u8> {
         // PPDrawing record header (will be patched)
         self.write_escher_header(0x0F, 0, ppt_record_type::PPDRAWING, 0);
@@ -356,15 +382,15 @@ impl MasterPPDrawingBuilder {
 
         // Title placeholder properties
         let title_props = [
-            (escher_prop::LOCK_AGGR, 0x00010005),
-            (escher_prop::TEXT_ID, 0x067C94EC),
-            (escher_prop::ANCHOR_TEXT, 0x00010000),
-            (escher_prop::FILL_COLOR, 0x08000004),
-            (escher_prop::FILL_BACK_COLOR, 0x08000000),
-            (escher_prop::NO_FILL_HIT_TEST, 0x00110001),
-            (escher_prop::LINE_COLOR, 0x08000001),
-            (escher_prop::LINE_STYLE_BOOL, 0x00090001),
-            (escher_prop::SHADOW_COLOR, 0x08000002),
+            (escher_prop::LOCK_AGGR, 0x0001_0005),
+            (escher_prop::TEXT_ID, 0x067C_94EC),
+            (escher_prop::ANCHOR_TEXT, 0x0001_0000),
+            (escher_prop::FILL_COLOR, 0x0800_0004),
+            (escher_prop::FILL_BACK_COLOR, 0x0800_0000),
+            (escher_prop::NO_FILL_HIT_TEST, 0x0011_0001),
+            (escher_prop::LINE_COLOR, 0x0800_0001),
+            (escher_prop::LINE_STYLE_BOOL, 0x0009_0001),
+            (escher_prop::SHADOW_COLOR, 0x0800_0002),
         ];
 
         // Title placeholder
@@ -379,14 +405,14 @@ impl MasterPPDrawingBuilder {
 
         // Body placeholder properties (similar but different lock value)
         let body_props = [
-            (escher_prop::LOCK_AGGR, 0x00010005),
-            (escher_prop::TEXT_ID, 0x067C9784),
-            (escher_prop::FILL_COLOR, 0x08000004),
-            (escher_prop::FILL_BACK_COLOR, 0x08000000),
-            (escher_prop::NO_FILL_HIT_TEST, 0x00110001),
-            (escher_prop::LINE_COLOR, 0x08000001),
-            (escher_prop::LINE_STYLE_BOOL, 0x00090001),
-            (escher_prop::SHADOW_COLOR, 0x08000002),
+            (escher_prop::LOCK_AGGR, 0x0001_0005),
+            (escher_prop::TEXT_ID, 0x067C_9784),
+            (escher_prop::FILL_COLOR, 0x0800_0004),
+            (escher_prop::FILL_BACK_COLOR, 0x0800_0000),
+            (escher_prop::NO_FILL_HIT_TEST, 0x0011_0001),
+            (escher_prop::LINE_COLOR, 0x0800_0001),
+            (escher_prop::LINE_STYLE_BOOL, 0x0009_0001),
+            (escher_prop::SHADOW_COLOR, 0x0800_0002),
         ];
 
         // Body placeholder
@@ -401,14 +427,14 @@ impl MasterPPDrawingBuilder {
 
         // Date/Footer/SlideNumber placeholders (simpler, no text)
         let simple_props = [
-            (escher_prop::LOCK_AGGR, 0x00010005),
-            (escher_prop::TEXT_ID, 0x067C9784),
-            (escher_prop::FILL_COLOR, 0x08000004),
-            (escher_prop::FILL_BACK_COLOR, 0x08000000),
-            (escher_prop::NO_FILL_HIT_TEST, 0x00110001),
-            (escher_prop::LINE_COLOR, 0x08000001),
-            (escher_prop::LINE_STYLE_BOOL, 0x00090001),
-            (escher_prop::SHADOW_COLOR, 0x08000002),
+            (escher_prop::LOCK_AGGR, 0x0001_0005),
+            (escher_prop::TEXT_ID, 0x067C_9784),
+            (escher_prop::FILL_COLOR, 0x0800_0004),
+            (escher_prop::FILL_BACK_COLOR, 0x0800_0000),
+            (escher_prop::NO_FILL_HIT_TEST, 0x0011_0001),
+            (escher_prop::LINE_COLOR, 0x0800_0001),
+            (escher_prop::LINE_STYLE_BOOL, 0x0009_0001),
+            (escher_prop::SHADOW_COLOR, 0x0800_0002),
         ];
 
         self.build_placeholder_container(
@@ -438,21 +464,21 @@ impl MasterPPDrawingBuilder {
 
         // Patch SpgrContainer length
         let spgr_len = (self.data.len() - spgr_container_start) as u32;
-        let len_bytes = spgr_len.to_le_bytes();
-        self.data[spgr_container_start - 4..spgr_container_start].copy_from_slice(&len_bytes);
+        let spgr_len_bytes = spgr_len.to_le_bytes();
+        self.data[spgr_container_start - 4..spgr_container_start].copy_from_slice(&spgr_len_bytes);
 
         // Background SpContainer (outside SpgrContainer, per POI PPDrawing.create())
         self.build_background_sp_container();
 
         // Patch DgContainer length
         let dg_len = (self.data.len() - dg_container_start) as u32;
-        let len_bytes = dg_len.to_le_bytes();
-        self.data[dg_container_start - 4..dg_container_start].copy_from_slice(&len_bytes);
+        let dg_len_bytes = dg_len.to_le_bytes();
+        self.data[dg_container_start - 4..dg_container_start].copy_from_slice(&dg_len_bytes);
 
         // Patch PPDrawing length
         let ppdrawing_len = (self.data.len() - ppdrawing_start) as u32;
-        let len_bytes = ppdrawing_len.to_le_bytes();
-        self.data[ppdrawing_start - 4..ppdrawing_start].copy_from_slice(&len_bytes);
+        let ppdrawing_len_bytes = ppdrawing_len.to_le_bytes();
+        self.data[ppdrawing_start - 4..ppdrawing_start].copy_from_slice(&ppdrawing_len_bytes);
 
         self.data
     }
@@ -464,12 +490,18 @@ impl Default for MasterPPDrawingBuilder {
     }
 }
 
-/// Build the master PPDrawing bytes programmatically
+/// Build the master `PPDrawing` bytes programmatically
+#[must_use]
 pub fn build_master_ppdrawing() -> Vec<u8> {
     MasterPPDrawingBuilder::new().build()
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

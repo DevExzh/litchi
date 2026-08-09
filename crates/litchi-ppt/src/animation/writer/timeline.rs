@@ -17,6 +17,10 @@ use crate::consts::RecordType;
 use crate::package::{Error, Result};
 
 /// Serialize an exact rotation behavior container.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
 pub fn write_time_rotation_behavior(behavior: &TimeRotationBehavior) -> Result<Vec<u8>> {
     validate_rotation_behavior(&behavior.behavior)?;
     let mut children = write_time_rotation_behavior_atom(&behavior.atom)?;
@@ -25,6 +29,10 @@ pub fn write_time_rotation_behavior(behavior: &TimeRotationBehavior) -> Result<V
 }
 
 /// Serialize an exact `TimeRotationBehaviorAtom`.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
 pub fn write_time_rotation_behavior_atom(atom: &TimeRotationBehaviorAtom) -> Result<Vec<u8>> {
     if atom.from_degrees.is_some() && atom.by_degrees.is_none() && atom.to_degrees.is_none() {
         return Err(Error::InvalidFormat(
@@ -54,6 +62,10 @@ pub fn write_time_rotation_behavior_atom(atom: &TimeRotationBehaviorAtom) -> Res
 }
 
 /// Serialize an exact scale behavior container.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
 pub fn write_time_scale_behavior(behavior: &TimeScaleBehavior) -> Result<Vec<u8>> {
     validate_basic_behavior_properties(&behavior.behavior)?;
     let mut children = write_time_scale_behavior_atom(&behavior.atom)?;
@@ -62,6 +74,10 @@ pub fn write_time_scale_behavior(behavior: &TimeScaleBehavior) -> Result<Vec<u8>
 }
 
 /// Serialize an exact `TimeScaleBehaviorAtom`.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
 pub fn write_time_scale_behavior_atom(atom: &TimeScaleBehaviorAtom) -> Result<Vec<u8>> {
     if atom.from_percent.is_some() && atom.by_percent.is_none() && atom.to_percent.is_none() {
         return Err(Error::InvalidFormat(
@@ -90,6 +106,10 @@ pub fn write_time_scale_behavior_atom(atom: &TimeScaleBehaviorAtom) -> Result<Ve
 }
 
 /// Serialize an exact set-property behavior container.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
 pub fn write_time_set_behavior(set: &TimeSetBehavior) -> Result<Vec<u8>> {
     validate_set_behavior(set)?;
     let mut children = write_time_set_behavior_atom(&set.atom);
@@ -101,6 +121,7 @@ pub fn write_time_set_behavior(set: &TimeSetBehavior) -> Result<Vec<u8>> {
 }
 
 /// Serialize an exact `TimeSetBehaviorAtom`.
+#[must_use]
 pub fn write_time_set_behavior_atom(atom: &TimeSetBehaviorAtom) -> Vec<u8> {
     let flags = u32::from(atom.to_used) | (u32::from(atom.value_type.is_some()) << 1);
     let value_type = atom.value_type.map_or(1u32, |value| match value {
@@ -191,6 +212,10 @@ pub(super) fn validate_basic_behavior_properties(behavior: &TimeBehavior) -> Res
 }
 
 /// Serialize an exact command behavior container.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
 pub fn write_time_command_behavior(behavior: &TimeCommandBehavior) -> Result<Vec<u8>> {
     validate_basic_behavior_properties(&behavior.behavior)?;
     if let Some(command) = &behavior.command {
@@ -200,7 +225,7 @@ pub fn write_time_command_behavior(behavior: &TimeCommandBehavior) -> Result<Vec
     if let Some(command) = &behavior.command {
         let data = encode_time_variant_string(command);
         let length = u32::try_from(data.len())
-            .map_err(|_| Error::InvalidFormat("time command exceeds 4 GiB".to_string()))?;
+            .map_err(|_err| Error::InvalidFormat("time command exceeds 4 GiB".to_string()))?;
         children.extend(create_record_header(RecordType::TimeVariant, 0, 1, length));
         children.extend(data);
     }
@@ -209,6 +234,7 @@ pub fn write_time_command_behavior(behavior: &TimeCommandBehavior) -> Result<Vec
 }
 
 /// Serialize an exact `TimeCommandBehaviorAtom`.
+#[must_use]
 pub fn write_time_command_behavior_atom(atom: &TimeCommandBehaviorAtom) -> Vec<u8> {
     let flags = u32::from(atom.command_type.is_some()) | (u32::from(atom.command_used) << 1);
     let command_type = atom.command_type.map_or(1u32, |value| match value {
@@ -249,6 +275,7 @@ fn validate_time_command(
 }
 
 /// Serialize an exact `TimeIterateDataAtom`.
+#[must_use]
 pub fn write_time_iterate_data(data: &TimeIterateData) -> Vec<u8> {
     let flags = (u32::from(data.direction.is_some()))
         | (u32::from(data.iterate_type.is_some()) << 1)
@@ -318,6 +345,10 @@ pub fn write_time_sequence_data(data: &TimeSequenceData) -> Vec<u8> {
 }
 
 /// Serialize an exact `TimeConditionContainer`.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
 pub fn write_time_condition(condition: &TimeCondition) -> Result<Vec<u8>> {
     let expects_visual = condition.atom.trigger_object == TimeTriggerObject::VisualElement;
     if expects_visual != condition.visual_target.is_some() {
@@ -341,6 +372,10 @@ pub fn write_time_condition(condition: &TimeCondition) -> Result<Vec<u8>> {
 }
 
 /// Serialize an exact `TimeConditionAtom`.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or the underlying writer reports an error.
 pub fn write_time_condition_atom(atom: &TimeConditionAtom) -> Result<Vec<u8>> {
     if atom.trigger_object == TimeTriggerObject::RuntimeNodeReference && atom.target_id != 2 {
         return Err(Error::InvalidFormat(
@@ -373,6 +408,7 @@ pub fn write_time_condition_atom(atom: &TimeConditionAtom) -> Result<Vec<u8>> {
 }
 
 /// Serialize an exact `TimeModifierAtom`.
+#[must_use]
 pub fn write_time_modifier(modifier: &TimeModifier) -> Vec<u8> {
     let (kind, value) = match modifier {
         TimeModifier::RepeatCount(value) => (0u32, *value),

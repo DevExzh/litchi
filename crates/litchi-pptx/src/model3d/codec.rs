@@ -1,4 +1,4 @@
-//! Bounded PresentationML graphic-frame and shared model3d wire codecs.
+//! Bounded `PresentationML` graphic-frame and shared model3d wire codecs.
 
 use std::ops::Range;
 
@@ -45,6 +45,10 @@ pub(crate) struct Inventory {
 
 /// Read one shared model3d scene without exposing relationship IDs in the
 /// PPTX semantic model.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn read(xml: &[u8]) -> Result<Scene> {
     let prepared = prepare_fragment(xml)?;
     Ok(Scene::from_wire(
@@ -53,6 +57,10 @@ pub fn read(xml: &[u8]) -> Result<Scene> {
 }
 
 /// Write one shared model3d scene using the common deterministic codec.
+///
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn write(scene: &Scene) -> Result<Vec<u8>> {
     let mut wire = scene.wire.clone();
     if !wire
@@ -282,7 +290,7 @@ fn is_namespace(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("model3d XML offset exceeds usize"))
+        .map_err(|_err| invalid("model3d XML offset exceeds usize"))
 }
 
 fn xml_error(error: quick_xml::Error) -> Error {
@@ -378,7 +386,7 @@ fn attribute_prefix<'a>(opening: &'a [u8], local: &[u8]) -> Option<&'a [u8]> {
         let colon = opening[..index].iter().rposition(|byte| *byte == b':')?;
         let prefix_start = opening[..colon]
             .iter()
-            .rposition(|byte| byte.is_ascii_whitespace())
+            .rposition(u8::is_ascii_whitespace)
             .map_or(1, |value| value.saturating_add(1));
         if prefix_start < colon
             && opening[index..].starts_with(local)

@@ -11,7 +11,11 @@ use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use std::collections::HashSet;
 
 mod comments {
-    use super::*;
+    use super::{
+        BlobPart, Comment, Error, Extensions, HashSet, List, MODERN_COMMENT_CONTENT_TYPE,
+        MODERN_COMMENT_RELATIONSHIP_TYPE, OpcPackage, PackURI, Part, Reply, Result,
+        SLIDE_CONTENT_TYPE, load_modern_comment_authors, validate_modern_comment_author_references,
+    };
 
     fn invalid(message: impl Into<String>) -> Error {
         Error::Invalid(message.into())
@@ -51,6 +55,9 @@ mod comments {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn load_modern_comments(package: &OpcPackage) -> Result<Vec<Part>> {
         if package
             .rels()
@@ -119,6 +126,10 @@ mod comments {
 
     /// Add a new modern Comment part after validating the complete existing graph.
     /// Existing parts are deliberately not overwritten.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
     pub fn store_modern_comment(package: &mut OpcPackage, value: &Part) -> Result<()> {
         load_modern_comments(package)?;
         validate_relationship_id(&value.relationship_id)?;
@@ -159,6 +170,9 @@ mod comments {
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn find_modern_comment(
         package: &OpcPackage,
         slide_part_name: &PackURI,
@@ -176,6 +190,10 @@ mod comments {
     }
 
     /// Add a modern comment to a slide, creating a collision-safe part when necessary.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add_modern_comment(
         package: &mut OpcPackage,
         slide_part_name: &PackURI,
@@ -231,6 +249,10 @@ mod comments {
     }
 
     /// Update a modern comment without permitting its stable GUID to change.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn update_modern_comment<F>(
         package: &mut OpcPackage,
         slide_part_name: &PackURI,
@@ -284,6 +306,10 @@ mod comments {
     }
 
     /// Replace a modern comment without permitting its stable GUID to change.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace_modern_comment(
         package: &mut OpcPackage,
         slide_part_name: &PackURI,
@@ -299,6 +325,10 @@ mod comments {
     }
 
     /// Remove a modern comment and remove an empty per-slide part unless another owner shares it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_modern_comment(
         package: &mut OpcPackage,
         slide_part_name: &PackURI,
@@ -341,6 +371,10 @@ mod comments {
     }
 
     /// Reorder every modern comment in one slide part by a complete GUID list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn reorder_modern_comments(
         package: &mut OpcPackage,
         slide_part_name: &PackURI,
@@ -382,6 +416,10 @@ mod comments {
     }
 
     /// Find a reply by its stable GUID within a modern comment thread.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn find_modern_comment_reply(
         package: &OpcPackage,
         slide_part_name: &PackURI,
@@ -399,6 +437,10 @@ mod comments {
     }
 
     /// Add a reply to a modern comment thread.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add_modern_comment_reply(
         package: &mut OpcPackage,
         slide_part_name: &PackURI,
@@ -419,6 +461,10 @@ mod comments {
     }
 
     /// Update a reply without permitting its stable GUID to change.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn update_modern_comment_reply<F>(
         package: &mut OpcPackage,
         slide_part_name: &PackURI,
@@ -454,6 +500,10 @@ mod comments {
 
     /// Read the typed extension envelope for one comment without exposing
     /// relationship or collaboration behavior.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn load_modern_comment_extensions(
         package: &OpcPackage,
         slide_part_name: &PackURI,
@@ -466,6 +516,10 @@ mod comments {
 
     /// Transactionally update one comment's typed task/reaction extension
     /// envelope while retaining all opaque extension entries.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn update_modern_comment_extensions<F>(
         package: &mut OpcPackage,
         slide_part_name: &PackURI,
@@ -501,6 +555,10 @@ mod comments {
     }
 
     /// Read the typed extension envelope for one reply.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn load_modern_comment_reply_extensions(
         package: &OpcPackage,
         slide_part_name: &PackURI,
@@ -513,6 +571,10 @@ mod comments {
     }
 
     /// Transactionally update one reply's typed reaction extension envelope.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn update_modern_comment_reply_extensions<F>(
         package: &mut OpcPackage,
         slide_part_name: &PackURI,
@@ -546,6 +608,10 @@ mod comments {
     }
 
     /// Replace a reply without permitting its stable GUID to change.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace_modern_comment_reply(
         package: &mut OpcPackage,
         slide_part_name: &PackURI,
@@ -568,6 +634,10 @@ mod comments {
     }
 
     /// Remove a reply from a modern comment thread.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_modern_comment_reply(
         package: &mut OpcPackage,
         slide_part_name: &PackURI,
@@ -714,8 +784,15 @@ mod comments {
 }
 
 mod authors {
-    use super::*;
+    use super::{
+        Author, AuthorPart, Authors, BlobPart, Error, Graph, HashSet,
+        MODERN_COMMENT_AUTHOR_CONTENT_TYPE, MODERN_COMMENT_AUTHOR_RELATIONSHIP_TYPE, OpcPackage,
+        PackURI, Part, Result, load_modern_comments,
+    };
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     fn invalid(message: impl Into<String>) -> Error {
         Error::Invalid(message.into())
     }
@@ -782,6 +859,9 @@ mod authors {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn load_modern_comment_authors(package: &OpcPackage) -> Result<Option<AuthorPart>> {
         let presentation = package.main_document_part()?;
         require_presentation_content_type(presentation.content_type())?;
@@ -859,6 +939,9 @@ mod authors {
         }))
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn load_modern_comment_graph(package: &OpcPackage) -> Result<Graph> {
         let authors = load_modern_comment_authors(package)?;
         let comments = load_modern_comments(package)?;
@@ -868,6 +951,10 @@ mod authors {
 
     /// Validate modeled comment, reply, and assignment author references.
     /// Author-looking values inside opaque extensions remain inert.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn validate_modern_comment_author_references(
         authors: Option<&AuthorPart>,
         comments: &[Part],
@@ -907,6 +994,10 @@ mod authors {
 
     /// Add a new modern Comment Author part after validating the complete graph.
     /// Existing Author parts are deliberately not overwritten.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
     pub fn store_modern_comment_authors(
         package: &mut OpcPackage,
         value: &AuthorPart,
@@ -953,6 +1044,9 @@ mod authors {
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn find_modern_comment_author(
         package: &OpcPackage,
         author_id: &str,
@@ -966,6 +1060,10 @@ mod authors {
     }
 
     /// Add a modern comment author, allocating a collision-safe part and relationship if needed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add_modern_comment_author(
         package: &mut OpcPackage,
         author: Author,
@@ -1022,6 +1120,10 @@ mod authors {
     }
 
     /// Update a modern comment author while keeping its stable GUID unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn update_modern_comment_author<F>(
         package: &mut OpcPackage,
         author_id: &str,
@@ -1051,6 +1153,10 @@ mod authors {
     }
 
     /// Replace a modern comment author while keeping its stable GUID unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace_modern_comment_author(
         package: &mut OpcPackage,
         author_id: &str,
@@ -1063,6 +1169,10 @@ mod authors {
     }
 
     /// Remove an unreferenced modern comment author.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_modern_comment_author(package: &mut OpcPackage, author_id: &str) -> Result<bool> {
         let graph = load_modern_comment_graph(package)?;
         let Some(mut part) = graph.authors.clone() else {
@@ -1101,6 +1211,10 @@ mod authors {
     }
 
     /// Reorder modern comment authors by a complete, duplicate-free GUID list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn reorder_modern_comment_authors(
         package: &mut OpcPackage,
         ordered_author_ids: &[String],

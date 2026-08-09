@@ -8,6 +8,10 @@ pub(crate) const MAX_FILE_TABLE_ENTRIES: usize = 4_096;
 pub(crate) const MAX_FILE_NAME_BYTES: usize = 4_096;
 pub(crate) const MAX_FILE_TABLE_TEXT_BYTES: usize = 1_048_576;
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent RTF feature flags stay flat for direct access"
+)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct FileSystemValidity {
     pub mac: bool,
@@ -35,6 +39,7 @@ pub struct FileTableEntry<'a> {
 }
 
 impl<'a> FileTableEntry<'a> {
+    #[must_use]
     pub fn new(id: u32, name: Cow<'a, str>) -> Self {
         Self {
             id,
@@ -46,6 +51,9 @@ impl<'a> FileTableEntry<'a> {
         }
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if self.id > i32::MAX as u32 {
             return Err(RtfError::MalformedDocument(
@@ -83,18 +91,24 @@ pub struct FileTable<'a> {
 }
 
 impl<'a> FileTable<'a> {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use]
     pub fn entries(&self) -> &[FileTableEntry<'a>] {
         &self.entries
     }
 
+    #[must_use]
     pub fn get(&self, id: u32) -> Option<&FileTableEntry<'a>> {
         self.entries.iter().find(|entry| entry.id == id)
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn add(&mut self, entry: FileTableEntry<'a>) -> RtfResult<()> {
         entry.validate()?;
         if self.entries.len() >= MAX_FILE_TABLE_ENTRIES {
@@ -115,6 +129,9 @@ impl<'a> FileTable<'a> {
         Ok(())
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if self.entries.is_empty() || self.entries.len() > MAX_FILE_TABLE_ENTRIES {
             return Err(RtfError::MalformedDocument(

@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::codec::*;
 use super::model::*;
 use crate::consts::RecordType;
@@ -188,7 +194,7 @@ fn ole_collection_preserves_unknown_children_and_source_slots() {
     let first_unknown = record_bytes_raw(0, 7, 0x7777, b"before").unwrap();
     let second_unknown = record_bytes_raw(0, 9, 0x8888, b"after").unwrap();
     let (root, original) = external_object_list_with_children(
-        value.object.id as i32,
+        i32::try_from(value.object.id).unwrap(),
         &[
             first_unknown.clone(),
             value.to_record_bytes().unwrap(),
@@ -268,8 +274,8 @@ fn ole_collection_discovers_objects_and_enforces_seed() {
     let parsed = Collection::parse(&root).unwrap().unwrap();
     assert_eq!(parsed.id_seed, 21);
     assert!(parsed.get(21).is_some());
-    let root = external_object_list(20, &[first.to_record_bytes().unwrap()]);
-    assert!(Collection::parse(&root).is_err());
+    let wrong_seed_root = external_object_list(20, &[first.to_record_bytes().unwrap()]);
+    assert!(Collection::parse(&wrong_seed_root).is_err());
 }
 
 #[test]
@@ -284,7 +290,7 @@ fn ole_collection_rejects_duplicate_ids() {
     let mut second = first.clone();
     second.object.persist_id += 1;
     let root = external_object_list(
-        first.object.id as i32,
+        i32::try_from(first.object.id).unwrap(),
         &[
             first.to_record_bytes().unwrap(),
             second.to_record_bytes().unwrap(),

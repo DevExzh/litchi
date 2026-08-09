@@ -490,14 +490,14 @@ fn parse_track(element: &BytesStart<'_>, decoder: Decoder, start: usize) -> Resu
 }
 
 fn parse_shape_id(element: &BytesStart<'_>, decoder: Decoder, start: usize) -> Result<Option<u32>> {
-    Ok(attr(element, b"id", None, decoder, start)?
+    attr(element, b"id", None, decoder, start)?
         .map(|value| {
             value
                 .value
                 .parse::<u32>()
-                .map_err(|_| invalid("media shape cNvPr/@id is not an unsigned integer"))
+                .map_err(|_err| invalid("media shape cNvPr/@id is not an unsigned integer"))
         })
-        .transpose()?)
+        .transpose()
 }
 
 fn required_attr(
@@ -674,7 +674,7 @@ fn namespace_kind(value: ResolveResult<'_>) -> NamespaceKind {
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("media tracks XML offset does not fit usize"))
+        .map_err(|_err| invalid("media tracks XML offset does not fit usize"))
 }
 
 fn xml_error(error: quick_xml::Error) -> Error {

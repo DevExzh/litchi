@@ -1,4 +1,4 @@
-//! Strict, inert PowerPoint document bookmark-summary metadata.
+//! Strict, inert `PowerPoint` document bookmark-summary metadata.
 
 mod codec;
 mod model;

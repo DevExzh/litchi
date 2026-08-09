@@ -4,6 +4,12 @@ use crate::prop::{Array, Id, Props, Value};
 use crate::{Error, Result};
 
 /// Parses the custom-geometry property family from one shape property table.
+///
+/// # Errors
+///
+/// Returns `Error::MalformedGeometry` if `shapePath` is complex or does not
+/// contain a scalar value, if a geometry array is malformed, or if the vertex
+/// and segment-info arrays fail validation.
 pub fn parse<'data>(properties: &Props<'data>) -> Result<Option<Geometry<'data>>> {
     let has_geometry = [Id::ShapePath, Id::Vertices, Id::SegmentInfo]
         .into_iter()
@@ -34,8 +40,8 @@ fn shape_path(properties: &Props<'_>) -> Result<PathKind> {
         });
     }
     match prop.value() {
-        Value::Simple(value) => Ok(PathKind::from_raw(*value as u32)),
-        _ => Err(Error::MalformedGeometry {
+        Value::Simple(value) => Ok(PathKind::from_raw((*value).cast_unsigned())),
+        Value::Complex(_) | Value::Array(_) => Err(Error::MalformedGeometry {
             reason: "shapePath does not contain a scalar value",
         }),
     }
@@ -60,7 +66,7 @@ fn array_value<'data>(
 
     let array = match prop.value() {
         Value::Array(array) => *array,
-        _ => {
+        Value::Simple(_) | Value::Complex(_) => {
             return Err(Error::MalformedGeometry {
                 reason: "complex geometry property is not an IMsoArray",
             });

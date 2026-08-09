@@ -1,4 +1,4 @@
-//! Layered, prefix-free slide facade for legacy PowerPoint.
+//! Layered, prefix-free slide facade for legacy `PowerPoint`.
 //!
 //! The facade keeps the stable [`Slide`] object and its lazy caches together,
 //! while delegating value objects, semantic queries, binary decoding, and
@@ -25,15 +25,19 @@ use once_cell::unsync::OnceCell;
 
 pub use model::{ParsedComment, ParsedSlideTiming};
 
-/// A slide in a PowerPoint presentation with lazy-loaded shapes and metadata.
+/// A slide in a `PowerPoint` presentation with lazy-loaded shapes and metadata.
 ///
 /// The object owns parsed record state and uses one-time cells for expensive
 /// projections.  Shape conversion and text extraction therefore remain
 /// demand-driven with no repeated allocation after the first access.
+#[allow(
+    clippy::struct_field_names,
+    reason = "the `slide_id`, `slide_list_text`, and `slide_number` fields mirror the MS-PPT `SlidePersistAtom` terminology; they are private and renaming them would churn sibling modules without changing the public API"
+)]
 pub struct Slide<'doc> {
     /// Slide persist ID.
     persist_id: u32,
-    /// Stable SlideId from the live SlidePersistAtom.
+    /// Stable `SlideId` from the live `SlidePersistAtom`.
     slide_id: u32,
     slide_list_text: String,
     outline_text_interactions: Vec<crate::TextBodyInteractions>,
@@ -43,7 +47,7 @@ pub struct Slide<'doc> {
     /// Slide record.
     record: Record,
     /// Reference to document data for lazy speaker-notes parsing.
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "reserved for lazy speaker-notes parsing")]
     doc_data: &'doc [u8],
     /// Lazily-loaded shapes stored as owned values.
     shapes: OnceCell<Vec<ShapeEnum<'static>>>,
@@ -51,13 +55,13 @@ pub struct Slide<'doc> {
     text_cache: OnceCell<String>,
     /// Lazily parsed, inert shape animation metadata.
     animations: OnceCell<Vec<ShapeAnimation>>,
-    /// Lazily parsed PowerPoint 2002 slide animation extension.
+    /// Lazily parsed `PowerPoint` 2002 slide animation extension.
     animation_extension: OnceCell<Option<SlideAnimationExtension>>,
-    /// Lazily parsed PowerPoint 12 slide/master round-trip metadata.
+    /// Lazily parsed `PowerPoint` 12 slide/master round-trip metadata.
     powerpoint12_extension: OnceCell<SlideExtension>,
     /// Lazily parsed, inert slide-library synchronization metadata.
     sync_info: OnceCell<Option<Synchronization>>,
-    /// Lazily parsed direct PowerPoint 12 slide round-trip metadata.
+    /// Lazily parsed direct `PowerPoint` 12 slide round-trip metadata.
     round_trip_metadata: OnceCell<SlideRoundTripMetadata12>,
     notes_descriptor: Result<Option<NoteDescriptor>, String>,
     speaker_notes: OnceCell<Option<SpeakerNotes>>,

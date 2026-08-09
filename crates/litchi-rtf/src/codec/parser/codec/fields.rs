@@ -1,10 +1,22 @@
-use super::*;
+#![allow(
+    clippy::shadow_unrelated,
+    reason = "decoding steps deliberately rebind a working value as it is refined through the parse pipeline"
+)]
+use super::{
+    ControlWord, Cow, Destination, DrawingStoryCapture, FormFieldBuilder, ParsedBodyStoryEvent,
+    Parser, RtfError, RtfResult, SmallVec, Token, control_symbol_text, parser_classification_error,
+    require_parameterless,
+};
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     /// Parse field content.
     ///
     /// Fields in RTF have the format:
     /// {\field{\*\fldinst INSTRUCTION}{\fldrslt RESULT}}
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn parse_field(&mut self) -> RtfResult<()> {
         let state = self.current_state()?;
         let enclosing_destination = state.destination;
@@ -20,7 +32,16 @@ impl<'a> Parser<'a> {
                 crate::FieldOwner::TableCell(table_level)
             },
             Destination::DocumentBody => crate::FieldOwner::Body,
-            _ => crate::FieldOwner::Other,
+            Destination::FontTable
+            | Destination::ColorTable
+            | Destination::StyleSheet
+            | Destination::Info
+            | Destination::Picture
+            | Destination::Result
+            | Destination::FieldInstruction
+            | Destination::NestedTableProperties
+            | Destination::Revision
+            | Destination::Other => crate::FieldOwner::Other,
         };
         let field_position = match field_owner {
             crate::FieldOwner::FieldResult => self
@@ -37,7 +58,9 @@ impl<'a> Parser<'a> {
                 .get(usize::from(level - 2))
                 .map_or(0, |builder| builder.cell_text.len()),
             crate::FieldOwner::Body => self.body_text_len,
-            _ => 0,
+            crate::FieldOwner::Detached
+            | crate::FieldOwner::FormField
+            | crate::FieldOwner::Other => 0,
         };
         self.pos += 1; // Skip \field
         let mut field_status = crate::FieldStatus::default();
@@ -103,7 +126,7 @@ impl<'a> Parser<'a> {
                 },
                 Token::OpenBrace => {
                     self.reject_non_body_custom_xml_markup_group()?;
-                    let is_status_control = |token: Option<&Token>| {
+                    let is_status_control = |token: Option<&Token<'_>>| {
                         matches!(
                             token,
                             Some(Token::Control(
@@ -257,8 +280,8 @@ impl<'a> Parser<'a> {
                                         (
                                             Some(Token::Control(ControlWord::IgnorableDestination)),
                                             Some(Token::Control(control)),
-                                        ) => Some(control),
-                                        (Some(Token::Control(control)), _) => Some(control),
+                                        )
+                                        | (Some(Token::Control(control)), _) => Some(control),
                                         _ => None,
                                     };
                                     match destination {
@@ -327,7 +350,7 @@ impl<'a> Parser<'a> {
                                         })?;
                                     self.pos += 1;
                                 },
-                                _ => {
+                                Token::Control(_) | Token::Binary(_) => {
                                     self.pos += 1;
                                 },
                             }
@@ -344,13 +367,13 @@ impl<'a> Parser<'a> {
                         }
                     }
                 },
-                _ => {
+                Token::Text(_) | Token::Binary(_) => {
                     self.pos += 1;
                 },
             }
         }
 
-        let result_text = std::str::from_utf8(&result).map_err(|_| {
+        let result_text = std::str::from_utf8(&result).map_err(|_err| {
             RtfError::MalformedDocument("RTF field result is not valid UTF-8".to_string())
         })?;
         let field_drawings = self.field_drawing_captures.pop().ok_or_else(|| {
@@ -427,7 +450,9 @@ impl<'a> Parser<'a> {
                     })?
                     .story_events
                     .push(crate::StoryEvent::Field(story_field)),
-                _ => {},
+                crate::FieldOwner::Detached
+                | crate::FieldOwner::FormField
+                | crate::FieldOwner::Other => {},
             }
         }
 
@@ -448,7 +473,7 @@ impl<'a> Parser<'a> {
                 )
             })?;
             let to_cow = |value: Option<String>| {
-                value.map(|text| Cow::Borrowed(self.arena.alloc_str(&text) as &str))
+                value.map(|text| Cow::Borrowed(self.arena.alloc_str(&text)))
             };
             let form_field = super::super::super::form_field::FormField {
                 field_type,
@@ -472,7 +497,7 @@ impl<'a> Parser<'a> {
                 list_entries: builder
                     .list_entries
                     .into_iter()
-                    .map(|text| Cow::Borrowed(self.arena.alloc_str(&text) as &str))
+                    .map(|text| Cow::Borrowed(self.arena.alloc_str(&text)))
                     .collect(),
                 has_list_box: builder.has_list_box.unwrap_or(false),
                 data: Cow::Borrowed(
@@ -526,8 +551,12 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn parse_form_field_destination(&mut self) -> RtfResult<FormFieldBuilder> {
-        self.expect_token(Token::OpenBrace)?;
+        self.expect_token(&Token::OpenBrace)?;
         if !matches!(
             self.tokens.get(self.pos),
             Some(Token::Control(ControlWord::IgnorableDestination))
@@ -567,8 +596,8 @@ impl<'a> Parser<'a> {
                             (
                                 Some(Token::Control(ControlWord::IgnorableDestination)),
                                 Some(Token::Control(control)),
-                            ) => Some(control),
-                            (Some(Token::Control(control)), _) => Some(control),
+                            )
+                            | (Some(Token::Control(control)), _) => Some(control),
                             _ => None,
                         };
                     if !starred
@@ -680,37 +709,37 @@ impl<'a> Parser<'a> {
                         ),
                         ControlWord::FormFieldMaxLength(value) => set_once!(
                             builder.max_length,
-                            u16::try_from(*value).map_err(|_| RtfError::MalformedDocument(
+                            u16::try_from(*value).map_err(|_err| RtfError::MalformedDocument(
                                 "RTF ffmaxlen is outside 0..=65535".to_string()
                             ))?,
                             "ffmaxlen"
                         ),
                         ControlWord::FormFieldProtected(value) => {
-                            set_once!(builder.protected, *value, "ffprot")
+                            set_once!(builder.protected, *value, "ffprot");
                         },
                         ControlWord::FormFieldRecalculate(value) => {
-                            set_once!(builder.calculate_on_exit, *value, "ffrecalc")
+                            set_once!(builder.calculate_on_exit, *value, "ffrecalc");
                         },
                         ControlWord::FormFieldAutomaticSize(value) => {
-                            set_once!(builder.size_automatically, *value, "ffsize")
+                            set_once!(builder.size_automatically, *value, "ffsize");
                         },
                         ControlWord::FormFieldDefaultResult(value) => {
-                            set_once!(builder.default_result, *value, "ffdefres")
+                            set_once!(builder.default_result, *value, "ffdefres");
                         },
                         ControlWord::FormFieldResult(value) => {
-                            set_once!(builder.result, *value, "ffres")
+                            set_once!(builder.result, *value, "ffres");
                         },
                         ControlWord::FormFieldHalfPointSize(value) => {
-                            set_once!(builder.half_point_size, *value, "ffhps")
+                            set_once!(builder.half_point_size, *value, "ffhps");
                         },
                         ControlWord::FormFieldOwnHelp(value) => {
-                            set_once!(builder.own_help, *value, "ffownhelp")
+                            set_once!(builder.own_help, *value, "ffownhelp");
                         },
                         ControlWord::FormFieldOwnStatus(value) => {
-                            set_once!(builder.own_status, *value, "ffownstat")
+                            set_once!(builder.own_status, *value, "ffownstat");
                         },
                         ControlWord::FormFieldHasListBox(value) => {
-                            set_once!(builder.has_list_box, *value, "ffhaslistbox")
+                            set_once!(builder.has_list_box, *value, "ffhaslistbox");
                         },
                         _ => {
                             return Err(RtfError::MalformedDocument(
@@ -740,7 +769,7 @@ impl<'a> Parser<'a> {
     }
 
     pub(super) fn parse_form_field_text_destination(&mut self) -> RtfResult<String> {
-        self.expect_token(Token::OpenBrace)?;
+        self.expect_token(&Token::OpenBrace)?;
         if matches!(
             self.tokens.get(self.pos),
             Some(Token::Control(ControlWord::IgnorableDestination))
@@ -771,7 +800,7 @@ impl<'a> Parser<'a> {
                     text.push_str(control_symbol_text(control).unwrap_or_default());
                     self.pos += 1;
                 },
-                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Control(_)) => {
+                Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF form-field text contains active, nested, or binary data".to_string(),
                     ));
@@ -787,7 +816,7 @@ impl<'a> Parser<'a> {
     }
 
     pub(super) fn parse_data_field_destination(&mut self) -> RtfResult<Vec<u8>> {
-        self.expect_token(Token::OpenBrace)?;
+        self.expect_token(&Token::OpenBrace)?;
         if matches!(
             self.tokens.get(self.pos),
             Some(Token::Control(ControlWord::IgnorableDestination))
@@ -840,7 +869,7 @@ impl<'a> Parser<'a> {
                     }
                     self.pos += 1;
                 },
-                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Control(_)) => {
+                Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF datafield cannot contain controls, nesting, or binary data"
                             .to_string(),

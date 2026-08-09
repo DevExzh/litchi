@@ -16,3 +16,4 @@ pub use litchi_odf_common::chart::authoring::{
 pub use litchi_odf_common::chart::authoring::{
     serialize_axis_fragment, serialize_content, serialize_series_fragment,
 };
+pub use litchi_odf_common::chart::{ChartClass, ChartClassKind};

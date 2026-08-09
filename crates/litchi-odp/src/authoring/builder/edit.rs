@@ -4,6 +4,31 @@ use super::Builder;
 use crate::{Slide, Transition};
 use litchi_core::Result;
 
+impl Builder {
+    /// Set or clear the typed transition attached to a slide.
+    ///
+    /// The transition is emitted as the slide's ODF drawing-page style. Pass
+    /// `None` to remove the transition and restore the default drawing-page
+    /// style.
+    ///
+    /// # Errors
+    /// Returns an error when a configured limit is exceeded or the package cannot be serialized.
+    pub fn set_slide_transition(
+        &mut self,
+        slide_index: usize,
+        transition: Option<Transition>,
+    ) -> Result<&mut Self> {
+        set_slide_transition(&mut self.slides, slide_index, transition)?;
+        Ok(self)
+    }
+
+    pub(super) fn append_slide(&mut self, mut slide: Slide) -> &mut Self {
+        slide.index = self.slides.len();
+        self.slides.push(slide);
+        self
+    }
+}
+
 pub(super) fn titled_slide(index: usize, title: &str, text: &str) -> Slide {
     Slide {
         title: Some(title.to_string()),
@@ -42,29 +67,12 @@ pub(super) fn set_slide_transition(
     Ok(())
 }
 
-impl Builder {
-    /// Set or clear the typed transition attached to a slide.
-    ///
-    /// The transition is emitted as the slide's ODF drawing-page style. Pass
-    /// `None` to remove the transition and restore the default drawing-page
-    /// style.
-    pub fn set_slide_transition(
-        &mut self,
-        slide_index: usize,
-        transition: Option<Transition>,
-    ) -> Result<&mut Self> {
-        set_slide_transition(&mut self.slides, slide_index, transition)?;
-        Ok(self)
-    }
-
-    pub(super) fn append_slide(&mut self, mut slide: Slide) -> Result<&mut Self> {
-        slide.index = self.slides.len();
-        self.slides.push(slide);
-        Ok(self)
-    }
-}
-
 #[cfg(test)]
+#[allow(
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::Builder;
     use crate::{Presentation, Speed, Style, Transition, Type};

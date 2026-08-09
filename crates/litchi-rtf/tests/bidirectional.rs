@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{RtfDocument, RtfWriter, StyleBlock, TextDirection};
 use std::fs;
 
@@ -20,7 +29,7 @@ fn block<'rtf>(document: &'rtf RtfDocument<'rtf>, text: &str) -> StyleBlock<'rtf
 
 #[test]
 fn preserves_group_scoped_run_direction_and_boundaries() {
-    let document = RtfDocument::parse(r#"{\rtf1\ltrch Left {\rtlch Right} LeftAgain}"#).unwrap();
+    let document = RtfDocument::parse(r"{\rtf1\ltrch Left {\rtlch Right} LeftAgain}").unwrap();
     assert_eq!(
         block(&document, "Left").formatting.direction,
         Some(TextDirection::LeftToRight)
@@ -60,12 +69,12 @@ fn plain_and_pard_reset_character_and_paragraph_direction() {
 
 #[test]
 fn writer_preserves_explicit_ltr_and_rtl_directions() {
-    let document = RtfDocument::parse(r#"{\rtf1\rtlpar{\rtlch rtl}{\ltrch ltr}\par}"#).unwrap();
+    let document = RtfDocument::parse(r"{\rtf1\rtlpar{\rtlch rtl}{\ltrch ltr}\par}").unwrap();
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
-    assert!(serialized.contains(r#"\rtlpar"#));
-    assert!(serialized.contains(r#"\rtlch"#));
-    assert!(serialized.contains(r#"\ltrch"#));
+    assert!(serialized.contains(r"\rtlpar"));
+    assert!(serialized.contains(r"\rtlch"));
+    assert!(serialized.contains(r"\ltrch"));
 
     let reparsed = RtfDocument::parse_bytes(&output).unwrap();
     assert_eq!(
@@ -144,7 +153,7 @@ fn round_trips_document_section_table_and_row_direction() {
         "rtlrow",
         "ltrrow",
     ] {
-        assert!(serialized.contains(&format!(r#"\{control}"#)));
+        assert!(serialized.contains(&format!(r"\{control}")));
     }
     let reparsed = RtfDocument::parse_bytes(&output).unwrap();
     assert!(

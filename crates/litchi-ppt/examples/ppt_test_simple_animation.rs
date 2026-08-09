@@ -1,7 +1,15 @@
+#![allow(
+    clippy::print_stdout,
+    reason = "this command-line example intentionally prints its results"
+)]
+
 //! Minimal animation test - single shape with Appear effect
 
 use litchi_ppt::Writer;
-use litchi_ppt::animation::*;
+use litchi_ppt::animation::{
+    AfterEffect, AnimationEffect, AnimationInfo, AnimationTrigger, BuildInfo, BuildLevel,
+    BuildType, EffectDirection, EffectSpeed, IterationType,
+};
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {

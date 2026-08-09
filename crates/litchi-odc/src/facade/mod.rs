@@ -1,7 +1,7 @@
 //! Concise family entry points.
 
 use litchi_core::{Metadata, Result};
-use litchi_odf_common::chart::{Element, Legend, PlotArea, read};
+use litchi_odf_common::chart::{ChartClass, Element, Legend, PlotArea, read};
 use std::path::Path;
 
 pub use crate::authoring::Builder;
@@ -56,6 +56,16 @@ impl Chart {
     #[must_use]
     pub fn chart(&self) -> &Element {
         &self.chart
+    }
+
+    /// Return the typed root `chart:class` without normalizing its QName.
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-format error if the retained chart has no valid
+    /// `chart:class` value.
+    pub fn class(&self) -> Result<ChartClass> {
+        self.chart.chart_class()
     }
 
     #[must_use]

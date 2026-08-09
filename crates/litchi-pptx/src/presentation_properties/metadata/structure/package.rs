@@ -16,6 +16,10 @@ use super::transaction::{Commit, Patch, Snapshot};
 use crate::{Error, Result};
 
 /// Capture the validated presentation graph and its exact source context.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load_snapshot(package: &OpcPackage) -> Result<Snapshot> {
     let graph = load(package)?;
     let presentation = package.main_document_part()?;
@@ -29,6 +33,10 @@ pub fn load_snapshot(package: &OpcPackage) -> Result<Snapshot> {
 }
 
 /// Apply a committed presentation-structure patch atomically.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
     let current = load_snapshot(package)?;
     if !current.same_source(patch.before()) {
@@ -60,6 +68,14 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
 }
 
 /// Apply a committed presentation-structure edit atomically.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "public API consumes the commit to signal it has been applied"
+)]
 pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
     apply_patch(package, commit.patch())
 }

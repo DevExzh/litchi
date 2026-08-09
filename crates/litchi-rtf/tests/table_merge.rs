@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{RtfDocument, RtfWriter, TableCellMergeRole};
 
 fn write(document: &RtfDocument<'_>) -> String {
@@ -8,7 +17,7 @@ fn write(document: &RtfDocument<'_>) -> String {
 
 #[test]
 fn parses_owned_merge_roles_boundaries_and_round_trips_canonically() {
-    let source = r#"{\rtf1\trowd\clmgf\clvmgf\cellx900\clmrg\cellx2100\intbl A\cell B\cell\row\trowd\clmgf\clvmrg\cellx900\clmrg\cellx2100\intbl C\cell D\cell\row}"#;
+    let source = r"{\rtf1\trowd\clmgf\clvmgf\cellx900\clmrg\cellx2100\intbl A\cell B\cell\row\trowd\clmgf\clvmrg\cellx900\clmrg\cellx2100\intbl C\cell D\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     let rows = document.tables()[0].rows();
     assert_eq!(
@@ -34,7 +43,7 @@ fn parses_owned_merge_roles_boundaries_and_round_trips_canonically() {
 
 #[test]
 fn resets_trowd_restores_groups_and_snapshots_each_cellx() {
-    let source = r#"{\rtf1\trowd{\clmgf}\cellx1000\cellx2000\intbl A\cell B\cell\row\trowd\clmgf\cellx1100\clmrg\cellx2200\intbl C\cell D\cell\row\trowd\cellx1200\intbl E\cell\row}"#;
+    let source = r"{\rtf1\trowd{\clmgf}\cellx1000\cellx2000\intbl A\cell B\cell\row\trowd\clmgf\cellx1100\clmrg\cellx2200\intbl C\cell D\cell\row\trowd\cellx1200\intbl E\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     let rows = document.tables()[0].rows();
     assert_eq!(rows[0].cells()[0].merge().horizontal, None);
@@ -69,27 +78,27 @@ fn rejects_parameters_duplicates_conflicts_and_invalid_horizontal_ordering() {
         assert!(RtfDocument::parse(&source).is_err(), "accepted {controls}");
     }
     for source in [
-        r#"{\rtf1\trowd\clmrg\cellx1000\intbl X\cell\row}"#,
-        r#"{\rtf1\trowd\clmgf\cellx1000\cellx2000\clmrg\cellx3000\intbl X\cell Y\cell Z\cell\row}"#,
+        r"{\rtf1\trowd\clmrg\cellx1000\intbl X\cell\row}",
+        r"{\rtf1\trowd\clmgf\cellx1000\cellx2000\clmrg\cellx3000\intbl X\cell Y\cell Z\cell\row}",
     ] {
         assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
     }
-    assert!(RtfDocument::parse(r#"{\rtf1\trowd\clmgf\clvmgf\cellx1000\intbl X\cell\row}"#).is_ok());
+    assert!(RtfDocument::parse(r"{\rtf1\trowd\clmgf\clvmgf\cellx1000\intbl X\cell\row}").is_ok());
 }
 
 #[test]
 fn validates_vertical_boundaries_and_logical_table_boundaries() {
-    let valid = r#"{\rtf1\trowd\clvmgf\cellx1000\cellx2000\intbl A\cell B\cell\row\trowd\clvmrg\cellx1000\cellx2000\intbl C\cell D\cell\row}"#;
+    let valid = r"{\rtf1\trowd\clvmgf\cellx1000\cellx2000\intbl A\cell B\cell\row\trowd\clvmrg\cellx1000\cellx2000\intbl C\cell D\cell\row}";
     assert!(RtfDocument::parse(valid).is_ok());
-    let mismatch = r#"{\rtf1\trowd\clvmgf\cellx1000\cellx2000\intbl A\cell B\cell\row\trowd\clvmrg\cellx1100\cellx2000\intbl C\cell D\cell\row}"#;
+    let mismatch = r"{\rtf1\trowd\clvmgf\cellx1000\cellx2000\intbl A\cell B\cell\row\trowd\clvmrg\cellx1100\cellx2000\intbl C\cell D\cell\row}";
     assert!(RtfDocument::parse(mismatch).is_err());
-    let split = r#"{\rtf1\trowd\clvmgf\cellx1000\intbl A\cell\row\trowd\clvmrg\cellx1000\intbl B\cell\row\pard\par\trowd\clvmrg\cellx1000\intbl C\cell\row}"#;
+    let split = r"{\rtf1\trowd\clvmgf\cellx1000\intbl A\cell\row\trowd\clvmrg\cellx1000\intbl B\cell\row\pard\par\trowd\clvmrg\cellx1000\intbl C\cell\row}";
     assert!(RtfDocument::parse(split).is_err());
 }
 
 #[test]
 fn applies_end_defined_nested_merge_metadata() {
-    let source = r#"{\rtf1\trowd\cellx5000\intbl\itap2 A\nestcell\intbl\itap2 B\nestcell{\*\nesttableprops\itap2\trowd\clmgf\cellx700\clmrg\cellx1700\nestrow}\intbl\itap1\cell\row}"#;
+    let source = r"{\rtf1\trowd\cellx5000\intbl\itap2 A\nestcell\intbl\itap2 B\nestcell{\*\nesttableprops\itap2\trowd\clmgf\cellx700\clmrg\cellx1700\nestrow}\intbl\itap1\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     let cells = document.tables()[0].rows()[0].cells()[0].nested_tables()[0]
         .table
@@ -135,8 +144,8 @@ fn parses_real_libreoffice_merge_fixtures() {
         vertical
             .tables()
             .iter()
-            .flat_map(|table| table.rows())
-            .flat_map(|row| row.cells())
+            .flat_map(litchi_rtf::raw::Table::rows)
+            .flat_map(litchi_rtf::raw::Row::cells)
             .any(|cell| cell.merge().vertical == Some(TableCellMergeRole::Continuation))
     );
 }

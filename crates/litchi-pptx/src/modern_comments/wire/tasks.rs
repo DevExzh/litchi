@@ -26,7 +26,7 @@ pub(super) fn parse_task_details(xml: &[u8]) -> Result<Details> {
                 history = Some(parse_history(&child.xml, &scan.namespaces)?);
             },
             (P, "extLst") if extension.is_none() => {
-                extension = Some(OpaqueXml::new(child.xml.clone())?)
+                extension = Some(OpaqueXml::new(child.xml.clone())?);
             },
             _ => return Err(invalid("unexpected task details child")),
         }

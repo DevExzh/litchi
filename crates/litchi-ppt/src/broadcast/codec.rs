@@ -1,4 +1,4 @@
-//! Bounded binary codecs for PowerPoint presentation-broadcast records.
+//! Bounded binary codecs for `PowerPoint` presentation-broadcast records.
 
 use chrono::NaiveDate;
 
@@ -75,6 +75,10 @@ impl BroadcastProperties {
 
 impl Broadcast {
     /// Parse one strict broadcast container and all specification-defined children.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(record: &Record) -> Result<Self> {
         Ok(parse_lossless(record)?.value)
     }
@@ -83,12 +87,12 @@ impl Broadcast {
         self.validate()?;
         let mut known = Vec::new();
         for (instance, value) in self.string_values() {
-            if let Some(value) = value {
+            if let Some(text) = value {
                 known.push(record_bytes(
                     0,
                     instance,
                     C_STRING_RECORD_TYPE,
-                    &encode_utf16(value),
+                    &encode_utf16(text),
                 )?);
             }
         }
@@ -118,7 +122,7 @@ impl Broadcast {
             ));
         }
         let data_length = u32::try_from(data.len())
-            .map_err(|_| Error::Corrupted("Broadcast container length overflow".to_string()))?;
+            .map_err(|_err| Error::Corrupted("Broadcast container length overflow".to_string()))?;
         Ok(Record {
             record_type: RecordType::from(BROADCAST_CONTAINER_RECORD_TYPE),
             record_type_raw: BROADCAST_CONTAINER_RECORD_TYPE,
@@ -131,10 +135,16 @@ impl Broadcast {
     }
 
     /// Validate lexical, size, date, and cross-field requirements.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a string violates its lexical or size limit, a
+    /// timestamp is out of range, or a capability flag lacks its required
+    /// companion string.
     pub fn validate(&self) -> Result<()> {
         for (instance, value) in self.string_values() {
-            if let Some(value) = value {
-                validate_string(value, string_descriptor(instance).unwrap())?;
+            if let (Some(text), Some(descriptor)) = (value, string_descriptor(instance)) {
+                validate_string(text, descriptor)?;
             }
         }
         validate_system_time(self.properties.start_time)?;
@@ -160,6 +170,10 @@ impl Broadcast {
     }
 
     /// Encode a canonical broadcast container in specification child order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_record(&self) -> Result<Record> {
         self.to_record_lossless(&[])
     }
@@ -168,89 +182,6 @@ impl Broadcast {
 pub(super) struct ParsedBroadcast {
     pub(super) value: Broadcast,
     pub(super) unknown_records: Vec<UnknownRecord>,
-}
-
-pub(super) fn parse_lossless(record: &Record) -> Result<ParsedBroadcast> {
-    if record.record_type_raw != BROADCAST_CONTAINER_RECORD_TYPE
-        || record.version != 0x0f
-        || record.instance != 0
-        || record.data.len() > MAX_CONTAINER_BYTES
-    {
-        return Err(Error::Corrupted(
-            "BroadcastDocInfo9Container has an invalid header or exceeds the resource cap"
-                .to_string(),
-        ));
-    }
-    let children = Record::parse_sequence_strict(&record.data, "BroadcastDocInfo9Container")?;
-    let mut strings: [Option<String>; 20] = std::array::from_fn(|_| None);
-    let mut last_instance = 0u16;
-    let mut properties = None;
-    let mut known_before = 0usize;
-    let mut unknown_records = Vec::new();
-    for child in children {
-        if child.record_type_raw == C_STRING_RECORD_TYPE {
-            if properties.is_some()
-                || child.instance == 0
-                || child.instance > 20
-                || child.instance <= last_instance
-            {
-                return Err(Error::Corrupted(
-                    "Broadcast container has duplicate or out-of-order string atoms".to_string(),
-                ));
-            }
-            let descriptor = string_descriptor(child.instance).unwrap();
-            strings[usize::from(child.instance - 1)] = Some(parse_string(&child, descriptor)?);
-            last_instance = child.instance;
-            known_before += 1;
-        } else if child.record_type_raw == BROADCAST_INFO_RECORD_TYPE && properties.is_none() {
-            properties = Some(BroadcastProperties::parse(&child)?);
-            known_before += 1;
-        } else if child.record_type_raw == BROADCAST_INFO_RECORD_TYPE {
-            return Err(Error::Corrupted(
-                "Broadcast container has a duplicate BroadcastDocInfoAtom".to_string(),
-            ));
-        } else {
-            unknown_records.push(UnknownRecord::from_record(&child, known_before));
-        }
-    }
-    let properties = properties.ok_or_else(|| {
-        Error::Corrupted("Broadcast container is missing BroadcastDocInfoAtom".to_string())
-    })?;
-    for required in 13..=19 {
-        if strings[required - 1].is_none() {
-            return Err(Error::Corrupted(format!(
-                "Broadcast container is missing required CString instance {required}"
-            )));
-        }
-    }
-    let value = Broadcast {
-        title: strings[0].take(),
-        description: strings[1].take(),
-        speaker: strings[2].take(),
-        contact: strings[3].take(),
-        remote_server_name: strings[4].take(),
-        email_address: strings[5].take(),
-        email_name: strings[6].take(),
-        chat_url: strings[7].take(),
-        archive_directory: strings[8].take(),
-        netshow_files_base_directory: strings[9].take(),
-        netshow_files_directory: strings[10].take(),
-        netshow_server_name: strings[11].take(),
-        ppt_files_base_directory: strings[12].take().unwrap(),
-        ppt_files_directory: strings[13].take().unwrap(),
-        ppt_files_base_url: strings[14].take().unwrap(),
-        user_name: strings[15].take().unwrap(),
-        broadcast_date_time: strings[16].take().unwrap(),
-        presentation_name: strings[17].take().unwrap(),
-        asd_file_name: strings[18].take().unwrap(),
-        entry_id: strings[19].take(),
-        properties,
-    };
-    value.validate()?;
-    Ok(ParsedBroadcast {
-        value,
-        unknown_records,
-    })
 }
 
 impl Broadcast {
@@ -280,6 +211,82 @@ impl Broadcast {
     }
 }
 
+pub(super) fn parse_lossless(record: &Record) -> Result<ParsedBroadcast> {
+    if record.record_type_raw != BROADCAST_CONTAINER_RECORD_TYPE
+        || record.version != 0x0f
+        || record.instance != 0
+        || record.data.len() > MAX_CONTAINER_BYTES
+    {
+        return Err(Error::Corrupted(
+            "BroadcastDocInfo9Container has an invalid header or exceeds the resource cap"
+                .to_string(),
+        ));
+    }
+    let children = Record::parse_sequence_strict(&record.data, "BroadcastDocInfo9Container")?;
+    let mut strings: [Option<String>; 20] = std::array::from_fn(|_| None);
+    let mut last_instance = 0u16;
+    let mut properties = None;
+    let mut known_before = 0usize;
+    let mut unknown_records = Vec::new();
+    for child in children {
+        if child.record_type_raw == C_STRING_RECORD_TYPE {
+            if properties.is_some() || child.instance <= last_instance {
+                return Err(Error::Corrupted(
+                    "Broadcast container has duplicate or out-of-order string atoms".to_string(),
+                ));
+            }
+            let Some(descriptor) = string_descriptor(child.instance) else {
+                return Err(Error::Corrupted(
+                    "Broadcast container has duplicate or out-of-order string atoms".to_string(),
+                ));
+            };
+            strings[usize::from(child.instance - 1)] = Some(parse_string(&child, descriptor)?);
+            last_instance = child.instance;
+            known_before += 1;
+        } else if child.record_type_raw == BROADCAST_INFO_RECORD_TYPE && properties.is_none() {
+            properties = Some(BroadcastProperties::parse(&child)?);
+            known_before += 1;
+        } else if child.record_type_raw == BROADCAST_INFO_RECORD_TYPE {
+            return Err(Error::Corrupted(
+                "Broadcast container has a duplicate BroadcastDocInfoAtom".to_string(),
+            ));
+        } else {
+            unknown_records.push(UnknownRecord::from_record(&child, known_before));
+        }
+    }
+    let broadcast_properties = properties.ok_or_else(|| {
+        Error::Corrupted("Broadcast container is missing BroadcastDocInfoAtom".to_string())
+    })?;
+    let value = Broadcast {
+        title: strings[0].take(),
+        description: strings[1].take(),
+        speaker: strings[2].take(),
+        contact: strings[3].take(),
+        remote_server_name: strings[4].take(),
+        email_address: strings[5].take(),
+        email_name: strings[6].take(),
+        chat_url: strings[7].take(),
+        archive_directory: strings[8].take(),
+        netshow_files_base_directory: strings[9].take(),
+        netshow_files_directory: strings[10].take(),
+        netshow_server_name: strings[11].take(),
+        ppt_files_base_directory: take_required_string(&mut strings, 12)?,
+        ppt_files_directory: take_required_string(&mut strings, 13)?,
+        ppt_files_base_url: take_required_string(&mut strings, 14)?,
+        user_name: take_required_string(&mut strings, 15)?,
+        broadcast_date_time: take_required_string(&mut strings, 16)?,
+        presentation_name: take_required_string(&mut strings, 17)?,
+        asd_file_name: take_required_string(&mut strings, 18)?,
+        entry_id: strings[19].take(),
+        properties: broadcast_properties,
+    };
+    value.validate()?;
+    Ok(ParsedBroadcast {
+        value,
+        unknown_records,
+    })
+}
+
 #[derive(Clone, Copy)]
 struct StringDescriptor {
     instance: u16,
@@ -298,6 +305,15 @@ enum StringKind {
     Unc,
     UncOrHttp,
     FileFragment,
+}
+
+fn take_required_string(strings: &mut [Option<String>; 20], index: usize) -> Result<String> {
+    strings[index].take().ok_or_else(|| {
+        Error::Corrupted(format!(
+            "Broadcast container is missing required CString instance {}",
+            index + 1
+        ))
+    })
 }
 
 fn string_descriptor(instance: u16) -> Option<StringDescriptor> {
@@ -352,7 +368,7 @@ fn parse_string(record: &Record, descriptor: StringDescriptor) -> Result<String>
         units.push(unit);
     }
     let value = String::from_utf16(&units)
-        .map_err(|_| Error::Corrupted(format!("{} contains invalid UTF-16", descriptor.name)))?;
+        .map_err(|_err| Error::Corrupted(format!("{} contains invalid UTF-16", descriptor.name)))?;
     validate_string(&value, descriptor)?;
     Ok(value)
 }
@@ -563,7 +579,7 @@ pub(super) fn record_bytes(
     data: &[u8],
 ) -> Result<Vec<u8>> {
     let data_length = u32::try_from(data.len())
-        .map_err(|_| Error::Corrupted("Broadcast record length overflow".to_string()))?;
+        .map_err(|_err| Error::Corrupted("Broadcast record length overflow".to_string()))?;
     let mut bytes = Vec::with_capacity(8 + data.len());
     bytes.extend_from_slice(&((instance << 4) | version).to_le_bytes());
     bytes.extend_from_slice(&record_type.to_le_bytes());

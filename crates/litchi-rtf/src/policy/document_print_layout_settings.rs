@@ -3,6 +3,10 @@ use crate::{RtfError, RtfResult};
 /// Largest supported document gutter width, in twips.
 pub const MAX_DOCUMENT_GUTTER_TWIPS: u32 = 31_680;
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent RTF feature flags stay flat for direct access"
+)]
 /// Passive document print-layout settings from the RTF header.
 ///
 /// These values are retained for round-tripping only. This crate does not
@@ -23,6 +27,9 @@ pub struct DocumentPrintLayoutSettings {
 
 impl DocumentPrintLayoutSettings {
     /// Validate values before installing or serializing these settings.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if self
             .document_gutter_twips
@@ -34,8 +41,10 @@ impl DocumentPrintLayoutSettings {
         }
         Ok(())
     }
-
     /// Atomically replace the document-wide gutter width.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_document_gutter_twips(&mut self, value: Option<u32>) -> RtfResult<()> {
         let mut candidate = *self;
         candidate.document_gutter_twips = value;
@@ -45,6 +54,7 @@ impl DocumentPrintLayoutSettings {
     }
 
     /// Return whether all print-layout settings were omitted.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         !self.facing_pages
             && !self.mirror_margins

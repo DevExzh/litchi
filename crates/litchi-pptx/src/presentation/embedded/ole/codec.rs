@@ -173,10 +173,10 @@ pub(crate) struct Parsed {
 }
 
 fn collect_frames(node: &Node, result: &mut Vec<Parsed>) -> Result<()> {
-    if node.local == "graphicFrame" {
-        if let Some(parsed) = parse_frame(node)? {
-            result.push(parsed);
-        }
+    if node.local == "graphicFrame"
+        && let Some(parsed) = parse_frame(node)?
+    {
+        result.push(parsed);
     }
     for child in &node.children {
         collect_frames(child, result)?;
@@ -200,7 +200,11 @@ fn parse_frame(frame: &Node) -> Result<Option<Parsed>> {
     let non_visual = child(frame, "nvGraphicFramePr").and_then(|node| child(node, "cNvPr"));
     let shape_id = non_visual
         .and_then(|node| attr(node, "id", false))
-        .map(|value| value.parse().map_err(|_| invalid("invalid OLE shape ID")))
+        .map(|value| {
+            value
+                .parse()
+                .map_err(|_err| invalid("invalid OLE shape ID"))
+        })
         .transpose()?;
     let shape_name = non_visual.and_then(|node| attr(node, "name", false).map(str::to_owned));
     let anchor = child(frame, "xfrm")
@@ -240,14 +244,14 @@ fn parse_frame(frame: &Node) -> Result<Option<Parsed>> {
             .map(|value| {
                 value
                     .parse()
-                    .map_err(|_| invalid("invalid OLE preview width"))
+                    .map_err(|_err| invalid("invalid OLE preview width"))
             })
             .transpose()?,
         preview_height: attr(object, "imgH", false)
             .map(|value| {
                 value
                     .parse()
-                    .map_err(|_| invalid("invalid OLE preview height"))
+                    .map_err(|_err| invalid("invalid OLE preview height"))
             })
             .transpose()?,
         anchor,
@@ -268,7 +272,7 @@ fn parse_anchor(node: &Node) -> Result<Option<Frame>> {
         attr(node, name, false)
             .ok_or_else(|| invalid(format!("missing OLE anchor attribute '{name}'")))?
             .parse::<i64>()
-            .map_err(|_| invalid(format!("invalid OLE anchor attribute '{name}'")))
+            .map_err(|_err| invalid(format!("invalid OLE anchor attribute '{name}'")))
     };
     Ok(Some(Frame::new(
         parse(off, "x")?,

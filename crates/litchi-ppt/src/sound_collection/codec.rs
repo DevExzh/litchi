@@ -14,6 +14,10 @@ const MAX_ID_DIGITS: usize = 10;
 
 impl<'a> Collection<'a> {
     /// Parse one strict `SoundCollectionContainer` without copying sound data.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(record: &'a Record) -> Result<Self> {
         require_header(
             record.version,
@@ -44,7 +48,7 @@ impl<'a> Collection<'a> {
         let sound_id_seed = u32::from_le_bytes(
             atom.data
                 .try_into()
-                .map_err(|_| Error::Corrupted("SoundCollectionAtom is truncated".into()))?,
+                .map_err(|_err| Error::Corrupted("SoundCollectionAtom is truncated".into()))?,
         );
         if sound_id_seed == 0 {
             return corrupted("SoundCollectionAtom soundIdSeed must be positive");
@@ -109,14 +113,14 @@ fn next_record<'a>(data: &'a [u8], offset: &mut usize, context: &str) -> Result<
     }
     let version_instance = u16::from_le_bytes([data[*offset], data[*offset + 1]]);
     let record_type = u16::from_le_bytes([data[*offset + 2], data[*offset + 3]]);
-    let length = u32::from_le_bytes([
+    let length_u32 = u32::from_le_bytes([
         data[*offset + 4],
         data[*offset + 5],
         data[*offset + 6],
         data[*offset + 7],
     ]);
-    let length = usize::try_from(length)
-        .map_err(|_| Error::Corrupted(format!("{context} record size overflow")))?;
+    let length = usize::try_from(length_u32)
+        .map_err(|_err| Error::Corrupted(format!("{context} record size overflow")))?;
     let end = header_end
         .checked_add(length)
         .ok_or_else(|| Error::Corrupted(format!("{context} record size overflow")))?;
@@ -161,7 +165,7 @@ fn parse_sound(data: &[u8]) -> Result<Sound<'_>> {
     }
     let id = id_text
         .parse::<u32>()
-        .map_err(|_| Error::Corrupted("SoundIdAtom is outside the u32 range".to_string()))?;
+        .map_err(|_err| Error::Corrupted("SoundIdAtom is outside the u32 range".to_string()))?;
     if id == 0 {
         return corrupted("SoundIdAtom must be positive");
     }
@@ -172,12 +176,12 @@ fn parse_sound(data: &[u8]) -> Result<Sound<'_>> {
         if value.len() != 3 || !value.bytes().all(|byte| byte.is_ascii_digit()) {
             return corrupted("SoundBuiltinIdAtom must be a canonical three-digit integer");
         }
-        let value = value.parse::<u16>().map_err(|_| {
+        let id_number = value.parse::<u16>().map_err(|_err| {
             Error::Corrupted("SoundBuiltinIdAtom is outside the u16 range".to_string())
         })?;
-        let value = parse_builtin_id(value)?;
+        let builtin = parse_builtin_id(id_number)?;
         child = next_record(data, &mut offset, "SoundContainer")?;
-        Some(value)
+        Some(builtin)
     } else {
         None
     };
@@ -267,7 +271,7 @@ fn parse_cstring(
         .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
         .collect::<Vec<_>>();
     let value = String::from_utf16(&values)
-        .map_err(|_| Error::Corrupted(format!("{context} contains invalid UTF-16")))?;
+        .map_err(|_err| Error::Corrupted(format!("{context} contains invalid UTF-16")))?;
     if !allow_empty && value.is_empty() {
         return corrupted(format!("{context} cannot be empty"));
     }

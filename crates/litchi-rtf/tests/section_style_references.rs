@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{RtfDocument, RtfWriter, SectionProperties, StyleType};
 
 #[test]
@@ -18,7 +27,7 @@ fn retains_grouped_references_inherits_sections_and_sectd_resets() {
     assert_eq!(inherited.sections()[0].properties.section_style, Some(6));
     assert_eq!(inherited.sections()[1].properties.section_style, Some(6));
 
-    let reset = RtfDocument::parse(r#"{\rtf1\sectd\ds6 First\sect\sectd Second}"#).unwrap();
+    let reset = RtfDocument::parse(r"{\rtf1\sectd\ds6 First\sect\sectd Second}").unwrap();
     assert_eq!(reset.sections().len(), 2);
     assert_eq!(reset.sections()[0].properties.section_style, Some(6));
     assert_eq!(reset.sections()[1].properties.section_style, None);
@@ -27,7 +36,7 @@ fn retains_grouped_references_inherits_sections_and_sectd_resets() {
 #[test]
 fn preserves_zero_maximum_omission_and_public_mutation() {
     let document =
-        RtfDocument::parse(r#"{\rtf1\sectd\ds0 First\sect\sectd\ds65535 Second\sect\sectd Third}"#)
+        RtfDocument::parse(r"{\rtf1\sectd\ds0 First\sect\sectd\ds65535 Second\sect\sectd Third}")
             .unwrap();
     assert_eq!(document.sections()[0].properties.section_style, Some(0));
     assert_eq!(
@@ -46,21 +55,21 @@ fn preserves_zero_maximum_omission_and_public_mutation() {
 #[test]
 fn rejects_malformed_body_and_stylesheet_handles_and_duplicate_selectors() {
     for source in [
-        r#"{\rtf1\sectd\ds Body}"#,
-        r#"{\rtf1\sectd\ds-1 Body}"#,
-        r#"{\rtf1\sectd\ds65536 Body}"#,
-        r#"{\rtf1{\stylesheet{\*\ds Missing;}}}"#,
-        r#"{\rtf1{\stylesheet{\*\ds-1 Negative;}}}"#,
-        r#"{\rtf1{\stylesheet{\*\ds65536 Overflow;}}}"#,
-        r#"{\rtf1{\stylesheet{\ds1 Unstarred;}}}"#,
-        r#"{\rtf1{\stylesheet{\*\b\ds1 Late;}}}"#,
-        r#"{\rtf1{\stylesheet{\*\ds1\ds2 Duplicate;}}}"#,
+        r"{\rtf1\sectd\ds Body}",
+        r"{\rtf1\sectd\ds-1 Body}",
+        r"{\rtf1\sectd\ds65536 Body}",
+        r"{\rtf1{\stylesheet{\*\ds Missing;}}}",
+        r"{\rtf1{\stylesheet{\*\ds-1 Negative;}}}",
+        r"{\rtf1{\stylesheet{\*\ds65536 Overflow;}}}",
+        r"{\rtf1{\stylesheet{\ds1 Unstarred;}}}",
+        r"{\rtf1{\stylesheet{\*\b\ds1 Late;}}}",
+        r"{\rtf1{\stylesheet{\*\ds1\ds2 Duplicate;}}}",
     ] {
         assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
     }
 
     let inert =
-        RtfDocument::parse(r#"{\rtf1{\field{\*\fldinst TEST \ds65536}{\fldrslt Result}}Body}"#)
+        RtfDocument::parse(r"{\rtf1{\field{\*\fldinst TEST \ds65536}{\fldrslt Result}}Body}")
             .unwrap();
     assert!(
         inert
@@ -84,7 +93,7 @@ fn writer_is_canonical_and_round_trip_is_stable_without_resolving_styles() {
         .write_document(&document)
         .unwrap();
     let serialized = String::from_utf8(first.clone()).unwrap();
-    assert!(serialized.contains(r#"\sectd\ds3"#));
+    assert!(serialized.contains(r"\sectd\ds3"));
 
     let reparsed = RtfDocument::parse_bytes(&first).unwrap();
     assert_eq!(reparsed.stylesheet(), document.stylesheet());

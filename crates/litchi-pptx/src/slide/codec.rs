@@ -6,7 +6,7 @@
 //! explicit semantic adapter: it selects the appropriate validated part
 //! reader for `Slide`, `SlideLayout`, or `SlideMaster` and does not duplicate
 //! XML parsing or copy shape subtrees. Keeping that boundary makes unknown
-//! DrawingML and all existing reader limits flow through the established
+//! `DrawingML` and all existing reader limits flow through the established
 //! codec unchanged.
 
 use crate::Result;

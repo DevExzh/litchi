@@ -91,6 +91,10 @@ pub struct LegacyParagraphNumberingRevision {
     pub text_start: Option<i32>,
 }
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent RTF feature flags stay flat for direct access"
+)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LegacyParagraphNumbering<'a> {
     pub level: LegacyParagraphNumberingLevel,
@@ -119,7 +123,8 @@ pub struct LegacyParagraphNumbering<'a> {
     pub revision: LegacyParagraphNumberingRevision,
 }
 
-impl<'a> LegacyParagraphNumbering<'a> {
+impl LegacyParagraphNumbering<'_> {
+    #[must_use]
     pub fn new(level: LegacyParagraphNumberingLevel) -> Self {
         Self {
             level,
@@ -145,10 +150,13 @@ impl<'a> LegacyParagraphNumbering<'a> {
             underline: None,
             text_before: None,
             text_after: None,
-            revision: Default::default(),
+            revision: LegacyParagraphNumberingRevision::default(),
         }
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if matches!(
             self.level,

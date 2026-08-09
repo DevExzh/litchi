@@ -4,4 +4,4 @@ mod dispatch;
 mod model;
 
 pub(super) use dispatch::match_control_word;
-pub use model::ControlWord;
+pub(crate) use model::ControlWord;

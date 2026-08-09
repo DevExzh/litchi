@@ -1,4 +1,4 @@
-//! Atomic slide-level package ownership for PresentationML model3d frames.
+//! Atomic slide-level package ownership for `PresentationML` model3d frames.
 
 use litchi_drawingml::model3d as drawing;
 use litchi_opc::constants::relationship_type as rt;
@@ -260,11 +260,10 @@ fn load_internal_data(package: &OpcPackage, source: &dyn Part, id: &drawing::Id)
     let relationship = source
         .rels()
         .get(id.as_str())
-        .ok_or_else(|| invalid(format!("relationship '{}' is missing", id)))?;
+        .ok_or_else(|| invalid(format!("relationship '{id}' is missing")))?;
     if relationship.is_external() {
         return Err(invalid(format!(
-            "relationship '{}' unexpectedly targets an external resource",
-            id
+            "relationship '{id}' unexpectedly targets an external resource"
         )));
     }
     let target = relationship.target_partname()?;
@@ -378,7 +377,7 @@ fn stage_linked(
                 .get_part(source_name)
                 .ok()
                 .and_then(|part| part.rels().get(&relation.id))
-                .is_some_and(|value| value.is_external())
+                .is_some_and(litchi_opc::Relationship::is_external)
         })
     {
         return previous_relation

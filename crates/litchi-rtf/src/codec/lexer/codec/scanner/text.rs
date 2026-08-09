@@ -17,10 +17,10 @@ impl<'a> Lexer<'a> {
             // A mutation or split multi-byte scalar yields non-ASCII bytes
             // here; treat them as an invalid escape rather than a slice panic.
             let hex = std::str::from_utf8(pair)
-                .map_err(|_| RtfError::InvalidUnicode("Invalid hex escape".to_string()))?;
+                .map_err(|_err| RtfError::InvalidUnicode("Invalid hex escape".to_string()))?;
             self.pos += 2;
             let byte = u8::from_str_radix(hex, 16)
-                .map_err(|_| RtfError::InvalidUnicode(format!("Invalid hex escape: {hex}")))?;
+                .map_err(|_err| RtfError::InvalidUnicode(format!("Invalid hex escape: {hex}")))?;
             bytes.push(char::from(byte));
             if !self.remaining()?.starts_with("\\'") {
                 break;

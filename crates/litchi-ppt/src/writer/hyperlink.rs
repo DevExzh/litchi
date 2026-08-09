@@ -5,59 +5,63 @@
 //!
 //! Reference: [MS-PPT] Section 2.8 - Interactive Information
 
-use zerocopy::IntoBytes as _;
-use zerocopy_derive::{Immutable, IntoBytes, KnownLayout};
-
 // =============================================================================
 // PPT Record Types for Hyperlinks
 // =============================================================================
 
 /// Record types for interactive/hyperlink records
 pub mod record_type {
-    /// InteractiveInfo container (RT_InteractiveInfo)
+    /// `InteractiveInfo` container (`RT_InteractiveInfo`)
     pub const INTERACTIVE_INFO: u16 = 0x0FF2;
-    /// InteractiveInfoAtom
+    /// `InteractiveInfoAtom`
     pub const INTERACTIVE_INFO_ATOM: u16 = 0x0FF3;
-    /// ExHyperlink container
+    /// `ExHyperlink` container
     pub const EX_HYPERLINK: u16 = 0x0FD7;
-    /// ExHyperlinkAtom
+    /// `ExHyperlinkAtom`
     pub const EX_HYPERLINK_ATOM: u16 = 0x0FD3;
-    /// CString (unicode string)
+    /// `CString` (unicode string)
     pub const CSTRING: u16 = 0x0FBA;
-    /// ExObjList container
+    /// `ExObjList` container
     pub const EX_OBJ_LIST: u16 = 0x0409;
-    /// ExObjListAtom
+    /// `ExObjListAtom`
     pub const EX_OBJ_LIST_ATOM: u16 = 0x040A;
-    /// MouseClick in shape
+    /// `MouseClick` in shape
     pub const MOUSE_CLICK: u16 = 0x0000; // instance value
-    /// MouseOver in shape
+    /// `MouseOver` in shape
     pub const MOUSE_OVER: u16 = 0x0001; // instance value
 }
+
+use zerocopy::IntoBytes as _;
+use zerocopy_derive::{Immutable, IntoBytes, KnownLayout};
 
 // =============================================================================
 // Hyperlink Action Types
 // =============================================================================
 
-/// Action type for hyperlinks (per POI InteractiveInfoAtom)
+/// Action type for hyperlinks (per POI `InteractiveInfoAtom`)
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`HyperlinkAction` is the established public API name; renaming it would break downstream crates"
+)]
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum HyperlinkAction {
-    /// No action (ACTION_NONE)
+    /// No action (`ACTION_NONE`)
     #[default]
     None = 0x00,
-    /// Macro (ACTION_MACRO)
+    /// Macro (`ACTION_MACRO`)
     Macro = 0x01,
-    /// Run program (ACTION_RUNPROGRAM)
+    /// Run program (`ACTION_RUNPROGRAM`)
     RunProgram = 0x02,
-    /// Jump to slide (ACTION_JUMP) - use with JumpAction
+    /// Jump to slide (`ACTION_JUMP`) - use with `JumpAction`
     Jump = 0x03,
-    /// Go to hyperlink URL (ACTION_HYPERLINK)
+    /// Go to hyperlink URL (`ACTION_HYPERLINK`)
     Hyperlink = 0x04,
-    /// OLE action (ACTION_OLE)
+    /// OLE action (`ACTION_OLE`)
     OleAction = 0x05,
-    /// Media (ACTION_MEDIA)
+    /// Media (`ACTION_MEDIA`)
     Media = 0x06,
-    /// Custom show (ACTION_CUSTOMSHOW)
+    /// Custom show (`ACTION_CUSTOMSHOW`)
     CustomShow = 0x07,
 }
 
@@ -86,13 +90,13 @@ pub enum JumpAction {
 // InteractiveInfoAtom (MS-PPT 2.8.1)
 // =============================================================================
 
-/// InteractiveInfoAtom structure (16 bytes)
+/// `InteractiveInfoAtom` structure (16 bytes)
 #[derive(Debug, Clone, Copy, IntoBytes, Immutable, KnownLayout)]
 #[repr(C, packed)]
 pub struct InteractiveInfoAtom {
     /// Sound reference (0 if none)
     pub sound_ref: u32,
-    /// ExHyperlink reference (0 if none)  
+    /// `ExHyperlink` reference (0 if none)
     pub hyperlink_ref: u32,
     /// Action type
     pub action: u8,
@@ -112,7 +116,8 @@ impl InteractiveInfoAtom {
     /// Size of the atom data
     pub const SIZE: usize = 16;
 
-    /// Create a new InteractiveInfoAtom for URL hyperlink (per POI linkToUrl)
+    /// Create a new `InteractiveInfoAtom` for URL hyperlink (per POI linkToUrl)
+    #[must_use]
     pub fn url_link(hyperlink_id: u32) -> Self {
         Self {
             sound_ref: 0,
@@ -126,7 +131,8 @@ impl InteractiveInfoAtom {
         }
     }
 
-    /// Create a new InteractiveInfoAtom for slide number link
+    /// Create a new `InteractiveInfoAtom` for slide number link
+    #[must_use]
     pub fn slide_link(hyperlink_id: u32) -> Self {
         Self {
             sound_ref: 0,
@@ -141,6 +147,7 @@ impl InteractiveInfoAtom {
     }
 
     /// Create atom for next slide action (per POI linkToNextSlide)
+    #[must_use]
     pub fn next_slide() -> Self {
         Self {
             sound_ref: 0,
@@ -155,6 +162,7 @@ impl InteractiveInfoAtom {
     }
 
     /// Create atom for previous slide action
+    #[must_use]
     pub fn prev_slide() -> Self {
         Self {
             sound_ref: 0,
@@ -169,6 +177,7 @@ impl InteractiveInfoAtom {
     }
 
     /// Create atom for first slide action
+    #[must_use]
     pub fn first_slide() -> Self {
         Self {
             sound_ref: 0,
@@ -183,6 +192,7 @@ impl InteractiveInfoAtom {
     }
 
     /// Create atom for last slide action
+    #[must_use]
     pub fn last_slide() -> Self {
         Self {
             sound_ref: 0,
@@ -197,6 +207,7 @@ impl InteractiveInfoAtom {
     }
 
     /// Create atom for end show action
+    #[must_use]
     pub fn end_show() -> Self {
         Self {
             sound_ref: 0,
@@ -215,7 +226,7 @@ impl InteractiveInfoAtom {
 // ExHyperlinkAtom (MS-PPT 2.10.18)
 // =============================================================================
 
-/// ExHyperlinkAtom structure (4 bytes)
+/// `ExHyperlinkAtom` structure (4 bytes)
 #[derive(Debug, Clone, Copy, IntoBytes, Immutable, KnownLayout)]
 #[repr(C, packed)]
 pub struct ExHyperlinkAtom {
@@ -228,6 +239,10 @@ pub struct ExHyperlinkAtom {
 // =============================================================================
 
 /// Hyperlink target types
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`HyperlinkTarget` is the established public API name; renaming it would break downstream crates"
+)]
 #[derive(Debug, Clone)]
 pub enum HyperlinkTarget {
     /// URL (external web link)
@@ -253,7 +268,7 @@ pub enum HyperlinkTarget {
 /// Complete hyperlink definition
 #[derive(Debug, Clone)]
 pub struct Hyperlink {
-    /// Unique ID (assigned by HyperlinkCollection)
+    /// Unique ID (assigned by `HyperlinkCollection`)
     pub id: u32,
     /// Display text (tooltip)
     pub display_text: Option<String>,
@@ -285,6 +300,7 @@ impl Hyperlink {
     }
 
     /// Create slide hyperlink
+    #[must_use]
     pub fn slide(slide_num: u32) -> Self {
         Self {
             id: 0,
@@ -295,6 +311,7 @@ impl Hyperlink {
     }
 
     /// Create next slide hyperlink
+    #[must_use]
     pub fn next_slide() -> Self {
         Self {
             id: 0,
@@ -305,6 +322,7 @@ impl Hyperlink {
     }
 
     /// Create previous slide hyperlink
+    #[must_use]
     pub fn prev_slide() -> Self {
         Self {
             id: 0,
@@ -315,18 +333,21 @@ impl Hyperlink {
     }
 
     /// Set display text
+    #[must_use]
     pub fn with_display_text(mut self, text: impl Into<String>) -> Self {
         self.display_text = Some(text.into());
         self
     }
 
     /// Set target frame
+    #[must_use]
     pub fn with_target_frame(mut self, frame: impl Into<String>) -> Self {
         self.target_frame = Some(frame.into());
         self
     }
 
     /// Check if this is an external link (URL or file)
+    #[must_use]
     pub fn is_external(&self) -> bool {
         matches!(
             self.target,
@@ -335,15 +356,23 @@ impl Hyperlink {
     }
 
     /// Get the URL/path string if applicable
+    #[must_use]
     pub fn target_string(&self) -> Option<&str> {
         match &self.target {
-            HyperlinkTarget::Url(s) | HyperlinkTarget::File(s) => Some(s.as_str()),
-            HyperlinkTarget::CustomShow(s) => Some(s.as_str()),
-            _ => None,
+            HyperlinkTarget::Url(s) | HyperlinkTarget::File(s) | HyperlinkTarget::CustomShow(s) => {
+                Some(s.as_str())
+            },
+            HyperlinkTarget::Slide(_)
+            | HyperlinkTarget::NextSlide
+            | HyperlinkTarget::PrevSlide
+            | HyperlinkTarget::FirstSlide
+            | HyperlinkTarget::LastSlide
+            | HyperlinkTarget::EndShow => None,
         }
     }
 
-    /// Build InteractiveInfoAtom for this hyperlink
+    /// Build `InteractiveInfoAtom` for this hyperlink
+    #[must_use]
     pub fn build_interactive_info_atom(&self) -> InteractiveInfoAtom {
         match &self.target {
             HyperlinkTarget::Url(_) => InteractiveInfoAtom::url_link(self.id),
@@ -371,6 +400,10 @@ impl Hyperlink {
 // =============================================================================
 
 /// Collection of hyperlinks for a presentation
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`HyperlinkCollection` is the established public API name; renaming it would break downstream crates"
+)]
 #[derive(Debug, Default)]
 pub struct HyperlinkCollection {
     hyperlinks: Vec<Hyperlink>,
@@ -379,6 +412,7 @@ pub struct HyperlinkCollection {
 
 impl HyperlinkCollection {
     /// Create new empty collection
+    #[must_use]
     pub fn new() -> Self {
         Self {
             hyperlinks: Vec::new(),
@@ -396,16 +430,19 @@ impl HyperlinkCollection {
     }
 
     /// Get hyperlink by ID
+    #[must_use]
     pub fn get(&self, id: u32) -> Option<&Hyperlink> {
         self.hyperlinks.iter().find(|h| h.id == id)
     }
 
     /// Get number of hyperlinks
+    #[must_use]
     pub fn len(&self) -> usize {
         self.hyperlinks.len()
     }
 
     /// Check if empty
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.hyperlinks.is_empty()
     }
@@ -429,11 +466,19 @@ impl HyperlinkCollection {
     pub(crate) fn build_ex_hyperlink_records(&self) -> Result<Vec<Vec<u8>>, std::io::Error> {
         self.hyperlinks
             .iter()
-            .map(|hyperlink| self.build_ex_hyperlink(hyperlink))
+            .map(Self::build_ex_hyperlink)
             .collect()
     }
 
-    /// Build ExObjList container for document
+    /// Build `ExObjList` container for document
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the underlying writer reports an error.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "`ExObjList` children are small in-memory hyperlink records whose total size is bounded far below u32::MAX"
+    )]
     pub fn build_ex_obj_list(&self) -> Result<Vec<u8>, std::io::Error> {
         if self.hyperlinks.is_empty() {
             return Ok(Vec::new());
@@ -452,7 +497,7 @@ impl HyperlinkCollection {
 
         // ExHyperlink for ALL hyperlinks (per POI, all hyperlinks need ExHyperlink)
         for hyperlink in &self.hyperlinks {
-            let ex_hyperlink = self.build_ex_hyperlink(hyperlink)?;
+            let ex_hyperlink = Self::build_ex_hyperlink(hyperlink)?;
             children.push(ex_hyperlink);
         }
 
@@ -470,9 +515,13 @@ impl HyperlinkCollection {
         Ok(container)
     }
 
-    /// Build ExHyperlink container for a single hyperlink
-    /// Per POI ExHyperlink: contains ExHyperlinkAtom + 2 CStrings (title, URL)
-    fn build_ex_hyperlink(&self, hyperlink: &Hyperlink) -> Result<Vec<u8>, std::io::Error> {
+    /// Build `ExHyperlink` container for a single hyperlink
+    /// Per POI `ExHyperlink`: contains `ExHyperlinkAtom` + 2 `CStrings` (title, URL)
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "`ExHyperlink` children are small in-memory records whose total size is bounded far below u32::MAX"
+    )]
+    fn build_ex_hyperlink(hyperlink: &Hyperlink) -> Result<Vec<u8>, std::io::Error> {
         let mut container = Vec::new();
         let mut children = Vec::new();
 
@@ -495,8 +544,8 @@ impl HyperlinkCollection {
             HyperlinkTarget::Slide(num) => {
                 // Per POI: linkToDocument(sheetNumber, slideNumber, alias, 0x30)
                 // URL format: "sheetNumber,slideNumber,alias"
-                let alias = format!("Slide {}", num);
-                let url = format!("1,{},{}", num, alias); // sheetNumber=1 for main presentation
+                let alias = format!("Slide {num}");
+                let url = format!("1,{num},{alias}"); // sheetNumber=1 for main presentation
                 (alias.clone(), url, 0x30u16) // Slide links: options=0x30
             },
             HyperlinkTarget::NextSlide => {
@@ -515,10 +564,10 @@ impl HyperlinkCollection {
         // CString records per POI ExHyperlink structure:
         // 1. linkDetailsA (title) with options=0x00 (instance=0)
         // 2. linkDetailsB (URL) with options=link_options
-        let title_cstring = build_cstring_with_options(0x00, &title)?;
+        let title_cstring = build_cstring_with_options(0x00, &title);
         children.push(title_cstring);
 
-        let url_cstring = build_cstring_with_options(link_options, &url)?;
+        let url_cstring = build_cstring_with_options(link_options, &url);
         children.push(url_cstring);
 
         // Calculate total size
@@ -541,6 +590,10 @@ impl HyperlinkCollection {
 // =============================================================================
 
 /// Hyperlink attached to a shape (for mouse click or hover)
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`ShapeHyperlink` is the established public API name; renaming it would break downstream crates"
+)]
 #[derive(Debug, Clone)]
 pub struct ShapeHyperlink {
     /// Hyperlink reference ID
@@ -555,6 +608,7 @@ pub struct ShapeHyperlink {
 
 impl ShapeHyperlink {
     /// Create click hyperlink
+    #[must_use]
     pub fn click(hyperlink_id: u32) -> Self {
         Self {
             hyperlink_id,
@@ -565,6 +619,7 @@ impl ShapeHyperlink {
     }
 
     /// Create hover hyperlink
+    #[must_use]
     pub fn hover(hyperlink_id: u32) -> Self {
         Self {
             hyperlink_id,
@@ -575,12 +630,17 @@ impl ShapeHyperlink {
     }
 
     /// Set sound
+    #[must_use]
     pub fn with_sound(mut self, sound_ref: u32) -> Self {
         self.sound_ref = sound_ref;
         self
     }
 
-    /// Build InteractiveInfo container for ClientData (per POI InteractiveInfo)
+    /// Build `InteractiveInfo` container for `ClientData` (per POI `InteractiveInfo`)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the underlying writer reports an error.
     pub fn build_interactive_info(
         &self,
         atom: &InteractiveInfoAtom,
@@ -645,7 +705,10 @@ fn write_ppt_container_header<W: std::io::Write>(
 }
 
 /// Write a PPT container header with custom instance
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "helper retained for planned hyperlink record support"
+)]
 fn write_ppt_container_header_with_instance<W: std::io::Write>(
     writer: &mut W,
     version: u8,
@@ -653,23 +716,30 @@ fn write_ppt_container_header_with_instance<W: std::io::Write>(
     rec_type: u16,
     length: u32,
 ) -> Result<(), std::io::Error> {
-    let ver_inst = (version as u16 & 0x0F) | ((instance & 0x0FFF) << 4);
+    let ver_inst = (u16::from(version) & 0x0F) | ((instance & 0x0FFF) << 4);
     writer.write_all(&ver_inst.to_le_bytes())?;
     writer.write_all(&rec_type.to_le_bytes())?;
     writer.write_all(&length.to_le_bytes())?;
     Ok(())
 }
 
-/// Build a CString record (UTF-16LE string) with instance value
-#[allow(dead_code)]
-fn build_cstring(instance: u16, text: &str) -> Result<Vec<u8>, std::io::Error> {
+/// Build a `CString` record (UTF-16LE string) with instance value
+#[allow(
+    dead_code,
+    reason = "helper retained for planned hyperlink record support"
+)]
+fn build_cstring(instance: u16, text: &str) -> Vec<u8> {
     // Convert instance to options format (instance << 4)
     build_cstring_with_options((instance & 0x0FFF) << 4, text)
 }
 
-/// Build a CString record (UTF-16LE string) with raw options value
-/// Per POI CString: first 2 bytes are options (version + instance << 4)
-fn build_cstring_with_options(options: u16, text: &str) -> Result<Vec<u8>, std::io::Error> {
+/// Build a `CString` record (UTF-16LE string) with raw options value
+/// Per POI `CString`: first 2 bytes are options (version + instance << 4)
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "hyperlink strings are short display texts or URLs whose UTF-16 byte length is bounded far below u32::MAX"
+)]
+fn build_cstring_with_options(options: u16, text: &str) -> Vec<u8> {
     let mut record = Vec::new();
 
     // Convert to UTF-16LE
@@ -686,7 +756,7 @@ fn build_cstring_with_options(options: u16, text: &str) -> Result<Vec<u8>, std::
         record.extend_from_slice(&ch.to_le_bytes());
     }
 
-    Ok(record)
+    record
 }
 
 // =============================================================================
@@ -694,6 +764,11 @@ fn build_cstring_with_options(options: u16, text: &str) -> Result<Vec<u8>, std::
 // =============================================================================
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -754,7 +829,7 @@ mod tests {
 
     #[test]
     fn test_cstring_build() {
-        let cstring = build_cstring(0, "Test").unwrap();
+        let cstring = build_cstring(0, "Test");
         // Header (8) + "Test" in UTF-16LE (8)
         assert_eq!(cstring.len(), 16);
     }

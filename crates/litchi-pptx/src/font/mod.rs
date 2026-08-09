@@ -1,4 +1,4 @@
-//! Typed PresentationML embedded fonts and inert OPC resources.
+//! Typed `PresentationML` embedded fonts and inert OPC resources.
 
 #[cfg(feature = "automatic-fonts")]
 mod automatic;

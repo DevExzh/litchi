@@ -1,4 +1,4 @@
-//! Detached source-checked edits for media TracksInfo and narration metadata.
+//! Detached source-checked edits for media `TracksInfo` and narration metadata.
 
 use std::ops::Range;
 use std::sync::Arc;
@@ -42,30 +42,35 @@ impl Snapshot {
 
     /// Return the selected media shape identity.
     #[inline]
+    #[must_use]
     pub fn key(&self) -> &super::model::MediaKey {
         &self.metadata.key
     }
 
     /// Borrow the typed metadata.
     #[inline]
+    #[must_use]
     pub fn metadata(&self) -> &MediaMetadata {
         &self.metadata
     }
 
     /// Return the source revision used by stale-source checks.
     #[inline]
+    #[must_use]
     pub const fn revision(&self) -> Revision {
         self.revision
     }
 
     /// Borrow the exact owning slide XML captured by this snapshot.
     #[inline]
+    #[must_use]
     pub fn source_xml(&self) -> &[u8] {
         self.source_xml.as_slice()
     }
 
     /// Start an atomic detached edit.
     #[inline]
+    #[must_use]
     pub fn edit(&self) -> Transaction {
         Transaction {
             original: self.clone(),
@@ -84,17 +89,23 @@ pub struct Transaction {
 impl Transaction {
     /// Borrow the projected typed metadata.
     #[inline]
+    #[must_use]
     pub fn snapshot(&self) -> &MediaMetadata {
         &self.working
     }
 
     /// Return whether a source-changing edit has been staged.
     #[inline]
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.original.metadata != self.working
     }
 
     /// Change the schema-defined `tracksInfo/@displayLoc` value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_display_location(&mut self, value: DisplayLocation) -> Result<()> {
         let tracks = self
             .working
@@ -107,6 +118,10 @@ impl Transaction {
 
     /// Replace one caption's identity and display label without touching its
     /// relationship target or opaque media payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_caption_identity(
         &mut self,
         index: usize,
@@ -123,6 +138,10 @@ impl Transaction {
     }
 
     /// Replace one caption's optional language metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_caption_language(&mut self, index: usize, language: Option<String>) -> Result<()> {
         let caption = self.caption_mut(index)?;
         let mut candidate = caption.clone();
@@ -134,6 +153,10 @@ impl Transaction {
 
     /// Set the shape-level narration flag. `None` means the authored `val`
     /// attribute is absent; it is kept distinct from `Some(false)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_narration(&mut self, value: Option<bool>) -> Result<()> {
         if self.original.layout.narration.is_none() && value.is_some() {
             return Err(invalid(
@@ -145,6 +168,10 @@ impl Transaction {
     }
 
     /// Validate and consume this edit into a source-checked commit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn commit(self) -> Result<Commit> {
         validate_metadata(&self.working)?;
         let updated = encode_edit(&self.original, &self.working)?;
@@ -192,24 +219,28 @@ pub struct Commit {
 impl Commit {
     /// Borrow the projected post-edit snapshot.
     #[inline]
+    #[must_use]
     pub fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrow the source-checked patch for package publication.
     #[inline]
+    #[must_use]
     pub fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Return whether this commit changes the owning slide bytes.
     #[inline]
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.patch.is_changed()
     }
 
     /// Consume the commit and return its patch.
     #[inline]
+    #[must_use]
     pub fn into_patch(self) -> Patch {
         self.patch
     }
@@ -228,12 +259,14 @@ pub struct Patch {
 impl Patch {
     /// Return whether the patch is an exact no-op.
     #[inline]
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.expected_xml.as_slice() != self.updated_xml.as_slice()
     }
 
     /// Return the source revision required for publication.
     #[inline]
+    #[must_use]
     pub const fn expected_revision(&self) -> Revision {
         self.expected_revision
     }
@@ -368,10 +401,10 @@ fn apply_replacements(source: &[u8], mut replacements: Vec<Replacement>) -> Resu
 }
 
 fn fingerprint(bytes: &[u8]) -> Revision {
-    let mut hash = 0xcbf29ce484222325u64;
+    let mut hash = 0xcbf2_9ce4_8422_2325u64;
     for byte in bytes {
         hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(0x100000001b3);
+        hash = hash.wrapping_mul(0x100_0000_01b3);
     }
     hash
 }

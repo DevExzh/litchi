@@ -74,10 +74,7 @@ fn project_storage_remains_clear_when_document_streams_are_encrypted() {
     assert_eq!(project.modules()[0].name(), "Module1");
 
     let document = package
-        .document_with_options(OpenOptions {
-            password: Some("secret"),
-            ..Default::default()
-        })
+        .document_with_options(OpenOptions::default().with_password("secret".to_owned().into()))
         .unwrap();
     assert!(document.text().unwrap().contains("Encrypted body"));
 }

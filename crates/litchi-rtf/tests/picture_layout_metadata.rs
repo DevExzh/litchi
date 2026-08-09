@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{ImageType, Picture, RtfDocument, RtfWriter};
 use std::borrow::Cow;
 
@@ -46,16 +55,16 @@ fn bitmap_crop_and_source_header_metadata_round_trip_inertly() {
 #[test]
 fn picture_layout_controls_reject_ambiguous_or_unbounded_forms() {
     for source in [
-        r#"{\rtf1{\pict\wbitmap0\piccropl 00}}"#,
-        r#"{\rtf1{\pict\wbitmap0\picbpp 00}}"#,
-        r#"{\rtf1{\pict\wbitmap0\wbmplanes0 00}}"#,
-        r#"{\rtf1{\pict\wbitmap0\wbmwidthbytes-1 00}}"#,
-        r#"{\rtf1{\pict\wbitmap0\picscaled1 00}}"#,
-        r#"{\rtf1{\pict\wbitmap0\picbmp1 00}}"#,
-        r#"{\rtf1{\pict\wbitmap0\piccropl1\piccropl2 00}}"#,
-        r#"{\rtf1{\pict\wbitmap0 00\piccropb1}}"#,
-        r#"{\rtf1{\pict\pngblip\picbpp8 00}}"#,
-        r#"{\rtf1\piccropl1 Body}"#,
+        r"{\rtf1{\pict\wbitmap0\piccropl 00}}",
+        r"{\rtf1{\pict\wbitmap0\picbpp 00}}",
+        r"{\rtf1{\pict\wbitmap0\wbmplanes0 00}}",
+        r"{\rtf1{\pict\wbitmap0\wbmwidthbytes-1 00}}",
+        r"{\rtf1{\pict\wbitmap0\picscaled1 00}}",
+        r"{\rtf1{\pict\wbitmap0\picbmp1 00}}",
+        r"{\rtf1{\pict\wbitmap0\piccropl1\piccropl2 00}}",
+        r"{\rtf1{\pict\wbitmap0 00\piccropb1}}",
+        r"{\rtf1{\pict\pngblip\picbpp8 00}}",
+        r"{\rtf1\piccropl1 Body}",
     ] {
         assert!(
             RtfDocument::parse(source).is_err(),

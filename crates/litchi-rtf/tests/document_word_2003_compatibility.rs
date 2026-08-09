@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{DocumentWord2003Compatibility, RtfDocument, RtfWriter};
 
 const CONTROLS: [&str; 14] = [
@@ -44,10 +53,11 @@ fn write(doc: &RtfDocument<'_>) -> String {
 
 #[test]
 fn parses_complete_word_2003_matrix_as_passive_metadata() {
-    let controls = CONTROLS
-        .iter()
-        .map(|name| format!("\\{name}"))
-        .collect::<String>();
+    let controls = CONTROLS.iter().fold(String::new(), |mut joined, name| {
+        joined.push('\\');
+        joined.push_str(name);
+        joined
+    });
     let doc = RtfDocument::parse(&format!(r"{{\rtf1\ansi{controls} Body}}")).unwrap();
     assert_eq!(*doc.word_2003_compatibility(), all_enabled());
     assert_eq!(doc.text(), "Body");

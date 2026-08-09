@@ -1,4 +1,4 @@
-//! Layered semantic state for the legacy PowerPoint writer core.
+//! Layered semantic state for the legacy `PowerPoint` writer core.
 //!
 //! This facade owns the typed writer state and caller-facing value models.
 //! Contextual authoring operations live in the semantic module, validation and
@@ -27,6 +27,7 @@ use crate::animation::AnimationInfo;
 #[cfg(feature = "encryption")]
 use crate::encryption::EncryptionProfile;
 use crate::header_footer::HeaderFooter;
+use crate::transition::TransitionInfo;
 use crate::view_info::SlideViewInfo;
 use std::collections::{BTreeMap, HashMap};
 use zeroize::Zeroizing;
@@ -74,11 +75,11 @@ impl From<litchi_ograph::Error> for WriteError {
 impl std::fmt::Display for WriteError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            WriteError::Io(e) => write!(f, "I/O error: {}", e),
-            WriteError::InvalidData(s) => write!(f, "Invalid data: {}", s),
-            WriteError::Ole(e) => write!(f, "OLE error: {}", e),
+            WriteError::Io(e) => write!(f, "I/O error: {e}"),
+            WriteError::InvalidData(s) => write!(f, "Invalid data: {s}"),
+            WriteError::Ole(e) => write!(f, "OLE error: {e}"),
             #[cfg(feature = "vba-inspection")]
-            WriteError::Vba(e) => write!(f, "VBA project error: {}", e),
+            WriteError::Vba(e) => write!(f, "VBA project error: {e}"),
             WriteError::Graph(e) => write!(f, "Office Graph error: {e}"),
         }
     }
@@ -97,7 +98,7 @@ impl std::error::Error for WriteError {
     }
 }
 
-/// Shape type (legacy - use ShapeKind from shapes module for new code)
+/// Shape type (legacy - use `ShapeKind` from shapes module for new code)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShapeType {
     /// Rectangle
@@ -124,7 +125,7 @@ pub enum ShapeType {
     Heart,
     /// Picture frame
     Picture,
-    /// Custom/freeform shape with explicit OfficeArt geometry
+    /// Custom/freeform shape with explicit `OfficeArt` geometry
     Freeform,
 }
 
@@ -212,8 +213,8 @@ impl Default for ShapeProperties {
             shape_type: ShapeType::Rectangle,
             x: 0,
             y: 0,
-            width: 914400,  // 1 inch
-            height: 914400, // 1 inch
+            width: 914_400,  // 1 inch
+            height: 914_400, // 1 inch
             text: None,
             paragraphs: None,
             alignment: TextAlignment::Left,
@@ -250,6 +251,8 @@ pub(super) struct WritableSlide {
     pub(super) comments: Vec<SlideComment>,
     /// Per-slide timing (auto-advance, hidden, etc.)
     pub(super) timing: Option<SlideTiming>,
+    /// Slide transition effect; owns the `SSSlideInfoAtom` record when set.
+    pub(super) transition: Option<TransitionInfo>,
     /// Optional header/footer override attached directly to this slide.
     pub(super) header_footer: Option<HeaderFooter>,
 }
@@ -262,8 +265,12 @@ pub(super) struct SerializedHeaderFooters {
 }
 
 impl WritableSlide {
-    /// Number of OfficeArt shapes in this slide's drawing, including the
+    /// Number of `OfficeArt` shapes in this slide's drawing, including the
     /// group patriarch, the background shape, and every table group/cell.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "in-memory shape and chart counts cannot approach u32::MAX on supported targets"
+    )]
     pub(super) fn escher_shape_count(&self) -> u32 {
         let table_shapes: u32 = self.tables.iter().map(|t| t.table.shape_count()).sum();
         2 + self.shapes.len() as u32 + table_shapes + self.charts.len() as u32
@@ -282,7 +289,7 @@ pub struct Writer {
     pub(super) blip_store: Pictures,
     /// Hyperlink collection
     pub(super) hyperlinks: HyperlinkCollection,
-    /// Typed base and PowerPoint 10 font collections.
+    /// Typed base and `PowerPoint` 10 font collections.
     pub(super) fonts: crate::font::FontCollections,
     /// Explicit embedded sound resources keyed by writer-local IDs.
     pub(super) sound_resources: BTreeMap<u32, crate::animation::SoundType>,
@@ -290,7 +297,7 @@ pub struct Writer {
     pub(super) next_sound_resource_id: u32,
     /// Custom slide shows (named shows)
     pub(super) custom_shows: Vec<CustomShow>,
-    /// Document-wide PowerPoint 11 smart-tag property bags.
+    /// Document-wide `PowerPoint` 11 smart-tag property bags.
     pub(super) smart_tags: Vec<SmartTagDefinition>,
     /// Optional typed override for the slide editing view.
     pub(super) slide_view_info: Option<SlideViewInfo>,

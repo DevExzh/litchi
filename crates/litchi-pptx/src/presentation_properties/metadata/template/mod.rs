@@ -1,4 +1,4 @@
-//! Deterministic PresentationML authoring templates.
+//! Deterministic `PresentationML` authoring templates.
 
 mod codec;
 

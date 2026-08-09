@@ -1,6 +1,6 @@
 //! `TimeNodeAtom` decoding.
 
-use super::super::support::{parse_optional_time_value, read_u32, require_atom};
+use super::super::support::{parse_optional_time_value, read_i32, read_u32, require_atom};
 use super::model::AtomFlags;
 use crate::animation::types::{TimeNodeAtom, TimeNodeFill, TimeNodeKind, TimeNodeRestart};
 use crate::consts::RecordType;
@@ -8,6 +8,11 @@ use crate::package::{Error, Result};
 use crate::records::Record;
 
 /// Parse the exact 32-byte payload of a `TimeNodeAtom`.
+///
+/// # Errors
+///
+/// Returns an error if the record header is malformed or a property field
+/// holds a value the format does not permit.
 pub fn parse_time_node_atom(record: &Record) -> Result<TimeNodeAtom> {
     require_atom(record, RecordType::TimeNode, 0, 32, "TimeNodeAtom")?;
     let flags = AtomFlags::from_raw(read_u32(&record.data, 28));
@@ -29,7 +34,7 @@ pub fn parse_time_node_atom(record: &Record) -> Result<TimeNodeAtom> {
         TimeNodeKind::parse,
         "TimeNodeAtom type",
     )?;
-    let duration = i32::from_le_bytes(record.data[24..28].try_into().expect("length checked"));
+    let duration = read_i32(&record.data, 24);
     let duration_ms = if flags.duration_property {
         Some(duration)
     } else if duration == 0 {

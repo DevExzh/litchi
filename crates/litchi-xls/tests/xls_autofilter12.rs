@@ -68,7 +68,7 @@ fn apache_poi_icon_filter_table_round_trips_through_writer() {
     let producer = Workbook::new(File::open(path).unwrap()).unwrap();
     let table = (0..producer.sheets().len())
         .filter_map(|sheet| producer.xls_worksheet(sheet).ok())
-        .flat_map(|sheet| sheet.list_objects())
+        .flat_map(litchi_xls::Worksheet::list_objects)
         .find(|table| table.range().column_count() >= 2 && table.opaque_future_records().is_empty())
         .cloned()
         .expect("Apache POI table suitable for icon-filter producer metadata");

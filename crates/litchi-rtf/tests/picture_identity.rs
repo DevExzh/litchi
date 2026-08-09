@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{ImageType, Picture, PictureIdentity, RtfDocument, RtfWriter};
 use std::borrow::Cow;
 
@@ -47,7 +56,7 @@ fn parses_and_canonically_round_trips_picture_identity() {
 #[test]
 fn accepts_real_empty_uid_but_rejects_malformed_identity_content() {
     let empty =
-        RtfDocument::parse(r#"{\rtf1{\pict\pngblip{\*\blipuid } 89504e470d0a1a0a}}"#).unwrap();
+        RtfDocument::parse(r"{\rtf1{\pict\pngblip{\*\blipuid } 89504e470d0a1a0a}}").unwrap();
     assert_eq!(
         empty.pictures()[0]
             .identity
@@ -59,27 +68,27 @@ fn accepts_real_empty_uid_but_rejects_malformed_identity_content() {
     );
 
     let malformed = [
-        r#"{\rtf1\bliptag1 X}"#,
-        r#"{\rtf1\blipupi96 X}"#,
-        r#"{\rtf1{\*\blipuid 00112233445566778899aabbccddeeff}}"#,
-        r#"{\rtf1{\pict\pngblip{\blipuid 00112233445566778899aabbccddeeff} 00}}"#,
-        r#"{\rtf1{\pict\pngblip\blipuid 00112233445566778899aabbccddeeff 00}}"#,
-        r#"{\rtf1{\pict\pngblip\bliptag1\bliptag2 00}}"#,
-        r#"{\rtf1{\pict\pngblip\blipupi96\blipupi97 00}}"#,
-        r#"{\rtf1{\pict\pngblip{\*\blipuid 00112233445566778899aabbccddeeff}{\*\blipuid 00112233445566778899aabbccddeeff} 00}}"#,
-        r#"{\rtf1{\pict\pngblip\blipupi-1 00}}"#,
-        r#"{\rtf1{\pict\pngblip\blipupi0 00}}"#,
-        r#"{\rtf1{\pict\pngblip\blipupi65536 00}}"#,
-        r#"{\rtf1{\pict\pngblip\blipupi96\bliptag1 00}}"#,
-        r#"{\rtf1{\pict\pngblip{\*\blipuid 00112233445566778899aabbccddeeff}\blipupi96 00}}"#,
-        r#"{\rtf1{\pict\pngblip{\*\blipuid 0} 00}}"#,
-        r#"{\rtf1{\pict\pngblip{\*\blipuid zz} 00}}"#,
-        r#"{\rtf1{\pict\pngblip{\*\blipuid 00112233445566778899aabbccddee} 00}}"#,
-        r#"{\rtf1{\pict\pngblip{\*\blipuid 00112233445566778899aabbccddeeff00} 00}}"#,
-        r#"{\rtf1{\pict\pngblip{\*\blipuid{\field danger}} 00}}"#,
-        r#"{\rtf1{\pict\pngblip{\*\blipuid{\object danger}} 00}}"#,
-        r#"{\rtf1{\pict\pngblip{\*\blipuid\bin2 xx} 00}}"#,
-        r#"{\rtf1{\pict\pngblip 00{\*\blipuid 00112233445566778899aabbccddeeff}}}"#,
+        r"{\rtf1\bliptag1 X}",
+        r"{\rtf1\blipupi96 X}",
+        r"{\rtf1{\*\blipuid 00112233445566778899aabbccddeeff}}",
+        r"{\rtf1{\pict\pngblip{\blipuid 00112233445566778899aabbccddeeff} 00}}",
+        r"{\rtf1{\pict\pngblip\blipuid 00112233445566778899aabbccddeeff 00}}",
+        r"{\rtf1{\pict\pngblip\bliptag1\bliptag2 00}}",
+        r"{\rtf1{\pict\pngblip\blipupi96\blipupi97 00}}",
+        r"{\rtf1{\pict\pngblip{\*\blipuid 00112233445566778899aabbccddeeff}{\*\blipuid 00112233445566778899aabbccddeeff} 00}}",
+        r"{\rtf1{\pict\pngblip\blipupi-1 00}}",
+        r"{\rtf1{\pict\pngblip\blipupi0 00}}",
+        r"{\rtf1{\pict\pngblip\blipupi65536 00}}",
+        r"{\rtf1{\pict\pngblip\blipupi96\bliptag1 00}}",
+        r"{\rtf1{\pict\pngblip{\*\blipuid 00112233445566778899aabbccddeeff}\blipupi96 00}}",
+        r"{\rtf1{\pict\pngblip{\*\blipuid 0} 00}}",
+        r"{\rtf1{\pict\pngblip{\*\blipuid zz} 00}}",
+        r"{\rtf1{\pict\pngblip{\*\blipuid 00112233445566778899aabbccddee} 00}}",
+        r"{\rtf1{\pict\pngblip{\*\blipuid 00112233445566778899aabbccddeeff00} 00}}",
+        r"{\rtf1{\pict\pngblip{\*\blipuid{\field danger}} 00}}",
+        r"{\rtf1{\pict\pngblip{\*\blipuid{\object danger}} 00}}",
+        r"{\rtf1{\pict\pngblip{\*\blipuid\bin2 xx} 00}}",
+        r"{\rtf1{\pict\pngblip 00{\*\blipuid 00112233445566778899aabbccddeeff}}}",
     ];
     for source in malformed {
         assert!(

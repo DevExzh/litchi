@@ -1,14 +1,17 @@
-//! PPT semantic inputs for OfficeArt group and shape records.
+//! PPT semantic inputs for `OfficeArt` group and shape records.
 //!
 //! These types model only the bounded group grammar owned by this writer. Host
-//! records such as ClientData remain on `UserShapeData`, so a group can reuse
+//! records such as `ClientData` remain on `UserShapeData`, so a group can reuse
 //! the same typed shape authoring path without duplicating shape properties.
 
-#![allow(dead_code)]
+#![allow(
+    dead_code,
+    reason = "typed shape authoring helpers retained for pending call sites"
+)]
 
 use super::{ChildAnchor, EscherSpgrData, UserShapeData};
 
-/// A shape that is a member of an OfficeArt group.
+/// A shape that is a member of an `OfficeArt` group.
 #[derive(Debug, Clone)]
 pub(crate) struct ChildShape {
     pub(crate) id: u32,
@@ -23,7 +26,7 @@ impl ChildShape {
     }
 }
 
-/// A nested OfficeArt group shape.
+/// A nested `OfficeArt` group shape.
 #[derive(Debug, Clone)]
 pub(crate) struct GroupShape {
     pub(crate) id: u32,
@@ -62,7 +65,9 @@ impl GroupShape {
     /// Appends a child shape in the group's coordinate system.
     pub(crate) fn push_shape(&mut self, id: u32, anchor: ChildAnchor, data: UserShapeData) {
         self.children
-            .push(GroupChild::Shape(ChildShape::new(id, anchor, data)));
+            .push(GroupChild::Shape(Box::new(ChildShape::new(
+                id, anchor, data,
+            ))));
     }
 
     /// Appends a nested group and returns the updated group.
@@ -92,7 +97,7 @@ impl GroupShape {
 #[derive(Debug, Clone)]
 pub(crate) enum GroupChild {
     /// A normal child `SpContainer`.
-    Shape(ChildShape),
+    Shape(Box<ChildShape>),
     /// A nested `SpgrContainer`.
     Group(GroupShape),
 }

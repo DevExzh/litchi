@@ -33,7 +33,7 @@ pub(super) fn header(
             record.instance
         )));
     }
-    let actual = usize::try_from(record.data_length).map_err(|_| {
+    let actual = usize::try_from(record.data_length).map_err(|_err| {
         Error::Corrupted(format!(
             "{expected_type:?} record length does not fit usize"
         ))
@@ -183,14 +183,14 @@ pub(super) fn read_u32(record: &Record, offset: usize, name: &str) -> Result<u32
         .data
         .get(offset..end)
         .ok_or_else(|| Error::Corrupted(format!("{name} is truncated")))?;
-    Ok(u32::from_le_bytes(bytes.try_into().map_err(|_| {
+    Ok(u32::from_le_bytes(bytes.try_into().map_err(|_err| {
         Error::Corrupted(format!("{name} is truncated"))
     })?))
 }
 
 pub(super) fn wire_size(record: &Record) -> Result<usize> {
     let body = usize::try_from(record.data_length)
-        .map_err(|_| Error::Corrupted("record length does not fit usize".to_string()))?;
+        .map_err(|_err| Error::Corrupted("record length does not fit usize".to_string()))?;
     if body != record.data.len() {
         return Err(Error::Corrupted(
             "record length does not match its payload".to_string(),

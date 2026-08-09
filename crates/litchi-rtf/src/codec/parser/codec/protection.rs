@@ -1,4 +1,8 @@
-use super::*;
+use super::{
+    ControlWord, Cow, Destination, EditableRegionSpan, MAX_BOOKMARK_NAME_BYTES, OpenEditableRegion,
+    OpenProtectionRange, ParsedBodyStoryEvent, Parser, ProtectionRangeSpan, RtfError, RtfResult,
+    SmallVec, Token, control_symbol_text,
+};
 
 impl<'a> Parser<'a> {
     /// Whether the group starting at `self.pos` is a custom XML markup
@@ -53,7 +57,7 @@ impl<'a> Parser<'a> {
         };
         self.pos += 1;
         let mut id = String::new();
-        let mut unicode_skip = self.current_state()?.unicode_skip.max(0) as usize;
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0).cast_unsigned() as usize;
         let mut fallback_skip = 0usize;
         loop {
             match self.tokens.get(self.pos) {
@@ -82,8 +86,8 @@ impl<'a> Parser<'a> {
                 },
             }
         }
-        let id = id.trim_end_matches(['\r', '\n']).to_string();
-        crate::ProtectionRange::new(Cow::Borrowed(id.as_str()), 0, Cow::Borrowed(""))?;
+        let range_id = id.trim_end_matches(['\r', '\n']).to_string();
+        crate::ProtectionRange::new(Cow::Borrowed(range_id.as_str()), 0, Cow::Borrowed(""))?;
 
         if is_start {
             if self.next_protection_range_order >= crate::protection_range::MAX_PROTECTION_RANGES {
@@ -92,7 +96,7 @@ impl<'a> Parser<'a> {
                 ));
             }
             let range = OpenProtectionRange {
-                id: id.clone(),
+                id: range_id.clone(),
                 position: self.body_text_len,
                 order: self.next_protection_range_order,
             };
@@ -101,10 +105,14 @@ impl<'a> Parser<'a> {
             ));
             self.next_protection_range_order += 1;
             self.open_protection_ranges
-                .entry(id)
+                .entry(range_id)
                 .or_default()
                 .push(range);
-        } else if let Some(open) = self.open_protection_ranges.get_mut(&id).and_then(Vec::pop) {
+        } else if let Some(open) = self
+            .open_protection_ranges
+            .get_mut(&range_id)
+            .and_then(Vec::pop)
+        {
             self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
                 crate::BodyStoryEvent::ProtectionRangeEnd(open.order),
             ));
@@ -233,7 +241,7 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_kinsoku_destination(&mut self, following: bool) -> RtfResult<Cow<'a, str>> {
         self.pos += 2; // ignorable marker and destination control word
         let mut value = String::new();
-        let mut unicode_skip = self.current_state()?.unicode_skip.max(0) as usize;
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0).cast_unsigned() as usize;
         let mut fallback_skip = 0usize;
         loop {
             match self.tokens.get(self.pos) {
@@ -297,22 +305,27 @@ impl<'a> Parser<'a> {
                 },
             }
         }
-        let value: String = value
+        let characters: String = value
             .chars()
             .filter(|c| !matches!(c, '\r' | '\n'))
             .collect();
         crate::DocumentKinsoku::validate_characters(
             if following { "following" } else { "leading" },
-            &value,
+            &characters,
         )?;
-        Ok(Cow::Owned(value))
+        Ok(Cow::Owned(characters))
     }
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "RTF \\uN parameters are signed 16-bit; the u16 wrap implements the specified negative-value conversion"
+    )]
     pub(super) fn parse_ignorable_text_destination(&mut self) -> RtfResult<String> {
         self.pos += 2; // ignorable marker and destination control word
         let mut value = String::new();
         let mut depth = 1usize;
-        let mut unicode_skip = self.current_state()?.unicode_skip.max(0) as usize;
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0).cast_unsigned() as usize;
         let mut fallback_skip = 0usize;
         while self.pos < self.tokens.len() && depth > 0 {
             match self.tokens.get(self.pos) {
@@ -341,7 +354,7 @@ impl<'a> Parser<'a> {
                     continue;
                 },
                 Some(Token::Control(ControlWord::UnicodeSkip(count))) => {
-                    unicode_skip = (*count).max(0) as usize;
+                    unicode_skip = (*count).max(0).cast_unsigned() as usize;
                 },
                 Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
                     value.push_str(control_symbol_text(control).unwrap_or_default());

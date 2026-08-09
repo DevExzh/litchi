@@ -25,6 +25,7 @@ pub struct Bookmark<'a> {
 impl<'a> Bookmark<'a> {
     /// Create a new bookmark
     #[inline]
+    #[must_use]
     pub fn new(name: Cow<'a, str>) -> Self {
         Self {
             name,
@@ -38,6 +39,7 @@ impl<'a> Bookmark<'a> {
 
     /// Create a bookmark with content
     #[inline]
+    #[must_use]
     pub fn with_content(name: Cow<'a, str>, content: Cow<'a, str>) -> Self {
         Self {
             name,
@@ -60,6 +62,7 @@ pub struct BookmarkTable<'a> {
 impl<'a> BookmarkTable<'a> {
     /// Create a new bookmark table
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             bookmarks: Vec::new(),
@@ -73,18 +76,21 @@ impl<'a> BookmarkTable<'a> {
     }
 
     /// Get a bookmark by name
+    #[must_use]
     pub fn get(&self, name: &str) -> Option<&Bookmark<'a>> {
         self.bookmarks.iter().find(|b| b.name.as_ref() == name)
     }
 
     /// Get all bookmarks
     #[inline]
+    #[must_use]
     pub fn bookmarks(&self) -> &[Bookmark<'a>] {
         &self.bookmarks
     }
 
     /// Check if a bookmark exists
     #[inline]
+    #[must_use]
     pub fn contains(&self, name: &str) -> bool {
         self.get(name).is_some()
     }

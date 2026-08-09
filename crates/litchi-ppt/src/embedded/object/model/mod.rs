@@ -1,4 +1,4 @@
-//! Semantic metadata models for PowerPoint OLE object records.
+//! Semantic metadata models for `PowerPoint` OLE object records.
 //!
 //! The model layer deliberately contains no record traversal or mutation
 //! policy.  Wire-facing implementations live under `crate::codec`, while

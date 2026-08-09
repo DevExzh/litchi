@@ -18,20 +18,20 @@ use litchi_core::{Error, Result, xml::escape_xml};
 use litchi_odf_common::datatype::lexical;
 
 /// Namespace URI of the LibreOffice `loext` extension used by theme colors.
-pub(crate) const LOEXT_NAMESPACE_URI: &str =
+pub const LOEXT_NAMESPACE_URI: &str =
     "urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0";
 /// Namespace declaration written on each complex-color element.
 const LOEXT_NAMESPACE_DECLARATION: &str =
     " xmlns:loext=\"urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0\"";
 
 /// Most sparkline groups one sheet may declare.
-pub(crate) const MAX_SPARKLINE_GROUPS_PER_SHEET: usize = 16_384;
+pub const MAX_SPARKLINE_GROUPS_PER_SHEET: usize = 16_384;
 /// Most sparklines one group may contain.
-pub(crate) const MAX_SPARKLINES_PER_GROUP: usize = 65_536;
+pub const MAX_SPARKLINES_PER_GROUP: usize = 65_536;
 /// Most `loext:transformation` children one complex color may carry.
-pub(crate) const MAX_COLOR_TRANSFORMATIONS: usize = 64;
+pub const MAX_COLOR_TRANSFORMATIONS: usize = 64;
 /// Largest accepted length of any single lexical attribute value.
-pub(crate) const MAX_SPARKLINE_ATTRIBUTE_BYTES: usize = 64 * 1024;
+pub const MAX_SPARKLINE_ATTRIBUTE_BYTES: usize = 64 * 1024;
 
 /// The rendering kind of a sparkline group (`calcext:type`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -42,7 +42,10 @@ pub enum Type {
 }
 
 impl Type {
-    pub(crate) fn parse(value: &str) -> Result<Self> {
+    /// # Errors
+    ///
+    /// Returns an error when the input is malformed or exceeds the parser's resource limits.
+    pub fn parse(value: &str) -> Result<Self> {
         match value {
             "line" => Ok(Self::Line),
             "column" => Ok(Self::Column),
@@ -71,7 +74,10 @@ pub enum EmptyCells {
 }
 
 impl EmptyCells {
-    pub(crate) fn parse(value: &str) -> Result<Self> {
+    /// # Errors
+    ///
+    /// Returns an error when the input is malformed or exceeds the parser's resource limits.
+    pub fn parse(value: &str) -> Result<Self> {
         match value {
             "gap" => Ok(Self::Gap),
             "span" => Ok(Self::Span),
@@ -101,7 +107,10 @@ pub enum AxisType {
 }
 
 impl AxisType {
-    pub(crate) fn parse(value: &str) -> Result<Self> {
+    /// # Errors
+    ///
+    /// Returns an error when the input is malformed or exceeds the parser's resource limits.
+    pub fn parse(value: &str) -> Result<Self> {
         match value {
             "individual" => Ok(Self::Individual),
             "group" => Ok(Self::Group),
@@ -191,7 +200,10 @@ pub enum ThemeColorType {
 }
 
 impl ThemeColorType {
-    pub(crate) fn parse(value: &str) -> Result<Self> {
+    /// # Errors
+    ///
+    /// Returns an error when the input is malformed or exceeds the parser's resource limits.
+    pub fn parse(value: &str) -> Result<Self> {
         Ok(match value {
             "dark1" => Self::Dark1,
             "light1" => Self::Light1,
@@ -241,7 +253,10 @@ pub enum TransformationType {
 }
 
 impl TransformationType {
-    pub(crate) fn parse(value: &str) -> Result<Self> {
+    /// # Errors
+    ///
+    /// Returns an error when the input is malformed or exceeds the parser's resource limits.
+    pub fn parse(value: &str) -> Result<Self> {
         match value {
             "tint" => Ok(Self::Tint),
             "shade" => Ok(Self::Shade),
@@ -333,7 +348,7 @@ pub struct ComplexColors {
 }
 
 /// The element names of the complex-color slots, in LibreOffice write order.
-pub(crate) const COMPLEX_COLOR_SLOTS: [&str; 8] = [
+pub const COMPLEX_COLOR_SLOTS: [&str; 8] = [
     "sparkline-series-complex-color",
     "sparkline-negative-complex-color",
     "sparkline-axis-complex-color",
@@ -346,7 +361,7 @@ pub(crate) const COMPLEX_COLOR_SLOTS: [&str; 8] = [
 
 impl ComplexColors {
     /// The slot for an element name, or `None` when it is not a complex color.
-    pub(crate) fn slot_mut(&mut self, element_name: &str) -> Option<&mut Option<ComplexColor>> {
+    pub fn slot_mut(&mut self, element_name: &str) -> Option<&mut Option<ComplexColor>> {
         Some(match element_name {
             "sparkline-series-complex-color" => &mut self.series,
             "sparkline-negative-complex-color" => &mut self.negative,
@@ -362,7 +377,11 @@ impl ComplexColors {
 
     /// Assign a slot, rejecting duplicates. `element_name` must be one of
     /// [`COMPLEX_COLOR_SLOTS`].
-    pub(crate) fn assign_slot(&mut self, element_name: &str, color: ComplexColor) -> Result<()> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the complex-color slot is already occupied.
+    pub fn assign_slot(&mut self, element_name: &str, color: ComplexColor) -> Result<()> {
         let slot = self.slot_mut(element_name).ok_or_else(|| {
             Error::InvalidFormat(format!("unknown complex color slot '{element_name}'"))
         })?;
@@ -498,7 +517,10 @@ impl Group {
     }
 }
 
-pub(crate) fn validate_sparkline_group(group: &Group) -> Result<()> {
+/// # Errors
+///
+/// Returns an error when a value violates the format or resource constraints.
+pub fn validate_sparkline_group(group: &Group) -> Result<()> {
     validate_sparkline_group_attributes(group)?;
     if group.sparklines.is_empty() {
         return Err(Error::InvalidFormat(
@@ -517,7 +539,11 @@ pub(crate) fn validate_sparkline_group(group: &Group) -> Result<()> {
 }
 
 /// Validate only the element attributes of a group, not its sparklines.
-pub(crate) fn validate_sparkline_group_attributes(group: &Group) -> Result<()> {
+///
+/// # Errors
+///
+/// Returns an error when a value violates the format or resource constraints.
+pub fn validate_sparkline_group_attributes(group: &Group) -> Result<()> {
     if let Some(id) = &group.id {
         lexical::validate_byte_limit("calcext:id", id, MAX_SPARKLINE_ATTRIBUTE_BYTES)?;
     }
@@ -564,7 +590,10 @@ pub(crate) fn validate_sparkline_group_attributes(group: &Group) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn validate_complex_color(complex_color: &ComplexColor) -> Result<()> {
+/// # Errors
+///
+/// Returns an error when a value violates the format or resource constraints.
+pub fn validate_complex_color(complex_color: &ComplexColor) -> Result<()> {
     if complex_color.transformations.len() > MAX_COLOR_TRANSFORMATIONS {
         return Err(Error::InvalidFormat(format!(
             "complex color exceeds the {MAX_COLOR_TRANSFORMATIONS} transformation safety limit"
@@ -573,7 +602,14 @@ pub(crate) fn validate_complex_color(complex_color: &ComplexColor) -> Result<()>
     Ok(())
 }
 
-pub(crate) fn validate_sparkline(sparkline: &Item) -> Result<()> {
+/// # Errors
+///
+/// Returns an error when a value violates the format or resource constraints.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "the codec entry point keeps its historical element-qualified name"
+)]
+pub fn validate_sparkline(sparkline: &Item) -> Result<()> {
     if sparkline.cell_address.is_empty() || sparkline.cell_address.trim() != sparkline.cell_address
     {
         return Err(Error::InvalidFormat(format!(
@@ -598,7 +634,10 @@ pub(crate) fn validate_sparkline(sparkline: &Item) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn validate_sparkline_groups(groups: &[Group]) -> Result<()> {
+/// # Errors
+///
+/// Returns an error when a value violates the format or resource constraints.
+pub fn validate_sparkline_groups(groups: &[Group]) -> Result<()> {
     if groups.len() > MAX_SPARKLINE_GROUPS_PER_SHEET {
         return Err(Error::InvalidFormat(format!(
             "sheet exceeds the {MAX_SPARKLINE_GROUPS_PER_SHEET} sparkline group safety limit"
@@ -627,7 +666,11 @@ fn validate_measure(name: &str, value: &str) -> Result<()> {
 
 /// Write a sheet's `calcext:sparkline-groups` container after its conditional
 /// formats, matching LibreOffice's element order inside `table:table`.
-pub(crate) fn write_sparkline_groups(out: &mut String, groups: &[Group]) -> Result<()> {
+///
+/// # Errors
+///
+/// Returns an error when the value cannot be serialized.
+pub fn write_sparkline_groups(out: &mut String, groups: &[Group]) -> Result<()> {
     validate_sparkline_groups(groups)?;
     if groups.is_empty() {
         return Ok(());

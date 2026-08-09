@@ -16,14 +16,16 @@ pub enum Show {
 }
 
 impl Show {
-    pub(crate) const fn as_str(self) -> &'static str {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::New => "new",
             Self::Replace => "replace",
         }
     }
 
-    pub(crate) fn parse(value: &str) -> Option<Self> {
+    #[must_use]
+    pub fn parse(value: &str) -> Option<Self> {
         match value {
             "new" => Some(Self::New),
             "replace" => Some(Self::Replace),
@@ -39,10 +41,12 @@ pub enum Actuate {
 }
 
 impl Actuate {
-    pub(crate) const fn as_str(self) -> &'static str {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
         "onRequest"
     }
-    pub(crate) fn parse(value: &str) -> Option<Self> {
+    #[must_use]
+    pub fn parse(value: &str) -> Option<Self> {
         (value == "onRequest").then_some(Self::OnRequest)
     }
 }
@@ -124,7 +128,7 @@ impl Link {
         self.range.clone()
     }
 
-    pub(crate) fn set_range(&mut self, range: Range<usize>) {
+    pub fn set_range(&mut self, range: Range<usize>) {
         self.range = range;
     }
 
@@ -153,7 +157,7 @@ impl Link {
     }
 
     /// Serialize this validated hyperlink as inert ODF inline content.
-    pub(crate) fn write_xml(&self, output: &mut String) {
+    pub fn write_xml(&self, output: &mut String) {
         output.push_str("<text:a xlink:type=\"simple\" xlink:href=\"");
         output.push_str(&escape_xml(&self.href));
         output.push('"');

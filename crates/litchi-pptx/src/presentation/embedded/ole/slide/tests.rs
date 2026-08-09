@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::super::model::{Frame, Kind, Mode, Target};
 use super::{Definition, Snapshot};
 use crate::presentation::embedded::ole::slide::apply_patch;

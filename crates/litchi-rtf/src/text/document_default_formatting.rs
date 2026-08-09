@@ -41,12 +41,15 @@ pub struct DocumentDefaultFormatting {
 }
 
 impl DocumentDefaultFormatting {
+    #[must_use]
     pub fn character(&self) -> Option<&DefaultCharacterProperties> {
         self.character.as_ref()
     }
+    #[must_use]
     pub fn paragraph(&self) -> Option<&DefaultParagraphProperties> {
         self.paragraph.as_ref()
     }
+    #[must_use]
     pub fn destination_order(&self) -> &[DefaultFormattingDestination] {
         &self.destination_order
     }
@@ -75,7 +78,9 @@ impl DocumentDefaultFormatting {
         self.destination_order
             .retain(|kind| *kind != DefaultFormattingDestination::Paragraph);
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if self.destination_order.len() > 2
             || self

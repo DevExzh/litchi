@@ -3,21 +3,25 @@
 use std::fmt;
 use std::sync::Arc;
 
-/// Largest millisecond value accepted by PowerPoint's transition timing
+/// Largest millisecond value accepted by `PowerPoint`'s transition timing
 /// attributes.
 ///
 /// Microsoft documents `advTm` as the inclusive range `0..=2_147_483_647`.
 /// The same conservative bound is used for the Office 2010 transition
-/// duration extension so both timing values remain accepted by PowerPoint.
+/// duration extension so both timing values remain accepted by `PowerPoint`.
 pub const MAX_MS: u32 = i32::MAX as u32;
 
-/// A checked PowerPoint transition time in milliseconds.
+/// A checked `PowerPoint` transition time in milliseconds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[must_use]
 pub struct Ms(u32);
 
 impl Ms {
     /// Creates a checked millisecond value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `value` exceeds [`MAX_MS`].
     pub const fn new(value: u32) -> Result<Self, TimeError> {
         if value <= MAX_MS {
             Ok(Self(value))
@@ -28,6 +32,7 @@ impl Ms {
 
     /// Returns the encoded millisecond value.
     #[inline]
+    #[must_use]
     pub const fn get(self) -> u32 {
         self.0
     }
@@ -51,7 +56,7 @@ impl From<Ms> for u32 {
     }
 }
 
-/// A millisecond value lies outside PowerPoint's checked domain.
+/// A millisecond value lies outside `PowerPoint`'s checked domain.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TimeError {
     value: u32,
@@ -59,6 +64,7 @@ pub struct TimeError {
 
 impl TimeError {
     /// Returns the rejected value.
+    #[must_use]
     pub const fn value(self) -> u32 {
         self.value
     }
@@ -152,7 +158,7 @@ pub enum Shape {
     Plus,
 }
 
-/// Origin of a PowerPoint 2010 ripple effect.
+/// Origin of a `PowerPoint` 2010 ripple effect.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Ripple {
     /// Center of the slide.
@@ -170,7 +176,7 @@ pub enum Ripple {
 /// PowerPoint-supported wheel spoke counts.
 ///
 /// Unlike an integer field, this enum cannot represent spoke counts that
-/// PowerPoint rejects.
+/// `PowerPoint` rejects.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum Spokes {
@@ -188,6 +194,7 @@ pub enum Spokes {
 
 impl Spokes {
     /// Returns the encoded spoke count.
+    #[must_use]
     pub const fn get(self) -> u8 {
         self as u8
     }
@@ -230,12 +237,14 @@ pub struct Raw {
 
 impl Raw {
     /// Returns the retained XML subtree.
+    #[must_use]
     pub fn xml(&self) -> &str {
         &self.xml
     }
 
     /// Whether the subtree is self-contained or uses only namespace prefixes
     /// guaranteed by a generated slide root.
+    #[must_use]
     pub const fn is_portable(&self) -> bool {
         self.portable
     }
@@ -262,7 +271,7 @@ impl Eq for Raw {}
 /// A transition effect.
 ///
 /// Each effect carries only the direction or option types accepted by its
-/// PresentationML grammar. Invalid combinations therefore cannot be built.
+/// `PresentationML` grammar. Invalid combinations therefore cannot be built.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Kind {
@@ -302,7 +311,7 @@ pub enum Kind {
     Wheel(Spokes),
     /// Newsflash effect.
     Newsflash,
-    /// PowerPoint 2010 ripple with a standard fade fallback.
+    /// `PowerPoint` 2010 ripple with a standard fade fallback.
     Ripple(Ripple),
     /// Diagonal strips from a corner.
     Strips(Corner),
@@ -357,6 +366,7 @@ impl Transition {
     }
 
     /// Returns the visual effect.
+    #[must_use]
     pub fn kind(&self) -> &Kind {
         &self.kind
     }
@@ -365,6 +375,7 @@ impl Transition {
     ///
     /// Unlike [`PartialEq`], this deliberately ignores retained raw XML. Use
     /// ordinary equality for no-op detection and exact authoring decisions.
+    #[must_use]
     pub fn same_semantics(&self, other: &Self) -> bool {
         self.kind == other.kind
             && self.speed == other.speed
@@ -393,6 +404,7 @@ impl Transition {
     }
 
     /// Returns the speed preset.
+    #[must_use]
     pub const fn speed(&self) -> Speed {
         self.speed
     }
@@ -409,6 +421,7 @@ impl Transition {
     }
 
     /// Returns the custom duration, if present.
+    #[must_use]
     pub const fn duration(&self) -> Option<Ms> {
         self.duration
     }
@@ -425,6 +438,7 @@ impl Transition {
     }
 
     /// Returns whether a click advances the slide.
+    #[must_use]
     pub const fn click(&self) -> bool {
         self.click
     }
@@ -441,6 +455,7 @@ impl Transition {
     }
 
     /// Returns the automatic-advance delay, if present.
+    #[must_use]
     pub const fn after(&self) -> Option<Ms> {
         self.after
     }
@@ -471,6 +486,7 @@ impl Transition {
 
     /// Returns the number of inert extension children retained around the
     /// effect.
+    #[must_use]
     pub fn preserved_len(&self) -> usize {
         self.before()
             .len()

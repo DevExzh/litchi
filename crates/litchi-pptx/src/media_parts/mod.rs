@@ -1,4 +1,4 @@
-//! Semantic layered owner for PresentationML slide media.
+//! Semantic layered owner for `PresentationML` slide media.
 //!
 //! The model, bounded XML codec, and OPC package graph are kept in separate
 //! layers. The canonical declarations use this module's context so callers

@@ -19,11 +19,19 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parse a slide-master color map and retain its exact source bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_master(source: impl AsRef<[u8]>) -> Result<Self> {
         Self::from_master_owned(source.as_ref().to_vec())
     }
 
     /// Parse an owned slide-master color map without another source copy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_master_owned(source: Vec<u8>) -> Result<Self> {
         let source_xml = Arc::new(source);
         let located = codec::locate_master(source_xml.as_slice())?;
@@ -32,6 +40,10 @@ impl Snapshot {
 
     /// Parse a slide or slide-layout color-map override and retain its exact
     /// source bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_override(
         source: impl AsRef<[u8]>,
         root_name: impl AsRef<[u8]>,
@@ -41,6 +53,10 @@ impl Snapshot {
     }
 
     /// Parse an owned color-map override without another source copy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_override_owned(
         source: Vec<u8>,
         root_name: impl AsRef<[u8]>,
@@ -55,42 +71,49 @@ impl Snapshot {
 
     /// Return the typed value represented by this source.
     #[inline]
+    #[must_use]
     pub fn value(&self) -> Value {
         self.located.value
     }
 
     /// Return the explicit map when this source owns one.
     #[inline]
+    #[must_use]
     pub fn map(&self) -> Option<Map> {
         mapped_value(&self.located.value)
     }
 
     /// Return whether this snapshot is a slide-master source.
     #[inline]
+    #[must_use]
     pub fn is_master(&self) -> bool {
         matches!(&self.located.source, codec::Source::Master)
     }
 
     /// Return whether this snapshot is a slide or slide-layout override.
     #[inline]
+    #[must_use]
     pub fn is_override(&self) -> bool {
         matches!(&self.located.source, codec::Source::Override { .. })
     }
 
     /// Borrow the exact source XML captured by this snapshot.
     #[inline]
+    #[must_use]
     pub fn source_xml(&self) -> &[u8] {
         self.source_xml.as_slice()
     }
 
     /// Return the source fingerprint used for stale-source checks.
     #[inline]
+    #[must_use]
     pub const fn revision(&self) -> Revision {
         self.revision
     }
 
     /// Start an atomic detached edit over this typed color-map value.
     #[inline]
+    #[must_use]
     pub fn edit(&self) -> Transaction {
         Transaction {
             original: self.clone(),
@@ -124,29 +147,37 @@ pub struct Transaction {
 impl Transaction {
     /// Borrow the projected typed value.
     #[inline]
+    #[must_use]
     pub fn snapshot(&self) -> &Value {
         &self.working
     }
 
     /// Return the projected typed value by copy.
     #[inline]
+    #[must_use]
     pub fn value(&self) -> Value {
         self.working
     }
 
     /// Return the projected explicit map, when one is available.
     #[inline]
+    #[must_use]
     pub fn map(&self) -> Option<Map> {
         mapped_value(&self.working)
     }
 
     /// Return whether the staged value differs from the source value.
     #[inline]
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.original.value() != self.working
     }
 
     /// Set one mapped color role without touching any other source bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_color(&mut self, slot: Slot, role: Role) -> Result<bool> {
         let map = self.map_mut()?;
         if map.color(slot) == role {
@@ -157,6 +188,10 @@ impl Transaction {
     }
 
     /// Replace the explicit map while retaining the source's mapping kind.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace_map(&mut self, map: Map) -> Result<bool> {
         let current = self.map_mut()?;
         if *current == map {
@@ -167,6 +202,10 @@ impl Transaction {
     }
 
     /// Replace the typed value without changing its source shape.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace(&mut self, value: Value) -> Result<bool> {
         if !same_shape(&self.working, &value) {
             return Err(invalid(
@@ -181,6 +220,10 @@ impl Transaction {
     }
 
     /// Validate and consume this detached edit into a source-checked commit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn commit(self) -> Result<Commit> {
         if !self.is_changed() {
             let patch = Patch::new(self.original.clone(), self.original.clone());
@@ -213,7 +256,7 @@ impl Transaction {
     fn map_mut(&mut self) -> Result<&mut Map> {
         match &mut self.working {
             Value::Master(map) | Value::Override(Some(Override::Override(map))) => Ok(map),
-            Value::Override(None) | Value::Override(Some(Override::Master)) => {
+            Value::Override(None | Some(Override::Master)) => {
                 Err(invalid("the color-map source has no explicit map to edit"))
             },
         }
@@ -231,30 +274,35 @@ pub struct Commit {
 impl Commit {
     /// Return whether publication changes the exact source bytes.
     #[inline]
+    #[must_use]
     pub const fn changed(&self) -> bool {
         self.changed
     }
 
     /// Alias for [`Self::changed`].
     #[inline]
+    #[must_use]
     pub const fn is_changed(&self) -> bool {
         self.changed
     }
 
     /// Borrow the projected post-edit snapshot.
     #[inline]
+    #[must_use]
     pub fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrow the reversible source-checked patch.
     #[inline]
+    #[must_use]
     pub fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Consume the commit into its patch.
     #[inline]
+    #[must_use]
     pub fn into_patch(self) -> Patch {
         self.patch
     }
@@ -274,29 +322,34 @@ impl Patch {
 
     /// Borrow the exact source context required before publication.
     #[inline]
+    #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Borrow the exact source context produced by publication.
     #[inline]
+    #[must_use]
     pub fn after(&self) -> &Snapshot {
         &self.after
     }
 
     /// Return whether this patch is an exact no-op.
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
     /// Return whether this patch changes the source bytes.
     #[inline]
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         !self.is_empty()
     }
 
     /// Return the exact inverse patch.
+    #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
@@ -306,17 +359,22 @@ impl Patch {
 
     /// Return the source fingerprint required for publication.
     #[inline]
+    #[must_use]
     pub const fn expected_revision(&self) -> Revision {
         self.before.revision
     }
 
     /// Apply this patch atomically to an exact XML source buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn apply(&self, target: &mut Vec<u8>) -> Result<Snapshot> {
         if target.as_slice() != self.before.source_xml.as_slice() {
             return Err(invalid("color-map source is stale"));
         }
         let current = codec::locate_source(target.as_slice(), &self.before.located.source)
-            .map_err(|_| invalid("color-map source is stale"))?;
+            .map_err(|_err| invalid("color-map source is stale"))?;
         if current.value != self.before.value() {
             return Err(invalid("color-map source is stale"));
         }
@@ -339,6 +397,10 @@ impl Patch {
     }
 
     /// Alias for [`Self::apply`] emphasizing the detached source target.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     #[inline]
     pub fn apply_to(&self, target: &mut Vec<u8>) -> Result<Snapshot> {
         self.apply(target)
@@ -349,7 +411,7 @@ fn mapped_value(value: &Value) -> Option<Map> {
     match value {
         Value::Master(map) => Some(*map),
         Value::Override(Some(Override::Override(map))) => Some(*map),
-        Value::Override(None) | Value::Override(Some(Override::Master)) => None,
+        Value::Override(None | Some(Override::Master)) => None,
     }
 }
 
@@ -367,10 +429,10 @@ fn same_shape(left: &Value, right: &Value) -> bool {
 }
 
 fn fingerprint(bytes: &[u8]) -> Revision {
-    let mut hash = 0xcbf29ce484222325u64;
+    let mut hash = 0xcbf2_9ce4_8422_2325u64;
     for byte in bytes {
         hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(0x100000001b3);
+        hash = hash.wrapping_mul(0x100_0000_01b3);
     }
     hash
 }
@@ -380,6 +442,11 @@ fn invalid(message: impl Into<String>) -> Error {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use crate::presentation_properties::metadata::color_map::{Role, Slot, Value};

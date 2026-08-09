@@ -6,7 +6,7 @@ use std::mem::size_of;
 use std::ops::Range;
 
 /// RTF Lexer using arena allocation.
-pub struct Lexer<'a> {
+pub(crate) struct Lexer<'a> {
     /// Source input
     pub(super) input: &'a str,
     /// Current position in bytes
@@ -23,13 +23,13 @@ impl<'a> Lexer<'a> {
     /// Create a new lexer.
     #[cfg(test)]
     #[inline]
-    pub fn new(input: &'a str, arena: &'a Bump) -> Self {
+    pub(crate) fn new(input: &'a str, arena: &'a Bump) -> Self {
         Self::new_with_limits(input, arena, ParseLimits::default())
     }
 
     /// Create a lexer with an explicit finite resource profile.
     #[inline]
-    pub fn new_with_limits(input: &'a str, arena: &'a Bump, limits: ParseLimits) -> Self {
+    pub(crate) fn new_with_limits(input: &'a str, arena: &'a Bump, limits: ParseLimits) -> Self {
         Self {
             input,
             pos: 0,
@@ -40,7 +40,8 @@ impl<'a> Lexer<'a> {
     }
 
     /// Tokenize the entire input.
-    pub fn tokenize(&mut self) -> RtfResult<Vec<Token<'a>>> {
+    #[cfg(test)]
+    pub(crate) fn tokenize(&mut self) -> RtfResult<Vec<Token<'a>>> {
         self.tokenize_with_spans().map(|(tokens, _)| tokens)
     }
 
@@ -60,13 +61,13 @@ impl<'a> Lexer<'a> {
             }
             tokens
                 .try_reserve(1)
-                .map_err(|_| RtfError::AllocationFailed {
+                .map_err(|_err| RtfError::AllocationFailed {
                     resource: "lexer tokens",
                     requested: observed.saturating_mul(size_of::<Token<'a>>()),
                 })?;
             spans
                 .try_reserve(1)
-                .map_err(|_| RtfError::AllocationFailed {
+                .map_err(|_err| RtfError::AllocationFailed {
                     resource: "lexer token spans",
                     requested: observed.saturating_mul(size_of::<Range<usize>>()),
                 })?;

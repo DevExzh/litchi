@@ -41,6 +41,11 @@ impl<'data> File<'data> {
     }
 
     /// Parses a fresh borrowed BLIP view over this file's storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an owned record cannot be re-parsed as a valid
+    /// BLIP.
     pub fn blip(&self) -> Result<Blip<'_>> {
         match &self.source {
             Source::View(blip) => Ok(blip.clone()),
@@ -90,6 +95,11 @@ impl<'data> File<'data> {
     }
 
     /// Borrows the stored native image bytes without decoding them.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::MalformedImage` when the owned BLIP data range is
+    /// invalid.
     pub fn data(&self) -> Result<&[u8]> {
         match &self.source {
             Source::View(blip) => Ok(blip.data()),
@@ -102,6 +112,12 @@ impl<'data> File<'data> {
     }
 
     /// Consumes this view into an independently owned `OfficeArt` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::MalformedImage` when the BLIP framing cannot be
+    /// encoded, or `Error::ArithmeticOverflow` when the owned data range
+    /// underflows.
     pub fn into_owned(self) -> Result<File<'static>> {
         let (record, data_start) = match self.source {
             Source::Owned { record, data_start } => (record, data_start),
@@ -131,10 +147,15 @@ impl<'data> File<'data> {
 }
 
 /// Finds the unique `BStore` below an `OfficeArt` drawing root.
+///
+/// # Errors
+///
+/// Returns an error when a record is malformed or when the drawing contains
+/// multiple `BStore` containers.
 pub fn store(data: &[u8]) -> Result<Option<Store<'_>>> {
     let mut found = None;
-    for record in Parser::new(data).records() {
-        let record = record?;
+    for result in Parser::new(data).records() {
+        let record = result?;
         if record.kind() == RecordKind::BStoreContainer {
             set_store(&mut found, record)?;
             continue;
@@ -150,6 +171,11 @@ pub fn store(data: &[u8]) -> Result<Option<Store<'_>>> {
 }
 
 /// Resolves one checked semantic `BStore` ID against an optional delay store.
+///
+/// # Errors
+///
+/// Returns an error when the store metadata is malformed or a delayed BLIP
+/// cannot be resolved.
 pub fn get<'data>(
     store: &Store<'data>,
     id: Id,
@@ -161,11 +187,16 @@ pub fn get<'data>(
     let index = usize::from(id.get() - 1);
     match block {
         Block::Blip(blip) => Ok(Some(File::new(blip, None, index))),
-        Block::Entry(entry) => file_from_entry(entry, delay_store, index),
+        Block::Entry(entry) => file_from_entry(&entry, delay_store, index),
     }
 }
 
 /// Resolves every semantic `BStore` slot in one-based ID order.
+///
+/// # Errors
+///
+/// Returns an error when a store slot ID is invalid or any slot cannot be
+/// resolved.
 pub fn all<'data>(
     store: &Store<'data>,
     delay_store: Option<&'data [u8]>,
@@ -181,11 +212,22 @@ pub fn all<'data>(
 }
 
 /// Extracts an image from a direct BLIP or FBSE record.
+///
+/// # Errors
+///
+/// Returns `Error::NotImageRecord` when the record is neither a BLIP nor an
+/// FBSE, or an error when the record payload is malformed.
 pub fn record<'data>(record: &Record<'data>) -> Result<File<'data>> {
     record_with_delay(record, None)
 }
 
 /// Extracts an image from a direct BLIP or FBSE with a host delay store.
+///
+/// # Errors
+///
+/// Returns `Error::NotImageRecord` when the record is neither a BLIP nor an
+/// FBSE, `Error::MalformedImage` when the payload is malformed or the FBSE
+/// slot is empty, or an error when a delayed BLIP cannot be resolved.
 pub fn record_with_delay<'data>(
     record: &Record<'data>,
     delay_store: Option<&'data [u8]>,
@@ -196,7 +238,7 @@ pub fn record_with_delay<'data>(
     }
     if record.kind() == RecordKind::Bse {
         let entry = Entry::parse(record.clone())?;
-        return file_from_entry(entry, delay_store, 0)?.ok_or(Error::MalformedImage {
+        return file_from_entry(&entry, delay_store, 0)?.ok_or(Error::MalformedImage {
             reason: "FBSE is an empty image slot",
         });
     }
@@ -206,6 +248,11 @@ pub fn record_with_delay<'data>(
 }
 
 /// Recursively discovers image files in an `OfficeArt` record sequence.
+///
+/// # Errors
+///
+/// Returns an error when a record is malformed or the file, record, or depth
+/// limits are exceeded.
 pub fn scan(data: &[u8]) -> Result<Vec<File<'_>>> {
     let mut files = Vec::new();
     collect(data, None, &mut files)?;
@@ -216,6 +263,11 @@ pub fn scan(data: &[u8]) -> Result<Vec<File<'_>>> {
 }
 
 /// Discovers files below one already checked `OfficeArt` container.
+///
+/// # Errors
+///
+/// Returns an error when a record below the container is malformed or a
+/// discovery limit is exceeded.
 pub fn container<'data>(
     container: &Container<'data>,
     delay_store: Option<&'data [u8]>,
@@ -229,6 +281,11 @@ pub fn container<'data>(
 }
 
 /// Parses a headerless `BStoreDelay` sequence, such as PPT's `Pictures` stream.
+///
+/// # Errors
+///
+/// Returns an error when a delay record is malformed, a delayed BLIP cannot
+/// be resolved, or the file count limit is exceeded.
 pub fn delay(data: &[u8]) -> Result<Vec<File<'_>>> {
     let delay = Delay::new(data);
     let mut files = Vec::new();
@@ -240,7 +297,7 @@ pub fn delay(data: &[u8]) -> Result<Vec<File<'_>>> {
                 files.push(File::new(blip, None, index));
             },
             Block::Entry(entry) => {
-                if let Some(file) = file_from_entry(entry, Some(data), index)? {
+                if let Some(file) = file_from_entry(&entry, Some(data), index)? {
                     check_count(files.len(), 1)?;
                     files.push(file);
                 }
@@ -260,17 +317,17 @@ fn safe_stem(name: &str) -> Option<String> {
         .trim_matches([' ', '.']);
     let mut safe = String::with_capacity(stem.len().min(MAX_STEM_BYTES));
     for character in stem.chars() {
-        let character = if character.is_control()
+        let sanitized = if character.is_control()
             || matches!(character, '<' | '>' | ':' | '"' | '|' | '?' | '*')
         {
             '_'
         } else {
             character
         };
-        if safe.len() + character.len_utf8() > MAX_STEM_BYTES {
+        if safe.len() + sanitized.len_utf8() > MAX_STEM_BYTES {
             break;
         }
-        safe.push(character);
+        safe.push(sanitized);
     }
     if safe.is_empty() || safe == "." || safe == ".." {
         return None;
@@ -306,17 +363,17 @@ fn entry_name(entry: &Entry<'_>) -> Result<Option<String>> {
 }
 
 fn file_from_entry<'data>(
-    entry: Entry<'data>,
+    entry: &Entry<'data>,
     delay_store: Option<&'data [u8]>,
     index: usize,
 ) -> Result<Option<File<'data>>> {
-    let name = entry_name(&entry)?;
+    let name = entry_name(entry)?;
     let context = delay_store.map_or_else(Context::new, |data| {
         Context::new().with_delay(Delay::new(data))
     });
     entry
         .resolve(context)
-        .map(|blip| blip.map(|blip| File::new(blip, name, index)))
+        .map(|resolved| resolved.map(|blip| File::new(blip, name, index)))
 }
 
 fn check_count(current: usize, additional: usize) -> Result<()> {
@@ -340,11 +397,11 @@ fn collect<'data>(
     let mut stack = vec![Children::new(data)];
     let mut visited = 0u32;
     while let Some(records) = stack.last_mut() {
-        let Some(record) = records.next() else {
+        let Some(result) = records.next() else {
             stack.pop();
             continue;
         };
-        let record = record?;
+        let record = result?;
         visited = visited.checked_add(1).ok_or(Error::ArithmeticOverflow {
             context: "image record count",
         })?;
@@ -360,7 +417,7 @@ fn collect<'data>(
             files.push(File::new(blip, None, files.len()));
         } else if record.kind() == RecordKind::Bse {
             let entry = Entry::parse(record)?;
-            if let Some(file) = file_from_entry(entry, delay_store, files.len())? {
+            if let Some(file) = file_from_entry(&entry, delay_store, files.len())? {
                 check_count(files.len(), 1)?;
                 files.push(file);
             }
@@ -370,9 +427,13 @@ fn collect<'data>(
             files.extend(all(&store, delay_store)?);
         } else if record.is_container() {
             if stack.len() >= MAX_DEPTH {
+                let maximum =
+                    u32::try_from(MAX_DEPTH).map_err(|_err| Error::ArithmeticOverflow {
+                        context: "maximum image depth",
+                    })?;
                 return Err(Error::LimitExceeded {
                     limit: Limit::Depth,
-                    maximum: MAX_DEPTH as u32,
+                    maximum,
                 });
             }
             stack.push(Children::new(record.data()));
@@ -397,7 +458,11 @@ mod tests {
         let mut record = Vec::new();
         record.extend_from_slice(&(0x6e0u16 << 4).to_le_bytes());
         record.extend_from_slice(&0xf01eu16.to_le_bytes());
-        record.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+        record.extend_from_slice(
+            &u32::try_from(payload.len())
+                .expect("payload length fits in u32")
+                .to_le_bytes(),
+        );
         record.extend_from_slice(&payload);
         record
     }
@@ -406,17 +471,25 @@ mod tests {
         let mut payload = vec![Kind::Png.raw(), Kind::Png.raw()];
         payload.extend_from_slice(&[0; 16]);
         payload.extend_from_slice(&0xffu16.to_le_bytes());
-        payload.extend_from_slice(&(blip.len() as u32).to_le_bytes());
+        payload.extend_from_slice(
+            &u32::try_from(blip.len())
+                .expect("BLIP length fits in u32")
+                .to_le_bytes(),
+        );
         payload.extend_from_slice(&1u32.to_le_bytes());
         payload.extend_from_slice(&offset.to_le_bytes());
         payload.push(0);
-        payload.push(name.len() as u8);
+        payload.push(u8::try_from(name.len()).expect("name length fits in u8"));
         payload.extend_from_slice(&[0, 0]);
         payload.extend_from_slice(name);
         let mut record = Vec::new();
         record.extend_from_slice(&0x62u16.to_le_bytes());
         record.extend_from_slice(&0xf007u16.to_le_bytes());
-        record.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+        record.extend_from_slice(
+            &u32::try_from(payload.len())
+                .expect("payload length fits in u32")
+                .to_le_bytes(),
+        );
         record.extend_from_slice(&payload);
         record
     }
@@ -450,7 +523,11 @@ mod tests {
 
         let long = File::new(blip, Some(format!("{}.old", "🦀".repeat(100))), 0);
         assert!(long.filename().len() <= 124);
-        assert!(long.filename().ends_with(".png"));
+        assert!(
+            std::path::Path::new(&long.filename())
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("png"))
+        );
     }
 
     #[test]
@@ -466,7 +543,11 @@ mod tests {
         let blip = png_blip(b"png");
         let fbse = delayed_fbse(&blip, 0, &[]);
         let mut bytes = vec![0x1f, 0, 0x01, 0xf0];
-        bytes.extend_from_slice(&(fbse.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(
+            &u32::try_from(fbse.len())
+                .expect("FBSE length fits in u32")
+                .to_le_bytes(),
+        );
         bytes.extend_from_slice(&fbse);
         let store = store(&bytes).expect("valid store").expect("store exists");
         let file = get(&store, Id::new(1).expect("valid ID"), Some(&blip))

@@ -1,3 +1,8 @@
+#![allow(
+    clippy::print_stdout,
+    reason = "this command-line example intentionally prints its results"
+)]
+
 //! Build a small RTF document using the public `write::Writer` API and write it to disk.
 //!
 //! This example demonstrates direct streaming of RTF control words through
@@ -71,7 +76,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let emphasis = Format {
         bold: true,
         italic: true,
-        font_size: NonZeroU16::new(28).expect("non-zero"),
+        font_size: NonZeroU16::new(28).ok_or("font size is non-zero")?,
         ..Default::default()
     };
     writer.write_str("{")?;

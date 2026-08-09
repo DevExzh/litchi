@@ -1,10 +1,10 @@
-//! AutoFilter Conditions & Sort — XLS Writer Example
+//! `AutoFilter` Conditions & Sort — XLS Writer Example
 //!
 //! Demonstrates the new `add_filter_condition` and `set_sort` APIs on `Writer`.
 //! Generates an XLS file with:
 //!
 //! - A data table of products with prices and stock levels.
-//! - An AutoFilter range with DOPER conditions on the "Price" column (> 50).
+//! - An `AutoFilter` range with DOPER conditions on the "Price" column (> 50).
 //! - A sort configuration (primary key: Price descending).
 //!
 //! Run with: `cargo run --example xls_autofilter_conditions`

@@ -9,6 +9,10 @@ use crate::Result;
 
 impl ParagraphTemplate {
     /// Construct a paragraph template with a PowerPoint-supported level.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(level: u8, time_node: TemplateTimeNode) -> Result<Self> {
         if level > 9 {
             return Err(invalid("paragraph template level exceeds PowerPoint limit"));
@@ -18,7 +22,11 @@ impl ParagraphTemplate {
 }
 
 impl Speed {
-    /// Construct a speed value. PowerPoint rejects zero speed.
+    /// Construct a speed value. `PowerPoint` rejects zero speed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(thousandths_percent: i32) -> Result<Self> {
         if thousandths_percent == 0 {
             Err(invalid("animation speed must be nonzero"))
@@ -30,6 +38,10 @@ impl Speed {
 
 impl MotionFraction {
     /// Construct a value from thousandths of a percent (`100000` is 100%).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(thousandths_percent: u32) -> Result<Self> {
         if thousandths_percent > 100_000 {
             Err(invalid(
@@ -43,6 +55,10 @@ impl MotionFraction {
 
 impl NormalizedTime {
     /// Construct a normalized time from millionths.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_millionths(value: u32) -> Result<Self> {
         if value > 1_000_000 {
             return Err(invalid("normalized time exceeds 1.0"));
@@ -50,6 +66,9 @@ impl NormalizedTime {
         Ok(Self::normalized(u64::from(value), 1_000_000))
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub(in crate::animations) fn normalized(mut numerator: u64, mut scale: u64) -> Self {
         while scale > 1 && numerator.is_multiple_of(10) {
             numerator /= 10;
@@ -66,6 +85,10 @@ impl NormalizedTime {
 
 impl TimeFilter {
     /// Construct a filter whose local times are strictly increasing.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(points: Vec<super::TimePoint>) -> Result<Self> {
         if points.is_empty() {
             return Err(invalid(
@@ -91,6 +114,7 @@ impl TimeFilter {
     }
 
     /// Mapping points in source-time order.
+    #[must_use]
     pub fn points(&self) -> &[super::TimePoint] {
         &self.points
     }

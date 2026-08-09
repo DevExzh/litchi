@@ -63,6 +63,34 @@ impl Rgb {
     pub const fn blue(self) -> u8 {
         self.blue
     }
+
+    /// Parse a hexadecimal color in `RRGGBB` or canonical `AARRGGBB` form.
+    ///
+    /// The six-digit form is an authoring convenience treated as opaque
+    /// (alpha `FF`); the wire form produced by [`fmt::Display`] is always
+    /// eight digits, so a valid eight-digit input round-trips
+    /// byte-identically.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ParseRgbError`] unless `value` is exactly six or eight
+    /// hexadecimal digits.
+    pub fn from_hex(value: &str) -> Result<Self, ParseRgbError> {
+        if value.len() == 8 {
+            return value.parse();
+        }
+        if value.len() != 6 {
+            return Err(ParseRgbError);
+        }
+        let mut components = [0u8; 3];
+        for (index, pair) in value.as_bytes().chunks_exact(2).enumerate() {
+            let component = parse_hex_pair(pair).ok_or(ParseRgbError)?;
+            let slot = components.get_mut(index).ok_or(ParseRgbError)?;
+            *slot = component;
+        }
+        let [red, green, blue] = components;
+        Ok(Self::new(red, green, blue))
+    }
 }
 
 impl fmt::Display for Rgb {

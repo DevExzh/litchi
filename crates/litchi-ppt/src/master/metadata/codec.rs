@@ -19,7 +19,7 @@ pub(super) fn read(context: Context, root: &Record) -> Result<Option<Name>> {
 pub(super) fn encode(name: &Name) -> Result<Record> {
     let data = name.wire()?;
     let data_length = u32::try_from(data.len())
-        .map_err(|_| Error::InvalidFormat("SlideNameAtom payload exceeds u32".into()))?;
+        .map_err(|_err| Error::InvalidFormat("SlideNameAtom payload exceeds u32".into()))?;
     Ok(Record {
         record_type: RecordType::CString,
         record_type_raw: RecordType::CString.as_u16(),

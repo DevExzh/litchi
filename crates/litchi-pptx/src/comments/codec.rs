@@ -1,4 +1,4 @@
-//! Bounded XML parsing and writing for PresentationML legacy comment parts.
+//! Bounded XML parsing and writing for `PresentationML` legacy comment parts.
 
 use super::{
     Author, Comment, Conformance, MAX_AUTHORS, MAX_COMMENTS_PER_SLIDE, MAX_DEPTH, MAX_NODES,
@@ -28,6 +28,9 @@ struct Node {
     text: String,
 }
 
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_comment_authors(xml: &[u8]) -> Result<Vec<Author>> {
     let root = parse_document(xml)?;
     let namespace = root_namespace(&root, "cmAuthorLst")?;
@@ -70,6 +73,9 @@ pub fn parse_comment_authors(xml: &[u8]) -> Result<Vec<Author>> {
     Ok(authors)
 }
 
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_slide_comments(xml: &[u8]) -> Result<Vec<Comment>> {
     let root = parse_document(xml)?;
     let namespace = root_namespace(&root, "cmLst")?;
@@ -126,6 +132,9 @@ pub fn parse_slide_comments(xml: &[u8]) -> Result<Vec<Comment>> {
     Ok(comments)
 }
 
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn write_comment_authors(authors: &[Author], conformance: Conformance) -> Result<Vec<u8>> {
     validate_authors(authors)?;
     let mut output = declaration();
@@ -145,6 +154,9 @@ pub fn write_comment_authors(authors: &[Author], conformance: Conformance) -> Re
     Ok(output)
 }
 
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn write_slide_comments(comments: &[Comment], conformance: Conformance) -> Result<Vec<u8>> {
     validate_comment_list(comments)?;
     let mut output = declaration();
@@ -429,7 +441,7 @@ fn optional<'a>(node: &'a Node, name: &str) -> Option<&'a str> {
 }
 
 fn required_u32(node: &Node, name: &str) -> Result<u32> {
-    required(node, name)?.parse().map_err(|_| {
+    required(node, name)?.parse().map_err(|_err| {
         invalid(format!(
             "invalid unsigned integer '{name}' on {}",
             node.name
@@ -440,7 +452,7 @@ fn required_u32(node: &Node, name: &str) -> Result<u32> {
 fn required_i64(node: &Node, name: &str) -> Result<i64> {
     required(node, name)?
         .parse()
-        .map_err(|_| invalid(format!("invalid coordinate '{name}' on {}", node.name)))
+        .map_err(|_err| invalid(format!("invalid coordinate '{name}' on {}", node.name)))
 }
 
 fn whitespace_only(node: &Node) -> Result<()> {

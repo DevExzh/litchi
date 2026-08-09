@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{
     MAX_PARAGRAPH_DROP_CAP_LINES, ParagraphDropCap, ParagraphDropCapKind, RtfDocument, RtfWriter,
     StyleBlock,
@@ -64,8 +73,8 @@ fn body_style_and_default_round_trip_canonically() {
         .write_document(&document)
         .unwrap();
     let text = String::from_utf8(first.clone()).unwrap();
-    assert!(text.contains(r#"\dropcapli2\dropcapt2"#));
-    assert!(text.contains(r#"\dropcapli4\dropcapt1"#));
+    assert!(text.contains(r"\dropcapli2\dropcapt2"));
+    assert!(text.contains(r"\dropcapli4\dropcapt1"));
     let reparsed = RtfDocument::parse_bytes(&first).unwrap();
     assert_eq!(block(&reparsed, "Body").paragraph.drop_cap, Some(expected));
     let mut second = Vec::new();
@@ -78,17 +87,17 @@ fn body_style_and_default_round_trip_canonically() {
 #[test]
 fn rejects_missing_partial_invalid_and_oversized_values() {
     for source in [
-        r#"{\rtf1\dropcapli X}"#,
-        r#"{\rtf1\dropcapt X}"#,
-        r#"{\rtf1\dropcapli0\dropcapt1 X}"#,
-        r#"{\rtf1\dropcapli-1\dropcapt1 X}"#,
-        r#"{\rtf1\dropcapli256\dropcapt1 X}"#,
-        r#"{\rtf1\dropcapli2\dropcapt0 X}"#,
-        r#"{\rtf1\dropcapli2\dropcapt3 X}"#,
-        r#"{\rtf1\dropcapli2 X}"#,
-        r#"{\rtf1\dropcapt1 X}"#,
-        r#"{\rtf1{\stylesheet{\s1\dropcapli2 Bad;}}X}"#,
-        r#"{\rtf1{\*\defpap\dropcapt1}X}"#,
+        r"{\rtf1\dropcapli X}",
+        r"{\rtf1\dropcapt X}",
+        r"{\rtf1\dropcapli0\dropcapt1 X}",
+        r"{\rtf1\dropcapli-1\dropcapt1 X}",
+        r"{\rtf1\dropcapli256\dropcapt1 X}",
+        r"{\rtf1\dropcapli2\dropcapt0 X}",
+        r"{\rtf1\dropcapli2\dropcapt3 X}",
+        r"{\rtf1\dropcapli2 X}",
+        r"{\rtf1\dropcapt1 X}",
+        r"{\rtf1{\stylesheet{\s1\dropcapli2 Bad;}}X}",
+        r"{\rtf1{\*\defpap\dropcapt1}X}",
     ] {
         assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
     }

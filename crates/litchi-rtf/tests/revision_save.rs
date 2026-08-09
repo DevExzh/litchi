@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{RevisionSaveMetadata, RtfDocument, RtfWriter};
 use std::fs;
 
@@ -12,7 +21,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 #[test]
 fn preserves_ordered_revision_save_table_and_root_round_trip() {
     let document = RtfDocument::parse(
-        r#"{\rtf1\ansi{\*\rsidtbl \rsid7564464\rsid8398352\rsid9049968}\rsidroot9049968 Body}"#,
+        r"{\rtf1\ansi{\*\rsidtbl \rsid7564464\rsid8398352\rsid9049968}\rsidroot9049968 Body}",
     )
     .unwrap();
     assert_eq!(document.text(), "Body");
@@ -27,7 +36,7 @@ fn preserves_ordered_revision_save_table_and_root_round_trip() {
 
 #[test]
 fn preserves_valid_empty_revision_save_table() {
-    let document = RtfDocument::parse(r#"{\rtf1{\*\rsidtbl}\rsidroot7 Body}"#).unwrap();
+    let document = RtfDocument::parse(r"{\rtf1{\*\rsidtbl}\rsidroot7 Body}").unwrap();
     let metadata = document.revision_save_metadata().unwrap();
     assert!(metadata.ids().is_empty());
     assert_eq!(metadata.root(), Some(7));
@@ -48,7 +57,7 @@ fn mutation_validates_membership_uniqueness_and_preserves_body() {
     assert!(metadata.push_id(22).is_err());
     assert!(metadata.set_root(Some(44)).is_err());
 
-    let mut document = RtfDocument::parse(r#"{\rtf1 Text}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Text}").unwrap();
     document
         .set_revision_save_metadata(metadata.clone())
         .unwrap();
@@ -64,17 +73,17 @@ fn mutation_validates_membership_uniqueness_and_preserves_body() {
 #[test]
 fn rejects_malformed_revision_save_metadata() {
     let cases = [
-        r#"{\rtf1{\rsidtbl \rsid1}\rsidroot1}"#,
-        r#"{\rtf1{\*\rsidtbl \rsid1\rsid1}\rsidroot1}"#,
-        r#"{\rtf1{\*\rsidtbl \rsid0}}"#,
-        r#"{\rtf1{\*\rsidtbl \rsid1}\rsidroot2}"#,
-        r#"{\rtf1{\*\rsidtbl \rsid1}\rsidroot1\rsidroot1}"#,
-        r#"{\rtf1{\*\rsidtbl \rsid1}{\b\rsidroot1}}"#,
-        r#"{\rtf1\rsid1}"#,
-        r#"{\rtf1{\*\rsidtbl text\rsid1}}"#,
-        r#"{\rtf1{\*\rsidtbl {\rsid1}}}"#,
-        r#"{\rtf1{\*\rsidtbl \bin2 xx}}"#,
-        r#"{\rtf1{\*\rsidtbl \b\rsid1}}"#,
+        r"{\rtf1{\rsidtbl \rsid1}\rsidroot1}",
+        r"{\rtf1{\*\rsidtbl \rsid1\rsid1}\rsidroot1}",
+        r"{\rtf1{\*\rsidtbl \rsid0}}",
+        r"{\rtf1{\*\rsidtbl \rsid1}\rsidroot2}",
+        r"{\rtf1{\*\rsidtbl \rsid1}\rsidroot1\rsidroot1}",
+        r"{\rtf1{\*\rsidtbl \rsid1}{\b\rsidroot1}}",
+        r"{\rtf1\rsid1}",
+        r"{\rtf1{\*\rsidtbl text\rsid1}}",
+        r"{\rtf1{\*\rsidtbl {\rsid1}}}",
+        r"{\rtf1{\*\rsidtbl \bin2 xx}}",
+        r"{\rtf1{\*\rsidtbl \b\rsid1}}",
     ];
     for rtf in cases {
         assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");

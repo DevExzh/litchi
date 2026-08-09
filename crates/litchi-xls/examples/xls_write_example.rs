@@ -1,10 +1,10 @@
 //! Example demonstrating XLS file writing with the Litchi library
 //!
 //! NOTE: This example demonstrates the API but will not work until
-//! the OLE2 writer infrastructure is complete. See OLE_WRITE_SUPPORT_STATUS.md
+//! the OLE2 writer infrastructure is complete. See `OLE_WRITE_SUPPORT_STATUS.md`
 //! for implementation status.
 //!
-//! Run with: cargo run --example xls_write_example
+//! Run with: cargo run --example `xls_write_example`
 use litchi_xls::Writer;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

@@ -1,7 +1,20 @@
 use super::super::codec::{parse_profiled, pml, xml_error};
-use super::super::*;
-use super::model::*;
-use super::validation::*;
+use super::super::{
+    CONTENT_TYPE, Conformance, Error, List, MAX_OWNER_BYTES, MAX_OWNER_DEPTH,
+    MAX_OWNER_MARKED_BYTES, MAX_OWNER_NODES, MAX_TAG_PARTS, P14, P15, Result, Source, allocation,
+    invalid, is_relationship, write,
+};
+use super::model::{
+    Anchor, AnchorIdentity, Attached, CommonSlidePhase, Container, OpenAnchor, OpenContainer,
+    OwnerKind, OwnerMapElement, OwnerMapName, OwnerXml,
+};
+use super::validation::{
+    anchor_relationship_id, available_part_name, available_relationship_id, bump_graph_link,
+    bump_owner_node, checked_owner_depth, has_non_namespace_attrs, has_other_inbound,
+    observe_common_slide_child, observe_customer_data_child, owner_anchor_uses, owner_kind,
+    presentation_later, resolve_anchor, validate_relative_target, validate_selected_relationship,
+    xml_position,
+};
 use litchi_ooxml_common::mce::{
     Capabilities, Limits, OffsetLimits, active_offsets, process_markup_compatibility,
 };
@@ -18,6 +31,10 @@ use std::ops::Range;
 /// Use [`load`] for the part-level semantic attachment. OPC relationship
 /// storage does not retain XML source order, so results are returned in
 /// ascending relationship-ID byte order.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn discover(owner: &dyn OpcPart, package: &OpcPackage) -> Result<Vec<Source>> {
     let mut scanned = 0usize;
     let mut relationships = Vec::new();
@@ -89,6 +106,10 @@ pub fn discover(owner: &dyn OpcPart, package: &OpcPackage) -> Result<Vec<Source>
 /// `p:presentation/p:custDataLst/p:tags`. For slides, layouts, masters, notes,
 /// and handouts it follows only direct `p:cSld/p:custDataLst/p:tags`.
 /// Shape-level `p:nvPr` anchors and unanchored tag relationships are ignored.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load(package: &OpcPackage, owner: &PackURI) -> Result<Option<Source>> {
     let owner = package.get_part(owner)?;
     let processed = process_owner_ooxml(owner.blob())?;
@@ -107,6 +128,10 @@ pub fn load(package: &OpcPackage, owner: &PackURI) -> Result<Option<Source>> {
 /// and forks the target only when another package edge shares it. A
 /// byte-identical replacement is a signature-preserving no-op. The returned
 /// value is the previous list, or `None` when a new attachment was created.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn put(package: &mut OpcPackage, owner: &PackURI, list: List) -> Result<Option<List>> {
     let (owner_name, layout, attached, anchor_uses) = {
         let owner = package.get_part(owner)?;
@@ -252,6 +277,10 @@ pub fn put(package: &mut OpcPackage, owner: &PackURI, list: List) -> Result<Opti
 /// Other customer-data children remain byte-for-byte intact; a customer-data
 /// container is removed only when the tag anchor was its sole content. The tag
 /// part is collected only when no other package edge retains it.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn remove(package: &mut OpcPackage, owner: &PackURI) -> Result<Option<List>> {
     let (owner_name, layout, attached, owner_xml, retain_relationship, orphan) = {
         let owner = package.get_part(owner)?;
@@ -744,7 +773,7 @@ fn owner_map_offsets(xml: &[u8]) -> Result<Vec<u32>> {
                     offsets
                         .try_reserve(1)
                         .map_err(|source| allocation("tag-owner MCE map offsets", source))?;
-                    offsets.push(u32::try_from(start).map_err(|_| {
+                    offsets.push(u32::try_from(start).map_err(|_err| {
                         invalid("tag-owner MCE map offset exceeds the compact u32 domain")
                     })?);
                 }
@@ -758,7 +787,7 @@ fn owner_map_offsets(xml: &[u8]) -> Result<Vec<u32>> {
                     offsets
                         .try_reserve(1)
                         .map_err(|source| allocation("tag-owner MCE map offsets", source))?;
-                    offsets.push(u32::try_from(start).map_err(|_| {
+                    offsets.push(u32::try_from(start).map_err(|_err| {
                         invalid("tag-owner MCE map offset exceeds the compact u32 domain")
                     })?);
                 }
@@ -926,7 +955,7 @@ where
     I: Iterator<Item = u32>,
 {
     let start = u32::try_from(start)
-        .map_err(|_| invalid("tag-owner MCE source offset exceeds the compact u32 domain"))?;
+        .map_err(|_err| invalid("tag-owner MCE source offset exceeds the compact u32 domain"))?;
     if active.peek().copied() == Some(start) {
         let _ = active.next();
         Ok(true)

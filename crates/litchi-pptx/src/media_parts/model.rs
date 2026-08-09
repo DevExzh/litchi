@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+    Arc, Coordinate, DML, Error, Extent, Offset, PML, REL, Result, STRICT_AUDIO_REL, STRICT_DML,
+    STRICT_PML, STRICT_REL, STRICT_VIDEO_REL, coordinate_error, rt,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Conformance {
@@ -82,6 +85,10 @@ impl Data {
     ///
     /// On sharing, ownership of `self` is returned so callers can keep borrowing
     /// the bytes or deliberately choose a copy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn try_into_vec(self) -> std::result::Result<Vec<u8>, Self> {
         Arc::try_unwrap(self.0).map_err(Self)
     }
@@ -144,7 +151,7 @@ pub struct Poster {
     pub resource: Option<Resource>,
 }
 
-/// A checked DrawingML transform for a media picture.
+/// A checked `DrawingML` transform for a media picture.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Transform {
     pub(super) x: Coordinate,
@@ -154,7 +161,7 @@ pub struct Transform {
 }
 
 impl Transform {
-    /// Construct a transform from schema-checked DrawingML values.
+    /// Construct a transform from schema-checked `DrawingML` values.
     #[must_use]
     pub fn new(x: Coordinate, y: Coordinate, width: Extent, height: Extent) -> Self {
         Self {
@@ -166,6 +173,10 @@ impl Transform {
     }
 
     /// Construct a transform from EMUs with all schema bounds checked.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn emu(x: i64, y: i64, width: i64, height: i64) -> Result<Self> {
         Ok(Self::new(
             Coordinate::emu(x).map_err(|error| coordinate_error(error, "x"))?,
@@ -256,7 +267,7 @@ pub struct Bookmark {
 
 /// A bounded, canonical `p:extLst` fragment retained without interpretation.
 ///
-/// The wrapper is validated and canonicalized while retaining QName prefixes
+/// The wrapper is validated and canonicalized while retaining `QName` prefixes
 /// and their bindings. Extension payloads remain inert and are never loaded,
 /// dispatched, or executed.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -285,7 +296,7 @@ pub struct Extension {
     pub trim: Option<Trim>,
     pub fade: Option<Fade>,
     pub bookmarks: Vec<Bookmark>,
-    /// Optional opaque PresentationML extension metadata, ordered last by XSD.
+    /// Optional opaque `PresentationML` extension metadata, ordered last by XSD.
     pub extensions: Option<ExtensionList>,
 }
 

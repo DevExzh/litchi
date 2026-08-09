@@ -37,16 +37,19 @@ pub struct Change {
 
 impl Change {
     /// Root-child index affected by this change.
+    #[must_use]
     pub const fn index(&self) -> usize {
         self.index
     }
 
     /// Opaque source record, if one existed.
+    #[must_use]
     pub const fn before(&self) -> Option<&Record> {
         self.before.as_ref()
     }
 
     /// Opaque committed record, if one exists.
+    #[must_use]
     pub const fn after(&self) -> Option<&Record> {
         self.after.as_ref()
     }
@@ -61,23 +64,31 @@ pub struct ChangeSet {
 }
 
 impl ChangeSet {
+    #[must_use]
     pub const fn base(&self) -> Revision {
         self.base
     }
 
+    #[must_use]
     pub const fn target(&self) -> Revision {
         self.target
     }
 
+    #[must_use]
     pub fn changes(&self) -> &[Change] {
         &self.changes
     }
 
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.changes.is_empty()
     }
 
     /// Undo this patch against the exact committed target snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision() != self.target {
             return invalid("cannot undo against a different slide revision");
@@ -90,6 +101,10 @@ impl ChangeSet {
     }
 
     /// Redo this patch against the exact source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision() != self.base {
             return invalid("cannot redo against a different slide revision");
@@ -120,31 +135,47 @@ impl Editor {
     }
 
     /// Borrow the candidate slide record.
+    #[must_use]
     pub const fn record(&self) -> &Record {
         &self.root
     }
 
     /// Read the candidate synchronization metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn synchronization(&self) -> Result<Option<Synchronization>> {
         codec::read(&self.root)
     }
 
     /// Return the source limits used by this transaction.
+    #[must_use]
     pub const fn limits(&self) -> Limits {
         self.source.limits
     }
 
     /// Whether a semantic change has been staged.
+    #[must_use]
     pub const fn is_changed(&self) -> bool {
         !self.changes.is_empty()
     }
 
     /// Borrow the semantic changes staged so far.
+    #[must_use]
     pub fn changes(&self) -> &[Change] {
         &self.changes
     }
 
     /// Set or replace synchronization metadata atomically in the candidate.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "taking the `Synchronization` by value is the established transaction API shape; changing it to a reference would churn callers in the sibling test module"
+    )]
     pub fn set(&mut self, value: Synchronization) -> Result<()> {
         let replacement = codec::encode_sync(&value)?;
         let existing = validation::sync_index(&self.root)?;
@@ -179,6 +210,10 @@ impl Editor {
     }
 
     /// Remove synchronization metadata, returning whether it was present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn clear(&mut self) -> Result<bool> {
         let Some(index) = validation::sync_index(&self.root)? else {
             return Ok(false);
@@ -194,11 +229,19 @@ impl Editor {
     }
 
     /// Capture the candidate without publishing it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn snapshot(&self) -> Result<Snapshot> {
         Snapshot::from_record_with_limits(self.root.clone(), self.source.limits)
     }
 
     /// Validate and publish the candidate and its reversible patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn commit(self) -> Result<Commit> {
         let snapshot = Snapshot::from_record_with_limits(self.root, self.source.limits)?;
         let changes = ChangeSet {
@@ -210,11 +253,16 @@ impl Editor {
     }
 
     /// Alias for move-owned writer terminology.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn finish(self) -> Result<Commit> {
         self.commit()
     }
 
     /// Discard the candidate and recover the source snapshot.
+    #[must_use]
     pub fn rollback(self) -> Snapshot {
         self.source
     }
@@ -264,26 +312,49 @@ pub struct Commit {
 }
 
 impl Commit {
+    #[must_use]
     pub const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
+    #[must_use]
     pub const fn changes(&self) -> &ChangeSet {
         &self.changes
     }
 
+    /// Read the synchronization metadata of the committed snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the synchronization record is malformed or exceeds
+    /// the snapshot's validation limits.
     pub fn synchronization(&self) -> Result<Option<Synchronization>> {
         self.snapshot.synchronization()
     }
 
+    /// Undo this commit's patch against `current`, which must be the
+    /// committed target snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `current` does not match the committed revision or
+    /// a staged change cannot be applied.
     pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.changes.undo(current)
     }
 
+    /// Redo this commit's patch against `current`, which must be the source
+    /// snapshot the commit was made from.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `current` does not match the source revision or a
+    /// staged change cannot be applied.
     pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.changes.redo(current)
     }
 
+    #[must_use]
     pub fn into_parts(self) -> (Snapshot, ChangeSet) {
         (self.snapshot, self.changes)
     }

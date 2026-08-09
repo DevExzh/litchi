@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{DocumentFileSettings, RtfDocument, RtfWriter};
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
@@ -10,7 +19,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_all_three_passive_parameterless_flags() {
-    let document = RtfDocument::parse(r#"{\rtf1\makebackup\defformat\doctemp Body}"#).unwrap();
+    let document = RtfDocument::parse(r"{\rtf1\makebackup\defformat\doctemp Body}").unwrap();
     assert_eq!(
         *document.file_settings(),
         DocumentFileSettings {
@@ -24,13 +33,13 @@ fn parses_all_three_passive_parameterless_flags() {
 
 #[test]
 fn omission_is_preserved_as_no_requested_file_behavior() {
-    let document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     assert!(document.file_settings().is_empty());
 }
 
 #[test]
 fn typed_api_round_trips_in_stable_order_and_clears_without_side_effects() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     document.set_file_settings(DocumentFileSettings {
         automatic_backup: true,
         default_save_format_rtf: true,
@@ -63,24 +72,24 @@ fn coexists_with_origin_external_reference_and_classification_metadata() {
 #[test]
 fn rejects_parameters_duplicates_starred_grouped_late_and_overlong_numeric_forms() {
     for source in [
-        r#"{\rtf1\makebackup0 Body}"#,
-        r#"{\rtf1\makebackup2147483647 Body}"#,
-        r#"{\rtf1\defformat1 Body}"#,
-        r#"{\rtf1\defformat-2147483648 Body}"#,
-        r#"{\rtf1\doctemp0 Body}"#,
-        r#"{\rtf1\doctemp99999999999 Body}"#,
-        r#"{\rtf1\makebackup\makebackup Body}"#,
-        r#"{\rtf1\defformat\defformat Body}"#,
-        r#"{\rtf1\doctemp\doctemp Body}"#,
-        r#"{\rtf1{\*\makebackup}Body}"#,
-        r#"{\rtf1{\*\defformat}Body}"#,
-        r#"{\rtf1{\*\doctemp}Body}"#,
-        r#"{\rtf1{\makebackup}Body}"#,
-        r#"{\rtf1{\defformat}Body}"#,
-        r#"{\rtf1{\doctemp}Body}"#,
-        r#"{\rtf1 Body\makebackup}"#,
-        r#"{\rtf1 Body\defformat}"#,
-        r#"{\rtf1 Body\doctemp}"#,
+        r"{\rtf1\makebackup0 Body}",
+        r"{\rtf1\makebackup2147483647 Body}",
+        r"{\rtf1\defformat1 Body}",
+        r"{\rtf1\defformat-2147483648 Body}",
+        r"{\rtf1\doctemp0 Body}",
+        r"{\rtf1\doctemp99999999999 Body}",
+        r"{\rtf1\makebackup\makebackup Body}",
+        r"{\rtf1\defformat\defformat Body}",
+        r"{\rtf1\doctemp\doctemp Body}",
+        r"{\rtf1{\*\makebackup}Body}",
+        r"{\rtf1{\*\defformat}Body}",
+        r"{\rtf1{\*\doctemp}Body}",
+        r"{\rtf1{\makebackup}Body}",
+        r"{\rtf1{\defformat}Body}",
+        r"{\rtf1{\doctemp}Body}",
+        r"{\rtf1 Body\makebackup}",
+        r"{\rtf1 Body\defformat}",
+        r"{\rtf1 Body\doctemp}",
     ] {
         assert!(
             RtfDocument::parse(source).is_err(),

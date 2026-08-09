@@ -27,6 +27,10 @@ impl Package {
     }
 
     /// Open an ordinary or encrypted package using a password and safe limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn open_with_password<P: AsRef<Path>>(path: P, password: &str) -> Result<Self> {
         Self::open_with_password_and_limits(
             path,
@@ -37,6 +41,10 @@ impl Package {
     }
 
     /// Open an ordinary or encrypted package with independent crypto and OPC limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn open_with_password_and_limits<P: AsRef<Path>>(
         path: P,
         password: &str,
@@ -48,6 +56,10 @@ impl Package {
     }
 
     /// Read an ordinary or encrypted package using a password and safe limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_reader_with_password<R: Read>(reader: R, password: &str) -> Result<Self> {
         Self::from_reader_with_password_and_limits(
             reader,
@@ -58,6 +70,10 @@ impl Package {
     }
 
     /// Read an ordinary or encrypted package with independent crypto and OPC limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_reader_with_password_and_limits<R: Read>(
         reader: R,
         password: &str,
@@ -69,6 +85,10 @@ impl Package {
     }
 
     /// Open an owned ordinary or encrypted package buffer using a password.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_vec_with_password(bytes: Vec<u8>, password: &str) -> Result<Self> {
         Self::from_vec_with_password_and_limits(
             bytes,
@@ -79,6 +99,10 @@ impl Package {
     }
 
     /// Open an owned package buffer with independent crypto and OPC limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_vec_with_password_and_limits(
         bytes: Vec<u8>,
         password: &str,
@@ -90,6 +114,10 @@ impl Package {
     }
 
     /// Open a borrowed ordinary or encrypted package buffer using a password.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_bytes_with_password(bytes: &[u8], password: &str) -> Result<Self> {
         Self::from_bytes_with_password_and_limits(
             bytes,
@@ -100,6 +128,10 @@ impl Package {
     }
 
     /// Open a borrowed package buffer with independent crypto and OPC limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_bytes_with_password_and_limits(
         bytes: &[u8],
         password: &str,
@@ -118,6 +150,10 @@ impl Package {
     }
 
     /// Explicitly serialize a clear OPC package, permitting an encryption downgrade.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_plain_bytes(&mut self) -> Result<Vec<u8>> {
         self.flush_presentation()?;
         let bytes = PackageWriter::to_bytes(&self.opc)?;
@@ -125,6 +161,10 @@ impl Package {
     }
 
     /// Explicitly save a clear OPC package, permitting an encryption downgrade.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
     pub fn save_plain<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
         self.flush_presentation()?;
         PackageWriter::write(path, &self.opc)?;
@@ -132,11 +172,19 @@ impl Package {
     }
 
     /// Serialize and encrypt the package in the selected mode.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_encrypted(&mut self, password: &str, mode: Mode) -> Result<Vec<u8>> {
         self.to_encrypted_with_limits(password, mode, Limits::default())
     }
 
     /// Serialize and encrypt the package in the selected mode under explicit limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_encrypted_with_limits(
         &mut self,
         password: &str,
@@ -147,16 +195,28 @@ impl Package {
     }
 
     /// Compatibility alias for [`Self::to_encrypted`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_encrypted_bytes(&mut self, password: &str, mode: Mode) -> Result<Vec<u8>> {
         self.to_encrypted(password, mode)
     }
 
     /// Serialize and encrypt using the retained input/output mode.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_reencrypted(&mut self, password: &str) -> Result<Vec<u8>> {
         self.to_reencrypted_with_limits(password, Limits::default())
     }
 
     /// Serialize and encrypt using the retained mode under explicit limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_reencrypted_with_limits(
         &mut self,
         password: &str,
@@ -174,11 +234,19 @@ impl Package {
     }
 
     /// Compatibility alias for [`Self::to_reencrypted`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_reencrypted_bytes(&mut self, password: &str) -> Result<Vec<u8>> {
         self.to_reencrypted(password)
     }
 
     /// Atomically save the package encrypted in the selected mode.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
     pub fn save_encrypted<P: AsRef<Path>>(
         &mut self,
         path: P,
@@ -189,6 +257,10 @@ impl Package {
     }
 
     /// Atomically save selected-mode encryption under explicit crypto limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
     pub fn save_encrypted_with_limits<P: AsRef<Path>>(
         &mut self,
         path: P,
@@ -203,11 +275,19 @@ impl Package {
     }
 
     /// Atomically save the package encrypted in its retained mode.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
     pub fn save_reencrypted<P: AsRef<Path>>(&mut self, path: P, password: &str) -> Result<()> {
         self.save_reencrypted_with_limits(path, password, Limits::default())
     }
 
     /// Atomically save retained-mode encryption under explicit crypto limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
     pub fn save_reencrypted_with_limits<P: AsRef<Path>>(
         &mut self,
         path: P,

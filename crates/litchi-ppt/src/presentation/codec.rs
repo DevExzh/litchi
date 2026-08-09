@@ -4,8 +4,8 @@ use crate::package::Result;
 use crate::records::Record;
 use crate::slide::Slide;
 
-/// Collect text boxes from a shared OfficeArt shape tree without owning the
-/// OfficeArt model in this format-specific crate.
+/// Collect text boxes from a shared `OfficeArt` shape tree without owning the
+/// `OfficeArt` model in this format-specific crate.
 pub(super) fn drawing_textboxes(data: &[u8]) -> Result<Vec<litchi_odraw::Record<'_>>> {
     fn collect<'data>(
         shape: &litchi_odraw::shape::Shape<'data>,
@@ -37,8 +37,8 @@ pub(super) fn placeholder_display_from_record(
     let parsed = crate::odraw::parse(&drawing.data)?;
     let mut shapes = Vec::with_capacity(parsed.len());
     for shape in &parsed {
-        if let Some(shape) = Slide::<'static>::convert_odraw_to_shape_enum(shape)? {
-            shapes.push(shape);
+        if let Some(converted) = Slide::<'static>::convert_odraw_to_shape_enum(shape)? {
+            shapes.push(converted);
         }
     }
     placeholder_display_from_shapes(&shapes)
@@ -54,11 +54,15 @@ pub(super) fn placeholder_display_from_shapes(
         let Some(placeholder) = shape.as_placeholder() else {
             continue;
         };
-        let target = match placeholder.placeholder_type() {
-            PlaceholderType::DateAndTime => &mut display.user_date,
-            PlaceholderType::Header => &mut display.header,
-            PlaceholderType::Footer => &mut display.footer,
-            _ => continue,
+        let placeholder_type = placeholder.placeholder_type();
+        let target = if placeholder_type == PlaceholderType::DateAndTime {
+            &mut display.user_date
+        } else if placeholder_type == PlaceholderType::Header {
+            &mut display.header
+        } else if placeholder_type == PlaceholderType::Footer {
+            &mut display.footer
+        } else {
+            continue;
         };
         if target.is_some() {
             continue;

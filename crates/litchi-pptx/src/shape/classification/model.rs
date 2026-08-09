@@ -35,6 +35,7 @@ impl Outcome {
     }
 
     /// Return the exact schema token used in `@val`.
+    #[must_use]
     pub const fn wire(self) -> &'static str {
         match self {
             Self::None => "none",
@@ -58,6 +59,7 @@ pub struct Opaque {
 impl Opaque {
     /// Borrow the exact extension element bytes.
     #[inline]
+    #[must_use]
     pub fn xml(&self) -> &[u8] {
         &self.xml
     }
@@ -92,6 +94,7 @@ pub struct Snapshot {
 impl Snapshot {
     /// Construct a new snapshot with an explicit classification outcome.
     #[inline]
+    #[must_use]
     pub fn new(outcome: Outcome) -> Self {
         Self {
             outcome: Some(outcome),
@@ -101,18 +104,21 @@ impl Snapshot {
 
     /// Return the optional wire outcome.
     #[inline]
+    #[must_use]
     pub const fn outcome(&self) -> Option<Outcome> {
         self.outcome
     }
 
     /// Borrow extension elements retained without interpretation.
     #[inline]
+    #[must_use]
     pub fn unknown_extensions(&self) -> &[Opaque] {
         &self.unknown_extensions
     }
 
     /// Start a detached atomic edit of this snapshot.
     #[inline]
+    #[must_use]
     pub fn edit(&self) -> crate::shape::classification::transaction::Editor {
         crate::shape::classification::transaction::Editor::new(self.clone())
     }

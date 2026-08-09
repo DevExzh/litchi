@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::codec::*;
 use super::model::*;
 use super::transaction::Snapshot;
@@ -49,8 +55,8 @@ fn rejects_hostile_media_flags_times_order_and_headers() {
     assert!(CdAudio::parse(&record).is_err());
     bytes = cd_audio().to_record_bytes().unwrap();
     bytes[0] = 0;
-    let record = Record::parse(&bytes, 0).unwrap().0;
-    assert!(CdAudio::parse(&record).is_err());
+    let zeroed_header_record = Record::parse(&bytes, 0).unwrap().0;
+    assert!(CdAudio::parse(&zeroed_header_record).is_err());
 }
 
 #[test]
@@ -131,8 +137,9 @@ fn movie_containers_reject_wrong_headers_and_extra_children() {
 
     let child = movie.video.to_record_bytes().unwrap();
     let doubled = [child.as_slice(), child.as_slice()].concat();
-    let bytes = record_bytes(0x0f, 0, RecordType::ExternalAviMovie.as_u16(), &doubled).unwrap();
-    assert!(Movie::parse(&Record::parse(&bytes, 0).unwrap().0).is_err());
+    let doubled_bytes =
+        record_bytes(0x0f, 0, RecordType::ExternalAviMovie.as_u16(), &doubled).unwrap();
+    assert!(Movie::parse(&Record::parse(&doubled_bytes, 0).unwrap().0).is_err());
 }
 
 #[test]
@@ -398,9 +405,9 @@ fn snapshot_transaction_rewrites_only_media_and_preserves_opaque_records() {
             .collection()
             .unwrap()
             .get(3)
-            .and_then(|object| match object {
+            .and_then(|media_object| match media_object {
                 Object::Movie(value) => value.video.path.as_deref(),
-                _ => None,
+                Object::LinkedAudio(_) | Object::CdAudio(_) | Object::EmbeddedWav(_) => None,
             }),
         Some(r"\\server\share\clip.avi")
     );
@@ -427,14 +434,14 @@ fn snapshot_transaction_supports_exact_noop_and_source_stale_rejection() {
 
     let mut editor = source.edit();
     editor.set_path(3, Some("clip.avi".into())).unwrap();
-    let noop = editor.commit().unwrap();
-    assert!(noop.patch().is_empty());
-    assert!(noop.patch().changes().is_empty());
+    let noop_edit = editor.commit().unwrap();
+    assert!(noop_edit.patch().is_empty());
+    assert!(noop_edit.patch().changes().is_empty());
 
     let changed = {
-        let mut editor = source.edit();
-        editor.set_path(3, Some("new.avi".into())).unwrap();
-        editor.commit().unwrap()
+        let mut changed_editor = source.edit();
+        changed_editor.set_path(3, Some("new.avi".into())).unwrap();
+        changed_editor.commit().unwrap()
     };
     let mut stale_bytes = source.bytes().to_vec();
     *stale_bytes.last_mut().unwrap() ^= 1;
@@ -453,7 +460,7 @@ fn owner_validation_blocks_media_removal_and_keeps_failed_edits_atomic() {
         &officeart_media_owner(3),
     )
     .unwrap();
-    let source = Snapshot::parse(&document_bytes(&[list, drawing].concat())).unwrap();
+    let source = Snapshot::parse(document_bytes(&[list, drawing].concat())).unwrap();
     assert_eq!(source.owner_ids(), &[3]);
     assert_eq!(source.owner_count(3), 1);
 
@@ -474,7 +481,7 @@ fn owner_validation_blocks_media_removal_and_keeps_failed_edits_atomic() {
 #[test]
 fn insert_attaches_a_missing_list_to_document_and_remove_preserves_unknown_order() {
     let trailer = record_bytes(0, 4, 0x7AC0, &[8, 9]).unwrap();
-    let source = Snapshot::parse(&document_bytes(&trailer)).unwrap();
+    let source = Snapshot::parse(document_bytes(&trailer)).unwrap();
     assert!(source.collection().is_none());
 
     let mut editor = source.edit();
@@ -489,10 +496,10 @@ fn insert_attaches_a_missing_list_to_document_and_remove_preserves_unknown_order
             .any(|window| window == trailer)
     );
 
-    let mut editor = commit.snapshot().edit();
-    let removed = editor.remove(12).unwrap();
+    let mut removal_editor = commit.snapshot().edit();
+    let removed = removal_editor.remove(12).unwrap();
     assert_eq!(removed.id(), 12);
-    let empty = editor.commit().unwrap();
+    let empty = removal_editor.commit().unwrap();
     assert!(empty.snapshot().collection().unwrap().objects.is_empty());
 }
 

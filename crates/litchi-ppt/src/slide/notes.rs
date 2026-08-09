@@ -1,4 +1,4 @@
-//! Read-side speaker-notes support for binary PowerPoint files.
+//! Read-side speaker-notes support for binary `PowerPoint` files.
 
 use super::directory::SlideDirectory;
 use super::types::Slide;
@@ -76,7 +76,7 @@ impl NotesIndex {
         index
             .slide_ids
             .try_reserve(slide_directory.entries().len())
-            .map_err(|_| Error::AllocationFailed("PPT notes slide index"))?;
+            .map_err(|_err| Error::AllocationFailed("PPT notes slide index"))?;
         for entry in slide_directory.entries() {
             index.slide_ids.insert(entry.persist_id(), entry.slide_id());
         }
@@ -150,11 +150,12 @@ impl NotesIndex {
                 slide_atom.data.len()
             ));
         }
-        let notes_id = u32::from_le_bytes(
-            slide_atom.data[16..20]
-                .try_into()
-                .expect("validated SlideAtom range"),
-        );
+        let notes_id = u32::from_le_bytes([
+            slide_atom.data[16],
+            slide_atom.data[17],
+            slide_atom.data[18],
+            slide_atom.data[19],
+        ]);
         if notes_id == 0 {
             return Ok(None);
         }
@@ -167,19 +168,23 @@ impl NotesIndex {
         let offset = persist_mapping
             .get_offset(persist_id)
             .ok_or_else(|| format!("notes persist ID {persist_id} has no directory entry"))?;
-        let offset = usize::try_from(offset)
-            .map_err(|_| format!("notes persist offset does not fit usize: {offset}"))?;
+        let offset_usize = usize::try_from(offset)
+            .map_err(|_err| format!("notes persist offset does not fit usize: {offset}"))?;
 
         Ok(Some(NoteDescriptor {
             notes_id,
             persist_id,
-            offset,
+            offset: offset_usize,
             expected_slide_id: self.slide_ids.get(&slide_persist_id).copied(),
         }))
     }
 }
 
 /// A notes page associated with a presentation slide.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`SpeakerNotes` is the established public API name re-exported as `slide::SpeakerNotes`; renaming it would break downstream crates"
+)]
 pub struct SpeakerNotes {
     notes_id: u32,
     persist_id: u32,
@@ -271,11 +276,19 @@ impl SpeakerNotes {
     /// loaded, or resolved. Use
     /// [`crate::ProgTags::slide_extensions`] to decode the
     /// versioned binary-tag payloads into typed extension structs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn programmable_tags(&self) -> Result<Option<crate::ProgTags>> {
         self.programmable_tags_with_limits(crate::ProgTagLimits::default())
     }
 
     /// Return notes programmable tags with caller-supplied resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn programmable_tags_with_limits(
         &self,
         limits: crate::ProgTagLimits,
@@ -283,12 +296,30 @@ impl SpeakerNotes {
         crate::ProgTags::parse_slide(&self.record, limits)
     }
 
+    /// Return the shapes drawn on this notes page.
+    ///
+    /// Shapes are parsed lazily on first access and then cached. Each
+    /// returned shape is bound to its parsed source and refuses public
+    /// mutation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the `PPDrawing` payload is malformed or a shape
+    /// fails to decode.
     pub fn shapes(&self) -> Result<&[ShapeEnum<'static>]> {
         self.shapes
             .get_or_try_init(|| self.parse_shapes())
             .map(Vec::as_slice)
     }
 
+    /// Return the body text of this notes page.
+    ///
+    /// The text is extracted lazily on first access and then cached.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the `PPDrawing` payload is malformed or the notes
+    /// shape tree cannot be traversed.
     pub fn text(&self) -> Result<&str> {
         self.text
             .get_or_try_init(|| self.extract_notes_body_text())
@@ -302,9 +333,10 @@ impl SpeakerNotes {
         let parsed = crate::odraw::parse(&drawing.data)?;
         let mut shapes = Vec::with_capacity(parsed.len());
         for shape in &parsed {
-            if let Some(mut shape) = Slide::<'static>::convert_odraw_to_shape_enum(shape)? {
-                shape.mark_source_bound_recursive();
-                shapes.push(shape);
+            if let Some(mut converted_shape) = Slide::<'static>::convert_odraw_to_shape_enum(shape)?
+            {
+                converted_shape.mark_source_bound_recursive();
+                shapes.push(converted_shape);
             }
         }
         Ok(shapes)
@@ -331,7 +363,7 @@ fn collect_notes_body_text(
 
     let mut pending = vec![shape];
     let mut visited = 0usize;
-    while let Some(shape) = pending.pop() {
+    while let Some(current) = pending.pop() {
         visited = visited
             .checked_add(1)
             .ok_or_else(|| Error::Corrupted("Notes shape count overflow".to_string()))?;
@@ -340,14 +372,14 @@ fn collect_notes_body_text(
                 "Notes page exceeds the PPT shape limit".to_string(),
             ));
         }
-        if shape
+        if current
             .placeholder()?
             .is_some_and(|placeholder| placeholder.kind == crate::PlaceholderKind::NotesBody)
-            && let Some(value) = shape.text()?.filter(|value| !value.is_empty())
+            && let Some(value) = current.text()?.filter(|value| !value.is_empty())
         {
             text.push(value);
         }
-        pending.extend(shape.children().iter().rev());
+        pending.extend(current.children().iter().rev());
     }
     Ok(())
 }
@@ -359,12 +391,15 @@ fn read_u32(data: &[u8], offset: usize, field: &str) -> Result<u32> {
     let bytes = data
         .get(offset..end)
         .ok_or_else(|| Error::Corrupted(format!("truncated {field}")))?;
-    Ok(u32::from_le_bytes(
-        bytes.try_into().expect("validated four-byte field"),
-    ))
+    Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use crate::Package;
@@ -373,7 +408,7 @@ mod tests {
         let mut bytes = Vec::with_capacity(8 + data.len());
         bytes.extend_from_slice(&(version | (instance << 4)).to_le_bytes());
         bytes.extend_from_slice(&record_type.to_le_bytes());
-        bytes.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(&u32::try_from(data.len()).unwrap().to_le_bytes());
         bytes.extend_from_slice(data);
         bytes
     }
@@ -485,7 +520,7 @@ mod tests {
             notes.text().expect("extract written notes"),
             "reader writer notes round trip"
         );
-        let _ = std::fs::remove_file(path);
+        let _removed = std::fs::remove_file(path);
     }
 
     #[test]
@@ -498,33 +533,33 @@ mod tests {
         );
         let package = Package::open(path);
         assert!(package.is_ok());
-        let Ok(mut package) = package else {
+        let Ok(mut opened_package) = package else {
             return;
         };
-        let presentation = package.presentation();
+        let presentation = opened_package.presentation();
         assert!(presentation.is_ok());
-        let Ok(presentation) = presentation else {
+        let Ok(parsed_presentation) = presentation else {
             return;
         };
-        let slides = presentation.slides();
+        let slides = parsed_presentation.slides();
         assert!(slides.is_ok());
-        let Ok(slides) = slides else {
+        let Ok(parsed_slides) = slides else {
             return;
         };
 
         let mut candidate = None;
-        'slides: for slide in &slides {
+        'slides: for slide in &parsed_slides {
             let notes = slide.speaker_notes();
             assert!(notes.is_ok());
-            let Ok(Some(notes)) = notes else {
+            let Ok(Some(parsed_notes)) = notes else {
                 continue;
             };
-            let shapes = notes.shapes();
+            let shapes = parsed_notes.shapes();
             assert!(shapes.is_ok());
-            let Ok(shapes) = shapes else {
+            let Ok(notes_shapes) = shapes else {
                 continue;
             };
-            for shape in shapes {
+            for shape in notes_shapes {
                 if !matches!(
                     shape,
                     ShapeEnum::TextBox(_) | ShapeEnum::Placeholder(_) | ShapeEnum::AutoShape(_)
@@ -533,10 +568,10 @@ mod tests {
                 }
                 let text = shape.text();
                 assert!(text.is_ok());
-                let Ok(text) = text else {
+                let Ok(shape_text) = text else {
                     continue;
                 };
-                if !text.is_empty() {
+                if !shape_text.is_empty() {
                     candidate = Some(shape.clone());
                     break 'slides;
                 }
@@ -549,20 +584,34 @@ mod tests {
         };
         let before_text = shape.text();
         assert!(before_text.is_ok());
-        let Ok(before_text) = before_text else {
+        let Ok(text_before_mutation) = before_text else {
             return;
         };
         let before_fill = match &shape {
-            ShapeEnum::TextBox(shape) => shape.properties().fill_color,
-            ShapeEnum::Placeholder(shape) => shape.properties().fill_color,
-            ShapeEnum::AutoShape(shape) => shape.properties().fill_color,
-            _ => return,
+            ShapeEnum::TextBox(text_box) => text_box.properties().fill_color,
+            ShapeEnum::Placeholder(placeholder) => placeholder.properties().fill_color,
+            ShapeEnum::AutoShape(auto_shape) => auto_shape.properties().fill_color,
+            ShapeEnum::Picture(_)
+            | ShapeEnum::Table(_)
+            | ShapeEnum::Group(_)
+            | ShapeEnum::Line(_) => {
+                return;
+            },
         };
         let mutation = match &mut shape {
-            ShapeEnum::TextBox(shape) => Shape::set_fill_color(shape, Some(0x0012_3456)),
-            ShapeEnum::Placeholder(shape) => Shape::set_fill_color(shape, Some(0x0012_3456)),
-            ShapeEnum::AutoShape(shape) => Shape::set_fill_color(shape, Some(0x0012_3456)),
-            _ => return,
+            ShapeEnum::TextBox(text_box) => Shape::set_fill_color(text_box, Some(0x0012_3456)),
+            ShapeEnum::Placeholder(placeholder) => {
+                Shape::set_fill_color(placeholder, Some(0x0012_3456))
+            },
+            ShapeEnum::AutoShape(auto_shape) => {
+                Shape::set_fill_color(auto_shape, Some(0x0012_3456))
+            },
+            ShapeEnum::Picture(_)
+            | ShapeEnum::Table(_)
+            | ShapeEnum::Group(_)
+            | ShapeEnum::Line(_) => {
+                return;
+            },
         };
 
         assert_eq!(
@@ -573,15 +622,20 @@ mod tests {
         );
         let after_text = shape.text();
         assert!(after_text.is_ok());
-        let Ok(after_text) = after_text else {
+        let Ok(text_after_mutation) = after_text else {
             return;
         };
-        assert_eq!(after_text, before_text);
+        assert_eq!(text_after_mutation, text_before_mutation);
         let after_fill = match &shape {
-            ShapeEnum::TextBox(shape) => shape.properties().fill_color,
-            ShapeEnum::Placeholder(shape) => shape.properties().fill_color,
-            ShapeEnum::AutoShape(shape) => shape.properties().fill_color,
-            _ => return,
+            ShapeEnum::TextBox(text_box) => text_box.properties().fill_color,
+            ShapeEnum::Placeholder(placeholder) => placeholder.properties().fill_color,
+            ShapeEnum::AutoShape(auto_shape) => auto_shape.properties().fill_color,
+            ShapeEnum::Picture(_)
+            | ShapeEnum::Table(_)
+            | ShapeEnum::Group(_)
+            | ShapeEnum::Line(_) => {
+                return;
+            },
         };
         assert_eq!(after_fill, before_fill);
     }

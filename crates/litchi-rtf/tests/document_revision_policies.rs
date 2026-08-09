@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{DocumentRevisionPolicies, RtfDocument, RtfWriter};
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
@@ -12,7 +21,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 fn parses_all_explicit_policy_combinations_without_enabling_tracking() {
     for (moves, formatting) in [(false, false), (false, true), (true, false), (true, true)] {
         let source = format!(
-            r#"{{\rtf1\trackmoves{}\trackformatting{} Body}}"#,
+            r"{{\rtf1\trackmoves{}\trackformatting{} Body}}",
             i32::from(moves),
             i32::from(formatting)
         );
@@ -31,7 +40,7 @@ fn parses_all_explicit_policy_combinations_without_enabling_tracking() {
 
 #[test]
 fn omission_remains_unspecified_and_is_not_serialized() {
-    let document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     assert!(document.revision_policies().is_empty());
     let serialized = String::from_utf8(write(&document)).unwrap();
     assert!(!serialized.contains("trackmoves"));
@@ -40,7 +49,7 @@ fn omission_remains_unspecified_and_is_not_serialized() {
 
 #[test]
 fn typed_api_round_trips_in_stable_order_and_clears_without_creating_revisions() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     document.set_revision_policies(DocumentRevisionPolicies {
         track_moves: Some(true),
         track_formatting: Some(false),
@@ -79,13 +88,13 @@ fn coexists_with_embedding_and_xml_policies_as_independent_metadata() {
 fn rejects_missing_non_boolean_overflow_and_duplicate_values() {
     for name in ["trackmoves", "trackformatting"] {
         for suffix in ["", "-1", "2", "32767", "99999999999"] {
-            let source = format!(r#"{{\rtf1\{name}{suffix} Body}}"#);
+            let source = format!(r"{{\rtf1\{name}{suffix} Body}}");
             assert!(
                 RtfDocument::parse(&source).is_err(),
                 "accepted malformed {source}"
             );
         }
-        let source = format!(r#"{{\rtf1\{name}0\{name}1 Body}}"#);
+        let source = format!(r"{{\rtf1\{name}0\{name}1 Body}}");
         assert!(
             RtfDocument::parse(&source).is_err(),
             "accepted duplicate {source}"
@@ -95,11 +104,11 @@ fn rejects_missing_non_boolean_overflow_and_duplicate_values() {
 
 #[test]
 fn rejects_every_starred_grouped_and_late_revision_policy() {
-    for control in [r#"\trackmoves0"#, r#"\trackformatting1"#] {
+    for control in [r"\trackmoves0", r"\trackformatting1"] {
         for source in [
-            format!(r#"{{\rtf1{{\*{control}}}Body}}"#),
-            format!(r#"{{\rtf1{{{control}}}Body}}"#),
-            format!(r#"{{\rtf1 Body{control}}}"#),
+            format!(r"{{\rtf1{{\*{control}}}Body}}"),
+            format!(r"{{\rtf1{{{control}}}Body}}"),
+            format!(r"{{\rtf1 Body{control}}}"),
         ] {
             assert!(
                 RtfDocument::parse(&source).is_err(),

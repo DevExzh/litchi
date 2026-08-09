@@ -62,6 +62,29 @@ impl Database {
         self.package.files()
     }
 
+    /// Reads a bounded, source-bound inert schema and query catalog.
+    ///
+    /// This never opens a connection, resolves a driver, or executes a query.
+    /// Unknown source markup remains preserved in the immutable package bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the content part is structurally invalid or
+    /// exceeds the default semantic discovery limits.
+    pub fn catalog(&self) -> Result<crate::Catalog<'_>> {
+        self.catalog_with(crate::Limits::default())
+    }
+
+    /// Reads an inert schema and query catalog with caller-selected finite limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the content part is structurally invalid or
+    /// exceeds `limits`.
+    pub fn catalog_with(&self, limits: crate::Limits) -> Result<crate::Catalog<'_>> {
+        crate::Catalog::parse(self.content_xml(), limits)
+    }
+
     /// Consumes the snapshot and returns the raw package bytes.
     #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
@@ -83,5 +106,6 @@ mod tests {
         let document = Database::from_bytes(bytes).unwrap();
         assert!(document.content_xml().contains("<office:database"));
         assert!(!document.as_bytes().is_empty());
+        assert!(document.catalog().unwrap().tables().is_empty());
     }
 }

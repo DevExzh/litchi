@@ -48,22 +48,32 @@ impl<'source> Inventory<'source> {
     }
 
     /// Select by checked zero-based discovery order.
+    ///
+    /// # Errors
+    /// Returns an error when the chart data is malformed or a configured limit is exceeded.
     pub fn at(&self, index: usize) -> Result<Option<&Chart>> {
         Ok(self.charts.get(index))
     }
 
     /// Select by exact producer-visible frame name.
+    ///
+    /// # Errors
+    /// Returns an error when the chart data is malformed or a configured limit is exceeded.
     pub fn named(&self, name: &str) -> Result<Option<&Chart>> {
         select(&self.charts, Selector::Name(name))
-            .map(|index| index.map(|index| &self.charts[index]))
+            .map(|index| index.map(|selected| &self.charts[selected]))
     }
 
     /// Select by exact name or checked zero-based position.
+    ///
+    /// # Errors
+    /// Returns an error when the chart data is malformed or a configured limit is exceeded.
     pub fn get<'a, S>(&self, selector: S) -> Result<Option<&Chart>>
     where
         S: Into<Selector<'a>>,
     {
-        select(&self.charts, selector.into()).map(|index| index.map(|index| &self.charts[index]))
+        select(&self.charts, selector.into())
+            .map(|index| index.map(|selected| &self.charts[selected]))
     }
 
     /// Start an isolated clone-staged transaction.
@@ -101,6 +111,9 @@ impl<'source> Transaction<'source> {
     }
 
     /// Replace one chart part, including every occurrence sharing its package part.
+    ///
+    /// # Errors
+    /// Returns an error when the chart data is malformed or a configured limit is exceeded.
     pub fn replace<'a, S>(&mut self, selector: S, part: Part) -> Result<()>
     where
         S: Into<Selector<'a>>,
@@ -109,6 +122,9 @@ impl<'source> Transaction<'source> {
     }
 
     /// Remove one chart occurrence from its containing drawing page.
+    ///
+    /// # Errors
+    /// Returns an error when the chart data is malformed or a configured limit is exceeded.
     pub fn remove<'a, S>(&mut self, selector: S) -> Result<Chart>
     where
         S: Into<Selector<'a>>,
@@ -117,6 +133,9 @@ impl<'source> Transaction<'source> {
     }
 
     /// Add a named chart frame to a selected page.
+    ///
+    /// # Errors
+    /// Returns an error when the chart data is malformed or a configured limit is exceeded.
     pub fn add<'a, P, N>(&mut self, page: P, name: N, storage: Storage, part: Part) -> Result<usize>
     where
         P: Into<Page<'a>>,
@@ -126,6 +145,9 @@ impl<'source> Transaction<'source> {
     }
 
     /// Publish all staged structural and part edits atomically.
+    ///
+    /// # Errors
+    /// Returns an error when the chart data is malformed or a configured limit is exceeded.
     pub fn commit(self) -> Result<Commit<'source>> {
         let changed = self.original != self.draft;
         let bytes = if changed {
@@ -154,6 +176,13 @@ impl Editor<'_, '_> {
     }
 
     /// Replace one chart part after resolving a semantic selector.
+    ///
+    /// # Errors
+    /// Returns an error when the chart data is malformed or a configured limit is exceeded.
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "matches the by-value part-taking signature of Transaction::replace; changing it to a borrow would alter the public API"
+    )]
     pub fn replace<'a, S>(&mut self, selector: S, part: Part) -> Result<()>
     where
         S: Into<Selector<'a>>,
@@ -172,6 +201,9 @@ impl Editor<'_, '_> {
     }
 
     /// Remove one chart occurrence and return its staged source value.
+    ///
+    /// # Errors
+    /// Returns an error when the chart data is malformed or a configured limit is exceeded.
     pub fn remove<'a, S>(&mut self, selector: S) -> Result<Chart>
     where
         S: Into<Selector<'a>>,
@@ -182,25 +214,28 @@ impl Editor<'_, '_> {
     }
 
     /// Add a named chart frame to a selected `draw:page`.
+    ///
+    /// # Errors
+    /// Returns an error when the chart data is malformed or a configured limit is exceeded.
     pub fn add<'a, P, N>(&mut self, page: P, name: N, storage: Storage, part: Part) -> Result<usize>
     where
         P: Into<Page<'a>>,
         N: Into<String>,
     {
         self.validate_part(&part)?;
-        let name = name.into();
-        validate_name(&name)?;
+        let frame_name = name.into();
+        validate_name(&frame_name)?;
         if self
             .transaction
             .draft
             .iter()
-            .any(|chart| chart.name() == Some(name.as_str()))
+            .any(|chart| chart.name() == Some(frame_name.as_str()))
         {
             return invalid("ODP chart frame names must be unique for selector stability");
         }
         let content = super::codec::content_xml(self.transaction.source)?;
-        let page = page.into();
-        let page_index = page_index(&content, page)?;
+        let target_page = page.into();
+        let page_index = page_index(&content, target_page)?;
         let page_name = locate_pages(&content)?
             .into_iter()
             .find(|value| value.index == page_index)
@@ -212,7 +247,7 @@ impl Editor<'_, '_> {
             .ok_or_else(|| invalid_error("ODP chart insertion token overflow"))?;
         self.transaction.draft.push(Chart {
             frame: Some(litchi_odf_common::drawing::Frame {
-                name: Some(name),
+                name: Some(frame_name),
                 page_name,
                 ..Default::default()
             }),

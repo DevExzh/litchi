@@ -15,12 +15,17 @@ pub struct DocumentWindowCaption<'a> {
 }
 
 impl<'a> DocumentWindowCaption<'a> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(text: Cow<'a, str>) -> RtfResult<Self> {
         let caption = Self { text };
         caption.validate()?;
         Ok(caption)
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if self.text.is_empty() {
             return Err(RtfError::MalformedDocument(

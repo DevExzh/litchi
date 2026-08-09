@@ -53,6 +53,9 @@ pub struct List {
 }
 
 impl List {
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn comment(nodes: Vec<Node>) -> Result<Self> {
         let value = Self {
             kind: Kind::Comment,
@@ -62,6 +65,9 @@ impl List {
         Ok(value)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn reply(nodes: Vec<Node>) -> Result<Self> {
         let value = Self {
             kind: Kind::Reply,
@@ -71,6 +77,9 @@ impl List {
         Ok(value)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn validate(&self) -> Result<()> {
         let mut comments = 0usize;
         let mut replies = 0usize;
@@ -105,6 +114,7 @@ impl List {
         }
     }
 
+    #[must_use]
     pub fn comment_id(&self) -> Option<&str> {
         self.nodes.iter().find_map(|node| match node {
             Node::Comment { id } => Some(id.as_str()),
@@ -112,6 +122,7 @@ impl List {
         })
     }
 
+    #[must_use]
     pub fn reply_id(&self) -> Option<&str> {
         self.nodes.iter().find_map(|node| match node {
             Node::Reply { id } => Some(id.as_str()),

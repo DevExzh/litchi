@@ -45,6 +45,9 @@ pub struct Metadata {
 }
 
 impl Metadata {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn validate(&self) -> Result<()> {
         for value in [
             self.name.as_deref(),
@@ -66,12 +69,12 @@ impl Metadata {
         if let Some(value) = &self.change_id {
             guid(value, "change metadata")?;
         }
-        if let Some(value) = &self.extension_xml {
-            if value.xml.len() > super::super::MAX_BYTES {
-                return Err(invalid(
-                    "modern comment change metadata extension is too large",
-                ));
-            }
+        if let Some(value) = &self.extension_xml
+            && value.xml.len() > super::super::MAX_BYTES
+        {
+            return Err(invalid(
+                "modern comment change metadata extension is too large",
+            ));
         }
         Ok(())
     }
@@ -165,6 +168,9 @@ pub struct Replies {
 }
 
 impl Replies {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn validate(&self) -> Result<()> {
         validate_bits(&self.changes, "comment reply changes")?;
         if self.monikers.kind != super::monikers::Kind::Reply {
@@ -174,10 +180,10 @@ impl Replies {
         if let Some(value) = &self.metadata {
             value.validate()?;
         }
-        if let Some(value) = &self.extension_xml {
-            if value.xml.len() > super::super::MAX_BYTES {
-                return Err(invalid("comment reply change extension is too large"));
-            }
+        if let Some(value) = &self.extension_xml
+            && value.xml.len() > super::super::MAX_BYTES
+        {
+            return Err(invalid("comment reply change extension is too large"));
         }
         Ok(())
     }
@@ -195,6 +201,9 @@ pub struct Changes {
 }
 
 impl Changes {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn validate(&self) -> Result<()> {
         validate_bits(&self.changes, "comment changes")?;
         if self.monikers.kind != super::monikers::Kind::Comment {
@@ -210,10 +219,10 @@ impl Changes {
         for value in &self.reply_changes {
             value.validate()?;
         }
-        if let Some(value) = &self.extension_xml {
-            if value.xml.len() > super::super::MAX_BYTES {
-                return Err(invalid("comment change extension is too large"));
-            }
+        if let Some(value) = &self.extension_xml
+            && value.xml.len() > super::super::MAX_BYTES
+        {
+            return Err(invalid("comment change extension is too large"));
         }
         Ok(())
     }

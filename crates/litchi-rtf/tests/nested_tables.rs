@@ -1,10 +1,19 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{Cell, RtfDocument, RtfWriter, Table};
 
 fn nested_count(table: &Table<'_>) -> usize {
     table
         .rows()
         .iter()
-        .flat_map(|row| row.cells())
+        .flat_map(litchi_rtf::raw::Row::cells)
         .map(|cell| {
             cell.nested_tables()
                 .iter()
@@ -36,7 +45,7 @@ fn assert_table_eq(left: &Table<'_>, right: &Table<'_>) {
 }
 
 fn sample() -> String {
-    r#"{\rtf1\trowd\cellx5000\intbl\itap1 Before \intbl\itap2 Inner\nestcell\intbl\itap2\nestcell{\*\nesttableprops\trowd\cellx1000\cellx2000\nestrow}{\nonesttables ignored fallback}\intbl\itap1 After\cell\row}"#.into()
+    r"{\rtf1\trowd\cellx5000\intbl\itap1 Before \intbl\itap2 Inner\nestcell\intbl\itap2\nestcell{\*\nesttableprops\trowd\cellx1000\cellx2000\nestrow}{\nonesttables ignored fallback}\intbl\itap1 After\cell\row}".into()
 }
 
 #[test]
@@ -81,8 +90,8 @@ fn parses_real_libreoffice_end_defined_nested_table() {
     let nested = document
         .tables()
         .iter()
-        .flat_map(|table| table.rows())
-        .flat_map(|row| row.cells())
+        .flat_map(Table::rows)
+        .flat_map(litchi_rtf::raw::Row::cells)
         .flat_map(Cell::nested_tables)
         .next()
         .unwrap();
@@ -91,7 +100,7 @@ fn parses_real_libreoffice_end_defined_nested_table() {
 
 #[test]
 fn restores_groups_and_ignores_fallback_and_unknown_destinations() {
-    let source = r#"{\rtf1\trowd\cellx2000\intbl\itap1 Outer{\itap2}{\*\unknown\itap32\nestcell bad}{\nonesttables\itap32\nestcell fallback}\cell\row}"#;
+    let source = r"{\rtf1\trowd\cellx2000\intbl\itap1 Outer{\itap2}{\*\unknown\itap32\nestcell bad}{\nonesttables\itap32\nestcell fallback}\cell\row}";
     let document = RtfDocument::parse(source).unwrap();
     assert_eq!(document.tables()[0].rows()[0].cells()[0].text(), "Outer");
     assert!(
@@ -104,14 +113,14 @@ fn restores_groups_and_ignores_fallback_and_unknown_destinations() {
 #[test]
 fn rejects_malformed_levels_destinations_and_boundaries() {
     for source in [
-        r#"{\rtf1\itap X}"#,
-        r#"{\rtf1\itap-1 X}"#,
-        r#"{\rtf1\itap33 X}"#,
-        r#"{\rtf1\trowd\cellx1\intbl\itap1 X\nestcell}"#,
-        r#"{\rtf1\trowd\cellx1\intbl\itap2 X\nestrow}"#,
-        r#"{\rtf1\trowd\cellx1\intbl\itap2 X{\nesttableprops\trowd\cellx1\nestrow}}"#,
-        r#"{\rtf1\trowd\cellx1\intbl\itap3 X}"#,
-        r#"{\rtf1\trowd\cellx1\intbl\itap2 X\nestcell{\nesttableprops\trowd\cellx1\cellx2\nestrow}}"#,
+        r"{\rtf1\itap X}",
+        r"{\rtf1\itap-1 X}",
+        r"{\rtf1\itap33 X}",
+        r"{\rtf1\trowd\cellx1\intbl\itap1 X\nestcell}",
+        r"{\rtf1\trowd\cellx1\intbl\itap2 X\nestrow}",
+        r"{\rtf1\trowd\cellx1\intbl\itap2 X{\nesttableprops\trowd\cellx1\nestrow}}",
+        r"{\rtf1\trowd\cellx1\intbl\itap3 X}",
+        r"{\rtf1\trowd\cellx1\intbl\itap2 X\nestcell{\nesttableprops\trowd\cellx1\cellx2\nestrow}}",
     ] {
         assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
     }
@@ -119,7 +128,7 @@ fn rejects_malformed_levels_destinations_and_boundaries() {
 
 #[test]
 fn enforces_nested_floating_invariant_and_trowd_reset() {
-    let source = r#"{\rtf1\trowd\cellx5000\intbl\itap2 A\nestcell{\nesttableprops\trowd\tposx1\cellx1000\nestrow}\intbl\itap2 B\nestcell{\nesttableprops\trowd\cellx1000\nestrow}\itap1\cell\row}"#;
+    let source = r"{\rtf1\trowd\cellx5000\intbl\itap2 A\nestcell{\nesttableprops\trowd\tposx1\cellx1000\nestrow}\intbl\itap2 B\nestcell{\nesttableprops\trowd\cellx1000\nestrow}\itap1\cell\row}";
     assert!(RtfDocument::parse(source).is_err());
 }
 
@@ -135,7 +144,7 @@ fn enforces_nested_cell_cap() {
 
 #[test]
 fn retains_nested_table_in_implicit_outer_cell() {
-    let source = r#"{\rtf1\trowd\cellx5000\intbl\itap2 Inner\nestcell{\*\nesttableprops\itap2\trowd\cellx1000\nestrow}\intbl\itap1\row}"#;
+    let source = r"{\rtf1\trowd\cellx5000\intbl\itap2 Inner\nestcell{\*\nesttableprops\itap2\trowd\cellx1000\nestrow}\intbl\itap1\row}";
     let document = RtfDocument::parse(source).unwrap();
     let cells = document.tables()[0].rows()[0].cells();
     assert_eq!(cells.len(), 1);

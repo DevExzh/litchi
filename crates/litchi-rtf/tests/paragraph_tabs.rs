@@ -1,4 +1,14 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{MAX_PARAGRAPH_TAB_STOPS, RtfDocument, RtfWriter, TabAlignment, TabLeader};
+use std::fmt::Write as _;
 
 fn block<'a>(document: &'a RtfDocument<'a>, needle: &str) -> &'a litchi_rtf::StyleBlock<'a> {
     document
@@ -31,7 +41,7 @@ fn parses_libreoffice_paragraph_and_style_tab_fixture() {
         table
             .rows()
             .iter()
-            .flat_map(|row| row.cells())
+            .flat_map(litchi_rtf::raw::Row::cells)
             .any(|cell| cell.text().contains("A1"))
     }));
 
@@ -101,8 +111,8 @@ fn parses_inherits_resets_and_deterministically_writes_all_tab_forms() {
         r#"\tqr\tldot\tx720\tqc\tlmdot\tx1440\tqdec\tlhyph\tx2160"#,
         r#"\tlul\tb2880\tlth\tx3600\tleq\tx4320\tx5040"#,
     )));
-    assert!(!written.contains(r#"\tql"#));
-    assert!(!written.contains(r#"\tb\tx"#));
+    assert!(!written.contains(r"\tql"));
+    assert!(!written.contains(r"\tb\tx"));
 
     let reparsed = RtfDocument::parse(&written).unwrap();
     assert_eq!(
@@ -114,7 +124,7 @@ fn parses_inherits_resets_and_deterministically_writes_all_tab_forms() {
 #[test]
 fn parses_and_writes_tabs_in_paragraph_styles() {
     let document =
-        RtfDocument::parse(r#"{\rtf1{\stylesheet{\s30\tqr\tldot\tx2552 Body Text 3;}}Body}"#)
+        RtfDocument::parse(r"{\rtf1{\stylesheet{\s30\tqr\tldot\tx2552 Body Text 3;}}Body}")
             .unwrap();
     let tabs = document
         .stylesheet()
@@ -147,25 +157,25 @@ fn parses_and_writes_tabs_in_paragraph_styles() {
 #[test]
 fn rejects_malformed_and_over_limit_tab_definitions() {
     for source in [
-        r#"{\rtf1\tx X}"#,
-        r#"{\rtf1\tb X}"#,
-        r#"{\rtf1\tqr1\tx20 X}"#,
-        r#"{\rtf1\tldot0\tx20 X}"#,
-        r#"{\rtf1\tqr\tqc\tx20 X}"#,
-        r#"{\rtf1\tldot\tleq\tx20 X}"#,
-        r#"{\rtf1\tldot\tqr\tx20 X}"#,
-        r#"{\rtf1\tqr\tb20 X}"#,
-        r#"{\rtf1\tx2147483648 X}"#,
+        r"{\rtf1\tx X}",
+        r"{\rtf1\tb X}",
+        r"{\rtf1\tqr1\tx20 X}",
+        r"{\rtf1\tldot0\tx20 X}",
+        r"{\rtf1\tqr\tqc\tx20 X}",
+        r"{\rtf1\tldot\tleq\tx20 X}",
+        r"{\rtf1\tldot\tqr\tx20 X}",
+        r"{\rtf1\tqr\tb20 X}",
+        r"{\rtf1\tx2147483648 X}",
     ] {
         assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
     }
 
-    let mut over_limit = String::from(r#"{\rtf1"#);
+    let mut over_limit = String::from(r"{\rtf1");
     for position in 0..=MAX_PARAGRAPH_TAB_STOPS {
-        over_limit.push_str(&format!(r#"\tx{}"#, position * 20));
+        write!(over_limit, r"\tx{}", position * 20).unwrap();
     }
     over_limit.push_str(" X}");
     assert!(RtfDocument::parse(&over_limit).is_err());
 
-    assert!(RtfDocument::parse(r#"{\rtf1{\*\unknown\tqr1\tx\tlmdot0 ignored}Visible}"#,).is_ok());
+    assert!(RtfDocument::parse(r"{\rtf1{\*\unknown\tqr1\tx\tlmdot0 ignored}Visible}",).is_ok());
 }

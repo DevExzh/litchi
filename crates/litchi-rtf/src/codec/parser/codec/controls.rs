@@ -1,11 +1,40 @@
-use super::*;
+#![allow(
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    reason = "decoding steps deliberately rebind a working value as it is refined through the parse pipeline"
+)]
+use super::{
+    Alignment, CharacterType, ColorRef, ControlWord, Destination, FontRef, Formatting, Mbcs,
+    NonZeroU16, Paragraph, ParagraphFontAlignment, ParagraphWrapping, Parser, RevisionMetadata,
+    RtfEncoding, RtfError, RtfResult, TextDirection, UnderlineStyle, animated_text,
+    apply_associated_character_control, apply_table_distance, apply_table_distance_side,
+    character_grid, character_style_reference, character_type_selector, complex_script_selector,
+    emphasis_mark, fit_text, floating_table_offset, floating_table_wrap_distance,
+    nonnegative_author_index, paragraph_style_reference, parser_classification_error,
+    pending_cell_revision, require_parameterless, required_list_spacing, required_paragraph_bool,
+    required_paragraph_indent, resolve_preferred_width, resolve_row_geometry,
+    strict_paragraph_selector, strict_paragraph_toggle, table_geometry_twips, table_indent_unit,
+    table_row_height, table_style_reference, table_width_unit,
+};
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     /// Apply a control word to the current state.
     // This exhaustive state-transition table mirrors the RTF control-word
     // specification; splitting it would obscure coverage and precedence.
-    #[allow(clippy::too_many_lines)]
-    pub(super) fn apply_control_word(&mut self, control: &ControlWord) -> RtfResult<()> {
+    #[allow(
+        clippy::too_many_lines,
+        reason = "exhaustive control-word dispatch stays in one auditable table"
+    )]
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "match guards and adjacent range checks bound the narrowing conversions; raw color and font-size parameters wrap to 16 bits by design"
+    )]
+    pub(super) fn apply_control_word(&mut self, control: &ControlWord<'_>) -> RtfResult<()> {
         if let ControlWord::Page(parameter) = control {
             require_parameterless(*parameter, "page")?;
             return Err(RtfError::MalformedDocument(
@@ -66,7 +95,7 @@ impl<'a> Parser<'a> {
             let value = u16::try_from(parameter.ok_or_else(|| {
                 RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
             })?)
-            .map_err(|_| {
+            .map_err(|_err| {
                 RtfError::MalformedDocument(format!("RTF {name} value must be in 0..=65535"))
             })?;
             self.default_font_selectors_seen |= bit;
@@ -76,13 +105,13 @@ impl<'a> Parser<'a> {
                 ControlWord::AssociatedDefaultFont(_) => fonts.associated = Some(value),
                 ControlWord::StylesheetDefaultBidiFont(_) => fonts.stylesheet_bidi = Some(value),
                 ControlWord::StylesheetDefaultDoubleByteFont(_) => {
-                    fonts.stylesheet_double_byte = Some(value)
+                    fonts.stylesheet_double_byte = Some(value);
                 },
                 ControlWord::StylesheetDefaultHighAnsiFont(_) => {
-                    fonts.stylesheet_high_ansi = Some(value)
+                    fonts.stylesheet_high_ansi = Some(value);
                 },
                 ControlWord::StylesheetDefaultLowAnsiFont(_) => {
-                    fonts.stylesheet_low_ansi = Some(value)
+                    fonts.stylesheet_low_ansi = Some(value);
                 },
                 _ => return Err(parser_classification_error()),
             }
@@ -99,7 +128,7 @@ impl<'a> Parser<'a> {
                     "RTF deftab requires a nonnegative numeric parameter".to_string(),
                 )
             })?;
-            let value = u32::try_from(value).map_err(|_| {
+            let value = u32::try_from(value).map_err(|_err| {
                 RtfError::MalformedDocument(
                     "RTF deftab requires a nonnegative numeric parameter".to_string(),
                 )
@@ -134,7 +163,7 @@ impl<'a> Parser<'a> {
                     "RTF ksulang requires a nonnegative numeric parameter".to_string(),
                 )
             })?;
-            self.kinsoku.language = Some(u32::try_from(value).map_err(|_| {
+            self.kinsoku.language = Some(u32::try_from(value).map_err(|_err| {
                 RtfError::MalformedDocument(
                     "RTF ksulang requires a nonnegative numeric parameter".to_string(),
                 )
@@ -479,7 +508,7 @@ impl<'a> Parser<'a> {
                     self.print_layout_settings.mirror_margins = true;
                 },
                 ControlWord::DocumentGutter(Some(value @ 0..=31_680)) => {
-                    let value = *value as u32;
+                    let value = (*value).cast_unsigned();
                     self.print_layout_settings.document_gutter_twips = Some(value);
                     for (index, section) in self.sections.iter_mut().enumerate() {
                         if !self
@@ -488,7 +517,7 @@ impl<'a> Parser<'a> {
                             .copied()
                             .unwrap_or(false)
                         {
-                            section.properties.margin_gutter = value as i32;
+                            section.properties.margin_gutter = value.cast_signed();
                         }
                     }
                 },
@@ -840,7 +869,7 @@ impl<'a> Parser<'a> {
                         "RTF bookfoldsheets must be a nonnegative multiple of four".to_string(),
                     ));
                 }
-                self.booklet_printing.sheets_per_booklet = Some(*value as u32);
+                self.booklet_printing.sheets_per_booklet = Some((*value).cast_unsigned());
             } else {
                 match control {
                     ControlWord::BookFold(_) => self.booklet_printing.book_fold = true,
@@ -963,53 +992,53 @@ impl<'a> Parser<'a> {
             match control {
                 ControlWord::PreserveAutofitTableWidthAroundShapes(_) => {
                     self.word_2003_compatibility
-                        .preserve_autofit_table_width_around_shapes = true
+                        .preserve_autofit_table_width_around_shapes = true;
                 },
                 ControlWord::UseHangingIndentAsNumberingTab(_) => {
                     self.word_2003_compatibility
-                        .use_hanging_indent_as_numbering_tab = true
+                        .use_hanging_indent_as_numbering_tab = true;
                 },
                 ControlWord::UseLegacyKinsokuCharacters(_) => {
-                    self.word_2003_compatibility.use_legacy_kinsoku_characters = true
+                    self.word_2003_compatibility.use_legacy_kinsoku_characters = true;
                 },
                 ControlWord::UseLegacyFloatingObjectIndentation(_) => {
                     self.word_2003_compatibility
-                        .use_legacy_floating_object_indentation = true
+                        .use_legacy_floating_object_indentation = true;
                 },
                 ControlWord::AllowContextualSpacingInTables(_) => {
                     self.word_2003_compatibility
-                        .allow_contextual_spacing_in_tables = true
+                        .allow_contextual_spacing_in_tables = true;
                 },
                 ControlWord::IgnoreCellVerticalAlignmentWithFloatingObjects(_) => {
                     self.word_2003_compatibility
-                        .ignore_cell_vertical_alignment_with_floating_objects = true
+                        .ignore_cell_vertical_alignment_with_floating_objects = true;
                 },
                 ControlWord::IgnoreTextBoxVerticalAlignment(_) => {
                     self.word_2003_compatibility
-                        .ignore_text_box_vertical_alignment = true
+                        .ignore_text_box_vertical_alignment = true;
                 },
                 ControlWord::SplitPageBreakParagraph(_) => {
-                    self.word_2003_compatibility.split_page_break_paragraph = true
+                    self.word_2003_compatibility.split_page_break_paragraph = true;
                 },
                 ControlWord::UseFixedWidthHangul(_) => {
-                    self.word_2003_compatibility.use_fixed_width_hangul = true
+                    self.word_2003_compatibility.use_fixed_width_hangul = true;
                 },
                 ControlWord::UseLegacyAutofitWidthExpansion(_) => {
                     self.word_2003_compatibility
-                        .use_legacy_autofit_width_expansion = true
+                        .use_legacy_autofit_width_expansion = true;
                 },
                 ControlWord::UseCachedColumnBalancing(_) => {
-                    self.word_2003_compatibility.use_cached_column_balancing = true
+                    self.word_2003_compatibility.use_cached_column_balancing = true;
                 },
                 ControlWord::UnderlineNumberingSuffix(_) => {
-                    self.word_2003_compatibility.underline_numbering_suffix = true
+                    self.word_2003_compatibility.underline_numbering_suffix = true;
                 },
                 ControlWord::DoNotSplitRowsAroundFloatingTables(_) => {
                     self.word_2003_compatibility
-                        .do_not_split_rows_around_floating_tables = true
+                        .do_not_split_rows_around_floating_tables = true;
                 },
                 ControlWord::UseAnsiKerningPairs(_) => {
-                    self.word_2003_compatibility.use_ansi_kerning_pairs = true
+                    self.word_2003_compatibility.use_ansi_kerning_pairs = true;
                 },
                 _ => return Err(parser_classification_error()),
             }
@@ -1595,7 +1624,7 @@ impl<'a> Parser<'a> {
             let value = parameter.ok_or_else(|| {
                 RtfError::MalformedDocument("RTF itap requires a numeric parameter".to_string())
             })?;
-            let level = u8::try_from(value).map_err(|_| {
+            let level = u8::try_from(value).map_err(|_err| {
                 RtfError::MalformedDocument("RTF itap is outside 0..=32".to_string())
             })?;
             if usize::from(level) > crate::MAX_TABLE_NESTING_DEPTH {
@@ -1619,7 +1648,7 @@ impl<'a> Parser<'a> {
                         "RTF rsidroot must occur exactly once at document scope".to_string(),
                     ));
                 }
-                let value = u32::try_from(*value).map_err(|_| {
+                let value = u32::try_from(*value).map_err(|_err| {
                     RtfError::MalformedDocument(
                         "RTF revision root must be a positive signed integer".to_string(),
                     )
@@ -1987,7 +2016,7 @@ impl<'a> Parser<'a> {
                 state.formatting.character_style = Some(character_style_reference(*value)?);
             },
             ControlWord::FontNumber(n) => {
-                state.formatting.font_ref = FontRef::try_from(*n).map_err(|_| {
+                state.formatting.font_ref = FontRef::try_from(*n).map_err(|_err| {
                     RtfError::MalformedDocument("invalid RTF body font reference".to_string())
                 })?;
             },
@@ -2015,21 +2044,21 @@ impl<'a> Parser<'a> {
                 state.formatting.character_type = Some(character_type_selector(
                     *parameter,
                     "loch",
-                    crate::CharacterType::LowAnsi,
+                    CharacterType::LowAnsi,
                 )?);
             },
             ControlWord::HighAnsiCharacter(parameter) => {
                 state.formatting.character_type = Some(character_type_selector(
                     *parameter,
                     "hich",
-                    crate::CharacterType::HighAnsi,
+                    CharacterType::HighAnsi,
                 )?);
             },
             ControlWord::DoubleByteCharacter(parameter) => {
                 state.formatting.character_type = Some(character_type_selector(
                     *parameter,
                     "dbch",
-                    crate::CharacterType::DoubleByte,
+                    CharacterType::DoubleByte,
                 )?);
             },
             ControlWord::FontComplexScript(value) => {
@@ -2062,79 +2091,56 @@ impl<'a> Parser<'a> {
 
             // Character formatting
             ControlWord::InsertRsid(value) => {
-                state.formatting.insert_rsid = Some(*value as u32);
+                state.formatting.insert_rsid = Some((*value).cast_unsigned());
             },
             ControlWord::DeleteRsid(value) => {
-                state.formatting.delete_rsid = Some(*value as u32);
+                state.formatting.delete_rsid = Some((*value).cast_unsigned());
             },
             ControlWord::CharStyleRsid(value) => {
-                state.formatting.char_style_rsid = Some(*value as u32);
+                state.formatting.char_style_rsid = Some((*value).cast_unsigned());
             },
             ControlWord::Bold(b) => state.formatting.bold = *b,
             ControlWord::Italic(b) => state.formatting.italic = *b,
             ControlWord::Underline(b) => {
                 state.formatting.underline = if *b {
-                    super::super::super::types::UnderlineStyle::Single
+                    UnderlineStyle::Single
                 } else {
-                    super::super::super::types::UnderlineStyle::None
+                    UnderlineStyle::None
                 }
             },
-            ControlWord::UnderlineNone => {
-                state.formatting.underline = super::super::super::types::UnderlineStyle::None
-            },
-            ControlWord::UnderlineDouble => {
-                state.formatting.underline = super::super::super::types::UnderlineStyle::Double
-            },
-            ControlWord::UnderlineDotted => {
-                state.formatting.underline = super::super::super::types::UnderlineStyle::Dotted
-            },
-            ControlWord::UnderlineDashed => {
-                state.formatting.underline = super::super::super::types::UnderlineStyle::Dashed
-            },
-            ControlWord::UnderlineDashDot => {
-                state.formatting.underline = super::super::super::types::UnderlineStyle::DashDot
-            },
+            ControlWord::UnderlineNone => state.formatting.underline = UnderlineStyle::None,
+            ControlWord::UnderlineDouble => state.formatting.underline = UnderlineStyle::Double,
+            ControlWord::UnderlineDotted => state.formatting.underline = UnderlineStyle::Dotted,
+            ControlWord::UnderlineDashed => state.formatting.underline = UnderlineStyle::Dashed,
+            ControlWord::UnderlineDashDot => state.formatting.underline = UnderlineStyle::DashDot,
             ControlWord::UnderlineDashDotDot => {
-                state.formatting.underline = super::super::super::types::UnderlineStyle::DashDotDot
+                state.formatting.underline = UnderlineStyle::DashDotDot;
             },
-            ControlWord::UnderlineWords => {
-                state.formatting.underline = super::super::super::types::UnderlineStyle::Words
-            },
-            ControlWord::UnderlineThick => {
-                state.formatting.underline = super::super::super::types::UnderlineStyle::Thick
-            },
-            ControlWord::UnderlineWave => {
-                state.formatting.underline = super::super::super::types::UnderlineStyle::Wave
-            },
-            ControlWord::UnderlineHairline => {
-                state.formatting.underline = super::super::super::types::UnderlineStyle::Hairline
-            },
+            ControlWord::UnderlineWords => state.formatting.underline = UnderlineStyle::Words,
+            ControlWord::UnderlineThick => state.formatting.underline = UnderlineStyle::Thick,
+            ControlWord::UnderlineWave => state.formatting.underline = UnderlineStyle::Wave,
+            ControlWord::UnderlineHairline => state.formatting.underline = UnderlineStyle::Hairline,
             ControlWord::UnderlineThickDotted => {
-                state.formatting.underline = super::super::super::types::UnderlineStyle::ThickDotted
+                state.formatting.underline = UnderlineStyle::ThickDotted;
             },
             ControlWord::UnderlineThickDashed => {
-                state.formatting.underline = super::super::super::types::UnderlineStyle::ThickDashed
+                state.formatting.underline = UnderlineStyle::ThickDashed;
             },
             ControlWord::UnderlineThickDashDot => {
-                state.formatting.underline =
-                    super::super::super::types::UnderlineStyle::ThickDashDot
+                state.formatting.underline = UnderlineStyle::ThickDashDot;
             },
             ControlWord::UnderlineThickDashDotDot => {
-                state.formatting.underline =
-                    super::super::super::types::UnderlineStyle::ThickDashDotDot
+                state.formatting.underline = UnderlineStyle::ThickDashDotDot;
             },
             ControlWord::UnderlineThickLongDash => {
-                state.formatting.underline =
-                    super::super::super::types::UnderlineStyle::ThickLongDash
+                state.formatting.underline = UnderlineStyle::ThickLongDash;
             },
-            ControlWord::UnderlineLongDash => {
-                state.formatting.underline = super::super::super::types::UnderlineStyle::LongDash
-            },
+            ControlWord::UnderlineLongDash => state.formatting.underline = UnderlineStyle::LongDash,
             ControlWord::UnderlineHeavyWave => {
-                state.formatting.underline = super::super::super::types::UnderlineStyle::HeavyWave
+                state.formatting.underline = UnderlineStyle::HeavyWave;
             },
             ControlWord::UnderlineDoubleWave => {
-                state.formatting.underline = super::super::super::types::UnderlineStyle::DoubleWave
+                state.formatting.underline = UnderlineStyle::DoubleWave;
             },
             ControlWord::UnderlineColor(value) => {
                 state.formatting.underline_color = Some(Self::required_character_value(
@@ -2203,6 +2209,11 @@ impl<'a> Parser<'a> {
                 state.formatting.character_positioning.set_kerning(*n)?;
                 state.formatting.kerning = *n;
             },
+            #[allow(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                reason = "the raw control-word parameter wraps to 16 bits by design"
+            )]
             ControlWord::Highlight(c) => state.formatting.highlight_color = Some(*c as ColorRef),
             ControlWord::Plain => {
                 // Reset to default formatting
@@ -2221,7 +2232,7 @@ impl<'a> Parser<'a> {
                 state.paragraph.paragraph_style = Some(paragraph_style_reference(*value)?);
             },
             ControlWord::ParagraphRsid(value) => {
-                state.paragraph.paragraph_rsid = Some(*value as u32);
+                state.paragraph.paragraph_rsid = Some((*value).cast_unsigned());
             },
             ControlWord::ParagraphRevisionAuthor(value) => {
                 state.paragraph.revision.author = Some(nonnegative_author_index(*value, "prauth")?);
@@ -2269,19 +2280,19 @@ impl<'a> Parser<'a> {
             ControlWord::LineMultiple(b) => state.paragraph.spacing.line_multiple = *b,
             ControlWord::SpaceBeforeAuto(value) => {
                 state.paragraph.spacing_policy.automatic_before =
-                    required_paragraph_bool(*value, "sbauto")?
+                    required_paragraph_bool(*value, "sbauto")?;
             },
             ControlWord::SpaceAfterAuto(value) => {
                 state.paragraph.spacing_policy.automatic_after =
-                    required_paragraph_bool(*value, "saauto")?
+                    required_paragraph_bool(*value, "saauto")?;
             },
             ControlWord::ListSpaceBefore(value) => {
                 state.paragraph.spacing_policy.list_before =
-                    Some(required_list_spacing(*value, "lisb")?)
+                    Some(required_list_spacing(*value, "lisb")?);
             },
             ControlWord::ListSpaceAfter(value) => {
                 state.paragraph.spacing_policy.list_after =
-                    Some(required_list_spacing(*value, "lisa")?)
+                    Some(required_list_spacing(*value, "lisa")?);
             },
             ControlWord::NoSnapLineGrid(value) => {
                 strict_paragraph_selector(*value, "nosnaplinegrid")?;
@@ -2298,25 +2309,25 @@ impl<'a> Parser<'a> {
             ControlWord::FirstLineIndent(n) => state.paragraph.indentation.first_line = *n,
             ControlWord::LogicalLeftIndent(v) => {
                 state.paragraph.logical_indentation.start =
-                    Some(required_paragraph_indent(*v, "lin")?)
+                    Some(required_paragraph_indent(*v, "lin")?);
             },
             ControlWord::LogicalRightIndent(v) => {
                 state.paragraph.logical_indentation.end =
-                    Some(required_paragraph_indent(*v, "rin")?)
+                    Some(required_paragraph_indent(*v, "rin")?);
             },
             ControlWord::CharacterFirstLineIndent(v) => {
                 state
                     .paragraph
                     .logical_indentation
-                    .first_line_character_units = Some(required_paragraph_indent(*v, "cufi")?)
+                    .first_line_character_units = Some(required_paragraph_indent(*v, "cufi")?);
             },
             ControlWord::CharacterLeftIndent(v) => {
                 state.paragraph.logical_indentation.left_character_units =
-                    Some(required_paragraph_indent(*v, "culi")?)
+                    Some(required_paragraph_indent(*v, "culi")?);
             },
             ControlWord::CharacterRightIndent(v) => {
                 state.paragraph.logical_indentation.right_character_units =
-                    Some(required_paragraph_indent(*v, "curi")?)
+                    Some(required_paragraph_indent(*v, "curi")?);
             },
             ControlWord::MirrorIndents(v) => {
                 strict_paragraph_selector(*v, "indmirror")?;
@@ -2342,68 +2353,65 @@ impl<'a> Parser<'a> {
             },
             ControlWord::ParagraphHyphenation(value) => {
                 state.paragraph.line_breaking.automatic_hyphenation =
-                    strict_paragraph_toggle(*value, "hyphpar")?
+                    strict_paragraph_toggle(*value, "hyphpar")?;
             },
             ControlWord::AutoSpaceAlphabetic(value) => {
                 state.paragraph.line_breaking.auto_space_alphabetic =
-                    strict_paragraph_toggle(*value, "aspalpha")?
+                    strict_paragraph_toggle(*value, "aspalpha")?;
             },
             ControlWord::AutoSpaceNumbers(value) => {
                 state.paragraph.line_breaking.auto_space_numbers =
-                    strict_paragraph_toggle(*value, "aspnum")?
+                    strict_paragraph_toggle(*value, "aspnum")?;
             },
             ControlWord::AdjustRightIndent(value) => {
                 state.paragraph.line_breaking.adjust_right_indent =
-                    strict_paragraph_toggle(*value, "adjustright")?
+                    strict_paragraph_toggle(*value, "adjustright")?;
             },
             ControlWord::WrapDefault(value) => {
                 strict_paragraph_selector(*value, "wrapdefault")?;
-                state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::Default;
+                state.paragraph.line_breaking.wrapping = ParagraphWrapping::Default;
             },
             ControlWord::NoCharacterWrap(value) => {
                 strict_paragraph_selector(*value, "nocwrap")?;
-                state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::NoCharacterWrap;
+                state.paragraph.line_breaking.wrapping = ParagraphWrapping::NoCharacterWrap;
             },
             ControlWord::NoWordWrap(value) => {
                 strict_paragraph_selector(*value, "nowwrap")?;
-                state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::NoWordWrap;
+                state.paragraph.line_breaking.wrapping = ParagraphWrapping::NoWordWrap;
             },
             ControlWord::NoOverflow(value) => {
                 strict_paragraph_selector(*value, "nooverflow")?;
-                state.paragraph.line_breaking.wrapping = crate::ParagraphWrapping::NoOverflow;
+                state.paragraph.line_breaking.wrapping = ParagraphWrapping::NoOverflow;
             },
             ControlWord::FontAlignAuto(value) => {
                 strict_paragraph_selector(*value, "faauto")?;
-                state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Auto;
+                state.paragraph.line_breaking.font_alignment = ParagraphFontAlignment::Auto;
             },
             ControlWord::FontAlignHanging(value) => {
                 strict_paragraph_selector(*value, "fahang")?;
-                state.paragraph.line_breaking.font_alignment =
-                    crate::ParagraphFontAlignment::Hanging;
+                state.paragraph.line_breaking.font_alignment = ParagraphFontAlignment::Hanging;
             },
             ControlWord::FontAlignCenter(value) => {
                 strict_paragraph_selector(*value, "facenter")?;
-                state.paragraph.line_breaking.font_alignment =
-                    crate::ParagraphFontAlignment::Center;
+                state.paragraph.line_breaking.font_alignment = ParagraphFontAlignment::Center;
             },
             ControlWord::FontAlignRoman(value) => {
                 strict_paragraph_selector(*value, "faroman")?;
-                state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Roman;
+                state.paragraph.line_breaking.font_alignment = ParagraphFontAlignment::Roman;
             },
             ControlWord::FontAlignVariable(value) => {
                 strict_paragraph_selector(*value, "favar")?;
-                state.paragraph.line_breaking.font_alignment =
-                    crate::ParagraphFontAlignment::Variable;
+                state.paragraph.line_breaking.font_alignment = ParagraphFontAlignment::Variable;
             },
             ControlWord::FontAlignFixed(value) => {
                 strict_paragraph_selector(*value, "fafixed")?;
-                state.paragraph.line_breaking.font_alignment = crate::ParagraphFontAlignment::Fixed;
+                state.paragraph.line_breaking.font_alignment = ParagraphFontAlignment::Fixed;
             },
             ControlWord::ListOverrideIndex(value) => {
                 state.paragraph.list_override = Some(*value);
             },
             ControlWord::ListLevelIndex(value) => {
-                let level = u8::try_from(*value).map_err(|_| {
+                let level = u8::try_from(*value).map_err(|_err| {
                     RtfError::MalformedDocument(
                         "RTF paragraph list level is outside the supported range".to_string(),
                     )
@@ -2544,7 +2552,7 @@ impl<'a> Parser<'a> {
                     state.destination,
                     Destination::DocumentBody | Destination::NestedTableProperties
                 ) {
-                    state.table_rsid = Some(*value as u32);
+                    state.table_rsid = Some((*value).cast_unsigned());
                 }
             },
             ControlWord::TableRowRevisionAuthor(value) => {
@@ -2569,22 +2577,22 @@ impl<'a> Parser<'a> {
                 state.cell_boundaries.clear();
                 state.table_style = None;
                 state.table_rsid = None;
-                state.table_row_padding = Default::default();
-                state.table_row_spacing = Default::default();
-                state.table_row_positioning = Default::default();
+                state.table_row_padding = crate::TableEdgeDistances::default();
+                state.table_row_spacing = crate::TableEdgeDistances::default();
+                state.table_row_positioning = crate::FloatingTablePosition::default();
                 state.table_row_direction = None;
-                state.table_row_layout = Default::default();
-                state.table_row_borders = Default::default();
-                state.table_row_shading = Default::default();
-                state.table_row_geometry = Default::default();
-                state.table_default_borders = Default::default();
-                state.table_default_padding = Default::default();
-                state.table_default_spacing = Default::default();
+                state.table_row_layout = crate::TableRowLayout::default();
+                state.table_row_borders = crate::TableRowBorders::default();
+                state.table_row_shading = crate::TableShading::default();
+                state.table_row_geometry = crate::TableRowGeometry::default();
+                state.table_default_borders = crate::TableStyleDefaultBorders::default();
+                state.table_default_padding = crate::TableEdgeDistances::default();
+                state.table_default_spacing = crate::TableEdgeDistances::default();
                 state.table_default_width_unit = None;
                 state.table_default_width_value = None;
-                state.table_autoformat_flags = Default::default();
-                state.table_row_banding = Default::default();
-                state.table_row_revision = Default::default();
+                state.table_autoformat_flags = crate::TableAutoformatFlags::default();
+                state.table_row_banding = crate::TableRowBanding::default();
+                state.table_row_revision = RevisionMetadata::default();
                 state.table_row_index_seen = false;
                 state.table_row_band_index_seen = false;
                 state.table_last_row_seen = false;
@@ -2596,13 +2604,13 @@ impl<'a> Parser<'a> {
                 state.table_trailing_width_value = None;
                 state.table_indent_value = None;
                 state.table_indent_unit = None;
-                state.pending_cell_padding = Default::default();
-                state.pending_cell_spacing = Default::default();
-                state.pending_cell_layout = Default::default();
-                state.pending_cell_merge = Default::default();
+                state.pending_cell_padding = crate::TableEdgeDistances::default();
+                state.pending_cell_spacing = crate::TableEdgeDistances::default();
+                state.pending_cell_layout = crate::TableCellLayout::default();
+                state.pending_cell_merge = crate::TableCellMergeState::default();
                 state.pending_cell_revision = None;
-                state.pending_cell_borders = Default::default();
-                state.pending_cell_shading = Default::default();
+                state.pending_cell_borders = crate::TableCellBorders::default();
+                state.pending_cell_shading = crate::TableShading::default();
                 state.pending_cell_width_unit = None;
                 state.pending_cell_width_value = None;
                 state.table_row_shading_seen = 0;
@@ -2627,14 +2635,14 @@ impl<'a> Parser<'a> {
                     let row = &mut self.ensure_nested_builder(level)?.row;
                     row.set_table_style(None);
                     row.set_direction(None);
-                    row.set_layout(Default::default());
+                    row.set_layout(crate::TableRowLayout::default());
                 } else {
                     self.drain_nested_to(1)?;
                     self.start_table_if_needed();
                     if let Some(row) = &mut self.current_row {
                         row.set_table_style(None);
                         row.set_direction(None);
-                        row.set_layout(Default::default());
+                        row.set_layout(crate::TableRowLayout::default());
                     }
                 }
             },
@@ -2647,10 +2655,10 @@ impl<'a> Parser<'a> {
                 let value = value.ok_or_else(|| {
                     RtfError::MalformedDocument("RTF irow requires a numeric parameter".to_string())
                 })?;
-                state.table_row_banding.row_index = Some(u16::try_from(value).map_err(|_| {
+                state.table_row_banding.row_index = Some(u16::try_from(value).map_err(|_err| {
                     RtfError::MalformedDocument("RTF irow must be in 0..=65535".to_string())
                 })?);
-                state.table_row_index_seen = true
+                state.table_row_index_seen = true;
             },
             ControlWord::TableRowBandIndex(value) => {
                 if state.table_row_band_index_seen {
@@ -2666,13 +2674,13 @@ impl<'a> Parser<'a> {
                 state.table_row_banding.band_index = Some(if value == -1 {
                     crate::TableRowBandIndex::Header
                 } else {
-                    crate::TableRowBandIndex::Row(u16::try_from(value).map_err(|_| {
+                    crate::TableRowBandIndex::Row(u16::try_from(value).map_err(|_err| {
                         RtfError::MalformedDocument(
                             "RTF irowband must be -1 or in 0..=65535".to_string(),
                         )
                     })?)
                 });
-                state.table_row_band_index_seen = true
+                state.table_row_band_index_seen = true;
             },
             ControlWord::TableLastRow(param) => {
                 require_parameterless(*param, "lastrow")?;
@@ -2682,7 +2690,7 @@ impl<'a> Parser<'a> {
                     ));
                 }
                 state.table_row_banding.last_row = true;
-                state.table_last_row_seen = true
+                state.table_last_row_seen = true;
             },
             ControlWord::TableAutoformatFlag(flag, param) => {
                 require_parameterless(*param, "table autoformat flag")?;
@@ -2694,11 +2702,11 @@ impl<'a> Parser<'a> {
             },
             ControlWord::LeftToRightRow(param) => {
                 require_parameterless(*param, "ltrrow")?;
-                state.table_row_direction = Some(TextDirection::LeftToRight)
+                state.table_row_direction = Some(TextDirection::LeftToRight);
             },
             ControlWord::RightToLeftRow(param) => {
                 require_parameterless(*param, "rtlrow")?;
-                state.table_row_direction = Some(TextDirection::RightToLeft)
+                state.table_row_direction = Some(TextDirection::RightToLeft);
             },
             ControlWord::TableRowGap(param) => {
                 let value = table_geometry_twips(*param, "trgaph", false)?;
@@ -2785,7 +2793,7 @@ impl<'a> Parser<'a> {
                             "RTF trautofit accepts only 0 or 1".to_string(),
                         ));
                     },
-                })
+                });
             },
             ControlWord::TableIndentValue(param) => {
                 let value = match param {
@@ -2808,39 +2816,39 @@ impl<'a> Parser<'a> {
             },
             ControlWord::TableRowHeader(param) => {
                 require_parameterless(*param, "trhdr")?;
-                state.table_row_layout.header = true
+                state.table_row_layout.header = true;
             },
             ControlWord::TableRowKeep(param) => {
                 require_parameterless(*param, "trkeep")?;
-                state.table_row_layout.keep_together = true
+                state.table_row_layout.keep_together = true;
             },
             ControlWord::TableRowKeepFollow(param) => {
                 require_parameterless(*param, "trkeepfollow")?;
-                state.table_row_layout.keep_with_following = true
+                state.table_row_layout.keep_with_following = true;
             },
             ControlWord::TableRowAlignment(value, param) => {
                 require_parameterless(*param, "table row alignment")?;
-                state.table_row_layout.alignment = Some(*value)
+                state.table_row_layout.alignment = Some(*value);
             },
             ControlWord::TableCellVerticalAlignment(value, param) => {
                 require_parameterless(*param, "cell vertical alignment")?;
-                state.pending_cell_layout.vertical_alignment = Some(*value)
+                state.pending_cell_layout.vertical_alignment = Some(*value);
             },
             ControlWord::TableCellTextFlow(value, param) => {
                 require_parameterless(*param, "cell text flow")?;
-                state.pending_cell_layout.text_flow = Some(*value)
+                state.pending_cell_layout.text_flow = Some(*value);
             },
             ControlWord::TableCellFitText(param) => {
                 require_parameterless(*param, "clFitText")?;
-                state.pending_cell_layout.fit_text = true
+                state.pending_cell_layout.fit_text = true;
             },
             ControlWord::TableCellNoWrap(param) => {
                 require_parameterless(*param, "clNoWrap")?;
-                state.pending_cell_layout.no_wrap = true
+                state.pending_cell_layout.no_wrap = true;
             },
             ControlWord::TableCellHideMark(param) => {
                 require_parameterless(*param, "clhidemark")?;
-                state.pending_cell_layout.hide_mark = true
+                state.pending_cell_layout.hide_mark = true;
             },
             ControlWord::TableCellMerge(axis, role, param) => {
                 require_parameterless(*param, "table cell merge")?;
@@ -2867,7 +2875,7 @@ impl<'a> Parser<'a> {
                 slot @ None => {
                     *slot = Some(crate::CellRevision {
                         kind: *kind,
-                        metadata: crate::RevisionMetadata::default(),
+                        metadata: RevisionMetadata::default(),
                     });
                 },
             },
@@ -2937,24 +2945,24 @@ impl<'a> Parser<'a> {
                 state.active_table_border_seen = 0;
             },
             ControlWord::TableDistanceValue(target, value) => {
-                apply_table_distance(state, *target, *value, false)?
+                apply_table_distance(state, *target, *value, false)?;
             },
             ControlWord::TableDistanceUnit(target, value) => {
-                apply_table_distance(state, *target, *value, true)?
+                apply_table_distance(state, *target, *value, true)?;
             },
             ControlWord::TableDefaultDistanceValue(kind, edge, value) => {
                 let distances = match kind {
                     crate::TableDistanceKind::Padding => &mut state.table_default_padding,
                     crate::TableDistanceKind::Spacing => &mut state.table_default_spacing,
                 };
-                apply_table_distance_side(distances, *edge, *value, false)?
+                apply_table_distance_side(distances, *edge, *value, false)?;
             },
             ControlWord::TableDefaultDistanceUnit(kind, edge, value) => {
                 let distances = match kind {
                     crate::TableDistanceKind::Padding => &mut state.table_default_padding,
                     crate::TableDistanceKind::Spacing => &mut state.table_default_spacing,
                 };
-                apply_table_distance_side(distances, *edge, *value, true)?
+                apply_table_distance_side(distances, *edge, *value, true)?;
             },
             ControlWord::TableDefaultCellWidthUnit(param) => {
                 let unit = table_width_unit(*param)?;
@@ -2980,7 +2988,7 @@ impl<'a> Parser<'a> {
                     Destination::DocumentBody | Destination::NestedTableProperties
                 ) {
                     require_parameterless(*param, "floating-table horizontal reference")?;
-                    state.table_row_positioning.horizontal_reference = Some(*value)
+                    state.table_row_positioning.horizontal_reference = Some(*value);
                 }
             },
             ControlWord::TableVerticalReference(value, param) => {
@@ -2989,7 +2997,7 @@ impl<'a> Parser<'a> {
                     Destination::DocumentBody | Destination::NestedTableProperties
                 ) {
                     require_parameterless(*param, "floating-table vertical reference")?;
-                    state.table_row_positioning.vertical_reference = Some(*value)
+                    state.table_row_positioning.vertical_reference = Some(*value);
                 }
             },
             ControlWord::TableHorizontalPosition(value, param) => {
@@ -2998,7 +3006,7 @@ impl<'a> Parser<'a> {
                     Destination::DocumentBody | Destination::NestedTableProperties
                 ) {
                     require_parameterless(*param, "floating-table horizontal position")?;
-                    state.table_row_positioning.horizontal_position = Some(*value)
+                    state.table_row_positioning.horizontal_position = Some(*value);
                 }
             },
             ControlWord::TableVerticalPosition(value, param) => {
@@ -3007,7 +3015,7 @@ impl<'a> Parser<'a> {
                     Destination::DocumentBody | Destination::NestedTableProperties
                 ) {
                     require_parameterless(*param, "floating-table vertical position")?;
-                    state.table_row_positioning.vertical_position = Some(*value)
+                    state.table_row_positioning.vertical_position = Some(*value);
                 }
             },
             ControlWord::TableHorizontalOffset(negative, param) => {
@@ -3020,7 +3028,7 @@ impl<'a> Parser<'a> {
                         crate::TableHorizontalPosition::NegativeOffset(value)
                     } else {
                         crate::TableHorizontalPosition::Offset(value)
-                    })
+                    });
                 }
             },
             ControlWord::TableVerticalOffset(negative, param) => {
@@ -3033,7 +3041,7 @@ impl<'a> Parser<'a> {
                         crate::TableVerticalPosition::NegativeOffset(value)
                     } else {
                         crate::TableVerticalPosition::Offset(value)
-                    })
+                    });
                 }
             },
             ControlWord::TableWrapDistance(edge, param) => {
@@ -3042,7 +3050,7 @@ impl<'a> Parser<'a> {
                     Destination::DocumentBody | Destination::NestedTableProperties
                 ) {
                     *state.table_row_positioning.wrap_distances.side_mut(*edge) =
-                        Some(floating_table_wrap_distance(*param)?)
+                        Some(floating_table_wrap_distance(*param)?);
                 }
             },
             ControlWord::TableNoOverlap(param) => {

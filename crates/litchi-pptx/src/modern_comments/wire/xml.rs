@@ -208,7 +208,7 @@ fn first_element_start(xml: &[u8]) -> Option<usize> {
     while let Some(relative) = xml[cursor..].iter().position(|byte| *byte == b'<') {
         let start = cursor + relative;
         let next = xml.get(start + 1).copied();
-        if !matches!(next, Some(b'?') | Some(b'!')) {
+        if !matches!(next, Some(b'?' | b'!')) {
             return Some(start);
         }
         cursor = start + 1;

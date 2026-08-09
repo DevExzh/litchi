@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::codec::decode;
 use super::model::{Chart, Frame, Graph, Info, Kind};
 use super::package::{classify, collect_frames, program_base};
@@ -76,12 +82,16 @@ fn payload_decoding_is_move_first_and_bounded() {
     let mut encoder = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
     encoder.write_all(&raw).expect("compress");
     let compressed = encoder.finish().expect("finish compression");
-    let decoded = decode(
-        storage(Compression::Zlib, raw.len() as u32, compressed),
+    let decoded_zlib = decode(
+        storage(
+            Compression::Zlib,
+            u32::try_from(raw.len()).expect("small test fixture"),
+            compressed,
+        ),
         Limits::default(),
     )
     .expect("compressed payload");
-    assert_eq!(decoded, raw);
+    assert_eq!(decoded_zlib, raw);
 
     let limits = Limits {
         max_package_bytes: 1024,
@@ -199,20 +209,20 @@ fn replacement_storage_preserves_compression_mode() {
     encoder.write_all(original).expect("compress source");
     let source = storage(
         Compression::Zlib,
-        original.len() as u32,
+        u32::try_from(original.len()).expect("small test fixture"),
         encoder.finish().expect("finish source compression"),
     );
     let replacement = b"replacement chart package with a new size".to_vec();
-    let encoded = super::codec::encode_storage(replacement.clone(), source.compression())
+    let encoded_storage = super::codec::encode_storage(replacement.clone(), source.compression())
         .expect("encode replacement");
 
-    assert_eq!(encoded.compression(), Compression::Zlib);
+    assert_eq!(encoded_storage.compression(), Compression::Zlib);
     assert_eq!(
-        encoded.declared_uncompressed_len(),
-        Some(replacement.len() as u32)
+        encoded_storage.declared_uncompressed_len(),
+        Some(u32::try_from(replacement.len()).expect("small test fixture"))
     );
     assert_eq!(
-        decode(encoded, Limits::default()).expect("decode replacement"),
+        decode(encoded_storage, Limits::default()).expect("decode replacement"),
         replacement
     );
 }

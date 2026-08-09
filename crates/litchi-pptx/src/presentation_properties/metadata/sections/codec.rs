@@ -1,6 +1,6 @@
-//! Typed, bounded support for PowerPoint 2010 presentation sections.
+//! Typed, bounded support for `PowerPoint` 2010 presentation sections.
 
-use super::model::*;
+use super::model::{List, Section};
 use crate::presentation_properties::metadata::escape_xml;
 use crate::{Error, Result};
 use quick_xml::encoding::Decoder;
@@ -23,6 +23,10 @@ const MAX_STRING_BYTES: usize = 1024 * 1024;
 
 impl Section {
     /// Serialize this `p14:section` element.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
     pub fn to_xml(&self) -> Result<String> {
         validate_section(self)?;
         let mut xml = String::with_capacity(256);
@@ -51,6 +55,10 @@ impl Section {
 
 impl List {
     /// Replace a section while retaining its stable GUID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace_by_id(&mut self, id: &str, mut replacement: Section) -> Result<()> {
         let target = self
             .get_by_id_mut(id)
@@ -63,6 +71,10 @@ impl List {
     /// Parse the section extension from a complete `p:presentation` document.
     ///
     /// Unrelated presentation extensions remain inert and are never evaluated.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_xml(xml: &[u8]) -> Result<Self> {
         if xml.len() > MAX_BYTES {
             return Err(invalid("presentation sections exceed 8 MiB"));
@@ -75,6 +87,10 @@ impl List {
     }
 
     /// Serialize the complete `p:extLst` fragment containing `p14:sectionLst`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
     pub fn to_xml(&self) -> Result<String> {
         if self.sections.is_empty() {
             return Ok(String::new());
@@ -362,7 +378,7 @@ fn parse_slide_id_list(node: &Node, total: &mut usize) -> Result<Vec<u32>> {
         expect(slide, &[P14], "sldId")?;
         let id = required_attr(slide, "id")?
             .parse::<u32>()
-            .map_err(|_| invalid("invalid section slide ID"))?;
+            .map_err(|_err| invalid("invalid section slide ID"))?;
         if id < 256 {
             return Err(invalid("section slide ID is below 256"));
         }
@@ -647,6 +663,11 @@ fn xml_error(error: impl std::fmt::Display) -> Error {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

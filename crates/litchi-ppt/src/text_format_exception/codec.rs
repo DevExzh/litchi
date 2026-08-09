@@ -112,107 +112,6 @@ pub(super) const TAB_STOP_LEN: usize = 4;
 /// (MS-PPT 2.2.20).
 pub(super) const MAX_PARA_SPACING_PERCENT: i16 = 13200;
 
-fn corrupted(message: impl Into<String>) -> Error {
-    Error::Corrupted(message.into())
-}
-
-fn read_u16(data: &[u8], offset: usize) -> u16 {
-    u16::from_le_bytes(data[offset..offset + 2].try_into().expect("length checked"))
-}
-
-fn read_i16(data: &[u8], offset: usize) -> i16 {
-    i16::from_le_bytes(data[offset..offset + 2].try_into().expect("length checked"))
-}
-
-fn read_u32(data: &[u8], offset: usize) -> u32 {
-    u32::from_le_bytes(data[offset..offset + 4].try_into().expect("length checked"))
-}
-
-fn require_bytes(data: &[u8], offset: usize, needed: usize, field: &str) -> Result<()> {
-    if data.len() < offset.saturating_add(needed) {
-        return Err(corrupted(format!("{field} is truncated")));
-    }
-    Ok(())
-}
-
-fn parse_alignment(value: u16) -> Result<ParagraphAlignment> {
-    match value {
-        0 => Ok(ParagraphAlignment::Left),
-        1 => Ok(ParagraphAlignment::Center),
-        2 => Ok(ParagraphAlignment::Right),
-        3 => Ok(ParagraphAlignment::Justify),
-        4 => Ok(ParagraphAlignment::Distributed),
-        5 => Ok(ParagraphAlignment::ThaiDistributed),
-        6 => Ok(ParagraphAlignment::JustifyLow),
-        _ => Err(corrupted("invalid TextAlignmentEnum value")),
-    }
-}
-
-const fn alignment_raw(alignment: ParagraphAlignment) -> u16 {
-    match alignment {
-        ParagraphAlignment::Left => 0,
-        ParagraphAlignment::Center => 1,
-        ParagraphAlignment::Right => 2,
-        ParagraphAlignment::Justify => 3,
-        ParagraphAlignment::Distributed => 4,
-        ParagraphAlignment::ThaiDistributed => 5,
-        ParagraphAlignment::JustifyLow => 6,
-    }
-}
-
-fn parse_font_alignment(value: u16) -> Result<ParagraphFontAlignment> {
-    match value {
-        0 => Ok(ParagraphFontAlignment::Roman),
-        1 => Ok(ParagraphFontAlignment::Hanging),
-        2 => Ok(ParagraphFontAlignment::Center),
-        3 => Ok(ParagraphFontAlignment::UpholdFixed),
-        _ => Err(corrupted("invalid TextFontAlignmentEnum value")),
-    }
-}
-
-const fn font_alignment_raw(alignment: ParagraphFontAlignment) -> u16 {
-    match alignment {
-        ParagraphFontAlignment::Roman => 0,
-        ParagraphFontAlignment::Hanging => 1,
-        ParagraphFontAlignment::Center => 2,
-        ParagraphFontAlignment::UpholdFixed => 3,
-    }
-}
-
-fn parse_text_direction(value: u16) -> Result<ParagraphTextDirection> {
-    match value {
-        0 => Ok(ParagraphTextDirection::LeftToRight),
-        1 => Ok(ParagraphTextDirection::RightToLeft),
-        _ => Err(corrupted("invalid TextDirectionEnum value")),
-    }
-}
-
-const fn text_direction_raw(direction: ParagraphTextDirection) -> u16 {
-    match direction {
-        ParagraphTextDirection::LeftToRight => 0,
-        ParagraphTextDirection::RightToLeft => 1,
-    }
-}
-
-fn parse_tab_alignment(value: u16) -> Result<ParagraphTabAlignment> {
-    match value {
-        0 => Ok(ParagraphTabAlignment::Left),
-        1 => Ok(ParagraphTabAlignment::Center),
-        2 => Ok(ParagraphTabAlignment::Right),
-        3 => Ok(ParagraphTabAlignment::Decimal),
-        _ => Err(corrupted("invalid TextTabTypeEnum value")),
-    }
-}
-
-const fn tab_alignment_raw(alignment: ParagraphTabAlignment) -> u16 {
-    match alignment {
-        ParagraphTabAlignment::Left => 0,
-        ParagraphTabAlignment::Center => 1,
-        ParagraphTabAlignment::Right => 2,
-        ParagraphTabAlignment::Decimal => 3,
-    }
-}
-
 impl TextCFException {
     /// Parse one `TextCFException` from the start of `data`.
     ///
@@ -346,6 +245,10 @@ impl TextCFException {
     }
 
     /// Parse a complete `TextCFExceptionAtom` record (MS-PPT 2.9.13).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_record(record: &Record) -> Result<Self> {
         if record.record_type != RecordType::TxCFStyleAtom
             || record.record_type_raw != TEXT_CF_EXCEPTION_TYPE
@@ -358,6 +261,10 @@ impl TextCFException {
     }
 
     /// Parse the whole payload of a `TextCFExceptionAtom`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(data: &[u8]) -> Result<Self> {
         let (exception, consumed) = Self::parse_prefix(data)?;
         if consumed != data.len() {
@@ -367,6 +274,11 @@ impl TextCFException {
     }
 
     /// Serialize the complete `TextCFExceptionAtom`, including its header.
+    #[must_use]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "a `TextCFException` payload contains only fixed-size fields, so its length is bounded far below `u32::MAX`"
+    )]
     pub fn to_bytes(&self) -> Vec<u8> {
         let payload = self.to_payload();
         let mut data = Vec::with_capacity(8 + payload.len());
@@ -593,6 +505,10 @@ impl TextPFException {
     }
 
     /// Serialize the structure without any record header or reserved field.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the tab-stop count is parsed from a `u16` length field and `TextPFException` fields are crate-private, so it cannot exceed `u16::MAX`"
+    )]
     pub(crate) fn to_payload(&self) -> Vec<u8> {
         let mut data = Vec::with_capacity(16);
         data.extend_from_slice(&self.masks.to_le_bytes());
@@ -652,6 +568,10 @@ impl TextPFException {
     }
 
     /// Parse a complete `TextPFExceptionAtom` record (MS-PPT 2.9.19).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_record(record: &Record) -> Result<Self> {
         if record.record_type != RecordType::TxPFStyleAtom
             || record.record_type_raw != TEXT_PF_EXCEPTION_TYPE
@@ -665,6 +585,10 @@ impl TextPFException {
 
     /// Parse the whole payload of a `TextPFExceptionAtom`, including its
     /// two reserved leading bytes, which must be zero (MS-PPT 2.9.19).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(data: &[u8]) -> Result<Self> {
         require_bytes(data, 0, 2, "TextPFExceptionAtom reserved")?;
         if read_u16(data, 0) != 0 {
@@ -678,6 +602,11 @@ impl TextPFException {
     }
 
     /// Serialize the complete `TextPFExceptionAtom`, including its header.
+    #[must_use]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "a `TextPFException` payload holds at most `u16::MAX` four-byte tab stops plus fixed-size fields, so its length is bounded far below `u32::MAX`"
+    )]
     pub fn to_bytes(&self) -> Vec<u8> {
         let payload = self.to_payload();
         let mut data = Vec::with_capacity(8 + 2 + payload.len());
@@ -698,4 +627,110 @@ fn parse_para_spacing(data: &[u8], offset: &mut usize, field: &str) -> Result<i1
         return Err(corrupted(format!("{field} is out of range")));
     }
     Ok(value)
+}
+
+fn corrupted(message: impl Into<String>) -> Error {
+    Error::Corrupted(message.into())
+}
+
+fn read_u16(data: &[u8], offset: usize) -> u16 {
+    u16::from_le_bytes([data[offset], data[offset + 1]])
+}
+
+fn read_i16(data: &[u8], offset: usize) -> i16 {
+    i16::from_le_bytes([data[offset], data[offset + 1]])
+}
+
+fn read_u32(data: &[u8], offset: usize) -> u32 {
+    u32::from_le_bytes([
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+    ])
+}
+
+fn require_bytes(data: &[u8], offset: usize, needed: usize, field: &str) -> Result<()> {
+    if data.len() < offset.saturating_add(needed) {
+        return Err(corrupted(format!("{field} is truncated")));
+    }
+    Ok(())
+}
+
+fn parse_alignment(value: u16) -> Result<ParagraphAlignment> {
+    match value {
+        0 => Ok(ParagraphAlignment::Left),
+        1 => Ok(ParagraphAlignment::Center),
+        2 => Ok(ParagraphAlignment::Right),
+        3 => Ok(ParagraphAlignment::Justify),
+        4 => Ok(ParagraphAlignment::Distributed),
+        5 => Ok(ParagraphAlignment::ThaiDistributed),
+        6 => Ok(ParagraphAlignment::JustifyLow),
+        _ => Err(corrupted("invalid TextAlignmentEnum value")),
+    }
+}
+
+const fn alignment_raw(alignment: ParagraphAlignment) -> u16 {
+    match alignment {
+        ParagraphAlignment::Left => 0,
+        ParagraphAlignment::Center => 1,
+        ParagraphAlignment::Right => 2,
+        ParagraphAlignment::Justify => 3,
+        ParagraphAlignment::Distributed => 4,
+        ParagraphAlignment::ThaiDistributed => 5,
+        ParagraphAlignment::JustifyLow => 6,
+    }
+}
+
+fn parse_font_alignment(value: u16) -> Result<ParagraphFontAlignment> {
+    match value {
+        0 => Ok(ParagraphFontAlignment::Roman),
+        1 => Ok(ParagraphFontAlignment::Hanging),
+        2 => Ok(ParagraphFontAlignment::Center),
+        3 => Ok(ParagraphFontAlignment::UpholdFixed),
+        _ => Err(corrupted("invalid TextFontAlignmentEnum value")),
+    }
+}
+
+const fn font_alignment_raw(alignment: ParagraphFontAlignment) -> u16 {
+    match alignment {
+        ParagraphFontAlignment::Roman => 0,
+        ParagraphFontAlignment::Hanging => 1,
+        ParagraphFontAlignment::Center => 2,
+        ParagraphFontAlignment::UpholdFixed => 3,
+    }
+}
+
+fn parse_text_direction(value: u16) -> Result<ParagraphTextDirection> {
+    match value {
+        0 => Ok(ParagraphTextDirection::LeftToRight),
+        1 => Ok(ParagraphTextDirection::RightToLeft),
+        _ => Err(corrupted("invalid TextDirectionEnum value")),
+    }
+}
+
+const fn text_direction_raw(direction: ParagraphTextDirection) -> u16 {
+    match direction {
+        ParagraphTextDirection::LeftToRight => 0,
+        ParagraphTextDirection::RightToLeft => 1,
+    }
+}
+
+fn parse_tab_alignment(value: u16) -> Result<ParagraphTabAlignment> {
+    match value {
+        0 => Ok(ParagraphTabAlignment::Left),
+        1 => Ok(ParagraphTabAlignment::Center),
+        2 => Ok(ParagraphTabAlignment::Right),
+        3 => Ok(ParagraphTabAlignment::Decimal),
+        _ => Err(corrupted("invalid TextTabTypeEnum value")),
+    }
+}
+
+const fn tab_alignment_raw(alignment: ParagraphTabAlignment) -> u16 {
+    match alignment {
+        ParagraphTabAlignment::Left => 0,
+        ParagraphTabAlignment::Center => 1,
+        ParagraphTabAlignment::Right => 2,
+        ParagraphTabAlignment::Decimal => 3,
+    }
 }

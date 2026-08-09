@@ -1,8 +1,8 @@
-//! PresentationML color-map parsing and resolution.
+//! `PresentationML` color-map parsing and resolution.
 
 use std::ops::Range;
 
-use super::model::*;
+use super::model::{Map, Override, Role, Slot, Value};
 use crate::presentation_properties::metadata::is_presentationml_name;
 use crate::{Error, Result};
 use litchi_ooxml_common::mce::process_ooxml;
@@ -232,7 +232,7 @@ fn mapped_value(value: &Value) -> Option<Map> {
     match value {
         Value::Master(map) => Some(*map),
         Value::Override(Some(Override::Override(map))) => Some(*map),
-        Value::Override(None) | Value::Override(Some(Override::Master)) => None,
+        Value::Override(None | Some(Override::Master)) => None,
     }
 }
 
@@ -419,7 +419,7 @@ fn apply_replacements(source: &[u8], mut replacements: Vec<Replacement>) -> Resu
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| Error::Invalid("color-map XML offset does not fit usize".to_string()))
+        .map_err(|_err| Error::Invalid("color-map XML offset does not fit usize".to_string()))
 }
 
 impl Role {
@@ -465,6 +465,9 @@ impl Map {
     }
 }
 
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_master(xml: &[u8]) -> Result<Map> {
     let xml = process_ooxml(xml)?;
     let mut reader = NsReader::from_reader(xml.as_ref());
@@ -535,6 +538,9 @@ pub fn parse_master(xml: &[u8]) -> Result<Map> {
     color_map.ok_or_else(|| Error::Invalid("slide master is missing its color map".to_string()))
 }
 
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_override(xml: &[u8], root_name: &[u8], root_label: &str) -> Result<Option<Override>> {
     let xml = process_ooxml(xml)?;
     let mut reader = NsReader::from_reader(xml.as_ref());
@@ -693,6 +699,11 @@ fn required_role(
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use crate::shape::theme::{Color as ThemeColor, Palette, Slot as ThemeSlot};

@@ -1,14 +1,28 @@
 //! RTF table output.
 
-use super::super::*;
+#![allow(
+    clippy::shadow_reuse,
+    reason = "serialization helpers deliberately rebind a working value as the output is assembled"
+)]
+use super::super::{
+    Border, BorderStyle, Cell, CellStoryEvent, Field, FieldOwner, FloatingTablePosition,
+    MAX_TABLE_CELLS_PER_ROW, MAX_TABLE_NESTING_DEPTH, NavigationEntry, Revision, RevisionType, Row,
+    RtfWriter, ShadingPattern, StoryDrawing, Table, TableAutoformatFlag, TableCellBorders,
+    TableCellMergeRole, TableCellTextFlow, TableCellVerticalAlignment, TableDistanceUnit,
+    TableEdgeDistances, TableHorizontalPosition, TableHorizontalReference, TableIndentUnit,
+    TablePreferredWidth, TablePreferredWidthUnit, TableRowAlignment, TableRowBandIndex,
+    TableRowBorders, TableRowCellDefaults, TableRowGeometry, TableRowHeight, TableShading,
+    TableVerticalPosition, TableVerticalReference, TextDirection, Write, invalid_story_reference,
+    io,
+};
 
 impl<W: Write> RtfWriter<W> {
     /// Write a table
     pub(in super::super) fn write_table(
         &mut self,
-        table: &Table,
-        fields: &[crate::Field<'_>],
-        navigation_entries: &[crate::NavigationEntry<'_>],
+        table: &Table<'_>,
+        fields: &[Field<'_>],
+        navigation_entries: &[NavigationEntry<'_>],
         revisions: &[Revision<'_>],
     ) -> io::Result<()> {
         if let Some(first) = table.rows().first()
@@ -36,11 +50,11 @@ impl<W: Write> RtfWriter<W> {
     }
 
     pub(in super::super) fn validate_table_tree(
-        table: &Table,
+        table: &Table<'_>,
         depth: usize,
         count: &mut usize,
     ) -> io::Result<()> {
-        if depth > crate::MAX_TABLE_NESTING_DEPTH {
+        if depth > MAX_TABLE_NESTING_DEPTH {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "RTF table nesting exceeds 32 levels",
@@ -83,7 +97,7 @@ impl<W: Write> RtfWriter<W> {
             row.geometry()
                 .validate()
                 .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
-            if row.cell_count() > crate::MAX_TABLE_CELLS_PER_ROW {
+            if row.cell_count() > MAX_TABLE_CELLS_PER_ROW {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "RTF table row exceeds 4096 cells",
@@ -120,10 +134,10 @@ impl<W: Write> RtfWriter<W> {
     /// Write a table row
     pub(in super::super) fn write_table_row(
         &mut self,
-        row: &Row,
+        row: &Row<'_>,
         table_direction: Option<TextDirection>,
-        fields: &[crate::Field<'_>],
-        navigation_entries: &[crate::NavigationEntry<'_>],
+        fields: &[Field<'_>],
+        navigation_entries: &[NavigationEntry<'_>],
         revisions: &[Revision<'_>],
     ) -> io::Result<()> {
         // Row defaults
@@ -132,7 +146,7 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("ts", Some(i32::from(table_style)))?;
         }
         if let Some(table_rsid) = row.table_rsid() {
-            self.write_control_word("tblrsid", Some(table_rsid as i32))?;
+            self.write_control_word("tblrsid", Some(table_rsid.cast_signed()))?;
         }
         self.write_revision_metadata("trauth", "trdate", row.revision())?;
 
@@ -163,9 +177,13 @@ impl<W: Write> RtfWriter<W> {
             self.write_table_shading("cl", cell.shading())?;
             self.write_table_distances("clpad", "clpadf", cell.padding())?;
             self.write_table_distances("clspd", "clspdf", cell.spacing())?;
-            let boundary = cell
-                .right_boundary()
-                .unwrap_or(cell_width * ((i + 1) as i32));
+            let cell_index = i32::try_from(i + 1).map_err(|_err| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF table cell index exceeds the i32 range",
+                )
+            })?;
+            let boundary = cell.right_boundary().unwrap_or(cell_width * cell_index);
             self.write_control_word("cellx", Some(boundary))?;
         }
 
@@ -188,13 +206,13 @@ impl<W: Write> RtfWriter<W> {
 
     pub(in super::super) fn write_cell_content(
         &mut self,
-        cell: &crate::Cell<'_>,
+        cell: &Cell<'_>,
         depth: usize,
-        fields: &[crate::Field<'_>],
-        navigation_entries: &[crate::NavigationEntry<'_>],
+        fields: &[Field<'_>],
+        navigation_entries: &[NavigationEntry<'_>],
         revisions: &[Revision<'_>],
     ) -> io::Result<()> {
-        let field_owner_depth = u8::try_from(depth).map_err(|_| {
+        let field_owner_depth = u8::try_from(depth).map_err(|_err| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "RTF table nesting depth cannot be represented",
@@ -203,31 +221,31 @@ impl<W: Write> RtfWriter<W> {
         let mut offset = 0usize;
         for event in cell.story_events() {
             let position = match *event {
-                crate::CellStoryEvent::NestedTable(index) => {
+                CellStoryEvent::NestedTable(index) => {
                     cell.nested_tables()
                         .get(index)
                         .ok_or_else(invalid_story_reference)?
                         .text_offset
                 },
-                crate::CellStoryEvent::Drawing(crate::StoryDrawing::Shape(index)) => {
+                CellStoryEvent::Drawing(StoryDrawing::Shape(index)) => {
                     cell.shapes()
                         .get(index)
                         .ok_or_else(invalid_story_reference)?
                         .position
                 },
-                crate::CellStoryEvent::Drawing(crate::StoryDrawing::ShapeGroup(index)) => {
+                CellStoryEvent::Drawing(StoryDrawing::ShapeGroup(index)) => {
                     cell.shape_groups()
                         .get(index)
                         .ok_or_else(invalid_story_reference)?
                         .position
                 },
-                crate::CellStoryEvent::Field(field) => field.position,
-                crate::CellStoryEvent::PageBreak(page_break) => page_break.position,
-                crate::CellStoryEvent::ColumnBreak(column_break) => column_break.position,
-                crate::CellStoryEvent::NavigationEntry(reference)
-                | crate::CellStoryEvent::RevisionStart(reference)
-                | crate::CellStoryEvent::RevisionEnd(reference)
-                | crate::CellStoryEvent::RevisionDeletion(reference) => reference.position,
+                CellStoryEvent::Field(field) => field.position,
+                CellStoryEvent::PageBreak(page_break) => page_break.position,
+                CellStoryEvent::ColumnBreak(column_break) => column_break.position,
+                CellStoryEvent::NavigationEntry(reference)
+                | CellStoryEvent::RevisionStart(reference)
+                | CellStoryEvent::RevisionEnd(reference)
+                | CellStoryEvent::RevisionDeletion(reference) => reference.position,
             };
             let fragment = cell.text().get(offset..position).ok_or_else(|| {
                 io::Error::new(
@@ -237,7 +255,7 @@ impl<W: Write> RtfWriter<W> {
             })?;
             self.write_text(fragment)?;
             match *event {
-                crate::CellStoryEvent::NestedTable(index) => {
+                CellStoryEvent::NestedTable(index) => {
                     let nested = cell
                         .nested_tables()
                         .get(index)
@@ -256,25 +274,25 @@ impl<W: Write> RtfWriter<W> {
                         revisions,
                     )?;
                 },
-                crate::CellStoryEvent::Drawing(crate::StoryDrawing::Shape(index)) => {
+                CellStoryEvent::Drawing(StoryDrawing::Shape(index)) => {
                     let shape = cell
                         .shapes()
                         .get(index)
                         .ok_or_else(invalid_story_reference)?;
-                    self.write_root_shape(shape)?
+                    self.write_root_shape(shape)?;
                 },
-                crate::CellStoryEvent::Drawing(crate::StoryDrawing::ShapeGroup(index)) => {
+                CellStoryEvent::Drawing(StoryDrawing::ShapeGroup(index)) => {
                     let group = cell
                         .shape_groups()
                         .get(index)
                         .ok_or_else(invalid_story_reference)?;
-                    self.write_shape_group(group, true)?
+                    self.write_shape_group(group, true)?;
                 },
-                crate::CellStoryEvent::Field(reference) => {
+                CellStoryEvent::Field(reference) => {
                     let field = fields
                         .get(reference.field_index)
                         .filter(|field| {
-                            field.owner == crate::FieldOwner::TableCell(field_owner_depth)
+                            field.owner == FieldOwner::TableCell(field_owner_depth)
                                 && field.position == reference.position
                                 && field.range_end == reference.position
                         })
@@ -286,9 +304,9 @@ impl<W: Write> RtfWriter<W> {
                         })?;
                     self.write_field_with_fields(field, fields, 0)?;
                 },
-                crate::CellStoryEvent::PageBreak(_) => self.write_str("\\page ")?,
-                crate::CellStoryEvent::ColumnBreak(_) => self.write_str("\\column ")?,
-                crate::CellStoryEvent::NavigationEntry(reference) => {
+                CellStoryEvent::PageBreak(_) => self.write_str("\\page ")?,
+                CellStoryEvent::ColumnBreak(_) => self.write_str("\\column ")?,
+                CellStoryEvent::NavigationEntry(reference) => {
                     let entry = navigation_entries
                         .get(reference.index)
                         .filter(|entry| entry.position() == reference.position)
@@ -300,7 +318,7 @@ impl<W: Write> RtfWriter<W> {
                         })?;
                     self.write_navigation_entry(entry)?;
                 },
-                crate::CellStoryEvent::RevisionStart(reference) => {
+                CellStoryEvent::RevisionStart(reference) => {
                     let revision = revisions
                         .get(reference.index)
                         .filter(|revision| {
@@ -317,7 +335,7 @@ impl<W: Write> RtfWriter<W> {
                         })?;
                     self.write_revision_start(revision)?;
                 },
-                crate::CellStoryEvent::RevisionEnd(reference) => {
+                CellStoryEvent::RevisionEnd(reference) => {
                     revisions
                         .get(reference.index)
                         .filter(|revision| {
@@ -332,7 +350,7 @@ impl<W: Write> RtfWriter<W> {
                         })?;
                     self.write_str("}")?;
                 },
-                crate::CellStoryEvent::RevisionDeletion(reference) => {
+                CellStoryEvent::RevisionDeletion(reference) => {
                     let revision = revisions
                         .get(reference.index)
                         .filter(|revision| {
@@ -361,13 +379,13 @@ impl<W: Write> RtfWriter<W> {
 
     pub(in super::super) fn write_nested_table(
         &mut self,
-        table: &Table,
+        table: &Table<'_>,
         depth: usize,
-        fields: &[crate::Field<'_>],
-        navigation_entries: &[crate::NavigationEntry<'_>],
+        fields: &[Field<'_>],
+        navigation_entries: &[NavigationEntry<'_>],
         revisions: &[Revision<'_>],
     ) -> io::Result<()> {
-        let depth_value = i32::try_from(depth).map_err(|_| {
+        let depth_value = i32::try_from(depth).map_err(|_err| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "RTF table nesting depth cannot be represented",
@@ -391,7 +409,7 @@ impl<W: Write> RtfWriter<W> {
                 self.write_control_word("ts", Some(i32::from(table_style)))?;
             }
             if let Some(table_rsid) = row.table_rsid() {
-                self.write_control_word("tblrsid", Some(table_rsid as i32))?;
+                self.write_control_word("tblrsid", Some(table_rsid.cast_signed()))?;
             }
             self.write_revision_metadata("trauth", "trdate", row.revision())?;
             if let Some(direction) = table.direction() {
@@ -418,9 +436,15 @@ impl<W: Write> RtfWriter<W> {
                 self.write_table_shading("cl", cell.shading())?;
                 self.write_table_distances("clpad", "clpadf", cell.padding())?;
                 self.write_table_distances("clspd", "clspdf", cell.spacing())?;
+                let cell_index = i32::try_from(index + 1).map_err(|_err| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "RTF table cell index exceeds the i32 range",
+                    )
+                })?;
                 self.write_control_word(
                     "cellx",
-                    Some(cell.right_boundary().unwrap_or(2880 * ((index + 1) as i32))),
+                    Some(cell.right_boundary().unwrap_or(2880 * cell_index)),
                 )?;
             }
             self.write_control_word("nestrow", None)?;
@@ -437,7 +461,7 @@ impl<W: Write> RtfWriter<W> {
         &mut self,
         unit_control: &str,
         value_control: &str,
-        width: Option<crate::TablePreferredWidth>,
+        width: Option<TablePreferredWidth>,
     ) -> io::Result<()> {
         let Some(width) = width else { return Ok(()) };
         width
@@ -446,10 +470,10 @@ impl<W: Write> RtfWriter<W> {
         self.write_control_word(
             unit_control,
             Some(match width.unit() {
-                crate::TablePreferredWidthUnit::Null => 0,
-                crate::TablePreferredWidthUnit::Auto => 1,
-                crate::TablePreferredWidthUnit::Percent => 2,
-                crate::TablePreferredWidthUnit::Twips => 3,
+                TablePreferredWidthUnit::Null => 0,
+                TablePreferredWidthUnit::Auto => 1,
+                TablePreferredWidthUnit::Percent => 2,
+                TablePreferredWidthUnit::Twips => 3,
             }),
         )?;
         if let Some(value) = width.value() {
@@ -462,7 +486,7 @@ impl<W: Write> RtfWriter<W> {
         &mut self,
         unit_control: &str,
         value_control: &str,
-        width: Option<crate::TablePreferredWidth>,
+        width: Option<TablePreferredWidth>,
     ) -> io::Result<()> {
         let Some(width) = width else { return Ok(()) };
         width
@@ -471,10 +495,10 @@ impl<W: Write> RtfWriter<W> {
         self.write_control_word(
             unit_control,
             Some(match width.unit() {
-                crate::TablePreferredWidthUnit::Null => 0,
-                crate::TablePreferredWidthUnit::Auto => 1,
-                crate::TablePreferredWidthUnit::Percent => 2,
-                crate::TablePreferredWidthUnit::Twips => 3,
+                TablePreferredWidthUnit::Null => 0,
+                TablePreferredWidthUnit::Auto => 1,
+                TablePreferredWidthUnit::Percent => 2,
+                TablePreferredWidthUnit::Twips => 3,
             }),
         )?;
         if let Some(value) = width.value().filter(|value| *value != 0) {
@@ -485,7 +509,7 @@ impl<W: Write> RtfWriter<W> {
 
     pub(in super::super) fn write_table_row_geometry(
         &mut self,
-        geometry: crate::TableRowGeometry,
+        geometry: TableRowGeometry,
     ) -> io::Result<()> {
         geometry
             .validate()
@@ -497,12 +521,12 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("trleft", Some(value))?;
         }
         match geometry.height() {
-            crate::TableRowHeight::Automatic => {},
-            crate::TableRowHeight::Minimum(value) => {
-                self.write_control_word("trrh", Some(i32::from(value)))?
+            TableRowHeight::Automatic => {},
+            TableRowHeight::Minimum(value) => {
+                self.write_control_word("trrh", Some(i32::from(value)))?;
             },
-            crate::TableRowHeight::Exact(value) => {
-                self.write_control_word("trrh", Some(-i32::from(value)))?
+            TableRowHeight::Exact(value) => {
+                self.write_control_word("trrh", Some(-i32::from(value)))?;
             },
         }
         self.write_table_preferred_width("trftsWidth", "trwWidth", geometry.preferred_width())?;
@@ -524,10 +548,10 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word(
                 "tblindtype",
                 Some(match indent.unit() {
-                    crate::TableIndentUnit::Auto => 0,
-                    crate::TableIndentUnit::Twips => 1,
-                    crate::TableIndentUnit::Nil => 2,
-                    crate::TableIndentUnit::Percent => 3,
+                    TableIndentUnit::Auto => 0,
+                    TableIndentUnit::Twips => 1,
+                    TableIndentUnit::Nil => 2,
+                    TableIndentUnit::Percent => 3,
                 }),
             )?;
         }
@@ -538,9 +562,9 @@ impl<W: Write> RtfWriter<W> {
         if let Some(alignment) = row.layout().alignment {
             self.write_control_word(
                 match alignment {
-                    crate::TableRowAlignment::Left => "trql",
-                    crate::TableRowAlignment::Center => "trqc",
-                    crate::TableRowAlignment::Right => "trqr",
+                    TableRowAlignment::Left => "trql",
+                    TableRowAlignment::Center => "trqc",
+                    TableRowAlignment::Right => "trqr",
                 },
                 None,
             )?;
@@ -575,27 +599,24 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word(
                 "irowband",
                 Some(match value {
-                    crate::TableRowBandIndex::Header => -1,
-                    crate::TableRowBandIndex::Row(value) => i32::from(value),
+                    TableRowBandIndex::Header => -1,
+                    TableRowBandIndex::Row(value) => i32::from(value),
                 }),
             )?;
         }
         let flags = row.autoformat_flags();
         for (flag, word) in [
-            (crate::TableAutoformatFlag::Border, "tbllkborder"),
-            (crate::TableAutoformatFlag::Shading, "tbllkshading"),
-            (crate::TableAutoformatFlag::Font, "tbllkfont"),
-            (crate::TableAutoformatFlag::Color, "tbllkcolor"),
-            (crate::TableAutoformatFlag::BestFit, "tbllkbestfit"),
-            (crate::TableAutoformatFlag::HeaderRows, "tbllkhdrrows"),
-            (crate::TableAutoformatFlag::LastRow, "tbllklastrow"),
-            (crate::TableAutoformatFlag::HeaderColumns, "tbllkhdrcols"),
-            (crate::TableAutoformatFlag::LastColumn, "tbllklastcol"),
-            (crate::TableAutoformatFlag::NoRowBanding, "tbllknorowband"),
-            (
-                crate::TableAutoformatFlag::NoColumnBanding,
-                "tbllknocolband",
-            ),
+            (TableAutoformatFlag::Border, "tbllkborder"),
+            (TableAutoformatFlag::Shading, "tbllkshading"),
+            (TableAutoformatFlag::Font, "tbllkfont"),
+            (TableAutoformatFlag::Color, "tbllkcolor"),
+            (TableAutoformatFlag::BestFit, "tbllkbestfit"),
+            (TableAutoformatFlag::HeaderRows, "tbllkhdrrows"),
+            (TableAutoformatFlag::LastRow, "tbllklastrow"),
+            (TableAutoformatFlag::HeaderColumns, "tbllkhdrcols"),
+            (TableAutoformatFlag::LastColumn, "tbllklastcol"),
+            (TableAutoformatFlag::NoRowBanding, "tbllknorowband"),
+            (TableAutoformatFlag::NoColumnBanding, "tbllknocolband"),
         ] {
             if flags.contains(flag) {
                 self.write_control_word(word, None)?;
@@ -607,17 +628,14 @@ impl<W: Write> RtfWriter<W> {
         Ok(())
     }
 
-    pub(in super::super) fn write_table_cell_layout(
-        &mut self,
-        cell: &crate::Cell<'_>,
-    ) -> io::Result<()> {
+    pub(in super::super) fn write_table_cell_layout(&mut self, cell: &Cell<'_>) -> io::Result<()> {
         let layout = cell.layout();
         if let Some(alignment) = layout.vertical_alignment {
             self.write_control_word(
                 match alignment {
-                    crate::TableCellVerticalAlignment::Top => "clvertalt",
-                    crate::TableCellVerticalAlignment::Center => "clvertalc",
-                    crate::TableCellVerticalAlignment::Bottom => "clvertalb",
+                    TableCellVerticalAlignment::Top => "clvertalt",
+                    TableCellVerticalAlignment::Center => "clvertalc",
+                    TableCellVerticalAlignment::Bottom => "clvertalb",
                 },
                 None,
             )?;
@@ -625,11 +643,11 @@ impl<W: Write> RtfWriter<W> {
         if let Some(flow) = layout.text_flow {
             self.write_control_word(
                 match flow {
-                    crate::TableCellTextFlow::LeftToRightTopToBottom => "cltxlrtb",
-                    crate::TableCellTextFlow::RightToLeftTopToBottom => "cltxtbrl",
-                    crate::TableCellTextFlow::LeftToRightBottomToTop => "cltxbtlr",
-                    crate::TableCellTextFlow::LeftToRightTopToBottomVertical => "cltxlrtbv",
-                    crate::TableCellTextFlow::TopToBottomRightToLeftVertical => "cltxtbrlv",
+                    TableCellTextFlow::LeftToRightTopToBottom => "cltxlrtb",
+                    TableCellTextFlow::RightToLeftTopToBottom => "cltxtbrl",
+                    TableCellTextFlow::LeftToRightBottomToTop => "cltxbtlr",
+                    TableCellTextFlow::LeftToRightTopToBottomVertical => "cltxlrtbv",
+                    TableCellTextFlow::TopToBottomRightToLeftVertical => "cltxtbrlv",
                 },
                 None,
             )?;
@@ -646,16 +664,13 @@ impl<W: Write> RtfWriter<W> {
         Ok(())
     }
 
-    pub(in super::super) fn write_table_cell_merge(
-        &mut self,
-        cell: &crate::Cell<'_>,
-    ) -> io::Result<()> {
+    pub(in super::super) fn write_table_cell_merge(&mut self, cell: &Cell<'_>) -> io::Result<()> {
         let merge = cell.merge();
         if let Some(role) = merge.horizontal {
             self.write_control_word(
                 match role {
-                    crate::TableCellMergeRole::First => "clmgf",
-                    crate::TableCellMergeRole::Continuation => "clmrg",
+                    TableCellMergeRole::First => "clmgf",
+                    TableCellMergeRole::Continuation => "clmrg",
                 },
                 None,
             )?;
@@ -663,8 +678,8 @@ impl<W: Write> RtfWriter<W> {
         if let Some(role) = merge.vertical {
             self.write_control_word(
                 match role {
-                    crate::TableCellMergeRole::First => "clvmgf",
-                    crate::TableCellMergeRole::Continuation => "clvmrg",
+                    TableCellMergeRole::First => "clvmgf",
+                    TableCellMergeRole::Continuation => "clvmrg",
                 },
                 None,
             )?;
@@ -674,7 +689,7 @@ impl<W: Write> RtfWriter<W> {
 
     pub(in super::super) fn write_table_cell_revision(
         &mut self,
-        cell: &crate::Cell<'_>,
+        cell: &Cell<'_>,
     ) -> io::Result<()> {
         if let Some(revision) = cell.revision() {
             self.write_control_word(revision.kind.control_word(), None)?;
@@ -713,7 +728,7 @@ impl<W: Write> RtfWriter<W> {
     }
     pub(in super::super) fn write_table_row_borders(
         &mut self,
-        borders: &crate::TableRowBorders,
+        borders: &TableRowBorders,
     ) -> io::Result<()> {
         borders
             .validate()
@@ -734,7 +749,7 @@ impl<W: Write> RtfWriter<W> {
     }
     pub(in super::super) fn write_table_cell_borders(
         &mut self,
-        borders: &crate::TableCellBorders,
+        borders: &TableCellBorders,
     ) -> io::Result<()> {
         borders
             .validate()
@@ -755,7 +770,7 @@ impl<W: Write> RtfWriter<W> {
     }
     pub(in super::super) fn write_table_row_cell_defaults(
         &mut self,
-        defaults: &crate::TableRowCellDefaults,
+        defaults: &TableRowCellDefaults,
     ) -> io::Result<()> {
         defaults
             .validate()
@@ -785,10 +800,14 @@ impl<W: Write> RtfWriter<W> {
         Ok(())
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(in super::super) fn write_table_shading(
         &mut self,
         prefix: &str,
-        shading: crate::TableShading,
+        shading: TableShading,
     ) -> io::Result<()> {
         shading
             .validate()
@@ -804,18 +823,18 @@ impl<W: Write> RtfWriter<W> {
         }
         if let Some(pattern) = shading.pattern {
             let suffix = match pattern {
-                crate::ShadingPattern::Horizontal => "bghoriz",
-                crate::ShadingPattern::Vertical => "bgvert",
-                crate::ShadingPattern::ForwardDiagonal => "bgfdiag",
-                crate::ShadingPattern::BackwardDiagonal => "bgbdiag",
-                crate::ShadingPattern::Cross => "bgcross",
-                crate::ShadingPattern::DiagonalCross => "bgdcross",
-                crate::ShadingPattern::DarkHorizontal => "bgdkhor",
-                crate::ShadingPattern::DarkVertical => "bgdkvert",
-                crate::ShadingPattern::DarkForwardDiagonal => "bgdkfdiag",
-                crate::ShadingPattern::DarkBackwardDiagonal => "bgdkbdiag",
-                crate::ShadingPattern::DarkCross => "bgdkcross",
-                crate::ShadingPattern::DarkDiagonalCross => "bgdkdcross",
+                ShadingPattern::Horizontal => "bghoriz",
+                ShadingPattern::Vertical => "bgvert",
+                ShadingPattern::ForwardDiagonal => "bgfdiag",
+                ShadingPattern::BackwardDiagonal => "bgbdiag",
+                ShadingPattern::Cross => "bgcross",
+                ShadingPattern::DiagonalCross => "bgdcross",
+                ShadingPattern::DarkHorizontal => "bgdkhor",
+                ShadingPattern::DarkVertical => "bgdkvert",
+                ShadingPattern::DarkForwardDiagonal => "bgdkfdiag",
+                ShadingPattern::DarkBackwardDiagonal => "bgdkbdiag",
+                ShadingPattern::DarkCross => "bgdkcross",
+                ShadingPattern::DarkDiagonalCross => "bgdkdcross",
                 _ => {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidInput,
@@ -891,7 +910,7 @@ impl<W: Write> RtfWriter<W> {
 
     pub(in super::super) fn write_floating_table_position(
         &mut self,
-        position: &crate::FloatingTablePosition,
+        position: &FloatingTablePosition,
     ) -> io::Result<()> {
         position
             .validate()
@@ -899,47 +918,47 @@ impl<W: Write> RtfWriter<W> {
         if let Some(reference) = position.horizontal_reference {
             self.write_control_word(
                 match reference {
-                    crate::TableHorizontalReference::Column => "tphcol",
-                    crate::TableHorizontalReference::Margin => "tphmrg",
-                    crate::TableHorizontalReference::Page => "tphpg",
+                    TableHorizontalReference::Column => "tphcol",
+                    TableHorizontalReference::Margin => "tphmrg",
+                    TableHorizontalReference::Page => "tphpg",
                 },
                 None,
-            )?
+            )?;
         }
         if let Some(value) = position.horizontal_position {
             let (word, param) = match value {
-                crate::TableHorizontalPosition::Offset(value) => ("tposx", Some(value)),
-                crate::TableHorizontalPosition::NegativeOffset(value) => ("tposnegx", Some(value)),
-                crate::TableHorizontalPosition::Center => ("tposxc", None),
-                crate::TableHorizontalPosition::Inside => ("tposxi", None),
-                crate::TableHorizontalPosition::Left => ("tposxl", None),
-                crate::TableHorizontalPosition::Outside => ("tposxo", None),
-                crate::TableHorizontalPosition::Right => ("tposxr", None),
+                TableHorizontalPosition::Offset(value) => ("tposx", Some(value)),
+                TableHorizontalPosition::NegativeOffset(value) => ("tposnegx", Some(value)),
+                TableHorizontalPosition::Center => ("tposxc", None),
+                TableHorizontalPosition::Inside => ("tposxi", None),
+                TableHorizontalPosition::Left => ("tposxl", None),
+                TableHorizontalPosition::Outside => ("tposxo", None),
+                TableHorizontalPosition::Right => ("tposxr", None),
             };
-            self.write_control_word(word, param)?
+            self.write_control_word(word, param)?;
         }
         if let Some(reference) = position.vertical_reference {
             self.write_control_word(
                 match reference {
-                    crate::TableVerticalReference::Margin => "tpvmrg",
-                    crate::TableVerticalReference::Paragraph => "tpvpara",
-                    crate::TableVerticalReference::Page => "tpvpg",
+                    TableVerticalReference::Margin => "tpvmrg",
+                    TableVerticalReference::Paragraph => "tpvpara",
+                    TableVerticalReference::Page => "tpvpg",
                 },
                 None,
-            )?
+            )?;
         }
         if let Some(value) = position.vertical_position {
             let (word, param) = match value {
-                crate::TableVerticalPosition::Offset(value) => ("tposy", Some(value)),
-                crate::TableVerticalPosition::NegativeOffset(value) => ("tposnegy", Some(value)),
-                crate::TableVerticalPosition::Bottom => ("tposyb", None),
-                crate::TableVerticalPosition::Center => ("tposyc", None),
-                crate::TableVerticalPosition::Inline => ("tposyil", None),
-                crate::TableVerticalPosition::Inside => ("tposyin", None),
-                crate::TableVerticalPosition::Outside => ("tposyout", None),
-                crate::TableVerticalPosition::Top => ("tposyt", None),
+                TableVerticalPosition::Offset(value) => ("tposy", Some(value)),
+                TableVerticalPosition::NegativeOffset(value) => ("tposnegy", Some(value)),
+                TableVerticalPosition::Bottom => ("tposyb", None),
+                TableVerticalPosition::Center => ("tposyc", None),
+                TableVerticalPosition::Inline => ("tposyil", None),
+                TableVerticalPosition::Inside => ("tposyin", None),
+                TableVerticalPosition::Outside => ("tposyout", None),
+                TableVerticalPosition::Top => ("tposyt", None),
             };
-            self.write_control_word(word, param)?
+            self.write_control_word(word, param)?;
         }
         for (word, value) in [
             ("tdfrmtxtLeft", position.wrap_distances.left),
@@ -948,11 +967,11 @@ impl<W: Write> RtfWriter<W> {
             ("tdfrmtxtBottom", position.wrap_distances.bottom),
         ] {
             if let Some(value) = value {
-                self.write_control_word(word, Some(i32::from(value)))?
+                self.write_control_word(word, Some(i32::from(value)))?;
             }
         }
         if position.no_overlap {
-            self.write_control_word("tabsnoovrlp", None)?
+            self.write_control_word("tabsnoovrlp", None)?;
         }
         Ok(())
     }

@@ -27,7 +27,35 @@ pub(super) fn validate(record: &Record<'_>) -> Result<Layout> {
             Ok(Layout::Callout)
         },
         RecordKind::Unknown(_) => Ok(Layout::Opaque),
-        _ => Err(Error::MalformedShape {
+        RecordKind::DggContainer
+        | RecordKind::BStoreContainer
+        | RecordKind::DgContainer
+        | RecordKind::SpgrContainer
+        | RecordKind::SpContainer
+        | RecordKind::SolverContainer
+        | RecordKind::Dgg
+        | RecordKind::Bse
+        | RecordKind::Dg
+        | RecordKind::Spgr
+        | RecordKind::Sp
+        | RecordKind::Opt
+        | RecordKind::ClientTextbox
+        | RecordKind::ChildAnchor
+        | RecordKind::ClientAnchor
+        | RecordKind::ClientData
+        | RecordKind::AlignRule
+        | RecordKind::ClientRule
+        | RecordKind::BlipEmf
+        | RecordKind::BlipWmf
+        | RecordKind::BlipPict
+        | RecordKind::BlipJpeg
+        | RecordKind::BlipPng
+        | RecordKind::BlipDib
+        | RecordKind::BlipTiff
+        | RecordKind::ColorMru
+        | RecordKind::SplitMenuColors
+        | RecordKind::SecondaryOpt
+        | RecordKind::TertiaryOpt => Err(Error::MalformedShape {
             reason: "record is not an OfficeArt solver rule",
         }),
     }

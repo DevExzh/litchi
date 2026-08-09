@@ -14,6 +14,9 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load_from_package(package: &OpcPackage) -> Result<Option<Properties>> {
     let Some(uri) = find_properties_part(package)? else {
         return Ok(None);
@@ -25,6 +28,10 @@ pub fn load_from_package(package: &OpcPackage) -> Result<Option<Properties>> {
 }
 
 /// Read only the typed document-level math defaults.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load_math_from_package(
     package: &OpcPackage,
 ) -> Result<Option<crate::presentation_properties::math::Properties>> {
@@ -32,6 +39,10 @@ pub fn load_math_from_package(
 }
 
 /// Replace the typed document-level math defaults as one package transaction.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn put_math_to_package(
     package: &mut OpcPackage,
     value: crate::presentation_properties::math::Properties,
@@ -87,6 +98,10 @@ pub fn put_math_to_package(
 }
 
 /// Remove the typed document-level math defaults as one package transaction.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn remove_math_from_package(
     package: &mut OpcPackage,
 ) -> Result<Option<crate::presentation_properties::math::Properties>> {

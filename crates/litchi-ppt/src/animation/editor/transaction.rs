@@ -18,6 +18,13 @@ use std::collections::{BTreeSet, HashSet};
 use super::semantic::{ESCHER_CLIENT_DATA, ESCHER_SP, ESCHER_SP_CONTAINER};
 
 impl Editor {
+    /// Opens an animation editor over the persisted records of a package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `limits` is invalid, the package or one of its
+    /// persisted records is malformed, or the animation data exceeds the
+    /// configured limits.
     pub fn open(bytes: Vec<u8>, limits: EditorLimits) -> Result<Self> {
         validate_limits(limits)?;
         let package = ObjectEditor::open_records(bytes)?;
@@ -70,10 +77,12 @@ impl Editor {
         })
     }
 
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.changed
     }
 
+    #[must_use]
     pub fn timelines(&self) -> Vec<Timeline> {
         self.entries
             .iter()
@@ -85,6 +94,7 @@ impl Editor {
             .collect()
     }
 
+    #[must_use]
     pub fn find(&self, persist_id: u32) -> Option<Timeline> {
         self.entries
             .iter()
@@ -96,6 +106,7 @@ impl Editor {
             })
     }
 
+    #[must_use]
     pub fn legacy_shape_animations(&self) -> Vec<LegacyShapeAnimation> {
         self.entries
             .iter()
@@ -103,6 +114,7 @@ impl Editor {
             .collect()
     }
 
+    #[must_use]
     pub fn find_shape(&self, persist_id: u32, shape_id: u32) -> Option<LegacyShapeAnimation> {
         self.entries
             .iter()
@@ -112,6 +124,10 @@ impl Editor {
     }
 
     /// Adds a child to the root timing container at `index`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add(&mut self, persist_id: u32, index: usize, node: ExtendedTimeNode) -> Result<()> {
         let mut candidate = self.clone();
         let entry = candidate.entry_mut(persist_id)?;
@@ -127,6 +143,10 @@ impl Editor {
     }
 
     /// Updates one root child in place.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn update(&mut self, persist_id: u32, index: usize, node: ExtendedTimeNode) -> Result<()> {
         let mut candidate = self.clone();
         let entry = candidate.entry_mut(persist_id)?;
@@ -146,6 +166,10 @@ impl Editor {
     }
 
     /// Replaces the root timeline and build list atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace(
         &mut self,
         persist_id: u32,
@@ -161,6 +185,12 @@ impl Editor {
         Ok(())
     }
 
+    /// Removes the root timeline child at `index` and returns it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the persist ID is unknown, the timeline has no root
+    /// node, `index` is out of range, or the rewritten record fails validation.
     pub fn remove(&mut self, persist_id: u32, index: usize) -> Result<ExtendedTimeNode> {
         let mut candidate = self.clone();
         let entry = candidate.entry_mut(persist_id)?;
@@ -178,6 +208,13 @@ impl Editor {
         Ok(removed)
     }
 
+    /// Reorders the root timeline children according to `order`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the persist ID is unknown, the timeline has no root
+    /// node, `order` is not a permutation of every child index, or the
+    /// rewritten record fails validation.
     pub fn reorder(&mut self, persist_id: u32, order: &[usize]) -> Result<()> {
         let mut candidate = self.clone();
         let entry = candidate.entry_mut(persist_id)?;
@@ -203,6 +240,12 @@ impl Editor {
         Ok(())
     }
 
+    /// Inserts a build-list entry at `index`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the persist ID is unknown, `index` is out of range,
+    /// or the rewritten record fails validation.
     pub fn add_build(
         &mut self,
         persist_id: u32,
@@ -224,6 +267,13 @@ impl Editor {
         Ok(())
     }
 
+    /// Replaces the build-list entry at `index`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the persist ID is unknown, the slide/master has no
+    /// build list, `index` is out of range, or the rewritten record fails
+    /// validation.
     pub fn update_build(
         &mut self,
         persist_id: u32,
@@ -247,6 +297,13 @@ impl Editor {
         Ok(())
     }
 
+    /// Removes the build-list entry at `index` and returns it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the persist ID is unknown, the slide/master has no
+    /// build list, `index` is out of range, or the rewritten record fails
+    /// validation.
     pub fn remove_build(&mut self, persist_id: u32, index: usize) -> Result<BuildListEntry> {
         let mut candidate = self.clone();
         let entry = candidate.entry_mut(persist_id)?;
@@ -264,6 +321,13 @@ impl Editor {
         Ok(removed)
     }
 
+    /// Reorders the build list according to `order`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the persist ID is unknown, the slide/master has no
+    /// build list, `order` is not a permutation of every entry index, or the
+    /// rewritten record fails validation.
     pub fn reorder_builds(&mut self, persist_id: u32, order: &[usize]) -> Result<()> {
         let mut candidate = self.clone();
         let entry = candidate.entry_mut(persist_id)?;
@@ -289,6 +353,13 @@ impl Editor {
         Ok(())
     }
 
+    /// Replaces or clears the legacy `PowerPoint` 97 animation of one shape.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the persist ID is unknown, the target shape does not
+    /// exist, the animation fails serialization, or the shape's `OfficeArt`
+    /// container is missing or malformed.
     pub fn replace_shape_animation(
         &mut self,
         persist_id: u32,
@@ -321,13 +392,13 @@ impl Editor {
         candidate.entries[index]
             .legacy
             .retain(|value| value.shape_id != shape_id);
-        if let Some(animation) = animation {
+        if let Some(new_animation) = animation {
             let scope = candidate.entries[index].scope;
             candidate.entries[index].legacy.push(LegacyShapeAnimation {
                 persist_id,
                 scope,
                 shape_id,
-                animation,
+                animation: new_animation,
             });
             candidate.entries[index]
                 .legacy
@@ -338,6 +409,11 @@ impl Editor {
         Ok(())
     }
 
+    /// Finishes the transaction and returns the rewritten package bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the rewritten package cannot be serialized.
     pub fn finish(self) -> Result<Vec<u8>> {
         self.package.finish()
     }
@@ -610,7 +686,7 @@ pub(super) fn rewrite_shape_animation(
     rewrite_ppt_record(root, &mut |record| {
         if raw_type(record).ok() != Some(RecordType::PPDrawing.as_u16()) {
             return Ok(None);
-        };
+        }
         let (data, found) = rewrite_escher_shapes(&record[8..], shape_id, animation)?;
         if found {
             Ok(Some(rebuild_record(record, &data)?))
@@ -742,7 +818,7 @@ fn rebuild_record(record: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
         .to_vec();
     out.extend_from_slice(
         &u32::try_from(payload.len())
-            .map_err(|_| Error::InvalidFormat("record payload exceeds u32".into()))?
+            .map_err(|_err| Error::InvalidFormat("record payload exceeds u32".into()))?
             .to_le_bytes(),
     );
     out.extend_from_slice(payload);
@@ -767,7 +843,7 @@ fn record_bytes(version: u16, instance: u16, kind: u16, payload: &[u8]) -> Resul
     out.extend_from_slice(&kind.to_le_bytes());
     out.extend_from_slice(
         &u32::try_from(payload.len())
-            .map_err(|_| Error::InvalidFormat("record payload exceeds u32".into()))?
+            .map_err(|_err| Error::InvalidFormat("record payload exceeds u32".into()))?
             .to_le_bytes(),
     );
     out.extend_from_slice(payload);
@@ -795,9 +871,10 @@ fn raw_version(record: &[u8]) -> Result<u16> {
         .ok_or_else(|| Error::Corrupted("record version is truncated".into()))
 }
 fn u32_at(data: &[u8], offset: usize) -> Result<u32> {
-    data.get(offset..offset + 4)
-        .map(|v| u32::from_le_bytes(v.try_into().unwrap()))
-        .ok_or_else(|| Error::Corrupted("record u32 is truncated".into()))
+    let bytes = data
+        .get(offset..offset + 4)
+        .ok_or_else(|| Error::Corrupted("record u32 is truncated".into()))?;
+    Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
 }
 fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(Error::InvalidFormat(message.into()))

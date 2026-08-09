@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::{Address, CurrentRecipient, Slip, Text};
 use crate::records::Record;
 
@@ -58,11 +64,11 @@ fn routing_slip_preserves_recipient_order() {
 #[test]
 fn routing_slip_rejects_reserved_flags_and_bad_recipients() {
     let slip = Slip::new(Address::new(text("origin")), vec![], text(""), text("")).unwrap();
-    let mut record = slip.to_record().unwrap();
-    record.data[16..20].copy_from_slice(&0x08u32.to_le_bytes());
-    assert!(Slip::parse(&record).is_err());
+    let mut record_reserved_flag = slip.to_record().unwrap();
+    record_reserved_flag.data[16..20].copy_from_slice(&0x08u32.to_le_bytes());
+    assert!(Slip::parse(&record_reserved_flag).is_err());
 
-    let mut record = slip.to_record().unwrap();
-    record.data[12..16].copy_from_slice(&2u32.to_le_bytes());
-    assert!(Slip::parse(&record).is_err());
+    let mut record_bad_recipients = slip.to_record().unwrap();
+    record_bad_recipients.data[12..16].copy_from_slice(&2u32.to_le_bytes());
+    assert!(Slip::parse(&record_bad_recipients).is_err());
 }

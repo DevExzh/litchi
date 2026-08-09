@@ -641,14 +641,19 @@ impl Changes {
         validate_record_relations_at(index, &self.changes, ids)
     }
 
-    pub(crate) fn has_multi_deletion_groups(&self) -> bool {
+    #[must_use]
+    pub fn has_multi_deletion_groups(&self) -> bool {
         self.changes.iter().any(|change| {
             matches!(change, Change::Deletion(value) if value.multi_deletion_spanned.is_some())
         })
     }
 
     /// Validate a simultaneous-deletion group affected near one structural edit.
-    pub(crate) fn validate_multi_deletion_near(&self, index: usize) -> Result<()> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a value violates the format or resource constraints.
+    pub fn validate_multi_deletion_near(&self, index: usize) -> Result<()> {
         if self.changes.is_empty() {
             return Ok(());
         }
@@ -684,7 +689,11 @@ impl Changes {
 
     /// Fallibly clone a validated semantic graph without attacker-sized
     /// infallible string or vector allocations.
-    pub(crate) fn try_clone_with_limits(&self, limits: &Limits) -> Result<Self> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the clone would exceed the supplied limits.
+    pub fn try_clone_with_limits(&self, limits: &Limits) -> Result<Self> {
         let validated = self.validate_indexed_with_limits(limits)?;
         self.try_clone_validated_with_limits(&validated, limits)
     }

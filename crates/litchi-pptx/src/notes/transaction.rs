@@ -88,37 +88,44 @@ impl Snapshot {
         })
     }
 
-    /// The physical PresentationML part owning this graph.
+    /// The physical `PresentationML` part owning this graph.
+    #[must_use]
     pub fn presentation_part_name(&self) -> &PackURI {
         &self.presentation_part_name
     }
 
-    /// Exact source PresentationML bytes captured by this snapshot.
+    /// Exact source `PresentationML` bytes captured by this snapshot.
+    #[must_use]
     pub fn source_xml(&self) -> &[u8] {
         self.presentation.data.as_slice()
     }
 
     /// Borrow the validated semantic graph.
+    #[must_use]
     pub fn graph(&self) -> &Graph {
         &self.graph
     }
 
     /// Borrow the shared notes master.
+    #[must_use]
     pub fn master(&self) -> &super::model::Master {
         self.graph.master()
     }
 
-    /// Borrow notes slides in PresentationML order.
+    /// Borrow notes slides in `PresentationML` order.
+    #[must_use]
     pub fn slides(&self) -> &[super::model::Slide] {
         self.graph.slides()
     }
 
     /// Compact source revision used for optimistic stale checks.
+    #[must_use]
     pub const fn revision(&self) -> Revision {
         self.revision
     }
 
     /// Start a detached atomic edit over this snapshot.
+    #[must_use]
     pub fn edit(&self) -> Transaction {
         Transaction {
             source: self.clone(),
@@ -143,16 +150,19 @@ pub struct Transaction {
 
 impl Transaction {
     /// Borrow the immutable source snapshot used by this edit.
+    #[must_use]
     pub fn source(&self) -> &Snapshot {
         &self.source
     }
 
     /// Borrow the currently staged semantic graph.
+    #[must_use]
     pub fn graph(&self) -> &Graph {
         &self.working
     }
 
     /// Whether any staged resource bytes or graph metadata differ from source.
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.working != self.source.graph
     }
@@ -178,6 +188,10 @@ impl Transaction {
     }
 
     /// Replace one notes slide's inert text projection while preserving XML.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_text(&mut self, index: usize, text: impl AsRef<str>) -> Result<bool> {
         let text = text.as_ref();
         let slide = self
@@ -195,11 +209,19 @@ impl Transaction {
     }
 
     /// Alias emphasizing that text is owned by one notes slide.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_slide_text(&mut self, index: usize, text: impl AsRef<str>) -> Result<bool> {
         self.set_text(index, text)
     }
 
     /// Replace one notes slide's XML after bounded conformance validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace_slide_xml(&mut self, index: usize, xml: Vec<u8>) -> Result<bool> {
         let conformance = self.working.conformance();
         validate_resource_xml(&xml, MAX_NOTES_XML, conformance, "notes", "notes slide")?;
@@ -216,6 +238,10 @@ impl Transaction {
     }
 
     /// Replace the inert notes-master XML while retaining its relationships.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace_master_xml(&mut self, xml: Vec<u8>) -> Result<bool> {
         let conformance = self.working.conformance();
         validate_resource_xml(
@@ -233,6 +259,10 @@ impl Transaction {
     }
 
     /// Replace the inert notes-master theme XML while retaining all edges.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace_theme_xml(&mut self, xml: Vec<u8>) -> Result<bool> {
         let conformance = self.working.conformance();
         validate_resource_xml(&xml, MAX_THEME_XML, conformance, "theme", "notes theme")?;
@@ -244,6 +274,10 @@ impl Transaction {
     }
 
     /// Validate and consume this edit into a reversible source patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn commit(self) -> Result<Commit> {
         super::package::validate_graph(&self.working)?;
         let changed = self.is_changed();
@@ -272,6 +306,7 @@ impl Transaction {
     }
 
     /// Discard edits and recover the exact source snapshot.
+    #[must_use]
     pub fn rollback(self) -> Snapshot {
         self.source
     }
@@ -286,31 +321,37 @@ pub struct Commit {
 
 impl Commit {
     /// Snapshot expected after publication.
+    #[must_use]
     pub fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Source-checked patch represented by this commit.
+    #[must_use]
     pub fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Whether publication changes any captured graph bytes.
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         !self.patch.is_empty()
     }
 
     /// Alias for callers that prefer a verb-style result.
+    #[must_use]
     pub fn changed(&self) -> bool {
         self.is_changed()
     }
 
     /// Consume the commit into its target snapshot and patch.
+    #[must_use]
     pub fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
 
     /// Consume the commit into its patch.
+    #[must_use]
     pub fn into_patch(self) -> Patch {
         self.patch
     }
@@ -325,26 +366,31 @@ pub struct Patch {
 
 impl Patch {
     /// Snapshot required before forward application.
+    #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Snapshot expected after forward application.
+    #[must_use]
     pub fn after(&self) -> &Snapshot {
         &self.after
     }
 
     /// Whether this patch is an exact no-op.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
     /// Whether this patch changes the source graph.
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         !self.is_empty()
     }
 
     /// Return the exact inverse patch.
+    #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
@@ -353,6 +399,7 @@ impl Patch {
     }
 
     /// Source fingerprint required for publication.
+    #[must_use]
     pub const fn expected_revision(&self) -> Revision {
         self.before.revision
     }

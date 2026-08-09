@@ -1,4 +1,4 @@
-//! Office Binary Document RC4 CryptoAPI handling for legacy PowerPoint files.
+//! Office Binary Document RC4 `CryptoAPI` handling for legacy `PowerPoint` files.
 
 use super::current_user::CurrentUser;
 use super::package::{EncryptionKind, Error, RecordLimits, Result};
@@ -11,10 +11,10 @@ const USER_EDIT_TYPE: u16 = 4085;
 const CRYPT_SESSION_TYPE: u16 = 12052;
 const CRYPTO_API_PROVIDER: &str = "Microsoft Enhanced Cryptographic Provider v1.0";
 
-/// Password-to-open encryption profile for binary PowerPoint presentations.
+/// Password-to-open encryption profile for binary `PowerPoint` presentations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EncryptionProfile {
-    /// Office Binary Document CryptoAPI RC4/SHA-1 encryption.
+    /// Office Binary Document `CryptoAPI` RC4/SHA-1 encryption.
     CryptoApiRc4 {
         /// RC4 key size in bits. Supported values are 40 through 128 in steps of eight.
         key_bits: u16,
@@ -31,6 +31,11 @@ impl EncryptionProfile {
         }
         Ok(())
     }
+}
+
+pub(crate) struct WriterEncryptionMaterial {
+    pub session_record: Vec<u8>,
+    pub crypto: Context,
 }
 
 pub(crate) fn validate_writer_password(
@@ -50,11 +55,6 @@ pub(crate) fn validate_writer_password(
     Ok(())
 }
 
-pub(crate) struct WriterEncryptionMaterial {
-    pub session_record: Vec<u8>,
-    pub crypto: Context,
-}
-
 pub(crate) fn prepare_writer_encryption(
     profile: EncryptionProfile,
     password: &str,
@@ -63,10 +63,10 @@ pub(crate) fn prepare_writer_encryption(
     let EncryptionProfile::CryptoApiRc4 { key_bits } = profile;
     let mut salt = Zeroizing::new([0u8; 16]);
     let mut verifier = Zeroizing::new([0u8; 16]);
-    SysRng.try_fill_bytes(salt.as_mut()).map_err(|_| {
+    SysRng.try_fill_bytes(salt.as_mut()).map_err(|_err| {
         "operating-system randomness unavailable for PPT CryptoAPI salt".to_string()
     })?;
-    SysRng.try_fill_bytes(verifier.as_mut()).map_err(|_| {
+    SysRng.try_fill_bytes(verifier.as_mut()).map_err(|_err| {
         "operating-system randomness unavailable for PPT CryptoAPI verifier".to_string()
     })?;
     let (encryption_info, crypto) = office_rc4::build_header(
@@ -79,7 +79,7 @@ pub(crate) fn prepare_writer_encryption(
     )
     .map_err(|error| map_crypto_error(error).to_string())?;
     let data_len = u32::try_from(encryption_info.len())
-        .map_err(|_| "PPT CryptoAPI EncryptionInfo is too large".to_string())?;
+        .map_err(|_err| "PPT CryptoAPI EncryptionInfo is too large".to_string())?;
     let mut session_record = Vec::with_capacity(8 + encryption_info.len());
     session_record.extend_from_slice(&0x000fu16.to_le_bytes());
     session_record.extend_from_slice(&CRYPT_SESSION_TYPE.to_le_bytes());
@@ -119,7 +119,8 @@ pub(crate) fn encrypt_powerpoint_document_for_write(
         .get(user_edit_offset + 8..user_end)
         .ok_or_else(|| "PPT UserEditAtom is truncated".to_string())?;
     if le_u32(user_data, 8).map_err(|error| error.to_string())? != 0
-        || le_u32(user_data, 12).map_err(|error| error.to_string())? != directory_offset as u32
+        || usize::try_from(le_u32(user_data, 12).map_err(|error| error.to_string())?)
+            != Ok(directory_offset)
         || le_u32(user_data, 16).map_err(|error| error.to_string())? != 1
         || le_u32(user_data, 28).map_err(|error| error.to_string())? != session_id
     {
@@ -140,12 +141,12 @@ pub(crate) fn encrypt_powerpoint_document_for_write(
             .find_map(|&(id, offset)| (id == session_id).then_some(offset))
             .ok_or_else(|| "PPT encryption session has no persist mapping".to_string())?,
     )
-    .map_err(|_| "PPT encryption session offset does not fit in memory".to_string())?;
+    .map_err(|_err| "PPT encryption session offset does not fit in memory".to_string())?;
 
     let mut ranges = Vec::with_capacity(mappings.len());
     for &(persist_id, raw_offset) in &mappings {
         let offset = usize::try_from(raw_offset)
-            .map_err(|_| format!("PPT persist object {persist_id} offset is too large"))?;
+            .map_err(|_err| format!("PPT persist object {persist_id} offset is too large"))?;
         let header = record_header(document, offset).map_err(|error| error.to_string())?;
         let end = offset
             .checked_add(8 + header.data_len)
@@ -268,16 +269,6 @@ fn clear_picture_segments(data: &[u8]) -> std::result::Result<Vec<(usize, usize)
     Ok(segments)
 }
 
-fn checked_picture_segment(
-    offset: usize,
-    len: usize,
-    record_end: usize,
-) -> std::result::Result<(), String> {
-    if offset.checked_add(len).is_none_or(|end| end > record_end) {
-        return Err("PPT picture fields exceed their record".to_string());
-    }
-    Ok(())
-}
 pub(super) struct EncryptedPresentation {
     pub live_offsets: Vec<usize>,
     pub mappings: Vec<(u32, u32)>,
@@ -292,17 +283,27 @@ struct RecordHeader {
     data_len: usize,
 }
 
+fn checked_picture_segment(
+    offset: usize,
+    len: usize,
+    record_end: usize,
+) -> std::result::Result<(), String> {
+    if offset.checked_add(len).is_none_or(|end| end > record_end) {
+        return Err("PPT picture fields exceed their record".to_string());
+    }
+    Ok(())
+}
 pub(super) fn decrypt_powerpoint_document(
     document: &mut Vec<u8>,
     current_user_data: Option<&[u8]>,
     password: Option<&str>,
     limits: RecordLimits,
 ) -> Result<Option<EncryptedPresentation>> {
-    let Some(current_user_data) = current_user_data else {
+    let Some(current_user_bytes) = current_user_data else {
         return Ok(None);
     };
-    let current_user = CurrentUser::parse_with_limits(current_user_data, limits)?;
-    let user_edit_offset = usize::try_from(current_user.current_edit_offset()).map_err(|_| {
+    let current_user = CurrentUser::parse_with_limits(current_user_bytes, limits)?;
+    let user_edit_offset = usize::try_from(current_user.current_edit_offset()).map_err(|_err| {
         Error::MalformedEncryptionHeader("current edit offset does not fit in memory".to_string())
     })?;
     let user_edit = record_header(document, user_edit_offset)?;
@@ -327,19 +328,18 @@ pub(super) fn decrypt_powerpoint_document(
         user_edit.data_len,
         "UserEditAtom",
     )?;
-    let session_id = (user_edit.data_len == 32)
+    let session_id_field = (user_edit.data_len == 32)
         .then(|| le_u32(user_data, 28))
-        .transpose()?;
-    let session_id = session_id.filter(|id| *id != u32::MAX && *id != 0);
-    if session_id.is_none() {
+        .transpose()?
+        .filter(|id| *id != u32::MAX && *id != 0);
+    let Some(session_id) = session_id_field else {
         if current_user.is_encrypted() {
             return Err(Error::MalformedEncryptionHeader(
                 "encrypted CurrentUser has no encryption-session persist reference".to_string(),
             ));
         }
         return Ok(None);
-    }
-    let session_id = session_id.unwrap();
+    };
     if le_u32(user_data, 8)? != 0 {
         return Err(Error::MalformedEncryptionHeader(
             "encrypted presentation contains more than one UserEditAtom".to_string(),
@@ -350,7 +350,7 @@ pub(super) fn decrypt_powerpoint_document(
             "encrypted UserEditAtom has an invalid document persist identifier".to_string(),
         ));
     }
-    let directory_offset = usize::try_from(le_u32(user_data, 12)?).map_err(|_| {
+    let directory_offset = usize::try_from(le_u32(user_data, 12)?).map_err(|_err| {
         Error::MalformedEncryptionHeader(
             "persist directory offset does not fit in memory".to_string(),
         )
@@ -361,7 +361,7 @@ pub(super) fn decrypt_powerpoint_document(
         ));
     }
     let mappings = parse_persist_directory_with_limits(document, directory_offset, limits)?;
-    let session_offset = mappings
+    let session_offset_raw = mappings
         .iter()
         .find_map(|&(id, offset)| (id == session_id).then_some(offset))
         .ok_or_else(|| {
@@ -369,7 +369,7 @@ pub(super) fn decrypt_powerpoint_document(
                 "encryption-session persist identifier is absent from the directory".to_string(),
             )
         })?;
-    let session_offset = usize::try_from(session_offset).map_err(|_| {
+    let session_offset = usize::try_from(session_offset_raw).map_err(|_err| {
         Error::MalformedEncryptionHeader(
             "encryption-session offset does not fit in memory".to_string(),
         )
@@ -390,39 +390,44 @@ pub(super) fn decrypt_powerpoint_document(
         "CryptSession10Container",
     )?;
     let header = office_rc4::parse_header(session_data).map_err(map_crypto_error)?;
-    let password = password.ok_or(Error::PasswordRequired)?;
-    let crypto = office_rc4::verify(&header, password)
+    let verified_password = password.ok_or(Error::PasswordRequired)?;
+    let crypto = office_rc4::verify(&header, verified_password)
         .map_err(map_crypto_error)?
         .ok_or(Error::InvalidPassword)?;
 
     let mut decrypted = Vec::new();
     decrypted
         .try_reserve_exact(document.len())
-        .map_err(|_| Error::AllocationFailed("decrypted PowerPoint Document stream"))?;
+        .map_err(|_err| Error::AllocationFailed("decrypted PowerPoint Document stream"))?;
     decrypted.extend_from_slice(document);
     let mut ranges = Vec::new();
     ranges
         .try_reserve_exact(mappings.len())
-        .map_err(|_| Error::AllocationFailed("encrypted persist ranges"))?;
+        .map_err(|_err| Error::AllocationFailed("encrypted persist ranges"))?;
     for &(persist_id, raw_offset) in &mappings {
         if persist_id == session_id {
             continue;
         }
-        let offset = usize::try_from(raw_offset).map_err(|_| {
+        let offset = usize::try_from(raw_offset).map_err(|_err| {
             Error::Corrupted("persist object offset does not fit in memory".to_string())
         })?;
         if offset == user_edit_offset || offset == directory_offset {
             continue;
         }
         let encrypted_header = checked_slice(document, offset, 8, "encrypted persist header")?;
-        let mut clear_header: [u8; 8] = encrypted_header.try_into().map_err(|_| {
+        let mut clear_header: [u8; 8] = encrypted_header.try_into().map_err(|_err| {
             Error::MalformedEncryptionHeader("encrypted persist header is truncated".to_string())
         })?;
         office_rc4::apply(&crypto, persist_id, &mut clear_header).map_err(map_crypto_error)?;
-        let data_len = usize::try_from(u32::from_le_bytes(clear_header[4..8].try_into().unwrap()))
-            .map_err(|_| {
-                Error::Corrupted("persist record length does not fit in memory".to_string())
-            })?;
+        let record_data_len = u32::from_le_bytes([
+            clear_header[4],
+            clear_header[5],
+            clear_header[6],
+            clear_header[7],
+        ]);
+        let data_len = usize::try_from(record_data_len).map_err(|_err| {
+            Error::Corrupted("persist record length does not fit in memory".to_string())
+        })?;
         let total = 8usize
             .checked_add(data_len)
             .ok_or_else(|| Error::Corrupted("persist record length overflow".to_string()))?;
@@ -458,7 +463,7 @@ pub(super) fn decrypt_powerpoint_document(
     let mut live_offsets = Vec::new();
     live_offsets
         .try_reserve_exact(ranges.len())
-        .map_err(|_| Error::AllocationFailed("encrypted live-offset table"))?;
+        .map_err(|_err| Error::AllocationFailed("encrypted live-offset table"))?;
     live_offsets.extend(ranges.into_iter().map(|range| range.0));
     Ok(Some(EncryptedPresentation {
         live_offsets,
@@ -475,7 +480,7 @@ pub(super) fn decrypt_pictures(
     let mut clear = Vec::new();
     clear
         .try_reserve_exact(data.len())
-        .map_err(|_| Error::AllocationFailed("decrypted Pictures stream"))?;
+        .map_err(|_err| Error::AllocationFailed("decrypted Pictures stream"))?;
     clear.extend_from_slice(data);
     let mut record_offset = 0usize;
     let mut record_count = 0usize;
@@ -585,7 +590,7 @@ fn parse_persist_directory_with_limits(
     let mut mappings = Vec::new();
     mappings
         .try_reserve((payload.len() / 4).min(limits.max_records))
-        .map_err(|_| Error::AllocationFailed("PPT persist directory"))?;
+        .map_err(|_err| Error::AllocationFailed("PPT persist directory"))?;
     let mut cursor = 0usize;
     while cursor < payload.len() {
         let info = le_u32(payload, cursor)?;
@@ -653,20 +658,21 @@ fn decrypt_picture_segment(
 
 fn record_header(data: &[u8], offset: usize) -> Result<RecordHeader> {
     let bytes = checked_slice(data, offset, 8, "PPT record header")?;
-    let version_instance = u16::from_le_bytes(bytes[0..2].try_into().unwrap());
+    let version_instance = u16::from_le_bytes([bytes[0], bytes[1]]);
+    let data_len_raw = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
     Ok(RecordHeader {
         version: version_instance & 0x000f,
         instance: version_instance >> 4,
-        record_type: u16::from_le_bytes(bytes[2..4].try_into().unwrap()),
-        data_len: usize::try_from(u32::from_le_bytes(bytes[4..8].try_into().unwrap())).map_err(
-            |_| Error::Corrupted("PPT record length does not fit in memory".to_string()),
-        )?,
+        record_type: u16::from_le_bytes([bytes[2], bytes[3]]),
+        data_len: usize::try_from(data_len_raw).map_err(|_err| {
+            Error::Corrupted("PPT record length does not fit in memory".to_string())
+        })?,
     })
 }
 
 fn le_u32(data: &[u8], offset: usize) -> Result<u32> {
     let bytes = checked_slice(data, offset, 4, "32-bit encryption field")?;
-    Ok(u32::from_le_bytes(bytes.try_into().unwrap()))
+    Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
 }
 
 fn checked_slice<'a>(data: &'a [u8], offset: usize, len: usize, field: &str) -> Result<&'a [u8]> {
@@ -691,6 +697,11 @@ fn checked_slice_mut<'a>(
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use crate::{OpenOptions, Package};
@@ -724,7 +735,6 @@ mod tests {
         assert!(matches!(
             package.presentation_with_options(OpenOptions {
                 password: Some("wrong"),
-                ..OpenOptions::default()
             }),
             Err(Error::InvalidPassword)
         ));
@@ -741,7 +751,6 @@ mod tests {
             let presentation = package
                 .presentation_with_options(OpenOptions {
                     password: Some("hello"),
-                    ..OpenOptions::default()
                 })
                 .unwrap();
             assert!(presentation.slide_count() > 0, "fixture {name}");
@@ -754,7 +763,6 @@ mod tests {
         let presentation = package
             .presentation_with_options(OpenOptions {
                 password: Some("crypto"),
-                ..OpenOptions::default()
             })
             .unwrap();
         assert!(presentation.text().unwrap().contains("Dominic Salemno"));
@@ -789,10 +797,13 @@ mod tests {
         let hashes: Vec<String> = images
             .iter()
             .map(|image| {
+                use std::fmt::Write as _;
                 Sha1::digest(image.data().unwrap())
                     .iter()
-                    .map(|byte| format!("{byte:02x}"))
-                    .collect()
+                    .fold(String::new(), |mut hex, byte| {
+                        write!(hex, "{byte:02x}").unwrap();
+                        hex
+                    })
             })
             .collect();
         assert_eq!(

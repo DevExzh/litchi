@@ -12,11 +12,13 @@ pub struct DocumentEmbeddingPolicies {
 
 impl DocumentEmbeddingPolicies {
     /// Return whether both embedding-policy controls were omitted.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.do_not_embed_system_fonts.is_none() && self.do_not_embed_linguistic_data.is_none()
     }
 
     /// Return the system-font policy; omission has the same effect as `1`.
+    #[must_use]
     pub fn effective_do_not_embed_system_fonts(&self) -> bool {
         self.do_not_embed_system_fonts.unwrap_or(true)
     }

@@ -1,9 +1,9 @@
-//! PowerPoint 2016 Revision Information parts.
+//! `PowerPoint` 2016 Revision Information parts.
 //!
 //! Revision extension payloads are retained as XML and never interpreted or
 //! used to resolve relationships.
 
-use super::model::*;
+use super::model::{Client, Info, Namespace, Part};
 use crate::{Error, Result};
 use chrono::{DateTime, NaiveDateTime};
 use litchi_ooxml_common::mce::process_ooxml;
@@ -29,10 +29,16 @@ const MAX_EXTENSIONS: usize = 4_096;
 const MAX_STRING_BYTES: usize = 1024 * 1024;
 
 impl Info {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(xml: &[u8]) -> Result<Self> {
         parse_revision_information(xml)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
     pub fn to_xml(&self) -> Result<Vec<u8>> {
         validate_model(self)?;
         let root_prefix = unused_root_prefix(&self.namespace_declarations);
@@ -99,6 +105,9 @@ impl Info {
     }
 }
 
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load(package: &OpcPackage) -> Result<Option<Part>> {
     let presentation = package.main_document_part()?;
     require_presentation_content_type(presentation.content_type())?;
@@ -181,6 +190,10 @@ pub fn load(package: &OpcPackage) -> Result<Option<Part>> {
 
 /// Add a new Revision Information part after validating the complete graph.
 /// Existing Revision Information parts are deliberately not overwritten.
+///
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn store(package: &mut OpcPackage, value: &Part) -> Result<()> {
     if load(package)?.is_some() {
         return Err(invalid("package already contains Revision Information"));
@@ -445,7 +458,7 @@ fn optional_u32(attributes: &[(String, String)], name: &str) -> Result<Option<u3
         .map(|(_, value)| {
             value
                 .parse()
-                .map_err(|_| invalid(format!("invalid unsigned client revision '{value}'")))
+                .map_err(|_err| invalid(format!("invalid unsigned client revision '{value}'")))
         })
         .transpose()
 }
@@ -632,8 +645,7 @@ fn element_prefix(element: &BytesStart<'_>) -> Result<String> {
     let qualified = std::str::from_utf8(name.as_ref()).map_err(xml_error)?;
     Ok(qualified
         .rsplit_once(':')
-        .map(|(prefix, _)| prefix)
-        .unwrap_or("")
+        .map_or("", |(prefix, _)| prefix)
         .to_string())
 }
 
@@ -735,6 +747,11 @@ fn limit(label: &str) -> Error {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -828,7 +845,7 @@ mod tests {
                 "<p:extLst><p:ext uri=\"urn:x\"><x:a xmlns:x=\"urn:x\"/><x:b xmlns:x=\"urn:x\"/></p:ext></p:extLst>",
             ),
             wrap("<p:extLst><p:ext><x:a xmlns:x=\"urn:x\"/></p:ext></p:extLst>"),
-            format!(r#"<!DOCTYPE x>{}"#, wrap("")),
+            format!(r"<!DOCTYPE x>{}", wrap("")),
         ];
         for xml in cases {
             assert!(Info::parse(xml.as_bytes()).is_err(), "accepted {xml}");

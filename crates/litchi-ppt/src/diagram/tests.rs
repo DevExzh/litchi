@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::*;
 use crate::animation::diagram_build::{self, Atom, Build as BuildAtom, BuildType, Container, Kind};
 use crate::consts::RecordType;
@@ -6,7 +12,7 @@ fn record(version: u16, instance: u16, kind: u16, payload: &[u8]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(8 + payload.len());
     bytes.extend_from_slice(&((instance << 4) | version).to_le_bytes());
     bytes.extend_from_slice(&kind.to_le_bytes());
-    bytes.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+    bytes.extend_from_slice(&u32::try_from(payload.len()).unwrap().to_le_bytes());
     bytes.extend_from_slice(payload);
     bytes
 }
@@ -292,8 +298,8 @@ fn transaction_rejects_stale_sources_and_supports_inverse_replay() {
 
     let mut other = snapshot.edit();
     other.set_mode(Id::new(9, 42), BuildType::Down).unwrap();
-    let other = other.commit().unwrap();
-    assert!(commit.patch().apply(other.snapshot()).is_err());
+    let other_commit = other.commit().unwrap();
+    assert!(commit.patch().apply(other_commit.snapshot()).is_err());
 
     let target = commit.patch().apply(&snapshot).unwrap();
     let restored = commit.patch().undo(&target).unwrap();

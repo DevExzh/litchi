@@ -43,35 +43,21 @@ pub const DEFAULT_ROW_HEIGHT_PT: i32 = 40;
 /// Escher property headers well within format limits.
 pub const MAX_TABLE_DIMENSION: usize = 1000;
 
-/// TextHeaderAtom text type used for table cells (4 = Other, same as
+/// `TextHeaderAtom` text type used for table cells (4 = Other, same as
 /// regular shapes written by this crate).
 const CELL_TEXT_TYPE: u32 = 4;
 
-/// OfficeArt TertiaryOpt record type (0xF122), which hosts the table
+/// `OfficeArt` `TertiaryOpt` record type (0xF122), which hosts the table
 /// properties per [MS-ODRAW] and POI `EscherRecordTypes.USER_DEFINED`.
 const RECORD_TYPE_TERTIARY_OPT: u16 = 0xF122;
-/// OfficeArt ChildAnchor record type (0xF00F) per [MS-ODRAW].
+/// `OfficeArt` `ChildAnchor` record type (0xF00F) per [MS-ODRAW].
 const RECORD_TYPE_CHILD_ANCHOR: u16 = 0xF00F;
-/// PowerPoint OfficeArtClientAnchor record type (0xF010).
+/// `PowerPoint` `OfficeArtClientAnchor` record type (0xF010).
 const RECORD_TYPE_CLIENT_ANCHOR: u16 = 0xF010;
-/// OfficeArt property id marking a group shape as a table ([MS-ODRAW]).
+/// `OfficeArt` property id marking a group shape as a table ([MS-ODRAW]).
 const PROP_GROUP_TABLE_PROPERTIES: u16 = 0x039F;
-/// OfficeArt complex property id with one i32 row height per row.
+/// `OfficeArt` complex property id with one i32 row height per row.
 const PROP_GROUP_TABLE_ROW_PROPERTIES: u16 = 0x03A0;
-
-/// Convert EMUs to PPT master units (576 per inch) without sign loss.
-fn emu_to_master_i32(emu: i32) -> i32 {
-    ((i64::from(emu) * PPT_MASTER_UNITS_PER_INCH) / EMUS_PER_INCH) as i32
-}
-
-/// Convert EMUs to whole points.
-fn emu_to_pt_i32(emu: i32) -> i32 {
-    (i64::from(emu) * 72 / EMUS_PER_INCH) as i32
-}
-
-fn invalid(message: impl Into<String>) -> WriteError {
-    WriteError::InvalidData(message.into())
-}
 
 /// A table to place on a slide: a grid of text cells with configurable
 /// row heights and column widths.
@@ -94,6 +80,10 @@ impl Table {
     ///
     /// Cells start empty; every column is [`DEFAULT_COLUMN_WIDTH_PT`] points
     /// wide and every row [`DEFAULT_ROW_HEIGHT_PT`] points high.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(rows: usize, columns: usize) -> Result<Self, WriteError> {
         if rows == 0 || columns == 0 {
             return Err(invalid("table requires at least one row and one column"));
@@ -113,11 +103,13 @@ impl Table {
     }
 
     /// Number of rows.
+    #[must_use]
     pub const fn rows(&self) -> usize {
         self.rows
     }
 
     /// Number of columns.
+    #[must_use]
     pub const fn columns(&self) -> usize {
         self.columns
     }
@@ -133,6 +125,10 @@ impl Table {
     }
 
     /// Set the text of the cell at (`row`, `column`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_cell_text(
         &mut self,
         row: usize,
@@ -150,6 +146,7 @@ impl Table {
     }
 
     /// Width of a column in points, or `None` if out of range.
+    #[must_use]
     pub fn column_width(&self, column: usize) -> Option<i32> {
         self.column_widths
             .get(column)
@@ -157,6 +154,10 @@ impl Table {
     }
 
     /// Set the width of a column in points.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_column_width(&mut self, column: usize, width_pt: i32) -> Result<(), WriteError> {
         let Some(slot) = self.column_widths.get_mut(column) else {
             return Err(invalid(format!(
@@ -168,11 +169,12 @@ impl Table {
             return Err(invalid("column width must be positive"));
         }
         *slot = i32::try_from(i64::from(width_pt) * EMUS_PER_PT)
-            .map_err(|_| invalid("column width exceeds the supported EMU range"))?;
+            .map_err(|_err| invalid("column width exceeds the supported EMU range"))?;
         Ok(())
     }
 
     /// Height of a row in points, or `None` if out of range.
+    #[must_use]
     pub fn row_height(&self, row: usize) -> Option<i32> {
         self.row_heights
             .get(row)
@@ -180,6 +182,10 @@ impl Table {
     }
 
     /// Set the height of a row in points.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_row_height(&mut self, row: usize, height_pt: i32) -> Result<(), WriteError> {
         let Some(slot) = self.row_heights.get_mut(row) else {
             return Err(invalid(format!(
@@ -191,7 +197,7 @@ impl Table {
             return Err(invalid("row height must be positive"));
         }
         *slot = i32::try_from(i64::from(height_pt) * EMUS_PER_PT)
-            .map_err(|_| invalid("row height exceeds the supported EMU range"))?;
+            .map_err(|_err| invalid("row height exceeds the supported EMU range"))?;
         Ok(())
     }
 
@@ -209,8 +215,13 @@ impl Table {
             .try_fold(0_i32, |total, height| total.checked_add(*height))
     }
 
-    /// Number of OfficeArt shapes this table occupies in its drawing:
+    /// Number of `OfficeArt` shapes this table occupies in its drawing:
     /// one group shape plus one shape per cell.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "rows and columns are each capped at MAX_TABLE_DIMENSION (1000) \
+                  by Table::new, so the product is at most 1_000_000 and fits in u32"
+    )]
     pub(crate) fn shape_count(&self) -> u32 {
         1 + (self.rows * self.columns) as u32
     }
@@ -227,7 +238,31 @@ pub(crate) struct PositionedTable {
     pub table: Table,
 }
 
-/// Build the SpgrContainer for a positioned table.
+/// Convert EMUs to PPT master units (576 per inch) without sign loss.
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "the input is an i32 EMU value, so the scaled result is bounded by \
+              roughly i32::MAX * 576 / 914400 (about 1.4M) and always fits in i32"
+)]
+fn emu_to_master_i32(emu: i32) -> i32 {
+    ((i64::from(emu) * PPT_MASTER_UNITS_PER_INCH) / EMUS_PER_INCH) as i32
+}
+
+/// Convert EMUs to whole points.
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "the input is an i32 EMU value, so the scaled result is bounded by \
+              roughly i32::MAX * 72 / 914400 (about 170k) and always fits in i32"
+)]
+fn emu_to_pt_i32(emu: i32) -> i32 {
+    (i64::from(emu) * 72 / EMUS_PER_INCH) as i32
+}
+
+fn invalid(message: impl Into<String>) -> WriteError {
+    WriteError::InvalidData(message.into())
+}
+
+/// Build the `SpgrContainer` for a positioned table.
 ///
 /// `group_spid` is the shape id of the table group; cell shapes are numbered
 /// consecutively starting at `group_spid + 1`. Layout:
@@ -308,25 +343,25 @@ pub(crate) fn build_table_spgr_container(
             "table bottom edge exceeds the supported master-unit range",
         )
     })?;
-    let top = i16::try_from(top).map_err(|_| {
+    let top_short = i16::try_from(top).map_err(|_err| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
             "table top edge exceeds the PPT short-anchor range",
         )
     })?;
-    let left = i16::try_from(left).map_err(|_| {
+    let left_short = i16::try_from(left).map_err(|_err| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
             "table left edge exceeds the PPT short-anchor range",
         )
     })?;
-    let right = i16::try_from(right).map_err(|_| {
+    let right_short = i16::try_from(right).map_err(|_err| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
             "table right edge exceeds the PPT short-anchor range",
         )
     })?;
-    let bottom = i16::try_from(bottom).map_err(|_| {
+    let bottom_short = i16::try_from(bottom).map_err(|_err| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
             "table bottom edge exceeds the PPT short-anchor range",
@@ -334,10 +369,10 @@ pub(crate) fn build_table_spgr_container(
     })?;
     let mut anchor = EscherBuilder::new(header_version::SIMPLE, 0, RECORD_TYPE_CLIENT_ANCHOR);
     // PPT's eight-byte SmallRectStruct stores top, left, right, bottom.
-    anchor.add_data(&top.to_le_bytes());
-    anchor.add_data(&left.to_le_bytes());
-    anchor.add_data(&right.to_le_bytes());
-    anchor.add_data(&bottom.to_le_bytes());
+    anchor.add_data(&top_short.to_le_bytes());
+    anchor.add_data(&left_short.to_le_bytes());
+    anchor.add_data(&right_short.to_le_bytes());
+    anchor.add_data(&bottom_short.to_le_bytes());
     header.add_data(&anchor.build()?);
 
     group.add_data(&header.build()?);
@@ -363,10 +398,10 @@ pub(crate) fn build_table_spgr_container(
     group.build()
 }
 
-/// Build the TertiaryOpt record holding the table marker and row heights.
+/// Build the `TertiaryOpt` record holding the table marker and row heights.
 fn build_table_properties(row_heights_emu: &[i32]) -> Result<Vec<u8>, Error> {
     let rows = row_heights_emu.len();
-    let rows_u16 = u16::try_from(rows).map_err(|_| {
+    let rows_u16 = u16::try_from(rows).map_err(|_err| {
         std::io::Error::new(std::io::ErrorKind::InvalidInput, "too many table rows")
     })?;
 
@@ -379,6 +414,12 @@ fn build_table_properties(row_heights_emu: &[i32]) -> Result<Vec<u8>, Error> {
         row_data.extend_from_slice(&emu_to_master_i32(*height).to_le_bytes());
     }
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "row_data is a 6-byte header plus 4 bytes per row, and \
+                  rows fits in u16 by the check above, so the length is \
+                  at most about 262 KiB and always fits in u32"
+    )]
     let properties = [
         EscherProperty::new(PROP_GROUP_TABLE_PROPERTIES, 1),
         EscherProperty::new(
@@ -387,6 +428,11 @@ fn build_table_properties(row_heights_emu: &[i32]) -> Result<Vec<u8>, Error> {
         ),
     ];
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the properties array above always contains exactly two \
+                  entries, so its length fits in u16"
+    )]
     let mut opt = EscherBuilder::new(
         header_version::OPT,
         properties.len() as u16,
@@ -400,7 +446,7 @@ fn build_table_properties(row_heights_emu: &[i32]) -> Result<Vec<u8>, Error> {
     opt.build()
 }
 
-/// Build one cell SpContainer (rectangle shape + anchor + text).
+/// Build one cell `SpContainer` (rectangle shape + anchor + text).
 fn build_cell_container(
     cell_spid: u32,
     text: &str,

@@ -1,4 +1,4 @@
-//! Shape-owned PowerPoint classification metadata.
+//! Shape-owned `PowerPoint` classification metadata.
 //!
 //! [MS-PPTX] stores the classification outcome in the direct non-visual
 //! properties of a shape:
@@ -29,7 +29,7 @@ pub use transaction::Editor;
 
 pub(crate) use package::{load, put, remove};
 
-/// URI identifying the PowerPoint classification extension.
+/// URI identifying the `PowerPoint` classification extension.
 pub const EXTENSION_URI: &str = "{1162E1C5-73C7-4A58-AE30-91384D911F3F}";
 
 /// Namespace introduced by the classification extension.

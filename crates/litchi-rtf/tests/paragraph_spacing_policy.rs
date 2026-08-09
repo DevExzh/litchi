@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{ParagraphSpacingPolicy, RtfDocument, RtfWriter, StyleBlock};
 fn block<'a>(d: &'a RtfDocument<'a>, s: &str) -> &'a StyleBlock<'a> {
     d.blocks().iter().find(|b| b.text.contains(s)).unwrap()
@@ -24,14 +33,14 @@ fn parses_inherits_resets_and_keeps_destinations_inert() {
     assert_eq!(block(&d, "Tail").paragraph.spacing_policy, outer);
     assert_eq!(
         block(&d, "Reset").paragraph.spacing_policy,
-        Default::default()
+        ParagraphSpacingPolicy::default()
     );
     assert_eq!(block(&d, "Visible").paragraph.spacing_policy, outer);
 }
 
 #[test]
 fn stylesheet_and_deterministic_writer_round_trip() {
-    let d=RtfDocument::parse(r#"{\rtf1{\stylesheet{\s8\sb100\sa200\lisb25\lisa50\sbauto1\saauto1\nosnaplinegrid\contextualspace Spaced;}}\pard\lisb25\lisa50\sbauto1\saauto1\nosnaplinegrid\contextualspace Body\par}"#).unwrap();
+    let d=RtfDocument::parse(r"{\rtf1{\stylesheet{\s8\sb100\sa200\lisb25\lisa50\sbauto1\saauto1\nosnaplinegrid\contextualspace Spaced;}}\pard\lisb25\lisa50\sbauto1\saauto1\nosnaplinegrid\contextualspace Body\par}").unwrap();
     let expected = d
         .stylesheet()
         .get(8)
@@ -42,7 +51,7 @@ fn stylesheet_and_deterministic_writer_round_trip() {
     let mut first = Vec::new();
     RtfWriter::new(&mut first).write_document(&d).unwrap();
     let text = String::from_utf8(first.clone()).unwrap();
-    assert!(text.contains(r#"\lisb25\lisa50\sbauto1\saauto1\nosnaplinegrid\contextualspace"#));
+    assert!(text.contains(r"\lisb25\lisa50\sbauto1\saauto1\nosnaplinegrid\contextualspace"));
     let reparsed = RtfDocument::parse_bytes(&first).unwrap();
     assert_eq!(
         reparsed
@@ -112,14 +121,14 @@ fn parses_real_libreoffice_stylesheet_fixture() {
 #[test]
 fn rejects_missing_out_of_range_and_selector_parameters() {
     for s in [
-        r#"{\rtf1\sbauto X}"#,
-        r#"{\rtf1\sbauto2 X}"#,
-        r#"{\rtf1\saauto-1 X}"#,
-        r#"{\rtf1\lisb X}"#,
-        r#"{\rtf1\lisb-1 X}"#,
-        r#"{\rtf1\lisa1000001 X}"#,
-        r#"{\rtf1\nosnaplinegrid0 X}"#,
-        r#"{\rtf1\contextualspace1 X}"#,
+        r"{\rtf1\sbauto X}",
+        r"{\rtf1\sbauto2 X}",
+        r"{\rtf1\saauto-1 X}",
+        r"{\rtf1\lisb X}",
+        r"{\rtf1\lisb-1 X}",
+        r"{\rtf1\lisa1000001 X}",
+        r"{\rtf1\nosnaplinegrid0 X}",
+        r"{\rtf1\contextualspace1 X}",
     ] {
         assert!(RtfDocument::parse(s).is_err(), "accepted {s}");
     }

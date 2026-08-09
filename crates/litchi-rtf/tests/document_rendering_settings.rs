@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{
     DocumentJustificationMode, DocumentRenderingOrientation, DocumentRenderingSettings,
     RtfDocument, RtfWriter,
@@ -13,7 +22,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_producer_style_horizontal_compressed_grid_flags() {
-    let document = RtfDocument::parse(r#"{\rtf1\horzdoc\jcompress\lnongrid Body}"#).unwrap();
+    let document = RtfDocument::parse(r"{\rtf1\horzdoc\jcompress\lnongrid Body}").unwrap();
     assert_eq!(
         *document.rendering_settings(),
         DocumentRenderingSettings {
@@ -27,7 +36,7 @@ fn parses_producer_style_horizontal_compressed_grid_flags() {
 
 #[test]
 fn parses_vertical_and_expanding_alternatives() {
-    let document = RtfDocument::parse(r#"{\rtf1\vertdoc\jexpand Body}"#).unwrap();
+    let document = RtfDocument::parse(r"{\rtf1\vertdoc\jexpand Body}").unwrap();
     assert_eq!(
         document.rendering_settings().orientation,
         Some(DocumentRenderingOrientation::Vertical)
@@ -40,7 +49,7 @@ fn parses_vertical_and_expanding_alternatives() {
 
 #[test]
 fn omission_is_distinct_from_the_effective_compression_default() {
-    let document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     assert!(document.rendering_settings().is_empty());
     assert_eq!(
         document.rendering_settings().effective_justification_mode(),
@@ -52,7 +61,7 @@ fn omission_is_distinct_from_the_effective_compression_default() {
 
 #[test]
 fn typed_api_round_trips_in_stable_order_and_clears_without_rendering_effects() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     document.set_rendering_settings(DocumentRenderingSettings {
         orientation: Some(DocumentRenderingOrientation::Vertical),
         justification_mode: Some(DocumentJustificationMode::Expand),
@@ -96,35 +105,35 @@ fn coexists_with_adjacent_output_and_file_properties_in_canonical_order() {
 #[test]
 fn rejects_numeric_starred_grouped_late_duplicate_and_conflicting_forms() {
     for source in [
-        r#"{\rtf1\horzdoc0 Body}"#,
-        r#"{\rtf1\vertdoc2147483647 Body}"#,
-        r#"{\rtf1\jcompress-2147483648 Body}"#,
-        r#"{\rtf1\jexpand1 Body}"#,
-        r#"{\rtf1\lnongrid99999999999 Body}"#,
-        r#"{\rtf1\horzdoc\horzdoc Body}"#,
-        r#"{\rtf1\vertdoc\vertdoc Body}"#,
-        r#"{\rtf1\jcompress\jcompress Body}"#,
-        r#"{\rtf1\jexpand\jexpand Body}"#,
-        r#"{\rtf1\lnongrid\lnongrid Body}"#,
-        r#"{\rtf1\horzdoc\vertdoc Body}"#,
-        r#"{\rtf1\vertdoc\horzdoc Body}"#,
-        r#"{\rtf1\jcompress\jexpand Body}"#,
-        r#"{\rtf1\jexpand\jcompress Body}"#,
-        r#"{\rtf1{\*\horzdoc}Body}"#,
-        r#"{\rtf1{\*\vertdoc}Body}"#,
-        r#"{\rtf1{\*\jcompress}Body}"#,
-        r#"{\rtf1{\*\jexpand}Body}"#,
-        r#"{\rtf1{\*\lnongrid}Body}"#,
-        r#"{\rtf1{\horzdoc}Body}"#,
-        r#"{\rtf1{\vertdoc}Body}"#,
-        r#"{\rtf1{\jcompress}Body}"#,
-        r#"{\rtf1{\jexpand}Body}"#,
-        r#"{\rtf1{\lnongrid}Body}"#,
-        r#"{\rtf1 Body\horzdoc}"#,
-        r#"{\rtf1 Body\vertdoc}"#,
-        r#"{\rtf1 Body\jcompress}"#,
-        r#"{\rtf1 Body\jexpand}"#,
-        r#"{\rtf1 Body\lnongrid}"#,
+        r"{\rtf1\horzdoc0 Body}",
+        r"{\rtf1\vertdoc2147483647 Body}",
+        r"{\rtf1\jcompress-2147483648 Body}",
+        r"{\rtf1\jexpand1 Body}",
+        r"{\rtf1\lnongrid99999999999 Body}",
+        r"{\rtf1\horzdoc\horzdoc Body}",
+        r"{\rtf1\vertdoc\vertdoc Body}",
+        r"{\rtf1\jcompress\jcompress Body}",
+        r"{\rtf1\jexpand\jexpand Body}",
+        r"{\rtf1\lnongrid\lnongrid Body}",
+        r"{\rtf1\horzdoc\vertdoc Body}",
+        r"{\rtf1\vertdoc\horzdoc Body}",
+        r"{\rtf1\jcompress\jexpand Body}",
+        r"{\rtf1\jexpand\jcompress Body}",
+        r"{\rtf1{\*\horzdoc}Body}",
+        r"{\rtf1{\*\vertdoc}Body}",
+        r"{\rtf1{\*\jcompress}Body}",
+        r"{\rtf1{\*\jexpand}Body}",
+        r"{\rtf1{\*\lnongrid}Body}",
+        r"{\rtf1{\horzdoc}Body}",
+        r"{\rtf1{\vertdoc}Body}",
+        r"{\rtf1{\jcompress}Body}",
+        r"{\rtf1{\jexpand}Body}",
+        r"{\rtf1{\lnongrid}Body}",
+        r"{\rtf1 Body\horzdoc}",
+        r"{\rtf1 Body\vertdoc}",
+        r"{\rtf1 Body\jcompress}",
+        r"{\rtf1 Body\jexpand}",
+        r"{\rtf1 Body\lnongrid}",
     ] {
         assert!(
             RtfDocument::parse(source).is_err(),

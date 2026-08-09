@@ -1,4 +1,4 @@
-//! Strict, inert PowerPoint document-level slide-show settings.
+//! Strict, inert `PowerPoint` document-level slide-show settings.
 
 use super::named_shows::{NamedShow, NamedShows};
 use super::package::{Error, Result};
@@ -58,7 +58,7 @@ impl ColorIndex {
     pub(crate) fn parse_bytes(data: &[u8]) -> Result<Self> {
         let [red, green, blue, index]: [u8; 4] = data
             .try_into()
-            .map_err(|_| Error::Corrupted("ColorIndexStruct is truncated".to_string()))?;
+            .map_err(|_err| Error::Corrupted("ColorIndexStruct is truncated".to_string()))?;
         Ok(Self {
             red,
             green,
@@ -74,6 +74,10 @@ impl ColorIndex {
 }
 
 /// The nine defined `SlideShowDocInfoAtom` flags.
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "each bool maps one-to-one to an independent flag bit of the MS-PPT `SlideShowDocInfoAtom` bitfield; grouping them into enums would misrepresent the on-disk layout and churn the public API"
+)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SlideShowFlags {
     pub auto_advance: bool,
@@ -109,15 +113,15 @@ impl SlideShowFlags {
 
     fn bits(self) -> Result<u16> {
         self.validate()?;
-        Ok(self.auto_advance as u16
-            | (self.will_skip_builds as u16) << 1
-            | (self.use_slide_range as u16) << 2
-            | (self.use_named_show as u16) << 3
-            | (self.browse_mode as u16) << 4
-            | (self.kiosk_mode as u16) << 5
-            | (self.will_skip_narration as u16) << 6
-            | (self.loop_continuously as u16) << 7
-            | (self.hide_scroll_bar as u16) << 8)
+        Ok(u16::from(self.auto_advance)
+            | u16::from(self.will_skip_builds) << 1
+            | u16::from(self.use_slide_range) << 2
+            | u16::from(self.use_named_show) << 3
+            | u16::from(self.browse_mode) << 4
+            | u16::from(self.kiosk_mode) << 5
+            | u16::from(self.will_skip_narration) << 6
+            | u16::from(self.loop_continuously) << 7
+            | u16::from(self.hide_scroll_bar) << 8)
     }
 
     fn validate(self) -> Result<()> {
@@ -143,6 +147,10 @@ pub struct SlideShowSettings {
 
 impl SlideShowSettings {
     /// Parse the unique direct settings atom below `document`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn parse(document: &Record) -> Result<Option<Self>> {
         let records = document
             .children
@@ -155,10 +163,13 @@ impl SlideShowSettings {
         let Some(record) = records.first() else {
             return Ok(None);
         };
+        let declared_length = usize::try_from(record.data_length).map_err(|_err| {
+            Error::Corrupted("SlideShowDocInfoAtom length is invalid".to_string())
+        })?;
         if record.version != 1
             || record.instance != 0
             || record.data.len() != PAYLOAD_LEN
-            || record.data_length != PAYLOAD_LEN as u32
+            || declared_length != PAYLOAD_LEN
         {
             return corrupted("SlideShowDocInfoAtom has an invalid header or size");
         }
@@ -169,7 +180,7 @@ impl SlideShowSettings {
             blue: data[2],
             kind: ColorIndexKind::parse(data[3])?,
         };
-        let restart_time_millis = i32::from_le_bytes(data[4..8].try_into().expect("fixed slice"));
+        let restart_time_millis = i32::from_le_bytes([data[4], data[5], data[6], data[7]]);
         let start_slide = parse_nonnegative_i16(&data[8..10], "startSlide")?;
         let end_slide = parse_nonnegative_i16(&data[10..12], "endSlide")?;
         let named_show = parse_char2(&data[12..12 + NAMED_SHOW_BYTES])?;
@@ -187,6 +198,12 @@ impl SlideShowSettings {
         Ok(Some(settings))
     }
 
+    /// Serialize as a parsed `Record`, verifying the canonical encoding round-trips.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if validation fails or the canonical record bytes
+    /// cannot be re-parsed exactly.
     pub fn to_record(&self) -> Result<Record> {
         let bytes = self.to_record_bytes()?;
         let (record, end) = Record::parse(&bytes, 0)?;
@@ -196,8 +213,19 @@ impl SlideShowSettings {
         Ok(record)
     }
 
+    /// Serialize the complete 88-byte `SlideShowDocInfoAtom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the flags, slide range, or named show fail validation.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         self.validate()?;
+        let start_slide = i16::try_from(self.start_slide).map_err(|_err| {
+            Error::Corrupted("slide-show range endpoint exceeds signed 16-bit range".to_string())
+        })?;
+        let end_slide = i16::try_from(self.end_slide).map_err(|_err| {
+            Error::Corrupted("slide-show range endpoint exceeds signed 16-bit range".to_string())
+        })?;
         let mut payload = Vec::with_capacity(PAYLOAD_LEN);
         payload.extend_from_slice(&[
             self.pen_color.red,
@@ -206,8 +234,8 @@ impl SlideShowSettings {
             self.pen_color.kind as u8,
         ]);
         payload.extend_from_slice(&self.restart_time_millis.to_le_bytes());
-        payload.extend_from_slice(&(self.start_slide as i16).to_le_bytes());
-        payload.extend_from_slice(&(self.end_slide as i16).to_le_bytes());
+        payload.extend_from_slice(&start_slide.to_le_bytes());
+        payload.extend_from_slice(&end_slide.to_le_bytes());
         payload.extend_from_slice(&encode_char2(&self.named_show)?);
         payload.extend_from_slice(&self.flags.bits()?.to_le_bytes());
         payload.extend_from_slice(&self.unused);
@@ -216,12 +244,19 @@ impl SlideShowSettings {
         let mut bytes = Vec::with_capacity(PAYLOAD_LEN + 8);
         bytes.extend_from_slice(&1u16.to_le_bytes());
         bytes.extend_from_slice(&RecordType::SlideShowDocInfoAtom.as_u16().to_le_bytes());
-        bytes.extend_from_slice(&(PAYLOAD_LEN as u32).to_le_bytes());
+        bytes.extend_from_slice(
+            &u32::try_from(PAYLOAD_LEN)
+                .map_err(|_err| {
+                    Error::Corrupted("SlideShowDocInfoAtom payload length is invalid".to_string())
+                })?
+                .to_le_bytes(),
+        );
         bytes.extend_from_slice(&payload);
         Ok(bytes)
     }
 
     /// The selected one-based slide range, if range mode is active.
+    #[must_use]
     pub fn selected_slide_range(&self) -> Option<RangeInclusive<u16>> {
         self.flags
             .use_slide_range
@@ -229,6 +264,7 @@ impl SlideShowSettings {
     }
 
     /// Resolve the active named show, ignoring it when range mode takes precedence.
+    #[must_use]
     pub fn selected_named_show<'a>(&self, named_shows: &'a NamedShows) -> Option<&'a NamedShow> {
         (!self.flags.use_slide_range && self.flags.use_named_show)
             .then(|| {
@@ -241,6 +277,10 @@ impl SlideShowSettings {
     }
 
     /// Validate the named-show reference in the document-wide context.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn validate_named_show(&self, named_shows: &NamedShows) -> Result<()> {
         if !self.flags.use_slide_range
             && self.flags.use_named_show
@@ -265,9 +305,12 @@ impl SlideShowSettings {
 }
 
 fn parse_nonnegative_i16(data: &[u8], field: &str) -> Result<u16> {
-    let value = i16::from_le_bytes(data.try_into().expect("two-byte slice"));
+    let bytes: [u8; 2] = data
+        .try_into()
+        .map_err(|_err| Error::Corrupted(format!("SlideShowDocInfoAtom {field} is truncated")))?;
+    let value = i16::from_le_bytes(bytes);
     u16::try_from(value)
-        .map_err(|_| Error::Corrupted(format!("SlideShowDocInfoAtom {field} is negative")))
+        .map_err(|_err| Error::Corrupted(format!("SlideShowDocInfoAtom {field} is negative")))
 }
 
 fn parse_char2(data: &[u8]) -> Result<String> {
@@ -280,7 +323,7 @@ fn parse_char2(data: &[u8]) -> Result<String> {
         units.push(unit);
     }
     String::from_utf16(&units)
-        .map_err(|_| Error::Corrupted("namedShow contains invalid UTF-16".to_string()))
+        .map_err(|_err| Error::Corrupted("namedShow contains invalid UTF-16".to_string()))
 }
 
 fn encode_char2(value: &str) -> Result<[u8; NAMED_SHOW_BYTES]> {
@@ -303,6 +346,11 @@ fn corrupted<T>(message: impl Into<String>) -> Result<T> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

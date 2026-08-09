@@ -1,4 +1,4 @@
-//! Strict PowerPoint shape references to inert external objects.
+//! Strict `PowerPoint` shape references to inert external objects.
 
 use crate::consts::RecordType;
 use crate::embedded::object::{Collection as OleCollection, ExternalObject};
@@ -18,6 +18,11 @@ pub enum Target<'a> {
 }
 
 impl Reference {
+    /// Create a reference to the external object with the given `id`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `id` is zero.
     pub fn new(id: u32) -> Result<Self> {
         if id == 0 {
             return corrupted("ExObjRefAtom external-object ID must be positive");
@@ -25,6 +30,12 @@ impl Reference {
         Ok(Self { id })
     }
 
+    /// Parse an `ExObjRefAtom` record into an external-object reference.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record header or payload size is invalid or if
+    /// the referenced external-object ID is zero.
     pub fn parse(record: &Record) -> Result<Self> {
         if record.version != 0
             || record.instance != 0
@@ -41,15 +52,26 @@ impl Reference {
         if payload.len() != 4 {
             return corrupted("ExObjRefAtom has an invalid payload size");
         }
-        Self::new(u32::from_le_bytes(
-            payload.try_into().expect("validated payload size"),
-        ))
+        Self::new(u32::from_le_bytes([
+            payload[0], payload[1], payload[2], payload[3],
+        ]))
     }
 
+    /// Serialize as a fully parsed `ExObjRefAtom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the referenced ID is zero or if the encoded
+    /// record cannot be re-parsed.
     pub fn to_record(&self) -> Result<Record> {
         Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 
+    /// Serialize to the raw bytes of a complete `ExObjRefAtom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the referenced external-object ID is zero.
     pub fn to_record_bytes(&self) -> Result<[u8; 12]> {
         let payload = self.to_payload_bytes()?;
         let mut bytes = [0; 12];
@@ -60,21 +82,27 @@ impl Reference {
     }
 
     /// Encode the four-byte external-object ID payload.
-    pub(crate) fn to_payload_bytes(&self) -> Result<[u8; 4]> {
+    pub(crate) fn to_payload_bytes(self) -> Result<[u8; 4]> {
         if self.id == 0 {
             return corrupted("ExObjRefAtom external-object ID must be positive");
         }
         Ok(self.id.to_le_bytes())
     }
 
+    /// Resolve the reference against the media and OLE object collections.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the referenced ID is missing from both collections
+    /// or if it is defined by both a media and an OLE object.
     pub fn resolve<'a>(
         &self,
         media: Option<&'a MediaCollection>,
         ole: Option<&'a OleCollection>,
     ) -> Result<Target<'a>> {
-        let media = media.and_then(|values| values.get(self.id));
-        let ole = ole.and_then(|values| values.get(self.id));
-        match (media, ole) {
+        let media_target = media.and_then(|values| values.get(self.id));
+        let ole_target = ole.and_then(|values| values.get(self.id));
+        match (media_target, ole_target) {
             (Some(value), None) => Ok(Target::Media(value)),
             (None, Some(value)) => Ok(Target::Ole(value)),
             (None, None) => corrupted(format!(
@@ -94,6 +122,11 @@ fn corrupted<T>(message: impl Into<String>) -> Result<T> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use crate::{LinkedAudio, LinkedAudioKind, Media};

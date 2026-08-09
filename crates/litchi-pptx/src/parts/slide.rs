@@ -25,8 +25,8 @@ fn root_name(part: &dyn Part) -> Result<String> {
                 ) {
                     return Err(invalid("PresentationML part has an invalid root namespace"));
                 }
-                return Ok(String::from_utf8(element.local_name().as_ref().to_vec())
-                    .map_err(|_| invalid("PresentationML root name is not UTF-8"))?);
+                return String::from_utf8(element.local_name().as_ref().to_vec())
+                    .map_err(|_err| invalid("PresentationML root name is not UTF-8"));
             },
             Event::Decl(_) | Event::Comment(_) => {},
             Event::Text(text) if text.as_ref().iter().all(u8::is_ascii_whitespace) => {},
@@ -203,7 +203,7 @@ fn text_from_part(part: &dyn Part) -> Result<Option<String>> {
     Ok((!value.is_empty()).then_some(value))
 }
 
-/// Borrowed view of a PresentationML slide part.
+/// Borrowed view of a `PresentationML` slide part.
 #[derive(Clone, Copy)]
 pub struct SlidePart<'a> {
     part: &'a dyn Part,
@@ -211,6 +211,10 @@ pub struct SlidePart<'a> {
 
 impl<'a> SlidePart<'a> {
     /// Validate and wrap a slide part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
         validate_content_type(part, ct::PML_SLIDE)?;
         if root_name(part)? != "sld" {
@@ -221,36 +225,61 @@ impl<'a> SlidePart<'a> {
 
     /// The underlying OPC part.
     #[inline]
+    #[must_use]
     pub fn part(&self) -> &'a dyn Part {
         self.part
     }
 
     /// Producer-visible slide name, if present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn name(&self) -> Result<String> {
         Ok(c_sld_name(self.part)?.unwrap_or_else(|| self.part.partname().to_string()))
     }
 
     /// Whether the slide is marked hidden by its root `show` attribute.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn is_hidden(&self) -> Result<bool> {
         Ok(!root_bool(self.part, b"show", "slide show", true)?)
     }
 
-    /// Flatten DrawingML text runs in source order.
+    /// Flatten `DrawingML` text runs in source order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn text(&self) -> Result<String> {
         Ok(text_from_part(self.part)?.unwrap_or_default())
     }
 
     /// Build the bounded borrowed shape scene for this slide.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<Scene<'a>> {
-        Ok(Scene::read(self.part.blob())?)
+        Scene::read(self.part.blob())
     }
 
-    /// Resolve ordinary DrawingML chart parts related to this slide.
+    /// Resolve ordinary `DrawingML` chart parts related to this slide.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn charts(&self, package: &'a OpcPackage) -> Result<Vec<crate::chart::Part<'a>>> {
         crate::chart::related(package, self.part)
     }
 
-    /// Resolve Microsoft ChartEx parts related to this slide.
+    /// Resolve Microsoft `ChartEx` parts related to this slide.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn chart_extensions(
         &self,
         package: &'a OpcPackage,
@@ -259,6 +288,10 @@ impl<'a> SlidePart<'a> {
     }
 
     /// Resolve the optional legacy comments list attached to this slide.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn comments(
         &self,
         package: &'a OpcPackage,
@@ -274,6 +307,10 @@ impl<'a> SlidePart<'a> {
     }
 
     /// Resolve the slide's optional layout relationship.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn layout(&self, package: &'a OpcPackage) -> Result<Option<SlideLayoutPart<'a>>> {
         related_part_by_type(
             package,
@@ -287,7 +324,7 @@ impl<'a> SlidePart<'a> {
     }
 }
 
-/// Borrowed view of a PresentationML slide-layout part.
+/// Borrowed view of a `PresentationML` slide-layout part.
 #[derive(Clone, Copy)]
 pub struct SlideLayoutPart<'a> {
     part: &'a dyn Part,
@@ -295,6 +332,10 @@ pub struct SlideLayoutPart<'a> {
 
 impl<'a> SlideLayoutPart<'a> {
     /// Validate and wrap a slide-layout part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
         validate_content_type(part, ct::PML_SLIDE_LAYOUT)?;
         if root_name(part)? != "sldLayout" {
@@ -306,17 +347,30 @@ impl<'a> SlideLayoutPart<'a> {
     }
 
     /// The underlying OPC part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     #[inline]
+    #[must_use]
     pub fn part(&self) -> &'a dyn Part {
         self.part
     }
 
     /// Producer-visible layout name, if present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn name(&self) -> Result<String> {
         Ok(c_sld_name(self.part)?.unwrap_or_else(|| self.part.partname().to_string()))
     }
 
     /// Layout kind token from `p:sldLayout@type`, if present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn kind(&self) -> Result<Option<String>> {
         let xml = processed_xml(self.part)?;
         let mut reader = Reader::from_reader(xml.as_ref());
@@ -336,11 +390,19 @@ impl<'a> SlideLayoutPart<'a> {
     }
 
     /// Build the bounded borrowed shape scene for this layout.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<Scene<'a>> {
-        Ok(Scene::read(self.part.blob())?)
+        Scene::read(self.part.blob())
     }
 
     /// Read the optional theme override attached to this layout.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn theme_override(
         &self,
         package: &'a OpcPackage,
@@ -349,6 +411,10 @@ impl<'a> SlideLayoutPart<'a> {
     }
 
     /// Resolve the required slide-master relationship.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn master(&self, package: &'a OpcPackage) -> Result<SlideMasterPart<'a>> {
         let part = related_part_by_type(
             package,
@@ -362,7 +428,7 @@ impl<'a> SlideLayoutPart<'a> {
     }
 }
 
-/// Borrowed view of a PresentationML slide-master part.
+/// Borrowed view of a `PresentationML` slide-master part.
 #[derive(Clone, Copy)]
 pub struct SlideMasterPart<'a> {
     part: &'a dyn Part,
@@ -370,6 +436,10 @@ pub struct SlideMasterPart<'a> {
 
 impl<'a> SlideMasterPart<'a> {
     /// Validate and wrap a slide-master part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
         validate_content_type(part, ct::PML_SLIDE_MASTER)?;
         if root_name(part)? != "sldMaster" {
@@ -382,26 +452,43 @@ impl<'a> SlideMasterPart<'a> {
 
     /// The underlying OPC part.
     #[inline]
+    #[must_use]
     pub fn part(&self) -> &'a dyn Part {
         self.part
     }
 
     /// Producer-visible master name, if present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn name(&self) -> Result<String> {
         Ok(c_sld_name(self.part)?.unwrap_or_else(|| self.part.partname().to_string()))
     }
 
     /// Whether the master is marked preserved.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn is_preserved(&self) -> Result<bool> {
         root_bool(self.part, b"preserve", "slide-master preserve", false)
     }
 
     /// Build the bounded borrowed shape scene for this master.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<Scene<'a>> {
-        Ok(Scene::read(self.part.blob())?)
+        Scene::read(self.part.blob())
     }
 
     /// Read the theme reached from this slide master.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn theme(
         &self,
         package: &'a OpcPackage,
@@ -412,6 +499,10 @@ impl<'a> SlideMasterPart<'a> {
     }
 
     /// Resolve the slide layouts listed by this master in XML order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn layouts(&self, package: &'a OpcPackage) -> Result<Vec<SlideLayoutPart<'a>>> {
         let relationship_ids = layout_relationship_ids(self.part)?;
         let mut layouts = Vec::with_capacity(relationship_ids.len());

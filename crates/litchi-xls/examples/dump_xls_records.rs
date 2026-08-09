@@ -69,7 +69,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let dt = u16::from_le_bytes([rec.payload()[2], rec.payload()[3]]);
             let ver = BiffVersion::from_bof_version(version_raw).unwrap_or(BiffVersion::Biff8);
             if in_workbook {
-                println!("{offset:06X}: BOF(Workbook) ver={ver:?} dt=0x{dt:04X} len={len}",);
+                println!("{offset:06X}: BOF(Workbook) ver={ver:?} dt=0x{dt:04X} len={len}");
             } else {
                 println!(
                     "{offset:06X}: BOF(Sheet#{sheet_index}) ver={ver:?} dt=0x{dt:04X} len={len}",
@@ -85,7 +85,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else if in_workbook {
             println!("{offset:06X}: {name} (0x{sid:04X}) len={len}");
         } else {
-            println!("{offset:06X}: [Sheet#{sheet_index}] {name} (0x{sid:04X}) len={len}",);
+            println!("{offset:06X}: [Sheet#{sheet_index}] {name} (0x{sid:04X}) len={len}");
         }
     }
 

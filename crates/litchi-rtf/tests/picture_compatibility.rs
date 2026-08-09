@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{
     ImageType, PictureCompatibilityKind, PictureCompatibilityRecord, RtfDocument, RtfWriter,
 };
@@ -25,7 +34,7 @@ fn parses_real_libreoffice_body_wrapper_and_rewrites_positionally() {
         .unwrap();
     assert!(std::ptr::eq(
         picture,
-        &document.pictures()[records[0].picture_index]
+        &raw const document.pictures()[records[0].picture_index]
     ));
     assert_eq!(picture.image_type, ImageType::Jpeg);
 
@@ -79,7 +88,7 @@ fn preferred_and_fallback_share_position_and_round_trip_in_order() {
 
 #[test]
 fn typed_mutation_references_and_clears_without_deleting_picture() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 A{\pict\pngblip 89504e470d0a1a0a}B}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 A{\pict\pngblip 89504e470d0a1a0a}B}").unwrap();
     document
         .push_picture_compatibility_record(PictureCompatibilityRecord {
             position: 1,
@@ -121,15 +130,15 @@ fn typed_mutation_references_and_clears_without_deleting_picture() {
 #[test]
 fn rejects_hostile_wrapper_grammar() {
     for source in [
-        r#"{\rtf1{\shppict{\pict\pngblip 00}}}"#,
-        r#"{\rtf1{\*\nonshppict{\pict\pngblip 00}}}"#,
-        r#"{\rtf1{\*\shppict1{\pict\pngblip 00}}}"#,
-        r#"{\rtf1{\nonshppict1{\pict\pngblip 00}}}"#,
-        r#"{\rtf1{\*\shppict}}"#,
-        r#"{\rtf1{\nonshppict text{\pict\pngblip 00}}}"#,
-        r#"{\rtf1{\*\shppict{\pict}}}"#,
-        r#"{\rtf1{\*\shppict{\pict\pngblip 00}{\pict\pngblip 00}}}"#,
-        r#"{\rtf1{\*\shppict{\pict\pngblip 00}}{\*\shppict{\pict\pngblip 01}}}"#,
+        r"{\rtf1{\shppict{\pict\pngblip 00}}}",
+        r"{\rtf1{\*\nonshppict{\pict\pngblip 00}}}",
+        r"{\rtf1{\*\shppict1{\pict\pngblip 00}}}",
+        r"{\rtf1{\nonshppict1{\pict\pngblip 00}}}",
+        r"{\rtf1{\*\shppict}}",
+        r"{\rtf1{\nonshppict text{\pict\pngblip 00}}}",
+        r"{\rtf1{\*\shppict{\pict}}}",
+        r"{\rtf1{\*\shppict{\pict\pngblip 00}{\pict\pngblip 00}}}",
+        r"{\rtf1{\*\shppict{\pict\pngblip 00}}{\*\shppict{\pict\pngblip 01}}}",
     ] {
         assert!(
             RtfDocument::parse(source).is_err(),

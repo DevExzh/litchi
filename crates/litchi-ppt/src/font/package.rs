@@ -20,27 +20,29 @@ impl Default for PackageLimits {
 }
 
 /// Borrowed open credentials plus finite package limits.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct PackageOptions<'a> {
     pub password: Option<&'a str>,
     pub limits: PackageLimits,
 }
 
-impl Default for PackageOptions<'_> {
-    fn default() -> Self {
-        Self {
-            password: None,
-            limits: PackageLimits::default(),
-        }
-    }
-}
-
 impl<R: Read + Seek> Package<R> {
     /// Read font semantics from the exact live persisted document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the package cannot be opened or its font records
+    /// are malformed.
     pub fn fonts(&mut self) -> Result<FontCollections> {
         self.presentation()?.fonts()
     }
 
+    /// Read font semantics under explicit limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the package cannot be opened, the limits are
+    /// invalid, or the font records are malformed or exceed the limits.
     pub fn fonts_with_limits(&mut self, limits: Limits) -> Result<FontCollections> {
         self.presentation_with_limits(limits.records)?
             .fonts_with_limits(limits)

@@ -1,4 +1,4 @@
-//! Snapshot editor for persisted PowerPoint animation and timing records.
+//! Snapshot editor for persisted `PowerPoint` animation and timing records.
 //!
 //! The facade keeps the public editor types compact while the implementation
 //! is split into semantic state, transactional snapshot rewrites, validation,

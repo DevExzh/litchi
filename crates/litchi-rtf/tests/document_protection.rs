@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{ProtectionLevel, ProtectionType, RtfDocument, RtfWriter};
 use std::fs;
 
@@ -41,17 +50,17 @@ fn parses_all_protection_controls_and_round_trips_inert_hash() {
 #[test]
 fn rejects_malformed_duplicate_or_misplaced_protection() {
     for source in [
-        r#"{\rtf1\formprot2}"#,
-        r#"{\rtf1\enforceprot}"#,
-        r#"{\rtf1\enforceprot2}"#,
-        r#"{\rtf1\protlevel}"#,
-        r#"{\rtf1\protlevel4}"#,
-        r#"{\rtf1\formprot\formprot}"#,
-        r#"{\rtf1{\b\readprot}}"#,
-        r#"{\rtf1 Body\revprot}"#,
-        r#"{\rtf1{\info{\password 00000000}}}"#,
-        r#"{\rtf1{\info{\*\password xyz}}}"#,
-        r#"{\rtf1{\info{\*\password 00000000}{\*\password 11111111}}}"#,
+        r"{\rtf1\formprot2}",
+        r"{\rtf1\enforceprot}",
+        r"{\rtf1\enforceprot2}",
+        r"{\rtf1\protlevel}",
+        r"{\rtf1\protlevel4}",
+        r"{\rtf1\formprot\formprot}",
+        r"{\rtf1{\b\readprot}}",
+        r"{\rtf1 Body\revprot}",
+        r"{\rtf1{\info{\password 00000000}}}",
+        r"{\rtf1{\info{\*\password xyz}}}",
+        r"{\rtf1{\info{\*\password 00000000}{\*\password 11111111}}}",
     ] {
         assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
     }

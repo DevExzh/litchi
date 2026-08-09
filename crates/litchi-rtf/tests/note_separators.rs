@@ -1,13 +1,22 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{NoteSeparatorElement, NoteSeparatorKind, RtfDocument, RtfWriter};
 
-const SYNTHETIC: &str = r#"{\rtf1\ansi\ansicpg1250\uc1
+const SYNTHETIC: &str = r"{\rtf1\ansi\ansicpg1250\uc1
 {\*\ftnsep \'8a\chftnsep\par}
 {\*\ftnsepc \chftnsepc\line}
 {\*\ftncn Notice \u20320?}
 {\*\aftnsep E\chftnsep\par}
 {\*\aftnsepc EC\chftnsepc\par}
 {\*\aftncn End}
-Body}"#;
+Body}";
 
 #[test]
 fn parses_decodes_and_round_trips_note_separators() {
@@ -55,13 +64,13 @@ fn parses_decodes_and_round_trips_note_separators() {
 #[test]
 fn rejects_malformed_note_separators() {
     let malformed = [
-        r#"{\rtf1{\ftnsep\chftnsep}}"#,
-        r#"{\rtf1{\*\ftnsep\chftnsep}{\*\ftnsep\chftnsep}}"#,
-        r#"{\rtf1{\*\aftnsep X}{\*\ftnsep X}}"#,
-        r#"{\rtf1 Body{\*\ftnsep X}}"#,
-        r#"{\rtf1{\*\ftnsep{\field X}}}"#,
-        r#"{\rtf1{\*\ftnsep{\object X}}}"#,
-        r#"{\rtf1{\*\ftnsep\bin2 AB}}"#,
+        r"{\rtf1{\ftnsep\chftnsep}}",
+        r"{\rtf1{\*\ftnsep\chftnsep}{\*\ftnsep\chftnsep}}",
+        r"{\rtf1{\*\aftnsep X}{\*\ftnsep X}}",
+        r"{\rtf1 Body{\*\ftnsep X}}",
+        r"{\rtf1{\*\ftnsep{\field X}}}",
+        r"{\rtf1{\*\ftnsep{\object X}}}",
+        r"{\rtf1{\*\ftnsep\bin2 AB}}",
     ];
     for source in malformed {
         assert!(

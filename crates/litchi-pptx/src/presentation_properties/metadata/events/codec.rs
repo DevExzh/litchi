@@ -1,4 +1,4 @@
-//! Bounded, inert PowerPoint slide-show event discovery.
+//! Bounded, inert `PowerPoint` slide-show event discovery.
 //!
 //! Slide-show events are retained as persisted document history only. This
 //! module never replays, renders, seeks, pauses, resumes, stops, or otherwise
@@ -6,7 +6,7 @@
 
 use std::ops::Range;
 
-use super::model::*;
+use super::model::{Draft, Event, Kind, Trigger};
 use super::validation::{
     MAX_EVENTS, MAX_SLIDE_XML_BYTES, MAX_TOTAL_SLIDE_XML_BYTES, MAX_XML_DEPTH, MAX_XML_NODES,
     validate_events, validate_extension_uri,
@@ -23,7 +23,7 @@ use quick_xml::events::{BytesStart, Event as XmlEvent};
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
-/// The PowerPoint extension URI that contains persisted slide-show events.
+/// The `PowerPoint` extension URI that contains persisted slide-show events.
 pub const EXTENSION_URI: &str = "{E180D4A7-C9FB-4DFB-919C-405C955672EB}";
 
 const P14_NAMESPACE: &str = "http://schemas.microsoft.com/office/powerpoint/2010/main";
@@ -55,7 +55,7 @@ impl ElementKind {
     }
 }
 
-/// Load bounded, inert slide-show events from one PresentationML slide.
+/// Load bounded, inert slide-show events from one `PresentationML` slide.
 pub(crate) fn load(
     slide_index: usize,
     slide: &dyn Part,
@@ -233,7 +233,10 @@ fn scan_slide_show_events(
     Ok(events)
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "element classifier threads one slot per event-element field"
+)]
 fn classify_element(
     namespace: &ResolveResult<'_>,
     element: &BytesStart<'_>,
@@ -416,7 +419,7 @@ fn required_attribute(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -
 fn parse_object_id(value: String) -> Result<u32> {
     value
         .parse()
-        .map_err(|_| invalid("slide-show event object ID must be an unsigned 32-bit integer"))
+        .map_err(|_err| invalid("slide-show event object ID must be an unsigned 32-bit integer"))
 }
 
 fn parse_trigger(value: String) -> Result<Trigger> {
@@ -498,7 +501,7 @@ impl Draft {
     }
 }
 
-/// Store slide-show event records onto a slide as a PowerPoint 2010
+/// Store slide-show event records onto a slide as a `PowerPoint` 2010
 /// `p14:showEvtLst` extension.
 ///
 /// The typed events are serialized canonically in caller order; the
@@ -650,14 +653,14 @@ fn locate_raw(source: &[u8]) -> Result<Located> {
 
     loop {
         let before = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("slide XML offset overflow"))?;
+            .map_err(|_err| invalid("slide XML offset overflow"))?;
         let decoder = reader.decoder();
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
         let after = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("slide XML offset overflow"))?;
+            .map_err(|_err| invalid("slide XML offset overflow"))?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
@@ -1096,6 +1099,11 @@ fn is_xml_space(byte: u8) -> bool {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

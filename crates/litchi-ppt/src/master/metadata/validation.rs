@@ -61,7 +61,7 @@ fn validate_name_record(record: &Record) -> Result<()> {
         ));
     }
     let data_length = usize::try_from(record.data_length)
-        .map_err(|_| Error::Corrupted("SlideNameAtom length exceeds usize".into()))?;
+        .map_err(|_err| Error::Corrupted("SlideNameAtom length exceeds usize".into()))?;
     if data_length != record.data.len() {
         return Err(Error::Corrupted(
             "SlideNameAtom length does not match its payload".into(),

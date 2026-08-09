@@ -1,8 +1,8 @@
-//! PPT's private compatibility facade for shared OfficeArt wire helpers.
+//! PPT's private compatibility facade for shared `OfficeArt` wire helpers.
 //!
 //! The binary vocabulary is owned by [`litchi_odraw`]. This module only keeps
 //! the existing crate-private helper paths used by PPT fixtures and semantic
-//! tests; no OfficeArt wire structs or constants are defined here.
+//! tests; no `OfficeArt` wire structs or constants are defined here.
 
 pub(crate) use litchi_odraw::write::prop_value;
 
@@ -15,6 +15,11 @@ pub(crate) use litchi_odraw::write::{
 pub(crate) use litchi_odraw::write::{child_anchor as write_child_anchor, spgr as write_spgr};
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

@@ -1,4 +1,4 @@
-//! Common PowerPoint record framing and bounded primitive decoding.
+//! Common `PowerPoint` record framing and bounded primitive decoding.
 
 use crate::consts::RecordType;
 use crate::package::{Error, Result};
@@ -13,7 +13,12 @@ pub(crate) fn parse_bool(value: u8, field: &str) -> Result<bool> {
 }
 
 pub(crate) fn u32_at(data: &[u8], offset: usize) -> u32 {
-    u32::from_le_bytes(data[offset..offset + 4].try_into().expect("fixed slice"))
+    u32::from_le_bytes([
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+    ])
 }
 
 pub(crate) fn require_atom(
@@ -54,7 +59,7 @@ pub(crate) fn record_bytes_raw(
         return corrupted("PowerPoint record header exceeds its encoded domain");
     }
     let length = u32::try_from(data.len())
-        .map_err(|_| Error::Corrupted("PowerPoint record payload exceeds u32".into()))?;
+        .map_err(|_err| Error::Corrupted("PowerPoint record payload exceeds u32".into()))?;
     let mut bytes = Vec::with_capacity(8usize.saturating_add(data.len()));
     bytes.extend_from_slice(&((instance << 4) | version).to_le_bytes());
     bytes.extend_from_slice(&kind.to_le_bytes());

@@ -18,6 +18,10 @@ use std::sync::Arc;
 /// users implement [`Clone`]; the blanket implementation supplies the erased
 /// clone operation.
 #[doc(hidden)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "supertrait name intentionally mirrors the Part trait it supports"
+)]
 pub trait PartClone {
     fn clone_part(&self) -> Box<dyn Part + Send + Sync>;
 }
@@ -43,27 +47,6 @@ impl Clone for Box<dyn Part + Send + Sync> {
 /// has a unique partname (`PackURI`), a content type, and may have relationships
 /// to other parts.
 pub trait Part: PartClone + Send + Sync {
-    /// Get the partname of this part.
-    fn partname(&self) -> &PackURI;
-
-    /// Get the content type of this part.
-    fn content_type(&self) -> &str;
-
-    /// Replace the content type of this part.
-    ///
-    /// Callers are responsible for selecting a content type permitted by the
-    /// owning package format. The package writer will emit the updated value
-    /// into `[Content_Types].xml`.
-    fn set_content_type(&mut self, content_type: String) -> Result<()> {
-        Err(OpcError::InvalidContentType {
-            value: content_type,
-            reason: format!(
-                "part '{}' does not support changing its content type",
-                self.partname().as_str()
-            ),
-        })
-    }
-
     /// Get the binary content of this part.
     /// Returns a reference to the blob data for efficient access.
     fn blob(&self) -> &[u8];
@@ -72,28 +55,24 @@ pub trait Part: PartClone + Send + Sync {
     /// This allows creating sub-slices that share the same allocation.
     fn blob_arc(&self) -> Arc<Vec<u8>>;
 
-    /// Set the binary content of this part.
-    ///
-    /// This allows for modification of part content.
-    fn set_blob(&mut self, blob: Vec<u8>);
+    /// Get the content type of this part.
+    fn content_type(&self) -> &str;
 
-    /// Replace content with an already shared immutable allocation.
+    /// Get the partname of this part.
+    fn partname(&self) -> &PackURI;
+
+    /// Count references to a relationship ID in the part content.
     ///
-    /// Custom part implementations need not override this method; the default
-    /// may copy when the allocation has other owners. Built-in parts adopt the
-    /// allocation directly.
-    fn set_blob_shared(&mut self, blob: Arc<Vec<u8>>) {
-        match Arc::try_unwrap(blob) {
-            Ok(blob) => self.set_blob(blob),
-            Err(blob) => self.set_blob(blob.as_ref().clone()),
-        }
+    /// Uses memchr for fast byte searching. For non-XML parts, returns 0.
+    fn rel_ref_count(&self, r_id: &str) -> usize {
+        // Fast byte-level search for r:id attribute references
+        let blob = self.blob();
+        let pattern = format!(r#"r:id="{r_id}""#);
+
+        // Use memmem from memchr for fast substring searching
+        let finder = memmem::Finder::new(pattern.as_bytes());
+        finder.find_iter(blob).count()
     }
-
-    /// Get the relationships for this part.
-    fn rels(&self) -> &Relationships;
-
-    /// Get mutable access to the relationships for this part.
-    fn rels_mut(&mut self) -> &mut Relationships;
 
     /// Add or get a relationship to another part.
     ///
@@ -110,25 +89,60 @@ pub trait Part: PartClone + Send + Sync {
         self.rels_mut().get_or_add_ext_rel(reltype, target_url)
     }
 
+    /// Get the relationships for this part.
+    fn rels(&self) -> &Relationships;
+
+    /// Get mutable access to the relationships for this part.
+    fn rels_mut(&mut self) -> &mut Relationships;
+
+    /// Set the binary content of this part.
+    ///
+    /// This allows for modification of part content.
+    fn set_blob(&mut self, blob: Vec<u8>);
+
+    /// Replace content with an already shared immutable allocation.
+    ///
+    /// Custom part implementations need not override this method; the default
+    /// may copy when the allocation has other owners. Built-in parts adopt the
+    /// allocation directly.
+    fn set_blob_shared(&mut self, blob: Arc<Vec<u8>>) {
+        match Arc::try_unwrap(blob) {
+            Ok(owned_blob) => self.set_blob(owned_blob),
+            Err(shared_blob) => self.set_blob(shared_blob.as_ref().clone()),
+        }
+    }
+
+    /// Replace the content type of this part.
+    ///
+    /// Callers are responsible for selecting a content type permitted by the
+    /// owning package format. The package writer will emit the updated value
+    /// into `[Content_Types].xml`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OpcError::InvalidContentType`] if the part does not support
+    /// changing its content type (the default behavior).
+    fn set_content_type(&mut self, content_type: String) -> Result<()> {
+        Err(OpcError::InvalidContentType {
+            value: content_type,
+            reason: format!(
+                "part '{}' does not support changing its content type",
+                self.partname().as_str()
+            ),
+        })
+    }
+
     /// Get the target reference for a relationship ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OpcError::RelationshipNotFound`] if no relationship with the
+    /// given `r_id` exists on this part.
     fn target_ref(&self, r_id: &str) -> Result<&str> {
         self.rels()
             .get(r_id)
             .map(Relationship::target_ref)
             .ok_or_else(|| OpcError::RelationshipNotFound(format!("rId: {r_id}")))
-    }
-
-    /// Count references to a relationship ID in the part content.
-    ///
-    /// Uses memchr for fast byte searching. For non-XML parts, returns 0.
-    fn rel_ref_count(&self, r_id: &str) -> usize {
-        // Fast byte-level search for r:id attribute references
-        let blob = self.blob();
-        let pattern = format!(r#"r:id="{r_id}""#);
-
-        // Use memmem from memchr for fast substring searching
-        let finder = memmem::Finder::new(pattern.as_bytes());
-        finder.find_iter(blob).count()
     }
 }
 
@@ -138,6 +152,10 @@ pub trait Part: PartClone + Send + Sync {
 /// content as a byte vector and manages relationships. Uses Arc for
 /// efficient sharing of blob data.
 #[derive(Debug, Clone)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "name mirrors the Part trait role; renaming would break the public API"
+)]
 pub struct BlobPart {
     /// The partname (URI) of this part
     partname: PackURI,
@@ -236,6 +254,10 @@ impl Part for BlobPart {
 /// using quick-xml with zero-copy parsing where possible. Uses Arc for efficient
 /// sharing of XML data.
 #[derive(Debug)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "name mirrors the Part trait role; renaming would break the public API"
+)]
 pub struct XmlPart {
     /// The partname (URI) of this part
     partname: PackURI,
@@ -315,6 +337,11 @@ impl XmlPart {
     ///
     /// # Arguments
     /// * `element_name` - The local name of the element to find (e.g., "text")
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the XML content cannot be parsed or the extracted
+    /// text is not valid UTF-8.
     pub fn extract_text(&mut self, element_name: &str) -> Result<Option<String>> {
         // Check cache first
         if let Some(cached) = self.element_cache.get(element_name) {
@@ -338,9 +365,6 @@ impl XmlPart {
                 Ok(Event::Start(_)) if target_depth > 0 => {
                     target_depth = target_depth.saturating_add(1);
                 },
-                // A self-closing target has no text and must not make unrelated
-                // following text appear to belong to it.
-                Ok(Event::Empty(_)) => {},
                 Ok(Event::Text(e)) if target_depth > 0 => {
                     // Efficiently decode text without unnecessary allocation
                     let text = std::str::from_utf8(e.as_ref())?;
@@ -357,6 +381,8 @@ impl XmlPart {
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OpcError::XmlError(format!("XML parse error: {e}"))),
+                // A self-closing target has no text and must not make unrelated
+                // following text appear to belong to it.
                 _ => {},
             }
         }
@@ -368,6 +394,11 @@ impl XmlPart {
     ///
     /// Returns a vector of `HashMaps`, where each `HashMap` contains the attributes
     /// of one matching element. Uses efficient streaming parsing.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the XML content cannot be parsed or an attribute
+    /// name or value is not valid UTF-8.
     pub fn find_elements_with_attrs(
         &self,
         element_name: &str,
@@ -378,14 +409,14 @@ impl XmlPart {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e))
+                Ok(Event::Start(ref e) | Event::Empty(ref e))
                     if e.local_name().as_ref() == element_name_bytes =>
                 {
                     let mut attrs = HashMap::new();
                     for attr in e.attributes() {
-                        let attr = attr?;
-                        let key = std::str::from_utf8(attr.key.as_ref())?;
-                        let value = attr.decoded_and_normalized_value(
+                        let attribute = attr?;
+                        let key = std::str::from_utf8(attribute.key.as_ref())?;
+                        let value = attribute.decoded_and_normalized_value(
                             XmlVersion::Implicit1_0,
                             reader.decoder(),
                         )?;
@@ -405,6 +436,10 @@ impl XmlPart {
     /// Get the XML content as a UTF-8 string.
     ///
     /// Performs zero-copy conversion if possible.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the XML content is not valid UTF-8.
     pub fn xml_str(&self) -> Result<&str> {
         std::str::from_utf8(&self.xml_bytes).map_err(Into::into)
     }
@@ -456,6 +491,10 @@ impl Part for XmlPart {
 ///
 /// The factory uses a type-based dispatch system to create the appropriate
 /// Part implementation (`BlobPart` for binary content, `XmlPart` for XML content).
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "factory name mirrors the Part trait it constructs; renaming would break the public API"
+)]
 pub struct PartFactory;
 
 impl PartFactory {
@@ -468,6 +507,11 @@ impl PartFactory {
     ///
     /// # Returns
     /// A boxed Part trait object
+    ///
+    /// # Errors
+    ///
+    /// This function currently never fails; the `Result` return type is kept
+    /// for future fallible part construction.
     pub fn load(
         partname: PackURI,
         content_type: String,

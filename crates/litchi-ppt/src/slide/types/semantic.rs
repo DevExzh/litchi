@@ -14,7 +14,7 @@ use crate::slide_round_trip::SlideRoundTripMetadata12;
 use crate::slide_sync::Synchronization;
 use crate::transition::{TransitionInfo, parse_transition};
 
-impl<'doc> Slide<'doc> {
+impl Slide<'_> {
     /// Get the slide number (1-based).
     #[inline]
     pub fn slide_number(&self) -> usize {
@@ -27,7 +27,7 @@ impl<'doc> Slide<'doc> {
         self.persist_id
     }
 
-    /// Get the stable presentation SlideId.
+    /// Get the stable presentation `SlideId`.
     #[inline]
     pub fn slide_id(&self) -> u32 {
         self.slide_id
@@ -40,23 +40,39 @@ impl<'doc> Slide<'doc> {
     /// - Shapes are parsed only on first call
     /// - Subsequent calls return cached reference
     /// - Zero allocation after first parse
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<&[ShapeEnum<'static>]> {
         self.shapes
             .get_or_try_init(|| self.parse_shapes())
-            .map(|v| v.as_slice())
+            .map(Vec::as_slice)
     }
 
     /// Get the number of shapes (triggers parsing if not yet loaded).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn shape_count(&self) -> Result<usize> {
         Ok(self.shapes()?.len())
     }
 
     /// Return every shape that has a click or mouse-over interaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn shape_interactions(&self) -> Result<Vec<crate::ShapeInteractionEntry>> {
         self.shape_interactions_with_limits(crate::InteractionLimits::default())
     }
 
     /// Return shape interactions with caller-supplied record and name limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn shape_interactions_with_limits(
         &self,
         limits: crate::InteractionLimits,
@@ -81,11 +97,19 @@ impl<'doc> Slide<'doc> {
     }
 
     /// Return every shape that has a range-anchored text action.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn shape_text_interactions(&self) -> Result<Vec<crate::ShapeTextInteractionEntry>> {
         self.shape_text_interactions_with_limits(crate::TextInteractionLimits::default())
     }
 
     /// Return shape text actions with caller-supplied resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn shape_text_interactions_with_limits(
         &self,
         limits: crate::TextInteractionLimits,
@@ -121,11 +145,19 @@ impl<'doc> Slide<'doc> {
     }
 
     /// Return every shape-scoped programmable-tag container on this slide.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn shape_programmable_tags(&self) -> Result<Vec<crate::ShapeProgrammableTagsEntry>> {
         self.shape_programmable_tags_with_limits(crate::ShapeProgrammableTagLimits::default())
     }
 
     /// Return shape programmable tags with caller-supplied resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn shape_programmable_tags_with_limits(
         &self,
         limits: crate::ShapeProgrammableTagLimits,
@@ -153,11 +185,19 @@ impl<'doc> Slide<'doc> {
     /// loaded, or resolved. Use
     /// [`crate::ProgTags::slide_extensions`] to decode the
     /// versioned binary-tag payloads into typed extension structs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn programmable_tags(&self) -> Result<Option<crate::ProgTags>> {
         self.programmable_tags_with_limits(crate::ProgTagLimits::default())
     }
 
     /// Return slide-level programmable tags with caller-supplied resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn programmable_tags_with_limits(
         &self,
         limits: crate::ProgTagLimits,
@@ -166,11 +206,19 @@ impl<'doc> Slide<'doc> {
     }
 
     /// Return every typed shape-flag projection on this slide.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn shape_flags(&self) -> Result<Vec<crate::ShapeFlagEntry>> {
         self.shape_flags_with_limits(crate::ShapeFlagLimits::default())
     }
 
     /// Return shape flags with caller-supplied client-data resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn shape_flags_with_limits(
         &self,
         limits: crate::ShapeFlagLimits,
@@ -192,11 +240,19 @@ impl<'doc> Slide<'doc> {
     }
 
     /// Return context-validated placeholders on this presentation slide.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn placeholder_atoms(&self) -> Result<Vec<crate::PlaceholderEntry>> {
         self.placeholder_atoms_with_limits(crate::PlaceholderLimits::default())
     }
 
     /// Return placeholders with caller-supplied client-data limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn placeholder_atoms_with_limits(
         &self,
         limits: crate::PlaceholderLimits,
@@ -227,6 +283,10 @@ impl<'doc> Slide<'doc> {
     }
 
     /// Return this slide's speaker-notes page, if one exists.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn speaker_notes(&self) -> Result<Option<&SpeakerNotes>> {
         self.speaker_notes
             .get_or_try_init(|| match &self.notes_descriptor {
@@ -240,32 +300,52 @@ impl<'doc> Slide<'doc> {
             .map(Option::as_ref)
     }
 
-    /// Return inert PowerPoint 97 animation metadata keyed by shape ID.
+    /// Return inert `PowerPoint` 97 animation metadata keyed by shape ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn animations(&self) -> Result<&[ShapeAnimation]> {
         self.animations
             .get_or_try_init(|| self.parse_animations())
             .map(Vec::as_slice)
     }
-    /// Return inert PowerPoint 2002 timing and build metadata from `___PPT10`.
+    /// Return inert `PowerPoint` 2002 timing and build metadata from `___PPT10`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn animation_extension(&self) -> Result<Option<&SlideAnimationExtension>> {
         self.animation_extension
             .get_or_try_init(|| self.parse_animation_extension())
             .map(Option::as_ref)
     }
-    /// Return PowerPoint 12 slide/master round-trip metadata from `___PPT12`.
+    /// Return `PowerPoint` 12 slide/master round-trip metadata from `___PPT12`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn powerpoint12_extension(&self) -> Result<&SlideExtension> {
         self.powerpoint12_extension
             .get_or_try_init(|| SlideExtension::parse(&self.record))
     }
 
-    /// Return inert PowerPoint 12 slide-library synchronization metadata.
+    /// Return inert `PowerPoint` 12 slide-library synchronization metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn sync_info(&self) -> Result<Option<&Synchronization>> {
         self.sync_info
             .get_or_try_init(|| Synchronization::parse(&self.record))
             .map(Option::as_ref)
     }
 
-    /// Return inert PowerPoint 12 metadata stored directly on this slide.
+    /// Return inert `PowerPoint` 12 metadata stored directly on this slide.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn powerpoint12_round_trip_metadata(&self) -> Result<&SlideRoundTripMetadata12> {
         self.round_trip_metadata
             .get_or_try_init(|| SlideRoundTripMetadata12::parse(&self.record))
@@ -279,6 +359,10 @@ impl<'doc> Slide<'doc> {
     /// - Includes text from:
     ///   * Direct text records in the slide
     ///   * Shapes (via PPDrawing/Escher)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn text(&self) -> Result<&str> {
         self.text_cache
             .get_or_try_init(|| {
@@ -289,9 +373,9 @@ impl<'doc> Slide<'doc> {
                     Ok(text)
                 }
             })
-            .map(|s| s.as_str())
+            .map(String::as_str)
     }
-    /// Check if this slide has a PPDrawing record (shapes).
+    /// Check if this slide has a `PPDrawing` record (shapes).
     #[inline]
     pub fn has_drawing(&self) -> bool {
         self.record.find_child(RecordType::PPDrawing).is_some()
@@ -303,7 +387,7 @@ impl<'doc> Slide<'doc> {
         &self.record
     }
 
-    /// Parse comments from this slide's BinaryTagData.
+    /// Parse comments from this slide's `BinaryTagData`.
     ///
     /// Comments are stored inside `ProgTags/ProgBinaryTag/BinaryTagData`
     /// as `Comment2000` (type=12000) containers.
@@ -315,7 +399,7 @@ impl<'doc> Slide<'doc> {
     ///
     /// # Errors
     ///
-    /// Returns an error when the PowerPoint 10 programmable tag or a comment record is malformed.
+    /// Returns an error when the `PowerPoint` 10 programmable tag or a comment record is malformed.
     pub fn comments(&self) -> Result<Vec<ParsedComment>> {
         crate::comments::parse_slide_comments(&self.record)
     }
@@ -340,7 +424,7 @@ impl<'doc> Slide<'doc> {
         }
     }
 
-    /// Get the slide timing from the SSSlideInfoAtom record.
+    /// Get the slide timing from the `SSSlideInfoAtom` record.
     ///
     /// Returns `None` if the slide has no timing record.
     pub fn timing(&self) -> Option<ParsedSlideTiming> {
@@ -353,11 +437,9 @@ impl<'doc> Slide<'doc> {
 
         let d = &info.data;
         let slide_time_ms = u32::from_le_bytes([d[0], d[1], d[2], d[3]]);
-        let _sound_id_ref = u32::from_le_bytes([d[4], d[5], d[6], d[7]]);
-        let _effect_direction = d[8];
-        let _effect_type = d[9];
+        // d[4..8] soundIdRef, d[8] effect direction, d[9] effect type, and
+        // d[12] speed are part of the atom layout but not yet exposed.
         let flags = u16::from_le_bytes([d[10], d[11]]);
-        let _speed = d[12];
 
         Some(ParsedSlideTiming {
             advance_time_ms: slide_time_ms,

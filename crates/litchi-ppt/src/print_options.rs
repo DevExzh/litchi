@@ -1,4 +1,4 @@
-//! Typed PowerPoint document print preferences.
+//! Typed `PowerPoint` document print preferences.
 
 use super::package::{Error, Result};
 use super::records::Record;
@@ -67,6 +67,12 @@ pub struct PrintOptions {
 }
 
 impl PrintOptions {
+    /// Discover and parse the optional `PrintOptionsAtom` below a document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the atom is duplicated, has an invalid header or
+    /// size, or contains out-of-range enum or bool1 values.
     pub fn parse(document: &Record) -> Result<Option<Self>> {
         let records = document
             .children
@@ -95,6 +101,11 @@ impl PrintOptions {
         }))
     }
 
+    /// Serialize this value as one canonical `PrintOptionsAtom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the canonical record cannot be re-parsed.
     pub fn to_record(&self) -> Result<Record> {
         let bytes = self.to_record_bytes();
         let (record, end) = Record::parse(&bytes, 0)?;
@@ -104,6 +115,7 @@ impl PrintOptions {
         Ok(record)
     }
 
+    #[must_use]
     pub fn to_record_bytes(&self) -> [u8; 13] {
         let mut bytes = [0; 13];
         bytes[2..4].copy_from_slice(&RecordType::PrintOptionsAtom.as_u16().to_le_bytes());
@@ -130,6 +142,11 @@ fn corrupted<T>(message: impl Into<String>) -> Result<T> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -193,8 +210,8 @@ mod tests {
         for (offset, invalid) in [(0, 1), (8, 10), (9, 3), (10, 2), (11, 0xff), (12, 7)] {
             let mut bytes = value.to_record_bytes();
             bytes[offset] = invalid;
-            let record = Record::parse(&bytes, 0).unwrap().0;
-            assert!(PrintOptions::parse(&root(vec![record])).is_err());
+            let mutated_record = Record::parse(&bytes, 0).unwrap().0;
+            assert!(PrintOptions::parse(&root(vec![mutated_record])).is_err());
         }
     }
 }

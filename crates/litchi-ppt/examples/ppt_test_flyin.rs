@@ -1,7 +1,15 @@
-//! Test FlyIn animation with sound
+#![allow(
+    clippy::print_stdout,
+    reason = "this command-line example intentionally prints its results"
+)]
+
+//! Test `FlyIn` animation with sound
 
 use litchi_ppt::Writer;
-use litchi_ppt::animation::*;
+use litchi_ppt::animation::{
+    AfterEffect, AnimationEffect, AnimationInfo, AnimationSound, AnimationTrigger, BuildInfo,
+    BuildLevel, BuildType, BuiltinSound, EffectDirection, EffectSpeed, IterationType,
+};
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {

@@ -229,7 +229,9 @@ fn is_valid_time_formula_bytes(value: &[u8]) -> bool {
             if self.position == start {
                 return false;
             }
-            let name = std::str::from_utf8(&self.value[start..self.position]).expect("ASCII only");
+            let Ok(name) = std::str::from_utf8(&self.value[start..self.position]) else {
+                return false;
+            };
             if !prefixed && self.peek() == Some(b'(') && is_time_formula_function(name) {
                 self.position += 1;
                 if !self.expression() {
@@ -698,10 +700,33 @@ fn is_time_set_numeric_attribute(attribute: &str) -> bool {
     )
 }
 
+impl TimeNodeFill {
+    pub(crate) fn parse(value: u32) -> Option<Self> {
+        match value {
+            0 => Some(Self::HoldUntilParentEnds),
+            1 => Some(Self::ResetWhenInactive),
+            2 => Some(Self::HoldUntilNext),
+            3 => Some(Self::HoldUntilParentEndsLegacy),
+            4 => Some(Self::ResetWhenInactiveLegacy),
+            _ => None,
+        }
+    }
+
+    pub(crate) const fn as_u32(self) -> u32 {
+        match self {
+            Self::HoldUntilParentEnds => 0,
+            Self::ResetWhenInactive => 1,
+            Self::HoldUntilNext => 2,
+            Self::HoldUntilParentEndsLegacy => 3,
+            Self::ResetWhenInactiveLegacy => 4,
+        }
+    }
+}
+
 fn is_valid_formula_or_number(value: &str) -> bool {
     if let Some(formula) = value
         .strip_prefix('(')
-        .and_then(|value| value.strip_suffix(')'))
+        .and_then(|rest| rest.strip_suffix(')'))
     {
         return is_valid_time_formula_bytes(formula.as_bytes());
     }
@@ -748,27 +773,4 @@ fn is_valid_formula_or_number(value: &str) -> bool {
         }
     }
     position == bytes.len()
-}
-
-impl TimeNodeFill {
-    pub(crate) fn parse(value: u32) -> Option<Self> {
-        match value {
-            0 => Some(Self::HoldUntilParentEnds),
-            1 => Some(Self::ResetWhenInactive),
-            2 => Some(Self::HoldUntilNext),
-            3 => Some(Self::HoldUntilParentEndsLegacy),
-            4 => Some(Self::ResetWhenInactiveLegacy),
-            _ => None,
-        }
-    }
-
-    pub(crate) const fn as_u32(self) -> u32 {
-        match self {
-            Self::HoldUntilParentEnds => 0,
-            Self::ResetWhenInactive => 1,
-            Self::HoldUntilNext => 2,
-            Self::HoldUntilParentEndsLegacy => 3,
-            Self::ResetWhenInactiveLegacy => 4,
-        }
-    }
 }

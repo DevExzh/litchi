@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::*;
 use crate::RecordType;
 use crate::records::Record;
@@ -172,6 +178,6 @@ fn placement_duplicate_and_order_violations_are_rejected() {
         data: Vec::new(),
         children: Vec::new(),
     };
-    let records = vec![&empty_document, &wrong_parent, &wrong_parent.children[0]];
-    assert!(HeaderFooters::parse_record_tree(&records).is_err());
+    let wrong_parent_records = vec![&empty_document, &wrong_parent, &wrong_parent.children[0]];
+    assert!(HeaderFooters::parse_record_tree(&wrong_parent_records).is_err());
 }

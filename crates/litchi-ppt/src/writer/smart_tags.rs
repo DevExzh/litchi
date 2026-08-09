@@ -25,7 +25,7 @@ pub struct ShapeTextExtensionRun {
     pub complex_script_font: Option<u16>,
 }
 
-/// Typed zero-based reference into a PowerPoint 11 smart-tag store.
+/// Typed zero-based reference into a `PowerPoint` 11 smart-tag store.
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SmartTagIndex(u32);
@@ -36,6 +36,7 @@ impl SmartTagIndex {
     }
 
     /// Return the encoded zero-based `SmartTagIndex`.
+    #[must_use]
     pub const fn as_u32(self) -> u32 {
         self.0
     }
@@ -62,12 +63,14 @@ impl SmartTagDefinition {
     }
 
     /// Set the inert recognizer download URL retained in the type declaration.
+    #[must_use]
     pub fn with_download_url(mut self, value: impl Into<String>) -> Self {
         self.download_url = value.into();
         self
     }
 
     /// Append a key/value property.
+    #[must_use]
     pub fn with_property(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
         self.properties.push((key.into(), value.into()));
         self
@@ -105,7 +108,7 @@ pub(crate) fn build_document_binary_tag(
         let type_id = if let Some(id) = type_ids.get(&type_key) {
             *id
         } else {
-            let id = u16::try_from(types.len() + 1).map_err(|_| {
+            let id = u16::try_from(types.len() + 1).map_err(|_err| {
                 WriteError::InvalidData("PowerPoint smart-tag type count exceeds 65535".to_string())
             })?;
             type_ids.insert(type_key, id);
@@ -138,7 +141,9 @@ pub(crate) fn build_document_binary_tag(
         strings,
     };
     let mut store_payload = u32::try_from(bags.len())
-        .map_err(|_| WriteError::InvalidData("PowerPoint smart-tag count exceeds u32".to_string()))?
+        .map_err(|_err| {
+            WriteError::InvalidData("PowerPoint smart-tag count exceeds u32".to_string())
+        })?
         .to_le_bytes()
         .to_vec();
     store_payload.extend(
@@ -156,7 +161,7 @@ pub(crate) fn build_document_binary_tag(
 pub(crate) fn build_shape_programmable_tags(
     runs: &[Vec<u32>],
 ) -> Result<Option<Vec<u8>>, WriteError> {
-    let runs = runs
+    let extension_runs = runs
         .iter()
         .cloned()
         .map(|smart_tags| ShapeTextExtensionRun {
@@ -165,7 +170,7 @@ pub(crate) fn build_shape_programmable_tags(
             complex_script_font: None,
         })
         .collect::<Vec<_>>();
-    build_shape_text_extensions(&runs)
+    build_shape_text_extensions(&extension_runs)
 }
 
 pub(crate) fn build_shape_text_extensions(
@@ -233,7 +238,11 @@ pub(crate) fn build_shape_text_extensions(
         style9.extend_from_slice(&SPECIAL_INFO_PP10_EXTENSION.to_le_bytes());
         style9.extend_from_slice(
             &u32::try_from(index % 16)
-                .expect("modulo 16 always fits u32")
+                .map_err(|_err| {
+                    WriteError::InvalidData(
+                        "PowerPoint text run PP9 identifier exceeds u32".to_string(),
+                    )
+                })?
                 .to_le_bytes(),
         );
 
@@ -258,15 +267,15 @@ pub(crate) fn build_shape_text_extensions(
             style11.extend_from_slice(&SPECIAL_INFO_SMART_TAG.to_le_bytes());
             style11.extend_from_slice(
                 &u32::try_from(run.smart_tags.len())
-                    .map_err(|_| {
+                    .map_err(|_err| {
                         WriteError::InvalidData(
                             "PowerPoint text run smart-tag count exceeds u32".to_string(),
                         )
                     })?
                     .to_le_bytes(),
             );
-            for index in &run.smart_tags {
-                style11.extend_from_slice(&index.to_le_bytes());
+            for tag_index in &run.smart_tags {
+                style11.extend_from_slice(&tag_index.to_le_bytes());
             }
         }
     }
@@ -351,7 +360,7 @@ fn intern_string<'a>(
     if let Some(index) = indexes.get(value) {
         return Ok(*index);
     }
-    let index = u32::try_from(strings.len()).map_err(|_| {
+    let index = u32::try_from(strings.len()).map_err(|_err| {
         WriteError::InvalidData("PowerPoint smart-tag string table exceeds u32".to_string())
     })?;
     indexes.insert(value, index);
@@ -371,6 +380,11 @@ fn invalid<T>(message: impl Into<String>) -> Result<T, WriteError> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use crate::records::Record;

@@ -6,6 +6,10 @@ use crate::animation::sound::{BuiltinSound, SoundType};
 
 /// Sound information for slide transition.
 #[derive(Debug, Clone, PartialEq)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`TransitionSound` is the established public API name, paralleling the animation sound types; renaming it would break downstream crates"
+)]
 pub struct TransitionSound {
     /// Sound type and data
     pub sound_type: SoundType,
@@ -25,6 +29,7 @@ impl Default for TransitionSound {
 
 impl TransitionSound {
     /// Create a new empty transition sound with default Click sound.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             sound_type: SoundType::Builtin(BuiltinSound::Click),
@@ -35,6 +40,7 @@ impl TransitionSound {
     }
 
     /// Create a built-in sound.
+    #[must_use]
     pub fn builtin(sound: BuiltinSound) -> Self {
         Self {
             sound_type: SoundType::Builtin(sound),
@@ -71,36 +77,41 @@ impl TransitionSound {
     }
 
     /// Check if this is a built-in sound.
+    #[must_use]
     pub fn is_builtin(&self) -> bool {
         matches!(self.sound_type, SoundType::Builtin(_))
     }
 
     /// Check if this is an embedded sound.
+    #[must_use]
     pub fn is_embedded(&self) -> bool {
         matches!(self.sound_type, SoundType::Embedded { .. })
     }
 
     /// Check if this is a linked sound.
+    #[must_use]
     pub fn is_linked(&self) -> bool {
         matches!(self.sound_type, SoundType::Linked { .. })
     }
 
     /// Get the sound name.
+    #[must_use]
     pub fn name(&self) -> &str {
         match &self.sound_type {
             SoundType::Builtin(sound) => sound.name(),
-            SoundType::Embedded { name, .. } => name,
-            SoundType::Linked { name, .. } => name,
+            SoundType::Embedded { name, .. } | SoundType::Linked { name, .. } => name,
         }
     }
 
     /// Set loop flag.
+    #[must_use]
     pub fn with_loop(mut self, loop_sound: bool) -> Self {
         self.loop_sound = loop_sound;
         self
     }
 
     /// Set stop previous sound flag.
+    #[must_use]
     pub fn with_stop_previous(mut self, stop: bool) -> Self {
         self.stop_previous = stop;
         self
@@ -108,6 +119,11 @@ impl TransitionSound {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -131,7 +147,7 @@ mod tests {
         assert_eq!(sound.name(), "CustomTransition");
         match &sound.sound_type {
             SoundType::Embedded { data: d, .. } => assert_eq!(d, &data),
-            _ => panic!("Expected embedded sound"),
+            SoundType::Builtin(_) | SoundType::Linked { .. } => panic!("Expected embedded sound"),
         }
     }
 
@@ -146,7 +162,7 @@ mod tests {
             SoundType::Linked { file_path, .. } => {
                 assert_eq!(file_path, "/sounds/whoosh.wav");
             },
-            _ => panic!("Expected linked sound"),
+            SoundType::Builtin(_) | SoundType::Embedded { .. } => panic!("Expected linked sound"),
         }
     }
 

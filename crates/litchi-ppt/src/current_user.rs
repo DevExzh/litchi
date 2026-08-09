@@ -1,11 +1,11 @@
-/// CurrentUser stream parser for PowerPoint presentations.
+/// `CurrentUser` stream parser for `PowerPoint` presentations.
 ///
-/// The CurrentUser stream contains information about the current editing session,
+/// The `CurrentUser` stream contains information about the current editing session,
 /// including the offset to the current user edit record. This follows Apache POI's
-/// CurrentUserAtom implementation.
+/// `CurrentUserAtom` implementation.
 use super::package::{Error, RecordLimits, Result};
 
-/// Minimum size of CurrentUser stream in bytes
+/// Minimum size of `CurrentUser` stream in bytes
 const CURRENT_USER_MIN_SIZE: usize = 28;
 const CURRENT_USER_RECORD_TYPE: u16 = 0x0FF6;
 const UNENCRYPTED_HEADER_TOKEN: u32 = 0xE391_C05F;
@@ -13,11 +13,11 @@ const ENCRYPTED_HEADER_TOKEN: u32 = 0xF3D1_C4DF;
 
 /// Current User information.
 ///
-/// Based on Apache POI's CurrentUserAtom, this contains information about
-/// the current editing session in a PowerPoint presentation.
+/// Based on Apache POI's `CurrentUserAtom`, this contains information about
+/// the current editing session in a `PowerPoint` presentation.
 #[derive(Debug, Clone)]
 pub struct CurrentUser {
-    /// Offset to the current UserEditAtom record
+    /// Offset to the current `UserEditAtom` record
     current_edit_offset: u32,
     /// Release version
     release_version: u16,
@@ -30,26 +30,34 @@ pub struct CurrentUser {
 }
 
 impl CurrentUser {
-    /// Parse a CurrentUser stream from binary data.
+    /// Parse a `CurrentUser` stream from binary data.
     ///
     /// # Arguments
     ///
-    /// * `data` - The CurrentUser stream data
+    /// * `data` - The `CurrentUser` stream data
     ///
     /// # Returns
     ///
-    /// A parsed CurrentUser structure or an error if the data is invalid.
+    /// A parsed `CurrentUser` structure or an error if the data is invalid.
     ///
-    /// # Format (based on Apache POI's CurrentUserAtom)
+    /// # Format (based on Apache POI's `CurrentUserAtom`)
     ///
-    /// - Bytes 0-7: PowerPoint record header
-    /// - Bytes 8-27: Fixed CurrentUserAtom fields
+    /// - Bytes 0-7: `PowerPoint` record header
+    /// - Bytes 8-27: Fixed `CurrentUserAtom` fields
     /// - Bytes 28+: ANSI username, release version, and optional UTF-16LE username
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(data: &[u8]) -> Result<Self> {
         Self::parse_with_limits(data, RecordLimits::default())
     }
 
     /// Parse a Current User stream with the same input bound as the document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_with_limits(data: &[u8], limits: RecordLimits) -> Result<Self> {
         if data.len() > limits.max_input_bytes {
             return Err(Error::ResourceLimit(format!(
@@ -139,17 +147,19 @@ impl CurrentUser {
         })
     }
 
-    /// Get the offset to the current UserEditAtom record.
+    /// Get the offset to the current `UserEditAtom` record.
     ///
-    /// This offset points to the location in the PowerPoint Document stream
-    /// where the current UserEditAtom record is located.
+    /// This offset points to the location in the `PowerPoint` Document stream
+    /// where the current `UserEditAtom` record is located.
     #[inline]
+    #[must_use]
     pub fn current_edit_offset(&self) -> u32 {
         self.current_edit_offset
     }
 
     /// Get the username.
     #[inline]
+    #[must_use]
     pub fn username(&self) -> &str {
         &self.username
     }
@@ -158,24 +168,28 @@ impl CurrentUser {
     ///
     /// `CurrentUserAtom` has no relative-path field, so this always returns an empty string.
     #[inline]
-    pub fn relative_path(&self) -> &str {
+    #[must_use]
+    pub fn relative_path(&self) -> &'static str {
         ""
     }
 
     /// Get the release version.
     #[inline]
+    #[must_use]
     pub fn release_version(&self) -> u16 {
         self.release_version
     }
 
     /// Return the document file version stored in the fixed atom fields.
     #[inline]
+    #[must_use]
     pub fn document_version(&self) -> u16 {
         self.document_version
     }
 
     /// Return whether the stream identifies an encrypted presentation.
     #[inline]
+    #[must_use]
     pub fn is_encrypted(&self) -> bool {
         self.encrypted
     }
@@ -194,6 +208,11 @@ impl CurrentUser {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -205,7 +224,7 @@ mod tests {
         data.extend_from_slice(&20u32.to_le_bytes());
         data.extend_from_slice(&token.to_le_bytes());
         data.extend_from_slice(&0x1000u32.to_le_bytes());
-        data.extend_from_slice(&(ansi_name.len() as u16).to_le_bytes());
+        data.extend_from_slice(&u16::try_from(ansi_name.len()).unwrap().to_le_bytes());
         data.extend_from_slice(&0x03F4u16.to_le_bytes());
         data.extend_from_slice(&[3, 0, 0, 0]);
         data.extend_from_slice(ansi_name);
@@ -215,7 +234,7 @@ mod tests {
                 data.extend_from_slice(&code_unit.to_le_bytes());
             }
         }
-        let record_len = (data.len() - 8) as u32;
+        let record_len = u32::try_from(data.len() - 8).unwrap();
         data[4..8].copy_from_slice(&record_len.to_le_bytes());
         data
     }

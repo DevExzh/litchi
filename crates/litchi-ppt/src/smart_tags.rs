@@ -1,4 +1,4 @@
-//! PowerPoint 11 smart-tag store parsing.
+//! `PowerPoint` 11 smart-tag store parsing.
 
 use super::package::{Error, Result};
 use super::records::Record;
@@ -31,7 +31,7 @@ pub struct SmartTag {
     pub properties: Vec<SmartTagProperty>,
 }
 
-/// PowerPoint 11 smart-tag types, shared strings, and property bags.
+/// `PowerPoint` 11 smart-tag types, shared strings, and property bags.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SmartTagStore {
     /// ANSI code page used to decode ANSI `PBString` values.
@@ -43,11 +43,19 @@ pub struct SmartTagStore {
 
 impl SmartTagStore {
     /// Parse the optional `___PPT11` smart-tag store using Windows-1252 for ANSI strings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(root: &Record) -> Result<Option<Self>> {
         Self::parse_with(root, Ansi::WINDOWS_1252)
     }
 
     /// Parse with an explicitly validated ANSI page.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_with(root: &Record, ansi: Ansi) -> Result<Option<Self>> {
         let mut store = None;
         for record in root.versioned_binary_tag_records(11)? {
@@ -65,17 +73,23 @@ impl SmartTagStore {
     }
 
     /// Validate a raw ANSI page identifier and parse the optional store.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_page(root: &Record, page: u32) -> Result<Option<Self>> {
         let ansi = Ansi::require(page).map_err(|error| Error::Corrupted(error.to_string()))?;
         Self::parse_with(root, ansi)
     }
 
     /// Resolve a zero-based smart-tag index from a text run.
+    #[must_use]
     pub fn get(&self, index: u32) -> Option<&SmartTag> {
         self.tags.get(usize::try_from(index).ok()?)
     }
 
     /// Resolve a smart tag's declared type.
+    #[must_use]
     pub fn tag_type(&self, tag: &SmartTag) -> Option<&SmartTagType> {
         self.types.iter().find(|kind| kind.id == tag.type_id)
     }
@@ -100,7 +114,7 @@ fn parse_store(record: &Record, ansi: Ansi) -> Result<SmartTagStore> {
         bag_count_bytes[2],
         bag_count_bytes[3],
     ]))
-    .map_err(|_| Error::Corrupted("smart-tag bag count overflows usize".to_string()))?;
+    .map_err(|_err| Error::Corrupted("smart-tag bag count overflows usize".to_string()))?;
     let limits = Limits::default();
     let (shared, consumed) = PropertyBagStore::parse_prefix(&data[4..], ansi, limits)
         .map_err(|error| Error::Corrupted(error.to_string()))?;
@@ -156,6 +170,11 @@ fn parse_store(record: &Record, ansi: Ansi) -> Result<SmartTagStore> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -163,7 +182,7 @@ mod tests {
         let mut data = Vec::new();
         data.extend_from_slice(&((instance << 4) | version).to_le_bytes());
         data.extend_from_slice(&kind.to_le_bytes());
-        data.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+        data.extend_from_slice(&u32::try_from(payload.len()).unwrap().to_le_bytes());
         data.extend_from_slice(payload);
         data
     }
@@ -226,7 +245,7 @@ mod tests {
             record_type_raw: 0x1388,
             version: 0x0f,
             instance: 0,
-            data_length: tag.len() as u32,
+            data_length: u32::try_from(tag.len()).unwrap(),
             data: tag,
             children: Vec::new(),
         }

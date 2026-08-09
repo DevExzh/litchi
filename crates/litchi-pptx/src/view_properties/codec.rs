@@ -1,9 +1,13 @@
-//! Bounded PresentationML view-properties XML codec.
+//! Bounded `PresentationML` view-properties XML codec.
 //!
 //! This module owns the package-independent view-properties model, bounded XML
 //! codec, and inert presentation relationship loading.
 
-use super::model::*;
+use super::model::{
+    CommonSlideView, CommonView, GridSpacing, Guide, GuideOrientation, NormalView, OutlineSlide,
+    OutlineView, Point, Ratio, RestoredPane, SimpleView, SlideLikeView, SorterView, SplitterState,
+    ViewKind, ViewProperties,
+};
 use crate::{Error, Result};
 use quick_xml::{
     Reader, XmlVersion,
@@ -24,6 +28,9 @@ const MAX_GUIDES: usize = 4096;
 const MAX_SLIDES: usize = 100_000;
 
 impl ViewProperties {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(xml: &[u8]) -> Result<Self> {
         if xml.len() > MAX {
             return Err(invalid("view properties exceed 8 MiB"));
@@ -34,6 +41,9 @@ impl ViewProperties {
         }
         project(&parse_dom(x.as_ref())?)
     }
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
     pub fn to_xml(&self, strict: bool) -> Result<Vec<u8>> {
         validate(self)?;
         let p = if strict { PS } else { P };
@@ -135,7 +145,7 @@ fn parse_dom(xml: &[u8]) -> Result<Node> {
             Ok(Event::Text(t)) => {
                 let v = t.decode().map_err(xml_error)?.into_owned();
                 if let Some(n) = stack.last_mut() {
-                    n.content.push(Content::Text(v))
+                    n.content.push(Content::Text(v));
                 } else if !v.trim().is_empty() {
                     return Err(invalid("text outside viewPr"));
                 }
@@ -143,7 +153,7 @@ fn parse_dom(xml: &[u8]) -> Result<Node> {
             Ok(Event::CData(t)) => {
                 if let Some(n) = stack.last_mut() {
                     n.content
-                        .push(Content::CData(t.decode().map_err(xml_error)?.into_owned()))
+                        .push(Content::CData(t.decode().map_err(xml_error)?.into_owned()));
                 } else {
                     return Err(invalid("CDATA outside viewPr"));
                 }
@@ -152,14 +162,14 @@ fn parse_dom(xml: &[u8]) -> Result<Node> {
                 if let Some(n) = stack.last_mut() {
                     n.content.push(Content::Comment(
                         t.decode().map_err(xml_error)?.into_owned(),
-                    ))
+                    ));
                 }
             },
             Ok(Event::GeneralRef(t)) => {
                 if let Some(n) = stack.last_mut() {
                     n.content.push(Content::Text(
                         litchi_ooxml_common::xml::decode_xml_reference(&t)?,
-                    ))
+                    ));
                 } else {
                     return Err(invalid("entity outside viewPr"));
                 }
@@ -198,9 +208,9 @@ fn make(e: &BytesStart<'_>, d: Decoder, stack: &[Node]) -> Result<Node> {
         if k == "xmlns" || k.starts_with("xmlns:") {
             let key = k.strip_prefix("xmlns:").unwrap_or("").to_string();
             if let Some(x) = bindings.iter_mut().find(|x| x.0 == key) {
-                x.1 = v.clone()
+                x.1 = v.clone();
             } else {
-                bindings.push((key, v.clone()))
+                bindings.push((key, v.clone()));
             }
         }
     }
@@ -237,7 +247,7 @@ fn make(e: &BytesStart<'_>, d: Decoder, stack: &[Node]) -> Result<Node> {
 }
 fn attach(stack: &mut [Node], root: &mut Option<Node>, n: Node) -> Result<()> {
     if let Some(p) = stack.last_mut() {
-        p.content.push(Content::Node(n))
+        p.content.push(Content::Node(n));
     } else if root.replace(n).is_some() {
         return Err(invalid("multiple XML roots"));
     }
@@ -336,7 +346,7 @@ fn parse_normal(n: &Node) -> Result<NormalView> {
 }
 fn parse_pane(n: &Node) -> Result<RestoredPane> {
     let size = u32req(n, "sz")?;
-    if size > 100000 {
+    if size > 100_000 {
         return Err(invalid("restored pane size exceeds 100000"));
     }
     let auto_adjust = bopt(n, "autoAdjust")?;
@@ -532,7 +542,7 @@ fn write_normal(x: &mut String, v: &NormalView, s: bool) -> Result<()> {
         ("snapVertSplitter", v.snap_vertical_splitter),
         ("preferSingleView", v.prefer_single_view),
     ] {
-        bool_attr(x, n, b)
+        bool_attr(x, n, b);
     }
     if let Some(z) = v.vertical_bar_state {
         attr(x, "vertBarState", splitter_str(z));
@@ -552,7 +562,7 @@ fn write_normal(x: &mut String, v: &NormalView, s: bool) -> Result<()> {
 fn pane(x: &mut String, n: &str, v: &RestoredPane) {
     x.push_str(&format!("<p:{n} sz=\"{}\"", v.size));
     bool_attr(x, "autoAdjust", v.auto_adjust);
-    x.push_str("/>")
+    x.push_str("/>");
 }
 fn write_common(x: &mut String, v: &CommonView) {
     x.push_str("<p:cViewPr");
@@ -578,7 +588,7 @@ fn write_common_slide(x: &mut String, v: &CommonSlideView) {
         ("snapToObjects", v.snap_to_objects),
         ("showGuides", v.show_guides),
     ] {
-        bool_attr(x, n, b)
+        bool_attr(x, n, b);
     }
     x.push('>');
     write_common(x, &v.view);
@@ -695,9 +705,9 @@ fn opaque(x: &mut String, b: &[u8], strict: bool) -> Result<()> {
     parse_dom(b)?;
     let mut s = std::str::from_utf8(b).map_err(xml_error)?.to_string();
     if strict {
-        s = s.replace(P, PS).replace(A, AS).replace(R, RS)
+        s = s.replace(P, PS).replace(A, AS).replace(R, RS);
     } else {
-        s = s.replace(PS, P).replace(AS, A).replace(RS, R)
+        s = s.replace(PS, P).replace(AS, A).replace(RS, R);
     }
     x.push_str(&s);
     Ok(())
@@ -712,11 +722,11 @@ fn node_write(x: &mut String, n: &Node, s: bool) -> Result<()> {
     x.push_str(&n.q);
     for (p, u) in &n.bindings {
         if p.is_empty() {
-            x.push_str(" xmlns=\"")
+            x.push_str(" xmlns=\"");
         } else {
             x.push_str(" xmlns:");
             x.push_str(p);
-            x.push_str("=\"")
+            x.push_str("=\"");
         }
         esc(x, mapns(u, s));
         x.push('"');
@@ -841,19 +851,19 @@ fn i64req(n: &Node, l: &str) -> Result<i64> {
     aopt(n, l)?
         .ok_or_else(|| invalid(format!("missing '{l}'")))?
         .parse()
-        .map_err(|_| invalid(format!("invalid integer '{l}'")))
+        .map_err(|_err| invalid(format!("invalid integer '{l}'")))
 }
 fn u32req(n: &Node, l: &str) -> Result<u32> {
     aopt(n, l)?
         .ok_or_else(|| invalid(format!("missing '{l}'")))?
         .parse()
-        .map_err(|_| invalid(format!("invalid integer '{l}'")))
+        .map_err(|_err| invalid(format!("invalid integer '{l}'")))
 }
 fn i32opt(n: &Node, l: &str) -> Result<Option<i32>> {
     aopt(n, l)?
         .map(|x| {
             x.parse()
-                .map_err(|_| invalid(format!("invalid integer '{l}'")))
+                .map_err(|_err| invalid(format!("invalid integer '{l}'")))
         })
         .transpose()
 }
@@ -907,11 +917,11 @@ fn attr(x: &mut String, n: &str, v: &str) {
     x.push_str(n);
     x.push_str("=\"");
     esc(x, v);
-    x.push('"')
+    x.push('"');
 }
 fn bool_attr(x: &mut String, n: &str, v: Option<bool>) {
     if let Some(v) = v {
-        attr(x, n, if v { "1" } else { "0" })
+        attr(x, n, if v { "1" } else { "0" });
     }
 }
 fn esc(x: &mut String, v: &str) {
@@ -948,6 +958,11 @@ fn xml_error(e: impl std::fmt::Display) -> Error {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::super::package::load_from_package;
     use super::*;

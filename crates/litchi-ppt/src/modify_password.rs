@@ -9,7 +9,7 @@ use super::records::Record;
 
 const MAX_PASSWORD_BYTES: usize = 510;
 
-/// A bounded PowerPoint modify-password value.
+/// A bounded `PowerPoint` modify-password value.
 ///
 /// The secret is intentionally redacted from `Debug` and is only returned by
 /// the explicitly named [`Self::expose_secret`] method. This type does not
@@ -21,13 +21,21 @@ pub struct ModifyPassword {
 
 impl ModifyPassword {
     /// Construct a canonical printable Unicode modify password.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(value: impl Into<String>) -> Result<Self> {
-        let value = value.into();
-        validate_value(&value)?;
-        Ok(Self { value })
+        let secret = value.into();
+        validate_value(&secret)?;
+        Ok(Self { value: secret })
     }
 
     /// Parse a `ModifyPasswordAtom` represented by a `CString` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(record: &Record) -> Result<Self> {
         if record.record_type != RecordType::CString
             || record.version != 0
@@ -52,7 +60,7 @@ impl ModifyPassword {
             }
             units.push(unit);
         }
-        let value = String::from_utf16(&units).map_err(|_| {
+        let value = String::from_utf16(&units).map_err(|_err| {
             Error::Corrupted("ModifyPasswordAtom contains invalid UTF-16".to_string())
         })?;
         Ok(Self { value })
@@ -76,21 +84,28 @@ impl ModifyPassword {
     }
 
     /// Explicitly expose the secret string.
+    #[must_use]
     pub fn expose_secret(&self) -> &str {
         &self.value
     }
 
     /// Return the number of UTF-16 code units in the secret.
+    #[must_use]
     pub fn len_utf16(&self) -> usize {
         self.value.encode_utf16().count()
     }
 
     /// Return whether the secret is empty.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.value.is_empty()
     }
 
     /// Encode a canonical `ModifyPasswordAtom` record without a terminator.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the password is validated to at most 510 bytes, always representable as u32"
+    )]
     pub fn to_record(&self) -> Record {
         let data: Vec<u8> = self
             .value
@@ -109,10 +124,6 @@ impl ModifyPassword {
     }
 }
 
-pub(crate) fn validate_value(value: &str) -> Result<()> {
-    validate_printable_unicode(value)
-}
-
 impl fmt::Debug for ModifyPassword {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
@@ -121,6 +132,10 @@ impl fmt::Debug for ModifyPassword {
             .field("value", &"[REDACTED]")
             .finish()
     }
+}
+
+pub(crate) fn validate_value(value: &str) -> Result<()> {
+    validate_printable_unicode(value)
 }
 
 fn validate_printable_unicode(value: &str) -> Result<()> {
@@ -148,6 +163,11 @@ const fn is_forbidden_printable_unit(unit: u16) -> bool {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -166,7 +186,7 @@ mod tests {
         let mut record = ModifyPassword::new("visible").unwrap().to_record();
         record.data.extend_from_slice(&0u16.to_le_bytes());
         record.data.extend_from_slice(&('x' as u16).to_le_bytes());
-        record.data_length = record.data.len() as u32;
+        record.data_length = u32::try_from(record.data.len()).unwrap();
         let parsed = ModifyPassword::parse(&record).unwrap();
         assert_eq!(parsed.expose_secret(), "visible");
         assert_eq!(parsed.to_record().data.len(), 14);

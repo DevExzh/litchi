@@ -81,7 +81,14 @@ impl Kind {
         match self {
             Self::Command => matches!(child, Self::Parameter),
             Self::Iterate | Self::Parallel | Self::Sequence => !matches!(child, Self::Parameter),
-            _ => false,
+            Self::Animate
+            | Self::AnimateColor
+            | Self::AnimateMotion
+            | Self::AnimateTransform
+            | Self::Audio
+            | Self::Parameter
+            | Self::Set
+            | Self::TransitionFilter => false,
         }
     }
 
@@ -128,7 +135,7 @@ impl Namespace {
             Some(SVG_NAMESPACE) => Self::Svg,
             Some(XLINK_NAMESPACE) => Self::Xlink,
             Some(XML_NAMESPACE) => Self::Xml,
-            Some(uri) => Self::Other(uri.to_string()),
+            Some(extension_uri) => Self::Other(extension_uri.to_string()),
         }
     }
 
@@ -168,20 +175,23 @@ pub struct Attribute {
 
 impl Attribute {
     /// Create an animation attribute.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(
         namespace: Namespace,
         local_name: impl Into<String>,
         value: impl Into<String>,
     ) -> Result<Self> {
-        let local_name = local_name.into();
-        let value = value.into();
-        validate_ncname(&local_name)?;
+        let local_name_string = local_name.into();
+        let value_string = value.into();
+        validate_ncname(&local_name_string)?;
         validate_attribute_namespace(&namespace)?;
-        validate_attribute_value(&value)?;
+        validate_attribute_value(&value_string)?;
         Ok(Self {
             namespace,
-            local_name,
-            value,
+            local_name: local_name_string,
+            value: value_string,
         })
     }
 
@@ -204,10 +214,13 @@ impl Attribute {
     }
 
     /// Replace the attribute value.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_value(&mut self, value: impl Into<String>) -> Result<()> {
-        let value = value.into();
-        validate_attribute_value(&value)?;
-        self.value = value;
+        let replacement = value.into();
+        validate_attribute_value(&replacement)?;
+        self.value = replacement;
         Ok(())
     }
 
@@ -297,6 +310,9 @@ impl Node {
     }
 
     /// Add a child if this node kind permits it under the ODF schema.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn add_child(&mut self, child: Node) -> Result<()> {
         if !self.kind.allows_child(child.kind) {
             return Err(Error::InvalidFormat(format!(

@@ -5,18 +5,23 @@ use litchi_odf_common::core::family::Package;
 use std::path::Path;
 
 pub(crate) const MIMETYPE: &str = litchi_odf_common::constants::ODF_DATABASE;
-const BODY_MARKER: &str = "<office:database";
+const BODY_MARKER: &str = "<";
 
 /// An immutable, validated package snapshot.
 pub(crate) struct Snapshot(Package);
 
 impl Snapshot {
     pub(crate) fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Package::open(path, MIMETYPE, BODY_MARKER, "ODB").map(Self)
+        Package::open(path, MIMETYPE, BODY_MARKER, "ODB").and_then(Self::validated)
     }
 
     pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODB").map(Self)
+        Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODB").and_then(Self::validated)
+    }
+
+    fn validated(package: Package) -> Result<Self> {
+        crate::codec::validate(package.content_xml())?;
+        Ok(Self(package))
     }
 
     pub(crate) fn content_xml(&self) -> &str {

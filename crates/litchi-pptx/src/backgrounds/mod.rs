@@ -1,4 +1,4 @@
-//! Layered owner for package-independent PresentationML slide backgrounds.
+//! Layered owner for package-independent `PresentationML` slide backgrounds.
 //!
 //! The semantic values live in [`model`], while the package-free `<p:bg>` XML
 //! codec lives in [`codec`]. Relationship lookup and image-part ownership are

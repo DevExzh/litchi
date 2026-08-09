@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use std::borrow::Cow;
 
 use litchi_rtf::{
@@ -42,7 +51,7 @@ fn parses_real_libreoffice_theme_metadata_and_round_trips_canonically() {
         })
     );
 
-    let mut document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     let mut shape = Shape::new(ShapeType::Rectangle);
     shape.properties.push(ShapeProperty::new_themed(
         Cow::Borrowed(property.name.as_ref()),
@@ -69,7 +78,7 @@ fn parses_real_libreoffice_theme_metadata_and_round_trips_canonically() {
 #[test]
 fn typed_picture_property_theme_metadata_round_trips() {
     let mut document =
-        RtfDocument::parse(r#"{\rtf1{\*\shppict{\pict\pngblip\picw1\pich1 89504e470d0a1a0a}}}"#)
+        RtfDocument::parse(r"{\rtf1{\*\shppict{\pict\pngblip\picw1\pich1 89504e470d0a1a0a}}}")
             .unwrap();
     document
         .set_picture_shape_properties(
@@ -110,19 +119,19 @@ fn typed_picture_property_theme_metadata_round_trips() {
 #[test]
 fn rejects_hostile_hsv_grammar() {
     for source in [
-        r#"{\rtf1{\*\hsv\caccentone\ctint255\cshade255}}"#,
-        r#"{\rtf1{\hsv\caccentone\ctint255\cshade255}}"#,
-        r#"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\*\hsv\caccentone\ctint255\cshade255}{\sv 1}}}\pngblip 89504e470d0a1a0a}}"#,
-        r#"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv 1}{\hsv\caccentone\ctint255\cshade255}}}\pngblip 89504e470d0a1a0a}}"#,
-        r#"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv 1}{\*\hsv1\caccentone\ctint255\cshade255}}}\pngblip 89504e470d0a1a0a}}"#,
-        r#"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv 1}{\*\hsv\ctint255\cshade255}}}\pngblip 89504e470d0a1a0a}}"#,
-        r#"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv 1}{\*\hsv\caccentone\cshade255}}}\pngblip 89504e470d0a1a0a}}"#,
-        r#"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv 1}{\*\hsv\caccentone\ctint255}}}\pngblip 89504e470d0a1a0a}}"#,
-        r#"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv 1}{\*\hsv\caccentone\caccenttwo\ctint255\cshade255}}}\pngblip 89504e470d0a1a0a}}"#,
-        r#"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv 1}{\*\hsv\caccentone\ctint256\cshade255}}}\pngblip 89504e470d0a1a0a}}"#,
-        r#"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv 1}{\*\hsv\caccentone\ctint128\cshade128}}}\pngblip 89504e470d0a1a0a}}"#,
-        r#"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv 1}{\*\hsv\caccentone\ctint255\cshade255{\object}}}}\pngblip 89504e470d0a1a0a}}"#,
-        r#"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv 1}{\*\hsv\caccentone\ctint255\cshade255}{\*\hsv\caccenttwo\ctint255\cshade255}}}\pngblip 89504e470d0a1a0a}}"#,
+        r"{\rtf1{\*\hsv\caccentone\ctint255\cshade255}}",
+        r"{\rtf1{\hsv\caccentone\ctint255\cshade255}}",
+        r"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\*\hsv\caccentone\ctint255\cshade255}{\sv 1}}}\pngblip 89504e470d0a1a0a}}",
+        r"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv 1}{\hsv\caccentone\ctint255\cshade255}}}\pngblip 89504e470d0a1a0a}}",
+        r"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv 1}{\*\hsv1\caccentone\ctint255\cshade255}}}\pngblip 89504e470d0a1a0a}}",
+        r"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv 1}{\*\hsv\ctint255\cshade255}}}\pngblip 89504e470d0a1a0a}}",
+        r"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv 1}{\*\hsv\caccentone\cshade255}}}\pngblip 89504e470d0a1a0a}}",
+        r"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv 1}{\*\hsv\caccentone\ctint255}}}\pngblip 89504e470d0a1a0a}}",
+        r"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv 1}{\*\hsv\caccentone\caccenttwo\ctint255\cshade255}}}\pngblip 89504e470d0a1a0a}}",
+        r"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv 1}{\*\hsv\caccentone\ctint256\cshade255}}}\pngblip 89504e470d0a1a0a}}",
+        r"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv 1}{\*\hsv\caccentone\ctint128\cshade128}}}\pngblip 89504e470d0a1a0a}}",
+        r"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv 1}{\*\hsv\caccentone\ctint255\cshade255{\object}}}}\pngblip 89504e470d0a1a0a}}",
+        r"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv 1}{\*\hsv\caccentone\ctint255\cshade255}{\*\hsv\caccenttwo\ctint255\cshade255}}}\pngblip 89504e470d0a1a0a}}",
     ] {
         assert!(
             RtfDocument::parse(source).is_err(),

@@ -1,7 +1,7 @@
 //! Web-template package authoring.
 
 use litchi_core::Result;
-use litchi_odf_common::{compact_xml, core::PackageWriter};
+use litchi_odf_common::core::PackageWriter;
 
 /// Detached builder; publication validates through the package facade.
 #[derive(Clone, Debug)]
@@ -32,7 +32,6 @@ impl Builder {
     ///
     /// Returns an error if content validation or package writing fails.
     pub fn build(self) -> Result<Vec<u8>> {
-        compact_xml::validate(self.content_xml.as_bytes())?;
         crate::codec::validate(&self.content_xml)?;
         let mut writer = PackageWriter::new();
         writer.set_mimetype(crate::package::MIMETYPE)?;
@@ -48,5 +47,5 @@ impl Default for Builder {
 }
 
 fn empty_content() -> &'static str {
-    r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:version="1.3"><office:body><office:text/></office:body></office:document-content>"#
+    r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:version="1.4"><office:body><office:text/></office:body></office:document-content>"#
 }

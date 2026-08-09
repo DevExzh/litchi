@@ -1,4 +1,4 @@
-//! Round-trip tests for the BIFF8 StyleExt record (cell-style extensions).
+//! Round-trip tests for the BIFF8 `StyleExt` record (cell-style extensions).
 
 use litchi_xls::writer::Writer;
 use litchi_xls::{StyleCategory, StyleExt, Workbook};

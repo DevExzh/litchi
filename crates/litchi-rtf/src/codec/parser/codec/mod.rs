@@ -2,10 +2,21 @@
 
 //! RTF parser that builds document structure from tokens.
 
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items stay grouped by RTF feature area rather than by item kind"
+)]
 use super::super::error::{RtfError, RtfResult};
 use super::super::lexer::{ControlWord, Token};
 use super::super::limits::ParseLimits;
-use super::super::types::*;
+use super::super::types::{
+    Alignment, AnimatedTextEffect, AssociatedCharacterFormatting, CharacterGrid, CharacterType,
+    Color, ColorRef, ColorTable, EmbeddedFont, EmbeddedFontFormat, EmphasisMark, FitText, Font,
+    FontCharset, FontFamily, FontPage, FontPitch, FontRef, FontTable, FontTheme, Formatting,
+    MAX_PARAGRAPH_DROP_CAP_LINES, Paragraph, ParagraphDropCap, ParagraphDropCapKind,
+    ParagraphFontAlignment, ParagraphWrapping, RevisionMetadata, StyleBlock, TextDirection,
+    UnderlineStyle,
+};
 use bumpalo::Bump;
 use litchi_codepage::Mbcs;
 use smallvec::SmallVec;
@@ -70,7 +81,7 @@ impl DeferredText {
         for part in self.parts {
             match part {
                 DeferredTextPart::Bytes(bytes) => {
-                    output.push_str(&encoding.decode_strict(&bytes, context)?)
+                    output.push_str(&encoding.decode_strict(&bytes, context)?);
                 },
                 DeferredTextPart::Unicode(text) => output.push_str(&text),
             }
@@ -79,7 +90,7 @@ impl DeferredText {
     }
 }
 
-fn strict_paragraph_toggle(value: Option<i32>, name: &str) -> std::result::Result<bool, RtfError> {
+fn strict_paragraph_toggle(value: Option<i32>, name: &str) -> Result<bool, RtfError> {
     match value {
         None | Some(1) => Ok(true),
         Some(0) => Ok(false),
@@ -94,7 +105,7 @@ pub(super) fn parser_classification_error() -> RtfError {
     RtfError::ParserError("RTF parser control classification invariant failed".to_string())
 }
 
-fn strict_paragraph_selector(value: Option<i32>, name: &str) -> std::result::Result<(), RtfError> {
+fn strict_paragraph_selector(value: Option<i32>, name: &str) -> Result<(), RtfError> {
     if value.is_some() {
         return Err(RtfError::MalformedDocument(format!(
             "RTF {name} must not have a numeric parameter"
@@ -103,7 +114,7 @@ fn strict_paragraph_selector(value: Option<i32>, name: &str) -> std::result::Res
     Ok(())
 }
 
-fn required_paragraph_bool(value: Option<i32>, name: &str) -> std::result::Result<bool, RtfError> {
+fn required_paragraph_bool(value: Option<i32>, name: &str) -> Result<bool, RtfError> {
     match value {
         Some(0) => Ok(false),
         Some(1) => Ok(true),
@@ -116,17 +127,17 @@ fn required_paragraph_bool(value: Option<i32>, name: &str) -> std::result::Resul
     }
 }
 
-fn required_list_spacing(value: Option<i32>, name: &str) -> std::result::Result<u32, RtfError> {
-    let value = value.ok_or_else(|| {
+fn required_list_spacing(raw_value: Option<i32>, name: &str) -> Result<u32, RtfError> {
+    let value = raw_value.ok_or_else(|| {
         RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
     })?;
     u32::try_from(value)
         .ok()
-        .filter(|value| *value <= 1_000_000)
+        .filter(|parsed| *parsed <= 1_000_000)
         .ok_or_else(|| RtfError::MalformedDocument(format!("RTF {name} must be in 0..=1000000")))
 }
-fn required_paragraph_indent(value: Option<i32>, name: &str) -> std::result::Result<i32, RtfError> {
-    let value = value.ok_or_else(|| {
+fn required_paragraph_indent(raw_value: Option<i32>, name: &str) -> Result<i32, RtfError> {
+    let value = raw_value.ok_or_else(|| {
         RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
     })?;
     if value.unsigned_abs() > 10_000_000 {
@@ -158,7 +169,7 @@ impl RtfEncoding {
 
     const fn from_font_page(page: FontPage) -> Self {
         match page {
-            FontPage::Mbcs(page) => Self::Standard(page),
+            FontPage::Mbcs(code_page) => Self::Standard(code_page),
             FontPage::Cp437 => Self::Cp437,
             FontPage::Cp850 => Self::Cp850,
         }
@@ -224,7 +235,7 @@ const CP850_HIGH: [char; 128] = [
 
 fn append_transport_bytes(buffer: &mut impl Extend<u8>, text: &str) -> RtfResult<()> {
     for character in text.chars() {
-        let byte = u8::try_from(character as u32).map_err(|_| {
+        let byte = u8::try_from(character as u32).map_err(|_err| {
             RtfError::InvalidUnicode(
                 "RTF source text is not a byte-preserving transport string".to_string(),
             )
@@ -234,6 +245,10 @@ fn append_transport_bytes(buffer: &mut impl Extend<u8>, text: &str) -> RtfResult
     Ok(())
 }
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "remaining variants share the same fallback by design"
+)]
 fn control_symbol_text(control: &ControlWord<'_>) -> Option<&'static str> {
     match control {
         ControlWord::NonBreakingSpace => Some("\u{00A0}"),
@@ -262,7 +277,7 @@ fn duplicate_mail_merge(name: &str) -> RtfError {
 }
 
 fn nonnegative_mail_merge(value: i32, name: &str) -> RtfResult<u32> {
-    u32::try_from(value).map_err(|_| {
+    u32::try_from(value).map_err(|_err| {
         RtfError::MalformedDocument(format!("RTF mail-merge {name} cannot be negative"))
     })
 }
@@ -310,7 +325,7 @@ enum Destination {
     /// End-defined row properties for a nested table.
     NestedTableProperties,
     /// Revision/track changes
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "reserved for revision-destination tracking")]
     Revision,
     /// Other destinations - should be skipped
     Other,
@@ -470,6 +485,10 @@ enum ParsedBodyStoryEvent {
     RevisionDeletion(usize),
 }
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent RTF feature flags stay flat for direct access"
+)]
 /// Parser state for tracking formatting context.
 #[derive(Debug, Clone)]
 struct State {
@@ -486,7 +505,7 @@ struct State {
     /// Paragraph border segments already declared in this paragraph.
     paragraph_border_seen: u8,
     /// Parsed `dropcapt` value retained independently until the pair is complete.
-    drop_cap_kind: Option<crate::ParagraphDropCapKind>,
+    drop_cap_kind: Option<ParagraphDropCapKind>,
     /// Parsed `dropcapli` value retained independently until the pair is complete.
     drop_cap_lines: Option<u8>,
     /// Optional alignment selector for the next `tx` tab terminator.
@@ -502,7 +521,7 @@ struct State {
     cell_boundaries: SmallVec<[i32; 8]>,
     table_style: Option<u16>,
     table_rsid: Option<u32>,
-    table_row_revision: crate::RevisionMetadata,
+    table_row_revision: RevisionMetadata,
     table_row_padding: crate::TableEdgeDistances,
     table_row_spacing: crate::TableEdgeDistances,
     table_row_positioning: crate::FloatingTablePosition,
@@ -644,6 +663,11 @@ fn is_section_control(control: &ControlWord<'_>) -> bool {
     )
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "adjacent range checks bound each narrowing conversion to the target type's range"
+)]
 fn apply_table_distance_side(
     distances: &mut crate::TableEdgeDistances,
     edge: crate::TableEdge,
@@ -726,11 +750,16 @@ fn table_indent_unit(parameter: Option<i32>) -> RtfResult<crate::TableIndentUnit
         )),
     }
 }
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "the crate width constants are defined within the u16 range"
+)]
 fn resolve_preferred_width(
     unit: Option<crate::TablePreferredWidthUnit>,
     value: Option<i32>,
 ) -> RtfResult<Option<crate::TablePreferredWidth>> {
-    let Some(unit) = unit else {
+    let Some(width_unit) = unit else {
         return if value.is_none() {
             Ok(None)
         } else {
@@ -739,9 +768,9 @@ fn resolve_preferred_width(
             ))
         };
     };
-    let value = match unit {
+    let width_value = match width_unit {
         crate::TablePreferredWidthUnit::Null | crate::TablePreferredWidthUnit::Auto => {
-            if value.is_some_and(|value| value != 0) {
+            if value.is_some_and(|v| v != 0) {
                 return Err(RtfError::MalformedDocument(
                     "RTF null or auto preferred width must omit its value or use zero".to_string(),
                 ));
@@ -759,14 +788,22 @@ fn resolve_preferred_width(
             crate::MAX_TABLE_GEOMETRY_TWIPS as u16,
         )?),
     };
-    Ok(Some(crate::TablePreferredWidth::new(unit, value)?))
+    Ok(Some(crate::TablePreferredWidth::new(
+        width_unit,
+        width_value,
+    )?))
 }
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "the crate width constants are defined within the u16 range"
+)]
 fn resolve_invisible_width(
     unit: Option<crate::TablePreferredWidthUnit>,
     value: Option<i32>,
     side: &str,
 ) -> RtfResult<Option<crate::TablePreferredWidth>> {
-    let Some(unit) = unit else {
+    let Some(width_unit) = unit else {
         return if value.is_none() {
             Ok(None)
         } else {
@@ -775,9 +812,9 @@ fn resolve_invisible_width(
             )))
         };
     };
-    let value = match unit {
+    let width_value = match width_unit {
         crate::TablePreferredWidthUnit::Null | crate::TablePreferredWidthUnit::Auto => {
-            if value.is_some_and(|value| value != 0) {
+            if value.is_some_and(|v| v != 0) {
                 return Err(RtfError::MalformedDocument(format!(
                     "RTF null or auto {side} invisible width must omit its value or use zero"
                 )));
@@ -795,7 +832,10 @@ fn resolve_invisible_width(
             crate::MAX_TABLE_GEOMETRY_TWIPS as u16,
         )?),
     };
-    Ok(Some(crate::TablePreferredWidth::new(unit, value)?))
+    Ok(Some(crate::TablePreferredWidth::new(
+        width_unit,
+        width_value,
+    )?))
 }
 fn resolve_row_geometry(state: &State) -> RtfResult<crate::TableRowGeometry> {
     let mut geometry = state.table_row_geometry;
@@ -841,6 +881,11 @@ fn table_geometry_twips(parameter: Option<i32>, name: &str, signed: bool) -> Rtf
         )))
     }
 }
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "adjacent range checks bound each narrowing conversion to the target type's range"
+)]
 fn table_row_height(parameter: Option<i32>) -> RtfResult<crate::TableRowHeight> {
     let value = parameter
         .ok_or_else(|| RtfError::MalformedDocument("RTF trrh requires a parameter".to_string()))?;
@@ -849,12 +894,10 @@ fn table_row_height(parameter: Option<i32>) -> RtfResult<crate::TableRowHeight> 
             "RTF trrh is out of range".to_string(),
         ));
     }
-    Ok(if value == 0 {
-        crate::TableRowHeight::Automatic
-    } else if value > 0 {
-        crate::TableRowHeight::Minimum(value as u16)
-    } else {
-        crate::TableRowHeight::Exact(value.unsigned_abs() as u16)
+    Ok(match value.cmp(&0) {
+        std::cmp::Ordering::Equal => crate::TableRowHeight::Automatic,
+        std::cmp::Ordering::Greater => crate::TableRowHeight::Minimum(value as u16),
+        std::cmp::Ordering::Less => crate::TableRowHeight::Exact(value.unsigned_abs() as u16),
     })
 }
 
@@ -868,18 +911,18 @@ fn require_parameterless(parameter: Option<i32>, name: &str) -> RtfResult<()> {
 }
 
 fn required_table_value(value: Option<i32>, name: &str, maximum: u16) -> RtfResult<u16> {
-    let value = value.ok_or_else(|| {
+    let parameter = value.ok_or_else(|| {
         RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
     })?;
-    let value = u16::try_from(value).map_err(|_| {
+    let table_value = u16::try_from(parameter).map_err(|_err| {
         RtfError::MalformedDocument(format!("RTF {name} value must be in 0..={maximum}"))
     })?;
-    if value > maximum {
+    if table_value > maximum {
         return Err(RtfError::MalformedDocument(format!(
             "RTF {name} value must be in 0..={maximum}"
         )));
     }
-    Ok(value)
+    Ok(table_value)
 }
 fn floating_table_offset(parameter: Option<i32>, negative: bool, axis: &str) -> RtfResult<i32> {
     let value = parameter.ok_or_else(|| {
@@ -899,6 +942,11 @@ fn floating_table_offset(parameter: Option<i32>, negative: bool, axis: &str) -> 
     }
     Ok(value)
 }
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "adjacent range checks bound each narrowing conversion to the target type's range"
+)]
 fn floating_table_wrap_distance(parameter: Option<i32>) -> RtfResult<u16> {
     let value = parameter.ok_or_else(|| {
         RtfError::MalformedDocument(
@@ -933,7 +981,7 @@ struct NestedTableBuilder<'a> {
     cell_drawings: DrawingStoryCapture<'a>,
     cell_story_events: Vec<crate::CellStoryEvent>,
 }
-impl<'a> NestedTableBuilder<'a> {
+impl NestedTableBuilder<'_> {
     fn new(level: u8) -> Self {
         Self {
             level,
@@ -957,19 +1005,20 @@ enum RootDrawingOwner {
     Body,
 }
 
-fn associated_font_ref(value: Option<i32>) -> RtfResult<FontRef> {
-    let value = value.ok_or_else(|| {
+fn associated_font_ref(raw_value: Option<i32>) -> RtfResult<FontRef> {
+    let value = raw_value.ok_or_else(|| {
         RtfError::MalformedDocument("RTF af control requires a numeric parameter".to_string())
     })?;
-    u16::try_from(value)
-        .map_err(|_| RtfError::MalformedDocument("RTF af value must be in 0..=65535".to_string()))
+    u16::try_from(value).map_err(|_err| {
+        RtfError::MalformedDocument("RTF af value must be in 0..=65535".to_string())
+    })
 }
 
 fn character_type_selector(
     parameter: Option<i32>,
     name: &str,
-    value: crate::CharacterType,
-) -> RtfResult<crate::CharacterType> {
+    value: CharacterType,
+) -> RtfResult<CharacterType> {
     require_parameterless(parameter, name)?;
     Ok(value)
 }
@@ -984,51 +1033,51 @@ fn complex_script_selector(value: Option<i32>) -> RtfResult<bool> {
     }
 }
 
-fn character_grid(value: Option<i32>) -> RtfResult<crate::CharacterGrid> {
+fn character_grid(value: Option<i32>) -> RtfResult<CharacterGrid> {
     match value {
-        None => Ok(crate::CharacterGrid::Parameterless),
-        Some(value) => i16::try_from(value)
-            .map(crate::CharacterGrid::Value)
-            .map_err(|_| {
+        None => Ok(CharacterGrid::Parameterless),
+        Some(raw) => i16::try_from(raw)
+            .map(CharacterGrid::Value)
+            .map_err(|_err| {
                 RtfError::MalformedDocument("RTF cgrid value must be in -32768..=32767".to_string())
             }),
     }
 }
 
-fn animated_text(value: Option<i32>) -> RtfResult<crate::AnimatedTextEffect> {
-    let value = value.ok_or_else(|| {
+fn animated_text(raw_value: Option<i32>) -> RtfResult<AnimatedTextEffect> {
+    let value = raw_value.ok_or_else(|| {
         RtfError::MalformedDocument("RTF animtext control requires a numeric parameter".to_string())
     })?;
-    crate::AnimatedTextEffect::from_rtf(value).ok_or_else(|| {
+    AnimatedTextEffect::from_rtf(value).ok_or_else(|| {
         RtfError::MalformedDocument(format!(
             "RTF animtext value must be in 0..={}",
-            crate::AnimatedTextEffect::MAX_RTF_VALUE
+            AnimatedTextEffect::MAX_RTF_VALUE
         ))
     })
 }
 
-fn fit_text(value: Option<i32>) -> RtfResult<crate::FitText> {
-    let value = value.ok_or_else(|| {
+fn fit_text(raw_value: Option<i32>) -> RtfResult<FitText> {
+    let value = raw_value.ok_or_else(|| {
         RtfError::MalformedDocument("RTF fittext control requires a numeric parameter".to_string())
     })?;
-    crate::FitText::from_rtf(value).ok_or_else(|| {
+    FitText::from_rtf(value).ok_or_else(|| {
         RtfError::MalformedDocument(format!(
             "RTF fittext value must be -1 or 0..={}",
-            crate::FitText::MAX_TWIPS
+            FitText::MAX_TWIPS
         ))
     })
 }
 
-fn emphasis_mark(mark: crate::EmphasisMark, value: Option<i32>) -> RtfResult<crate::EmphasisMark> {
+fn emphasis_mark(mark: EmphasisMark, value: Option<i32>) -> RtfResult<EmphasisMark> {
     require_parameterless(value, mark.control_word())?;
     Ok(mark)
 }
 
-fn paper_source_bin(value: Option<i32>, name: &str) -> RtfResult<u16> {
-    let value = value.ok_or_else(|| {
+fn paper_source_bin(raw_value: Option<i32>, name: &str) -> RtfResult<u16> {
+    let value = raw_value.ok_or_else(|| {
         RtfError::MalformedDocument(format!("RTF {name} control requires a numeric parameter"))
     })?;
-    u16::try_from(value).map_err(|_| {
+    u16::try_from(value).map_err(|_err| {
         RtfError::MalformedDocument(format!(
             "RTF {name} value must be in 0..={}",
             super::super::section::MAX_SECTION_PAPER_BIN
@@ -1036,57 +1085,57 @@ fn paper_source_bin(value: Option<i32>, name: &str) -> RtfResult<u16> {
     })
 }
 
-fn associated_font_size(value: Option<i32>) -> RtfResult<NonZeroU16> {
-    let value = value.ok_or_else(|| {
+fn associated_font_size(raw_value: Option<i32>) -> RtfResult<NonZeroU16> {
+    let value = raw_value.ok_or_else(|| {
         RtfError::MalformedDocument("RTF afs control requires a numeric parameter".to_string())
     })?;
-    let value = u16::try_from(value).map_err(|_| {
+    let size = u16::try_from(value).map_err(|_err| {
         RtfError::MalformedDocument("RTF afs value must be in 1..=65535".to_string())
     })?;
-    NonZeroU16::new(value).ok_or_else(|| {
+    NonZeroU16::new(size).ok_or_else(|| {
         RtfError::MalformedDocument("RTF afs value must be in 1..=65535".to_string())
     })
 }
 
-fn associated_language(value: Option<i32>) -> RtfResult<crate::LanguageId> {
-    let value = value.ok_or_else(|| {
+fn associated_language(raw_value: Option<i32>) -> RtfResult<crate::LanguageId> {
+    let value = raw_value.ok_or_else(|| {
         RtfError::MalformedDocument("RTF alang control requires a numeric parameter".to_string())
     })?;
     crate::LanguageId::from_rtf(value)
 }
 
-fn character_style_reference(value: Option<i32>) -> RtfResult<u16> {
-    let value = value.ok_or_else(|| {
+fn character_style_reference(raw_value: Option<i32>) -> RtfResult<u16> {
+    let value = raw_value.ok_or_else(|| {
         RtfError::MalformedDocument("RTF cs control requires a numeric style handle".to_string())
     })?;
-    u16::try_from(value).map_err(|_| {
+    u16::try_from(value).map_err(|_err| {
         RtfError::MalformedDocument("RTF cs style handle must be in 0..=65535".to_string())
     })
 }
 
-fn paragraph_style_reference(value: Option<i32>) -> RtfResult<u16> {
-    let value = value.ok_or_else(|| {
+fn paragraph_style_reference(raw_value: Option<i32>) -> RtfResult<u16> {
+    let value = raw_value.ok_or_else(|| {
         RtfError::MalformedDocument("RTF s control requires a numeric style handle".to_string())
     })?;
-    u16::try_from(value).map_err(|_| {
+    u16::try_from(value).map_err(|_err| {
         RtfError::MalformedDocument("RTF s style handle must be in 0..=65535".to_string())
     })
 }
 
-fn section_style_reference(value: Option<i32>) -> RtfResult<u16> {
-    let value = value.ok_or_else(|| {
+fn section_style_reference(raw_value: Option<i32>) -> RtfResult<u16> {
+    let value = raw_value.ok_or_else(|| {
         RtfError::MalformedDocument("RTF ds control requires a numeric style handle".to_string())
     })?;
-    u16::try_from(value).map_err(|_| {
+    u16::try_from(value).map_err(|_err| {
         RtfError::MalformedDocument("RTF ds style handle must be in 0..=65535".to_string())
     })
 }
 
-fn table_style_reference(value: Option<i32>) -> RtfResult<u16> {
-    let value = value.ok_or_else(|| {
+fn table_style_reference(raw_value: Option<i32>) -> RtfResult<u16> {
+    let value = raw_value.ok_or_else(|| {
         RtfError::MalformedDocument("RTF ts control requires a numeric style handle".to_string())
     })?;
-    u16::try_from(value).map_err(|_| {
+    u16::try_from(value).map_err(|_err| {
         RtfError::MalformedDocument("RTF ts style handle must be in 0..=65535".to_string())
     })
 }
@@ -1131,8 +1180,13 @@ fn associated_toggle(value: Option<i32>, name: &str) -> RtfResult<bool> {
     }
 }
 
-fn associated_required_u16(value: Option<i32>, name: &str, maximum: i32) -> RtfResult<u16> {
-    let value = value.ok_or_else(|| {
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "adjacent range checks bound each narrowing conversion to the target type's range"
+)]
+fn associated_required_u16(raw_value: Option<i32>, name: &str, maximum: i32) -> RtfResult<u16> {
+    let value = raw_value.ok_or_else(|| {
         RtfError::MalformedDocument(format!("RTF {name} control requires a numeric parameter"))
     })?;
     if !(0..=maximum).contains(&value) {
@@ -1143,8 +1197,17 @@ fn associated_required_u16(value: Option<i32>, name: &str, maximum: i32) -> RtfR
     Ok(value as u16)
 }
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "remaining variants share the same fallback by design"
+)]
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "adjacent range checks bound each narrowing conversion to the target type's range"
+)]
 fn apply_associated_character_control(
-    formatting: &mut crate::AssociatedCharacterFormatting,
+    formatting: &mut AssociatedCharacterFormatting,
     control: &ControlWord<'_>,
 ) -> RtfResult<bool> {
     use crate::{AssociatedCharacterBaseline as Baseline, AssociatedUnderlineStyle as Underline};
@@ -1168,18 +1231,19 @@ fn apply_associated_character_control(
             )?));
         },
         ControlWord::AssociatedExpansion(value) => {
-            let value = value.ok_or_else(|| {
+            let expansion = value.ok_or_else(|| {
                 RtfError::MalformedDocument(
                     "RTF aexpnd control requires a numeric parameter".to_string(),
                 )
             })?;
-            if !(-crate::MAX_CHARACTER_EXPANSION..=crate::MAX_CHARACTER_EXPANSION).contains(&value)
+            if !(-crate::MAX_CHARACTER_EXPANSION..=crate::MAX_CHARACTER_EXPANSION)
+                .contains(&expansion)
             {
                 return Err(RtfError::MalformedDocument(
                     "RTF aexpnd value must be in -31680..=31680".to_string(),
                 ));
             }
-            formatting.expansion_quarter_points = Some(value as i16);
+            formatting.expansion_quarter_points = Some(expansion as i16);
         },
         ControlWord::AssociatedFontNumber(value) => {
             formatting.font_ref = Some(associated_font_ref(*value)?);
@@ -1259,22 +1323,22 @@ impl Default for State {
             cell_boundaries: SmallVec::new(),
             table_style: None,
             table_rsid: None,
-            table_row_revision: crate::RevisionMetadata::default(),
-            table_row_padding: Default::default(),
-            table_row_spacing: Default::default(),
-            table_row_positioning: Default::default(),
+            table_row_revision: RevisionMetadata::default(),
+            table_row_padding: crate::TableEdgeDistances::default(),
+            table_row_spacing: crate::TableEdgeDistances::default(),
+            table_row_positioning: crate::FloatingTablePosition::default(),
             table_row_direction: None,
-            table_row_layout: Default::default(),
-            table_row_borders: Default::default(),
-            table_row_shading: Default::default(),
-            table_row_geometry: Default::default(),
-            table_default_borders: Default::default(),
-            table_default_padding: Default::default(),
-            table_default_spacing: Default::default(),
+            table_row_layout: crate::TableRowLayout::default(),
+            table_row_borders: crate::TableRowBorders::default(),
+            table_row_shading: crate::TableShading::default(),
+            table_row_geometry: crate::TableRowGeometry::default(),
+            table_default_borders: crate::TableStyleDefaultBorders::default(),
+            table_default_padding: crate::TableEdgeDistances::default(),
+            table_default_spacing: crate::TableEdgeDistances::default(),
             table_default_width_unit: None,
             table_default_width_value: None,
-            table_autoformat_flags: Default::default(),
-            table_row_banding: Default::default(),
+            table_autoformat_flags: crate::TableAutoformatFlags::default(),
+            table_row_banding: crate::TableRowBanding::default(),
             table_row_index_seen: false,
             table_row_band_index_seen: false,
             table_last_row_seen: false,
@@ -1286,13 +1350,13 @@ impl Default for State {
             table_trailing_width_value: None,
             table_indent_value: None,
             table_indent_unit: None,
-            pending_cell_padding: Default::default(),
-            pending_cell_spacing: Default::default(),
-            pending_cell_layout: Default::default(),
-            pending_cell_merge: Default::default(),
+            pending_cell_padding: crate::TableEdgeDistances::default(),
+            pending_cell_spacing: crate::TableEdgeDistances::default(),
+            pending_cell_layout: crate::TableCellLayout::default(),
+            pending_cell_merge: crate::TableCellMergeState::default(),
             pending_cell_revision: None,
-            pending_cell_borders: Default::default(),
-            pending_cell_shading: Default::default(),
+            pending_cell_borders: crate::TableCellBorders::default(),
+            pending_cell_shading: crate::TableShading::default(),
             pending_cell_width_unit: None,
             pending_cell_width_value: None,
             table_row_shading_seen: 0,
@@ -1319,8 +1383,12 @@ impl Default for State {
     }
 }
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent RTF feature flags stay flat for direct access"
+)]
 /// RTF Parser.
-pub struct Parser<'a> {
+pub(crate) struct Parser<'a> {
     /// Token stream
     tokens: &'a [Token<'a>],
     token_spans: Option<&'a [Range<usize>]>,
@@ -1468,7 +1536,7 @@ pub struct Parser<'a> {
     default_formatting: crate::DocumentDefaultFormatting,
     default_font_selectors_seen: u8,
     saw_info_group: bool,
-    document_direction: Option<crate::TextDirection>,
+    document_direction: Option<TextDirection>,
     gutter_on_right: bool,
     /// Embedded and linked objects
     objects: Vec<super::super::object::EmbeddedObject<'a>>,
@@ -1572,7 +1640,7 @@ pub struct Parser<'a> {
     /// Aggregate decoded tracked-change text.
     revision_text_bytes: usize,
     /// Current header/footer being parsed
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "retained for header/footer reassembly")]
     current_header_footer: Option<super::super::section::HeaderFooter<'a>>,
     /// Current note being parsed (content buffer)
     current_note_buffer: SmallVec<[u8; 256]>,
@@ -1679,7 +1747,9 @@ impl LegacyColorBuilder {
                 value
                     .ok_or_else(|| Parser::legacy_error(&format!("incomplete {name} RGB color")))?,
             )
-            .map_err(|_| Parser::legacy_error(&format!("{name} RGB component is outside 0..=255")))
+            .map_err(|_err| {
+                Parser::legacy_error(&format!("{name} RGB component is outside 0..=255"))
+            })
         };
         Ok(Some(crate::LegacyDrawingColor::Rgb {
             red: component(self.red)?,
@@ -1746,28 +1816,32 @@ impl LegacyPropertiesBuilder {
         Ok(())
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     fn apply(&mut self, control: &ControlWord<'_>) -> RtfResult<bool> {
         match control {
             ControlWord::LegacyDrawingLineStyle(value) => {
-                Self::set(&mut self.line_style, *value, "line style")?
+                Self::set(&mut self.line_style, *value, "line style")?;
             },
             ControlWord::LegacyDrawingLineGray(value) => {
-                Self::set(&mut self.line_color.gray, *value, "line grayscale")?
+                Self::set(&mut self.line_color.gray, *value, "line grayscale")?;
             },
             ControlWord::LegacyDrawingLineRed(value) => {
-                Self::set(&mut self.line_color.red, *value, "line red")?
+                Self::set(&mut self.line_color.red, *value, "line red")?;
             },
             ControlWord::LegacyDrawingLineGreen(value) => {
-                Self::set(&mut self.line_color.green, *value, "line green")?
+                Self::set(&mut self.line_color.green, *value, "line green")?;
             },
             ControlWord::LegacyDrawingLineBlue(value) => {
-                Self::set(&mut self.line_color.blue, *value, "line blue")?
+                Self::set(&mut self.line_color.blue, *value, "line blue")?;
             },
             ControlWord::LegacyDrawingLinePalette => {
-                Self::flag(&mut self.line_color.palette, "line palette")?
+                Self::flag(&mut self.line_color.palette, "line palette")?;
             },
             ControlWord::LegacyDrawingLineWidth(value) => {
-                Self::set(&mut self.line_width, *value, "line width")?
+                Self::set(&mut self.line_width, *value, "line width")?;
             },
             ControlWord::LegacyDrawingFillForegroundGray(value) => Self::set(
                 &mut self.fill_foreground.gray,
@@ -1775,16 +1849,16 @@ impl LegacyPropertiesBuilder {
                 "foreground grayscale",
             )?,
             ControlWord::LegacyDrawingFillForegroundRed(value) => {
-                Self::set(&mut self.fill_foreground.red, *value, "foreground red")?
+                Self::set(&mut self.fill_foreground.red, *value, "foreground red")?;
             },
             ControlWord::LegacyDrawingFillForegroundGreen(value) => {
-                Self::set(&mut self.fill_foreground.green, *value, "foreground green")?
+                Self::set(&mut self.fill_foreground.green, *value, "foreground green")?;
             },
             ControlWord::LegacyDrawingFillForegroundBlue(value) => {
-                Self::set(&mut self.fill_foreground.blue, *value, "foreground blue")?
+                Self::set(&mut self.fill_foreground.blue, *value, "foreground blue")?;
             },
             ControlWord::LegacyDrawingFillForegroundPalette => {
-                Self::flag(&mut self.fill_foreground.palette, "foreground palette")?
+                Self::flag(&mut self.fill_foreground.palette, "foreground palette")?;
             },
             ControlWord::LegacyDrawingFillBackgroundGray(value) => Self::set(
                 &mut self.fill_background.gray,
@@ -1792,44 +1866,44 @@ impl LegacyPropertiesBuilder {
                 "background grayscale",
             )?,
             ControlWord::LegacyDrawingFillBackgroundRed(value) => {
-                Self::set(&mut self.fill_background.red, *value, "background red")?
+                Self::set(&mut self.fill_background.red, *value, "background red")?;
             },
             ControlWord::LegacyDrawingFillBackgroundGreen(value) => {
-                Self::set(&mut self.fill_background.green, *value, "background green")?
+                Self::set(&mut self.fill_background.green, *value, "background green")?;
             },
             ControlWord::LegacyDrawingFillBackgroundBlue(value) => {
-                Self::set(&mut self.fill_background.blue, *value, "background blue")?
+                Self::set(&mut self.fill_background.blue, *value, "background blue")?;
             },
             ControlWord::LegacyDrawingFillBackgroundPalette => {
-                Self::flag(&mut self.fill_background.palette, "background palette")?
+                Self::flag(&mut self.fill_background.palette, "background palette")?;
             },
             ControlWord::LegacyDrawingFillPattern(value) => {
-                Self::set(&mut self.fill_pattern, *value, "fill pattern")?
+                Self::set(&mut self.fill_pattern, *value, "fill pattern")?;
             },
             ControlWord::LegacyDrawingStartArrowFill(value) => {
-                Self::set(&mut self.start_arrow.fill, *value, "start arrow fill")?
+                Self::set(&mut self.start_arrow.fill, *value, "start arrow fill")?;
             },
             ControlWord::LegacyDrawingStartArrowLength(value) => {
-                Self::set(&mut self.start_arrow.length, *value, "start arrow length")?
+                Self::set(&mut self.start_arrow.length, *value, "start arrow length")?;
             },
             ControlWord::LegacyDrawingStartArrowWidth(value) => {
-                Self::set(&mut self.start_arrow.width, *value, "start arrow width")?
+                Self::set(&mut self.start_arrow.width, *value, "start arrow width")?;
             },
             ControlWord::LegacyDrawingEndArrowFill(value) => {
-                Self::set(&mut self.end_arrow.fill, *value, "end arrow fill")?
+                Self::set(&mut self.end_arrow.fill, *value, "end arrow fill")?;
             },
             ControlWord::LegacyDrawingEndArrowLength(value) => {
-                Self::set(&mut self.end_arrow.length, *value, "end arrow length")?
+                Self::set(&mut self.end_arrow.length, *value, "end arrow length")?;
             },
             ControlWord::LegacyDrawingEndArrowWidth(value) => {
-                Self::set(&mut self.end_arrow.width, *value, "end arrow width")?
+                Self::set(&mut self.end_arrow.width, *value, "end arrow width")?;
             },
             ControlWord::LegacyDrawingShadow => Self::flag(&mut self.shadow, "shadow")?,
             ControlWord::LegacyDrawingShadowX(value) => {
-                Self::set(&mut self.shadow_x, *value, "shadow x")?
+                Self::set(&mut self.shadow_x, *value, "shadow x")?;
             },
             ControlWord::LegacyDrawingShadowY(value) => {
-                Self::set(&mut self.shadow_y, *value, "shadow y")?
+                Self::set(&mut self.shadow_y, *value, "shadow y")?;
             },
             _ => return Ok(false),
         }
@@ -1919,7 +1993,7 @@ struct LatentStyleExceptionBuilder {
 /// This is an intermediate representation produced by the parser
 /// before being converted into the final `RtfDocument` structure.
 /// All fields are public to allow direct access during document construction.
-pub struct ParsedDocument<'a> {
+pub(crate) struct ParsedDocument<'a> {
     /// Font table
     pub font_table: FontTable<'a>,
     pub file_table: Option<crate::FileTable<'a>>,
@@ -1994,7 +2068,7 @@ pub struct ParsedDocument<'a> {
     pub default_tab_width_twips: Option<u32>,
     pub language_defaults: crate::DocumentLanguageDefaults,
     pub default_formatting: crate::DocumentDefaultFormatting,
-    pub document_direction: Option<crate::TextDirection>,
+    pub document_direction: Option<TextDirection>,
     pub gutter_on_right: bool,
     /// Embedded and linked objects
     pub objects: Vec<super::super::object::EmbeddedObject<'a>>,

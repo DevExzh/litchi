@@ -1,4 +1,4 @@
-//! Semantic OfficeArt client-data values.
+//! Semantic `OfficeArt` client-data values.
 
 use std::sync::Arc;
 
@@ -49,6 +49,7 @@ pub enum ClientDataChildKind {
 
 impl ClientDataChildKind {
     /// Whether this child is an opaque producer extension.
+    #[must_use]
     pub const fn is_unknown(self) -> bool {
         matches!(self, Self::Unknown)
     }
@@ -66,36 +67,43 @@ pub struct ClientDataChild {
 
 impl ClientDataChild {
     /// Classified child kind.
+    #[must_use]
     pub fn kind(&self) -> ClientDataChildKind {
         self.kind
     }
 
-    /// Raw OfficeArt record type, including producer-defined values.
+    /// Raw `OfficeArt` record type, including producer-defined values.
+    #[must_use]
     pub const fn record_type(&self) -> u16 {
         self.record_type
     }
 
     /// Record version retained from the input.
+    #[must_use]
     pub fn version(&self) -> u16 {
         self.version
     }
 
     /// Record instance retained from the input.
+    #[must_use]
     pub fn instance(&self) -> u16 {
         self.instance
     }
 
     /// Exact child payload.
+    #[must_use]
     pub fn payload(&self) -> &[u8] {
         &self.payload
     }
 
     /// Whether this child is an opaque producer record.
+    #[must_use]
     pub const fn is_unknown(&self) -> bool {
         self.kind.is_unknown()
     }
 
-    /// External object ID when this is an ExObjRefAtom.
+    /// External object ID when this is an `ExObjRefAtom`.
+    #[must_use]
     pub fn external_object_id(&self) -> Option<u32> {
         if self.kind != ClientDataChildKind::ExternalObjectReference {
             return None;
@@ -105,18 +113,21 @@ impl ClientDataChild {
             .map(|reference| reference.id)
     }
 
-    /// PowerPoint 12 shape ID when this is the corresponding round-trip atom.
+    /// `PowerPoint` 12 shape ID when this is the corresponding round-trip atom.
+    #[must_use]
     pub fn round_trip_shape_id(&self) -> Option<u32> {
         (self.kind == ClientDataChildKind::RoundTripShapeId12).then(|| u32_at(&self.payload, 0))
     }
 
     /// Shape and text checksums when this is the checksum round-trip atom.
+    #[must_use]
     pub fn round_trip_checksums(&self) -> Option<(u32, u32)> {
         (self.kind == ClientDataChildKind::RoundTripShapeChecksumForCustomLayouts12)
             .then(|| (u32_at(&self.payload, 0), u32_at(&self.payload, 4)))
     }
 
     /// Placeholder ID carried by either one-byte placeholder round-trip atom.
+    #[must_use]
     pub fn round_trip_placeholder_id(&self) -> Option<u8> {
         matches!(
             self.kind,
@@ -127,7 +138,7 @@ impl ClientDataChild {
     }
 }
 
-/// A complete, ordered OfficeArtClientData container.
+/// A complete, ordered `OfficeArtClientData` container.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClientData {
     pub(super) children: Vec<ClientDataChild>,
@@ -135,11 +146,13 @@ pub struct ClientData {
 
 impl ClientData {
     /// Ordered child records.
+    #[must_use]
     pub fn children(&self) -> &[ClientDataChild] {
         &self.children
     }
 
     /// Return the unique record of a particular kind.
+    #[must_use]
     pub fn child(&self, kind: ClientDataChildKind) -> Option<&ClientDataChild> {
         self.children.iter().find(|child| child.kind == kind)
     }
@@ -149,34 +162,42 @@ impl ClientData {
         self.children.iter().filter(|child| child.is_unknown())
     }
 
+    #[must_use]
     pub fn shape_flags(&self) -> Option<&ClientDataChild> {
         self.child(ClientDataChildKind::ShapeFlags)
     }
 
+    #[must_use]
     pub fn shape_flags10(&self) -> Option<&ClientDataChild> {
         self.child(ClientDataChildKind::ShapeFlags10)
     }
 
+    #[must_use]
     pub fn external_object_reference(&self) -> Option<&ClientDataChild> {
         self.child(ClientDataChildKind::ExternalObjectReference)
     }
 
+    #[must_use]
     pub fn animation_info(&self) -> Option<&ClientDataChild> {
         self.child(ClientDataChildKind::AnimationInfo)
     }
 
+    #[must_use]
     pub fn mouse_click_interactive_info(&self) -> Option<&ClientDataChild> {
         self.child(ClientDataChildKind::MouseClickInteractiveInfo)
     }
 
+    #[must_use]
     pub fn mouse_over_interactive_info(&self) -> Option<&ClientDataChild> {
         self.child(ClientDataChildKind::MouseOverInteractiveInfo)
     }
 
+    #[must_use]
     pub fn placeholder(&self) -> Option<&ClientDataChild> {
         self.child(ClientDataChildKind::Placeholder)
     }
 
+    #[must_use]
     pub fn recolor_info(&self) -> Option<&ClientDataChild> {
         self.child(ClientDataChildKind::RecolorInfo)
     }

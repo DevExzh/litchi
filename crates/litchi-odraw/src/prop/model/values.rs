@@ -65,6 +65,13 @@ pub struct Array<'data> {
 
 impl<'data> Array<'data> {
     /// Validates an entire `IMsoArray`, including its exact payload extent.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::MalformedProperties` when the data is shorter than the
+    /// six-byte header, the allocation count is smaller than the element
+    /// count, or the payload does not match its exact declared extent, and
+    /// `Error::ArithmeticOverflow` when the declared extent overflows.
     pub fn new(data: &'data [u8]) -> Result<Self> {
         let header = data.get(..6).ok_or(Error::MalformedProperties {
             reason: "array property is shorter than its six-byte header",

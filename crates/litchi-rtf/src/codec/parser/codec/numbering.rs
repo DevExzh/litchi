@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+    ControlWord, Cow, Destination, Parser, RtfError, RtfResult, Token, control_symbol_text,
+    require_parameterless,
+};
 
 impl<'a> Parser<'a> {
     pub(super) fn parse_paragraph_group_table(
@@ -38,7 +41,7 @@ impl<'a> Parser<'a> {
                         Some(Token::Control(ControlWord::ParagraphGroup))
                     ) =>
                 {
-                    let id = u32::try_from(table.entries().len() + 1).map_err(|_| {
+                    let id = u32::try_from(table.entries().len() + 1).map_err(|_err| {
                         RtfError::MalformedDocument("RTF paragraph-group ID overflow".to_string())
                     })?;
                     let entry = self.parse_paragraph_group_property(id)?;
@@ -64,6 +67,10 @@ impl<'a> Parser<'a> {
         Err(RtfError::UnexpectedEof)
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn parse_paragraph_group_property(
         &mut self,
         id: u32,
@@ -87,13 +94,13 @@ impl<'a> Parser<'a> {
                         parent_id: u32::try_from(parent_id.ok_or_else(|| {
                             RtfError::MalformedDocument("RTF pgp entry lacks ipgp".to_string())
                         })?)
-                        .map_err(|_| {
+                        .map_err(|_err| {
                             RtfError::MalformedDocument("invalid RTF ipgp reference".to_string())
                         })?,
                         table_nesting_level: u8::try_from(nesting.ok_or_else(|| {
                             RtfError::MalformedDocument("RTF pgp entry lacks itap".to_string())
                         })?)
-                        .map_err(|_| {
+                        .map_err(|_err| {
                             RtfError::MalformedDocument("invalid RTF pgp itap value".to_string())
                         })?,
                         left_indent: left.ok_or_else(|| {
@@ -268,7 +275,7 @@ impl<'a> Parser<'a> {
                                 "RTF pgp brdrcf requires a numeric parameter".to_string(),
                             )
                         })?)
-                        .map_err(|_| {
+                        .map_err(|_err| {
                             RtfError::MalformedDocument("invalid RTF pgp border color".to_string())
                         })?;
                     },
@@ -314,6 +321,10 @@ impl<'a> Parser<'a> {
         Err(RtfError::UnexpectedEof)
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn parse_legacy_section_numbering_level(&mut self) -> RtfResult<()> {
         if self.states.len() != 3
             || self
@@ -329,7 +340,7 @@ impl<'a> Parser<'a> {
         self.pos += 1; // ignorable-destination marker
         let level_index = match self.tokens.get(self.pos) {
             Some(Token::Control(ControlWord::LegacySectionNumberingLevel(value))) => {
-                u8::try_from(*value).map_err(|_| {
+                u8::try_from(*value).map_err(|_err| {
                     RtfError::MalformedDocument(
                         "RTF pnseclvl index must be between 1 and 9".to_string(),
                     )
@@ -357,12 +368,13 @@ impl<'a> Parser<'a> {
             match self.tokens.get(self.pos) {
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
-                    let format = format.ok_or_else(|| {
+                    let numbering_format = format.ok_or_else(|| {
                         RtfError::MalformedDocument(
                             "RTF pnseclvl destination has no numbering format".to_string(),
                         )
                     })?;
-                    let mut level = crate::LegacySectionNumberingLevel::new(level_index, format);
+                    let mut level =
+                        crate::LegacySectionNumberingLevel::new(level_index, numbering_format);
                     level.start_at = start_at;
                     level.indent = indent;
                     level.space = space;
@@ -520,7 +532,7 @@ impl<'a> Parser<'a> {
                                         "RTF pnf requires a numeric parameter".to_string(),
                                     )
                                 })?)
-                                .map_err(|_| {
+                                .map_err(|_err| {
                                     RtfError::MalformedDocument(
                                         "invalid RTF pnf reference".to_string(),
                                     )
@@ -572,8 +584,30 @@ impl<'a> Parser<'a> {
         Err(RtfError::UnexpectedEof)
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn parse_legacy_paragraph_numbering(&mut self) -> RtfResult<()> {
-        let parameter = match self.tokens.get(self.pos) {
+        fn value(parameter: Option<i32>, name: &str) -> RtfResult<i32> {
+            parameter.ok_or_else(|| {
+                RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
+            })
+        }
+        #[allow(
+            clippy::wildcard_enum_match_arm,
+            reason = "remaining variants share the same fallback by design"
+        )]
+        fn toggle(parameter: Option<i32>, name: &str) -> RtfResult<bool> {
+            match parameter {
+                None | Some(1) => Ok(true),
+                Some(0) => Ok(false),
+                Some(_) => Err(RtfError::MalformedDocument(format!(
+                    "RTF {name} accepts only 0 or 1"
+                ))),
+            }
+        }
+        let pn_parameter = match self.tokens.get(self.pos) {
             Some(Token::Control(ControlWord::LegacyParagraphNumbering(parameter))) => *parameter,
             _ => {
                 return Err(RtfError::MalformedDocument(
@@ -581,27 +615,27 @@ impl<'a> Parser<'a> {
                 ));
             },
         };
-        require_parameterless(parameter, "pn")?;
+        require_parameterless(pn_parameter, "pn")?;
         let parent = self.states.len().checked_sub(2).ok_or_else(|| {
             RtfError::MalformedDocument("RTF pn destination has no paragraph owner".to_string())
         })?;
-        let owner = self.states.get(parent).ok_or_else(|| {
+        let owner_state = self.states.get(parent).ok_or_else(|| {
             RtfError::ParserError("RTF pn paragraph owner state is missing".to_string())
         })?;
-        if owner.destination != Destination::DocumentBody
-            || owner.in_table
-            || owner.table_nesting_level >= 2
+        if owner_state.destination != Destination::DocumentBody
+            || owner_state.in_table
+            || owner_state.table_nesting_level >= 2
         {
             return Err(RtfError::MalformedDocument(
                 "RTF pn destination must belong to a non-table paragraph".to_string(),
             ));
         }
-        if owner.paragraph_content_started {
+        if owner_state.paragraph_content_started {
             return Err(RtfError::MalformedDocument(
                 "RTF pn destination must precede paragraph content".to_string(),
             ));
         }
-        if owner.paragraph_numbering_declared {
+        if owner_state.paragraph_numbering_declared {
             return Err(RtfError::MalformedDocument(
                 "duplicate RTF pn destination in one paragraph".to_string(),
             ));
@@ -647,20 +681,6 @@ impl<'a> Parser<'a> {
                 }
             };
         }
-        fn value(parameter: Option<i32>, name: &str) -> RtfResult<i32> {
-            parameter.ok_or_else(|| {
-                RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
-            })
-        }
-        fn toggle(parameter: Option<i32>, name: &str) -> RtfResult<bool> {
-            match parameter {
-                None | Some(1) => Ok(true),
-                Some(0) => Ok(false),
-                Some(_) => Err(RtfError::MalformedDocument(format!(
-                    "RTF {name} accepts only 0 or 1"
-                ))),
-            }
-        }
         loop {
             match self.tokens.get(self.pos) {
                 Some(Token::CloseBrace) => {
@@ -696,7 +716,7 @@ impl<'a> Parser<'a> {
                     record.revision = revision;
                     record.validate()?;
                     let index =
-                        u32::try_from(self.legacy_paragraph_numbering.len()).map_err(|_| {
+                        u32::try_from(self.legacy_paragraph_numbering.len()).map_err(|_err| {
                             RtfError::MalformedDocument("RTF pn record index overflow".to_string())
                         })?;
                     self.legacy_paragraph_numbering.push(record);
@@ -746,7 +766,7 @@ impl<'a> Parser<'a> {
                         once!("level", "pnlvl");
                         let v = value(*parameter, "pnlvl")?;
                         level = Some(crate::LegacyParagraphNumberingLevel::Explicit(
-                            u8::try_from(v).map_err(|_| {
+                            u8::try_from(v).map_err(|_err| {
                                 RtfError::MalformedDocument(
                                     "RTF pnlvl value must be in 1..=9".to_string(),
                                 )
@@ -832,7 +852,7 @@ impl<'a> Parser<'a> {
                     ControlWord::LegacyNumberingFont(parameter) => {
                         once!("font", "pnf");
                         font_ref =
-                            Some(u16::try_from(value(*parameter, "pnf")?).map_err(|_| {
+                            Some(u16::try_from(value(*parameter, "pnf")?).map_err(|_err| {
                                 RtfError::MalformedDocument(
                                     "RTF pnf value must be in 0..=65535".to_string(),
                                 )
@@ -841,7 +861,7 @@ impl<'a> Parser<'a> {
                     ControlWord::LegacyNumberingFontSize(parameter) => {
                         once!("font-size", "pnfs");
                         font_size =
-                            Some(u16::try_from(value(*parameter, "pnfs")?).map_err(|_| {
+                            Some(u16::try_from(value(*parameter, "pnfs")?).map_err(|_err| {
                                 RtfError::MalformedDocument(
                                     "RTF pnfs value must be in 1..=65535".to_string(),
                                 )
@@ -850,7 +870,7 @@ impl<'a> Parser<'a> {
                     ControlWord::LegacyNumberingColor(parameter) => {
                         once!("color", "pncf");
                         color_ref =
-                            Some(u16::try_from(value(*parameter, "pncf")?).map_err(|_| {
+                            Some(u16::try_from(value(*parameter, "pncf")?).map_err(|_err| {
                                 RtfError::MalformedDocument(
                                     "RTF pncf value must be in 0..=65535".to_string(),
                                 )
@@ -914,12 +934,13 @@ impl<'a> Parser<'a> {
                     },
                     ControlWord::LegacyNumberingRevisionAuthor(parameter) => {
                         once!("revision-author", "pnrauth");
-                        revision.author =
-                            Some(u16::try_from(value(*parameter, "pnrauth")?).map_err(|_| {
+                        revision.author = Some(
+                            u16::try_from(value(*parameter, "pnrauth")?).map_err(|_err| {
                                 RtfError::MalformedDocument(
                                     "RTF pnrauth value must be in 0..=65535".to_string(),
                                 )
-                            })?);
+                            })?,
+                        );
                     },
                     ControlWord::LegacyNumberingRevisionDate(parameter) => {
                         once!("revision-date", "pnrdate");
@@ -941,7 +962,7 @@ impl<'a> Parser<'a> {
                     ControlWord::LegacyNumberingRevisionRgb(parameter) => {
                         once!("revision-rgb", "pnrrgb");
                         revision.rgb =
-                            Some(u32::try_from(value(*parameter, "pnrrgb")?).map_err(|_| {
+                            Some(u32::try_from(value(*parameter, "pnrrgb")?).map_err(|_err| {
                                 RtfError::MalformedDocument(
                                     "RTF pnrrgb must be non-negative".to_string(),
                                 )
@@ -1006,8 +1027,8 @@ impl<'a> Parser<'a> {
                     value.push_str(&self.parse_style_unicode(*first, unicode_skip)?);
                     continue;
                 },
-                Some(Token::Control(ControlWord::UnicodeSkip(value))) => {
-                    unicode_skip = (*value).max(0);
+                Some(Token::Control(ControlWord::UnicodeSkip(skip))) => {
+                    unicode_skip = (*skip).max(0);
                 },
                 Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
                     value.push_str(control_symbol_text(control).unwrap_or_default());
@@ -1018,7 +1039,7 @@ impl<'a> Parser<'a> {
                 Some(Token::Control(
                     ControlWord::Unknown("dbch", None) | ControlWord::DoubleByteCharacter(None),
                 )) => {},
-                Some(Token::Control(_)) | Some(Token::Binary(_)) => {
+                Some(Token::Control(_) | Token::Binary(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF legacy-numbering text contains a non-text control".to_string(),
                     ));

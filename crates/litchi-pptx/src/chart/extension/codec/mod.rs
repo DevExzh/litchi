@@ -1,4 +1,4 @@
-//! Inert reader for Microsoft ChartEx (cx:chartSpace) parts.
+//! Inert reader for Microsoft `ChartEx` (cx:chartSpace) parts.
 
 pub const CONTENT_TYPE: &str = "application/vnd.ms-office.chartex+xml";
 

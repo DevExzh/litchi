@@ -47,18 +47,24 @@ pub struct ServerId(String);
 
 impl ServerId {
     /// Build an identifier from its semantic Unicode value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(value: impl Into<String>) -> Result<Self> {
-        let value = value.into();
-        validate_printable(&value, "server slide identifier")?;
-        Ok(Self(value))
+        let text = value.into();
+        validate_printable(&text, "server slide identifier")?;
+        Ok(Self(text))
     }
 
     /// Borrow the identifier text.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
     /// Consume the value and return its text.
+    #[must_use]
     pub fn into_string(self) -> String {
         self.0
     }
@@ -100,25 +106,31 @@ pub struct LibraryUrl(String);
 
 impl LibraryUrl {
     /// Build a URL using the HTTP URI required by `[MS-PPT]`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(value: impl Into<String>) -> Result<Self> {
-        let value = value.into();
-        validate_printable(&value, "slide-library URL")?;
-        let parsed = url::Url::parse(&value)
-            .map_err(|_| Error::InvalidFormat("slide-library URL is not a valid URI".into()))?;
+        let text = value.into();
+        validate_printable(&text, "slide-library URL")?;
+        let parsed = url::Url::parse(&text)
+            .map_err(|_err| Error::InvalidFormat("slide-library URL is not a valid URI".into()))?;
         if parsed.scheme() != "http" {
             return Err(Error::InvalidFormat(
                 "slide-library URL must use the HTTP scheme".into(),
             ));
         }
-        Ok(Self(value))
+        Ok(Self(text))
     }
 
     /// Borrow the exact URL text supplied by the producer.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
     /// Consume the value and return its exact text.
+    #[must_use]
     pub fn into_string(self) -> String {
         self.0
     }
@@ -169,7 +181,14 @@ pub struct SystemTime {
 
 impl SystemTime {
     /// Construct and validate one Gregorian `SYSTEMTIME` value.
-    #[allow(clippy::too_many_arguments)]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "constructor parameters mirror the atom wire fields one-to-one"
+    )]
     pub fn new(
         year: u16,
         month: u16,
@@ -194,34 +213,42 @@ impl SystemTime {
         Ok(value)
     }
 
+    #[must_use]
     pub const fn year(self) -> u16 {
         self.year
     }
 
+    #[must_use]
     pub const fn month(self) -> u16 {
         self.month
     }
 
+    #[must_use]
     pub const fn day_of_week(self) -> u16 {
         self.day_of_week
     }
 
+    #[must_use]
     pub const fn day(self) -> u16 {
         self.day
     }
 
+    #[must_use]
     pub const fn hour(self) -> u16 {
         self.hour
     }
 
+    #[must_use]
     pub const fn minute(self) -> u16 {
         self.minute
     }
 
+    #[must_use]
     pub const fn second(self) -> u16 {
         self.second
     }
 
+    #[must_use]
     pub const fn millisecond(self) -> u16 {
         self.millisecond
     }
@@ -243,7 +270,7 @@ impl SystemTime {
             field_at(12),
             field_at(14),
         )
-        .map_err(|_| Error::Corrupted(format!("{field} is not a valid SYSTEMTIME")))
+        .map_err(|_err| Error::Corrupted(format!("{field} is not a valid SYSTEMTIME")))
     }
 
     pub(crate) fn write_wire(self, output: &mut Vec<u8>) {
@@ -295,6 +322,10 @@ pub struct Synchronization {
 impl Synchronization {
     /// Construct a complete synchronization value from ergonomic strings and
     /// validated timestamps.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(
         server_slide_id: impl Into<String>,
         slide_library_url: impl Into<String>,
@@ -310,6 +341,10 @@ impl Synchronization {
     }
 
     /// Construct from already validated wire-domain values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn from_parts(
         server_slide_id: ServerId,
         slide_library_url: LibraryUrl,
@@ -325,32 +360,40 @@ impl Synchronization {
     }
 
     /// Borrow the server-side slide identifier.
+    #[must_use]
     pub const fn server_slide_id(&self) -> &ServerId {
         &self.server_slide_id
     }
 
     /// Borrow the exact slide-library URL.
+    #[must_use]
     pub const fn slide_library_url(&self) -> &LibraryUrl {
         &self.slide_library_url
     }
 
     /// Return the server modification timestamp.
+    #[must_use]
     pub const fn server_modified(&self) -> SystemTime {
         self.server_modified
     }
 
     /// Return the client insertion timestamp.
+    #[must_use]
     pub const fn client_inserted(&self) -> SystemTime {
         self.client_inserted
     }
 
     /// Parse the optional synchronization container below a slide record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(root: &Record) -> Result<Option<Self>> {
         codec::read(root)
     }
 }
 
-/// An immutable, lossless snapshot of one legacy PowerPoint slide record.
+/// An immutable, lossless snapshot of one legacy `PowerPoint` slide record.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Snapshot {
     pub(crate) root: Record,
@@ -360,35 +403,55 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Capture a slide record and normalize its container payloads.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn from_record(root: Record) -> Result<Self> {
         Self::from_record_with_limits(root, Limits::default())
     }
 
     /// Capture a slide record under explicit resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "taking the record by value is the established public API; the snapshot stores a normalized re-parse, so the argument is only borrowed internally"
+    )]
     pub fn from_record_with_limits(root: Record, limits: Limits) -> Result<Self> {
-        let limits = limits.validate()?;
+        let validated = limits.validate()?;
         validation::validate_slide_header(&root)?;
-        let bytes = codec::encode(&root, limits)?;
-        let root = codec::parse(&bytes, limits)?;
-        validation::validate(&root, limits)?;
+        let bytes = codec::encode(&root, validated)?;
+        let normalized_root = codec::parse(&bytes, validated)?;
+        validation::validate(&normalized_root, validated)?;
         Ok(Self {
-            root,
+            root: normalized_root,
             bytes,
-            limits,
+            limits: validated,
         })
     }
 
     /// Parse and capture exactly one complete slide record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(bytes: &[u8]) -> Result<Self> {
         Self::parse_with_limits(bytes, Limits::default())
     }
 
     /// Parse one complete slide record under explicit limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
-        let limits = limits.validate()?;
-        let root = codec::parse(bytes, limits)?;
-        validation::validate(&root, limits)?;
-        let encoded = codec::encode(&root, limits)?;
+        let validated = limits.validate()?;
+        let root = codec::parse(bytes, validated)?;
+        validation::validate(&root, validated)?;
+        let encoded = codec::encode(&root, validated)?;
         if encoded != bytes {
             return Err(Error::Corrupted(
                 "slide synchronization snapshot is not losslessly representable".into(),
@@ -397,26 +460,33 @@ impl Snapshot {
         Ok(Self {
             root,
             bytes: bytes.to_vec(),
-            limits,
+            limits: validated,
         })
     }
 
     /// Borrow the complete slide record represented by this snapshot.
+    #[must_use]
     pub const fn record(&self) -> &Record {
         &self.root
     }
 
     /// Borrow the exact source or committed bytes.
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
     /// Return the optional typed synchronization metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn synchronization(&self) -> Result<Option<Synchronization>> {
         codec::read(&self.root)
     }
 
     /// Resource limits attached to this snapshot.
+    #[must_use]
     pub const fn limits(&self) -> Limits {
         self.limits
     }
@@ -428,6 +498,7 @@ impl Snapshot {
     }
 
     /// Start an isolated atomic semantic edit.
+    #[must_use]
     pub fn edit(&self) -> transaction::Editor {
         transaction::Editor::open(self.clone())
     }
@@ -459,7 +530,7 @@ fn validate_printable(value: &str, field: &str) -> Result<()> {
 }
 
 fn decode_printable(bytes: &[u8], field: &str) -> Result<String> {
-    if bytes.len() % 2 != 0 {
+    if !bytes.len().is_multiple_of(2) {
         return Err(Error::Corrupted(format!("{field} payload must be even")));
     }
     if bytes.len() > MAX_TEXT_BYTES {
@@ -481,7 +552,7 @@ fn decode_printable(bytes: &[u8], field: &str) -> Result<String> {
         units.push(unit);
     }
     String::from_utf16(&units)
-        .map_err(|_| Error::Corrupted(format!("{field} contains invalid UTF-16")))
+        .map_err(|_err| Error::Corrupted(format!("{field} contains invalid UTF-16")))
 }
 
 fn encode_printable(value: &str, field: &str) -> Result<Vec<u8>> {
@@ -494,7 +565,7 @@ fn encode_printable(value: &str, field: &str) -> Result<Vec<u8>> {
     let mut bytes = Vec::new();
     bytes
         .try_reserve_exact(byte_len)
-        .map_err(|_| Error::InvalidFormat(format!("{field} allocation failed")))?;
+        .map_err(|_err| Error::InvalidFormat(format!("{field} allocation failed")))?;
     for unit in units {
         bytes.extend_from_slice(&unit.to_le_bytes());
     }

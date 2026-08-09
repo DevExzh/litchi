@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI};

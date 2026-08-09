@@ -1,7 +1,7 @@
 //! PPT animation support.
 //!
 //! This module provides structures and functions for parsing and writing
-//! PowerPoint binary animation records, including:
+//! `PowerPoint` binary animation records, including:
 //! - Basic and advanced animation effects
 //! - Motion paths
 //! - Interactive triggers
@@ -20,6 +20,10 @@ pub mod triggers;
 pub mod types;
 pub mod writer;
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`LegacyShapeAnimation` is an established public API name; renaming the re-export would break downstream crates"
+)]
 pub use editor::{Editor, EditorLimits, LegacyShapeAnimation, Scope, Timeline};
 
 pub use hash::{Hash10, Hash10Limits};
@@ -40,11 +44,23 @@ pub use parser::{
     parse_time_set_behavior_atom, parse_time_sub_effect, parse_time_visual_element,
 };
 pub use slide_metadata::{SlideMetadataLimits, SlideTime};
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`AnimationSound` is an established public API name; renaming the re-export would break downstream crates"
+)]
 pub use sound::{AnimationSound, BuiltinSound, SoundType};
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`AnimationCondition` is an established public API name; renaming the re-export would break downstream crates"
+)]
 pub use triggers::{
     AnimationCondition, BeginCondition, EndCondition, InteractiveTrigger, IterationType,
     NextCondition, PreviousCondition, RepeatBehavior,
 };
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names like `AnimationEffect`, `AnimationInfo`, `AnimationTrigger`, and `SlideAnimationExtension` are established public API names; renaming the re-exports would break downstream crates"
+)]
 pub use types::{
     AfterEffect, AnimationEffect, AnimationInfo, AnimationTrigger, BuildAtom, BuildInfo,
     BuildLevel, BuildList, BuildListEntry, BuildType, ChartBuild, ChartBuildAtom, ChartBuildType,

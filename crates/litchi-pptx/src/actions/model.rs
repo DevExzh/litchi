@@ -1,4 +1,4 @@
-//! Semantic PresentationML action-setting values.
+//! Semantic `PresentationML` action-setting values.
 
 use litchi_opc::PackURI;
 
@@ -11,7 +11,7 @@ pub enum Trigger {
     Hover,
 }
 
-/// A reserved PowerPoint slide-show jump target.
+/// A reserved `PowerPoint` slide-show jump target.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Jump {
     /// End the slide show.
@@ -33,7 +33,7 @@ pub enum Jump {
 /// The original action string remains available from [`Setting::action`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
-    /// A regular hyperlink relationship without a PowerPoint action string.
+    /// A regular hyperlink relationship without a `PowerPoint` action string.
     Hyperlink,
     /// A relationship-targeted jump to a slide in this presentation.
     SlideJump,
@@ -53,7 +53,7 @@ pub enum Kind {
     Media,
     /// A setting without an action string or relationship reference.
     None,
-    /// An action string outside the bounded recognized PowerPoint vocabulary.
+    /// An action string outside the bounded recognized `PowerPoint` vocabulary.
     Unknown,
 }
 
@@ -79,6 +79,7 @@ pub enum Target {
 impl Target {
     /// Return the declared relationship type URI.
     #[inline]
+    #[must_use]
     pub fn relationship_type(&self) -> &str {
         match self {
             Self::Internal {
@@ -92,6 +93,7 @@ impl Target {
 
     /// Return the target part name for an internal relationship.
     #[inline]
+    #[must_use]
     pub fn part_name(&self) -> Option<&PackURI> {
         match self {
             Self::Internal { part_name, .. } => Some(part_name),
@@ -101,6 +103,7 @@ impl Target {
 
     /// Return the stored target string for an external relationship.
     #[inline]
+    #[must_use]
     pub fn external_target(&self) -> Option<&str> {
         match self {
             Self::Internal { .. } => None,
@@ -109,7 +112,7 @@ impl Target {
     }
 }
 
-/// An inert PowerPoint click or hover action setting.
+/// An inert `PowerPoint` click or hover action setting.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Setting {
     pub(super) slide_index: usize,
@@ -126,54 +129,63 @@ pub struct Setting {
 impl Setting {
     /// Return the zero-based index of the slide that owns this setting.
     #[inline]
+    #[must_use]
     pub fn slide_index(&self) -> usize {
         self.slide_index
     }
 
     /// Return the zero-based source-order index of this setting on the slide.
     #[inline]
+    #[must_use]
     pub fn action_index(&self) -> usize {
         self.action_index
     }
 
     /// Return whether this setting is activated by click or hover.
     #[inline]
+    #[must_use]
     pub fn trigger(&self) -> Trigger {
         self.trigger
     }
 
     /// Return the recognized action kind.
     #[inline]
+    #[must_use]
     pub fn kind(&self) -> Kind {
         self.kind
     }
 
     /// Return the original stored action string, when present.
     #[inline]
+    #[must_use]
     pub fn action(&self) -> Option<&str> {
         self.action.as_deref()
     }
 
     /// Return the optional relationship ID from the owning slide.
     #[inline]
+    #[must_use]
     pub fn relationship_id(&self) -> Option<&str> {
         self.relationship_id.as_deref()
     }
 
     /// Return the declared relationship target, when present.
     #[inline]
+    #[must_use]
     pub fn target(&self) -> Option<&Target> {
         self.target.as_ref()
     }
 
     /// Return the optional stored tooltip.
     #[inline]
+    #[must_use]
     pub fn tooltip(&self) -> Option<&str> {
         self.tooltip.as_deref()
     }
 
     /// Return the optional stored target frame.
     #[inline]
+    #[must_use]
     pub fn target_frame(&self) -> Option<&str> {
         self.target_frame.as_deref()
     }

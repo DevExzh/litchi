@@ -73,6 +73,16 @@ pub enum Error {
     InvalidData(String),
     /// A requested edit cannot preserve unsupported source records safely.
     UnsafeEdit(String),
+    /// A decoded worksheet cannot be edited through the create-only worksheet API.
+    ///
+    /// Use a source-checked transaction when one exists for the selected XLS
+    /// feature, or author a new worksheet through [`crate::writer::Writer`].
+    SourceBoundWorksheetMutation {
+        /// The attempted create-only operation.
+        operation: &'static str,
+    },
+    /// Weak legacy encryption authoring requires an explicit opt-in policy.
+    WeakEncryptionRequiresExplicitPolicy,
     /// Unexpected record type
     UnexpectedRecordType {
         /// Expected record type
@@ -142,6 +152,14 @@ impl fmt::Display for Error {
                 write!(f, "Invalid data: {}", msg)
             },
             Error::UnsafeEdit(msg) => write!(f, "Unsafe edit refused: {msg}"),
+            Error::SourceBoundWorksheetMutation { operation } => write!(
+                f,
+                "source-bound worksheet mutation refused: {operation}; use a source-checked transaction or author a new worksheet"
+            ),
+            Error::WeakEncryptionRequiresExplicitPolicy => write!(
+                f,
+                "BIFF8 XOR obfuscation requires an explicit weak-encryption policy"
+            ),
             Error::UnexpectedRecordType { expected, found } => {
                 write!(
                     f,

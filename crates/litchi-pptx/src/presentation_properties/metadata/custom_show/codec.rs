@@ -1,8 +1,8 @@
-//! Custom slide show support for PowerPoint presentations.
+//! Custom slide show support for `PowerPoint` presentations.
 //!
 //! Custom slide shows allow defining named subsets of slides that can be
 //! presented independently of the full presentation.
-use super::model::*;
+use super::model::{List, Show};
 use crate::presentation_properties::metadata::escape_xml;
 use crate::{Error, Result};
 use quick_xml::Reader;
@@ -11,6 +11,10 @@ use std::collections::HashMap;
 
 impl List {
     /// Parse custom shows from presentation XML.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_xml(xml: &str) -> Result<Self> {
         let mut list = Self::new();
         let xml = litchi_ooxml_common::mce::process_str(xml)?;
@@ -80,6 +84,7 @@ impl List {
     /// numeric slide IDs as their corresponding `rId` values (e.g. slide 5 → `rId5`).
     /// For full fidelity, prefer [`Self::to_xml_with_rel_map`] and pass the workbook's
     /// actual slide relationship map.
+    #[must_use]
     pub fn to_xml(&self) -> String {
         if self.is_empty() {
             return String::new();
@@ -101,6 +106,7 @@ impl List {
     ///
     /// # Arguments
     /// * `slide_id_to_rel_id` - Mapping from slide ID (e.g., 256) to relationship ID (e.g., "rId6")
+    #[must_use]
     pub fn to_xml_with_rel_map(&self, slide_id_to_rel_id: &HashMap<u32, String>) -> String {
         if self.is_empty() {
             return String::new();
@@ -120,7 +126,7 @@ impl List {
             for slide_id in &show.slide_ids {
                 // Look up the relationship ID for this slide ID
                 if let Some(rel_id) = slide_id_to_rel_id.get(slide_id) {
-                    xml.push_str(&format!(r#"<p:sld r:id="{}"/>"#, rel_id));
+                    xml.push_str(&format!(r#"<p:sld r:id="{rel_id}"/>"#));
                 }
             }
             xml.push_str("</p:sldLst>");
@@ -134,6 +140,11 @@ impl List {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

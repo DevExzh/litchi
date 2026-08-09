@@ -1,4 +1,4 @@
-//! Strict codecs for PowerPoint 10 presentation-comment records.
+//! Strict codecs for `PowerPoint` 10 presentation-comment records.
 
 use super::model::{Author, Authors};
 use crate::consts::RecordType;
@@ -12,6 +12,10 @@ const COMMENT_TEXT_MAX_BYTES: usize = 64_000;
 impl Authors {
     /// Parse comment-author records from `___PPT10` document extensions below
     /// `root`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(root: &Record) -> Result<Self> {
         let mut authors = Vec::new();
         for record in root.versioned_binary_tag_records(10)? {
@@ -35,6 +39,10 @@ pub(crate) fn parse_slide_comments(root: &Record) -> Result<Vec<ParsedComment>> 
     Ok(comments)
 }
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "`RecordType` has hundreds of variants; any type other than the two author children is rejected by the fallback arm"
+)]
 fn parse_author(record: &Record) -> Result<Author> {
     if record.record_type != RecordType::CommentIndex10
         || record.version != 0x0f
@@ -67,10 +75,10 @@ fn parse_author(record: &Record) -> Result<Author> {
                         "CommentIndex10Atom has an invalid record header or size".to_string(),
                     ));
                 }
-                let color = i32::from_le_bytes(child.data[0..4].try_into().map_err(|_| {
+                let color = i32::from_le_bytes(child.data[0..4].try_into().map_err(|_err| {
                     Error::Corrupted("Comment color index is truncated".to_string())
                 })?);
-                let seed = i32::from_le_bytes(child.data[4..8].try_into().map_err(|_| {
+                let seed = i32::from_le_bytes(child.data[4..8].try_into().map_err(|_err| {
                     Error::Corrupted("Comment index seed is truncated".to_string())
                 })?);
                 if color < 0 || seed < 0 {
@@ -171,7 +179,7 @@ fn parse_comment_atom(record: &Record, comment: &mut ParsedComment) -> Result<()
     comment.index = i32::from_le_bytes(
         data[0..4]
             .try_into()
-            .map_err(|_| Error::Corrupted("Comment10Atom index is truncated".to_string()))?,
+            .map_err(|_err| Error::Corrupted("Comment10Atom index is truncated".to_string()))?,
     );
     if comment.index < 0 {
         return Err(Error::Corrupted(
@@ -186,13 +194,12 @@ fn parse_comment_atom(record: &Record, comment: &mut ParsedComment) -> Result<()
     comment.minute = u16::from_le_bytes([data[14], data[15]]);
     comment.second = u16::from_le_bytes([data[16], data[17]]);
     comment.millisecond = u16::from_le_bytes([data[18], data[19]]);
-    comment.x = i32::from_le_bytes(data[20..24].try_into().map_err(|_| {
+    comment.x = i32::from_le_bytes(data[20..24].try_into().map_err(|_err| {
         Error::Corrupted("Comment10Atom horizontal anchor is truncated".to_string())
     })?);
-    comment.y =
-        i32::from_le_bytes(data[24..28].try_into().map_err(|_| {
-            Error::Corrupted("Comment10Atom vertical anchor is truncated".to_string())
-        })?);
+    comment.y = i32::from_le_bytes(data[24..28].try_into().map_err(|_err| {
+        Error::Corrupted("Comment10Atom vertical anchor is truncated".to_string())
+    })?);
     Ok(())
 }
 
@@ -232,5 +239,5 @@ fn parse_string(
         units.push(unit);
     }
     String::from_utf16(&units)
-        .map_err(|_| Error::Corrupted(format!("{name} contains invalid UTF-16")))
+        .map_err(|_err| Error::Corrupted(format!("{name} contains invalid UTF-16")))
 }

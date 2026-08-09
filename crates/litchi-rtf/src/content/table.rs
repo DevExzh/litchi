@@ -5,6 +5,10 @@
 //! This module provides basic table parsing for RTF documents.
 //! RTF tables use a complex row-based model with cell boundaries.
 
+#![allow(
+    clippy::shadow_unrelated,
+    reason = "builder-style helpers deliberately rebind a working value as it is refined"
+)]
 use crate::TextDirection;
 use std::borrow::Cow;
 use std::collections::{BTreeSet, HashSet};
@@ -17,6 +21,10 @@ pub const MAX_TABLE_NESTING_DEPTH: usize = 32;
 pub const MAX_TABLE_CELLS_PER_ROW: usize = 4_096;
 pub const MAX_TABLE_ROW_INDEX: u16 = u16::MAX;
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum TablePreferredWidthUnit {
     #[default]
@@ -26,20 +34,29 @@ pub enum TablePreferredWidthUnit {
     Twips,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TablePreferredWidth {
     unit: TablePreferredWidthUnit,
     value: Option<u16>,
 }
 impl TablePreferredWidth {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(unit: TablePreferredWidthUnit, value: Option<u16>) -> crate::RtfResult<Self> {
         let width = Self { unit, value };
         width.validate()?;
         Ok(width)
     }
+    #[must_use]
     pub const fn unit(self) -> TablePreferredWidthUnit {
         self.unit
     }
+    #[must_use]
     pub const fn value(self) -> Option<u16> {
         self.value
     }
@@ -73,6 +90,10 @@ impl TablePreferredWidth {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum TableRowHeight {
     #[default]
@@ -81,6 +102,10 @@ pub enum TableRowHeight {
     Exact(u16),
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableIndentUnit {
     Auto,
@@ -88,21 +113,29 @@ pub enum TableIndentUnit {
     Nil,
     Percent,
 }
-
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TableIndent {
     unit: TableIndentUnit,
     value: i32,
 }
 impl TableIndent {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(unit: TableIndentUnit, value: i32) -> crate::RtfResult<Self> {
         let indent = Self { unit, value };
         indent.validate()?;
         Ok(indent)
     }
+    #[must_use]
     pub const fn unit(self) -> TableIndentUnit {
         self.unit
     }
+    #[must_use]
     pub const fn value(self) -> i32 {
         self.value
     }
@@ -120,7 +153,7 @@ impl TableIndent {
                 };
             },
         };
-        if self.value.unsigned_abs() <= cap as u32 {
+        if self.value.unsigned_abs() <= cap.cast_unsigned() {
             Ok(())
         } else {
             Err(crate::RtfError::MalformedDocument(
@@ -130,6 +163,10 @@ impl TableIndent {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TableRowGeometry {
     half_gap_twips: Option<u16>,
@@ -142,57 +179,65 @@ pub struct TableRowGeometry {
     indent: Option<TableIndent>,
 }
 impl TableRowGeometry {
+    #[must_use]
     pub const fn half_gap_twips(self) -> Option<u16> {
         self.half_gap_twips
     }
     pub fn set_half_gap_twips(&mut self, value: Option<u16>) {
-        self.half_gap_twips = value
+        self.half_gap_twips = value;
     }
+    #[must_use]
     pub const fn left_edge_twips(self) -> Option<i32> {
         self.left_edge_twips
     }
     pub fn set_left_edge_twips(&mut self, value: Option<i32>) {
-        self.left_edge_twips = value
+        self.left_edge_twips = value;
     }
+    #[must_use]
     pub const fn height(self) -> TableRowHeight {
         self.height
     }
     pub fn set_height(&mut self, value: TableRowHeight) {
-        self.height = value
+        self.height = value;
     }
+    #[must_use]
     pub const fn preferred_width(self) -> Option<TablePreferredWidth> {
         self.preferred_width
     }
     pub fn set_preferred_width(&mut self, value: Option<TablePreferredWidth>) {
-        self.preferred_width = value
+        self.preferred_width = value;
     }
     /// Width of the invisible cell at the logical beginning of the row (`trftsWidthB`/`trwWidthB`).
     /// This is the left side for an LTR row and the right side for an RTL row.
+    #[must_use]
     pub const fn leading_invisible_width(self) -> Option<TablePreferredWidth> {
         self.leading_invisible_width
     }
     pub fn set_leading_invisible_width(&mut self, value: Option<TablePreferredWidth>) {
-        self.leading_invisible_width = value
+        self.leading_invisible_width = value;
     }
     /// Width of the invisible cell at the logical end of the row (`trftsWidthA`/`trwWidthA`).
     /// This is the right side for an LTR row and the left side for an RTL row.
+    #[must_use]
     pub const fn trailing_invisible_width(self) -> Option<TablePreferredWidth> {
         self.trailing_invisible_width
     }
     pub fn set_trailing_invisible_width(&mut self, value: Option<TablePreferredWidth>) {
-        self.trailing_invisible_width = value
+        self.trailing_invisible_width = value;
     }
+    #[must_use]
     pub const fn auto_fit(self) -> bool {
         self.auto_fit
     }
     pub fn set_auto_fit(&mut self, value: bool) {
-        self.auto_fit = value
+        self.auto_fit = value;
     }
+    #[must_use]
     pub const fn indent(self) -> Option<TableIndent> {
         self.indent
     }
     pub fn set_indent(&mut self, value: Option<TableIndent>) {
-        self.indent = value
+        self.indent = value;
     }
     pub(crate) fn validate(self) -> crate::RtfResult<()> {
         if self
@@ -215,27 +260,39 @@ impl TableRowGeometry {
         .into_iter()
         .flatten()
         {
-            width.validate()?
+            width.validate()?;
         }
         if let Some(indent) = self.indent {
-            indent.validate()?
+            indent.validate()?;
         }
         Ok(())
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableCellMergeAxis {
     Horizontal,
     Vertical,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableCellMergeRole {
     First,
     Continuation,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TableCellMergeState {
     pub horizontal: Option<TableCellMergeRole>,
@@ -255,6 +312,7 @@ pub enum CellRevisionKind {
 
 impl CellRevisionKind {
     /// The RTF control word that marks this revision kind.
+    #[must_use]
     pub const fn control_word(self) -> &'static str {
         match self {
             Self::Inserted => "clins",
@@ -264,6 +322,7 @@ impl CellRevisionKind {
     }
 
     /// The RTF control word carrying this revision's author index.
+    #[must_use]
     pub const fn author_control_word(self) -> &'static str {
         match self {
             Self::Inserted => "clinsauth",
@@ -273,6 +332,7 @@ impl CellRevisionKind {
     }
 
     /// The RTF control word carrying this revision's packed DTTM timestamp.
+    #[must_use]
     pub const fn date_control_word(self) -> &'static str {
         match self {
             Self::Inserted => "clinsdttm",
@@ -290,6 +350,10 @@ pub struct CellRevision {
     pub metadata: crate::RevisionMetadata,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableHorizontalReference {
     Column,
@@ -297,6 +361,10 @@ pub enum TableHorizontalReference {
     Page,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableVerticalReference {
     Margin,
@@ -304,6 +372,10 @@ pub enum TableVerticalReference {
     Page,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableHorizontalPosition {
     Offset(i32),
@@ -315,6 +387,10 @@ pub enum TableHorizontalPosition {
     Right,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableVerticalPosition {
     Offset(i32),
@@ -327,6 +403,10 @@ pub enum TableVerticalPosition {
     Top,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TableWrapDistances {
     pub left: Option<u16>,
@@ -343,6 +423,9 @@ impl TableWrapDistances {
             TableEdge::Bottom => &mut self.bottom,
         }
     }
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::RtfResult<()> {
         if [self.left, self.right, self.top, self.bottom]
             .into_iter()
@@ -367,6 +450,7 @@ pub struct FloatingTablePosition {
     pub wrap_distances: TableWrapDistances,
 }
 impl FloatingTablePosition {
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.horizontal_reference.is_none()
             && self.horizontal_position.is_none()
@@ -375,6 +459,9 @@ impl FloatingTablePosition {
             && !self.no_overlap
             && self.wrap_distances == TableWrapDistances::default()
     }
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::RtfResult<()> {
         let offset = |value| (0..=MAX_FLOATING_TABLE_DISTANCE_TWIPS).contains(&value);
         let negative = |value| (-MAX_FLOATING_TABLE_DISTANCE_TWIPS..=-1).contains(&value);
@@ -391,22 +478,38 @@ impl FloatingTablePosition {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableDistanceUnit {
     Null,
     Twips,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableDistanceScope {
     Row,
     Cell,
 }
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableDistanceKind {
     Padding,
     Spacing,
 }
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableEdge {
     Left,
@@ -415,6 +518,10 @@ pub enum TableEdge {
     Bottom,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableRowBorderSide {
     Top,
@@ -425,6 +532,10 @@ pub enum TableRowBorderSide {
     Vertical,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableCellBorderSide {
     Top,
@@ -435,6 +546,10 @@ pub enum TableCellBorderSide {
     UpperRightToLowerLeft,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Sides of the table-style default borders (`\tsbrdr*`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableStyleBorderSide {
@@ -455,6 +570,10 @@ pub(crate) enum TableBorderTarget {
     StyleDefault(TableStyleBorderSide),
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TableRowBorders {
     pub top: Option<crate::Border>,
@@ -475,6 +594,9 @@ impl TableRowBorders {
             TableRowBorderSide::Vertical => &mut self.vertical,
         }
     }
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::RtfResult<()> {
         for border in [
             self.top,
@@ -493,6 +615,10 @@ impl TableRowBorders {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Table-style default borders declared once per row (`\tsbrdr*`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TableStyleDefaultBorders {
@@ -523,6 +649,7 @@ impl TableStyleDefaultBorders {
         }
     }
     /// Whether no default border was explicitly retained.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         [
             self.top,
@@ -537,6 +664,9 @@ impl TableStyleDefaultBorders {
         .into_iter()
         .all(|border| border.is_none())
     }
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::RtfResult<()> {
         for border in [
             self.top,
@@ -557,6 +687,10 @@ impl TableStyleDefaultBorders {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// Row-scoped default formatting applied to every cell in the row
 /// (`\tsbrdr*`, `\tscellpadd*`, `\tscellspc*`, and `\tscellwidth*`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -568,12 +702,16 @@ pub struct TableRowCellDefaults {
 }
 impl TableRowCellDefaults {
     /// Whether no default formatting was explicitly retained.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.borders.is_empty()
             && self.padding == TableEdgeDistances::default()
             && self.spacing == TableEdgeDistances::default()
             && self.preferred_cell_width.is_none()
     }
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::RtfResult<()> {
         self.borders.validate()?;
         self.padding.validate()?;
@@ -585,6 +723,10 @@ impl TableRowCellDefaults {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TableCellBorders {
     pub top: Option<crate::Border>,
@@ -605,6 +747,9 @@ impl TableCellBorders {
             TableCellBorderSide::UpperRightToLowerLeft => &mut self.upper_right_to_lower_left,
         }
     }
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::RtfResult<()> {
         for border in [
             self.top,
@@ -623,6 +768,10 @@ impl TableCellBorders {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TableShading {
     pub amount: Option<u16>,
@@ -636,6 +785,9 @@ pub struct TableShading {
     pub pattern_index: Option<u16>,
 }
 impl TableShading {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::RtfResult<()> {
         if self
             .amount
@@ -655,6 +807,10 @@ impl TableShading {
         Ok(())
     }
 }
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TableDistanceTarget {
     pub scope: TableDistanceScope,
@@ -662,6 +818,10 @@ pub struct TableDistanceTarget {
     pub edge: TableEdge,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableRowAlignment {
     Left,
@@ -669,6 +829,10 @@ pub enum TableRowAlignment {
     Right,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableAutoformatFlag {
     Border,
@@ -702,19 +866,24 @@ impl TableAutoformatFlag {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TableAutoformatFlags {
     bits: u16,
 }
 impl TableAutoformatFlags {
+    #[must_use]
     pub const fn contains(self, flag: TableAutoformatFlag) -> bool {
         self.bits & flag.bit() != 0
     }
     pub fn set(&mut self, flag: TableAutoformatFlag, enabled: bool) {
         if enabled {
-            self.bits |= flag.bit()
+            self.bits |= flag.bit();
         } else {
-            self.bits &= !flag.bit()
+            self.bits &= !flag.bit();
         }
     }
     pub(crate) fn insert(&mut self, flag: TableAutoformatFlag) -> bool {
@@ -724,12 +893,20 @@ impl TableAutoformatFlags {
     }
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableRowBandIndex {
     Header,
     Row(u16),
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TableRowBanding {
     pub row_index: Option<u16>,
@@ -737,6 +914,10 @@ pub struct TableRowBanding {
     pub last_row: bool,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TableRowLayout {
     pub header: bool,
@@ -745,6 +926,10 @@ pub struct TableRowLayout {
     pub alignment: Option<TableRowAlignment>,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableCellVerticalAlignment {
     Top,
@@ -752,6 +937,10 @@ pub enum TableCellVerticalAlignment {
     Bottom,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableCellTextFlow {
     LeftToRightTopToBottom,
@@ -761,6 +950,10 @@ pub enum TableCellTextFlow {
     TopToBottomRightToLeftVertical,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TableCellLayout {
     pub vertical_alignment: Option<TableCellVerticalAlignment>,
@@ -770,12 +963,20 @@ pub struct TableCellLayout {
     pub hide_mark: bool,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TableSideDistance {
     pub value: Option<u16>,
     pub unit: Option<TableDistanceUnit>,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TableEdgeDistances {
     pub left: TableSideDistance,
@@ -792,6 +993,9 @@ impl TableEdgeDistances {
             TableEdge::Bottom => &mut self.bottom,
         }
     }
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::RtfResult<()> {
         for side in [&self.left, &self.right, &self.top, &self.bottom] {
             if side
@@ -818,6 +1022,7 @@ pub struct Table<'a> {
 
 impl<'a> Table<'a> {
     /// Create a new table.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             rows: Vec::new(),
@@ -831,16 +1036,19 @@ impl<'a> Table<'a> {
     }
 
     /// Get the number of rows.
+    #[must_use]
     pub fn row_count(&self) -> usize {
         self.rows.len()
     }
 
     /// Get all rows.
+    #[must_use]
     pub fn rows(&self) -> &[Row<'a>] {
         &self.rows
     }
 
     /// Return the explicit table direction.
+    #[must_use]
     pub fn direction(&self) -> Option<TextDirection> {
         self.direction
     }
@@ -851,7 +1059,7 @@ impl<'a> Table<'a> {
     }
 }
 
-impl<'a> Default for Table<'a> {
+impl Default for Table<'_> {
     fn default() -> Self {
         Self::new()
     }
@@ -885,6 +1093,7 @@ pub struct Row<'a> {
 
 impl<'a> Row<'a> {
     /// Create a new row.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             cells: Vec::new(),
@@ -896,11 +1105,11 @@ impl<'a> Row<'a> {
             spacing: TableEdgeDistances::default(),
             cell_defaults: TableRowCellDefaults::default(),
             positioning: FloatingTablePosition::default(),
-            borders: Default::default(),
-            shading: Default::default(),
-            geometry: Default::default(),
-            autoformat_flags: Default::default(),
-            banding: Default::default(),
+            borders: TableRowBorders::default(),
+            shading: TableShading::default(),
+            geometry: TableRowGeometry::default(),
+            autoformat_flags: TableAutoformatFlags::default(),
+            banding: TableRowBanding::default(),
             revision: crate::RevisionMetadata::default(),
         }
     }
@@ -911,16 +1120,19 @@ impl<'a> Row<'a> {
     }
 
     /// Get the number of cells.
+    #[must_use]
     pub fn cell_count(&self) -> usize {
         self.cells.len()
     }
 
     /// Get all cells.
+    #[must_use]
     pub fn cells(&self) -> &[Cell<'a>] {
         &self.cells
     }
 
     /// Return the table-style handle referenced by this row.
+    #[must_use]
     pub fn table_style(&self) -> Option<u16> {
         self.table_style
     }
@@ -931,6 +1143,7 @@ impl<'a> Row<'a> {
     }
 
     /// RSID attached to this row, when present.
+    #[must_use]
     pub fn table_rsid(&self) -> Option<u32> {
         self.table_rsid
     }
@@ -941,6 +1154,7 @@ impl<'a> Row<'a> {
     }
 
     /// Return the explicit row direction.
+    #[must_use]
     pub fn direction(&self) -> Option<TextDirection> {
         self.direction
     }
@@ -949,78 +1163,89 @@ impl<'a> Row<'a> {
     pub fn set_direction(&mut self, direction: Option<TextDirection>) {
         self.direction = direction;
     }
+    #[must_use]
     pub fn layout(&self) -> &TableRowLayout {
         &self.layout
     }
     pub fn set_layout(&mut self, value: TableRowLayout) {
-        self.layout = value
+        self.layout = value;
     }
+    #[must_use]
     pub fn padding(&self) -> &TableEdgeDistances {
         &self.padding
     }
+    #[must_use]
     pub fn spacing(&self) -> &TableEdgeDistances {
         &self.spacing
     }
     pub fn set_padding(&mut self, value: TableEdgeDistances) {
-        self.padding = value
+        self.padding = value;
     }
     pub fn set_spacing(&mut self, value: TableEdgeDistances) {
-        self.spacing = value
+        self.spacing = value;
     }
     /// Row-scoped default cell formatting (`\tsbrdr*`, `\tscellpadd*`,
     /// `\tscellspc*`, and `\tscellwidth*`).
+    #[must_use]
     pub fn cell_defaults(&self) -> &TableRowCellDefaults {
         &self.cell_defaults
     }
     pub fn set_cell_defaults(&mut self, value: TableRowCellDefaults) {
-        self.cell_defaults = value
+        self.cell_defaults = value;
     }
+    #[must_use]
     pub fn positioning(&self) -> &FloatingTablePosition {
         &self.positioning
     }
     pub fn set_positioning(&mut self, value: FloatingTablePosition) {
-        self.positioning = value
+        self.positioning = value;
     }
+    #[must_use]
     pub fn borders(&self) -> &TableRowBorders {
         &self.borders
     }
+    #[must_use]
     pub fn shading(&self) -> TableShading {
         self.shading
     }
     pub fn set_borders(&mut self, value: TableRowBorders) {
-        self.borders = value
+        self.borders = value;
     }
     pub fn set_shading(&mut self, value: TableShading) {
-        self.shading = value
+        self.shading = value;
     }
+    #[must_use]
     pub fn geometry(&self) -> TableRowGeometry {
         self.geometry
     }
     pub fn set_geometry(&mut self, value: TableRowGeometry) {
-        self.geometry = value
+        self.geometry = value;
     }
+    #[must_use]
     pub const fn autoformat_flags(&self) -> TableAutoformatFlags {
         self.autoformat_flags
     }
     pub fn set_autoformat_flags(&mut self, value: TableAutoformatFlags) {
-        self.autoformat_flags = value
+        self.autoformat_flags = value;
     }
+    #[must_use]
     pub const fn banding(&self) -> TableRowBanding {
         self.banding
     }
     pub fn set_banding(&mut self, value: TableRowBanding) {
-        self.banding = value
+        self.banding = value;
     }
     /// Author/date metadata for the revision that changed this row.
+    #[must_use]
     pub const fn revision(&self) -> crate::RevisionMetadata {
         self.revision
     }
     pub fn set_revision(&mut self, value: crate::RevisionMetadata) {
-        self.revision = value
+        self.revision = value;
     }
 }
 
-impl<'a> Default for Row<'a> {
+impl Default for Row<'_> {
     fn default() -> Self {
         Self::new()
     }
@@ -1048,6 +1273,10 @@ pub struct Cell<'a> {
     story_events: Vec<CellStoryEvent>,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// A nested table inserted between UTF-8 text bytes in its containing cell.
 #[derive(Debug, Clone)]
 pub struct CellNestedTable<'a> {
@@ -1061,6 +1290,10 @@ pub struct CellStoryReference {
     pub position: usize,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// A row/cell coordinate inside a document table or nested table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TableCellCoordinate {
@@ -1069,6 +1302,10 @@ pub struct TableCellCoordinate {
     pub cell_index: usize,
 }
 
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "names mirror the RTF specification vocabulary"
+)]
 /// A stable route from a document table to an outer or nested cell.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TableCellPath {
@@ -1077,6 +1314,7 @@ pub struct TableCellPath {
 }
 
 impl TableCellPath {
+    #[must_use]
     pub fn outer(table_index: usize, row_index: usize, cell_index: usize) -> Self {
         Self {
             root: TableCellCoordinate {
@@ -1088,6 +1326,7 @@ impl TableCellPath {
         }
     }
 
+    #[must_use]
     pub fn with_nested(mut self, coordinate: TableCellCoordinate) -> Self {
         self.nested.push(coordinate);
         self
@@ -1109,15 +1348,16 @@ pub enum CellStoryEvent {
 
 impl<'a> Cell<'a> {
     /// Create a new cell.
+    #[must_use]
     pub fn new(text: Cow<'a, str>) -> Self {
         Self {
             text,
             padding: TableEdgeDistances::default(),
             spacing: TableEdgeDistances::default(),
             layout: TableCellLayout::default(),
-            borders: Default::default(),
-            shading: Default::default(),
-            merge: Default::default(),
+            borders: TableCellBorders::default(),
+            shading: TableShading::default(),
+            merge: TableCellMergeState::default(),
             right_boundary: None,
             preferred_width: None,
             revision: None,
@@ -1128,6 +1368,7 @@ impl<'a> Cell<'a> {
             story_events: Vec::new(),
         }
     }
+    #[must_use]
     pub fn with_distances(
         text: Cow<'a, str>,
         padding: TableEdgeDistances,
@@ -1138,9 +1379,9 @@ impl<'a> Cell<'a> {
             padding,
             spacing,
             layout: TableCellLayout::default(),
-            borders: Default::default(),
-            shading: Default::default(),
-            merge: Default::default(),
+            borders: TableCellBorders::default(),
+            shading: TableShading::default(),
+            merge: TableCellMergeState::default(),
             right_boundary: None,
             preferred_width: None,
             revision: None,
@@ -1153,67 +1394,81 @@ impl<'a> Cell<'a> {
     }
 
     /// Get the cell text.
+    #[must_use]
     pub fn text(&self) -> &str {
         &self.text
     }
+    #[must_use]
     pub fn padding(&self) -> &TableEdgeDistances {
         &self.padding
     }
+    #[must_use]
     pub fn spacing(&self) -> &TableEdgeDistances {
         &self.spacing
     }
     pub fn set_padding(&mut self, value: TableEdgeDistances) {
-        self.padding = value
+        self.padding = value;
     }
     pub fn set_spacing(&mut self, value: TableEdgeDistances) {
-        self.spacing = value
+        self.spacing = value;
     }
+    #[must_use]
     pub fn layout(&self) -> &TableCellLayout {
         &self.layout
     }
     pub fn set_layout(&mut self, value: TableCellLayout) {
-        self.layout = value
+        self.layout = value;
     }
+    #[must_use]
     pub fn borders(&self) -> &TableCellBorders {
         &self.borders
     }
+    #[must_use]
     pub fn shading(&self) -> TableShading {
         self.shading
     }
     pub fn set_borders(&mut self, value: TableCellBorders) {
-        self.borders = value
+        self.borders = value;
     }
     pub fn set_shading(&mut self, value: TableShading) {
-        self.shading = value
+        self.shading = value;
     }
+    #[must_use]
     pub fn merge(&self) -> TableCellMergeState {
         self.merge
     }
     pub fn set_merge(&mut self, value: TableCellMergeState) {
-        self.merge = value
+        self.merge = value;
     }
+    #[must_use]
     pub fn right_boundary(&self) -> Option<i32> {
         self.right_boundary
     }
     pub fn set_right_boundary(&mut self, value: Option<i32>) {
-        self.right_boundary = value
+        self.right_boundary = value;
     }
+    #[must_use]
     pub fn preferred_width(&self) -> Option<TablePreferredWidth> {
         self.preferred_width
     }
     pub fn set_preferred_width(&mut self, value: Option<TablePreferredWidth>) {
-        self.preferred_width = value
+        self.preferred_width = value;
     }
     /// Tracked-change revision attached to this cell, if any.
+    #[must_use]
     pub const fn revision(&self) -> Option<CellRevision> {
         self.revision
     }
     pub fn set_revision(&mut self, value: Option<CellRevision>) {
-        self.revision = value
+        self.revision = value;
     }
+    #[must_use]
     pub fn nested_tables(&self) -> &[CellNestedTable<'a>] {
         &self.nested_tables
     }
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn add_nested_table(
         &mut self,
         text_offset: usize,
@@ -1243,15 +1498,19 @@ impl<'a> Cell<'a> {
     pub fn nested_tables_mut(&mut self) -> &mut Vec<CellNestedTable<'a>> {
         &mut self.nested_tables
     }
+    #[must_use]
     pub fn shapes(&self) -> &[crate::Shape<'a>] {
         &self.shapes
     }
+    #[must_use]
     pub fn shape_groups(&self) -> &[crate::ShapeGroup<'a>] {
         &self.shape_groups
     }
+    #[must_use]
     pub fn drawing_order(&self) -> &[crate::StoryDrawing] {
         &self.drawing_order
     }
+    #[must_use]
     pub fn story_events(&self) -> &[CellStoryEvent] {
         &self.story_events
     }
@@ -1329,9 +1588,9 @@ impl<'a> Cell<'a> {
         let mut saw_fields = HashSet::new();
         saw_fields
             .try_reserve(field_count)
-            .map_err(|_| crate::RtfError::AllocationFailed {
+            .map_err(|_err| crate::RtfError::AllocationFailed {
                 resource: "table-cell field references",
-                requested: field_count.saturating_mul(std::mem::size_of::<usize>()),
+                requested: field_count.saturating_mul(size_of::<usize>()),
             })?;
 
         let mut drawings = drawing_order.iter().copied();
@@ -1397,6 +1656,9 @@ impl<'a> Cell<'a> {
         Ok(())
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate_drawings(&self) -> crate::RtfResult<()> {
         Self::validate_story_content(
             self.text.as_ref(),
@@ -1407,6 +1669,9 @@ impl<'a> Cell<'a> {
             &self.story_events,
         )
     }
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_shape(&mut self, shape: crate::Shape<'a>) -> crate::RtfResult<()> {
         let position = shape.position;
         if self.shapes.len() >= crate::shape::MAX_SHAPES_PER_GROUP {
@@ -1451,6 +1716,9 @@ impl<'a> Cell<'a> {
         self.story_events.push(CellStoryEvent::Drawing(drawing));
         Ok(())
     }
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'a>) -> crate::RtfResult<()> {
         let position = group.position;
         if self.shape_groups.len() >= crate::shape::MAX_GROUPS_PER_GROUP {
@@ -1504,9 +1772,19 @@ impl<'a> Cell<'a> {
     pub fn page_breaks(&self) -> impl Iterator<Item = &crate::PageBreak> {
         self.story_events.iter().filter_map(|event| match event {
             CellStoryEvent::PageBreak(page_break) => Some(page_break),
-            _ => None,
+            CellStoryEvent::NestedTable(_)
+            | CellStoryEvent::Drawing(_)
+            | CellStoryEvent::Field(_)
+            | CellStoryEvent::ColumnBreak(_)
+            | CellStoryEvent::NavigationEntry(_)
+            | CellStoryEvent::RevisionStart(_)
+            | CellStoryEvent::RevisionEnd(_)
+            | CellStoryEvent::RevisionDeletion(_) => None,
         })
     }
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_page_break(&mut self, position: usize) -> crate::RtfResult<()> {
         self.push_ordered_story_events(
             [CellStoryEvent::PageBreak(crate::PageBreak::new(position))],
@@ -1520,9 +1798,19 @@ impl<'a> Cell<'a> {
     pub fn column_breaks(&self) -> impl Iterator<Item = &crate::ColumnBreak> {
         self.story_events.iter().filter_map(|event| match event {
             CellStoryEvent::ColumnBreak(column_break) => Some(column_break),
-            _ => None,
+            CellStoryEvent::NestedTable(_)
+            | CellStoryEvent::Drawing(_)
+            | CellStoryEvent::Field(_)
+            | CellStoryEvent::PageBreak(_)
+            | CellStoryEvent::NavigationEntry(_)
+            | CellStoryEvent::RevisionStart(_)
+            | CellStoryEvent::RevisionEnd(_)
+            | CellStoryEvent::RevisionDeletion(_) => None,
         })
     }
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_column_break(&mut self, position: usize) -> crate::RtfResult<()> {
         self.push_ordered_story_events(
             [CellStoryEvent::ColumnBreak(crate::ColumnBreak::new(
@@ -1538,7 +1826,14 @@ impl<'a> Cell<'a> {
     pub fn navigation_entry_references(&self) -> impl Iterator<Item = &CellStoryReference> {
         self.story_events.iter().filter_map(|event| match event {
             CellStoryEvent::NavigationEntry(reference) => Some(reference),
-            _ => None,
+            CellStoryEvent::NestedTable(_)
+            | CellStoryEvent::Drawing(_)
+            | CellStoryEvent::Field(_)
+            | CellStoryEvent::PageBreak(_)
+            | CellStoryEvent::ColumnBreak(_)
+            | CellStoryEvent::RevisionStart(_)
+            | CellStoryEvent::RevisionEnd(_)
+            | CellStoryEvent::RevisionDeletion(_) => None,
         })
     }
     pub fn revision_events(&self) -> impl Iterator<Item = &CellStoryEvent> {
@@ -1551,6 +1846,9 @@ impl<'a> Cell<'a> {
             )
         })
     }
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_navigation_entry_reference(
         &mut self,
         index: usize,
@@ -1561,6 +1859,9 @@ impl<'a> Cell<'a> {
             position,
         }))
     }
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_insertion_revision_reference(
         &mut self,
         index: usize,
@@ -1583,6 +1884,9 @@ impl<'a> Cell<'a> {
             "invalid or out-of-order table-cell insertion revision",
         )
     }
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_deletion_revision_reference(
         &mut self,
         index: usize,
@@ -1617,6 +1921,9 @@ impl<'a> Cell<'a> {
         self.story_events.extend(events);
         Ok(())
     }
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn set_text(&mut self, text: Cow<'a, str>) -> crate::RtfResult<()> {
         Self::validate_story_content(
             text.as_ref(),
@@ -1760,6 +2067,7 @@ impl Cell<'_> {
 
 impl CellNestedTable<'_> {
     /// Detach this nested table from the source buffer, keeping its anchor.
+    #[must_use]
     pub fn into_owned(self) -> CellNestedTable<'static> {
         CellNestedTable {
             text_offset: self.text_offset,
@@ -1796,7 +2104,10 @@ impl Table<'_> {
             let mut next_vertical: BTreeSet<(i32, i32)> = BTreeSet::new();
             let mut left = 0i32;
             for (index, cell) in row.cells().iter().enumerate() {
-                let right = cell.right_boundary().unwrap_or(2880 * ((index + 1) as i32));
+                let fallback_boundary = 2880
+                    * i32::try_from(index + 1)
+                        .map_err(|_err| "RTF table cell index exceeds the i32 range".to_string())?;
+                let right = cell.right_boundary().unwrap_or(fallback_boundary);
                 match cell.merge().horizontal {
                     None => horizontal_open = false,
                     Some(TableCellMergeRole::First) => horizontal_open = true,
@@ -1832,6 +2143,11 @@ impl Table<'_> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::*;
 
     #[test]

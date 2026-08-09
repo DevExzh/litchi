@@ -90,6 +90,7 @@ impl Limits {
     };
 
     /// Construct a finite, nonzero limit set.
+    #[must_use]
     pub const fn new(
         input_bytes: usize,
         output_bytes: usize,
@@ -119,31 +120,37 @@ impl Limits {
     }
 
     #[inline]
+    #[must_use]
     pub const fn input_bytes(self) -> usize {
         self.input_bytes
     }
 
     #[inline]
+    #[must_use]
     pub const fn output_bytes(self) -> usize {
         self.output_bytes
     }
 
     #[inline]
+    #[must_use]
     pub const fn depth(self) -> usize {
         self.depth
     }
 
     #[inline]
+    #[must_use]
     pub const fn nodes(self) -> usize {
         self.nodes
     }
 
     #[inline]
+    #[must_use]
     pub const fn shapes(self) -> usize {
         self.shapes
     }
 
     #[inline]
+    #[must_use]
     pub const fn retained_text_bytes(self) -> usize {
         self.retained_text_bytes
     }
@@ -155,7 +162,7 @@ impl Default for Limits {
     }
 }
 
-/// A bounded, borrowed-by-default index over one PresentationML shape tree.
+/// A bounded, borrowed-by-default index over one `PresentationML` shape tree.
 ///
 /// MCE-free input remains borrowed. If markup-compatibility processing must
 /// select or unwrap a branch, the scene owns exactly that processed owner XML;
@@ -169,11 +176,19 @@ pub struct Scene<'a> {
 
 impl<'a> Scene<'a> {
     /// Index a scene with conservative finite limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn read(xml: &'a [u8]) -> Result<Self> {
         Self::read_with(xml, Limits::DEFAULT)
     }
 
     /// Index a scene with caller-selected finite limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn read_with(xml: &'a [u8], limits: Limits) -> Result<Self> {
         if xml.len() > limits.input_bytes {
             return Err(Error::Limit {
@@ -214,28 +229,33 @@ impl<'a> Scene<'a> {
 
     /// Processed owner XML against which every [`Span`] is defined.
     #[inline]
+    #[must_use]
     pub fn xml(&self) -> &[u8] {
         self.xml.as_ref()
     }
 
     /// Whether MCE preprocessing produced a replacement owner buffer.
     #[inline]
+    #[must_use]
     pub const fn is_rewritten(&self) -> bool {
         matches!(self.xml, Cow::Owned(_))
     }
 
     /// Number of shapes in depth-first pre-order, including grouped children.
     #[inline]
+    #[must_use]
     pub fn len(&self) -> usize {
         self.records.len()
     }
 
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.records.is_empty()
     }
 
     /// Iterate all shapes in depth-first pre-order.
+    #[must_use]
     pub fn iter(&self) -> Shapes<'_> {
         Shapes {
             xml: self.xml(),
@@ -249,6 +269,7 @@ impl<'a> Scene<'a> {
     }
 
     /// Iterate only direct children of the owner shape tree.
+    #[must_use]
     pub fn roots(&self) -> Shapes<'_> {
         Shapes {
             xml: self.xml(),
@@ -270,6 +291,10 @@ impl<'a> Scene<'a> {
     ///
     /// A missing name is ordinary absence. Malformed duplicate exact names and
     /// out-of-bounds numeric positions are typed errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn get<'k>(
         &self,
         key: impl Into<Key<'k>>,
@@ -299,6 +324,10 @@ impl<'a> Scene<'a> {
     }
 
     /// Select a checked depth-first pre-order position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn at(&self, index: usize) -> std::result::Result<Shape<'_>, LookupError> {
         let record = self
             .records
@@ -317,6 +346,10 @@ impl<'a> Scene<'a> {
     }
 
     /// Require a shape selected by semantic name or checked numeric position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn shape<'k>(
         &self,
         key: impl Into<Key<'k>>,
@@ -478,7 +511,10 @@ impl<'a> Scanner<'a> {
         Ok((self.records, self.strings))
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "element handler threads one slot per shape-reader field"
+    )]
     fn start_element(
         &mut self,
         namespace: &ResolveResult<'_>,
@@ -550,7 +586,7 @@ impl<'a> Scanner<'a> {
             let name = unqualified_attribute_value(element, b"name", decoder)?;
             let id = unqualified_attribute_value(element, b"id", decoder)?
                 .map(|value| {
-                    value.parse::<u32>().map_err(|_| {
+                    value.parse::<u32>().map_err(|_err| {
                         Error::Invalid(format!("invalid non-visual shape ID '{value}'"))
                     })
                 })
@@ -580,7 +616,7 @@ impl<'a> Scanner<'a> {
             let index = match unqualified_attribute_value(element, b"idx", decoder)? {
                 Some(value) => value
                     .parse::<u32>()
-                    .map_err(|_| Error::Invalid(format!("invalid placeholder index '{value}'"))),
+                    .map_err(|_err| Error::Invalid(format!("invalid placeholder index '{value}'"))),
                 None => Ok(0),
             }?;
             let kind = kind
@@ -736,12 +772,12 @@ impl<'a> Scanner<'a> {
                 source,
             })?;
         let index = u32::try_from(self.records.len())
-            .map_err(|_| Error::Invalid("shape count exceeds the compact u32 domain".into()))?;
+            .map_err(|_err| Error::Invalid("shape count exceeds the compact u32 domain".into()))?;
         let start = u32::try_from(start)
-            .map_err(|_| Error::Invalid("shape offset exceeds the compact u32 domain".into()))?;
+            .map_err(|_err| Error::Invalid("shape offset exceeds the compact u32 domain".into()))?;
         let qualified_name = element.name();
         let source_name = str::from_utf8(qualified_name.as_ref())
-            .map_err(|_| Error::Invalid("shape element name is not UTF-8".into()))?;
+            .map_err(|_err| Error::Invalid("shape element name is not UTF-8".into()))?;
         let source_name = Some(self.retain(source_name)?);
         self.records.push(Record {
             span: Span { start, len: 0 },
@@ -784,7 +820,7 @@ impl<'a> Scanner<'a> {
             return Err(Error::Invalid("shape ended inside DrawingML text".into()));
         }
         let index = usize::try_from(active.index)
-            .map_err(|_| Error::Invalid("shape index does not fit usize".into()))?;
+            .map_err(|_err| Error::Invalid("shape index does not fit usize".into()))?;
         let start = self
             .records
             .get(index)
@@ -792,14 +828,14 @@ impl<'a> Scanner<'a> {
             .span
             .start;
         let start_usize = usize::try_from(start)
-            .map_err(|_| Error::Invalid("shape offset does not fit usize".into()))?;
+            .map_err(|_err| Error::Invalid("shape offset does not fit usize".into()))?;
         let len = end
             .checked_sub(start_usize)
             .ok_or_else(|| Error::Invalid("shape end precedes its start".into()))?;
         let len = u32::try_from(len)
-            .map_err(|_| Error::Invalid("shape length exceeds the compact u32 domain".into()))?;
+            .map_err(|_err| Error::Invalid("shape length exceeds the compact u32 domain".into()))?;
         let subtree_end = u32::try_from(self.records.len())
-            .map_err(|_| Error::Invalid("shape count exceeds the compact u32 domain".into()))?;
+            .map_err(|_err| Error::Invalid("shape count exceeds the compact u32 domain".into()))?;
         let text = active
             .text
             .as_deref()
@@ -851,9 +887,9 @@ impl<'a> Scanner<'a> {
         self.strings.push_str(value);
         Ok(TextSpan {
             start: u32::try_from(start)
-                .map_err(|_| Error::Invalid("shape string offset exceeds u32".into()))?,
+                .map_err(|_err| Error::Invalid("shape string offset exceeds u32".into()))?,
             len: u32::try_from(value.len())
-                .map_err(|_| Error::Invalid("shape string length exceeds u32".into()))?,
+                .map_err(|_err| Error::Invalid("shape string length exceeds u32".into()))?,
         })
     }
 
@@ -978,7 +1014,7 @@ fn parse_i64(
             String::from_utf8_lossy(name)
         ))
     })?;
-    value.parse::<i64>().map_err(|_| {
+    value.parse::<i64>().map_err(|_err| {
         Error::Invalid(format!(
             "invalid DrawingML coordinate '{}' for '{}'",
             value,
@@ -1005,5 +1041,5 @@ fn parse_nonnegative(
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| Error::Invalid("shape XML position does not fit usize".into()))
+        .map_err(|_err| Error::Invalid("shape XML position does not fit usize".into()))
 }

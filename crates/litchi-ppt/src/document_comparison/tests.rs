@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 //! Focused round-trip and malformed-input coverage for document comparison.
 
 use super::*;
@@ -10,7 +16,7 @@ fn record(version: u16, kind: RecordType, data: Vec<u8>) -> Record {
         instance: 0,
         record_type: kind,
         record_type_raw: kind.as_u16(),
-        data_length: data.len() as u32,
+        data_length: u32::try_from(data.len()).unwrap(),
         data,
         children: Vec::new(),
     }

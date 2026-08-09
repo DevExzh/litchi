@@ -8,19 +8,16 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
-pub use model::{ConditionalStyle, Protection, Rule, TableStyle};
+pub use model::{
+    CellStyleRegistry, ConditionalStyle, PreservedXmlFragment, Protection, Rule, TableStyle,
+};
 
-#[allow(unused_imports)]
-pub(crate) use codec::{
+pub use codec::{
     extract_automatic_styles, extract_font_face_decls, rewrite_conditional_styles,
     rewrite_managed_cell_styles,
 };
-#[allow(unused_imports)]
-pub(crate) use model::{CellStyleRegistry, PreservedXmlFragment};
-#[allow(unused_imports)]
-pub(crate) use semantic::{common_table_cell_style_names, validate_protection_style_document};
-#[allow(unused_imports)]
-pub(crate) use validation::{
+pub use semantic::{common_table_cell_style_names, validate_protection_style_document};
+pub use validation::{
     validate_conditional_style_collection, validate_protection_style_collection,
     validate_style_name,
 };

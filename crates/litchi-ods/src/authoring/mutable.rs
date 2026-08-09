@@ -9,10 +9,14 @@ use litchi_core::{Error, Result};
 use litchi_odf_common::rdf::Triple;
 use std::path::Path;
 
-/// Mutable ODS snapshot.
+/// Legacy mutable ODS compatibility facade.
 ///
 /// Every package-level edit is validated and atomically replaces the owned
-/// immutable snapshot. Failed edits leave the document unchanged.
+/// immutable snapshot. Failed edits leave the document unchanged. New code
+/// should prefer the source-checked `Snapshot`/`Transaction`/`Commit`/`Patch`
+/// APIs of individual feature owners, or `FlatSpreadsheet` for flat-ODS cell
+/// edits; this attached compatibility facade cannot safely edit every
+/// source-level worksheet extension.
 pub struct MutableSpreadsheet {
     spreadsheet: Spreadsheet,
 }

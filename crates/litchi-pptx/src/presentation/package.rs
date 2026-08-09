@@ -1,4 +1,4 @@
-//! PresentationML package-graph adapters.
+//! `PresentationML` package-graph adapters.
 //!
 //! This layer resolves slides, masters, companion parts, and relationships
 //! without changing the borrowed typed facade or interpreting XML payloads.
@@ -104,10 +104,10 @@ pub(super) fn slide<'a>(
     Ok(Some(Slide::new(package, part)))
 }
 
-pub(super) fn find_slide<'a, 'k>(
+pub(super) fn find_slide<'a>(
     package: &'a OpcPackage,
     presentation: &PresentationPart<'a>,
-    key: Key<'k>,
+    key: Key<'_>,
 ) -> Result<Option<Slide<'a>>> {
     match key {
         Key::Index(index) => slide(package, presentation, index),

@@ -1,13 +1,13 @@
-//! Package-aware custom-show and section mutation for PowerPoint presentations.
+//! Package-aware custom-show and section mutation for `PowerPoint` presentations.
 //!
-//! Custom shows reference slide relationships while PowerPoint 2010 sections
+//! Custom shows reference slide relationships while `PowerPoint` 2010 sections
 //! reference stable numeric presentation slide IDs. This module resolves both
 //! representations into one validated graph and patches only the corresponding
 //! children of `ppt/presentation.xml`.
 
 use super::super::custom_show::{List as ShowList, Show};
 use super::super::sections::{List as SectionList, Section};
-use super::model::*;
+use super::model::{Graph, Reference};
 use crate::presentation_properties::metadata::{escape_xml, new_guid};
 use crate::{Error, Result};
 use litchi_opc::OpcPackage;
@@ -30,6 +30,10 @@ const MAX_DEPTH: usize = 128;
 const MAX_SLIDE_ID: u32 = 2_147_483_647;
 
 /// Load and validate the presentation structure graph.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load(package: &OpcPackage) -> Result<Graph> {
     let presentation = package.main_document_part()?;
     require_presentation(presentation.content_type())?;
@@ -37,6 +41,10 @@ pub fn load(package: &OpcPackage) -> Result<Graph> {
 }
 
 /// Atomically replace custom shows and sections while preserving unrelated XML.
+///
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn store(package: &mut OpcPackage, value: &Graph) -> Result<()> {
     validate_graph(package, value)?;
     let presentation_name = package.main_document_part()?.partname().clone();
@@ -131,10 +139,16 @@ pub(crate) fn equivalent_graph(left: &Graph, right: &Graph) -> bool {
         && left.sections == right.sections
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn find_custom_show(package: &OpcPackage, id: u32) -> Result<Option<Show>> {
     Ok(load(package)?.custom_shows.get_by_id(id).cloned())
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn add_custom_show(package: &mut OpcPackage, show: Show) -> Result<()> {
     mutate(package, |graph| {
         if graph.custom_shows.get_by_id(show.id).is_some()
@@ -147,16 +161,25 @@ pub fn add_custom_show(package: &mut OpcPackage, show: Show) -> Result<()> {
     })
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn update_custom_show(package: &mut OpcPackage, id: u32, replacement: Show) -> Result<()> {
     mutate(package, |graph| {
         graph.custom_shows.replace_by_id(id, replacement)
     })
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn replace_custom_show(package: &mut OpcPackage, id: u32, replacement: Show) -> Result<()> {
     update_custom_show(package, id, replacement)
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn remove_custom_show(package: &mut OpcPackage, id: u32) -> Result<bool> {
     let mut graph = load(package)?;
     let removed = graph.custom_shows.remove_by_id(id).is_some();
@@ -166,10 +189,16 @@ pub fn remove_custom_show(package: &mut OpcPackage, id: u32) -> Result<bool> {
     Ok(removed)
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn reorder_custom_shows(package: &mut OpcPackage, ordered_ids: &[u32]) -> Result<()> {
     mutate(package, |graph| graph.custom_shows.reorder(ordered_ids))
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn add_custom_show_slide(package: &mut OpcPackage, show_id: u32, slide_id: u32) -> Result<()> {
     mutate(package, |graph| {
         require_slide(graph, slide_id)?;
@@ -185,6 +214,9 @@ pub fn add_custom_show_slide(package: &mut OpcPackage, show_id: u32, slide_id: u
     })
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn remove_custom_show_slide(
     package: &mut OpcPackage,
     show_id: u32,
@@ -203,6 +235,9 @@ pub fn remove_custom_show_slide(
     Ok(true)
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn reorder_custom_show_slides(
     package: &mut OpcPackage,
     show_id: u32,
@@ -219,10 +254,16 @@ pub fn reorder_custom_show_slides(
     })
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn find_section(package: &OpcPackage, id: &str) -> Result<Option<Section>> {
     Ok(load(package)?.sections.get_by_id(id).cloned())
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn add_section(package: &mut OpcPackage, mut section: Section) -> Result<String> {
     if section.id.is_none() {
         section.id = Some(new_guid());
@@ -246,6 +287,9 @@ pub fn add_section(package: &mut OpcPackage, mut section: Section) -> Result<Str
     Ok(retained)
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn update_section(package: &mut OpcPackage, id: &str, replacement: Section) -> Result<()> {
     let id = id.to_owned();
     mutate(package, move |graph| {
@@ -261,10 +305,16 @@ pub fn update_section(package: &mut OpcPackage, id: &str, replacement: Section) 
     })
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn replace_section(package: &mut OpcPackage, id: &str, replacement: Section) -> Result<()> {
     update_section(package, id, replacement)
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn remove_section(package: &mut OpcPackage, id: &str) -> Result<bool> {
     let mut graph = load(package)?;
     let removed = graph.sections.remove_by_id(id).is_some();
@@ -274,10 +324,16 @@ pub fn remove_section(package: &mut OpcPackage, id: &str) -> Result<bool> {
     Ok(removed)
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn reorder_sections(package: &mut OpcPackage, ordered_ids: &[String]) -> Result<()> {
     mutate(package, |graph| graph.sections.reorder(ordered_ids))
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn add_section_slide(package: &mut OpcPackage, section_id: &str, slide_id: u32) -> Result<()> {
     let section_id = section_id.to_owned();
     mutate(package, move |graph| {
@@ -307,6 +363,9 @@ pub fn add_section_slide(package: &mut OpcPackage, section_id: &str, slide_id: u
     })
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn remove_section_slide(
     package: &mut OpcPackage,
     section_id: &str,
@@ -325,6 +384,9 @@ pub fn remove_section_slide(
     Ok(true)
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn reorder_section_slides(
     package: &mut OpcPackage,
     section_id: &str,
@@ -346,6 +408,10 @@ pub fn reorder_section_slides(
 ///
 /// Deleted slide references are removed, custom-show order is retained, and section
 /// memberships are sorted to the current `p:sldIdLst` order.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn synchronize_after_slide_mutation(package: &mut OpcPackage) -> Result<()> {
     let presentation = package.main_document_part()?;
     let mut graph = parse_structure_blob(package, presentation.blob(), false)?;
@@ -484,7 +550,10 @@ struct Attribute {
     value: String,
 }
 
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "raw-show tuple mirrors the persisted XML structure"
+)]
 pub(super) fn parse_core(xml: &[u8]) -> Result<(Vec<(u32, String)>, Vec<RawShow>)> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(true);
@@ -614,7 +683,7 @@ fn parse_show(
     let attributes = attributes_ns(element, decoder, reader)?;
     let id = required(&attributes, "id")?
         .parse::<u32>()
-        .map_err(|_| invalid("invalid custom-show ID"))?;
+        .map_err(|_err| invalid("invalid custom-show ID"))?;
     let name = required(&attributes, "name")?.to_owned();
     if name.is_empty() {
         return Err(invalid("custom-show name cannot be empty"));
@@ -634,7 +703,7 @@ fn parse_slide_reference(
     let attributes = attributes_ns(element, decoder, reader)?;
     let id = required_unqualified(&attributes, "id")?
         .parse::<u32>()
-        .map_err(|_| invalid("invalid presentation slide ID"))?;
+        .map_err(|_err| invalid("invalid presentation slide ID"))?;
     if !(256..=MAX_SLIDE_ID).contains(&id) {
         return Err(invalid("presentation slide ID is outside 256..=2147483647"));
     }
@@ -839,10 +908,7 @@ fn write_custom_shows(
         .iter()
         .map(|slide| (slide.slide_id, slide.relationship_id.as_str()))
         .collect::<HashMap<_, _>>();
-    let mut xml = format!(
-        "<p:custShowLst xmlns:p=\"{}\" xmlns:r=\"{}\">",
-        p_namespace, r_namespace
-    );
+    let mut xml = format!("<p:custShowLst xmlns:p=\"{p_namespace}\" xmlns:r=\"{r_namespace}\">");
     for show in &shows.shows {
         xml.push_str("<p:custShow name=\"");
         xml.push_str(&escape_xml(&show.name));
@@ -1008,8 +1074,7 @@ fn patch_custom_shows(xml: &[u8], replacement: &[u8]) -> Result<Vec<u8>> {
         .direct
         .iter()
         .find(|span| schema_rank(&span.local).is_some_and(|rank| rank > 8))
-        .map(|span| span.start)
-        .unwrap_or(layout.root_close);
+        .map_or(layout.root_close, |span| span.start);
     insert_bytes(xml, insert, replacement)
 }
 
@@ -1150,6 +1215,11 @@ fn invalid(message: impl Into<String>) -> Error {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

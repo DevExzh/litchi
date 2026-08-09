@@ -1,4 +1,4 @@
-//! Borrowed semantic view of one PresentationML package graph.
+//! Borrowed semantic view of one `PresentationML` package graph.
 //!
 //! The typed facade delegates XML scanning to [`codec`] and package
 //! relationship traversal to [`package`]. Embedded resources and media

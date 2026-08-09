@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::codec::{NORMAL_VIEW_SET_INFO_ATOM_TYPE, NORMAL_VIEW_SET_INFO_TYPE};
 use super::*;
 use crate::consts::RecordType;
@@ -9,7 +15,7 @@ fn atom_record(data: &[u8]) -> Record {
         record_type_raw: NORMAL_VIEW_SET_INFO_ATOM_TYPE,
         version: 0,
         instance: 0,
-        data_length: data.len() as u32,
+        data_length: u32::try_from(data.len()).unwrap(),
         data: data.to_vec(),
         children: Vec::new(),
     }
@@ -20,14 +26,14 @@ fn container_record(atom_data: &[u8]) -> Record {
     let mut data = Vec::new();
     data.extend_from_slice(&0u16.to_le_bytes());
     data.extend_from_slice(&NORMAL_VIEW_SET_INFO_ATOM_TYPE.to_le_bytes());
-    data.extend_from_slice(&(atom.data.len() as u32).to_le_bytes());
+    data.extend_from_slice(&u32::try_from(atom.data.len()).unwrap().to_le_bytes());
     data.extend_from_slice(&atom.data);
     Record {
         record_type: RecordType::NormalViewSetInfo9,
         record_type_raw: NORMAL_VIEW_SET_INFO_TYPE,
         version: 0xF,
         instance: 1,
-        data_length: data.len() as u32,
+        data_length: u32::try_from(data.len()).unwrap(),
         data,
         children: Vec::new(),
     }
@@ -85,17 +91,17 @@ fn rejects_malformed_layouts() {
     // Truncated atom.
     assert!(NormalViewSetInfo::parse(&pane_atom()[..12]).is_err());
     // Ratio above 1.
-    let mut bad = pane_atom();
-    bad[0..4].copy_from_slice(&5i32.to_le_bytes());
-    assert!(NormalViewSetInfo::parse(&bad).is_err());
+    let mut bad_ratio = pane_atom();
+    bad_ratio[0..4].copy_from_slice(&5i32.to_le_bytes());
+    assert!(NormalViewSetInfo::parse(&bad_ratio).is_err());
     // Undefined bar state.
-    let mut bad = pane_atom();
-    bad[16] = 3;
-    assert!(NormalViewSetInfo::parse(&bad).is_err());
+    let mut bad_bar_state = pane_atom();
+    bad_bar_state[16] = 3;
+    assert!(NormalViewSetInfo::parse(&bad_bar_state).is_err());
     // Reserved flag bits set.
-    let mut bad = pane_atom();
-    bad[19] = 0xFC;
-    assert!(NormalViewSetInfo::parse(&bad).is_err());
+    let mut bad_flags = pane_atom();
+    bad_flags[19] = 0xFC;
+    assert!(NormalViewSetInfo::parse(&bad_flags).is_err());
     // Two atoms in one container.
     let mut data = container_record(&pane_atom()).data;
     data.extend_from_slice(&container_record(&pane_atom()).data);
@@ -104,7 +110,7 @@ fn rejects_malformed_layouts() {
         record_type_raw: NORMAL_VIEW_SET_INFO_TYPE,
         version: 0xF,
         instance: 1,
-        data_length: data.len() as u32,
+        data_length: u32::try_from(data.len()).unwrap(),
         data,
         children: Vec::new(),
     };

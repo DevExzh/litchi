@@ -224,7 +224,10 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
 }
 
 #[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
-#[allow(unreachable_patterns)]
+#[allow(
+    unreachable_patterns,
+    reason = "match arms are feature-gated; some are unreachable depending on the enabled features"
+)]
 fn iwork_format(format: litchi_iwa_detect::Format) -> Option<FileFormat> {
     match format {
         #[cfg(feature = "pages")]

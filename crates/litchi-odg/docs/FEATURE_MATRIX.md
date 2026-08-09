@@ -1,28 +1,23 @@
 # ODG Feature Matrix
 
-This matrix records the current public `litchi-odg` capability for packaged
-OpenDocument drawings and flat FODG snapshots. Packaged drawings remain an
-immutable raw shell; flat drawings expose bounded pages, shapes, and text edits.
+This matrix records the public `litchi-odg` contract for packaged ODG and flat
+FODG. iWork formats are not part of this crate's scope.
 
 | Mark | Meaning |
 |---|---|
-| ✅ | Supported for the narrow scope in Notes |
-| 🟡 | Partial, raw, detached, or preservation-only |
-| ❌ | No public support |
-| N/A | The direction does not apply |
+| yes | Supported for the narrow scope in Notes |
+| partial | Partial, preservation-only, or deliberately refused outside a safe closure |
+| no | No public support |
 
 | Feature | Status | Read | Write | Notes |
 |---|---|---|---|---|
-| ODG package snapshot | 🟡 | ✅ | N/A | `Drawing::open` and `from_bytes` require the exact graphics MIME and expose original bytes and safe entry names. |
-| Raw `content.xml` | 🟡 | 🟡 | 🟡 | Snapshot opening checks UTF-8, a 256 MiB ceiling, and the literal `office:drawing` marker only. Fresh builds additionally require bounded, well-formed, DTD-free compact XML before the marker check; ODF namespace and schema semantics remain unvalidated. |
-| Fresh package builder | 🟡 | N/A | 🟡 | Creates MIME, `content.xml`, and manifest only; it does not serialize drawing semantics or preserve an opened package. |
-| Compact XML | 🟡 | N/A | 🟡 | Fresh input is validated before publication; indentation line breaks/tabs and padded markup return structured `XmlCompactness` errors. Accepted bytes, semantic character data, and `xml:space="preserve"` content remain exact. Space-only inter-element text is still accepted, so absolute minimality is not yet guaranteed. |
-| Styles and metadata | 🟡 | 🟡 | ❌ | Optional styles are raw UTF-8; metadata is projected through the common model. Neither is writable here. |
-| Pages and layers | 🟡 | 🟡 | ❌ | `FlatDrawing` inventories bounded FODG pages and their names; layers and packaged semantic traversal remain absent. |
-| Shapes, text, geometry, and resources | 🟡 | 🟡 | 🟡 | Flat snapshots expose bounded shapes and paragraph text. A detached transaction can replace one lossless text span with typed readback; geometry, images, styles, links, forms, and resource CRUD remain absent. |
-| Existing-package edits and patches | ❌ | ❌ | ❌ | Packaged ODG has no save or edit path. This does not describe the separately supported source-checked flat patch API. |
-| Flat FODG snapshots and patches | 🟡 | ✅ | 🟡 | `FlatDrawing` validates namespace-aware document/body/drawing/page placement, preserves source bytes, commits bounded escaped text changes atomically, rejects patches for nonmatching source bytes, and provides an applicable exact-byte inverse. |
-| Untouched-byte preservation | ✅ | ✅ | N/A | Package snapshots and flat snapshots return their original bytes exactly. |
-| Templates, encryption, signatures | ❌ | ❌ | ❌ | OTG, password operations, and signing/verification are not exposed. |
-| Active content | 🟡 | 🟡 | 🟡 | Arbitrary markup may survive only as raw bytes. It is not inventoried or activated; scripts, controls, actions, DDE, links, and embedded code are never executed. |
-| Limits and evidence | 🟡 | 🟡 | 🟡 | Package content has a 256 MiB family ceiling; authoring first applies shared 64 MiB and depth-256 compactness limits. Flat parsing caps depth, pages, shapes, and replacement text. Active tests cover source mismatch, applicable inversion, typed structure failures, compactness rejection, semantic whitespace, exact flat bytes, and opaque real resource XML. |
+| ODG package snapshot | yes | yes | N/A | `Drawing` and `PackageSnapshot` retain exact bytes and expose bounded pages, layers, shapes, metadata, styles, and safe member names. |
+| Package semantic model | partial | yes | partial | Namespace-aware parsing requires one `office:document-content` / `office:body` / `office:drawing` chain. Pages, declared layers, shape kind/name/layer/text, and shared inert `drawing::Frame` context are typed. Unknown markup remains source bytes. |
+| Package text transaction | partial | yes | partial | One `set_shape_text` operation replaces only one sole plain paragraph character-data span. Commit validates compact whole-package output, reparses, verifies typed readback, and returns an exact-source reversible in-memory patch. |
+| Rewrite refusal | yes | N/A | yes | Split/mixed/CDATA/entity text, noncompact source XML, signed packages, encrypted packages, and unsupported ownership return errors rather than silently rewriting. |
+| Compact XML | yes | N/A | yes | Authored and edited XML output has no indentation, padded markup, DTD, or custom entities. Opened noncompact XML remains readable but cannot be republished by this API. |
+| Flat FODG snapshots and patches | partial | yes | partial | `FlatDrawing` preserves source bytes, inventories bounded pages/shapes, and has an independent source-checked reversible text patch chain. |
+| Geometry, styles, resources, forms | partial | partial | no | Frame occurrence context is read-only. Geometry/resource/form CRUD is not exposed. |
+| Active content | yes | yes | N/A | Controls, scripts, actions, DDE, links, and embedded payloads are retained inertly only and are never evaluated or executed. |
+| Templates, encryption, signatures | no | no | no | OTG, password writes, and signing are not exposed. Signed and encrypted package rewrite is refused. |
+| Limits and evidence | partial | yes | yes | Parsing caps depth, pages, layers, shapes, extracted text, replacement text, and output. Tests cover real resource package preservation, semantic parse, atomic source-checked patch/inverse, DTD refusal, and noncompact rewrite refusal. |

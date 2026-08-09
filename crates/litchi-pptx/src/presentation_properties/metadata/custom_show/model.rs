@@ -34,12 +34,14 @@ impl Show {
     }
 
     /// Set slides with builder pattern.
+    #[must_use]
     pub fn with_slides(mut self, slide_ids: Vec<u32>) -> Self {
         self.slide_ids = slide_ids;
         self
     }
 
     /// Get the number of slides in the custom show.
+    #[must_use]
     pub fn slide_count(&self) -> usize {
         self.slide_ids.len()
     }
@@ -56,6 +58,7 @@ pub struct List {
 
 impl List {
     /// Create a new empty custom-show list.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             shows: Vec::new(),
@@ -80,11 +83,13 @@ impl List {
     }
 
     /// Get a custom show by name.
+    #[must_use]
     pub fn get_by_name(&self, name: &str) -> Option<&Show> {
         self.shows.iter().find(|show| show.name == name)
     }
 
     /// Get a custom show by ID.
+    #[must_use]
     pub fn get_by_id(&self, id: u32) -> Option<&Show> {
         self.shows.iter().find(|show| show.id == id)
     }
@@ -95,6 +100,10 @@ impl List {
     }
 
     /// Replace a custom show while retaining its stable ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace_by_id(&mut self, id: u32, mut replacement: Show) -> Result<()> {
         let target = self
             .shows
@@ -115,6 +124,10 @@ impl List {
     }
 
     /// Reorder custom shows by a complete ID permutation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn reorder(&mut self, ordered_ids: &[u32]) -> Result<()> {
         let expected = self
             .shows
@@ -150,11 +163,13 @@ impl List {
     }
 
     /// Get the number of custom shows.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.shows.len()
     }
 
     /// Return whether this list has no custom shows.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.shows.is_empty()
     }

@@ -1,4 +1,4 @@
-//! Custom-show values and PresentationML fragment codec.
+//! Custom-show values and `PresentationML` fragment codec.
 
 mod codec;
 mod model;

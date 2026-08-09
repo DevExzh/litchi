@@ -36,6 +36,9 @@ pub struct IndexEntry<'a> {
 }
 
 impl<'a> IndexEntry<'a> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(position: usize, text: impl Into<Cow<'a, str>>) -> RtfResult<Self> {
         let entry = Self {
             position,
@@ -86,6 +89,7 @@ impl<'a> IndexEntry<'a> {
             .checked_add(self.yomi.as_ref().map_or(0, |value| value.len()))
     }
 
+    #[must_use]
     pub fn into_owned(self) -> IndexEntry<'static> {
         IndexEntry {
             position: self.position,
@@ -121,6 +125,9 @@ pub struct TableOfContentsEntry<'a> {
 }
 
 impl<'a> TableOfContentsEntry<'a> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(position: usize, text: impl Into<Cow<'a, str>>) -> RtfResult<Self> {
         let entry = Self {
             position,
@@ -148,6 +155,7 @@ impl<'a> TableOfContentsEntry<'a> {
         Ok(())
     }
 
+    #[must_use]
     pub fn into_owned(self) -> TableOfContentsEntry<'static> {
         TableOfContentsEntry {
             position: self.position,
@@ -166,7 +174,8 @@ pub enum NavigationEntry<'a> {
     TableOfContents(TableOfContentsEntry<'a>),
 }
 
-impl<'a> NavigationEntry<'a> {
+impl NavigationEntry<'_> {
+    #[must_use]
     pub fn position(&self) -> usize {
         match self {
             Self::Index(entry) => entry.position,
@@ -188,6 +197,7 @@ impl<'a> NavigationEntry<'a> {
         }
     }
 
+    #[must_use]
     pub fn into_owned(self) -> NavigationEntry<'static> {
         match self {
             Self::Index(entry) => NavigationEntry::Index(entry.into_owned()),

@@ -26,10 +26,6 @@ const SPELL_ERROR: u16 = 0x0001;
 /// `SpellingFlags.clean`.
 const SPELL_CLEAN: u16 = 0x0002;
 
-fn corrupted(message: impl Into<String>) -> Error {
-    Error::Corrupted(message.into())
-}
-
 /// Spelling status defaults from a `SpellingFlags` structure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SpellingFlags {
@@ -46,10 +42,12 @@ impl SpellingFlags {
         Self { error, clean }
     }
     /// Whether the text is spelled incorrectly.
+    #[must_use]
     pub const fn error(&self) -> bool {
         self.error
     }
     /// Whether the text needs rechecking.
+    #[must_use]
     pub const fn clean(&self) -> bool {
         self.clean
     }
@@ -68,19 +66,26 @@ pub struct TextSpecialInfoDefaults {
 
 impl TextSpecialInfoDefaults {
     /// Spelling status defaults, when present.
+    #[must_use]
     pub const fn spelling(&self) -> Option<SpellingFlags> {
         self.spelling
     }
     /// Primary language identifier, when present.
+    #[must_use]
     pub const fn language(&self) -> Option<u16> {
         self.language
     }
     /// Alternate language identifier, when present.
+    #[must_use]
     pub const fn alternate_language(&self) -> Option<u16> {
         self.alternate_language
     }
 
     /// Parse a complete `TextSIExceptionAtom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_record(record: &Record) -> Result<Self> {
         if record.record_type != RecordType::TextSpecialInfoDefaultAtom
             || record.record_type_raw != TEXT_SPECIAL_INFO_DEFAULT_TYPE
@@ -96,7 +101,7 @@ impl TextSpecialInfoDefaults {
         if data.len() < 4 {
             return Err(corrupted("TextSIException mask is truncated"));
         }
-        let mask = u32::from_le_bytes(data[..4].try_into().expect("length checked"));
+        let mask = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
         // TextSIExceptionAtom forbids fPp10ext, fBidi, smartTag, reserved1,
         // and reserved2 (MS-PPT 2.9.31).
         if mask & MASK_FORBIDDEN != 0 {
@@ -113,9 +118,7 @@ impl TextSpecialInfoDefaults {
                 return Err(corrupted(format!("TextSIException {name} is truncated")));
             };
             offset += 2;
-            Ok(Some(u16::from_le_bytes(
-                bytes.try_into().expect("length checked"),
-            )))
+            Ok(Some(u16::from_le_bytes([bytes[0], bytes[1]])))
         };
         let spelling = take_u16(MASK_SPELL, "spellInfo")?
             .map(|raw| {
@@ -145,6 +148,10 @@ impl TextSpecialInfoDefaults {
     }
 
     /// Serialize the complete record, including its header.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the underlying writer reports an error.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         let mut mask = 0u32;
         if self.spelling.is_some() {
@@ -182,18 +189,28 @@ pub struct OutlineTextRef(u32);
 
 impl OutlineTextRef {
     /// A validated non-negative outline text reference index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn new(index: i32) -> Result<Self> {
         u32::try_from(index)
             .map(Self)
-            .map_err(|_| corrupted("OutlineTextRefAtom index is negative"))
+            .map_err(|_err| corrupted("OutlineTextRefAtom index is negative"))
     }
 
     /// The zero-based outline text index.
+    #[must_use]
     pub const fn get(self) -> u32 {
         self.0
     }
 
     /// Parse a complete `OutlineTextRefAtom` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record header is invalid, the payload is not
+    /// exactly 4 bytes, or the index is negative.
     pub fn parse_record(record: &Record) -> Result<Self> {
         if record.record_type != RecordType::OutlineTextRefAtom
             || record.record_type_raw != 0x0F9E
@@ -204,13 +221,25 @@ impl OutlineTextRef {
                 "OutlineTextRefAtom has an invalid header or length",
             ));
         }
-        Self::new(i32::from_le_bytes(
-            record.data[..4].try_into().expect("length checked"),
-        ))
+        Self::new(i32::from_le_bytes([
+            record.data[0],
+            record.data[1],
+            record.data[2],
+            record.data[3],
+        ]))
     }
 }
 
+fn corrupted(message: impl Into<String>) -> Error {
+    Error::Corrupted(message.into())
+}
+
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -220,7 +249,7 @@ mod tests {
             record_type_raw: TEXT_SPECIAL_INFO_DEFAULT_TYPE,
             version: 0,
             instance: 0,
-            data_length: data.len() as u32,
+            data_length: u32::try_from(data.len()).unwrap(),
             data: data.to_vec(),
             children: Vec::new(),
         }
@@ -249,13 +278,17 @@ mod tests {
         assert_eq!(defaults.language(), None);
         assert_eq!(defaults.to_bytes().unwrap()[8..], data[..]);
 
-        let mut data = Vec::new();
-        data.extend_from_slice(&0x0002u32.to_le_bytes());
-        data.extend_from_slice(&0x0002u16.to_le_bytes());
-        let defaults = TextSpecialInfoDefaults::parse_record(&atom(&data)).unwrap();
-        assert_eq!(defaults.spelling(), None);
-        assert_eq!(defaults.language(), Some(0x0002));
-        assert_eq!(defaults.to_bytes().unwrap()[8..], data[..]);
+        let mut language_data = Vec::new();
+        language_data.extend_from_slice(&0x0002u32.to_le_bytes());
+        language_data.extend_from_slice(&0x0002u16.to_le_bytes());
+        let language_defaults =
+            TextSpecialInfoDefaults::parse_record(&atom(&language_data)).unwrap();
+        assert_eq!(language_defaults.spelling(), None);
+        assert_eq!(language_defaults.language(), Some(0x0002));
+        assert_eq!(
+            language_defaults.to_bytes().unwrap()[8..],
+            language_data[..]
+        );
     }
 
     #[test]
@@ -263,21 +296,21 @@ mod tests {
         // Truncated mask.
         assert!(TextSpecialInfoDefaults::parse_record(&atom(&[1, 0])).is_err());
         // Forbidden mask bits (fBidi / smartTag / reserved).
-        let mut data = Vec::new();
-        data.extend_from_slice(&0x0042u32.to_le_bytes());
-        data.extend_from_slice(&0u16.to_le_bytes());
-        data.extend_from_slice(&0u16.to_le_bytes());
-        assert!(TextSpecialInfoDefaults::parse_record(&atom(&data)).is_err());
+        let mut forbidden_mask_data = Vec::new();
+        forbidden_mask_data.extend_from_slice(&0x0042u32.to_le_bytes());
+        forbidden_mask_data.extend_from_slice(&0u16.to_le_bytes());
+        forbidden_mask_data.extend_from_slice(&0u16.to_le_bytes());
+        assert!(TextSpecialInfoDefaults::parse_record(&atom(&forbidden_mask_data)).is_err());
         // Grammar flag set.
-        let mut data = Vec::new();
-        data.extend_from_slice(&0x0001u32.to_le_bytes());
-        data.extend_from_slice(&0x0004u16.to_le_bytes());
-        assert!(TextSpecialInfoDefaults::parse_record(&atom(&data)).is_err());
+        let mut grammar_flag_data = Vec::new();
+        grammar_flag_data.extend_from_slice(&0x0001u32.to_le_bytes());
+        grammar_flag_data.extend_from_slice(&0x0004u16.to_le_bytes());
+        assert!(TextSpecialInfoDefaults::parse_record(&atom(&grammar_flag_data)).is_err());
         // Mask count not consuming the payload.
-        let mut data = Vec::new();
-        data.extend_from_slice(&0x0002u32.to_le_bytes());
-        data.extend_from_slice(&[0; 4]);
-        assert!(TextSpecialInfoDefaults::parse_record(&atom(&data)).is_err());
+        let mut trailing_data = Vec::new();
+        trailing_data.extend_from_slice(&0x0002u32.to_le_bytes());
+        trailing_data.extend_from_slice(&[0; 4]);
+        assert!(TextSpecialInfoDefaults::parse_record(&atom(&trailing_data)).is_err());
     }
 
     #[test]

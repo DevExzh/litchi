@@ -361,7 +361,7 @@ pub use differential_format::{
     XfGradient, XfGradientStop, XfProperties, XfProperty,
 };
 pub use drawing_metadata::{AnchorBehavior, AnchorPoint, SheetAnchor};
-pub use encryption::EncryptionProfile;
+pub use encryption::{EncryptionProfile, WeakEncryptionPolicy};
 pub use ent_ex_u2::EntExU2;
 pub use environment::{LinkUpdateMode, ObjectDisplayMode, WorkbookEnvironment};
 pub use error::{EncryptionKind, Error, Result};

@@ -411,10 +411,7 @@ fn classify_start(
         },
         Kind::Extension { known: is_known } => {
             if is_known && is_p184(namespace, element.local_name().as_ref()) {
-                if local.as_ref() != b"classification" {
-                    mark_other(parent);
-                    Kind::Other
-                } else {
+                if local.as_ref() == b"classification" {
                     if parent.classification_seen {
                         return Err(invalid(
                             "classification extension has duplicate classification elements",
@@ -423,6 +420,9 @@ fn classify_start(
                     validate_classification_attributes(element, decoder)?;
                     parent.classification_seen = true;
                     Kind::Classification
+                } else {
+                    mark_other(parent);
+                    Kind::Other
                 }
             } else {
                 mark_other(parent);
@@ -437,12 +437,12 @@ fn classify_start(
         Kind::Other => Kind::Other,
     };
 
-    if let Kind::NvPr = kind {
-        if nv_pr.is_some() {
-            return Err(invalid(
-                "classification shape has duplicate p:nvPr elements",
-            ));
-        }
+    if let Kind::NvPr = kind
+        && nv_pr.is_some()
+    {
+        return Err(invalid(
+            "classification shape has duplicate p:nvPr elements",
+        ));
     }
     Ok(kind)
 }
@@ -654,7 +654,7 @@ fn mark_other(frame: &mut Frame) {
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("classification XML offset does not fit usize"))
+        .map_err(|_err| invalid("classification XML offset does not fit usize"))
 }
 
 fn frame_close_start(end: usize, xml: &[u8]) -> usize {
@@ -664,7 +664,7 @@ fn frame_close_start(end: usize, xml: &[u8]) -> usize {
         .unwrap_or(end)
 }
 
-/// Serialize one fresh known extension using the selected PresentationML
+/// Serialize one fresh known extension using the selected `PresentationML`
 /// namespace profile.
 pub(super) fn write_extension(conformance: Conformance, outcome: Outcome) -> Result<Vec<u8>> {
     let xml = format!(

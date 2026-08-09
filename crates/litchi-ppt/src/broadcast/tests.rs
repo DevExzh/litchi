@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::codec::{BROADCAST_INFO_RECORD_TYPE, C_STRING_RECORD_TYPE, validate_system_time};
 use super::model::{Broadcast, BroadcastProperties};
 use super::transaction::Snapshot;
@@ -105,7 +111,7 @@ fn rejects_dependency_order_reserved_and_lexical_failures() {
     }
     let mut wrong_order = valid.clone();
     wrong_order.data = data;
-    wrong_order.data_length = wrong_order.data.len() as u32;
+    wrong_order.data_length = u32::try_from(wrong_order.data.len()).unwrap();
     assert!(Broadcast::parse(&wrong_order).is_err());
 
     let mut reserved = valid;

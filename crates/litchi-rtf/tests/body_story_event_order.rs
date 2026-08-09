@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{BodyStoryEvent, RtfDocument, RtfWriter};
 
 fn round_trip(source: &str) -> RtfDocument<'static> {
@@ -39,7 +48,7 @@ fn preserves_equal_offset_order_across_all_atomic_body_destinations() {
 
 #[test]
 fn preserves_revision_and_form_field_boundaries_without_canonical_ties() {
-    let revisions = r#"{\rtf1{\*\revtbl{A;}}{\revised\revauth0\revdttm1 X}{\deleted\revauthdel0\revdttmdel2 Y}Z}"#;
+    let revisions = r"{\rtf1{\*\revtbl{A;}}{\revised\revauth0\revdttm1 X}{\deleted\revauthdel0\revdttmdel2 Y}Z}";
     let document = RtfDocument::parse(revisions).unwrap();
     let expected = [
         BodyStoryEvent::RevisionStart(0),
@@ -49,7 +58,7 @@ fn preserves_revision_and_form_field_boundaries_without_canonical_ties() {
     assert_eq!(document.body_story_events(), expected);
     assert_eq!(round_trip(revisions).body_story_events(), expected);
 
-    let adjacent = r#"{\rtf1{\*\revtbl{A;}}{\revised\revauth0 X}{\revised\revauth0 Y}}"#;
+    let adjacent = r"{\rtf1{\*\revtbl{A;}}{\revised\revauth0 X}{\revised\revauth0 Y}}";
     let document = round_trip(adjacent);
     assert_eq!(document.revisions().len(), 2);
     assert_eq!(
@@ -62,7 +71,7 @@ fn preserves_revision_and_form_field_boundaries_without_canonical_ties() {
         ]
     );
 
-    let form = r#"{\rtf1{\field{\*\fldinst FORMCHECKBOX{\*\formfield{\fftype1\fftypetxt0\ffhps20\ffdefres0\ffres0}}}{\fldrslt }}}"#;
+    let form = r"{\rtf1{\field{\*\fldinst FORMCHECKBOX{\*\formfield{\fftype1\fftypetxt0\ffhps20\ffdefres0\ffres0}}}{\fldrslt }}}";
     let document = round_trip(form);
     assert_eq!(
         document.body_story_events(),

@@ -25,6 +25,10 @@ pub struct ColorPart<'a> {
 
 impl<'a> Part<'a> {
     /// Validate and borrow one chart-style companion part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_part(part: &'a dyn OpcPart) -> Result<Self> {
         if part.content_type() != STYLE_CONTENT_TYPE {
             return Err(Error::ContentType {
@@ -35,12 +39,21 @@ impl<'a> Part<'a> {
         Ok(Self { part })
     }
 
-    /// Parse the XML owned by this package part with the shared DrawingML codec.
+    /// Parse the XML owned by this package part with the shared `DrawingML` codec.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(&self) -> Result<Document> {
         Ok(litchi_drawingml::chart::style::parse(self.part.blob())?)
     }
 
     /// The underlying OPC part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    #[must_use]
     pub fn part(&self) -> &'a dyn OpcPart {
         self.part
     }
@@ -48,6 +61,10 @@ impl<'a> Part<'a> {
 
 impl<'a> ColorPart<'a> {
     /// Validate and borrow one chart-color-style companion part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_part(part: &'a dyn OpcPart) -> Result<Self> {
         if part.content_type() != COLOR_CONTENT_TYPE {
             return Err(Error::ContentType {
@@ -58,7 +75,11 @@ impl<'a> ColorPart<'a> {
         Ok(Self { part })
     }
 
-    /// Parse the XML owned by this package part with the shared DrawingML codec.
+    /// Parse the XML owned by this package part with the shared `DrawingML` codec.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(&self) -> Result<ColorDocument> {
         Ok(litchi_drawingml::chart::style::parse_color(
             self.part.blob(),
@@ -66,12 +87,17 @@ impl<'a> ColorPart<'a> {
     }
 
     /// The underlying OPC part.
+    #[must_use]
     pub fn part(&self) -> &'a dyn OpcPart {
         self.part
     }
 }
 
-/// Resolve the chart-style siblings related to a ChartEx part.
+/// Resolve the chart-style siblings related to a `ChartEx` part.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn discover(
     package: &OpcPackage,
     source: &dyn OpcPart,
@@ -113,7 +139,7 @@ pub fn discover(
         }
         let target_part = package
             .get_part(&target)
-            .map_err(|_| Error::PartNotFound(format!("{label} target is missing")))?;
+            .map_err(|_err| Error::PartNotFound(format!("{label} target is missing")))?;
         if target_part.content_type() != expected {
             return Err(Error::ContentType {
                 expected: expected.to_owned(),

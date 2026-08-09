@@ -10,11 +10,19 @@ use super::transaction::{Commit, Patch, Snapshot};
 use crate::{Error, Result};
 
 /// Read the unique Changes Information part after validating its OPC graph.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load(package: &OpcPackage) -> Result<Option<ChangesPart>> {
     codec::load(package)
 }
 
 /// Add a new Changes Information owner atomically.
+///
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn store(package: &mut OpcPackage, value: &ChangesPart) -> Result<()> {
     let mut candidate = package.clone();
     codec::store(&mut candidate, value)?;
@@ -27,6 +35,10 @@ pub fn store(package: &mut OpcPackage, value: &ChangesPart) -> Result<()> {
 }
 
 /// Capture the typed Changes Information owner and its exact source context.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load_snapshot(package: &OpcPackage) -> Result<Option<Snapshot>> {
     let Some(value) = codec::load(package)? else {
         return Ok(None);
@@ -52,16 +64,32 @@ pub fn load_snapshot(package: &OpcPackage) -> Result<Option<Snapshot>> {
 }
 
 /// Apply an already committed Changes Information patch atomically.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
     patch.apply(package)
 }
 
 /// Apply a committed Changes Information edit atomically.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "public API consumes the commit to signal it has been applied"
+)]
 pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
     apply_patch(package, commit.patch())
 }
 
 /// Remove the Changes Information owner and its Presentation relationship.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn remove(package: &mut OpcPackage) -> Result<Option<ChangesPart>> {
     let mut candidate = package.clone();
     let Some(value) = codec::load(&candidate)? else {

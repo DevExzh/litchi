@@ -1,4 +1,4 @@
-use super::model::*;
+use super::model::{GraphicBuildMode, Sequence};
 use crate::{Error, Result};
 use litchi_opc::{OpcPackage, PackURI, Part, Relationship};
 use quick_xml::events::{BytesStart, Event};
@@ -101,6 +101,9 @@ struct AlternateState {
     fallback_seen: bool,
 }
 
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn parse_package_slide(package: &OpcPackage, slide_part_name: &PackURI) -> Result<Sequence> {
     let slide = package.get_part(slide_part_name)?;
     if slide.content_type() != SLIDE_CT {
@@ -125,8 +128,10 @@ fn validate_build_relationships(
             animation_relationship_error("graphical-object build has no package-resolvable host")
         })?;
         match (&build.mode, host) {
-            (GraphicBuildMode::AsOne, HostReference::Chart { id, extended })
-            | (GraphicBuildMode::Chart { .. }, HostReference::Chart { id, extended }) => {
+            (
+                GraphicBuildMode::AsOne | GraphicBuildMode::Chart { .. },
+                HostReference::Chart { id, extended },
+            ) => {
                 if *extended {
                     validate_target(package, slide, id, &CHARTEX_REL, CHARTEX_CT, "/ppt/charts/")?;
                 } else {
@@ -134,16 +139,7 @@ fn validate_build_relationships(
                 }
             },
             (
-                GraphicBuildMode::AsOne,
-                HostReference::Diagram {
-                    data,
-                    layout,
-                    style,
-                    colors,
-                },
-            )
-            | (
-                GraphicBuildMode::Diagram { .. },
+                GraphicBuildMode::AsOne | GraphicBuildMode::Diagram { .. },
                 HostReference::Diagram {
                     data,
                     layout,
@@ -254,7 +250,7 @@ fn validate_target(
             "animation host relationship '{id}' escapes its required package directory"
         ));
     }
-    let part = package.get_part(&target).map_err(|_| {
+    let part = package.get_part(&target).map_err(|_err| {
         animation_relationship_error(format!(
             "animation host relationship '{id}' targets a missing part"
         ))
@@ -484,7 +480,7 @@ fn inspect_start(
             unqualified_attribute(reader, element, b"id")?
                 .ok_or_else(|| animation_relationship_error("graphic frame shape ID is missing"))?
                 .parse::<u32>()
-                .map_err(|_| animation_relationship_error("invalid graphic frame shape ID"))?,
+                .map_err(|_err| animation_relationship_error("invalid graphic frame shape ID"))?,
         );
     } else if depth == current.depth + 1
         && is_name(namespace, element.name(), &[A_NS, A_STRICT_NS], b"graphic")
@@ -727,16 +723,26 @@ fn invalid_relationship<T>(message: impl Into<String>) -> Result<T> {
 impl Sequence {
     /// Parse a slide timing tree and strictly validate build targets against its OPC package.
     ///
-    /// Unlike the XML-only parser, this resolves chart, SmartArt, and OLE relationship IDs,
+    /// Unlike the XML-only parser, this resolves chart, `SmartArt`, and OLE relationship IDs,
     /// requires internal existing target parts with matching relationship/content types, and
     /// never reads or executes embedded target bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_package_slide(package: &OpcPackage, slide_part_name: &PackURI) -> Result<Self> {
         parse_package_slide(package, slide_part_name)
     }
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
+    use super::super::model::{Effect, EffectInstance, GraphicBuild, GroupId};
     use super::*;
     use litchi_opc::part::BlobPart;
 

@@ -1,4 +1,4 @@
-//! Chart parts for PowerPoint presentations.
+//! Chart parts for `PowerPoint` presentations.
 //!
 //! This module provides types for working with charts in PPTX files.
 
@@ -15,7 +15,7 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
-impl<'a> Part<'a> {
+impl Part<'_> {
     fn plot_type(name: &[u8]) -> Option<Type> {
         match name {
             b"barChart" | b"bar3DChart" => Some(Type::Bar),
@@ -47,6 +47,10 @@ impl<'a> Part<'a> {
     /// let info = chart_part.chart_info()?;
     /// println!("Chart type: {:?}", info.chart_type);
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn chart_info(&self) -> Result<Info> {
         let xml = litchi_ooxml_common::mce::process_ooxml(self.xml_bytes())?;
         let mut reader = NsReader::from_reader(xml.as_ref());
@@ -352,6 +356,10 @@ fn append_title(title: &mut Option<String>, text: &str) {
 }
 
 /// Generate chart XML from Chart.
+///
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn encode(chart: &Chart) -> Result<String> {
     validate(chart)?;
     let mut xml = String::with_capacity(8192);
@@ -525,8 +533,8 @@ fn generate_bar_chart(xml: &mut String, chart: &Chart, horizontal: bool) {
     let chart_tag = "barChart";
     let dir = if horizontal { "bar" } else { "col" };
 
-    xml.push_str(&format!("<c:{}>", chart_tag));
-    xml.push_str(&format!(r#"<c:barDir val="{}"/>"#, dir));
+    xml.push_str(&format!("<c:{chart_tag}>"));
+    xml.push_str(&format!(r#"<c:barDir val="{dir}"/>"#));
     xml.push_str(r#"<c:grouping val="clustered"/>"#);
     xml.push_str(r#"<c:varyColors val="0"/>"#);
 
@@ -537,7 +545,7 @@ fn generate_bar_chart(xml: &mut String, chart: &Chart, horizontal: bool) {
     xml.push_str(r#"<c:dLbls><c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/></c:dLbls>"#);
     xml.push_str(r#"<c:gapWidth val="150"/>"#);
     xml.push_str(r#"<c:axId val="1"/><c:axId val="2"/>"#);
-    xml.push_str(&format!("</c:{}>", chart_tag));
+    xml.push_str(&format!("</c:{chart_tag}>"));
 }
 
 fn generate_line_chart(xml: &mut String, chart: &Chart) {
@@ -589,8 +597,8 @@ fn generate_scatter_chart(xml: &mut String, chart: &Chart) {
 
     for (idx, series) in chart.series.iter().enumerate() {
         xml.push_str("<c:ser>");
-        xml.push_str(&format!(r#"<c:idx val="{}"/>"#, idx));
-        xml.push_str(&format!(r#"<c:order val="{}"/>"#, idx));
+        xml.push_str(&format!(r#"<c:idx val="{idx}"/>"#));
+        xml.push_str(&format!(r#"<c:order val="{idx}"/>"#));
         xml.push_str(&format!(
             "<c:tx><c:v>{}</c:v></c:tx>",
             escape_xml(&series.name)
@@ -614,7 +622,7 @@ fn generate_scatter_chart(xml: &mut String, chart: &Chart) {
             } else {
                 i as f64
             };
-            xml.push_str(&format!(r#"<c:pt idx="{}"><c:v>{}</c:v></c:pt>"#, i, x_val));
+            xml.push_str(&format!(r#"<c:pt idx="{i}"><c:v>{x_val}</c:v></c:pt>"#));
         }
         xml.push_str("</c:numCache></c:numRef></c:xVal>");
 
@@ -627,7 +635,7 @@ fn generate_scatter_chart(xml: &mut String, chart: &Chart) {
             series.values.len()
         ));
         for (i, val) in series.values.iter().enumerate() {
-            xml.push_str(&format!(r#"<c:pt idx="{}"><c:v>{}</c:v></c:pt>"#, i, val));
+            xml.push_str(&format!(r#"<c:pt idx="{i}"><c:v>{val}</c:v></c:pt>"#));
         }
         xml.push_str("</c:numCache></c:numRef></c:yVal>");
 
@@ -702,10 +710,7 @@ fn generate_surface_chart(xml: &mut String, chart: &Chart) {
 
 fn write_xy_size_series(xml: &mut String, series: &Series, idx: u32, x_column: usize) {
     xml.push_str("<c:ser>");
-    xml.push_str(&format!(
-        r#"<c:idx val="{}"/><c:order val="{}"/>"#,
-        idx, idx
-    ));
+    xml.push_str(&format!(r#"<c:idx val="{idx}"/><c:order val="{idx}"/>"#));
     xml.push_str(&format!(
         "<c:tx><c:v>{}</c:v></c:tx>",
         escape_xml(&series.name)
@@ -740,10 +745,7 @@ fn write_numeric_reference(xml: &mut String, tag: &str, formula: &str, values: &
         values.len()
     ));
     for (index, value) in values.iter().enumerate() {
-        xml.push_str(&format!(
-            r#"<c:pt idx="{}"><c:v>{}</c:v></c:pt>"#,
-            index, value
-        ));
+        xml.push_str(&format!(r#"<c:pt idx="{index}"><c:v>{value}</c:v></c:pt>"#));
     }
     xml.push_str(&format!("</c:numCache></c:numRef></c:{tag}>"));
 }
@@ -774,12 +776,10 @@ fn write_surface_axes(xml: &mut String) {
 
 fn write_value_axis(xml: &mut String, id: u32, position: &str, cross_axis: u32) {
     xml.push_str(&format!(
-        r#"<c:valAx><c:axId val="{}"/><c:scaling><c:orientation val="minMax"/></c:scaling>"#,
-        id
+        r#"<c:valAx><c:axId val="{id}"/><c:scaling><c:orientation val="minMax"/></c:scaling>"#
     ));
     xml.push_str(&format!(
-        r#"<c:delete val="0"/><c:axPos val="{}"/><c:majorGridlines/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:crossAx val="{}"/><c:crosses val="autoZero"/></c:valAx>"#,
-        position, cross_axis
+        r#"<c:delete val="0"/><c:axPos val="{position}"/><c:majorGridlines/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:crossAx val="{cross_axis}"/><c:crosses val="autoZero"/></c:valAx>"#
     ));
 }
 
@@ -802,8 +802,8 @@ fn worksheet_column(mut index: usize) -> String {
 
 fn write_series(xml: &mut String, series: &Series, idx: u32, is_pie: bool) {
     xml.push_str("<c:ser>");
-    xml.push_str(&format!(r#"<c:idx val="{}"/>"#, idx));
-    xml.push_str(&format!(r#"<c:order val="{}"/>"#, idx));
+    xml.push_str(&format!(r#"<c:idx val="{idx}"/>"#));
+    xml.push_str(&format!(r#"<c:order val="{idx}"/>"#));
     xml.push_str(&format!(
         "<c:tx><c:v>{}</c:v></c:tx>",
         escape_xml(&series.name)
@@ -837,7 +837,7 @@ fn write_series(xml: &mut String, series: &Series, idx: u32, is_pie: bool) {
         series.values.len()
     ));
     for (i, val) in series.values.iter().enumerate() {
-        xml.push_str(&format!(r#"<c:pt idx="{}"><c:v>{}</c:v></c:pt>"#, i, val));
+        xml.push_str(&format!(r#"<c:pt idx="{i}"><c:v>{val}</c:v></c:pt>"#));
     }
     xml.push_str("</c:numCache></c:numRef></c:val>");
 
@@ -850,14 +850,14 @@ fn write_series(xml: &mut String, series: &Series, idx: u32, is_pie: bool) {
 }
 
 /// Generate graphic frame XML for embedding a chart on a slide.
+#[must_use]
 pub fn write_graphic_frame(shape_id: u32, chart_rel_id: &str, chart: &Chart) -> String {
     let mut xml = String::with_capacity(1024);
 
     xml.push_str("<p:graphicFrame>");
     xml.push_str("<p:nvGraphicFramePr>");
     xml.push_str(&format!(
-        r#"<p:cNvPr id="{}" name="Chart {}"/>"#,
-        shape_id, shape_id
+        r#"<p:cNvPr id="{shape_id}" name="Chart {shape_id}"/>"#
     ));
     xml.push_str(r#"<p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr>"#);
     xml.push_str("<p:nvPr/>");
@@ -886,6 +886,11 @@ pub fn write_graphic_frame(shape_id: u32, chart_rel_id: &str, chart: &Chart) -> 
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use litchi_opc::{packuri::PackURI, part::BlobPart};
@@ -984,7 +989,7 @@ mod tests {
 
     #[test]
     fn test_chart_data() {
-        let chart = Chart::new(Type::Bar, 914400, 914400, 4572000, 2743200)
+        let chart = Chart::new(Type::Bar, 914_400, 914_400, 4_572_000, 2_743_200)
             .with_title("Quarterly Sales")
             .add_series(Series::new("2023").with_values(vec![100.0, 200.0]));
 

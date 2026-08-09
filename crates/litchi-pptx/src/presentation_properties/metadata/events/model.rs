@@ -2,7 +2,7 @@
 
 use crate::time::Offset;
 
-/// A trigger type recorded by a PowerPoint slide show.
+/// A trigger type recorded by a `PowerPoint` slide show.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Trigger {
     None,
@@ -19,7 +19,7 @@ pub enum Trigger {
     OnStopAudio,
 }
 
-/// The recorded action represented by a PowerPoint slide-show event.
+/// The recorded action represented by a `PowerPoint` slide-show event.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Kind {
     Trigger(Trigger),
@@ -31,7 +31,7 @@ pub enum Kind {
     Seek {
         at: Offset,
     },
-    /// A reserved unknown event record for future PowerPoint extensions.
+    /// A reserved unknown event record for future `PowerPoint` extensions.
     Null,
 }
 
@@ -48,18 +48,21 @@ pub struct Event {
 impl Event {
     /// Return the zero-based index of the slide that owns this event.
     #[inline]
+    #[must_use]
     pub fn slide_index(&self) -> usize {
         self.slide_index
     }
 
     /// Return the zero-based source-order index of this event on its slide.
     #[inline]
+    #[must_use]
     pub fn event_index(&self) -> usize {
         self.event_index
     }
 
     /// Return the recorded event kind.
     #[inline]
+    #[must_use]
     pub fn kind(&self) -> &Kind {
         &self.kind
     }
@@ -70,14 +73,16 @@ impl Event {
         &self.time
     }
 
-    /// Return the DrawingML object identifier targeted by this event.
+    /// Return the `DrawingML` object identifier targeted by this event.
     #[inline]
+    #[must_use]
     pub fn object_id(&self) -> u32 {
         self.object_id
     }
 
     /// Return the exact normalized media-stream offset for a seek event.
     #[inline]
+    #[must_use]
     pub fn seek_time(&self) -> Option<&Offset> {
         match &self.kind {
             Kind::Seek { at } => Some(at),
@@ -148,6 +153,7 @@ impl Draft {
     }
 
     /// Return the recorded event kind.
+    #[must_use]
     pub fn kind(&self) -> &Kind {
         &self.kind
     }
@@ -157,7 +163,8 @@ impl Draft {
         &self.time
     }
 
-    /// Return the DrawingML object identifier targeted by this event.
+    /// Return the `DrawingML` object identifier targeted by this event.
+    #[must_use]
     pub fn object_id(&self) -> u32 {
         self.object_id
     }
@@ -207,6 +214,7 @@ impl Draft {
     }
 
     /// Return the exact normalized media-stream offset for a seek event.
+    #[must_use]
     pub fn seek_time(&self) -> Option<&Offset> {
         match &self.kind {
             Kind::Seek { at } => Some(at),

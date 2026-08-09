@@ -1,9 +1,14 @@
+#![allow(
+    clippy::print_stdout,
+    reason = "this command-line example intentionally prints its results"
+)]
+
 //! Comprehensive PPT file writer test
 //!
 //! This example demonstrates all features available in the PPT writer.
 //! Tests slides, text boxes, shapes, notes, and slide manipulation.
 //!
-//! Run with: cargo run --example comprehensive_ppt_test
+//! Run with: cargo run --example `comprehensive_ppt_test`
 
 use litchi_ppt::Writer;
 
@@ -273,8 +278,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for (row, row_data) in features.iter().enumerate() {
         for (col, text) in row_data.iter().enumerate() {
-            let x = grid_start_x + (col as i32) * (cell_width + spacing);
-            let y = grid_start_y + (row as i32) * (cell_height + spacing);
+            let x = grid_start_x + i32::try_from(col)? * (cell_width + spacing);
+            let y = grid_start_y + i32::try_from(row)? * (cell_height + spacing);
 
             writer.add_rectangle(slide8, x, y, cell_width, cell_height)?;
             writer.add_textbox(slide8, x + 10, y + 25, cell_width - 20, 30, text)?;
@@ -429,9 +434,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // SLIDE 12: STATISTICS
     // ============================================================
     println!("12. Creating statistics slide...");
-    let slide12 = writer.add_slide()?;
+    let stats_slide = writer.add_slide()?;
 
-    writer.add_textbox(slide12, 50, 30, 700, 50, "Implementation Statistics")?;
+    writer.add_textbox(stats_slide, 50, 30, 700, 50, "Implementation Statistics")?;
 
     // Stats in boxes
     let stats_y = 120;
@@ -447,13 +452,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     for (i, stat) in stats.iter().enumerate() {
-        let y = stats_y + (i as i32) * (stat_height + stat_spacing);
-        writer.add_rectangle(slide12, 150, y, 500, stat_height)?;
-        writer.add_textbox(slide12, 160, y + 15, 480, 30, stat)?;
+        let y = stats_y + i32::try_from(i)? * (stat_height + stat_spacing);
+        writer.add_rectangle(stats_slide, 150, y, 500, stat_height)?;
+        writer.add_textbox(stats_slide, 160, y + 15, 480, 30, stat)?;
     }
 
     writer.set_slide_notes(
-        slide12,
+        stats_slide,
         "Statistical information about the library implementation. \
          Shows code size, coverage, and performance metrics. \
          Performance comparisons are against Apache POI (Java).",
@@ -463,12 +468,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // SLIDE 13: CONCLUSION
     // ============================================================
     println!("13. Creating conclusion slide...");
-    let slide13 = writer.add_slide()?;
+    let conclusion_slide = writer.add_slide()?;
 
-    writer.add_textbox(slide13, 50, 50, 700, 80, "Conclusion")?;
+    writer.add_textbox(conclusion_slide, 50, 50, 700, 80, "Conclusion")?;
 
     writer.add_textbox(
-        slide13,
+        conclusion_slide,
         100,
         160,
         600,
@@ -482,7 +487,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     writer.set_slide_notes(
-        slide13,
+        conclusion_slide,
         "Final slide summarizing the presentation. \
          Emphasizes specification compliance and production readiness. \
          The PPT writer is part of a comprehensive Office file processing library.",
@@ -492,10 +497,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // SLIDE 14: THANK YOU
     // ============================================================
     println!("14. Creating thank you slide...");
-    let slide14 = writer.add_slide()?;
+    let thanks_slide = writer.add_slide()?;
 
     writer.add_textbox(
-        slide14,
+        thanks_slide,
         150,
         180,
         500,
@@ -505,7 +510,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     writer.add_textbox(
-        slide14,
+        thanks_slide,
         200,
         320,
         400,
@@ -515,7 +520,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     writer.set_slide_notes(
-        slide14,
+        thanks_slide,
         "Final thank you slide. \
          Provides links to project resources for further information. \
          This concludes the comprehensive PPT format demonstration.",
@@ -525,13 +530,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // SAVE FILE
     // ============================================================
     let slide_count = writer.slide_count();
-    println!("\nTotal slides created: {}", slide_count);
+    println!("\nTotal slides created: {slide_count}");
 
     println!("\nSaving to comprehensive_test.ppt...");
     writer.save("comprehensive_test.ppt")?;
 
     println!("\n✅ SUCCESS! PPT file created with:");
-    println!("   ✓ {} slides", slide_count);
+    println!("   ✓ {slide_count} slides");
     println!("   ✓ 100+ text boxes with various positions and sizes");
     println!("   ✓ 50+ rectangle shapes");
     println!("   ✓ Slide notes for all slides (speaker notes)");
@@ -545,7 +550,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("     - Process flows");
     println!("     - Comparison tables");
     println!("\n🎯 Open 'comprehensive_test.ppt' in Microsoft PowerPoint to verify!");
-    println!("   - Check all {} slides are present", slide_count);
+    println!("   - Check all {slide_count} slides are present");
     println!("   - Verify shapes and text boxes render correctly");
     println!("   - View speaker notes in Notes pane");
     println!("   - Check document properties");

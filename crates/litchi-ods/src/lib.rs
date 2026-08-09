@@ -19,6 +19,7 @@ pub mod model;
 pub mod package;
 pub mod protection;
 pub mod settings;
+pub mod source_features;
 pub mod styles;
 pub mod worksheet;
 
@@ -37,4 +38,8 @@ pub use model::names;
 pub use model::tracked_changes;
 pub use model::{dde, scenario};
 pub use settings::{Iteration, IterationStatus, NullDate, Settings};
+pub use source_features::{
+    Drawing, DrawingKind, Hyperlink as SourceHyperlink, Sheet as SourceSheet,
+    Snapshot as SourceFeatures,
+};
 pub use worksheet::{Cell, CellValue, CellView, Merge, Row, Sheet};

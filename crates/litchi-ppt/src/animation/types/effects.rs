@@ -178,7 +178,7 @@ pub enum AnimationEffect {
     Flicker,
 
     // Exit Effects
-    /// Fade out (same as FadeIn but exit type)
+    /// Fade out (same as `FadeIn` but exit type)
     FadeOut,
     /// Fly out
     FlyOut,
@@ -305,6 +305,7 @@ pub enum EffectSpeed {
 
 impl EffectSpeed {
     /// Get duration in milliseconds.
+    #[must_use]
     pub fn duration_ms(&self) -> u32 {
         match self {
             EffectSpeed::VerySlow => 5000,

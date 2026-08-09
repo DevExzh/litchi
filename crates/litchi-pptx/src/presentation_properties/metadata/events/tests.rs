@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 
@@ -65,7 +71,7 @@ fn unknown_event_attributes_and_opaque_extensions_survive_attribute_edits() {
     store(&mut package, &name, &drafts()).unwrap();
     let part = package.get_part_mut(&name).unwrap();
     let mut xml = part.blob().to_vec();
-    let needle = br#"<p14:triggerEvt"#;
+    let needle = br"<p14:triggerEvt";
     let at = xml
         .windows(needle.len())
         .position(|value| value == needle)

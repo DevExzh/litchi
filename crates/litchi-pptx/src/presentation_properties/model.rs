@@ -1,4 +1,4 @@
-//! Typed PresentationML property values.
+//! Typed `PresentationML` property values.
 
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::is_ncname;
@@ -76,6 +76,10 @@ pub enum SlideSelection {
 impl SlideSelection {
     /// Validate the typed selection constraints from `CT_SlideRange` and
     /// `CT_CustomShowId` before a caller snapshots it into XML.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn validate(&self) -> Result<()> {
         if let Self::Range { start, end } = self
             && start > end
@@ -103,7 +107,7 @@ pub enum ColorKind {
     Preset,
 }
 
-/// DrawingML color plus its bounded source fragment.
+/// `DrawingML` color plus its bounded source fragment.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Color {
     pub kind: ColorKind,
@@ -191,11 +195,15 @@ pub struct Properties {
 }
 
 impl Properties {
-    /// Validate the package-independent PresentationML property snapshot.
+    /// Validate the package-independent `PresentationML` property snapshot.
     ///
     /// XML fragments are checked by the codec, while this method covers the
     /// constraints that can be established from typed values alone. It is
     /// useful for callers that edit a loaded snapshot before serializing it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn validate(&self) -> Result<()> {
         if self.recent_colors.len() > 10 {
             return Err(invalid("clrMru permits at most ten colors"));
@@ -232,6 +240,7 @@ impl Properties {
     }
 
     /// Borrow the typed document-level math defaults, if present.
+    #[must_use]
     pub fn math(&self) -> Option<&crate::presentation_properties::math::Properties> {
         self.extensions
             .iter()

@@ -1,4 +1,4 @@
-//! Source-bound host for PowerPoint 2020 Designer shape properties.
+//! Source-bound host for `PowerPoint` 2020 Designer shape properties.
 //!
 //! The `p202:designPr` payload belongs below exactly one selected shape's
 //! direct `p:nvPr` extension list.  This module deliberately scans the whole
@@ -43,6 +43,7 @@ struct PropertySource {
 impl PropertiesSnapshot {
     /// Borrow the selected shape's optional typed properties.
     #[inline]
+    #[must_use]
     pub fn properties(&self) -> Option<&DrawingProperties> {
         match self.occurrences.as_slice() {
             [occurrence] => occurrence.value.as_ref(),
@@ -52,6 +53,7 @@ impl PropertiesSnapshot {
 
     /// Return whether any matching extension has a typed `designPr` payload.
     #[inline]
+    #[must_use]
     pub fn is_present(&self) -> bool {
         self.occurrences
             .iter()
@@ -63,6 +65,7 @@ impl PropertiesSnapshot {
     /// More than one occurrence is preserved for inspection, but singular
     /// mutation is refused because the intended owner would be ambiguous.
     #[inline]
+    #[must_use]
     pub fn occurrence_count(&self) -> usize {
         self.occurrences.len()
     }
@@ -71,6 +74,7 @@ impl PropertiesSnapshot {
     ///
     /// An item is `None` when the matching extension has no correctly
     /// namespace-qualified `p202:designPr` payload.
+    #[must_use]
     pub fn occurrences(&self) -> impl ExactSizeIterator<Item = Option<&DrawingProperties>> + '_ {
         self.occurrences
             .iter()
@@ -79,6 +83,7 @@ impl PropertiesSnapshot {
 
     /// Start a move-only edit tied to this exact slide source.
     #[inline]
+    #[must_use]
     pub fn edit(self) -> PropertiesEdit {
         PropertiesEdit {
             snapshot: self,
@@ -106,6 +111,7 @@ pub struct PropertiesEdit {
 impl PropertiesEdit {
     /// Borrow the currently projected optional properties.
     #[inline]
+    #[must_use]
     pub fn properties(&self) -> Option<&DrawingProperties> {
         match &self.state {
             EditState::Unchanged => self.snapshot.properties(),
@@ -116,6 +122,10 @@ impl PropertiesEdit {
 
     /// Replace the optional properties after validating them under this
     /// source's finite limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set(&mut self, value: DrawingProperties) -> Result<()> {
         validate_properties(&value, self.snapshot.limits)?;
         self.changed =
@@ -132,11 +142,16 @@ impl PropertiesEdit {
 
     /// Return whether this edit will change the selected source.
     #[inline]
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.changed
     }
 
     /// Consume this edit into a move-only source-bound commit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn commit(self) -> Result<PropertiesCommit> {
         if self.changed && self.snapshot.occurrence_count() > 1 {
             return Err(Error::UnsafeEdit {
@@ -170,6 +185,7 @@ pub struct PropertiesCommit {
 impl PropertiesCommit {
     /// Return whether publishing this commit is a byte-preserving no-op.
     #[inline]
+    #[must_use]
     pub fn is_noop(&self) -> bool {
         !self.changed
     }
@@ -291,7 +307,10 @@ fn validate_current_source(package: &OpcPackage, snapshot: &PropertiesSnapshot) 
 }
 
 /// Directly replace or create selected shape Designer properties.
-#[allow(dead_code)] // Kept as the crate-private direct publication wrapper.
+#[allow(
+    dead_code,
+    reason = "kept as the crate-private direct publication wrapper"
+)]
 pub(crate) fn put_properties<'k>(
     package: &mut OpcPackage,
     owner: &PackURI,
@@ -304,7 +323,10 @@ pub(crate) fn put_properties<'k>(
 }
 
 /// Directly remove selected shape Designer properties.
-#[allow(dead_code)] // Kept as the crate-private direct publication wrapper.
+#[allow(
+    dead_code,
+    reason = "kept as the crate-private direct publication wrapper"
+)]
 pub(crate) fn remove_properties<'k>(
     package: &mut OpcPackage,
     owner: &PackURI,
@@ -430,7 +452,7 @@ fn locate(xml: &[u8], shape: Range<usize>, limits: Limits) -> Result<Located> {
                 let prefix = element
                     .name()
                     .prefix()
-                    .map(|value| value.into_inner())
+                    .map(quick_xml::name::Prefix::into_inner)
                     .map(|value| copy(value, "Designer namespace prefix"))
                     .transpose()?;
                 let frame = Frame {
@@ -492,7 +514,7 @@ fn start_role(
     limits: Limits,
 ) -> Result<Role> {
     let local = element.local_name();
-    let parent = stack.last().map(|frame| frame.role).unwrap_or(Role::Other);
+    let parent = stack.last().map_or(Role::Other, |frame| frame.role);
     if start == shape.start {
         if pml.is_none()
             || !matches!(
@@ -993,7 +1015,7 @@ fn copy(value: &[u8], resource: &'static str) -> Result<Vec<u8>> {
 }
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| Error::Invalid("Designer properties XML offset does not fit usize".into()))
+        .map_err(|_err| Error::Invalid("Designer properties XML offset does not fit usize".into()))
 }
 fn close_start(xml: &[u8], end: usize) -> usize {
     xml[..end]
@@ -1023,6 +1045,11 @@ fn limit(resource: &'static str, limit: usize) -> Error {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use litchi_opc::XmlPart;

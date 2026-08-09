@@ -155,7 +155,7 @@ impl Protection {
 }
 
 #[derive(Clone, Debug, Default)]
-pub(crate) struct CellStyleRegistry {
+pub struct CellStyleRegistry {
     pub(super) styles: HashMap<String, CellStyleDefinition>,
     pub(super) default: Option<Protection>,
     pub(super) common_table_cell_styles: HashSet<String>,
@@ -169,7 +169,7 @@ pub(crate) struct CellStyleRegistry {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct PreservedXmlFragment {
+pub struct PreservedXmlFragment {
     pub xml: String,
     pub(super) namespaces: BTreeMap<String, String>,
 }

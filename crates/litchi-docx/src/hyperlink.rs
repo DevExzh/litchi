@@ -37,8 +37,6 @@ pub struct Hyperlink {
     text: String,
     /// The target URL (None for internal bookmarks)
     url: Option<String>,
-    /// The relationship ID (rId) if external
-    r_id: Option<String>,
     /// The bookmark anchor if internal
     anchor: Option<String>,
     /// Tooltip text (optional)
@@ -48,24 +46,24 @@ pub struct Hyperlink {
 impl Hyperlink {
     /// Create a new Hyperlink.
     ///
+    /// Package-internal constructor: the raw relationship ID used to resolve
+    /// `url` is transient OPC plumbing (ADR-0004) and is not retained.
+    ///
     /// # Arguments
     ///
     /// * `text` - The display text
     /// * `url` - The target URL (for external links)
-    /// * `r_id` - The relationship ID (for external links)
     /// * `anchor` - The bookmark anchor (for internal links)
     /// * `tooltip` - Optional tooltip text
-    pub fn new(
+    pub(crate) fn new(
         text: String,
         url: Option<String>,
-        r_id: Option<String>,
         anchor: Option<String>,
         tooltip: Option<String>,
     ) -> Self {
         Self {
             text,
             url,
-            r_id,
             anchor,
             tooltip,
         }
@@ -81,12 +79,6 @@ impl Hyperlink {
     #[inline]
     pub fn url(&self) -> Option<&str> {
         self.url.as_deref()
-    }
-
-    /// Get the relationship ID of the hyperlink (if external).
-    #[inline]
-    pub fn r_id(&self) -> Option<&str> {
-        self.r_id.as_deref()
     }
 
     /// Get the bookmark anchor of the hyperlink (if internal).
@@ -243,7 +235,6 @@ impl Hyperlink {
                             hyperlinks.push(Hyperlink::new(
                                 current_text.clone(),
                                 url,
-                                current_r_id.clone(),
                                 current_anchor.clone(),
                                 current_tooltip.clone(),
                             ));
@@ -283,7 +274,6 @@ mod tests {
         let link = Hyperlink::new(
             "Click here".to_string(),
             Some("https://example.com".to_string()),
-            Some("rId1".to_string()),
             None,
             Some("Example website".to_string()),
         );
@@ -291,7 +281,6 @@ mod tests {
         assert_eq!(link.text(), "Click here");
         assert_eq!(link.display(), "Click here");
         assert_eq!(link.url(), Some("https://example.com"));
-        assert_eq!(link.r_id(), Some("rId1"));
         assert_eq!(link.tooltip(), Some("Example website"));
         assert!(link.is_external());
         assert!(!link.is_internal());
@@ -301,7 +290,6 @@ mod tests {
     fn test_internal_hyperlink() {
         let link = Hyperlink::new(
             "Go to section".to_string(),
-            None,
             None,
             Some("section1".to_string()),
             None,
@@ -317,14 +305,12 @@ mod tests {
         let link = Hyperlink::new(
             "Test Link".to_string(),
             Some("https://example.org".to_string()),
-            Some("rId5".to_string()),
             Some("bookmark1".to_string()),
             Some("Click me".to_string()),
         );
 
         assert_eq!(link.text(), "Test Link");
         assert_eq!(link.url(), Some("https://example.org"));
-        assert_eq!(link.r_id(), Some("rId5"));
         assert_eq!(link.anchor(), Some("bookmark1"));
         assert_eq!(link.tooltip(), Some("Click me"));
         assert!(link.is_external());
@@ -336,7 +322,6 @@ mod tests {
         let link = Hyperlink::new(
             "".to_string(),
             Some("https://example.com".to_string()),
-            Some("rId1".to_string()),
             None,
             None,
         );
@@ -348,11 +333,10 @@ mod tests {
 
     #[test]
     fn test_hyperlink_no_optional_fields() {
-        let link = Hyperlink::new("Plain Text".to_string(), None, None, None, None);
+        let link = Hyperlink::new("Plain Text".to_string(), None, None, None);
 
         assert_eq!(link.text(), "Plain Text");
         assert_eq!(link.url(), None);
-        assert_eq!(link.r_id(), None);
         assert_eq!(link.anchor(), None);
         assert_eq!(link.tooltip(), None);
         assert!(!link.is_external());
@@ -364,7 +348,6 @@ mod tests {
         let link = Hyperlink::new(
             "Clone me".to_string(),
             Some("https://clone.test".to_string()),
-            Some("rId10".to_string()),
             Some("anchor".to_string()),
             Some("Tooltip".to_string()),
         );
@@ -372,7 +355,6 @@ mod tests {
 
         assert_eq!(cloned.text(), link.text());
         assert_eq!(cloned.url(), link.url());
-        assert_eq!(cloned.r_id(), link.r_id());
         assert_eq!(cloned.anchor(), link.anchor());
         assert_eq!(cloned.tooltip(), link.tooltip());
     }
@@ -382,7 +364,6 @@ mod tests {
         let link = Hyperlink::new(
             "Debug".to_string(),
             Some("https://debug.test".to_string()),
-            None,
             None,
             None,
         );
@@ -398,7 +379,6 @@ mod tests {
         let link = Hyperlink::new(
             "Unicode: 你好世界 🎉".to_string(),
             Some("https://例子.com".to_string()),
-            Some("rId99".to_string()),
             None,
             Some("工具提示 🎈".to_string()),
         );
@@ -412,13 +392,7 @@ mod tests {
     fn test_hyperlink_long_url() {
         let long_url =
             "https://example.com/".to_string() + &"a".repeat(1000) + "/" + &"b".repeat(1000);
-        let link = Hyperlink::new(
-            "Long URL".to_string(),
-            Some(long_url.clone()),
-            Some("rId1".to_string()),
-            None,
-            None,
-        );
+        let link = Hyperlink::new("Long URL".to_string(), Some(long_url.clone()), None, None);
 
         assert_eq!(link.url(), Some(long_url.as_str()));
     }
@@ -445,7 +419,6 @@ mod tests {
         assert_eq!(hyperlinks.len(), 1);
         assert_eq!(hyperlinks[0].text(), "Click here");
         assert_eq!(hyperlinks[0].url(), Some("https://example.com"));
-        assert_eq!(hyperlinks[0].r_id(), Some("rId1"));
     }
 
     #[test]
@@ -601,7 +574,6 @@ mod tests {
         assert_eq!(hyperlinks.len(), 1);
         assert_eq!(hyperlinks[0].text(), "Broken Link");
         assert_eq!(hyperlinks[0].url(), None); // URL not resolved
-        assert_eq!(hyperlinks[0].r_id(), Some("rId99"));
     }
 
     #[test]
@@ -609,7 +581,6 @@ mod tests {
         let link = Hyperlink::new(
             "Email me".to_string(),
             Some("mailto:test@example.com".to_string()),
-            Some("rId1".to_string()),
             None,
             None,
         );
@@ -623,7 +594,6 @@ mod tests {
         let link = Hyperlink::new(
             "FTP Link".to_string(),
             Some("ftp://ftp.example.com/file.txt".to_string()),
-            Some("rId1".to_string()),
             None,
             None,
         );
@@ -637,7 +607,6 @@ mod tests {
         let link = Hyperlink::new(
             "File Link".to_string(),
             Some("file:///C:/path/to/file.txt".to_string()),
-            Some("rId1".to_string()),
             None,
             None,
         );

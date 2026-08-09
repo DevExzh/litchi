@@ -1,4 +1,4 @@
-/// PresentationML namespace and relationship conformance used by a notes graph.
+/// `PresentationML` namespace and relationship conformance used by a notes graph.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Conformance {
     Transitional,
@@ -62,7 +62,7 @@ use litchi_opc::TargetMode;
 /// An opaque OPC relationship retained by a notes resource.
 ///
 /// The notes semantic layer interprets only the edges required by the
-/// PresentationML graph. Every other relationship is retained as inert
+/// `PresentationML` graph. Every other relationship is retained as inert
 /// metadata so a transaction can round-trip vendor extensions and related
 /// parts without activating or rendering them.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -89,26 +89,31 @@ impl Link {
     }
 
     /// Relationship identifier in the owning `.rels` part.
+    #[must_use]
     pub fn id(&self) -> &str {
         &self.id
     }
 
     /// Relationship type URI, retained without vocabulary interpretation.
+    #[must_use]
     pub fn relationship_type(&self) -> &str {
         &self.relationship_type
     }
 
     /// Exact authored target reference.
+    #[must_use]
     pub fn target(&self) -> &str {
         &self.target_ref
     }
 
     /// Whether the target is external and therefore never resolved.
+    #[must_use]
     pub const fn target_mode(&self) -> TargetMode {
         self.target_mode
     }
 
     /// Whether the target is external and remains inert.
+    #[must_use]
     pub const fn is_external(&self) -> bool {
         matches!(self.target_mode, TargetMode::External)
     }
@@ -126,16 +131,19 @@ pub struct Theme {
 
 impl Theme {
     /// Return the validated package part name for diagnostics.
+    #[must_use]
     pub fn part(&self) -> &str {
         &self.part_name
     }
 
     /// Return the validated resource content type.
+    #[must_use]
     pub fn content_type(&self) -> &str {
         &self.content_type
     }
 
     /// Lend the inert theme XML payload.
+    #[must_use]
     pub fn xml(&self) -> &[u8] {
         &self.data
     }
@@ -146,6 +154,7 @@ impl Theme {
     }
 
     /// Lend all outbound relationships, including opaque vendor edges.
+    #[must_use]
     pub fn relationships(&self) -> &[Link] {
         &self.relationships
     }
@@ -164,16 +173,19 @@ pub struct Master {
 
 impl Master {
     /// Return the validated package part name for diagnostics.
+    #[must_use]
     pub fn part(&self) -> &str {
         &self.part_name
     }
 
     /// Return the validated resource content type.
+    #[must_use]
     pub fn content_type(&self) -> &str {
         &self.content_type
     }
 
     /// Lend the inert notes-master XML payload.
+    #[must_use]
     pub fn xml(&self) -> &[u8] {
         &self.data
     }
@@ -184,6 +196,7 @@ impl Master {
     }
 
     /// Lend the owned notes-master theme resource.
+    #[must_use]
     pub fn theme(&self) -> &Theme {
         &self.theme
     }
@@ -194,6 +207,7 @@ impl Master {
     }
 
     /// Lend all outbound relationships, including the required theme edge.
+    #[must_use]
     pub fn relationships(&self) -> &[Link] {
         &self.relationships
     }
@@ -214,21 +228,25 @@ pub struct Slide {
 
 impl Slide {
     /// Return the validated owning slide part name for diagnostics.
+    #[must_use]
     pub fn owner(&self) -> &str {
         &self.slide_part_name
     }
 
     /// Return the validated notes-slide part name for diagnostics.
+    #[must_use]
     pub fn part(&self) -> &str {
         &self.part_name
     }
 
     /// Return the validated resource content type.
+    #[must_use]
     pub fn content_type(&self) -> &str {
         &self.content_type
     }
 
     /// Lend the inert notes-slide XML payload.
+    #[must_use]
     pub fn xml(&self) -> &[u8] {
         &self.data
     }
@@ -239,6 +257,7 @@ impl Slide {
     }
 
     /// Lend all outbound relationships, including opaque vendor edges.
+    #[must_use]
     pub fn relationships(&self) -> &[Link] {
         &self.relationships
     }
@@ -258,11 +277,13 @@ pub struct Graph {
 
 impl Graph {
     /// Return the graph's Strict or Transitional namespace profile.
+    #[must_use]
     pub fn conformance(&self) -> Conformance {
         self.conformance
     }
 
     /// Lend the shared notes-master resource.
+    #[must_use]
     pub fn master(&self) -> &Master {
         &self.master
     }
@@ -273,6 +294,7 @@ impl Graph {
     }
 
     /// Lend notes slides in presentation order.
+    #[must_use]
     pub fn slides(&self) -> &[Slide] {
         &self.slides
     }

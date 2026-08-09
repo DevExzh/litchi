@@ -1,6 +1,20 @@
 //! RTF resource-table and style output.
 
-use super::super::*;
+#![allow(
+    clippy::shadow_reuse,
+    reason = "serialization helpers deliberately rebind a working value as the output is assembled"
+)]
+use super::super::{
+    DefaultFormattingDestination, DocumentDataStore, DocumentDefaultFormatting, DocumentGenerator,
+    DocumentMathProperties, DocumentTheme, EmbeddedFontFormat, EndnoteRestart, FileLocation,
+    FileTable, FontFamily, FontPitch, FootnoteRestart, HashSet, ImageType, LatentStyles,
+    LegacyNumberingAlignment, LegacyNumberingFormat, LegacySectionNumbering, List, ListFollow,
+    ListJustification, ListLevel, ListLevelType, ListOverrideTable, ListTable, MailMerge,
+    NoteNumberingStyle, NoteOptions, NotePlacement, NoteSeparatorElement, NoteSeparatorKind,
+    NoteSeparatorTable, ParagraphGroupPropertyTable, Picture, PresentNoteKinds,
+    ProtectionUserTable, Revision, RevisionAuthor, RevisionSaveMetadata, RtfWriter, StoryDrawing,
+    Style, StyleSheet, StyleType, Write, XmlNamespace, annotation, io,
+};
 
 impl<W: Write> RtfWriter<W> {
     /// Write font table
@@ -18,13 +32,19 @@ impl<W: Write> RtfWriter<W> {
         // Clone fonts to avoid borrowing issues
         let fonts: Vec<_> = self.font_table.fonts().to_vec();
         for (idx, font) in fonts.iter().enumerate() {
-            if !self.font_table.is_defined(idx as FontRef) {
+            let font_ref = u16::try_from(idx).map_err(|_err| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF font-table index exceeds the u16 range",
+                )
+            })?;
+            if !self.font_table.is_defined(font_ref) {
                 continue;
             }
             font.validate()
                 .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
             self.write_str("{")?;
-            self.write_control_word("f", Some(idx as i32))?;
+            self.write_control_word("f", Some(i32::from(font_ref)))?;
 
             // Write font family
             match font.family {
@@ -50,9 +70,9 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word(
                 "fprq",
                 Some(match font.pitch {
-                    crate::FontPitch::Default => 0,
-                    crate::FontPitch::Fixed => 1,
-                    crate::FontPitch::Variable => 2,
+                    FontPitch::Default => 0,
+                    FontPitch::Fixed => 1,
+                    FontPitch::Variable => 2,
                 }),
             )?;
             if let Some(code_page) = font.code_page {
@@ -79,8 +99,8 @@ impl<W: Write> RtfWriter<W> {
                 self.write_control_word("fontemb", None)?;
                 self.write_control_word(
                     match embedded.format {
-                        crate::EmbeddedFontFormat::Nil => "ftnil",
-                        crate::EmbeddedFontFormat::TrueType => "fttruetype",
+                        EmbeddedFontFormat::Nil => "ftnil",
+                        EmbeddedFontFormat::TrueType => "fttruetype",
                     },
                     None,
                 )?;
@@ -122,7 +142,10 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write the optional external-file metadata table.
-    pub fn write_file_table(&mut self, table: Option<&crate::FileTable<'_>>) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
+    pub fn write_file_table(&mut self, table: Option<&FileTable<'_>>) -> io::Result<()> {
         let Some(table) = table else {
             return Ok(());
         };
@@ -135,7 +158,7 @@ impl<W: Write> RtfWriter<W> {
         for entry in table.entries() {
             self.write_str("{")?;
             self.write_control_word("file", None)?;
-            self.write_control_word("fid", Some(entry.id as i32))?;
+            self.write_control_word("fid", Some(entry.id.cast_signed()))?;
             if let Some(level) = entry.relative_path_level {
                 self.write_control_word("frelative", Some(i32::from(level)))?;
             }
@@ -155,9 +178,9 @@ impl<W: Write> RtfWriter<W> {
                 self.write_control_word("fvalidhpfs", None)?;
             }
             match entry.location {
-                crate::FileLocation::Local => {},
-                crate::FileLocation::Network => self.write_control_word("fnetwork", None)?,
-                crate::FileLocation::NonFileSystem => {
+                FileLocation::Local => {},
+                FileLocation::Network => self.write_control_word("fnetwork", None)?,
+                FileLocation::NonFileSystem => {
                     self.write_control_word("fnonfilesys", None)?;
                 },
             }
@@ -185,9 +208,9 @@ impl<W: Write> RtfWriter<W> {
                 .ok()
                 .is_some_and(|reference| self.color_table.is_automatic(reference));
             if !automatic {
-                self.write_control_word("red", Some(color.red as i32))?;
-                self.write_control_word("green", Some(color.green as i32))?;
-                self.write_control_word("blue", Some(color.blue as i32))?;
+                self.write_control_word("red", Some(i32::from(color.red)))?;
+                self.write_control_word("green", Some(i32::from(color.green)))?;
+                self.write_control_word("blue", Some(i32::from(color.blue)))?;
             }
             self.write_str(";")?;
         }
@@ -197,6 +220,9 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write the list-definition table.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_picture(&mut self, picture: &Picture<'_>) -> io::Result<()> {
         picture
             .validate()
@@ -208,7 +234,7 @@ impl<W: Write> RtfWriter<W> {
             ImageType::Png => self.write_control_word("pngblip", None)?,
             ImageType::Jpeg => self.write_control_word("jpegblip", None)?,
             ImageType::Dib if picture.bitmap.windows_bitmap => {
-                self.write_control_word("wbitmap", Some(0))?
+                self.write_control_word("wbitmap", Some(0))?;
             },
             ImageType::Dib => self.write_control_word("dibitmap", Some(0))?,
             ImageType::Pict => self.write_control_word("macpict", None)?,
@@ -292,6 +318,9 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write the list-definition table.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_list_table(&mut self, table: &ListTable<'_>) -> io::Result<()> {
         self.write_list_table_with_pictures(table, &[])
     }
@@ -456,7 +485,7 @@ impl<W: Write> RtfWriter<W> {
         if let Some(picture_index) = level.picture_index {
             self.write_control_word(
                 "levelpicture",
-                Some(i32::try_from(picture_index).map_err(|_| {
+                Some(i32::try_from(picture_index).map_err(|_err| {
                     io::Error::new(io::ErrorKind::InvalidInput, "invalid list picture index")
                 })?),
             )?;
@@ -490,7 +519,7 @@ impl<W: Write> RtfWriter<W> {
         text: &str,
         positions: &str,
     ) -> io::Result<()> {
-        let count = u8::try_from(text.chars().count()).map_err(|_| {
+        let count = u8::try_from(text.chars().count()).map_err(|_err| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "RTF list level text cannot exceed 255 characters",
@@ -514,7 +543,7 @@ impl<W: Write> RtfWriter<W> {
         if positions.is_empty() {
             for (index, ch) in text.chars().enumerate() {
                 if u32::from(ch) <= 8 {
-                    let position = u8::try_from(index + 1).map_err(|_| {
+                    let position = u8::try_from(index + 1).map_err(|_err| {
                         io::Error::new(io::ErrorKind::InvalidInput, "invalid RTF list placeholder")
                     })?;
                     self.write_hex_byte(position)?;
@@ -534,6 +563,9 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write the list-override table.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_list_override_table(&mut self, table: &ListOverrideTable) -> io::Result<()> {
         if table.overrides().is_empty() {
             return Ok(());
@@ -585,9 +617,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write ordered inert legacy section-numbering defaults.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_legacy_section_numbering(
         &mut self,
-        numbering: &crate::LegacySectionNumbering<'_>,
+        numbering: &LegacySectionNumbering<'_>,
     ) -> io::Result<()> {
         numbering
             .validate()
@@ -597,20 +632,20 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("pnseclvl", Some(i32::from(level.level)))?;
             self.write_control_word(
                 match level.format {
-                    crate::LegacyNumberingFormat::Decimal => "pndec",
-                    crate::LegacyNumberingFormat::UpperRoman => "pnucrm",
-                    crate::LegacyNumberingFormat::LowerRoman => "pnlcrm",
-                    crate::LegacyNumberingFormat::UpperLetter => "pnucltr",
-                    crate::LegacyNumberingFormat::LowerLetter => "pnlcltr",
+                    LegacyNumberingFormat::Decimal => "pndec",
+                    LegacyNumberingFormat::UpperRoman => "pnucrm",
+                    LegacyNumberingFormat::LowerRoman => "pnlcrm",
+                    LegacyNumberingFormat::UpperLetter => "pnucltr",
+                    LegacyNumberingFormat::LowerLetter => "pnlcltr",
                 },
                 None,
             )?;
             if let Some(alignment) = level.alignment {
                 self.write_control_word(
                     match alignment {
-                        crate::LegacyNumberingAlignment::Left => "pnql",
-                        crate::LegacyNumberingAlignment::Center => "pnqc",
-                        crate::LegacyNumberingAlignment::Right => "pnqr",
+                        LegacyNumberingAlignment::Left => "pnql",
+                        LegacyNumberingAlignment::Center => "pnqc",
+                        LegacyNumberingAlignment::Right => "pnqr",
                     },
                     None,
                 )?;
@@ -653,9 +688,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write the inert paragraph-group property table.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_paragraph_group_table(
         &mut self,
-        table: Option<&crate::ParagraphGroupPropertyTable>,
+        table: Option<&ParagraphGroupPropertyTable>,
     ) -> io::Result<()> {
         let Some(table) = table else {
             return Ok(());
@@ -669,7 +707,7 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("pgp", None)?;
             self.write_control_word(
                 "ipgp",
-                Some(i32::try_from(entry.parent_id).map_err(|_| {
+                Some(i32::try_from(entry.parent_id).map_err(|_err| {
                     io::Error::new(io::ErrorKind::InvalidInput, "invalid pgp parent ID")
                 })?),
             )?;
@@ -686,7 +724,10 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write explicit document-level footnote and endnote configuration.
-    pub fn write_note_options(&mut self, options: &crate::NoteOptions) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
+    pub fn write_note_options(&mut self, options: &NoteOptions) -> io::Result<()> {
         options
             .validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
@@ -695,19 +736,19 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word(
                 "fet",
                 Some(match value {
-                    crate::PresentNoteKinds::FootnotesOnly => 0,
-                    crate::PresentNoteKinds::EndnotesOnly => 1,
-                    crate::PresentNoteKinds::FootnotesAndEndnotes => 2,
+                    PresentNoteKinds::FootnotesOnly => 0,
+                    PresentNoteKinds::EndnotesOnly => 1,
+                    PresentNoteKinds::FootnotesAndEndnotes => 2,
                 }),
             )?;
         }
         if let Some(value) = options.footnote_placement {
             self.write_control_word(
                 match value {
-                    crate::NotePlacement::EndOfSection => "endnotes",
-                    crate::NotePlacement::EndOfDocument => "enddoc",
-                    crate::NotePlacement::BeneathText => "ftntj",
-                    crate::NotePlacement::BottomOfPage => "ftnbj",
+                    NotePlacement::EndOfSection => "endnotes",
+                    NotePlacement::EndOfDocument => "enddoc",
+                    NotePlacement::BeneathText => "ftntj",
+                    NotePlacement::BottomOfPage => "ftnbj",
                 },
                 None,
             )?;
@@ -718,9 +759,9 @@ impl<W: Write> RtfWriter<W> {
         if let Some(value) = options.footnote_restart {
             self.write_control_word(
                 match value {
-                    crate::FootnoteRestart::Continuous => "ftnrstcont",
-                    crate::FootnoteRestart::EachSection => "ftnrestart",
-                    crate::FootnoteRestart::EachPage => "ftnrstpg",
+                    FootnoteRestart::Continuous => "ftnrstcont",
+                    FootnoteRestart::EachSection => "ftnrestart",
+                    FootnoteRestart::EachPage => "ftnrstpg",
                 },
                 None,
             )?;
@@ -731,10 +772,10 @@ impl<W: Write> RtfWriter<W> {
         if let Some(value) = options.endnote_placement {
             self.write_control_word(
                 match value {
-                    crate::NotePlacement::EndOfSection => "aendnotes",
-                    crate::NotePlacement::EndOfDocument => "aenddoc",
-                    crate::NotePlacement::BeneathText => "aftntj",
-                    crate::NotePlacement::BottomOfPage => "aftnbj",
+                    NotePlacement::EndOfSection => "aendnotes",
+                    NotePlacement::EndOfDocument => "aenddoc",
+                    NotePlacement::BeneathText => "aftntj",
+                    NotePlacement::BottomOfPage => "aftnbj",
                 },
                 None,
             )?;
@@ -745,8 +786,8 @@ impl<W: Write> RtfWriter<W> {
         if let Some(value) = options.endnote_restart {
             self.write_control_word(
                 match value {
-                    crate::EndnoteRestart::Continuous => "aftnrstcont",
-                    crate::EndnoteRestart::EachSection => "aftnrestart",
+                    EndnoteRestart::Continuous => "aftnrstcont",
+                    EndnoteRestart::EachSection => "aftnrestart",
                 },
                 None,
             )?;
@@ -758,60 +799,60 @@ impl<W: Write> RtfWriter<W> {
     }
 
     pub(in super::super) fn note_numbering_control(
-        style: crate::NoteNumberingStyle,
+        style: NoteNumberingStyle,
         endnote: bool,
     ) -> &'static str {
         match (endnote, style) {
-            (false, crate::NoteNumberingStyle::Arabic) => "ftnnar",
-            (false, crate::NoteNumberingStyle::LowercaseLetter) => "ftnnalc",
-            (false, crate::NoteNumberingStyle::UppercaseLetter) => "ftnnauc",
-            (false, crate::NoteNumberingStyle::LowercaseRoman) => "ftnnrlc",
-            (false, crate::NoteNumberingStyle::UppercaseRoman) => "ftnnruc",
-            (false, crate::NoteNumberingStyle::Chicago) => "ftnnchi",
-            (false, crate::NoteNumberingStyle::KoreanChosung) => "ftnnchosung",
-            (false, crate::NoteNumberingStyle::Circle) => "ftnncnum",
-            (false, crate::NoteNumberingStyle::KanjiDigitless) => "ftnndbnum",
-            (false, crate::NoteNumberingStyle::KanjiWithDigit) => "ftnndbnumd",
-            (false, crate::NoteNumberingStyle::KanjiThree) => "ftnndbnumt",
-            (false, crate::NoteNumberingStyle::KanjiFour) => "ftnndbnumk",
-            (false, crate::NoteNumberingStyle::DoubleByte) => "ftnndbar",
-            (false, crate::NoteNumberingStyle::KoreanGanada) => "ftnnganada",
-            (false, crate::NoteNumberingStyle::ChineseOne) => "ftnngbnum",
-            (false, crate::NoteNumberingStyle::ChineseTwo) => "ftnngbnumd",
-            (false, crate::NoteNumberingStyle::ChineseThree) => "ftnngbnuml",
-            (false, crate::NoteNumberingStyle::ChineseFour) => "ftnngbnumk",
-            (false, crate::NoteNumberingStyle::ZodiacOne) => "ftnnzodiac",
-            (false, crate::NoteNumberingStyle::ZodiacTwo) => "ftnnzodiacd",
-            (false, crate::NoteNumberingStyle::ZodiacThree) => "ftnnzodiacl",
-            (true, crate::NoteNumberingStyle::Arabic) => "aftnnar",
-            (true, crate::NoteNumberingStyle::LowercaseLetter) => "aftnnalc",
-            (true, crate::NoteNumberingStyle::UppercaseLetter) => "aftnnauc",
-            (true, crate::NoteNumberingStyle::LowercaseRoman) => "aftnnrlc",
-            (true, crate::NoteNumberingStyle::UppercaseRoman) => "aftnnruc",
-            (true, crate::NoteNumberingStyle::Chicago) => "aftnnchi",
-            (true, crate::NoteNumberingStyle::KoreanChosung) => "aftnnchosung",
-            (true, crate::NoteNumberingStyle::Circle) => "aftnncnum",
-            (true, crate::NoteNumberingStyle::KanjiDigitless) => "aftnndbnum",
-            (true, crate::NoteNumberingStyle::KanjiWithDigit) => "aftnndbnumd",
-            (true, crate::NoteNumberingStyle::KanjiThree) => "aftnndbnumt",
-            (true, crate::NoteNumberingStyle::KanjiFour) => "aftnndbnumk",
-            (true, crate::NoteNumberingStyle::DoubleByte) => "aftnndbar",
-            (true, crate::NoteNumberingStyle::KoreanGanada) => "aftnnganada",
-            (true, crate::NoteNumberingStyle::ChineseOne) => "aftnngbnum",
-            (true, crate::NoteNumberingStyle::ChineseTwo) => "aftnngbnumd",
-            (true, crate::NoteNumberingStyle::ChineseThree) => "aftnngbnuml",
-            (true, crate::NoteNumberingStyle::ChineseFour) => "aftnngbnumk",
-            (true, crate::NoteNumberingStyle::ZodiacOne) => "aftnnzodiac",
-            (true, crate::NoteNumberingStyle::ZodiacTwo) => "aftnnzodiacd",
-            (true, crate::NoteNumberingStyle::ZodiacThree) => "aftnnzodiacl",
+            (false, NoteNumberingStyle::Arabic) => "ftnnar",
+            (false, NoteNumberingStyle::LowercaseLetter) => "ftnnalc",
+            (false, NoteNumberingStyle::UppercaseLetter) => "ftnnauc",
+            (false, NoteNumberingStyle::LowercaseRoman) => "ftnnrlc",
+            (false, NoteNumberingStyle::UppercaseRoman) => "ftnnruc",
+            (false, NoteNumberingStyle::Chicago) => "ftnnchi",
+            (false, NoteNumberingStyle::KoreanChosung) => "ftnnchosung",
+            (false, NoteNumberingStyle::Circle) => "ftnncnum",
+            (false, NoteNumberingStyle::KanjiDigitless) => "ftnndbnum",
+            (false, NoteNumberingStyle::KanjiWithDigit) => "ftnndbnumd",
+            (false, NoteNumberingStyle::KanjiThree) => "ftnndbnumt",
+            (false, NoteNumberingStyle::KanjiFour) => "ftnndbnumk",
+            (false, NoteNumberingStyle::DoubleByte) => "ftnndbar",
+            (false, NoteNumberingStyle::KoreanGanada) => "ftnnganada",
+            (false, NoteNumberingStyle::ChineseOne) => "ftnngbnum",
+            (false, NoteNumberingStyle::ChineseTwo) => "ftnngbnumd",
+            (false, NoteNumberingStyle::ChineseThree) => "ftnngbnuml",
+            (false, NoteNumberingStyle::ChineseFour) => "ftnngbnumk",
+            (false, NoteNumberingStyle::ZodiacOne) => "ftnnzodiac",
+            (false, NoteNumberingStyle::ZodiacTwo) => "ftnnzodiacd",
+            (false, NoteNumberingStyle::ZodiacThree) => "ftnnzodiacl",
+            (true, NoteNumberingStyle::Arabic) => "aftnnar",
+            (true, NoteNumberingStyle::LowercaseLetter) => "aftnnalc",
+            (true, NoteNumberingStyle::UppercaseLetter) => "aftnnauc",
+            (true, NoteNumberingStyle::LowercaseRoman) => "aftnnrlc",
+            (true, NoteNumberingStyle::UppercaseRoman) => "aftnnruc",
+            (true, NoteNumberingStyle::Chicago) => "aftnnchi",
+            (true, NoteNumberingStyle::KoreanChosung) => "aftnnchosung",
+            (true, NoteNumberingStyle::Circle) => "aftnncnum",
+            (true, NoteNumberingStyle::KanjiDigitless) => "aftnndbnum",
+            (true, NoteNumberingStyle::KanjiWithDigit) => "aftnndbnumd",
+            (true, NoteNumberingStyle::KanjiThree) => "aftnndbnumt",
+            (true, NoteNumberingStyle::KanjiFour) => "aftnndbnumk",
+            (true, NoteNumberingStyle::DoubleByte) => "aftnndbar",
+            (true, NoteNumberingStyle::KoreanGanada) => "aftnnganada",
+            (true, NoteNumberingStyle::ChineseOne) => "aftnngbnum",
+            (true, NoteNumberingStyle::ChineseTwo) => "aftnngbnumd",
+            (true, NoteNumberingStyle::ChineseThree) => "aftnngbnuml",
+            (true, NoteNumberingStyle::ChineseFour) => "aftnngbnumk",
+            (true, NoteNumberingStyle::ZodiacOne) => "aftnnzodiac",
+            (true, NoteNumberingStyle::ZodiacTwo) => "aftnnzodiacd",
+            (true, NoteNumberingStyle::ZodiacThree) => "aftnnzodiacl",
         }
     }
 
     /// Write ordered semantic note-separator destinations.
-    pub fn write_note_separators(
-        &mut self,
-        table: &crate::NoteSeparatorTable<'_>,
-    ) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
+    pub fn write_note_separators(&mut self, table: &NoteSeparatorTable<'_>) -> io::Result<()> {
         table
             .validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
@@ -819,50 +860,44 @@ impl<W: Write> RtfWriter<W> {
             self.write_str("{\\*")?;
             self.write_control_word(
                 match separator.kind {
-                    crate::NoteSeparatorKind::FootnoteSeparator => "ftnsep",
-                    crate::NoteSeparatorKind::FootnoteContinuationSeparator => "ftnsepc",
-                    crate::NoteSeparatorKind::FootnoteContinuationNotice => "ftncn",
-                    crate::NoteSeparatorKind::EndnoteSeparator => "aftnsep",
-                    crate::NoteSeparatorKind::EndnoteContinuationSeparator => "aftnsepc",
-                    crate::NoteSeparatorKind::EndnoteContinuationNotice => "aftncn",
+                    NoteSeparatorKind::FootnoteSeparator => "ftnsep",
+                    NoteSeparatorKind::FootnoteContinuationSeparator => "ftnsepc",
+                    NoteSeparatorKind::FootnoteContinuationNotice => "ftncn",
+                    NoteSeparatorKind::EndnoteSeparator => "aftnsep",
+                    NoteSeparatorKind::EndnoteContinuationSeparator => "aftnsepc",
+                    NoteSeparatorKind::EndnoteContinuationNotice => "aftncn",
                 },
                 None,
             )?;
             self.write_str(" ")?;
             for element in &separator.elements {
                 match element {
-                    crate::NoteSeparatorElement::Text(text) => self.write_text(text.as_ref())?,
-                    crate::NoteSeparatorElement::SeparatorMark => {
-                        self.write_control_word("chftnsep", None)?
+                    NoteSeparatorElement::Text(text) => self.write_text(text.as_ref())?,
+                    NoteSeparatorElement::SeparatorMark => {
+                        self.write_control_word("chftnsep", None)?;
                     },
-                    crate::NoteSeparatorElement::ContinuationSeparatorMark => {
-                        self.write_control_word("chftnsepc", None)?
+                    NoteSeparatorElement::ContinuationSeparatorMark => {
+                        self.write_control_word("chftnsepc", None)?;
                     },
-                    crate::NoteSeparatorElement::ParagraphBreak => {
-                        self.write_control_word("par", None)?
-                    },
-                    crate::NoteSeparatorElement::LineBreak => {
-                        self.write_control_word("line", None)?
-                    },
-                    crate::NoteSeparatorElement::Drawing(crate::StoryDrawing::Shape(index)) => {
+                    NoteSeparatorElement::ParagraphBreak => self.write_control_word("par", None)?,
+                    NoteSeparatorElement::LineBreak => self.write_control_word("line", None)?,
+                    NoteSeparatorElement::Drawing(StoryDrawing::Shape(index)) => {
                         let shape = separator.shapes.get(*index).ok_or_else(|| {
                             io::Error::new(
                                 io::ErrorKind::InvalidInput,
                                 "RTF note separator references a missing shape",
                             )
                         })?;
-                        self.write_root_shape(shape)?
+                        self.write_root_shape(shape)?;
                     },
-                    crate::NoteSeparatorElement::Drawing(crate::StoryDrawing::ShapeGroup(
-                        index,
-                    )) => {
+                    NoteSeparatorElement::Drawing(StoryDrawing::ShapeGroup(index)) => {
                         let group = separator.shape_groups.get(*index).ok_or_else(|| {
                             io::Error::new(
                                 io::ErrorKind::InvalidInput,
                                 "RTF note separator references a missing shape group",
                             )
                         })?;
-                        self.write_shape_group(group, true)?
+                        self.write_shape_group(group, true)?;
                     },
                 }
             }
@@ -872,15 +907,18 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write the revision-author table referenced by tracked-change runs.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_revision_table(
         &mut self,
-        authors: &[crate::RevisionAuthor<'_>],
+        authors: &[RevisionAuthor<'_>],
         revisions: &[Revision<'_>],
     ) -> io::Result<()> {
         if authors.is_empty() && revisions.is_empty() {
             return Ok(());
         }
-        if authors.len() > crate::annotation::MAX_REVISION_AUTHORS {
+        if authors.len() > annotation::MAX_REVISION_AUTHORS {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "RTF revision-author table exceeds the safety limit",
@@ -897,7 +935,7 @@ impl<W: Write> RtfWriter<W> {
                 )
             })
         })?;
-        if author_bytes > crate::annotation::MAX_REVISION_AUTHOR_TEXT_TOTAL_BYTES {
+        if author_bytes > annotation::MAX_REVISION_AUTHOR_TEXT_TOTAL_BYTES {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "RTF aggregate revision-author text exceeds the safety limit",
@@ -907,7 +945,7 @@ impl<W: Write> RtfWriter<W> {
             revision
                 .validate()
                 .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
-            let index = usize::try_from(revision.id).map_err(|_| {
+            let index = usize::try_from(revision.id).map_err(|_err| {
                 io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "RTF revision author indices cannot be negative",
@@ -936,11 +974,10 @@ impl<W: Write> RtfWriter<W> {
         self.write_str("}")?;
         Ok(())
     }
-
-    pub fn write_generator(
-        &mut self,
-        generator: Option<&crate::DocumentGenerator<'_>>,
-    ) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
+    pub fn write_generator(&mut self, generator: Option<&DocumentGenerator<'_>>) -> io::Result<()> {
         let Some(generator) = generator else {
             return Ok(());
         };
@@ -951,10 +988,12 @@ impl<W: Write> RtfWriter<W> {
         self.write_destination_text(generator.value.as_ref())?;
         self.write_str(";}")
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_revision_save_metadata(
         &mut self,
-        metadata: Option<&crate::RevisionSaveMetadata>,
+        metadata: Option<&RevisionSaveMetadata>,
     ) -> io::Result<()> {
         let Some(metadata) = metadata else {
             return Ok(());
@@ -964,18 +1003,20 @@ impl<W: Write> RtfWriter<W> {
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
         self.write_str("{\\*\\rsidtbl ")?;
         for id in metadata.ids() {
-            self.write_control_word("rsid", Some(*id as i32))?;
+            self.write_control_word("rsid", Some((*id).cast_signed()))?;
         }
         self.write_str("}")?;
         if let Some(root) = metadata.root() {
-            self.write_control_word("rsidroot", Some(root as i32))?;
+            self.write_control_word("rsidroot", Some(root.cast_signed()))?;
         }
         Ok(())
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_xml_namespace_table(
         &mut self,
-        namespaces: Option<&[crate::XmlNamespace<'_>]>,
+        namespaces: Option<&[XmlNamespace<'_>]>,
     ) -> io::Result<()> {
         let Some(namespaces) = namespaces else {
             return Ok(());
@@ -1014,7 +1055,7 @@ impl<W: Write> RtfWriter<W> {
                 ));
             }
             self.write_str("{")?;
-            self.write_control_word("xmlns", Some(namespace.id as i32))?;
+            self.write_control_word("xmlns", Some(namespace.id.cast_signed()))?;
             self.write_str(" ")?;
             self.write_destination_text(namespace.namespace.as_ref())?;
             self.write_str("}")?;
@@ -1023,9 +1064,12 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write inert range-protection usernames without resolving any identity.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_protection_user_table(
         &mut self,
-        table: Option<&crate::ProtectionUserTable<'_>>,
+        table: Option<&ProtectionUserTable<'_>>,
     ) -> io::Result<()> {
         let Some(table) = table else {
             return Ok(());
@@ -1041,8 +1085,10 @@ impl<W: Write> RtfWriter<W> {
         }
         self.write_str("}")
     }
-
-    pub fn write_theme(&mut self, theme: Option<&crate::DocumentTheme<'_>>) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
+    pub fn write_theme(&mut self, theme: Option<&DocumentTheme<'_>>) -> io::Result<()> {
         let Some(theme) = theme else {
             return Ok(());
         };
@@ -1069,11 +1115,10 @@ impl<W: Write> RtfWriter<W> {
         }
         self.write_str("}")
     }
-
-    pub fn write_latent_styles(
-        &mut self,
-        styles: Option<&crate::LatentStyles<'_>>,
-    ) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
+    pub fn write_latent_styles(&mut self, styles: Option<&LatentStyles<'_>>) -> io::Result<()> {
         let Some(styles) = styles else {
             return Ok(());
         };
@@ -1081,7 +1126,7 @@ impl<W: Write> RtfWriter<W> {
             .validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
         self.write_str("{\\*\\latentstyles")?;
-        self.write_control_word("lsdstimax", Some(styles.max_style_index as i32))?;
+        self.write_control_word("lsdstimax", Some(styles.max_style_index.cast_signed()))?;
         self.write_optional_bool("lsdlockeddef", styles.locked_default)?;
         self.write_optional_bool("lsdsemihiddendef", styles.semi_hidden_default)?;
         self.write_optional_bool("lsdunhideuseddef", styles.unhide_when_used_default)?;
@@ -1106,10 +1151,12 @@ impl<W: Write> RtfWriter<W> {
         }
         self.write_str("}")
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_data_store(
         &mut self,
-        data_store: Option<&crate::DocumentDataStore<'_>>,
+        data_store: Option<&DocumentDataStore<'_>>,
     ) -> io::Result<()> {
         let Some(data_store) = data_store else {
             return Ok(());
@@ -1121,7 +1168,10 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write inert RTF 1.9.1 mail-merge metadata without evaluating it.
-    pub fn write_mail_merge(&mut self, merge: Option<&crate::MailMerge<'_>>) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
+    pub fn write_mail_merge(&mut self, merge: Option<&MailMerge<'_>>) -> io::Result<()> {
         let Some(merge) = merge else {
             return Ok(());
         };
@@ -1140,13 +1190,13 @@ impl<W: Write> RtfWriter<W> {
         if let Some(object) = &merge.data_source_object {
             self.write_str("{\\*\\mmodso")?;
             if let Some(value) = object.active_record {
-                self.write_control_word("mmodsoactive", Some(value as i32))?;
+                self.write_control_word("mmodsoactive", Some(value.cast_signed()))?;
             }
             if let Some(value) = object.column_delimiter {
                 self.write_control_word("mmodsocoldelim", Some(value))?;
             }
             if let Some(value) = object.column_count {
-                self.write_control_word("mmodsocolumn", Some(value as i32))?;
+                self.write_control_word("mmodsocolumn", Some(value.cast_signed()))?;
             }
             self.write_optional_bool("mmodsodynaddr", object.dynamic_address)?;
             self.write_optional_bool("mmodsofhdr", object.first_row_header)?;
@@ -1200,10 +1250,12 @@ impl<W: Write> RtfWriter<W> {
         self.write_destination_text(value)?;
         self.write_str("}")
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_math_properties(
         &mut self,
-        properties: Option<&crate::DocumentMathProperties>,
+        properties: Option<&DocumentMathProperties>,
     ) -> io::Result<()> {
         let Some(properties) = properties else {
             return Ok(());
@@ -1237,7 +1289,7 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("mlMargin", Some(value))?;
         }
         if let Some(value) = properties.math_font {
-            self.write_control_word("mmathFont", Some(value as i32))?;
+            self.write_control_word("mmathFont", Some(value.cast_signed()))?;
         }
         if let Some(value) = properties.nary_limit_placement {
             self.write_control_word("mnaryLim", Some(value.rtf_value()))?;
@@ -1275,6 +1327,9 @@ impl<W: Write> RtfWriter<W> {
     }
 
     /// Write an RTF stylesheet destination.
+    ///
+    /// # Errors
+    /// Returns an error when writing to the underlying output fails.
     pub fn write_stylesheet(&mut self, stylesheet: &StyleSheet<'_>) -> io::Result<()> {
         if stylesheet.styles().is_empty() {
             return Ok(());
@@ -1294,7 +1349,7 @@ impl<W: Write> RtfWriter<W> {
 
     pub(in super::super) fn write_default_formatting_destinations(
         &mut self,
-        defaults: &crate::DocumentDefaultFormatting,
+        defaults: &DocumentDefaultFormatting,
     ) -> io::Result<()> {
         defaults
             .validate()
@@ -1302,7 +1357,7 @@ impl<W: Write> RtfWriter<W> {
         for kind in defaults.destination_order() {
             self.write_str("{\\*")?;
             match kind {
-                crate::DefaultFormattingDestination::Character => {
+                DefaultFormattingDestination::Character => {
                     let value = defaults.character().ok_or_else(|| {
                         io::Error::new(io::ErrorKind::InvalidInput, "missing defchp value")
                     })?;
@@ -1319,7 +1374,7 @@ impl<W: Write> RtfWriter<W> {
                         }
                     }
                 },
-                crate::DefaultFormattingDestination::Paragraph => {
+                DefaultFormattingDestination::Paragraph => {
                     let value = defaults.paragraph().ok_or_else(|| {
                         io::Error::new(io::ErrorKind::InvalidInput, "missing defpap value")
                     })?;

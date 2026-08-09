@@ -51,7 +51,10 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "snapshot constructor mirrors the persisted part fields"
+    )]
     pub(crate) fn from_parts(
         slide_index: usize,
         control_index: usize,
@@ -74,7 +77,7 @@ impl Snapshot {
                     .descriptor
                     .as_ref()
                     .and_then(|d| d.binary())
-                    .map_or(binary.bytes.len(), |b| b.byte_length())
+                    .map_or(binary.bytes.len(), super::super::model::Binary::byte_length)
             {
                 return Err(invalid(
                     "ActiveX binary metadata length does not match its part",
@@ -108,30 +111,35 @@ impl Snapshot {
 
     /// Zero-based presentation position of the owning slide.
     #[inline]
+    #[must_use]
     pub const fn slide_index(&self) -> usize {
         self.slide_index
     }
 
     /// Zero-based control position in the selected slide's semantic control list.
     #[inline]
+    #[must_use]
     pub const fn control_index(&self) -> usize {
         self.control_index
     }
 
     /// Absolute OPC part name of the owning slide.
     #[inline]
+    #[must_use]
     pub fn slide_part_name(&self) -> &PackURI {
         &self.slide_part_name
     }
 
     /// Typed inert control metadata captured by this snapshot.
     #[inline]
+    #[must_use]
     pub fn control(&self) -> &Control {
         &self.control
     }
 
     /// Exact owning slide XML bytes captured by this snapshot.
     #[inline]
+    #[must_use]
     pub fn source_xml(&self) -> &[u8] {
         self.source_xml.as_slice()
     }
@@ -142,20 +150,23 @@ impl Snapshot {
         self.descriptor_xml.as_deref().map(Vec::as_slice)
     }
 
-    /// Exact opaque ActiveX binary payload, when the descriptor has one.
+    /// Exact opaque `ActiveX` binary payload, when the descriptor has one.
     #[inline]
+    #[must_use]
     pub fn binary_bytes(&self) -> Option<&[u8]> {
         self.binary.as_ref().map(|value| value.bytes.as_slice())
     }
 
     /// Compact source revision used for optimistic stale-source checks.
     #[inline]
+    #[must_use]
     pub const fn revision(&self) -> Revision {
         self.revision
     }
 
     /// Start an isolated transaction over this snapshot.
     #[inline]
+    #[must_use]
     pub fn edit(&self) -> Transaction {
         Transaction {
             source: self.clone(),
@@ -187,17 +198,20 @@ pub struct Transaction {
 impl Transaction {
     /// Borrow the immutable source snapshot used by this edit.
     #[inline]
+    #[must_use]
     pub const fn source(&self) -> &Snapshot {
         &self.source
     }
 
     /// Borrow the currently staged typed control metadata.
     #[inline]
+    #[must_use]
     pub const fn control(&self) -> &Control {
         &self.control
     }
 
     /// Whether any staged metadata or payload operation changes the source.
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.control != self.source.control
             || self.binary.as_ref().map(|value| value.as_slice())
@@ -209,6 +223,10 @@ impl Transaction {
     }
 
     /// Replace or remove the owning slide control's display name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_name(&mut self, value: Option<String>) -> Result<()> {
         if let Some(value) = value.as_deref() {
             validate_text(value, "control name", true)?;
@@ -233,6 +251,10 @@ impl Transaction {
     }
 
     /// Replace the descriptor's required `ax:classid` value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_class_id(&mut self, value: impl Into<String>) -> Result<()> {
         let value = value.into();
         validate_text(&value, "ActiveX class ID", false)?;
@@ -241,6 +263,10 @@ impl Transaction {
     }
 
     /// Replace or remove the descriptor's optional `ax:license` value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_license(&mut self, value: Option<String>) -> Result<()> {
         if let Some(value) = value.as_deref() {
             validate_text(value, "ActiveX license", true)?;
@@ -252,12 +278,20 @@ impl Transaction {
     /// Set the descriptor persistence mode. `Unknown` removes a known
     /// persistence attribute and leaves the descriptor in its inert default
     /// state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
     pub fn set_persistence(&mut self, value: Persistence) -> Result<()> {
         self.descriptor_mut()?.persistence = value;
         Ok(())
     }
 
     /// Replace the opaque binary state without interpreting or activating it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace_binary(&mut self, bytes: impl Into<Vec<u8>>) -> Result<()> {
         let bytes = bytes.into();
         validate_binary(&bytes)?;
@@ -276,6 +310,10 @@ impl Transaction {
 
     /// Remove the descriptor's binary relationship. An unshared orphan part
     /// is collected during package publication; a shared part is retained.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn remove_binary(&mut self) -> Result<()> {
         if self.binary.is_none() {
             return Ok(());
@@ -286,6 +324,10 @@ impl Transaction {
     }
 
     /// Validate and consume this edit into a reversible package patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn commit(self) -> Result<Commit> {
         validate_control(&self.control)?;
         let relationship_id = self
@@ -302,20 +344,20 @@ impl Transaction {
             name: (self.control.name != self.source.control.name)
                 .then(|| self.control.name.clone()),
             show_as_icon: (self.control.show_as_icon != self.source.control.show_as_icon)
-                .then(|| self.control.show_as_icon),
+                .then_some(self.control.show_as_icon),
             image_width: (self.control.image_width != self.source.control.image_width)
-                .then(|| self.control.image_width),
+                .then_some(self.control.image_width),
             image_height: (self.control.image_height != self.source.control.image_height)
-                .then(|| self.control.image_height),
+                .then_some(self.control.image_height),
         };
-        let source_xml = if control_changes != ControlChanges::default() {
+        let source_xml = if control_changes == ControlChanges::default() {
+            Arc::clone(&self.source.source_xml)
+        } else {
             Arc::new(rewrite_control(
                 self.source.source_xml.as_slice(),
                 relationship_id,
                 &control_changes,
             )?)
-        } else {
-            Arc::clone(&self.source.source_xml)
         };
 
         let source_descriptor = self.source.control.descriptor.as_ref();
@@ -351,12 +393,11 @@ impl Transaction {
             .descriptor_relationships
             .as_ref()
             .map(|value| value.as_ref().clone());
-        if descriptor_changes.remove_binary_relationship {
-            if let Some(binary) = self.source.binary.as_ref() {
-                if let Some(relationships) = descriptor_relationships.as_mut() {
-                    relationships.retain(|value| value.id != binary.relationship_id);
-                }
-            }
+        if descriptor_changes.remove_binary_relationship
+            && let Some(binary) = self.source.binary.as_ref()
+            && let Some(relationships) = descriptor_relationships.as_mut()
+        {
+            relationships.retain(|value| value.id != binary.relationship_id);
         }
         let binary = match (&self.source.binary, &self.binary) {
             (Some(source), Some(bytes)) => {
@@ -364,7 +405,7 @@ impl Transaction {
                 value.bytes = Arc::clone(bytes);
                 Some(value)
             },
-            (Some(_), None) | (None, None) => None,
+            (Some(_) | None, None) => None,
             (None, Some(_)) => {
                 return Err(invalid(
                     "cannot create an ActiveX binary relationship in this transaction",
@@ -390,6 +431,7 @@ impl Transaction {
     }
 
     /// Discard staged edits and return the exact source snapshot.
+    #[must_use]
     pub fn rollback(self) -> Snapshot {
         self.source
     }
@@ -412,34 +454,39 @@ pub struct Commit {
 impl Commit {
     /// Borrow the validated detached target snapshot.
     #[inline]
+    #[must_use]
     pub const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrow the source-checked package patch.
     #[inline]
+    #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Whether the transaction changes any serialized graph bytes or edges.
     #[inline]
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         !self.patch.is_empty()
     }
 
     /// Consume this commit into its target snapshot and patch.
+    #[must_use]
     pub fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
 
     /// Consume this commit into its source-checked package patch.
+    #[must_use]
     pub fn into_patch(self) -> Patch {
         self.patch
     }
 }
 
-/// A reversible, source-checked replacement of one slide-owned ActiveX graph.
+/// A reversible, source-checked replacement of one slide-owned `ActiveX` graph.
 #[derive(Debug, Clone)]
 pub struct Patch {
     before: Snapshot,
@@ -449,12 +496,14 @@ pub struct Patch {
 impl Patch {
     /// Source snapshot required for forward application.
     #[inline]
+    #[must_use]
     pub const fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Target snapshot produced by forward application.
     #[inline]
+    #[must_use]
     pub const fn after(&self) -> &Snapshot {
         &self.after
     }
@@ -467,12 +516,14 @@ impl Patch {
 
     /// Public spelling for callers that inspect transaction changes.
     #[inline]
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         !self.is_empty()
     }
 
     /// Build the exact inverse patch.
     #[inline]
+    #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
@@ -481,11 +532,19 @@ impl Patch {
     }
 
     /// Publish this patch atomically to its owning OPC package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn apply(&self, package: &mut litchi_opc::OpcPackage) -> Result<Snapshot> {
         super::package::apply_patch(package, self)
     }
 
     /// Alias for undoing a committed patch against its exact target graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn undo(&self, package: &mut litchi_opc::OpcPackage) -> Result<Snapshot> {
         self.inverse().apply(package)
     }

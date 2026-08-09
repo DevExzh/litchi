@@ -3,7 +3,7 @@
 //! Generates an XLS file showcasing merged cells, hyperlinks, and auto-filter
 //! so you can open it in Microsoft Excel and verify correctness.
 //!
-//! Run with: cargo run --example xls_new_features_demo
+//! Run with: cargo run --example `xls_new_features_demo`
 //!
 //! The file is saved to `output/xls_new_features_demo.xls`.
 
@@ -260,7 +260,7 @@ fn round_trip_verify(path: &std::path::Path) -> Result<(), Box<dyn std::error::E
     println!("Sheet count: {}", wb.worksheet_count());
 
     for (idx, name) in wb.worksheet_names().iter().enumerate() {
-        println!("\n--- Sheet {}: \"{}\" ---", idx, name);
+        println!("\n--- Sheet {idx}: \"{name}\" ---");
 
         // Access the underlying Worksheet to inspect new features.
         // The WorkbookTrait gives us a dyn Worksheet, but we stored

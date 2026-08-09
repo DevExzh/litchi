@@ -10,6 +10,8 @@ mod lexer;
 mod model;
 mod scanner;
 
-pub use control_word::ControlWord;
-pub use lexer::Lexer;
-pub use model::{CharacterSet, Token};
+pub(crate) use control_word::ControlWord;
+pub(crate) use lexer::Lexer;
+#[cfg(test)]
+pub(crate) use model::CharacterSet;
+pub(crate) use model::Token;

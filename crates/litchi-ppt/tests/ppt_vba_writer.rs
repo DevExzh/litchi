@@ -1,3 +1,8 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 #![cfg(feature = "vba-inspection")]
 
 #[cfg(feature = "encryption")]
@@ -55,19 +60,19 @@ fn compressed_complete_project_round_trips_as_inert_source() {
     assert_eq!(outer.kind(), Kind::VbaProject);
     assert!(matches!(outer.compression(), Compression::Zlib));
 
-    let project = presentation.vba().unwrap().unwrap();
-    assert_eq!(project.name(), "PresentationTools");
-    assert_eq!(project.modules().len(), 2);
-    assert_eq!(project.modules()[0].name(), "Module1");
+    let read_project = presentation.vba().unwrap().unwrap();
+    assert_eq!(read_project.name(), "PresentationTools");
+    assert_eq!(read_project.modules().len(), 2);
+    assert_eq!(read_project.modules()[0].name(), "Module1");
     assert!(
-        project.modules()[0]
+        read_project.modules()[0]
             .source()
             .text()
             .contains("Public Sub RefreshSlides()")
     );
-    assert_eq!(project.modules()[1].name(), "ThisPresentation");
+    assert_eq!(read_project.modules()[1].name(), "ThisPresentation");
     assert!(
-        project.modules()[1]
+        read_project.modules()[1]
             .source()
             .text()
             .contains("Private Sub Presentation_Open()")
@@ -91,18 +96,18 @@ fn uncompressed_empty_project_round_trips_and_can_be_cleared() {
     assert!(storage.has_macros());
     assert!(!storage.is_compressed());
     assert_eq!(storage.declared_uncompressed_len(), None);
-    let project = presentation.vba().unwrap().unwrap();
-    assert_eq!(project.name(), "EmptyPresentation");
-    assert!(project.modules().is_empty());
+    let read_project = presentation.vba().unwrap().unwrap();
+    assert_eq!(read_project.name(), "EmptyPresentation");
+    assert!(read_project.modules().is_empty());
 
     writer.clear_vba();
     assert!(!writer.has_vba());
-    let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
-    let presentation = package.presentation().unwrap();
-    let storage = presentation.vba_project_storage().unwrap().unwrap();
-    assert!(!storage.has_macros());
-    assert!(!storage.has_persisted_storage());
-    assert!(presentation.vba().unwrap().is_none());
+    let mut cleared_package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
+    let cleared_presentation = cleared_package.presentation().unwrap();
+    let cleared_storage = cleared_presentation.vba_project_storage().unwrap().unwrap();
+    assert!(!cleared_storage.has_macros());
+    assert!(!cleared_storage.has_persisted_storage());
+    assert!(cleared_presentation.vba().unwrap().is_none());
 }
 
 #[test]
@@ -136,12 +141,12 @@ fn failed_replacement_is_atomic_and_outer_limits_are_enforced() {
         Err(VbaProjectError::PowerPoint(_))
     ));
 
-    let limits = VbaProjectLimits {
+    let stored_limits = VbaProjectLimits {
         max_stored_bytes: 0,
         ..VbaProjectLimits::default()
     };
     assert!(matches!(
-        presentation.vba_with(&limits),
+        presentation.vba_with(&stored_limits),
         Err(VbaProjectError::PowerPoint(_))
     ));
 }
@@ -164,10 +169,9 @@ fn project_remains_available_after_presentation_decryption() {
     let presentation = package
         .presentation_with_options(OpenOptions {
             password: Some("secret"),
-            ..OpenOptions::default()
         })
         .unwrap();
-    let project = presentation.vba().unwrap().unwrap();
-    assert_eq!(project.name(), "EncryptedPresentation");
-    assert_eq!(project.modules()[0].name(), "Module1");
+    let read_project = presentation.vba().unwrap().unwrap();
+    assert_eq!(read_project.name(), "EncryptedPresentation");
+    assert_eq!(read_project.modules()[0].name(), "Module1");
 }

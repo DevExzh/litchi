@@ -1,4 +1,4 @@
-//! Typed terminal structure of a legacy PowerPoint document container.
+//! Typed terminal structure of a legacy `PowerPoint` document container.
 
 mod codec;
 mod model;

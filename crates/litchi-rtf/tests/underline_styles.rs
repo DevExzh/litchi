@@ -1,14 +1,15 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 //! Round-trip tests for extended underline styles and `\ulcN` underline color.
 
 use litchi_rtf::{RtfDocument, RtfWriter};
-
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
-    let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
-    output
-}
 
 const STYLES: &[(&str, &str)] = &[
     (r"\ulhair", "Hairline"),
@@ -21,6 +22,14 @@ const STYLES: &[(&str, &str)] = &[
     (r"\ulhwave", "HeavyWave"),
     (r"\ululdbwave", "DoubleWave"),
 ];
+
+fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+    let mut output = Vec::new();
+    RtfWriter::new(&mut output)
+        .write_document(document)
+        .unwrap();
+    output
+}
 
 #[test]
 fn extended_underline_styles_round_trip() {

@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+    ControlWord, Cow, MAX_REVISION_AUTHOR_BYTES, Parser, RtfError, RtfResult, Token,
+    control_symbol_text, duplicate_mail_merge, nonnegative_mail_merge, set_mail_merge_text,
+};
 
 impl<'a> Parser<'a> {
     pub(super) fn parse_revision_table(&mut self) -> RtfResult<()> {
@@ -16,7 +19,7 @@ impl<'a> Parser<'a> {
                 Some(Token::OpenBrace) => {
                     self.push_direct_revision_authors(&mut direct_text)?;
                     let author = self.parse_revision_author_group()?;
-                    self.push_revision_author(author)?;
+                    self.push_revision_author(&author)?;
                     continue;
                 },
                 Some(Token::Control(ControlWord::Page(_))) => {
@@ -28,7 +31,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     self.push_direct_revision_authors(&mut direct_text)?;
                     if !direct_text.trim().is_empty() {
-                        self.push_revision_author(direct_text.trim().to_string())?;
+                        self.push_revision_author(direct_text.trim())?;
                     }
                     return Ok(());
                 },
@@ -44,7 +47,7 @@ impl<'a> Parser<'a> {
                 Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
                     direct_text.push_str(control_symbol_text(control).unwrap_or_default());
                 },
-                Some(Token::Control(_)) | Some(Token::Binary(_)) => {
+                Some(Token::Control(_) | Token::Binary(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF revision-author table contains a non-text control or binary data"
                             .to_string(),
@@ -78,12 +81,12 @@ impl<'a> Parser<'a> {
                     return Ok(());
                 },
                 Some(Token::Control(ControlWord::RevisionSaveId(value))) => {
-                    let value = u32::try_from(*value).map_err(|_| {
+                    let save_id = u32::try_from(*value).map_err(|_err| {
                         RtfError::MalformedDocument(
                             "RTF revision-save IDs must be positive signed integers".to_string(),
                         )
                     })?;
-                    if value == 0 {
+                    if save_id == 0 {
                         return Err(RtfError::MalformedDocument(
                             "RTF revision-save IDs must be positive signed integers".to_string(),
                         ));
@@ -93,20 +96,18 @@ impl<'a> Parser<'a> {
                             "RTF revision-save ID count exceeds the safety limit".to_string(),
                         ));
                     }
-                    if self.revision_save_ids.contains(&value) {
+                    if self.revision_save_ids.contains(&save_id) {
                         return Err(RtfError::MalformedDocument(
                             "RTF revision-save IDs must be unique".to_string(),
                         ));
                     }
-                    self.revision_save_ids.push(value);
+                    self.revision_save_ids.push(save_id);
                     self.pos += 1;
                 },
                 Some(Token::Text(text)) if self.decode_transport_text(text)?.trim().is_empty() => {
                     self.pos += 1;
                 },
-                Some(Token::OpenBrace | Token::Binary(_))
-                | Some(Token::Control(_))
-                | Some(Token::Text(_)) => {
+                Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_) | Token::Text(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF revision-save table contains text, nesting, binary data, or an unsupported control"
                             .to_string(),
@@ -118,6 +119,10 @@ impl<'a> Parser<'a> {
         Err(RtfError::UnexpectedEof)
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn parse_mail_merge_destination(&mut self) -> RtfResult<crate::MailMerge<'a>> {
         self.pos += 1; // ignorable-destination marker
         if !matches!(
@@ -248,7 +253,7 @@ impl<'a> Parser<'a> {
                 "RTF mail-merge nesting depth exceeds the safety limit".to_string(),
             ));
         }
-        self.expect_token(Token::OpenBrace)?;
+        self.expect_token(&Token::OpenBrace)?;
         if !matches!(
             self.tokens.get(self.pos),
             Some(Token::Control(ControlWord::IgnorableDestination))
@@ -303,6 +308,10 @@ impl<'a> Parser<'a> {
         }
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn parse_mail_merge_data_source_object(
         &mut self,
         depth: usize,
@@ -312,9 +321,9 @@ impl<'a> Parser<'a> {
                 "RTF mail-merge nesting depth exceeds the safety limit".to_string(),
             ));
         }
-        self.expect_token(Token::OpenBrace)?;
-        self.expect_token(Token::Control(ControlWord::IgnorableDestination))?;
-        self.expect_token(Token::Control(ControlWord::MailMergeDataSourceObject))?;
+        self.expect_token(&Token::OpenBrace)?;
+        self.expect_token(&Token::Control(ControlWord::IgnorableDestination))?;
+        self.expect_token(&Token::Control(ControlWord::MailMergeDataSourceObject))?;
         let mut object = crate::MailMergeDataSourceObject::default();
         let mut saw_dynamic_address = false;
         let mut saw_first_row_header = false;
@@ -489,6 +498,10 @@ impl<'a> Parser<'a> {
         }
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn parse_mail_merge_field_mapping(
         &mut self,
         depth: usize,
@@ -498,9 +511,9 @@ impl<'a> Parser<'a> {
                 "RTF mail-merge nesting depth exceeds the safety limit".to_string(),
             ));
         }
-        self.expect_token(Token::OpenBrace)?;
-        self.expect_token(Token::Control(ControlWord::IgnorableDestination))?;
-        self.expect_token(Token::Control(ControlWord::MailMergeFieldMapData))?;
+        self.expect_token(&Token::OpenBrace)?;
+        self.expect_token(&Token::Control(ControlWord::IgnorableDestination))?;
+        self.expect_token(&Token::Control(ControlWord::MailMergeFieldMapData))?;
         let mut column = None;
         let mut name = None;
         let mut mapped_name = None;
@@ -508,19 +521,19 @@ impl<'a> Parser<'a> {
             match self.tokens.get(self.pos) {
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
-                    let column = column.ok_or_else(|| {
+                    let column_value = column.ok_or_else(|| {
                         RtfError::MalformedDocument(
                             "RTF field mapping is missing mmodsofmcolumn".to_string(),
                         )
                     })?;
-                    let name = name.ok_or_else(|| {
+                    let name_value = name.ok_or_else(|| {
                         RtfError::MalformedDocument(
                             "RTF field mapping is missing mmodsoname".to_string(),
                         )
                     })?;
                     let mapping = crate::MailMergeFieldMapping {
-                        column,
-                        name,
+                        column: column_value,
+                        name: name_value,
                         mapped_name,
                     };
                     mapping.validate()?;
@@ -623,7 +636,7 @@ impl<'a> Parser<'a> {
                     }
                     self.pos += 1;
                 },
-                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Control(_)) => {
+                Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF datastore cannot contain controls, nesting, or binary data"
                             .to_string(),
@@ -639,6 +652,10 @@ impl<'a> Parser<'a> {
         }
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "remaining variants share the same fallback by design"
+    )]
     pub(super) fn parse_math_properties_destination(
         &mut self,
     ) -> RtfResult<crate::DocumentMathProperties> {
@@ -703,7 +720,7 @@ impl<'a> Parser<'a> {
                             "mdispDef"
                         ),
                         ControlWord::MathInterEquationSpacing(value) => {
-                            set_once!(inter_equation_spacing, value, "minterSp")
+                            set_once!(inter_equation_spacing, value, "minterSp");
                         },
                         ControlWord::MathIntegralLimitPlacement(value) => set_once!(
                             integral_limit_placement,
@@ -711,18 +728,18 @@ impl<'a> Parser<'a> {
                             "mintLim"
                         ),
                         ControlWord::MathIntraEquationSpacing(value) => {
-                            set_once!(intra_equation_spacing, value, "mintraSp")
+                            set_once!(intra_equation_spacing, value, "mintraSp");
                         },
                         ControlWord::MathLeftMargin(value) => {
-                            set_once!(left_margin, value, "mlMargin")
+                            set_once!(left_margin, value, "mlMargin");
                         },
                         ControlWord::MathFont(value) => {
-                            let value = u32::try_from(value).map_err(|_| {
+                            let font_index = u32::try_from(value).map_err(|_err| {
                                 RtfError::MalformedDocument(
                                     "RTF math font index cannot be negative".to_string(),
                                 )
                             })?;
-                            set_once!(math_font, value, "mmathFont");
+                            set_once!(math_font, font_index, "mmathFont");
                         },
                         ControlWord::MathNaryLimitPlacement(value) => set_once!(
                             nary_limit_placement,
@@ -730,13 +747,13 @@ impl<'a> Parser<'a> {
                             "mnaryLim"
                         ),
                         ControlWord::MathPostSpacing(value) => {
-                            set_once!(post_spacing, value, "mpostSp")
+                            set_once!(post_spacing, value, "mpostSp");
                         },
                         ControlWord::MathPreSpacing(value) => {
-                            set_once!(pre_spacing, value, "mpreSp")
+                            set_once!(pre_spacing, value, "mpreSp");
                         },
                         ControlWord::MathRightMargin(value) => {
-                            set_once!(right_margin, value, "mrMargin")
+                            set_once!(right_margin, value, "mrMargin");
                         },
                         ControlWord::MathSmallFractions(value) => set_once!(
                             small_fractions,
@@ -744,10 +761,10 @@ impl<'a> Parser<'a> {
                             "msmallFrac"
                         ),
                         ControlWord::MathWrapIndent(value) => {
-                            set_once!(wrap_indent, value, "mwrapIndent")
+                            set_once!(wrap_indent, value, "mwrapIndent");
                         },
                         ControlWord::MathWrapRight(value) => {
-                            set_once!(wrap_right, crate::MathFlag::from_rtf(value), "mwrapRight")
+                            set_once!(wrap_right, crate::MathFlag::from_rtf(value), "mwrapRight");
                         },
                         _ => {
                             return Err(RtfError::MalformedDocument(
@@ -758,7 +775,7 @@ impl<'a> Parser<'a> {
                     }
                     self.pos += 1;
                 },
-                Some(Token::OpenBrace | Token::Binary(_)) | Some(Token::Text(_)) => {
+                Some(Token::OpenBrace | Token::Binary(_) | Token::Text(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF math-properties destination contains active, nested, or binary data"
                             .to_string(),

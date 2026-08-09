@@ -112,7 +112,10 @@ enum ProcessStatus {
     Success,
     Failed(String),
     /// Used when certain features are disabled; currently not emitted but kept for future extensibility
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "kept for future extensibility; currently not emitted"
+    )]
     Skipped(String),
 }
 

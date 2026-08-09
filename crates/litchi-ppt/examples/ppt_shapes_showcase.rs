@@ -1,10 +1,15 @@
+#![allow(
+    clippy::print_stdout,
+    reason = "this command-line example intentionally prints its results"
+)]
+
 //! Comprehensive PPT shapes showcase
 //!
-//! This example demonstrates creating a PowerPoint presentation with various
-//! Escher shapes including rectangles, ellipses, lines, text boxes, arrows,
+//! This example demonstrates creating a `PowerPoint` presentation with various
+//! `Escher` shapes including rectangles, ellipses, lines, text boxes, arrows,
 //! stars, callouts, flowchart shapes, and more - all with proper styling.
 //!
-//! Run with: cargo run --example ppt_shapes_showcase
+//! Run with: `cargo run --example ppt_shapes_showcase`
 
 use litchi_ppt::writer::{
     FillStyle, LineStyleConfig, ShadowStyle, ShapeColor, ShapeStyle, ShapeType, Writer,
@@ -50,7 +55,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let output_path = "output/ppt_shapes_showcase.ppt";
     ppt.save(output_path)?;
 
-    println!("✓ Created: {}", output_path);
+    println!("✓ Created: {output_path}");
     println!("  10 slides with 80+ shapes");
     println!(
         "  Includes: basic shapes, arrows, stars, flowchart, gradients, shadows, transparency"

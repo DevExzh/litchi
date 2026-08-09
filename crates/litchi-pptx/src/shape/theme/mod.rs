@@ -1,7 +1,7 @@
-//! Layered PresentationML theme semantics.
+//! Layered `PresentationML` theme semantics.
 //!
-//! DrawingML color/font schemes and their XML codecs are owned by
-//! `litchi-drawingml`; this module retains only PresentationML package
+//! `DrawingML` color/font schemes and their XML codecs are owned by
+//! `litchi-drawingml`; this module retains only `PresentationML` package
 //! relationships and the format-specific summary projection.
 
 pub mod package;

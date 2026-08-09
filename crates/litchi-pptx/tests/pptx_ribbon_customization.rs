@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use litchi_ooxml_common::Error as CommonError;
 use litchi_ooxml_common::ribbon::{Family, Version, load, put, remove};
 use litchi_opc::OpcPackage;

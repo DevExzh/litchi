@@ -1,5 +1,10 @@
 //! PPT OLE2 package and stream assembly.
 
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "the stream-builder helpers stay ahead of the `Writer` save pipeline that consumes them"
+)]
+
 use super::super::escher::{UserShapeData, create_dg_container_with_charts, create_dgg_container};
 use super::super::master_drawing::build_master_ppdrawing;
 use super::super::notes::{NotesContainerBuilder, NotesPage};
@@ -15,7 +20,7 @@ use super::codec::{
     append_child_to_built_container, build_writer_sound_collection,
     convert_shape_to_escher_with_sound_mapping,
 };
-use super::model::{WriteError, Writer};
+use super::model::{WritableSlide, WriteError, Writer};
 #[cfg(feature = "encryption")]
 use crate::encryption::{encrypt_pictures_for_write, encrypt_powerpoint_document_for_write};
 use litchi_cfb::writer::OleWriter;
@@ -79,42 +84,7 @@ impl Writer {
     }
 }
 
-#[cfg(test)]
-mod font_plan_tests {
-    use super::*;
-
-    #[test]
-    fn default_catalog_preserves_the_historical_environment_bytes() {
-        let writer = Writer::new();
-        let plan = writer.font_publication_plan().unwrap();
-        assert_eq!(plan.environment, create_environment_minimal().unwrap());
-        assert!(plan.powerpoint10_records.is_empty());
-        assert!(!plan.save_with_fonts);
-    }
-
-    #[test]
-    fn built_in_master_style_font_zero_is_validated_before_destinations_change() {
-        let mut writer = Writer::new();
-        writer.fonts.base = Some(crate::FontCollection::new(crate::FontScope::Base));
-
-        let mut output = std::io::Cursor::new(Vec::new());
-        assert!(writer.write_to(&mut output).is_err());
-        assert!(output.get_ref().is_empty());
-
-        let path = std::env::temp_dir().join(format!(
-            "litchi-ppt-invalid-master-font-{}-{}.ppt",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        assert!(writer.save(&path).is_err());
-        assert!(!path.exists());
-    }
-}
-
-/// Build a minimal, valid Current User stream referencing the given UserEditAtom offset.
+/// Build a minimal, valid Current User stream referencing the given `UserEditAtom` offset.
 fn build_current_user_stream(offset_to_current_edit: u32, encrypted: bool) -> Vec<u8> {
     // Build per Apache POI CurrentUserAtom:
     // [0..3]   atomHeader = {0x00,0x00,0xF6,0x0F}
@@ -179,6 +149,10 @@ fn build_summary_information_stream() -> Vec<u8> {
     section.extend_from_slice(&0u16.to_le_bytes());
     section.extend_from_slice(&(1252i16).to_le_bytes());
     section.extend_from_slice(&0i16.to_le_bytes());
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the section built above holds only a few fixed-size fields"
+    )]
     let size = section.len() as u32;
     section[0..4].copy_from_slice(&size.to_le_bytes());
     s.extend_from_slice(&section);
@@ -202,10 +176,51 @@ fn build_document_summary_information_stream() -> Vec<u8> {
     let mut section = Vec::new();
     section.extend_from_slice(&0u32.to_le_bytes());
     section.extend_from_slice(&0u32.to_le_bytes());
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the section built above holds only a few fixed-size fields"
+    )]
     let size = section.len() as u32;
     section[0..4].copy_from_slice(&size.to_le_bytes());
     s.extend_from_slice(&section);
     s
+}
+
+/// Convert an in-memory element count or index to its bounded wire value.
+fn wire_index(value: usize) -> Result<u32, WriteError> {
+    u32::try_from(value).map_err(|_err| {
+        WriteError::InvalidData("presentation element count exceeds the PPT limit".to_string())
+    })
+}
+
+/// Current offset of the next top-level record in the PPT document stream.
+fn stream_offset(ppt_stream: &[u8]) -> Result<u32, WriteError> {
+    u32::try_from(ppt_stream.len())
+        .map_err(|_err| WriteError::InvalidData("PPT document stream exceeds 4 GiB".to_string()))
+}
+
+/// Build the slide's optional `SSSlideInfoAtom` (MS-PPT 2.6.6).
+///
+/// A transition owns this record when set; per-slide timing is emitted only
+/// when the slide has no transition. The hidden flag from the timing model is
+/// preserved in either case.
+fn build_slide_info_atom(slide: &WritableSlide) -> Result<Option<Vec<u8>>, WriteError> {
+    if let Some(ref transition) = slide.transition {
+        // write_transition always returns an 8-byte header plus a 16-byte payload
+        let mut record = crate::transition::writer::write_transition(transition);
+        if slide.timing.as_ref().is_some_and(|timing| timing.hidden) {
+            // fHidden is bit 2 of effectTransitionFlags (payload offset 10)
+            let flags = u16::from_le_bytes([record[18], record[19]]) | (1 << 2);
+            record[18..20].copy_from_slice(&flags.to_le_bytes());
+        }
+        Ok(Some(record))
+    } else if let Some(ref timing) = slide.timing {
+        Ok(Some(super::super::slide_timing::build_slide_timing(
+            timing,
+        )?))
+    } else {
+        Ok(None)
+    }
 }
 
 impl Writer {
@@ -221,10 +236,14 @@ impl Writer {
     ///
     /// # Implementation
     ///
-    /// This generates a complete PowerPoint 97-2003 binary file conforming to MS-PPT specification:
+    /// This generates a complete `PowerPoint` 97-2003 binary file conforming to MS-PPT specification:
     /// - PPT record structures - [MS-PPT] Section 2.3
     /// - Escher drawing containers - [MS-ODRAW] Section 2.2
-    /// - PersistPtr directory - [MS-PPT] Section 2.4.16
+    /// - `PersistPtr` directory - [MS-PPT] Section 2.4.16
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the underlying writer reports an error.
     pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), WriteError> {
         self.validate_encryption()?;
         self.validate_references()?;
@@ -249,10 +268,11 @@ impl Writer {
         let mut doc_container = RecordBuilder::new(0x0F, 0, record_type::DOCUMENT);
 
         // 2.1) DocumentAtom
+        let slide_count = wire_index(self.slides.len())?;
         let doc_atom = create_document_atom_with_font_embedding(
-            self.slide_width as u32,
-            self.slide_height as u32,
-            self.slides.len() as u32,
+            self.slide_width.cast_unsigned(),
+            self.slide_height.cast_unsigned(),
+            slide_count,
             0,
             0,
             font_plan.save_with_fonts,
@@ -268,18 +288,18 @@ impl Writer {
         let slide_shape_counts: Vec<u32> = self
             .slides
             .iter()
-            .map(|s| s.escher_shape_count()) // 2 for group+background, plus user shapes and tables
+            .map(WritableSlide::escher_shape_count) // 2 for group+background, plus user shapes and tables
             .collect();
         // Build DggContainer with BStore if pictures are present
-        let dgg = if !self.blip_store.is_empty() {
+        let dgg = if self.blip_store.is_empty() {
+            create_dgg_container(master_shapes, &slide_shape_counts)?
+        } else {
             let bstore = self.blip_store.store().map_err(WriteError::Io)?;
             super::super::escher::create_dgg_container_with_blips(
                 master_shapes,
                 &slide_shape_counts,
                 &bstore,
             )?
-        } else {
-            create_dgg_container(master_shapes, &slide_shape_counts)?
         };
         let pp_dgg = wrap_dgg_into_ppdrawing_group(&dgg)?;
         doc_container.write_child(&pp_dgg);
@@ -310,7 +330,7 @@ impl Writer {
         for (i, _slide) in self.slides.iter().enumerate() {
             let pid = persist_builder.allocate_id();
             slide_persist_ids.push(pid);
-            let slide_identifier = 256u32 + (i as u32);
+            let slide_identifier = wire_index(256 + i)?;
             slwt_entries.push((pid, slide_identifier));
         }
         if !slwt_entries.is_empty() {
@@ -331,7 +351,7 @@ impl Writer {
                 let notes_pid = persist_builder.allocate_id();
                 notes_persist_ids[i] = Some(notes_pid);
                 // Use SAME slideIdentifier as the slide (256 + i) for matching!
-                let slide_identifier = 256u32 + (i as u32);
+                let slide_identifier = wire_index(256 + i)?;
                 notes_slwt_entries.push((notes_pid, slide_identifier));
             }
         }
@@ -378,15 +398,15 @@ impl Writer {
         if let Some(value) = &header_footers.main_master {
             append_child_to_built_container(&mut master_container, value)?;
         }
-        let master_offset = ppt_stream.len() as u32;
+        let master_offset = stream_offset(&ppt_stream)?;
         persist_builder.set_offset(master_persist_id, master_offset);
         ppt_stream.extend_from_slice(&master_container);
 
         // 3.2) Slides
         for (i, slide) in self.slides.iter().enumerate() {
             // drawing_id for slides starts from 2 (1 is used by MainMaster)
-            let drawing_id = (i as u32) + 2;
-            let slide_identifier = 256u32 + (i as u32);
+            let drawing_id = wire_index(i + 2)?;
+            let slide_identifier = wire_index(256 + i)?;
 
             // Build Slide container with SlideAtom
             let mut slide_container = RecordBuilder::new(0x0F, 0, record_type::SLIDE);
@@ -453,10 +473,9 @@ impl Writer {
             color.write_data(&ColorScheme::POI_DEFAULT.to_bytes());
             slide_container.write_child(&color.build()?);
 
-            // SSSlideInfoAtom for per-slide timing (if set and no transition handles it)
-            if let Some(ref timing) = slide.timing {
-                let timing_record = super::super::slide_timing::build_slide_timing(timing)?;
-                slide_container.write_child(&timing_record);
+            // SSSlideInfoAtom (MS-PPT 2.6.6) for the transition and/or per-slide timing
+            if let Some(record) = build_slide_info_atom(slide)? {
+                slide_container.write_child(&record);
             }
 
             if let Some(value) = &header_footers.slides[i] {
@@ -480,7 +499,7 @@ impl Writer {
             slide_container.write_child(&prog_tags.build()?);
 
             // Compute this slide's offset in the stream: current top-level length
-            let slide_offset = ppt_stream.len() as u32;
+            let slide_offset = stream_offset(&ppt_stream)?;
 
             // Track persist pointer (allocate new persist id per slide)
             let persist_id = slide_persist_ids[i];
@@ -494,16 +513,16 @@ impl Writer {
         // 3.3) Notes containers for slides with notes
         for (i, slide) in self.slides.iter().enumerate() {
             if let Some(notes_pid) = notes_persist_ids[i] {
-                let notes_offset = ppt_stream.len() as u32;
+                let notes_offset = stream_offset(&ppt_stream)?;
                 persist_builder.set_offset(notes_pid, notes_offset);
 
                 // Per POI: NotesAtom.slideID = slideIdentifier (same as slide's identifier)
                 // This equals SlideAtom.notesID and Notes' SlidePersistAtom.slideIdentifier
-                let slide_identifier = 256u32 + (i as u32);
+                let slide_identifier = wire_index(256 + i)?;
                 let notes_page = if let Some(page) = &slide.notes_page {
-                    let mut page = page.clone();
-                    page.slide_id_ref = slide_identifier;
-                    page
+                    let mut notes = page.clone();
+                    notes.slide_id_ref = slide_identifier;
+                    notes
                 } else if let Some(text) = &slide.notes {
                     NotesPage::simple(slide_identifier, text)
                 } else {
@@ -511,7 +530,7 @@ impl Writer {
                 };
 
                 // Build notes container (drawing_id continues after slides)
-                let notes_drawing_id = (self.slides.len() as u32) + 2 + (i as u32);
+                let notes_drawing_id = wire_index(self.slides.len() + 2 + i)?;
                 let notes_builder = NotesContainerBuilder::new(notes_page, notes_drawing_id);
                 let notes_bytes = notes_builder.build().map_err(std::io::Error::other)?;
                 ppt_stream.extend_from_slice(&notes_bytes);
@@ -520,7 +539,7 @@ impl Writer {
 
         // 3.4) ExOleObjStg persisted storages for embedded chart objects
         for plan in &chart_plans {
-            let offset = u32::try_from(ppt_stream.len()).map_err(|_| {
+            let offset = u32::try_from(ppt_stream.len()).map_err(|_err| {
                 WriteError::InvalidData("PPT document stream exceeds 4 GiB".to_string())
             })?;
             persist_builder.set_offset(plan.persist_id, offset);
@@ -531,7 +550,7 @@ impl Writer {
         }
 
         if let (Some(persist_id), Some(storage)) = (vba_persist_id, &self.vba_project) {
-            let offset = u32::try_from(ppt_stream.len()).map_err(|_| {
+            let offset = u32::try_from(ppt_stream.len()).map_err(|_err| {
                 WriteError::InvalidData("PPT document stream exceeds 4 GiB".to_string())
             })?;
             persist_builder.set_offset(persist_id, offset);
@@ -541,46 +560,56 @@ impl Writer {
             ppt_stream.extend_from_slice(&record);
         }
 
-        let pictures_stream = if self.blip_store.is_empty() {
+        #[cfg_attr(
+            not(feature = "encryption"),
+            allow(
+                unused_mut,
+                reason = "the pictures stream is only rewritten when the encryption feature is enabled"
+            )
+        )]
+        let mut pictures_stream = if self.blip_store.is_empty() {
             None
         } else {
             Some(self.blip_store.delay().map_err(WriteError::Io)?)
         };
         #[cfg(feature = "encryption")]
-        let mut pictures_stream = pictures_stream;
-        #[cfg(feature = "encryption")]
         let encryption = self.prepare_encryption()?;
         #[cfg(feature = "encryption")]
-        let encryption_session_id = if let Some(encryption) = &encryption {
+        let encryption_session_id = if let Some(material) = &encryption {
             let persist_id = persist_builder.allocate_id();
-            let offset = u32::try_from(ppt_stream.len()).map_err(|_| {
+            let offset = u32::try_from(ppt_stream.len()).map_err(|_err| {
                 WriteError::InvalidData("PPT document stream exceeds 4 GiB".to_string())
             })?;
             persist_builder.set_offset(persist_id, offset);
-            ppt_stream.extend_from_slice(&encryption.session_record);
+            ppt_stream.extend_from_slice(&material.session_record);
             Some(persist_id)
         } else {
             None
         };
 
         // 4) PersistPtrIncrementalBlock (6002) then single UserEditAtom
-        let persist_dir_offset = ppt_stream.len() as u32;
+        let persist_dir_offset = stream_offset(&ppt_stream)?;
         let persist_dir_block = persist_builder.generate_record();
         ppt_stream.extend_from_slice(&persist_dir_block);
 
-        let user_edit = UserEditAtom::new_minimal(
+        #[cfg_attr(
+            not(feature = "encryption"),
+            allow(
+                unused_mut,
+                reason = "the binding is only mutated when the encryption feature sets a session"
+            )
+        )]
+        let mut user_edit = UserEditAtom::new_minimal(
             persist_dir_offset,
             doc_persist_id,
             persist_builder.persist_id_seed(),
-            self.slides.len() as u32,
+            slide_count,
         );
-        #[cfg(feature = "encryption")]
-        let mut user_edit = user_edit;
         #[cfg(feature = "encryption")]
         if let Some(session_id) = encryption_session_id {
             user_edit = user_edit.with_encryption_session(session_id);
         }
-        let user_edit_offset = ppt_stream.len() as u32;
+        let user_edit_offset = stream_offset(&ppt_stream)?;
         let user_edit_record = user_edit.generate_record();
         ppt_stream.extend_from_slice(&user_edit_record);
 
@@ -594,17 +623,17 @@ impl Writer {
         let doc_summary = build_document_summary_information_stream();
 
         #[cfg(feature = "encryption")]
-        if let (Some(encryption), Some(session_id)) = (&encryption, encryption_session_id) {
+        if let (Some(material), Some(session_id)) = (&encryption, encryption_session_id) {
             encrypt_powerpoint_document_for_write(
                 &mut ppt_stream,
                 persist_dir_offset as usize,
                 user_edit_offset as usize,
                 session_id,
-                &encryption.crypto,
+                &material.crypto,
             )
             .map_err(WriteError::InvalidData)?;
             if let Some(pictures) = &mut pictures_stream {
-                encrypt_pictures_for_write(pictures, &encryption.crypto)
+                encrypt_pictures_for_write(pictures, &material.crypto)
                     .map_err(WriteError::InvalidData)?;
             }
         }
@@ -622,8 +651,8 @@ impl Writer {
         ole_writer.create_stream(&["\u{0005}DocumentSummaryInformation"], &doc_summary)?;
 
         // Pictures stream (per POI: separate stream for BLIP data)
-        if let Some(pictures_stream) = &pictures_stream {
-            ole_writer.create_stream(&["Pictures"], pictures_stream)?;
+        if let Some(pictures) = &pictures_stream {
+            ole_writer.create_stream(&["Pictures"], pictures)?;
         }
 
         ole_writer.save(path)?;
@@ -640,6 +669,10 @@ impl Writer {
     /// # Returns
     ///
     /// * `Result<(), WriteError>` - Success or error
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the underlying writer reports an error.
     pub fn write_to<W: std::io::Write + std::io::Seek>(
         &mut self,
         writer: &mut W,
@@ -664,10 +697,11 @@ impl Writer {
 
         let mut doc_container = RecordBuilder::new(0x0F, 0, record_type::DOCUMENT);
 
+        let slide_count = wire_index(self.slides.len())?;
         let doc_atom = create_document_atom_with_font_embedding(
-            self.slide_width as u32,
-            self.slide_height as u32,
-            self.slides.len() as u32,
+            self.slide_width.cast_unsigned(),
+            self.slide_height.cast_unsigned(),
+            slide_count,
             0,
             0,
             font_plan.save_with_fonts,
@@ -679,18 +713,21 @@ impl Writer {
         // 2.3) PPDrawingGroup wrapping Dgg Escher
         // Calculate per-slide shape counts (group + background + user shapes)
         let master_shapes = 6u32;
-        let slide_shape_counts: Vec<u32> =
-            self.slides.iter().map(|s| s.escher_shape_count()).collect();
+        let slide_shape_counts: Vec<u32> = self
+            .slides
+            .iter()
+            .map(WritableSlide::escher_shape_count)
+            .collect();
         // Build DggContainer with BStore if pictures are present
-        let dgg = if !self.blip_store.is_empty() {
+        let dgg = if self.blip_store.is_empty() {
+            create_dgg_container(master_shapes, &slide_shape_counts)?
+        } else {
             let bstore = self.blip_store.store().map_err(WriteError::Io)?;
             super::super::escher::create_dgg_container_with_blips(
                 master_shapes,
                 &slide_shape_counts,
                 &bstore,
             )?
-        } else {
-            create_dgg_container(master_shapes, &slide_shape_counts)?
         };
         let pp_dgg = wrap_dgg_into_ppdrawing_group(&dgg)?;
         doc_container.write_child(&pp_dgg);
@@ -721,7 +758,7 @@ impl Writer {
         for (i, _slide) in self.slides.iter().enumerate() {
             let pid = persist_builder.allocate_id();
             slide_persist_ids.push(pid);
-            let slide_identifier = 256u32 + (i as u32);
+            let slide_identifier = wire_index(256 + i)?;
             slwt_entries.push((pid, slide_identifier));
         }
         if !slwt_entries.is_empty() {
@@ -766,13 +803,13 @@ impl Writer {
         if let Some(value) = &header_footers.main_master {
             append_child_to_built_container(&mut master_container, value)?;
         }
-        let master_offset = ppt_stream.len() as u32;
+        let master_offset = stream_offset(&ppt_stream)?;
         persist_builder.set_offset(master_persist_id, master_offset);
         ppt_stream.extend_from_slice(&master_container);
 
         // Slides
         for (i, slide) in self.slides.iter().enumerate() {
-            let drawing_id = (i as u32) + 2; // 1 reserved for master
+            let drawing_id = wire_index(i + 2)?; // 1 reserved for master
 
             let mut slide_container = RecordBuilder::new(0x0F, 0, record_type::SLIDE);
             // SlideAtom (MS-PPT 2.4.7)
@@ -828,10 +865,9 @@ impl Writer {
             color.write_data(&ColorScheme::POI_DEFAULT.to_bytes());
             slide_container.write_child(&color.build()?);
 
-            // SSSlideInfoAtom for per-slide timing (if set)
-            if let Some(ref timing) = slide.timing {
-                let timing_record = super::super::slide_timing::build_slide_timing(timing)?;
-                slide_container.write_child(&timing_record);
+            // SSSlideInfoAtom (MS-PPT 2.6.6) for the transition and/or per-slide timing
+            if let Some(record) = build_slide_info_atom(slide)? {
+                slide_container.write_child(&record);
             }
 
             if let Some(value) = &header_footers.slides[i] {
@@ -854,7 +890,7 @@ impl Writer {
             prog_tags.write_child(&prog_bin.build()?);
             slide_container.write_child(&prog_tags.build()?);
 
-            let slide_offset = ppt_stream.len() as u32;
+            let slide_offset = stream_offset(&ppt_stream)?;
             let persist_id = slide_persist_ids[i];
             persist_builder.set_offset(persist_id, slide_offset);
 
@@ -867,7 +903,7 @@ impl Writer {
 
         // 3.4) ExOleObjStg persisted storages for embedded chart objects
         for plan in &chart_plans {
-            let offset = u32::try_from(ppt_stream.len()).map_err(|_| {
+            let offset = u32::try_from(ppt_stream.len()).map_err(|_err| {
                 WriteError::InvalidData("PPT document stream exceeds 4 GiB".to_string())
             })?;
             persist_builder.set_offset(plan.persist_id, offset);
@@ -878,7 +914,7 @@ impl Writer {
         }
 
         if let (Some(persist_id), Some(storage)) = (vba_persist_id, &self.vba_project) {
-            let offset = u32::try_from(ppt_stream.len()).map_err(|_| {
+            let offset = u32::try_from(ppt_stream.len()).map_err(|_err| {
                 WriteError::InvalidData("PPT document stream exceeds 4 GiB".to_string())
             })?;
             persist_builder.set_offset(persist_id, offset);
@@ -888,46 +924,56 @@ impl Writer {
             ppt_stream.extend_from_slice(&record);
         }
 
-        let pictures_stream = if self.blip_store.is_empty() {
+        #[cfg_attr(
+            not(feature = "encryption"),
+            allow(
+                unused_mut,
+                reason = "the pictures stream is only rewritten when the encryption feature is enabled"
+            )
+        )]
+        let mut pictures_stream = if self.blip_store.is_empty() {
             None
         } else {
             Some(self.blip_store.delay().map_err(WriteError::Io)?)
         };
         #[cfg(feature = "encryption")]
-        let mut pictures_stream = pictures_stream;
-        #[cfg(feature = "encryption")]
         let encryption = self.prepare_encryption()?;
         #[cfg(feature = "encryption")]
-        let encryption_session_id = if let Some(encryption) = &encryption {
+        let encryption_session_id = if let Some(material) = &encryption {
             let persist_id = persist_builder.allocate_id();
-            let offset = u32::try_from(ppt_stream.len()).map_err(|_| {
+            let offset = u32::try_from(ppt_stream.len()).map_err(|_err| {
                 WriteError::InvalidData("PPT document stream exceeds 4 GiB".to_string())
             })?;
             persist_builder.set_offset(persist_id, offset);
-            ppt_stream.extend_from_slice(&encryption.session_record);
+            ppt_stream.extend_from_slice(&material.session_record);
             Some(persist_id)
         } else {
             None
         };
 
         // PersistPtrHolder and UserEditAtom
-        let persist_dir_offset = ppt_stream.len() as u32;
+        let persist_dir_offset = stream_offset(&ppt_stream)?;
         let persist_dir_block = persist_builder.generate_record();
         ppt_stream.extend_from_slice(&persist_dir_block);
 
-        let user_edit = UserEditAtom::new_minimal(
+        #[cfg_attr(
+            not(feature = "encryption"),
+            allow(
+                unused_mut,
+                reason = "the binding is only mutated when the encryption feature sets a session"
+            )
+        )]
+        let mut user_edit = UserEditAtom::new_minimal(
             persist_dir_offset,
             doc_persist_id,
             persist_builder.persist_id_seed(),
-            self.slides.len() as u32,
+            slide_count,
         );
-        #[cfg(feature = "encryption")]
-        let mut user_edit = user_edit;
         #[cfg(feature = "encryption")]
         if let Some(session_id) = encryption_session_id {
             user_edit = user_edit.with_encryption_session(session_id);
         }
-        let user_edit_offset = ppt_stream.len() as u32;
+        let user_edit_offset = stream_offset(&ppt_stream)?;
         let user_edit_record = user_edit.generate_record();
         ppt_stream.extend_from_slice(&user_edit_record);
 
@@ -940,17 +986,17 @@ impl Writer {
         let doc_summary = build_document_summary_information_stream();
 
         #[cfg(feature = "encryption")]
-        if let (Some(encryption), Some(session_id)) = (&encryption, encryption_session_id) {
+        if let (Some(material), Some(session_id)) = (&encryption, encryption_session_id) {
             encrypt_powerpoint_document_for_write(
                 &mut ppt_stream,
                 persist_dir_offset as usize,
                 user_edit_offset as usize,
                 session_id,
-                &encryption.crypto,
+                &material.crypto,
             )
             .map_err(WriteError::InvalidData)?;
             if let Some(pictures) = &mut pictures_stream {
-                encrypt_pictures_for_write(pictures, &encryption.crypto)
+                encrypt_pictures_for_write(pictures, &material.crypto)
                     .map_err(WriteError::InvalidData)?;
             }
         }
@@ -966,8 +1012,8 @@ impl Writer {
         ole_writer.create_stream(&["\u{0005}DocumentSummaryInformation"], &doc_summary)?;
 
         // Pictures stream (per POI: separate stream for BLIP data)
-        if let Some(pictures_stream) = &pictures_stream {
-            ole_writer.create_stream(&["Pictures"], pictures_stream)?;
+        if let Some(pictures) = &pictures_stream {
+            ole_writer.create_stream(&["Pictures"], pictures)?;
         }
 
         ole_writer.write_to(writer)?;
@@ -987,4 +1033,44 @@ impl Writer {
     // - Managing master slides and layouts
     //
     // For production use, the PPTX writer is fully implemented and recommended.
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+mod font_plan_tests {
+    use super::*;
+
+    #[test]
+    fn default_catalog_preserves_the_historical_environment_bytes() {
+        let writer = Writer::new();
+        let plan = writer.font_publication_plan().unwrap();
+        assert_eq!(plan.environment, create_environment_minimal().unwrap());
+        assert!(plan.powerpoint10_records.is_empty());
+        assert!(!plan.save_with_fonts);
+    }
+
+    #[test]
+    fn built_in_master_style_font_zero_is_validated_before_destinations_change() {
+        let mut writer = Writer::new();
+        writer.fonts.base = Some(crate::FontCollection::new(crate::FontScope::Base));
+
+        let mut output = std::io::Cursor::new(Vec::new());
+        assert!(writer.write_to(&mut output).is_err());
+        assert!(output.get_ref().is_empty());
+
+        let path = std::env::temp_dir().join(format!(
+            "litchi-ppt-invalid-master-font-{}-{}.ppt",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        assert!(writer.save(&path).is_err());
+        assert!(!path.exists());
+    }
 }

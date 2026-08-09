@@ -105,7 +105,13 @@ impl ElementBuffer {
 
         // Group lines into continuous paths
         let mut current_path: Vec<(f64, f64, f64, f64)> = Vec::new();
-        let stroke = self.current_stroke.as_ref().unwrap().clone();
+        // A pending line is normally installed together with its stroke. Keep
+        // this branch total nevertheless: conversion must not panic if an
+        // earlier malformed record leaves the optimization buffer incomplete.
+        let Some(stroke) = self.current_stroke.clone() else {
+            self.pending_lines.clear();
+            return;
+        };
 
         for &line in &self.pending_lines {
             let (x1, y1, _x2, _y2) = line;
@@ -113,9 +119,8 @@ impl ElementBuffer {
             if current_path.is_empty() {
                 // Start new path
                 current_path.push(line);
-            } else {
+            } else if let Some(&(_, _, prev_x2, prev_y2)) = current_path.last() {
                 // Check if this line connects to the previous one
-                let (_, _, prev_x2, prev_y2) = current_path.last().unwrap();
                 let connects = (x1 - prev_x2).abs() < 0.1 && (y1 - prev_y2).abs() < 0.1;
 
                 if connects {
@@ -127,6 +132,10 @@ impl ElementBuffer {
                     current_path.clear();
                     current_path.push(line);
                 }
+            } else {
+                // `current_path` is populated above, but retain a safe path
+                // for future changes to the grouping logic.
+                current_path.push(line);
             }
         }
 
@@ -224,6 +233,7 @@ impl Default for ElementBuffer {
 
 #[cfg(test)]
 mod tests {
+    use super::ElementBuffer;
     use crate::svg_utils::fmt_num;
 
     #[test]
@@ -233,5 +243,26 @@ mod tests {
         assert_eq!(fmt_num(10.5), "10.5");
         assert_eq!(fmt_num(10.50), "10.5");
         assert_eq!(fmt_num(10.123), "10.12");
+    }
+
+    #[test]
+    fn malformed_line_is_not_buffered() {
+        assert!(
+            ElementBuffer::parse_line(
+                r#"<line x1="1" y1="2" x2="not-a-number" y2="4" stroke="black"/>"#
+            )
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn incomplete_pending_state_is_discarded_without_panicking() {
+        let mut buffer = ElementBuffer::new();
+        buffer.pending_lines.push((1.0, 2.0, 3.0, 4.0));
+
+        buffer.flush();
+
+        assert!(buffer.pending_lines.is_empty());
+        assert!(buffer.elements.is_empty());
     }
 }

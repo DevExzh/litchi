@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 //! Time-node containers, properties, conditions, modifiers, and extensions.
 use super::super::*;
 use super::support::*;
@@ -87,11 +93,11 @@ fn round_trips_exact_time_node_atoms_and_envelopes() {
         children: vec![behavior_child, media_child],
         ..ExtendedTimeNode::default()
     };
-    let bytes = write_extended_time_node(&node).unwrap();
-    let (record, consumed) = Record::parse(&bytes, 0).unwrap();
-    assert_eq!(consumed, bytes.len());
+    let node_bytes = write_extended_time_node(&node).unwrap();
+    let (node_record, node_consumed) = Record::parse(&node_bytes, 0).unwrap();
+    assert_eq!(node_consumed, node_bytes.len());
     assert_eq!(
-        record
+        node_record
             .children
             .iter()
             .map(|child| child.record_type)
@@ -112,7 +118,7 @@ fn round_trips_exact_time_node_atoms_and_envelopes() {
             RecordType::ExtTimeNode,
         ]
     );
-    assert_eq!(parse_extended_time_node(&record).unwrap(), node);
+    assert_eq!(parse_extended_time_node(&node_record).unwrap(), node);
 }
 
 #[test]
@@ -196,7 +202,7 @@ fn rejects_invalid_extended_time_node_structure() {
     };
     let behavior_bytes = write_time_set_behavior(set).unwrap();
     record.data.extend(&behavior_bytes);
-    record.data_length += behavior_bytes.len() as u32;
+    record.data_length += u32::try_from(behavior_bytes.len()).unwrap();
     record.children.push(behavior_record);
     assert!(parse_extended_time_node(&record).is_err());
 
@@ -213,10 +219,10 @@ fn rejects_invalid_extended_time_node_structure() {
         begin_conditions: vec![simple_condition(TimeConditionType::Begin)],
         ..ExtendedTimeNode::default()
     };
-    let bytes = write_extended_time_node(&ordered).unwrap();
-    let (mut record, _) = Record::parse(&bytes, 0).unwrap();
-    record.children.swap(1, 2);
-    assert!(parse_extended_time_node(&record).is_err());
+    let ordered_bytes = write_extended_time_node(&ordered).unwrap();
+    let (mut ordered_record, _) = Record::parse(&ordered_bytes, 0).unwrap();
+    ordered_record.children.swap(1, 2);
+    assert!(parse_extended_time_node(&ordered_record).is_err());
 }
 
 #[test]
@@ -263,9 +269,9 @@ fn round_trips_and_validates_subordinate_effects() {
     invalid.begin_conditions[0].condition_type = TimeConditionType::Next;
     assert!(write_time_sub_effect(&invalid).is_err());
 
-    let mut record = record;
-    record.children.swap(2, 3);
-    assert!(parse_time_sub_effect(&record).is_err());
+    let mut swapped_record = record;
+    swapped_record.children.swap(2, 3);
+    assert!(parse_time_sub_effect(&swapped_record).is_err());
 }
 
 #[test]
@@ -366,11 +372,12 @@ fn round_trips_all_time_node_property_variants() {
             TimeNodeProperty::MediaMute(false),
         ],
     };
-    let bytes =
+    let subeffect_bytes =
         write_time_node_property_list(&subeffect, TimePropertyListContext::SubEffect).unwrap();
-    let (record, _) = Record::parse(&bytes, 0).unwrap();
+    let (subeffect_record, _) = Record::parse(&subeffect_bytes, 0).unwrap();
     assert_eq!(
-        parse_time_node_property_list(&record, TimePropertyListContext::SubEffect).unwrap(),
+        parse_time_node_property_list(&subeffect_record, TimePropertyListContext::SubEffect)
+            .unwrap(),
         subeffect
     );
 }
@@ -442,9 +449,10 @@ fn validates_effect_ids_and_category_specific_directions() {
             ],
         },
     ];
-    for invalid in invalid {
+    for invalid_list in invalid {
         assert!(
-            write_time_node_property_list(&invalid, TimePropertyListContext::TimeNode).is_err()
+            write_time_node_property_list(&invalid_list, TimePropertyListContext::TimeNode)
+                .is_err()
         );
     }
 
@@ -597,10 +605,10 @@ fn rejects_malformed_time_conditions_and_modifiers() {
     let (record, _) = Record::parse(&bytes, 0).unwrap();
     assert!(parse_time_condition_atom(&record).is_err());
 
-    let mut bytes = write_time_modifier(&TimeModifier::Speed(100));
-    bytes[8..12].copy_from_slice(&6u32.to_le_bytes());
-    let (record, _) = Record::parse(&bytes, 0).unwrap();
-    assert!(parse_time_modifier(&record).is_err());
+    let mut modifier_bytes = write_time_modifier(&TimeModifier::Speed(100));
+    modifier_bytes[8..12].copy_from_slice(&6u32.to_le_bytes());
+    let (modifier_record, _) = Record::parse(&modifier_bytes, 0).unwrap();
+    assert!(parse_time_modifier(&modifier_record).is_err());
 }
 
 #[test]
@@ -650,9 +658,9 @@ fn parses_slide_animation_extensions_and_rejects_duplicates_or_truncation() {
     duplicate.extend(build_bytes);
     assert!(parse_slide_animation_extension(&duplicate).is_err());
     for atom in [&flags_bytes, &time_bytes, &hash_bytes] {
-        let mut duplicate = data.clone();
-        duplicate.extend(atom);
-        assert!(parse_slide_animation_extension(&duplicate).is_err());
+        let mut duplicate_atom = data.clone();
+        duplicate_atom.extend(atom);
+        assert!(parse_slide_animation_extension(&duplicate_atom).is_err());
     }
 
     for malformed in [

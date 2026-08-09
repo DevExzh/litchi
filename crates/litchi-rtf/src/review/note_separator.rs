@@ -35,6 +35,9 @@ pub struct NoteSeparator<'a> {
 }
 
 impl<'a> NoteSeparator<'a> {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if self.elements.len() > MAX_NOTE_SEPARATOR_ELEMENTS {
             return Err(RtfError::MalformedDocument(
@@ -47,7 +50,11 @@ impl<'a> NoteSeparator<'a> {
             .try_fold(0usize, |total, element| {
                 total.checked_add(match element {
                     NoteSeparatorElement::Text(text) => text.len(),
-                    _ => 0,
+                    NoteSeparatorElement::SeparatorMark
+                    | NoteSeparatorElement::ContinuationSeparatorMark
+                    | NoteSeparatorElement::ParagraphBreak
+                    | NoteSeparatorElement::LineBreak
+                    | NoteSeparatorElement::Drawing(_) => 0,
                 })
             })
             .ok_or_else(|| {
@@ -70,13 +77,14 @@ impl<'a> NoteSeparator<'a> {
         Ok(())
     }
 
+    #[must_use]
     pub fn text(&self) -> String {
         let mut text = String::new();
         for element in &self.elements {
             match element {
                 NoteSeparatorElement::Text(value) => text.push_str(value),
                 NoteSeparatorElement::ParagraphBreak | NoteSeparatorElement::LineBreak => {
-                    text.push('\n')
+                    text.push('\n');
                 },
                 NoteSeparatorElement::SeparatorMark
                 | NoteSeparatorElement::ContinuationSeparatorMark
@@ -86,16 +94,23 @@ impl<'a> NoteSeparator<'a> {
         text
     }
 
+    #[must_use]
     pub fn drawing_order(&self) -> Vec<crate::StoryDrawing> {
         self.elements
             .iter()
             .filter_map(|element| match element {
                 NoteSeparatorElement::Drawing(drawing) => Some(*drawing),
-                _ => None,
+                NoteSeparatorElement::Text(_)
+                | NoteSeparatorElement::SeparatorMark
+                | NoteSeparatorElement::ContinuationSeparatorMark
+                | NoteSeparatorElement::ParagraphBreak
+                | NoteSeparatorElement::LineBreak => None,
             })
             .collect()
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_shape(&mut self, shape: crate::Shape<'a>) -> RtfResult<()> {
         self.elements
             .push(NoteSeparatorElement::Drawing(crate::StoryDrawing::Shape(
@@ -109,7 +124,9 @@ impl<'a> NoteSeparator<'a> {
         }
         Ok(())
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'a>) -> RtfResult<()> {
         self.elements.push(NoteSeparatorElement::Drawing(
             crate::StoryDrawing::ShapeGroup(self.shape_groups.len()),
@@ -164,18 +181,23 @@ pub struct NoteSeparatorTable<'a> {
 }
 
 impl<'a> NoteSeparatorTable<'a> {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use]
     pub fn entries(&self) -> &[NoteSeparator<'a>] {
         &self.entries
     }
 
+    #[must_use]
     pub fn get(&self, kind: NoteSeparatorKind) -> Option<&NoteSeparator<'a>> {
         self.entries.iter().find(|entry| entry.kind == kind)
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn add(&mut self, separator: NoteSeparator<'a>) -> RtfResult<()> {
         separator.validate()?;
         if self.entries.len() >= 6
@@ -191,7 +213,9 @@ impl<'a> NoteSeparatorTable<'a> {
         self.entries.push(separator);
         Ok(())
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         let mut previous = None;
         for entry in &self.entries {

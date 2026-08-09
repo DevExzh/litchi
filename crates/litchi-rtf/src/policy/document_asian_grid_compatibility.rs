@@ -1,3 +1,7 @@
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent RTF feature flags stay flat for direct access"
+)]
 /// Passive Asian grid and line-breaking compatibility requests.
 ///
 /// These flags are retained for round trips only. This crate does not apply
@@ -18,6 +22,7 @@ pub struct DocumentAsianGridCompatibility {
 
 impl DocumentAsianGridCompatibility {
     /// Return whether every Asian grid compatibility request was omitted.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         !self.apply_thai_line_breaking_rules
             && !self.snap_text_to_grid_inside_table

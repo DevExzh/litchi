@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{CharacterBaseline, CharacterExpansion, RtfDocument, RtfWriter};
 
 fn block<'a>(document: &'a RtfDocument<'a>, needle: &str) -> &'a litchi_rtf::StyleBlock<'a> {
@@ -10,7 +19,7 @@ fn block<'a>(document: &'a RtfDocument<'a>, needle: &str) -> &'a litchi_rtf::Sty
 
 #[test]
 fn parses_inherits_resets_and_keeps_destinations_inert() {
-    let source = r#"{\rtf1\ansi\super\expnd4\charscalex80\kerning16 Outer{\dn3\expndtw20 Inner}{Tail}\nosupersub Normal{\up2 Raised}{\plain Plain}{\*\unknown\up999999\expndtw999999 ignored}Visible}"#;
+    let source = r"{\rtf1\ansi\super\expnd4\charscalex80\kerning16 Outer{\dn3\expndtw20 Inner}{Tail}\nosupersub Normal{\up2 Raised}{\plain Plain}{\*\unknown\up999999\expndtw999999 ignored}Visible}";
     let document = RtfDocument::parse(source).unwrap();
     let outer = block(&document, "Outer");
     assert_eq!(
@@ -69,7 +78,7 @@ fn parses_inherits_resets_and_keeps_destinations_inert() {
     );
     assert_eq!(
         block(&document, "Plain").formatting.character_positioning,
-        Default::default()
+        litchi_rtf::CharacterPositioning::default()
     );
     assert_eq!(
         block(&document, "Visible")
@@ -83,7 +92,7 @@ fn parses_inherits_resets_and_keeps_destinations_inert() {
 #[test]
 fn writer_is_deterministic_and_preserves_units() {
     let document =
-        RtfDocument::parse(r#"{\rtf1 A{\up2\expndtw-15\charscalex75\kerning8 B}{\sub\expnd3 C}}"#)
+        RtfDocument::parse(r"{\rtf1 A{\up2\expndtw-15\charscalex75\kerning8 B}{\sub\expnd3 C}}")
             .unwrap();
     let mut first = Vec::new();
     RtfWriter::new(&mut first)
@@ -124,15 +133,15 @@ fn parses_libreoffice_superscript_fixture() {
 #[test]
 fn rejects_out_of_range_parameters() {
     for source in [
-        r#"{\rtf1\up-1 X}"#,
-        r#"{\rtf1\up31681 X}"#,
-        r#"{\rtf1\dn-1 X}"#,
-        r#"{\rtf1\expnd31681 X}"#,
-        r#"{\rtf1\expndtw-31681 X}"#,
-        r#"{\rtf1\charscalex0 X}"#,
-        r#"{\rtf1\charscalex601 X}"#,
-        r#"{\rtf1\kerning-1 X}"#,
-        r#"{\rtf1\kerning32768 X}"#,
+        r"{\rtf1\up-1 X}",
+        r"{\rtf1\up31681 X}",
+        r"{\rtf1\dn-1 X}",
+        r"{\rtf1\expnd31681 X}",
+        r"{\rtf1\expndtw-31681 X}",
+        r"{\rtf1\charscalex0 X}",
+        r"{\rtf1\charscalex601 X}",
+        r"{\rtf1\kerning-1 X}",
+        r"{\rtf1\kerning32768 X}",
     ] {
         assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
     }

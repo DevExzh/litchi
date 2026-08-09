@@ -1,6 +1,16 @@
-//! Geography and map data validation concerns for the ChartEx graph.
+//! Geography and map data validation concerns for the `ChartEx` graph.
 
-use super::*;
+use super::{
+    CX, GeoAddress, GeoCache, GeoCacheEntry, GeoChildEntitiesQuery, GeoChildEntitiesQueryResult,
+    GeoClear, GeoData, GeoDataEntityQuery, GeoDataEntityQueryResult, GeoDataPointQuery,
+    GeoDataPointToEntityQuery, GeoDataPointToEntityQueryResult, GeoEntity, GeoEntityType,
+    GeoHierarchyEntity, GeoLocation, GeoLocationQuery, GeoLocationQueryResult, GeoMappingLevel,
+    GeoParentEntitiesQueryResult, GeoPolygon, GeoProjection, Geography, MAX_ATTRIBUTION_LEN,
+    MAX_CULTURE_NAME_LEN, MAX_GEO_BINARY_BYTES, MAX_GEO_CACHE_ENTRIES, MAX_GEO_POLYGON_DATA_LEN,
+    MAX_GEO_RESULTS, MAX_GEO_STRING_LEN, MiniNode, Result, bounded_required, invalid,
+    invalid_error, limit, optional, reject_unknown, require_empty_content, required,
+    valid_xml_double,
+};
 use std::collections::HashSet;
 
 pub(super) fn parse_geography(node: &MiniNode) -> Result<Geography> {
@@ -120,35 +130,35 @@ pub(super) fn parse_geo_clear(node: &MiniNode) -> Result<GeoClear> {
                     child,
                     "geoLocationQueryResult",
                     parse_geo_location_query_result,
-                )?)
+                )?);
             },
             "geoDataEntityQueryResults" => {
                 result.data_entity_query_results = Some(parse_geo_collection(
                     child,
                     "geoDataEntityQueryResult",
                     parse_geo_data_entity_query_result,
-                )?)
+                )?);
             },
             "geoDataPointToEntityQueryResults" => {
                 result.data_point_to_entity_query_results = Some(parse_geo_collection(
                     child,
                     "geoDataPointToEntityQueryResult",
                     parse_geo_data_point_to_entity_query_result,
-                )?)
+                )?);
             },
             "geoChildEntitiesQueryResults" => {
                 result.child_entities_query_results = Some(parse_geo_collection(
                     child,
                     "geoChildEntitiesQueryResult",
                     parse_geo_child_entities_query_result,
-                )?)
+                )?);
             },
             "geoParentEntitiesQueryResults" => {
                 result.parent_entities_query_results = Some(parse_geo_collection(
                     child,
                     "geoParentEntitiesQueryResult",
                     parse_geo_parent_entities_query_result,
-                )?)
+                )?);
             },
             _ => unreachable!(),
         }

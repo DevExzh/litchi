@@ -82,13 +82,13 @@ pub(super) fn locate(bytes: &[u8], limits: SlideLimits) -> Result<Parts> {
         },
     )?;
 
-    let drawing =
+    let drawing_range =
         drawing.ok_or_else(|| corrupted("SlideContainer is missing its PPDrawing sibling"))?;
-    let build_list = build_list
+    let build_list_range = build_list
         .ok_or_else(|| invalid("SlideContainer has no supported ___PPT10 BuildList payload"))?;
     Ok(Parts {
-        build_list,
-        drawing,
+        build_list: build_list_range,
+        drawing: drawing_range,
     })
 }
 
@@ -220,7 +220,7 @@ fn read_record(bytes: &[u8], start: usize, limit: usize, context: &str) -> Resul
         bytes[start + 6],
         bytes[start + 7],
     ]))
-    .map_err(|_| corrupted(format!("{context} record length exceeds this platform")))?;
+    .map_err(|_err| corrupted(format!("{context} record length exceeds this platform")))?;
     let end = header_end
         .checked_add(data_len)
         .ok_or_else(|| corrupted(format!("{context} record length overflows")))?;
@@ -236,7 +236,7 @@ fn read_record(bytes: &[u8], start: usize, limit: usize, context: &str) -> Resul
     })
 }
 
-/// Replace only the fixed-width BuildList range in its owning slide.
+/// Replace only the fixed-width `BuildList` range in its owning slide.
 pub(super) fn replace_build_list(
     source: &[u8],
     range: Range<usize>,

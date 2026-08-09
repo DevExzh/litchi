@@ -17,26 +17,31 @@ pub struct Color {
 
 impl Color {
     /// Construct an RGB color.
+    #[must_use]
     pub const fn new(red: u8, green: u8, blue: u8) -> Self {
         Self { red, green, blue }
     }
 
     /// Red component.
+    #[must_use]
     pub const fn red(self) -> u8 {
         self.red
     }
 
     /// Green component.
+    #[must_use]
     pub const fn green(self) -> u8 {
         self.green
     }
 
     /// Blue component.
+    #[must_use]
     pub const fn blue(self) -> u8 {
         self.blue
     }
 
     /// All components in RGB order.
+    #[must_use]
     pub const fn rgb(self) -> [u8; 3] {
         [self.red, self.green, self.blue]
     }
@@ -58,6 +63,7 @@ pub enum Value {
 
 impl Value {
     /// Return the explicit RGB value, or `None` for [`Self::Automatic`].
+    #[must_use]
     pub const fn color(self) -> Option<Color> {
         match self {
             Self::Automatic => None,
@@ -81,16 +87,19 @@ impl<'a> Palette<'a> {
     }
 
     /// Number of retained palette entries.
+    #[must_use]
     pub fn len(self) -> usize {
         self.raw.colors().len()
     }
 
     /// Whether the palette has no entries.
+    #[must_use]
     pub fn is_empty(self) -> bool {
         self.raw.colors().is_empty()
     }
 
     /// Return a checked zero-based palette entry.
+    #[must_use]
     pub fn at(self, position: usize) -> Option<Value> {
         let color = self.raw.colors().get(position).copied()?;
         Some(if self.raw.is_automatic_at(position) {
@@ -101,6 +110,7 @@ impl<'a> Palette<'a> {
     }
 
     /// Lazily traverse palette entries in source order.
+    #[must_use]
     pub fn iter(self) -> Iter<'a> {
         Iter {
             palette: self,

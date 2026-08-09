@@ -10,6 +10,7 @@ pub struct DocumentFileSettings {
 }
 
 impl DocumentFileSettings {
+    #[must_use]
     pub fn is_empty(self) -> bool {
         self == Self::default()
     }

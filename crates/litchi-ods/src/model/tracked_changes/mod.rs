@@ -13,24 +13,8 @@ mod transaction;
 #[cfg(test)]
 mod tests;
 
-use litchi_core::{Error, Result};
-
 const MAX_DEPTH: usize = 256;
-const MAX_NODES: usize = 1_000_000;
 const MAX_VALUE_BYTES: usize = 65_536;
-const MAX_AGGREGATE_BYTES: usize = 16 * 1_048_576;
-
-pub(super) fn append_size(aggregate: &mut usize, amount: usize) -> Result<()> {
-    *aggregate = aggregate.checked_add(amount).ok_or_else(|| {
-        Error::InvalidFormat("tracked-change aggregate size overflow".to_string())
-    })?;
-    if *aggregate > MAX_AGGREGATE_BYTES {
-        return Err(Error::InvalidFormat(
-            "tracked-change metadata exceeds 16 MiB".to_string(),
-        ));
-    }
-    Ok(())
-}
 
 pub use limits::Limits;
 pub use model::{
@@ -41,7 +25,7 @@ pub use model::{
 pub use transaction::{Commit, Patch, Snapshot, Transaction, update};
 
 #[allow(
-    unused_imports,
-    reason = "codec entry points retain the historical crate-internal module path"
+    clippy::module_name_repetitions,
+    reason = "the codec entry points keep their historical element-qualified names"
 )]
-pub(crate) use codec::{parse_tracked_changes, write_tracked_changes};
+pub use codec::{parse_tracked_changes, write_tracked_changes};

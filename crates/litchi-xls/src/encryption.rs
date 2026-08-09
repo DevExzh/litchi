@@ -28,6 +28,25 @@ pub enum EncryptionProfile {
     CryptoApiRc4 { key_bits: u16 },
 }
 
+/// Explicit capability required to author legacy BIFF8 XOR obfuscation.
+///
+/// XOR obfuscation is retained for interoperability with legacy documents, not
+/// for confidentiality. It is decode-only by default; construct this policy
+/// at the call site to make an intentional compatibility downgrade visible in
+/// code and diagnostics.
+#[derive(Debug, PartialEq, Eq)]
+#[must_use = "weak encryption must be explicitly passed to Writer::set_xor_obfuscation_password"]
+pub struct WeakEncryptionPolicy {
+    _private: (),
+}
+
+impl WeakEncryptionPolicy {
+    /// Explicitly permit writing legacy BIFF8 XOR obfuscation.
+    pub const fn allow_xor_obfuscation() -> Self {
+        Self { _private: () }
+    }
+}
+
 #[derive(Clone)]
 pub(crate) struct WriterEncryption {
     pub(crate) password: Zeroizing<String>,

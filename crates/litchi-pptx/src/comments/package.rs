@@ -13,6 +13,9 @@ use crate::{Error, Result};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use std::collections::{HashMap, HashSet};
 
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn load_presentation_comments(package: &OpcPackage) -> Result<Option<Comments>> {
     let presentation = package.main_document_part()?;
     require_presentation_content_type(presentation.content_type())?;
@@ -99,6 +102,9 @@ pub fn load_presentation_comments(package: &OpcPackage) -> Result<Option<Comment
     Ok(Some(value))
 }
 
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn store_presentation_comments(
     package: &mut OpcPackage,
     value: &Comments,
@@ -203,6 +209,9 @@ pub fn store_presentation_comments(
     Ok(())
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn find_presentation_comment_author(
     package: &OpcPackage,
     author_id: u32,
@@ -215,6 +224,9 @@ pub fn find_presentation_comment_author(
     }))
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn add_presentation_comment_author(
     package: &mut OpcPackage,
     author: Author,
@@ -246,6 +258,9 @@ pub fn add_presentation_comment_author(
     commit_legacy_authors(package, &graph, conformance)
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn update_presentation_comment_author(
     package: &mut OpcPackage,
     author_id: u32,
@@ -266,6 +281,9 @@ pub fn update_presentation_comment_author(
     commit_legacy_authors(package, &graph, conformance)
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn replace_presentation_comment_author(
     package: &mut OpcPackage,
     author_id: u32,
@@ -275,6 +293,9 @@ pub fn replace_presentation_comment_author(
     update_presentation_comment_author(package, author_id, author, conformance)
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn remove_presentation_comment_author(
     package: &mut OpcPackage,
     author_id: u32,
@@ -303,6 +324,9 @@ pub fn remove_presentation_comment_author(
     Ok(true)
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn reorder_presentation_comment_authors(
     package: &mut OpcPackage,
     ordered_ids: &[u32],
@@ -337,6 +361,9 @@ pub fn reorder_presentation_comment_authors(
     commit_legacy_authors(package, &graph, conformance)
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn find_presentation_comment(
     package: &OpcPackage,
     slide_part_name: &str,
@@ -357,6 +384,9 @@ pub fn find_presentation_comment(
     }))
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn add_presentation_comment(
     package: &mut OpcPackage,
     slide_part_name: &str,
@@ -423,6 +453,9 @@ pub fn add_presentation_comment(
     Ok(())
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn update_presentation_comment(
     package: &mut OpcPackage,
     slide_part_name: &str,
@@ -450,6 +483,9 @@ pub fn update_presentation_comment(
     commit_legacy_slide_comments(package, slide, comments, conformance)
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn replace_presentation_comment(
     package: &mut OpcPackage,
     slide_part_name: &str,
@@ -468,6 +504,9 @@ pub fn replace_presentation_comment(
     )
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn remove_presentation_comment(
     package: &mut OpcPackage,
     slide_part_name: &str,
@@ -510,6 +549,9 @@ pub fn remove_presentation_comment(
     Ok(true)
 }
 
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn reorder_presentation_comments(
     package: &mut OpcPackage,
     slide_part_name: &str,
@@ -822,6 +864,11 @@ fn is_authors_relationship(value: &str) -> bool {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::super::{MAX_AUTHORS, MAX_DEPTH, MAX_PART_BYTES, PML, STRICT_PML};
     use super::*;

@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use std::borrow::Cow;
 
 use litchi_rtf::{
@@ -45,7 +54,7 @@ fn writer_canonicalizes_hash_and_round_trips_both_independent_values() {
     .unwrap();
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
-    assert!(serialized.contains(r#"{\*\writereservhash 0ABC}"#));
+    assert!(serialized.contains(r"{\*\writereservhash 0ABC}"));
     assert!(
         serialized.find("\\writereservhash").unwrap()
             < serialized.find("\\writereservation").unwrap()
@@ -58,7 +67,7 @@ fn writer_canonicalizes_hash_and_round_trips_both_independent_values() {
 #[test]
 fn typed_api_is_passive_clearable_and_coexists_with_adjacent_metadata() {
     let mut document = RtfDocument::parse(
-        r#"{\rtf1{\*\wgrffmtfilter 2002}\stylesortmethod4\readonlyrecommended Body}"#,
+        r"{\rtf1{\*\wgrffmtfilter 2002}\stylesortmethod4\readonlyrecommended Body}",
     )
     .unwrap();
     document
@@ -84,17 +93,17 @@ fn typed_api_is_passive_clearable_and_coexists_with_adjacent_metadata() {
 #[test]
 fn rejects_invalid_hash_and_active_or_oversized_payloads() {
     for source in [
-        r#"{\rtf1{\*\writereservhash}Body}"#,
-        r#"{\rtf1{\*\writereservhash 0}Body}"#,
-        r#"{\rtf1{\*\writereservhash 0G}Body}"#,
-        r#"{\rtf1{\*\writereservhash 00 11}Body}"#,
-        r#"{\rtf1{\*\writereservhash \u48?0}Body}"#,
-        r#"{\rtf1{\*\writereservhash {00}}Body}"#,
-        r#"{\rtf1{\*\writereservhash \bin1 x}Body}"#,
-        r#"{\rtf1{\*\writereservation}Body}"#,
-        r#"{\rtf1{\*\writereservation \b active}Body}"#,
-        r#"{\rtf1{\*\writereservation {nested}}Body}"#,
-        r#"{\rtf1{\*\writereservation \bin1 x}Body}"#,
+        r"{\rtf1{\*\writereservhash}Body}",
+        r"{\rtf1{\*\writereservhash 0}Body}",
+        r"{\rtf1{\*\writereservhash 0G}Body}",
+        r"{\rtf1{\*\writereservhash 00 11}Body}",
+        r"{\rtf1{\*\writereservhash \u48?0}Body}",
+        r"{\rtf1{\*\writereservhash {00}}Body}",
+        r"{\rtf1{\*\writereservhash \bin1 x}Body}",
+        r"{\rtf1{\*\writereservation}Body}",
+        r"{\rtf1{\*\writereservation \b active}Body}",
+        r"{\rtf1{\*\writereservation {nested}}Body}",
+        r"{\rtf1{\*\writereservation \bin1 x}Body}",
     ] {
         assert!(
             RtfDocument::parse(source).is_err(),
@@ -103,26 +112,26 @@ fn rejects_invalid_hash_and_active_or_oversized_payloads() {
     }
 
     let oversized = "a".repeat(litchi_rtf::MAX_WRITE_RESERVATION_BYTES + 1);
-    let legacy = format!(r#"{{\rtf1{{\*\writereservation {oversized}}}Body}}"#);
+    let legacy = format!(r"{{\rtf1{{\*\writereservation {oversized}}}Body}}");
     assert!(RtfDocument::parse(&legacy).is_err());
     let oversized_hash = "aa".repeat(litchi_rtf::MAX_WRITE_RESERVATION_BYTES + 1);
-    let hash = format!(r#"{{\rtf1{{\*\writereservhash {oversized_hash}}}Body}}"#);
+    let hash = format!(r"{{\rtf1{{\*\writereservhash {oversized_hash}}}Body}}");
     assert!(RtfDocument::parse(&hash).is_err());
 }
 
 #[test]
 fn rejects_parameters_unstarred_direct_duplicate_nested_and_late_destinations() {
     for source in [
-        r#"{\rtf1{\*\writereservhash1 00}Body}"#,
-        r#"{\rtf1{\*\writereservation1 old}Body}"#,
-        r#"{\rtf1{\writereservhash 00}Body}"#,
-        r#"{\rtf1{\writereservation old}Body}"#,
-        r#"{\rtf1\writereservhash 00 Body}"#,
-        r#"{\rtf1\writereservation old Body}"#,
-        r#"{\rtf1{\*\writereservhash 00}{\*\writereservhash 11}Body}"#,
-        r#"{\rtf1{\*\writereservation one}{\*\writereservation two}Body}"#,
-        r#"{\rtf1{{\*\writereservhash 00}}Body}"#,
-        r#"{\rtf1 Body{\*\writereservation late}}"#,
+        r"{\rtf1{\*\writereservhash1 00}Body}",
+        r"{\rtf1{\*\writereservation1 old}Body}",
+        r"{\rtf1{\writereservhash 00}Body}",
+        r"{\rtf1{\writereservation old}Body}",
+        r"{\rtf1\writereservhash 00 Body}",
+        r"{\rtf1\writereservation old Body}",
+        r"{\rtf1{\*\writereservhash 00}{\*\writereservhash 11}Body}",
+        r"{\rtf1{\*\writereservation one}{\*\writereservation two}Body}",
+        r"{\rtf1{{\*\writereservhash 00}}Body}",
+        r"{\rtf1 Body{\*\writereservation late}}",
     ] {
         assert!(
             RtfDocument::parse(source).is_err(),

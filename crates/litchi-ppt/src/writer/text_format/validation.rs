@@ -1,4 +1,4 @@
-//! Validation for the bounded PowerPoint text-format wire model.
+//! Validation for the bounded `PowerPoint` text-format wire model.
 //!
 //! These checks are kept beside the codec so serialization has one source of
 //! truth for the limits defined by [MS-PPT] section 2.9.

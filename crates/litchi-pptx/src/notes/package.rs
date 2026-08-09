@@ -1273,7 +1273,7 @@ fn validate_opaque_relationship(
         return Ok(());
     }
     let target = relationship.target_partname()?;
-    package.get_part(&target).map(|_| ()).map_err(|_| {
+    package.get_part(&target).map(|_| ()).map_err(|_err| {
         invalid(format!(
             "opaque notes relationship '{}' from '{}' targets a missing part",
             relationship.r_id(),

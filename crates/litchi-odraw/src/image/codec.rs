@@ -15,11 +15,21 @@ enum Family {
 /// Parses exactly one BLIP record.
 impl<'data> Blip<'data> {
     /// Parses exactly one complete BLIP record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `data` cannot be decoded as exactly one BLIP record
+    /// under the default limits.
     pub fn parse(data: &'data [u8]) -> Result<Self> {
         Self::parse_with(data, Limits::default())
     }
 
     /// Parses exactly one complete BLIP record under explicit limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `data` cannot be decoded as exactly one BLIP record,
+    /// or if the record exceeds `limits` or fails BLIP validation.
     pub fn parse_with(data: &'data [u8], limits: Limits) -> Result<Self> {
         let (record, consumed) = Record::parse(data, 0)?;
         if consumed != data.len() {
@@ -29,11 +39,21 @@ impl<'data> Blip<'data> {
     }
 
     /// Parses a previously checked `OfficeArt` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `record` is not a valid BLIP record under the
+    /// default limits.
     pub fn from_record(record: Record<'data>) -> Result<Self> {
         Self::from_record_with(record, Limits::default())
     }
 
     /// Parses a previously checked `OfficeArt` record under explicit limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `record` exceeds `limits`, is not a BLIP record, or
+    /// fails BLIP validation.
     pub fn from_record_with(record: Record<'data>, limits: Limits) -> Result<Self> {
         if record.len() > limits.max_blip_bytes {
             return Err(Error::ImageLimitExceeded {
@@ -135,7 +155,14 @@ impl<'data> Blip<'data> {
                     Kind::Emf => Ok(Self::Emf(meta)),
                     Kind::Wmf => Ok(Self::Wmf(meta)),
                     Kind::Pict => Ok(Self::Pict(meta)),
-                    _ => Err(Error::MalformedImage {
+                    Kind::Error
+                    | Kind::Unknown
+                    | Kind::Jpeg
+                    | Kind::Png
+                    | Kind::Dib
+                    | Kind::Tiff
+                    | Kind::CmykJpeg
+                    | Kind::Other(_) => Err(Error::MalformedImage {
                         reason: "metafile layout resolved to a non-metafile kind",
                     }),
                 }
@@ -157,7 +184,12 @@ impl<'data> Blip<'data> {
                     Kind::Png => Ok(Self::Png(bitmap)),
                     Kind::Dib => Ok(Self::Dib(bitmap)),
                     Kind::Tiff => Ok(Self::Tiff(bitmap)),
-                    _ => Err(Error::MalformedImage {
+                    Kind::Error
+                    | Kind::Unknown
+                    | Kind::Emf
+                    | Kind::Wmf
+                    | Kind::Pict
+                    | Kind::Other(_) => Err(Error::MalformedImage {
                         reason: "bitmap layout resolved to a non-bitmap kind",
                     }),
                 }
@@ -166,65 +198,23 @@ impl<'data> Blip<'data> {
     }
 }
 
-impl<'data> TryFrom<Record<'data>> for Blip<'data> {
-    type Error = Error;
-
-    fn try_from(record: Record<'data>) -> Result<Self> {
-        Self::from_record(record)
-    }
-}
-
-fn layout(raw_kind: u16, instance: u16) -> Option<(Kind, Family, bool)> {
-    let value = match (raw_kind, instance) {
-        (0xF01A, 0x3D4) => (Kind::Emf, Family::Meta, false),
-        (0xF01A, 0x3D5) => (Kind::Emf, Family::Meta, true),
-        (0xF01B, 0x216) => (Kind::Wmf, Family::Meta, false),
-        (0xF01B, 0x217) => (Kind::Wmf, Family::Meta, true),
-        (0xF01C, 0x542) => (Kind::Pict, Family::Meta, false),
-        (0xF01C, 0x543) => (Kind::Pict, Family::Meta, true),
-        (0xF01D | 0xF02A, 0x46A) => (Kind::Jpeg, Family::Bitmap, false),
-        (0xF01D | 0xF02A, 0x46B) => (Kind::Jpeg, Family::Bitmap, true),
-        (0xF01D | 0xF02A, 0x6E2) => (Kind::CmykJpeg, Family::Bitmap, false),
-        (0xF01D | 0xF02A, 0x6E3) => (Kind::CmykJpeg, Family::Bitmap, true),
-        (0xF01E, 0x6E0) => (Kind::Png, Family::Bitmap, false),
-        (0xF01E, 0x6E1) => (Kind::Png, Family::Bitmap, true),
-        (0xF01F, 0x7A8) => (Kind::Dib, Family::Bitmap, false),
-        (0xF01F, 0x7A9) => (Kind::Dib, Family::Bitmap, true),
-        (0xF029, 0x6E4) => (Kind::Tiff, Family::Bitmap, false),
-        (0xF029, 0x6E5) => (Kind::Tiff, Family::Bitmap, true),
-        _ => return None,
-    };
-    Some(value)
-}
-
-fn parse_uids(data: &[u8], second: bool) -> Result<(Uids, usize)> {
-    let first = uid_at(data, 0)?;
-    if second {
-        Ok((Uids::new(first, Some(uid_at(data, 16)?)), 32))
-    } else {
-        Ok((Uids::new(first, None), 16))
-    }
-}
-
-pub(super) fn uid_at(data: &[u8], offset: usize) -> Result<Uid> {
-    let end = offset.checked_add(16).ok_or(Error::ArithmeticOverflow {
-        context: "BLIP UID extent",
-    })?;
-    let bytes = data.get(offset..end).ok_or(Error::MalformedImage {
-        reason: "BLIP UID is truncated",
-    })?;
-    let mut uid = [0; 16];
-    uid.copy_from_slice(bytes);
-    Ok(Uid::new(uid))
-}
-
 impl<'data> Entry<'data> {
     /// Parses an FBSE record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `record` is not a valid FBSE record under the
+    /// default limits.
     pub fn parse(record: Record<'data>) -> Result<Self> {
         Self::parse_with(record, Limits::default())
     }
 
     /// Parses an FBSE record under explicit image limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `record` is not an FBSE record, exceeds `limits`, or
+    /// fails FBSE validation.
     pub fn parse_with(record: Record<'data>, limits: Limits) -> Result<Self> {
         if record.kind() != RecordKind::Bse {
             return Err(Error::NotImageRecord {
@@ -349,37 +339,23 @@ impl<'data> Entry<'data> {
     }
 }
 
-impl<'data> Iterator for Embedded<'data> {
-    type Item = Result<Blip<'data>>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.records
-            .next()
-            .map(|record| record.and_then(|record| Blip::from_record_with(record, self.limits)))
-    }
-}
-
-impl std::iter::FusedIterator for Embedded<'_> {}
-
-pub(super) fn block(record: Record<'_>, limits: Limits) -> Result<Block<'_>> {
-    if record.kind() == RecordKind::Bse {
-        Entry::parse_with(record, limits).map(Block::Entry)
-    } else if record.kind().is_blip() {
-        Blip::from_record_with(record, limits).map(Block::Blip)
-    } else {
-        Err(Error::MalformedImage {
-            reason: "BLIP store contains a non-image file block",
-        })
-    }
-}
-
 impl<'data> Store<'data> {
     /// Parses exactly one `BStore` container.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `data` cannot be decoded as exactly one `BStore`
+    /// container under the default limits.
     pub fn parse(data: &'data [u8]) -> Result<Self> {
         Self::parse_with(data, Limits::default())
     }
 
     /// Parses exactly one `BStore` container under explicit limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `data` cannot be decoded as exactly one `BStore`
+    /// container under `limits`.
     pub fn parse_with(data: &'data [u8], limits: Limits) -> Result<Self> {
         let (record, consumed) = Record::parse(data, 0)?;
         if consumed != data.len() {
@@ -413,21 +389,30 @@ impl<'data> Store<'data> {
     }
 
     /// Looks up a checked one-based identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a file block at or before `id` fails to decode.
     pub fn get(&self, id: super::model::Id) -> Result<Option<Block<'data>>> {
         if id.get() > self.count {
             return Ok(None);
         }
         let wanted = id.get() - 1;
         for (index, item) in self.iter().enumerate() {
-            let item = item?;
+            let parsed = item?;
             if index == usize::from(wanted) {
-                return Ok(Some(item));
+                return Ok(Some(parsed));
             }
         }
         Ok(None)
     }
 
     /// Resolves an image identifier with optional delay-store context.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the addressed file block fails to decode or its BLIP
+    /// reference cannot be resolved.
     pub fn resolve(
         &self,
         id: super::model::Id,
@@ -446,6 +431,94 @@ impl<'data> Store<'data> {
         &self.record
     }
 }
+
+impl<'data> Delay<'data> {
+    /// Borrows a delay-store byte sequence.
+    #[must_use]
+    pub const fn new(data: &'data [u8]) -> Self {
+        Self::with_limits(
+            data,
+            Limits {
+                max_blip_bytes: 256 * 1024 * 1024,
+                max_store_entries: super::model::MAX_STORE_ENTRIES,
+            },
+        )
+    }
+
+    /// Borrows a delay store under explicit image limits.
+    #[must_use]
+    pub const fn with_limits(data: &'data [u8], limits: Limits) -> Self {
+        Self { data, limits }
+    }
+
+    /// Iterates every file block in order.
+    #[must_use]
+    pub fn iter(self) -> DelayBlocks<'data> {
+        DelayBlocks {
+            records: crate::Children::new(self.data),
+            limits: self.limits,
+            seen: 0,
+            done: false,
+        }
+    }
+
+    /// Parses the file block beginning at an exact delay offset.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::DelayOffsetOutOfBounds` if `offset` lies outside the
+    /// delay store, or an error if the record at `offset` fails to decode.
+    pub fn at(self, offset: Offset) -> Result<Block<'data>> {
+        let start =
+            usize::try_from(offset.get()).map_err(|_err| Error::DelayOffsetOutOfBounds {
+                offset: offset.get(),
+                available: self.data.len(),
+            })?;
+        if start >= self.data.len() {
+            return Err(Error::DelayOffsetOutOfBounds {
+                offset: offset.get(),
+                available: self.data.len(),
+            });
+        }
+        let (record, _) = Record::parse(self.data, start)?;
+        block(record, self.limits)
+    }
+
+    /// Returns the borrowed delay-store bytes.
+    #[must_use]
+    pub const fn as_bytes(self) -> &'data [u8] {
+        self.data
+    }
+}
+
+impl<'data> TryFrom<Record<'data>> for Blip<'data> {
+    type Error = Error;
+
+    fn try_from(record: Record<'data>) -> Result<Self> {
+        Self::from_record(record)
+    }
+}
+
+impl<'data> IntoIterator for &Store<'data> {
+    type Item = Result<Block<'data>>;
+    type IntoIter = super::model::Blocks<'data>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'data> Iterator for Embedded<'data> {
+    type Item = Result<Blip<'data>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.records.next().map(|record| {
+            record.and_then(|blip_record| Blip::from_record_with(blip_record, self.limits))
+        })
+    }
+}
+
+impl std::iter::FusedIterator for Embedded<'_> {}
 
 impl<'data> Iterator for super::model::Blocks<'data> {
     type Item = Result<Block<'data>>;
@@ -485,60 +558,6 @@ impl<'data> Iterator for super::model::Blocks<'data> {
 
 impl std::iter::FusedIterator for super::model::Blocks<'_> {}
 
-impl<'data> Delay<'data> {
-    /// Borrows a delay-store byte sequence.
-    #[must_use]
-    pub const fn new(data: &'data [u8]) -> Self {
-        Self::with_limits(
-            data,
-            Limits {
-                max_blip_bytes: 256 * 1024 * 1024,
-                max_store_entries: super::model::MAX_STORE_ENTRIES,
-            },
-        )
-    }
-
-    /// Borrows a delay store under explicit image limits.
-    #[must_use]
-    pub const fn with_limits(data: &'data [u8], limits: Limits) -> Self {
-        Self { data, limits }
-    }
-
-    /// Iterates every file block in order.
-    #[must_use]
-    pub fn iter(self) -> DelayBlocks<'data> {
-        DelayBlocks {
-            records: crate::Children::new(self.data),
-            limits: self.limits,
-            seen: 0,
-            done: false,
-        }
-    }
-
-    /// Parses the file block beginning at an exact delay offset.
-    pub fn at(self, offset: Offset) -> Result<Block<'data>> {
-        let start =
-            usize::try_from(offset.get()).map_err(|_err| Error::DelayOffsetOutOfBounds {
-                offset: offset.get(),
-                available: self.data.len(),
-            })?;
-        if start >= self.data.len() {
-            return Err(Error::DelayOffsetOutOfBounds {
-                offset: offset.get(),
-                available: self.data.len(),
-            });
-        }
-        let (record, _) = Record::parse(self.data, start)?;
-        block(record, self.limits)
-    }
-
-    /// Returns the borrowed delay-store bytes.
-    #[must_use]
-    pub const fn as_bytes(self) -> &'data [u8] {
-        self.data
-    }
-}
-
 impl<'data> Iterator for DelayBlocks<'data> {
     type Item = Result<Block<'data>>;
 
@@ -571,6 +590,62 @@ impl<'data> Iterator for DelayBlocks<'data> {
 }
 
 impl std::iter::FusedIterator for DelayBlocks<'_> {}
+
+fn layout(raw_kind: u16, instance: u16) -> Option<(Kind, Family, bool)> {
+    let value = match (raw_kind, instance) {
+        (0xF01A, 0x3D4) => (Kind::Emf, Family::Meta, false),
+        (0xF01A, 0x3D5) => (Kind::Emf, Family::Meta, true),
+        (0xF01B, 0x216) => (Kind::Wmf, Family::Meta, false),
+        (0xF01B, 0x217) => (Kind::Wmf, Family::Meta, true),
+        (0xF01C, 0x542) => (Kind::Pict, Family::Meta, false),
+        (0xF01C, 0x543) => (Kind::Pict, Family::Meta, true),
+        (0xF01D | 0xF02A, 0x46A) => (Kind::Jpeg, Family::Bitmap, false),
+        (0xF01D | 0xF02A, 0x46B) => (Kind::Jpeg, Family::Bitmap, true),
+        (0xF01D | 0xF02A, 0x6E2) => (Kind::CmykJpeg, Family::Bitmap, false),
+        (0xF01D | 0xF02A, 0x6E3) => (Kind::CmykJpeg, Family::Bitmap, true),
+        (0xF01E, 0x6E0) => (Kind::Png, Family::Bitmap, false),
+        (0xF01E, 0x6E1) => (Kind::Png, Family::Bitmap, true),
+        (0xF01F, 0x7A8) => (Kind::Dib, Family::Bitmap, false),
+        (0xF01F, 0x7A9) => (Kind::Dib, Family::Bitmap, true),
+        (0xF029, 0x6E4) => (Kind::Tiff, Family::Bitmap, false),
+        (0xF029, 0x6E5) => (Kind::Tiff, Family::Bitmap, true),
+        _ => return None,
+    };
+    Some(value)
+}
+
+fn parse_uids(data: &[u8], second: bool) -> Result<(Uids, usize)> {
+    let first = uid_at(data, 0)?;
+    if second {
+        Ok((Uids::new(first, Some(uid_at(data, 16)?)), 32))
+    } else {
+        Ok((Uids::new(first, None), 16))
+    }
+}
+
+pub(super) fn uid_at(data: &[u8], offset: usize) -> Result<Uid> {
+    let end = offset.checked_add(16).ok_or(Error::ArithmeticOverflow {
+        context: "BLIP UID extent",
+    })?;
+    let bytes = data.get(offset..end).ok_or(Error::MalformedImage {
+        reason: "BLIP UID is truncated",
+    })?;
+    let mut uid = [0; 16];
+    uid.copy_from_slice(bytes);
+    Ok(Uid::new(uid))
+}
+
+pub(super) fn block(record: Record<'_>, limits: Limits) -> Result<Block<'_>> {
+    if record.kind() == RecordKind::Bse {
+        Entry::parse_with(record, limits).map(Block::Entry)
+    } else if record.kind().is_blip() {
+        Blip::from_record_with(record, limits).map(Block::Blip)
+    } else {
+        Err(Error::MalformedImage {
+            reason: "BLIP store contains a non-image file block",
+        })
+    }
+}
 
 fn le_u16(data: &[u8], offset: usize) -> Result<u16> {
     let end = offset.checked_add(2).ok_or(Error::ArithmeticOverflow {

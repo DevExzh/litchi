@@ -7,6 +7,10 @@ use litchi_opc::{OpcPackage, PackURI};
 use std::sync::Arc;
 
 /// Discover the one inert VBA graph attached to a presentation main part.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn discover(package: &OpcPackage, source: &PackURI) -> Result<Option<Project>> {
     let source_part = package.get_part(source)?;
     let mut matches = source_part
@@ -47,6 +51,10 @@ pub fn discover(package: &OpcPackage, source: &PackURI) -> Result<Option<Project
 }
 
 /// Store an opaque VBA payload through the shared transactional graph service.
+///
+/// # Errors
+///
+/// Returns an error if the output cannot be encoded or written.
 pub fn store(package: &mut OpcPackage, source: &PackURI, payload: Vec<u8>) -> Result<Project> {
     if payload.is_empty() || payload.len() > MAX_PAYLOAD_BYTES {
         return Err(Error::Limit {
@@ -61,6 +69,10 @@ pub fn store(package: &mut OpcPackage, source: &PackURI, payload: Vec<u8>) -> Re
 }
 
 /// Remove the complete VBA relationship graph and restore the non-macro main type.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
 pub fn remove(package: &mut OpcPackage, source: &PackURI) -> Result<bool> {
     remove_project_graph(package, source, Host::PowerPoint).map_err(map_common)
 }
@@ -87,6 +99,11 @@ fn map_common(error: litchi_ooxml_common::Error) -> Error {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use litchi_opc::Part;

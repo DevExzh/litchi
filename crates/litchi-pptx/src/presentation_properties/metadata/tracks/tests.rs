@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::model::{Caption, CaptionTarget, DisplayLocation, MediaKey, MediaMetadata, TracksInfo};
 use super::tracks_info;
 use super::transaction::Snapshot;

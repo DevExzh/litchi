@@ -1,4 +1,4 @@
-//! Failure-atomic edits for one inert PowerPoint storage payload.
+//! Failure-atomic edits for one inert `PowerPoint` storage payload.
 
 use super::model::{Kind, Storage};
 use super::snapshot::Snapshot;
@@ -33,7 +33,7 @@ impl Editor {
         self.candidate.metadata()
     }
 
-    /// Change the PowerPoint context associated with the payload.
+    /// Change the `PowerPoint` context associated with the payload.
     ///
     /// This does not alter the embedded bytes or activate the storage. The
     /// context is written by the host when the candidate is serialized.
@@ -44,6 +44,10 @@ impl Editor {
     /// Replace the candidate with an uncompressed payload.
     ///
     /// If validation fails, the editor retains its previous candidate.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace_uncompressed(&mut self, data: Vec<u8>) -> Result<()> {
         let candidate = Storage::uncompressed(self.candidate.kind, data)?;
         self.candidate = candidate;
@@ -52,8 +56,12 @@ impl Editor {
 
     /// Replace the candidate with a zlib payload and its declared size.
     ///
-    /// `data` excludes PowerPoint's four-byte decompressed-size prefix. If
+    /// `data` excludes `PowerPoint`'s four-byte decompressed-size prefix. If
     /// validation fails, the editor retains its previous candidate.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn replace_compressed(&mut self, uncompressed_len: u32, data: Vec<u8>) -> Result<()> {
         let candidate = Storage::compressed(self.candidate.kind, uncompressed_len, data)?;
         self.candidate = candidate;
@@ -61,6 +69,10 @@ impl Editor {
     }
 
     /// Publish the fully validated candidate as a new immutable storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn commit(self) -> Result<Storage> {
         Storage::from_parts(
             self.candidate.kind,
@@ -76,7 +88,7 @@ impl Editor {
         self.candidate.compression
     }
 
-    /// Return the current PowerPoint storage context.
+    /// Return the current `PowerPoint` storage context.
     #[must_use]
     pub const fn kind(&self) -> Kind {
         self.candidate.kind

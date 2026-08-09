@@ -75,6 +75,9 @@ pub struct NoteOptions {
 }
 
 impl NoteOptions {
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if self.footnote_start.is_some_and(|value| value <= 0)
             || self.endnote_start.is_some_and(|value| value <= 0)
@@ -86,6 +89,7 @@ impl NoteOptions {
         Ok(())
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         *self == Self::default()
     }

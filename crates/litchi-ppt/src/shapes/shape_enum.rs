@@ -58,6 +58,7 @@ where
     }
 
     /// Get the shape type.
+    #[must_use]
     pub fn shape_type(&self) -> ShapeType {
         match self {
             ShapeEnum::TextBox(_) => ShapeType::TextBox,
@@ -77,6 +78,10 @@ where
     /// - Pattern matching compiles to jump table
     /// - No heap allocation for empty text
     /// - Recursive for group shapes
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn text(&self) -> Result<String> {
         match self {
             ShapeEnum::TextBox(tb) => Shape::text(tb),
@@ -127,43 +132,71 @@ where
         }
     }
 
-    /// Get shape as TextBox if it is one.
+    /// Get shape as `TextBox` if it is one.
     #[inline]
+    #[must_use]
     pub fn as_textbox(&self) -> Option<&TextBox<'a>> {
         match self {
             ShapeEnum::TextBox(tb) => Some(tb),
-            _ => None,
+            ShapeEnum::Placeholder(_)
+            | ShapeEnum::AutoShape(_)
+            | ShapeEnum::Picture(_)
+            | ShapeEnum::Table(_)
+            | ShapeEnum::Group(_)
+            | ShapeEnum::Line(_) => None,
         }
     }
 
     /// Get shape as Placeholder if it is one.
     #[inline]
+    #[must_use]
     pub fn as_placeholder(&self) -> Option<&Placeholder<'a>> {
         match self {
             ShapeEnum::Placeholder(ph) => Some(ph),
-            _ => None,
+            ShapeEnum::TextBox(_)
+            | ShapeEnum::AutoShape(_)
+            | ShapeEnum::Picture(_)
+            | ShapeEnum::Table(_)
+            | ShapeEnum::Group(_)
+            | ShapeEnum::Line(_) => None,
         }
     }
 
-    /// Get shape as AutoShape if it is one.
+    /// Get shape as `AutoShape` if it is one.
     #[inline]
+    #[must_use]
     pub fn as_autoshape(&self) -> Option<&AutoShape<'a>> {
         match self {
             ShapeEnum::AutoShape(as_) => Some(as_),
-            _ => None,
+            ShapeEnum::TextBox(_)
+            | ShapeEnum::Placeholder(_)
+            | ShapeEnum::Picture(_)
+            | ShapeEnum::Table(_)
+            | ShapeEnum::Group(_)
+            | ShapeEnum::Line(_) => None,
         }
     }
 
-    /// Get shape as PictureShape if it is one.
+    /// Get shape as `PictureShape` if it is one.
     #[inline]
+    #[must_use]
     pub fn as_picture(&self) -> Option<&PictureShape> {
         match self {
             ShapeEnum::Picture(pic) => Some(pic),
-            _ => None,
+            ShapeEnum::TextBox(_)
+            | ShapeEnum::Placeholder(_)
+            | ShapeEnum::AutoShape(_)
+            | ShapeEnum::Table(_)
+            | ShapeEnum::Group(_)
+            | ShapeEnum::Line(_) => None,
         }
     }
 
-    /// Get shape as mutable PictureShape if it is one.
+    /// Get shape as mutable `PictureShape` if it is one.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     #[inline]
     pub fn as_picture_mut(
         &mut self,
@@ -173,12 +206,18 @@ where
                 picture.ensure_mutable(crate::shapes::shape::Mutation::Picture)?;
                 Ok(Some(picture))
             },
-            _ => Ok(None),
+            ShapeEnum::TextBox(_)
+            | ShapeEnum::Placeholder(_)
+            | ShapeEnum::AutoShape(_)
+            | ShapeEnum::Table(_)
+            | ShapeEnum::Group(_)
+            | ShapeEnum::Line(_) => Ok(None),
         }
     }
 
     /// Get an embedded or linked OLE object frame.
     #[inline]
+    #[must_use]
     pub fn as_object_frame(&self) -> Option<&PictureShape> {
         self.as_picture()
             .filter(|picture| picture.frame_kind() == super::picture::PictureFrameKind::OleObject)
@@ -186,39 +225,59 @@ where
 
     /// Get an audio or video media frame.
     #[inline]
+    #[must_use]
     pub fn as_media_frame(&self) -> Option<&PictureShape> {
         self.as_picture()
             .filter(|picture| picture.frame_kind() == super::picture::PictureFrameKind::Media)
     }
 
-    /// Get shape as TableShape if it is one.
+    /// Get shape as `TableShape` if it is one.
     #[inline]
+    #[must_use]
     pub fn as_table(&self) -> Option<&TableShape> {
         match self {
             ShapeEnum::Table(table) => Some(table),
-            _ => None,
+            ShapeEnum::TextBox(_)
+            | ShapeEnum::Placeholder(_)
+            | ShapeEnum::AutoShape(_)
+            | ShapeEnum::Picture(_)
+            | ShapeEnum::Group(_)
+            | ShapeEnum::Line(_) => None,
         }
     }
 
-    /// Get shape as GroupShape if it is one.
+    /// Get shape as `GroupShape` if it is one.
     #[inline]
+    #[must_use]
     pub fn as_group(&self) -> Option<&GroupShape<'a>> {
         match self {
             ShapeEnum::Group(group) => Some(group),
-            _ => None,
+            ShapeEnum::TextBox(_)
+            | ShapeEnum::Placeholder(_)
+            | ShapeEnum::AutoShape(_)
+            | ShapeEnum::Picture(_)
+            | ShapeEnum::Table(_)
+            | ShapeEnum::Line(_) => None,
         }
     }
 
-    /// Get shape as LineShape if it is one.
+    /// Get shape as `LineShape` if it is one.
     #[inline]
+    #[must_use]
     pub fn as_line(&self) -> Option<&LineShape> {
         match self {
             ShapeEnum::Line(line) => Some(line),
-            _ => None,
+            ShapeEnum::TextBox(_)
+            | ShapeEnum::Placeholder(_)
+            | ShapeEnum::AutoShape(_)
+            | ShapeEnum::Picture(_)
+            | ShapeEnum::Table(_)
+            | ShapeEnum::Group(_) => None,
         }
     }
 
-    /// Return inert PowerPoint 12 placeholder metadata retained for round trips.
+    /// Return inert `PowerPoint` 12 placeholder metadata retained for round trips.
+    #[must_use]
     pub fn powerpoint12_shape_metadata(&self) -> Option<&ShapeMetadata> {
         match self {
             ShapeEnum::TextBox(shape) => shape.properties().powerpoint12_shape_metadata.as_ref(),
@@ -263,6 +322,7 @@ pub struct TableShape {
 
 impl TableShape {
     /// Create a new table shape.
+    #[must_use]
     pub fn new(id: u32, rows: usize, columns: usize) -> Self {
         let cells = vec![vec![String::new(); columns]; rows];
         Self {
@@ -293,44 +353,52 @@ impl TableShape {
     }
 
     /// Get shape ID.
+    #[must_use]
     pub fn id(&self) -> u32 {
         self.id
     }
 
     /// Get number of rows.
+    #[must_use]
     pub fn rows(&self) -> usize {
         self.rows
     }
 
     /// Get number of columns.
+    #[must_use]
     pub fn columns(&self) -> usize {
         self.columns
     }
 
     /// Get cell text.
+    #[must_use]
     pub fn cell(&self, row: usize, col: usize) -> Option<&str> {
         self.cells
             .get(row)
             .and_then(|r| r.get(col))
-            .map(|s| s.as_str())
+            .map(String::as_str)
     }
 
     /// Get the left coordinate.
+    #[must_use]
     pub fn left(&self) -> i32 {
         self.left
     }
 
     /// Get the top coordinate.
+    #[must_use]
     pub fn top(&self) -> i32 {
         self.top
     }
 
     /// Get the table width.
+    #[must_use]
     pub fn width(&self) -> i32 {
         self.width
     }
 
     /// Get the table height.
+    #[must_use]
     pub fn height(&self) -> i32 {
         self.height
     }
@@ -367,6 +435,7 @@ pub struct GroupShape<'a> {
 
 impl<'a> GroupShape<'a> {
     /// Create a new group shape.
+    #[must_use]
     pub fn new(id: u32) -> Self {
         Self {
             id,
@@ -381,6 +450,10 @@ impl<'a> GroupShape<'a> {
     }
 
     /// Add a child shape.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn add_child(
         &mut self,
         shape: ShapeEnum<'a>,
@@ -399,11 +472,16 @@ impl<'a> GroupShape<'a> {
     }
 
     /// Get child shapes.
+    #[must_use]
     pub fn children(&self) -> &[ShapeEnum<'a>] {
         &self.children
     }
 
     /// Set group bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_bounds(
         &mut self,
         left: i32,
@@ -428,26 +506,31 @@ impl<'a> GroupShape<'a> {
     }
 
     /// Get shape ID.
+    #[must_use]
     pub fn id(&self) -> u32 {
         self.id
     }
 
     /// Get the left coordinate.
+    #[must_use]
     pub fn left(&self) -> i32 {
         self.left
     }
 
     /// Get the top coordinate.
+    #[must_use]
     pub fn top(&self) -> i32 {
         self.top
     }
 
     /// Get the group width.
+    #[must_use]
     pub fn width(&self) -> i32 {
         self.width
     }
 
     /// Get the group height.
+    #[must_use]
     pub fn height(&self) -> i32 {
         self.height
     }
@@ -493,6 +576,7 @@ enum LineKind {
 
 impl LineShape {
     /// Create a new line shape.
+    #[must_use]
     pub fn new(id: u32, x1: i32, y1: i32, x2: i32, y2: i32) -> Self {
         Self {
             kind: LineKind::Line,
@@ -509,6 +593,7 @@ impl LineShape {
     }
 
     /// Create a connector between two points.
+    #[must_use]
     pub fn connector(id: u32, x1: i32, y1: i32, x2: i32, y2: i32) -> Self {
         Self {
             kind: LineKind::Connector,
@@ -517,6 +602,7 @@ impl LineShape {
     }
 
     /// Return whether this shape is a plain line or a connector.
+    #[must_use]
     pub fn shape_type(&self) -> ShapeType {
         match self.kind {
             LineKind::Line => ShapeType::Line,
@@ -525,6 +611,10 @@ impl LineShape {
     }
 
     /// Set line width.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_width(
         &mut self,
         width: i32,
@@ -543,6 +633,10 @@ impl LineShape {
     }
 
     /// Set line color.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn set_color(
         &mut self,
         color: u32,
@@ -561,14 +655,16 @@ impl LineShape {
     }
 
     /// Get shape ID.
+    #[must_use]
     pub fn id(&self) -> u32 {
         self.id
     }
 
     /// Get line length.
+    #[must_use]
     pub fn length(&self) -> f64 {
-        let dx = (self.x2 - self.x1) as f64;
-        let dy = (self.y2 - self.y1) as f64;
+        let dx = f64::from(self.x2 - self.x1);
+        let dy = f64::from(self.y2 - self.y1);
         (dx * dx + dy * dy).sqrt()
     }
 
@@ -582,6 +678,11 @@ impl LineShape {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 
@@ -608,7 +709,7 @@ mod tests {
             })
         );
         assert_eq!(
-            line.set_color(0x00ff00),
+            line.set_color(0x0000_ff00),
             Err(crate::shapes::shape::MutationError::SourceBound {
                 mutation: crate::shapes::shape::Mutation::Line,
             })
@@ -651,7 +752,9 @@ mod tests {
         let mut shape: ShapeEnum<'static> = ShapeEnum::Picture(picture);
 
         assert_eq!(
-            shape.as_picture_mut().map(|picture| picture.is_some()),
+            shape
+                .as_picture_mut()
+                .map(|picture_ref| picture_ref.is_some()),
             Err(crate::shapes::shape::MutationError::SourceBound {
                 mutation: crate::shapes::shape::Mutation::Picture,
             })

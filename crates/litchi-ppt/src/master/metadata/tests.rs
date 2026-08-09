@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::*;
 use crate::consts::RecordType;
 use crate::records::Record;
@@ -14,7 +20,7 @@ fn record(
         record_type_raw: record_type.as_u16(),
         version,
         instance,
-        data_length: data.len() as u32,
+        data_length: u32::try_from(data.len()).unwrap(),
         data,
         children,
     }
@@ -201,7 +207,7 @@ fn rejects_duplicate_malformed_and_oversized_names() {
     odd_root.children[2].data = vec![0];
     odd_root.children[2].data_length = 1;
     odd_root.data = children_wire(&odd_root.children);
-    odd_root.data_length = odd_root.data.len() as u32;
+    odd_root.data_length = u32::try_from(odd_root.data.len()).unwrap();
     assert!(Snapshot::from_record(Context::Notes, odd_root).is_err());
 
     let invalid_utf16 = record(RecordType::CString, 0, 3, vec![0, 0xd8], Vec::new());

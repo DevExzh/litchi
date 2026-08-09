@@ -1,4 +1,4 @@
-//! Record codecs for strict, inert legacy PowerPoint external-media metadata.
+//! Record codecs for strict, inert legacy `PowerPoint` external-media metadata.
 
 use super::model::{
     CdAudio, CdTime, Collection, EmbeddedWav, LinkedAudio, LinkedAudioKind, Media, Movie,
@@ -16,6 +16,12 @@ pub(crate) const MAX_PATH_UNITS: usize = 32_768;
 pub(crate) const MAX_EXTERNAL_MEDIA_OBJECTS: usize = 4_096;
 
 impl Media {
+    /// Parse one `ExMediaAtom` record into typed media metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record header or size is invalid, the external
+    /// object ID is zero, or reserved flag bits are set.
     pub fn parse(record: &Record) -> Result<Self> {
         if record.version != 0
             || record.instance != 0
@@ -25,7 +31,12 @@ impl Media {
         {
             return corrupted("ExMediaAtom has an invalid header or size");
         }
-        let id = u32::from_le_bytes(record.data[0..4].try_into().expect("fixed slice"));
+        let id = u32::from_le_bytes([
+            record.data[0],
+            record.data[1],
+            record.data[2],
+            record.data[3],
+        ]);
         if id == 0 {
             return corrupted("ExMediaAtom external object ID must be positive");
         }
@@ -42,17 +53,28 @@ impl Media {
         })
     }
 
+    /// Serialize this atom and reparse it as a generic [`Record`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the bytes cannot be reparsed
+    /// as a record.
     pub fn to_record(&self) -> Result<Record> {
         Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 
+    /// Serialize this atom into its exact 16-byte record image.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the external object ID is zero.
     pub fn to_record_bytes(&self) -> Result<[u8; 16]> {
         if self.id == 0 {
             return corrupted("ExMediaAtom external object ID must be positive");
         }
-        let flags = self.loop_playback as u16
-            | (self.rewind_after_playing as u16) << 1
-            | (self.narration as u16) << 2;
+        let flags = u16::from(self.loop_playback)
+            | u16::from(self.rewind_after_playing) << 1
+            | u16::from(self.narration) << 2;
         let mut bytes = [0; 16];
         bytes[2..4].copy_from_slice(&RecordType::ExternalMediaAtom.as_u16().to_le_bytes());
         bytes[4..8].copy_from_slice(&8u32.to_le_bytes());
@@ -64,6 +86,13 @@ impl Media {
 }
 
 impl Video {
+    /// Parse one `ExVideoContainer` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the container header is invalid, the child sequence
+    /// is malformed, or the container does not hold one media atom and at most
+    /// one path atom.
     pub fn parse(record: &Record) -> Result<Self> {
         if record.version != 0x0f
             || record.instance != 0
@@ -83,10 +112,22 @@ impl Video {
         Ok(Self { media, path })
     }
 
+    /// Serialize this container and reparse it as a generic [`Record`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the bytes cannot be reparsed
+    /// as a record.
     pub fn to_record(&self) -> Result<Record> {
         Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 
+    /// Serialize this container, including its optional path atom.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the media atom carries the narration flag or the
+    /// path violates the `UncOrLocalPathAtom` limits.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         if self.media.narration {
             return corrupted("video ExMediaAtom cannot have the narration flag set");
@@ -122,6 +163,13 @@ impl MovieKind {
 }
 
 impl Movie {
+    /// Parse one external movie container (`ExAviMovieContainer` or
+    /// `ExMciMovieContainer`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the container header or record type is invalid, or
+    /// the container does not hold exactly one `ExVideoContainer`.
     pub fn parse(record: &Record) -> Result<Self> {
         if record.version != 0x0f || record.instance != 0 {
             return corrupted("external movie container has an invalid header");
@@ -137,10 +185,21 @@ impl Movie {
         })
     }
 
+    /// Serialize this container and reparse it as a generic [`Record`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the bytes cannot be reparsed
+    /// as a record.
     pub fn to_record(&self) -> Result<Record> {
         Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 
+    /// Serialize this container, wrapping its `ExVideoContainer`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the nested video container fails serialization.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         record_bytes(
             0x0f,
@@ -169,6 +228,13 @@ impl LinkedAudioKind {
 }
 
 impl LinkedAudio {
+    /// Parse one linked audio container (`ExMidiAudioContainer` or
+    /// `ExWAVAudioLinkContainer`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the container header or record type is invalid, or
+    /// the container does not hold one media atom and at most one path atom.
     pub fn parse(record: &Record) -> Result<Self> {
         if record.version != 0x0f || record.instance != 0 {
             return corrupted("linked audio container has an invalid header");
@@ -185,10 +251,22 @@ impl LinkedAudio {
         })
     }
 
+    /// Serialize this container and reparse it as a generic [`Record`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the bytes cannot be reparsed
+    /// as a record.
     pub fn to_record(&self) -> Result<Record> {
         Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 
+    /// Serialize this container, including its optional path atom.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the media atom fails validation or the path
+    /// violates the `UncOrLocalPathAtom` limits.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         let mut children = self.media.to_record_bytes()?.to_vec();
         if let Some(path) = &self.path {
@@ -204,6 +282,13 @@ impl LinkedAudio {
 }
 
 impl EmbeddedWav {
+    /// Parse one `ExWAVAudioEmbeddedContainer` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the container header is invalid, the container does
+    /// not hold exactly one media atom and one embedded-audio atom, or the
+    /// duration is negative.
     pub fn parse(record: &Record) -> Result<Self> {
         if record.version != 0x0f
             || record.instance != 0
@@ -227,18 +312,24 @@ impl EmbeddedWav {
         {
             return corrupted("ExWAVAudioEmbeddedAtom has an invalid header or size");
         }
-        let sound_id = u32::from_le_bytes(atom.data[..4].try_into().expect("fixed slice"));
-        let duration_ms = i32::from_le_bytes(atom.data[4..].try_into().expect("fixed slice"));
+        let sound_id = u32::from_le_bytes([atom.data[0], atom.data[1], atom.data[2], atom.data[3]]);
+        let duration_ms =
+            i32::from_le_bytes([atom.data[4], atom.data[5], atom.data[6], atom.data[7]]);
         if duration_ms < 0 {
             return corrupted("ExWAVAudioEmbeddedAtom duration cannot be negative");
         }
         Ok(Self {
             media,
             sound_id: (sound_id != 0).then_some(sound_id),
-            duration_ms: duration_ms as u32,
+            duration_ms: duration_ms.cast_unsigned(),
         })
     }
 
+    /// Validate the embedded sound reference against a sound collection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the referenced sound ID is absent from `sounds`.
     pub fn validate_sound_collection(&self, sounds: &SoundCollection<'_>) -> Result<()> {
         if let Some(id) = self.sound_id
             && sounds.get(id).is_none()
@@ -248,10 +339,22 @@ impl EmbeddedWav {
         Ok(())
     }
 
+    /// Serialize this container and reparse it as a generic [`Record`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the bytes cannot be reparsed
+    /// as a record.
     pub fn to_record(&self) -> Result<Record> {
         Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 
+    /// Serialize this container with its embedded-audio atom.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the duration exceeds the signed 32-bit range or the
+    /// media atom fails validation.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         if self.duration_ms > i32::MAX as u32 {
             return corrupted("embedded WAV duration exceeds the signed 32-bit range");
@@ -276,6 +379,7 @@ impl EmbeddedWav {
 }
 
 impl Object {
+    #[must_use]
     pub fn id(&self) -> u32 {
         match self {
             Self::Movie(value) => value.video.media.id,
@@ -286,6 +390,10 @@ impl Object {
     }
 
     /// Serialize one complete typed external-media object container.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         match self {
             Self::Movie(value) => value.to_record_bytes(),
@@ -298,14 +406,18 @@ impl Object {
 
 impl Collection {
     /// Discover the single `ExObjListContainer`, if present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(root: &Record) -> Result<Option<Self>> {
         let result = Self::parse_media_only(root)?;
         let hyperlinks = Hyperlinks::parse(root)?;
-        if let Some(result) = &result
+        if let Some(collection) = &result
             && hyperlinks
                 .hyperlinks
                 .iter()
-                .any(|hyperlink| result.get(hyperlink.id).is_some())
+                .any(|hyperlink| collection.get(hyperlink.id).is_some())
         {
             return corrupted("external-object list reuses an ID for media and a hyperlink");
         }
@@ -344,16 +456,21 @@ impl Collection {
         {
             return corrupted("ExObjListAtom has an invalid header or size");
         }
-        let signed_seed = i32::from_le_bytes(atom.data[..4].try_into().expect("fixed slice"));
+        let signed_seed =
+            i32::from_le_bytes([atom.data[0], atom.data[1], atom.data[2], atom.data[3]]);
         if signed_seed < 1 {
             return corrupted("ExObjListAtom identifier seed must be positive");
         }
-        let id_seed = signed_seed as u32;
+        let id_seed = signed_seed.cast_unsigned();
         let mut ids = HashSet::new();
         let mut objects = Vec::new();
         let mut unknown_records = Vec::new();
         for child in &children[1..] {
-            let object = match child.record_type {
+            #[allow(
+                clippy::wildcard_enum_match_arm,
+                reason = "every other `RecordType` variant is retained verbatim as an opaque record"
+            )]
+            let parsed_object = match child.record_type {
                 RecordType::ExternalAviMovie | RecordType::ExternalMciMovie => {
                     Some(Object::Movie(Movie::parse(child)?))
                 },
@@ -369,7 +486,9 @@ impl Collection {
                     None
                 },
             };
-            let Some(object) = object else { continue };
+            let Some(object) = parsed_object else {
+                continue;
+            };
             if objects.len() >= MAX_EXTERNAL_MEDIA_OBJECTS {
                 return corrupted(format!(
                     "external-object list exceeds {MAX_EXTERNAL_MEDIA_OBJECTS} media objects"
@@ -395,29 +514,35 @@ impl Collection {
         })
     }
 
+    #[must_use]
     pub fn get(&self, id: u32) -> Option<&Object> {
         self.objects.iter().find(|object| object.id() == id)
     }
 
     /// Unmodeled `ExObjList` children retained in source order.
+    #[must_use]
     pub fn unknown_records(&self) -> &[UnknownRecord] {
         &self.unknown_records
     }
 
     /// Validate every non-null embedded WAV reference without decoding sound data.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn validate_sound_collection(&self, sounds: Option<&SoundCollection<'_>>) -> Result<()> {
         for object in &self.objects {
             let Object::EmbeddedWav(value) = object else {
                 continue;
             };
             if value.sound_id.is_some() {
-                let sounds = sounds.ok_or_else(|| {
+                let sound_collection = sounds.ok_or_else(|| {
                     Error::Corrupted(
                         "embedded WAV references a sound but the document has no SoundCollection"
                             .to_string(),
                     )
                 })?;
-                value.validate_sound_collection(sounds)?;
+                value.validate_sound_collection(sound_collection)?;
             }
         }
         Ok(())
@@ -425,9 +550,13 @@ impl Collection {
 
     /// Serialize the complete `ExObjListContainer`, retaining opaque child
     /// records in their original relative positions.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         let seed = i32::try_from(self.id_seed)
-            .map_err(|_| Error::Corrupted("ExObjListAtom identifier seed exceeds i32".into()))?;
+            .map_err(|_err| Error::Corrupted("ExObjListAtom identifier seed exceeds i32".into()))?;
         let mut payload = record_bytes(
             0,
             0,
@@ -455,26 +584,34 @@ impl Collection {
 
 impl UnknownRecord {
     /// The original raw record type value.
+    #[must_use]
     pub fn record_type(&self) -> u16 {
         self.record.record_type_raw
     }
 
     /// The original record version.
+    #[must_use]
     pub fn version(&self) -> u16 {
         self.record.version
     }
 
     /// The original record instance.
+    #[must_use]
     pub fn instance(&self) -> u16 {
         self.record.instance
     }
 
     /// The original record payload, borrowed from this collection snapshot.
+    #[must_use]
     pub fn data(&self) -> &[u8] {
         &self.record.data
     }
 
     /// Reconstruct the exact header and payload retained by this record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         record_bytes(
             self.record.version,
@@ -492,50 +629,12 @@ impl UnknownRecord {
     }
 }
 
-fn collect_external_object_lists<'a>(record: &'a Record, lists: &mut Vec<&'a Record>) {
-    if record.record_type == RecordType::ExObjList {
-        lists.push(record);
-    }
-    for child in &record.children {
-        collect_external_object_lists(child, lists);
-    }
-}
-
-fn parse_path(record: &Record) -> Result<String> {
-    if record.version != 0
-        || record.instance != 0
-        || record.record_type_raw != RecordType::CString.as_u16()
-        || !record.data.len().is_multiple_of(2)
-        || record.data.len() / 2 > MAX_PATH_UNITS
-    {
-        return corrupted("UncOrLocalPathAtom has an invalid header or size");
-    }
-    let units = record
-        .data
-        .chunks_exact(2)
-        .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
-        .collect::<Vec<_>>();
-    if units.contains(&0) {
-        return corrupted("UncOrLocalPathAtom contains an embedded null");
-    }
-    String::from_utf16(&units)
-        .map_err(|_| Error::Corrupted("UncOrLocalPathAtom contains invalid UTF-16".to_string()))
-}
-
-fn encode_path(path: &str) -> Result<Vec<u8>> {
-    let units = path.encode_utf16().collect::<Vec<_>>();
-    if units.len() > MAX_PATH_UNITS {
-        return corrupted(format!(
-            "UncOrLocalPathAtom exceeds {MAX_PATH_UNITS} UTF-16 units"
-        ));
-    }
-    if units.contains(&0) {
-        return corrupted("UncOrLocalPathAtom contains an embedded null");
-    }
-    Ok(units.into_iter().flat_map(u16::to_le_bytes).collect())
-}
-
 impl CdTime {
+    /// Build one validated `TmsfTimeStruct` CD time value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any component is outside its valid range.
     pub fn new(track: u8, minute: u8, second: u8, frame: u8) -> Result<Self> {
         let value = Self {
             track,
@@ -568,6 +667,13 @@ impl CdTime {
 }
 
 impl CdAudio {
+    /// Parse one `ExCDAudioContainer` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the container header is invalid, the container does
+    /// not hold exactly one media atom and one CD-audio atom, or the start
+    /// time is later than the end time.
     pub fn parse(record: &Record) -> Result<Self> {
         if record.version != 0x0f
             || record.instance != 0
@@ -597,10 +703,22 @@ impl CdAudio {
         Ok(Self { media, start, end })
     }
 
+    /// Serialize this container and reparse it as a generic [`Record`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the bytes cannot be reparsed
+    /// as a record.
     pub fn to_record(&self) -> Result<Record> {
         Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 
+    /// Serialize this container with its CD-audio atom.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either time component is out of range or the start
+    /// time is later than the end time.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         self.start.validate()?;
         self.end.validate()?;
@@ -621,6 +739,49 @@ impl CdAudio {
     }
 }
 
+fn collect_external_object_lists<'a>(record: &'a Record, lists: &mut Vec<&'a Record>) {
+    if record.record_type == RecordType::ExObjList {
+        lists.push(record);
+    }
+    for child in &record.children {
+        collect_external_object_lists(child, lists);
+    }
+}
+
+fn parse_path(record: &Record) -> Result<String> {
+    if record.version != 0
+        || record.instance != 0
+        || record.record_type_raw != RecordType::CString.as_u16()
+        || !record.data.len().is_multiple_of(2)
+        || record.data.len() / 2 > MAX_PATH_UNITS
+    {
+        return corrupted("UncOrLocalPathAtom has an invalid header or size");
+    }
+    let units = record
+        .data
+        .chunks_exact(2)
+        .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
+        .collect::<Vec<_>>();
+    if units.contains(&0) {
+        return corrupted("UncOrLocalPathAtom contains an embedded null");
+    }
+    String::from_utf16(&units)
+        .map_err(|_err| Error::Corrupted("UncOrLocalPathAtom contains invalid UTF-16".to_string()))
+}
+
+fn encode_path(path: &str) -> Result<Vec<u8>> {
+    let units = path.encode_utf16().collect::<Vec<_>>();
+    if units.len() > MAX_PATH_UNITS {
+        return corrupted(format!(
+            "UncOrLocalPathAtom exceeds {MAX_PATH_UNITS} UTF-16 units"
+        ));
+    }
+    if units.contains(&0) {
+        return corrupted("UncOrLocalPathAtom contains an embedded null");
+    }
+    Ok(units.into_iter().flat_map(u16::to_le_bytes).collect())
+}
+
 pub(crate) fn record_bytes(
     version: u16,
     instance: u16,
@@ -628,7 +789,7 @@ pub(crate) fn record_bytes(
     data: &[u8],
 ) -> Result<Vec<u8>> {
     let length = u32::try_from(data.len())
-        .map_err(|_| Error::Corrupted("PowerPoint record payload exceeds u32".to_string()))?;
+        .map_err(|_err| Error::Corrupted("PowerPoint record payload exceeds u32".to_string()))?;
     let mut bytes = Vec::with_capacity(8usize.saturating_add(data.len()));
     bytes.extend_from_slice(&((instance << 4) | version).to_le_bytes());
     bytes.extend_from_slice(&record_type.to_le_bytes());

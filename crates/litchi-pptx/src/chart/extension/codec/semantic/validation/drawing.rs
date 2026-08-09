@@ -1,6 +1,14 @@
-//! Drawing, labels, and series validation concerns for the ChartEx graph.
+//! Drawing, labels, and series validation concerns for the `ChartEx` graph.
 
-use super::*;
+use super::{
+    A, A_STRICT, CX, ColorKind, ColorPosition, DataLabel, DataLabelPosition, DataLabelVisibility,
+    DataLabels, DataPoint, DrawingPayload, MAX_AXIS_REFS_PER_SERIES, MAX_DATA_LABELS,
+    MAX_LABEL_TEXT_BYTES, MAX_SERIES_POINTS, MiniNode, NumberFormat, Result, SeriesDataReference,
+    SeriesLayout, SolidColor, Text, ValueColorPositions, ValueColors, bounded_optional,
+    bounded_required, invalid, invalid_error, limit, optional, parse_bool, parse_formula,
+    parse_layout_properties, parse_u32, reject_unknown, require_empty_content,
+    require_empty_element, required, valid_xml_double,
+};
 use std::collections::HashSet;
 
 pub(super) fn parse_drawing_payload(node: &MiniNode, label: &str) -> Result<DrawingPayload> {
@@ -221,7 +229,7 @@ pub(super) fn parse_color_position(node: &MiniNode, allow_extreme: bool) -> Resu
             let value = parse_position_value(child, "percent color position")?;
             let number = value
                 .parse::<f64>()
-                .map_err(|_| invalid_error("invalid  percent color position"))?;
+                .map_err(|_err| invalid_error("invalid  percent color position"))?;
             if !number.is_finite() || !(0.0..=100.0).contains(&number) {
                 return invalid("invalid  percent color position");
             }
@@ -251,7 +259,7 @@ pub(super) fn parse_data_point(node: &MiniNode) -> Result<DataPoint> {
         }
         match child.name.as_str() {
             "spPr" if shape_properties.is_none() && !ext_seen => {
-                shape_properties = Some(parse_drawing_payload(child, "data point spPr")?)
+                shape_properties = Some(parse_drawing_payload(child, "data point spPr")?);
             },
             "extLst" if !ext_seen => ext_seen = true,
             _ => {

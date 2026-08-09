@@ -1,8 +1,8 @@
-//! Contextual values for the bounded ChartEx container and data-index graph.
+//! Contextual values for the bounded `ChartEx` container and data-index graph.
 
 use super::super::style::{ColorDocument, Document as StyleDocument};
 
-/// Typed metadata from the bounded ChartEx container and data-index core.
+/// Typed metadata from the bounded `ChartEx` container and data-index core.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Info {
     pub version: String,
@@ -216,7 +216,7 @@ pub struct SeriesDataReference {
     pub axis_ids: Vec<u32>,
 }
 
-/// A DrawingML subtree retained by the document's lossless source XML.
+/// A `DrawingML` subtree retained by the document's lossless source XML.
 /// Only its bounded, namespace-checked outer payload is exposed here.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DrawingPayload {

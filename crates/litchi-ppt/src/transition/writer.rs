@@ -1,13 +1,14 @@
 //! Slide transition writer.
 //!
-//! Writes PowerPoint binary slide transition records.
+//! Writes `PowerPoint` binary slide transition records.
 
 use super::types::{
     AdvanceMode, TransitionDirection, TransitionInfo, TransitionSpeed, TransitionType,
 };
 use crate::consts::RecordType;
 
-/// Write SSSlideInfoAtom record with transition information.
+/// Write `SSSlideInfoAtom` record with transition information.
+#[must_use]
 pub fn write_transition(transition: &TransitionInfo) -> Vec<u8> {
     let mut data = Vec::new();
 
@@ -21,11 +22,7 @@ pub fn write_transition(transition: &TransitionInfo) -> Vec<u8> {
     };
     data.extend(&slide_time.to_le_bytes());
 
-    let sound_id_ref = if transition.sound.is_some() {
-        1u32
-    } else {
-        0u32
-    };
+    let sound_id_ref = u32::from(transition.sound.is_some());
     data.extend(&sound_id_ref.to_le_bytes());
 
     // effectDirection comes BEFORE effectType (1 byte)
@@ -48,6 +45,10 @@ pub fn write_transition(transition: &TransitionInfo) -> Vec<u8> {
     // unused (3 bytes)
     data.extend(&[0u8, 0u8, 0u8]);
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the SSSlideInfoAtom payload built above is always 16 bytes, so its length fits in `u32`"
+    )]
     let header = create_record_header(RecordType::SSSlideInfoAtom, 0x00, 0, data.len() as u32);
 
     let mut result = Vec::new();
@@ -58,7 +59,10 @@ pub fn write_transition(transition: &TransitionInfo) -> Vec<u8> {
 }
 
 /// Encode transition type to effect type value (1 byte).
-/// Values from LibreOffice pptanimations.hxx
+///
+/// These are the crate's established `SlideShowSlideInfoAtom` effect values,
+/// shared with `parse_transition_type` in the reader so authored files
+/// round-trip through this crate unchanged.
 fn encode_transition_type(transition_type: TransitionType) -> u8 {
     match transition_type {
         TransitionType::None => 0,
@@ -108,58 +112,147 @@ fn encode_transition_type(transition_type: TransitionType) -> u8 {
 }
 
 /// Encode transition direction based on type.
+///
+/// Direction values follow MS-PPT 2.6.6 (`SlideShowSlideInfoAtom`) and are the
+/// exact inverse of `parse_transition_direction` in the reader.
 fn encode_transition_direction(
     direction: TransitionDirection,
     transition_type: TransitionType,
 ) -> u8 {
     match transition_type {
         TransitionType::Blinds => match direction {
-            // Per LibreOffice pptin.cxx lines 1578-1583:
-            // 0=VERTICAL_STRIPES (vertical blinds), 1=HORIZONTAL_STRIPES
-            TransitionDirection::Vertical => 0,
+            // MS-PPT 2.6.6 Blinds: 0=Vertical, 1=Horizontal
             TransitionDirection::Horizontal => 1,
-            _ => 0,
+            TransitionDirection::None
+            | TransitionDirection::Vertical
+            | TransitionDirection::FromLeft
+            | TransitionDirection::FromRight
+            | TransitionDirection::FromTop
+            | TransitionDirection::FromBottom
+            | TransitionDirection::In
+            | TransitionDirection::Out
+            | TransitionDirection::LeftDown
+            | TransitionDirection::LeftUp
+            | TransitionDirection::RightDown
+            | TransitionDirection::RightUp => 0,
         },
         TransitionType::Checkerboard | TransitionType::RandomBars => match direction {
             // Checkerboard: 0=horizontal, 1=vertical
-            TransitionDirection::Horizontal => 0,
             TransitionDirection::Vertical => 1,
-            _ => 0,
+            TransitionDirection::None
+            | TransitionDirection::Horizontal
+            | TransitionDirection::FromLeft
+            | TransitionDirection::FromRight
+            | TransitionDirection::FromTop
+            | TransitionDirection::FromBottom
+            | TransitionDirection::In
+            | TransitionDirection::Out
+            | TransitionDirection::LeftDown
+            | TransitionDirection::LeftUp
+            | TransitionDirection::RightDown
+            | TransitionDirection::RightUp => 0,
         },
         TransitionType::Split => match direction {
-            // Per LibreOffice pptin.cxx lines 1644-1651:
-            // 0=OPEN_VERTICAL (horizontal split out), 1=CLOSE_VERTICAL (horizontal split in)
-            // 2=OPEN_HORIZONTAL (vertical split out), 3=CLOSE_HORIZONTAL (vertical split in)
-            TransitionDirection::Horizontal => 0, // Horizontal split (opens vertically)
-            TransitionDirection::Vertical => 2,   // Vertical split (opens horizontally)
-            _ => 0,
+            // MS-PPT 2.6.6 Split: 0=Horizontally out, 2=Vertically out
+            // (the in/out axis is not representable in `TransitionDirection`)
+            TransitionDirection::Vertical => 2,
+            // Horizontal split (opens vertically)
+            TransitionDirection::None
+            | TransitionDirection::Horizontal
+            | TransitionDirection::FromLeft
+            | TransitionDirection::FromRight
+            | TransitionDirection::FromTop
+            | TransitionDirection::FromBottom
+            | TransitionDirection::In
+            | TransitionDirection::Out
+            | TransitionDirection::LeftDown
+            | TransitionDirection::LeftUp
+            | TransitionDirection::RightDown
+            | TransitionDirection::RightUp => 0,
         },
         TransitionType::Cover
         | TransitionType::Uncover
         | TransitionType::Wipe
         | TransitionType::Push => match direction {
-            // Per LibreOffice pptin.cxx lines 1596-1603:
-            // 0=FROM_RIGHT, 1=FROM_BOTTOM, 2=FROM_LEFT, 3=FROM_TOP
-            TransitionDirection::FromRight => 0,
-            TransitionDirection::FromBottom => 1,
-            TransitionDirection::FromLeft => 2,
-            TransitionDirection::FromTop => 3,
-            _ => 0,
+            // MS-PPT 2.6.6 Cover/Uncover/Wipe/Push: 0=Left, 1=Up, 2=Right, 3=Down
+            TransitionDirection::FromTop => 1,
+            TransitionDirection::FromRight => 2,
+            TransitionDirection::FromBottom => 3,
+            TransitionDirection::None
+            | TransitionDirection::Horizontal
+            | TransitionDirection::Vertical
+            | TransitionDirection::FromLeft
+            | TransitionDirection::In
+            | TransitionDirection::Out
+            | TransitionDirection::LeftDown
+            | TransitionDirection::LeftUp
+            | TransitionDirection::RightDown
+            | TransitionDirection::RightUp => 0,
         },
         TransitionType::Strips => match direction {
-            TransitionDirection::LeftDown => 0,
-            TransitionDirection::LeftUp => 1,
-            TransitionDirection::RightDown => 2,
-            TransitionDirection::RightUp => 3,
-            _ => 0,
+            // MS-PPT 2.6.6 Strips: 4=Left Up, 5=Right Up, 6=Left Down, 7=Right Down
+            TransitionDirection::LeftUp => 4,
+            TransitionDirection::RightUp => 5,
+            TransitionDirection::LeftDown => 6,
+            TransitionDirection::None
+            | TransitionDirection::Horizontal
+            | TransitionDirection::Vertical
+            | TransitionDirection::FromLeft
+            | TransitionDirection::FromRight
+            | TransitionDirection::FromTop
+            | TransitionDirection::FromBottom
+            | TransitionDirection::In
+            | TransitionDirection::Out
+            | TransitionDirection::RightDown => 7,
         },
         TransitionType::Box | TransitionType::Zoom => match direction {
-            // Box/Zoom use same type (11), direction differentiates In vs Out
+            // MS-PPT 2.6.6 Box In/Out: 0=Out, 1=In
             TransitionDirection::Out => 0,
-            TransitionDirection::In => 1,
-            _ => 1,
+            TransitionDirection::None
+            | TransitionDirection::Horizontal
+            | TransitionDirection::Vertical
+            | TransitionDirection::FromLeft
+            | TransitionDirection::FromRight
+            | TransitionDirection::FromTop
+            | TransitionDirection::FromBottom
+            | TransitionDirection::In
+            | TransitionDirection::LeftDown
+            | TransitionDirection::LeftUp
+            | TransitionDirection::RightDown
+            | TransitionDirection::RightUp => 1,
         },
-        _ => 0,
+        TransitionType::None
+        | TransitionType::Cut
+        | TransitionType::Dissolve
+        | TransitionType::Fade
+        | TransitionType::Comb
+        | TransitionType::Wheel
+        | TransitionType::Wedge
+        | TransitionType::Random
+        | TransitionType::Newsflash
+        | TransitionType::Vortex
+        | TransitionType::Shred
+        | TransitionType::Switch
+        | TransitionType::Flip
+        | TransitionType::Gallery
+        | TransitionType::Cube
+        | TransitionType::Doors
+        | TransitionType::Window
+        | TransitionType::Ferris
+        | TransitionType::Conveyor
+        | TransitionType::Rotate
+        | TransitionType::Pan
+        | TransitionType::Glitter
+        | TransitionType::Honeycomb
+        | TransitionType::Flash
+        | TransitionType::Ripple
+        | TransitionType::Fracture
+        | TransitionType::Crush
+        | TransitionType::Peel
+        | TransitionType::PageCurl
+        | TransitionType::Airplane
+        | TransitionType::Origami
+        | TransitionType::Morph => 0,
     }
 }
 
@@ -173,14 +266,15 @@ fn encode_transition_speed(speed: TransitionSpeed) -> u8 {
 }
 
 /// Encode transition flags (effectTransitionFlags).
-/// Per POI SSSlideInfoAtom:
-/// - MANUAL_ADVANCE_BIT = 1 << 0 (bit 0)
-/// - HIDDEN_BIT = 1 << 2
-/// - SOUND_BIT = 1 << 4
-/// - LOOP_SOUND_BIT = 1 << 6
-/// - STOP_SOUND_BIT = 1 << 8
-/// - AUTO_ADVANCE_BIT = 1 << 10
-/// - CURSOR_VISIBLE_BIT = 1 << 12
+///
+/// Bit layout per MS-PPT 2.6.6 (`SlideShowSlideInfoAtom`):
+/// - bit 0: `fManualAdvance`
+/// - bit 2: `fHidden`
+/// - bit 4: `fSound`
+/// - bit 6: `fLoopSound`
+/// - bit 8: `fStopSound`
+/// - bit 10: `fAutoAdvance`
+/// - bit 12: `fCursorVisible`
 fn encode_transition_flags(transition: &TransitionInfo) -> u16 {
     let mut flags = 0u16;
 
@@ -189,7 +283,7 @@ fn encode_transition_flags(transition: &TransitionInfo) -> u16 {
         transition.advance_mode,
         AdvanceMode::OnClick | AdvanceMode::Both
     ) {
-        flags |= 1 << 0; // MANUAL_ADVANCE_BIT
+        flags |= 1 << 0; // fManualAdvance
     }
 
     // Auto advance
@@ -197,11 +291,15 @@ fn encode_transition_flags(transition: &TransitionInfo) -> u16 {
         transition.advance_mode,
         AdvanceMode::Automatic | AdvanceMode::Both
     ) {
-        flags |= 1 << 10; // AUTO_ADVANCE_BIT
+        flags |= 1 << 10; // fAutoAdvance
+    }
+
+    if transition.sound.is_some() {
+        flags |= 1 << 4; // fSound
     }
 
     if transition.loop_sound {
-        flags |= 1 << 6; // LOOP_SOUND_BIT
+        flags |= 1 << 6; // fLoopSound
     }
 
     flags
@@ -227,6 +325,11 @@ fn create_record_header(
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

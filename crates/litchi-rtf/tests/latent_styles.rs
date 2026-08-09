@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{LatentStyleException, LatentStyles, RtfDocument, RtfError, RtfWriter};
 use std::borrow::Cow;
 use std::fs;
@@ -71,7 +80,7 @@ fn mutation_validates_and_clear_preserves_body() {
             priority: Some(10),
         }],
     };
-    let mut document = RtfDocument::parse(r#"{\rtf1 Text}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Text}").unwrap();
     document.set_latent_styles(styles.clone()).unwrap();
     let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.latent_styles(), Some(&styles));
@@ -85,18 +94,18 @@ fn mutation_validates_and_clear_preserves_body() {
 #[test]
 fn rejects_malformed_or_active_latent_style_grammar() {
     let cases = [
-        r#"{\rtf1{\latentstyles\lsdstimax1}}"#,
-        r#"{\rtf1{\*\latentstyles\lsdlockeddef0}}"#,
-        r#"{\rtf1{\*\latentstyles\lsdstimax1\lsdstimax1}}"#,
-        r#"{\rtf1{\*\latentstyles\lsdstimax1\lsdlockeddef2}}"#,
-        r#"{\rtf1{\*\latentstyles\lsdstimax1\lsdprioritydef100}}"#,
-        r#"{\rtf1{\*\latentstyles\lsdstimax1{\lsdlockedexcept Name}}}"#,
-        r#"{\rtf1{\*\latentstyles\lsdstimax1{\lsdlockedexcept ;}}}"#,
-        r#"{\rtf1{\*\latentstyles\lsdstimax1{\lsdlockedexcept Normal;Normal;}}}"#,
-        r#"{\rtf1{\*\latentstyles\lsdstimax1{\lsdlockedexcept \lsdqformat1\lsdqformat0 Name;}}}"#,
-        r#"{\rtf1{\*\latentstyles\lsdstimax1{\lsdlockedexcept {Name;}}}}"#,
-        r#"{\rtf1{\*\latentstyles\lsdstimax1{\lsdlockedexcept\bin2 xx}}}"#,
-        r#"{\rtf1\lsdstimax1}"#,
+        r"{\rtf1{\latentstyles\lsdstimax1}}",
+        r"{\rtf1{\*\latentstyles\lsdlockeddef0}}",
+        r"{\rtf1{\*\latentstyles\lsdstimax1\lsdstimax1}}",
+        r"{\rtf1{\*\latentstyles\lsdstimax1\lsdlockeddef2}}",
+        r"{\rtf1{\*\latentstyles\lsdstimax1\lsdprioritydef100}}",
+        r"{\rtf1{\*\latentstyles\lsdstimax1{\lsdlockedexcept Name}}}",
+        r"{\rtf1{\*\latentstyles\lsdstimax1{\lsdlockedexcept ;}}}",
+        r"{\rtf1{\*\latentstyles\lsdstimax1{\lsdlockedexcept Normal;Normal;}}}",
+        r"{\rtf1{\*\latentstyles\lsdstimax1{\lsdlockedexcept \lsdqformat1\lsdqformat0 Name;}}}",
+        r"{\rtf1{\*\latentstyles\lsdstimax1{\lsdlockedexcept {Name;}}}}",
+        r"{\rtf1{\*\latentstyles\lsdstimax1{\lsdlockedexcept\bin2 xx}}}",
+        r"{\rtf1\lsdstimax1}",
     ];
     for rtf in cases {
         assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");

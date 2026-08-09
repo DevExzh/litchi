@@ -336,7 +336,10 @@ impl ContentValidation {
     }
 }
 
-pub(crate) fn validate_collection(validations: &[ContentValidation]) -> Result<()> {
+/// # Errors
+///
+/// Returns an error when a value violates the format or resource constraints.
+pub fn validate_collection(validations: &[ContentValidation]) -> Result<()> {
     let mut names = HashSet::with_capacity(validations.len());
     for validation in validations {
         validation.validate()?;
@@ -350,7 +353,7 @@ pub(crate) fn validate_collection(validations: &[ContentValidation]) -> Result<(
     Ok(())
 }
 
-pub(crate) fn write(out: &mut String, validations: &[ContentValidation]) {
+pub fn write(out: &mut String, validations: &[ContentValidation]) {
     if validations.is_empty() {
         return;
     }
@@ -568,7 +571,14 @@ fn write_bool_attribute(out: &mut String, name: &str, value: bool) {
     write_optional_attribute(out, name, Some(if value { "true" } else { "false" }));
 }
 
-pub(crate) fn parse(xml: &str) -> Result<Vec<ContentValidation>> {
+/// # Errors
+///
+/// Returns an error when the input is malformed or exceeds the parser's resource limits.
+///
+/// # Panics
+///
+/// Panics if the parser's internal state becomes inconsistent; every `expect` is guarded by a preceding state check.
+pub fn parse(xml: &str) -> Result<Vec<ContentValidation>> {
     let mut reader = NsReader::from_str(xml);
     let mut buf = Vec::new();
     let mut validations = Vec::new();

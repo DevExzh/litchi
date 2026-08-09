@@ -17,13 +17,17 @@ pub struct ContentType(String);
 
 impl ContentType {
     /// Validate and construct a content type.
+    ///
+    /// # Errors
+    /// Returns an error if the value does not conform to the MIME grammar
+    /// required by OPC.
     pub fn new(value: impl Into<String>) -> Result<Self> {
-        let value = value.into();
-        validate_content_type(&value).map_err(|reason| OpcError::InvalidContentType {
-            value: value.clone(),
+        let text = value.into();
+        validate_content_type(&text).map_err(|reason| OpcError::InvalidContentType {
+            value: text.clone(),
             reason,
         })?;
-        Ok(Self(value))
+        Ok(Self(text))
     }
 
     /// Return the serialized content type.
@@ -52,68 +56,6 @@ impl TryFrom<&str> for ContentType {
     fn try_from(value: &str) -> Result<Self> {
         Self::new(value)
     }
-}
-
-fn validate_content_type(value: &str) -> std::result::Result<(), String> {
-    let mut components = value.split(';');
-    let media_type = components.next().unwrap_or_default();
-    let Some((type_name, subtype)) = media_type.split_once('/') else {
-        return Err("missing type/subtype separator".to_string());
-    };
-    if !is_token(type_name) || !is_token(subtype) {
-        return Err("type and subtype must be non-empty ASCII tokens".to_string());
-    }
-
-    for parameter in components {
-        let Some((name, raw_value)) = parameter.split_once('=') else {
-            return Err("content type parameter is missing '='".to_string());
-        };
-        if !is_token(name) {
-            return Err("content type parameter name is not an ASCII token".to_string());
-        }
-        let parameter_value = if raw_value.starts_with('"') && raw_value.ends_with('"') {
-            raw_value
-                .strip_prefix('"')
-                .and_then(|value| value.strip_suffix('"'))
-                .unwrap_or_default()
-        } else {
-            raw_value
-        };
-        if !is_token(parameter_value)
-            || (raw_value.contains('"')
-                && !(raw_value.starts_with('"') && raw_value.ends_with('"')))
-        {
-            return Err("content type parameter value is not an ASCII token".to_string());
-        }
-    }
-
-    Ok(())
-}
-
-fn is_token(value: &str) -> bool {
-    !value.is_empty()
-        && value.bytes().all(|byte| {
-            matches!(byte, 0x21..=0x7e)
-                && !matches!(
-                    byte,
-                    b'(' | b')'
-                        | b'<'
-                        | b'>'
-                        | b'@'
-                        | b','
-                        | b';'
-                        | b':'
-                        | b'\\'
-                        | b'"'
-                        | b'/'
-                        | b'['
-                        | b']'
-                        | b'?'
-                        | b'='
-                        | b'{'
-                        | b'}'
-                )
-        })
 }
 
 /// Parsed content type mappings used by the package reader.
@@ -190,7 +132,11 @@ impl ContentTypeMap {
                     ));
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Text(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::GeneralRef(_) => {},
             }
         }
 
@@ -244,6 +190,68 @@ impl ContentTypeMap {
     }
 }
 
+fn validate_content_type(value: &str) -> std::result::Result<(), String> {
+    let mut components = value.split(';');
+    let media_type = components.next().unwrap_or_default();
+    let Some((type_name, subtype)) = media_type.split_once('/') else {
+        return Err("missing type/subtype separator".to_string());
+    };
+    if !is_token(type_name) || !is_token(subtype) {
+        return Err("type and subtype must be non-empty ASCII tokens".to_string());
+    }
+
+    for parameter in components {
+        let Some((name, raw_value)) = parameter.split_once('=') else {
+            return Err("content type parameter is missing '='".to_string());
+        };
+        if !is_token(name) {
+            return Err("content type parameter name is not an ASCII token".to_string());
+        }
+        let parameter_value = if raw_value.starts_with('"') && raw_value.ends_with('"') {
+            raw_value
+                .strip_prefix('"')
+                .and_then(|quoted| quoted.strip_suffix('"'))
+                .unwrap_or_default()
+        } else {
+            raw_value
+        };
+        if !is_token(parameter_value)
+            || (raw_value.contains('"')
+                && !(raw_value.starts_with('"') && raw_value.ends_with('"')))
+        {
+            return Err("content type parameter value is not an ASCII token".to_string());
+        }
+    }
+
+    Ok(())
+}
+
+fn is_token(value: &str) -> bool {
+    !value.is_empty()
+        && value.bytes().all(|byte| {
+            matches!(byte, 0x21..=0x7e)
+                && !matches!(
+                    byte,
+                    b'(' | b')'
+                        | b'<'
+                        | b'>'
+                        | b'@'
+                        | b','
+                        | b';'
+                        | b':'
+                        | b'\\'
+                        | b'"'
+                        | b'/'
+                        | b'['
+                        | b']'
+                        | b'?'
+                        | b'='
+                        | b'{'
+                        | b'}'
+                )
+        })
+}
+
 fn inspect_element(
     map: &mut ContentTypeMap,
     resolved_namespace: &ResolveResult<'_>,
@@ -295,8 +303,8 @@ fn inspect_element(
         b"Override" => {
             let (partname, content_type) =
                 required_attributes(element, decoder, "PartName", "Override", limits)?;
-            let partname = PackURI::new(&partname).map_err(OpcError::InvalidPackUri)?;
-            map.add_override(partname, ContentType::new(content_type)?)
+            let part_uri = PackURI::new(&partname).map_err(OpcError::InvalidPackUri)?;
+            map.add_override(part_uri, ContentType::new(content_type)?)
         },
         _ => Err(OpcError::InvalidContentTypesManifest(
             "only Default and Override children are permitted".to_string(),
@@ -313,8 +321,8 @@ fn required_attributes(
 ) -> Result<(String, String)> {
     let mut key_value = None;
     let mut content_type = None;
-    for attribute in element.attributes() {
-        let attribute = attribute?;
+    for attribute_result in element.attributes() {
+        let attribute = attribute_result?;
         limits.check(
             ReadResource::XmlAttributeBytes,
             attribute.value.as_ref().len() as u64,
@@ -349,7 +357,7 @@ fn required_attributes(
     }
 
     match (key_value, content_type) {
-        (Some(key), Some(content_type)) => Ok((key, content_type)),
+        (Some(key), Some(content_type_value)) => Ok((key, content_type_value)),
         _ => Err(OpcError::InvalidContentTypesManifest(format!(
             "{element_name} requires {key_name} and ContentType attributes"
         ))),

@@ -1,16 +1,13 @@
-//! TxMasterStyleAtom builder (MS-PPT 2.9.45)
+//! `TxMasterStyleAtom` builder (MS-PPT 2.9.45)
 //!
 //! Constructs text master style atoms with proper formatting structures
 //! using zerocopy for binary serialization.
-
-use bitflags::bitflags;
-use zerocopy_derive::{Immutable, IntoBytes, KnownLayout};
 
 // =============================================================================
 // TxMasterStyleAtom Instance Types (MS-PPT 2.9.45)
 // =============================================================================
 
-/// TxMasterStyleAtom instance types
+/// `TxMasterStyleAtom` instance types
 pub mod tx_style_instance {
     pub const TITLE: u16 = 0;
     pub const BODY: u16 = 1;
@@ -23,53 +20,8 @@ pub mod tx_style_instance {
 }
 
 // =============================================================================
-// TextPFException mask bits (MS-PPT 2.9.18)
+// Backward-compatible mask constant modules
 // =============================================================================
-
-bitflags! {
-    /// Paragraph formatting mask bits (MS-PPT 2.9.18)
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub struct ParagraphMask: u32 {
-        /// Has bullet
-        const HAS_BULLET = 0x0001;
-        /// Bullet has font
-        const BULLET_HAS_FONT = 0x0002;
-        /// Bullet has color
-        const BULLET_HAS_COLOR = 0x0004;
-        /// Bullet has size
-        const BULLET_HAS_SIZE = 0x0008;
-        /// Bullet font index present
-        const BULLET_FONT = 0x0010;
-        /// Bullet color present
-        const BULLET_COLOR = 0x0020;
-        /// Bullet size present
-        const BULLET_SIZE = 0x0040;
-        /// Bullet character present
-        const BULLET_CHAR = 0x0080;
-        /// Left margin present
-        const LEFT_MARGIN = 0x0100;
-        /// Unused
-        const UNUSED = 0x0200;
-        /// Indent present
-        const INDENT = 0x0400;
-        /// Alignment present
-        const ALIGN = 0x0800;
-        /// Line spacing present
-        const LINE_SPACING = 0x1000;
-        /// Space before present
-        const SPACE_BEFORE = 0x2000;
-        /// Space after present
-        const SPACE_AFTER = 0x4000;
-        /// Default tab size present
-        const DEFAULT_TAB_SIZE = 0x8000;
-        /// Font alignment present
-        const FONT_ALIGN = 0x0001_0000;
-        /// Wrap flags present
-        const WRAP_FLAGS = 0x0002_0000;
-        /// Text direction present
-        const TEXT_DIRECTION = 0x0004_0000;
-    }
-}
 
 // Keep module for backward compatibility
 pub mod pf_mask {
@@ -92,43 +44,6 @@ pub mod pf_mask {
     pub const FONT_ALIGN: u32 = super::ParagraphMask::FONT_ALIGN.bits();
     pub const WRAP_FLAGS: u32 = super::ParagraphMask::WRAP_FLAGS.bits();
     pub const TEXT_DIRECTION: u32 = super::ParagraphMask::TEXT_DIRECTION.bits();
-}
-
-// =============================================================================
-// TextCFException mask bits (MS-PPT 2.9.6)
-// =============================================================================
-
-bitflags! {
-    /// Character formatting mask bits (MS-PPT 2.9.6)
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub struct CharacterMask: u16 {
-        /// Bold
-        const BOLD = 0x0001;
-        /// Italic
-        const ITALIC = 0x0002;
-        /// Underline
-        const UNDERLINE = 0x0004;
-        /// Unused
-        const UNUSED1 = 0x0008;
-        /// Shadow
-        const SHADOW = 0x0010;
-        /// FEHint (East Asian)
-        const FEHINT = 0x0020;
-        /// Unused
-        const UNUSED2 = 0x0040;
-        /// Kumimoji
-        const KUMI = 0x0080;
-        /// Unused
-        const UNUSED3 = 0x0100;
-        /// Emboss
-        const EMBOSS = 0x0200;
-        /// Style index present
-        const STYLE_INDEX = 0x0800;
-        /// Has scheme color
-        const HAS_SCHEME_COLOR = 0x1000;
-        /// Has shadow color
-        const HAS_SHADOW_COLOR = 0x2000;
-    }
 }
 
 // Keep module for backward compatibility
@@ -234,6 +149,95 @@ pub mod position {
     pub const OTHER_DEFAULT: u16 = 0x0012; // 18
 }
 
+use bitflags::bitflags;
+use zerocopy_derive::{Immutable, IntoBytes, KnownLayout};
+
+// =============================================================================
+// TextPFException mask bits (MS-PPT 2.9.18)
+// =============================================================================
+
+bitflags! {
+    /// Paragraph formatting mask bits (MS-PPT 2.9.18)
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct ParagraphMask: u32 {
+        /// Has bullet
+        const HAS_BULLET = 0x0001;
+        /// Bullet has font
+        const BULLET_HAS_FONT = 0x0002;
+        /// Bullet has color
+        const BULLET_HAS_COLOR = 0x0004;
+        /// Bullet has size
+        const BULLET_HAS_SIZE = 0x0008;
+        /// Bullet font index present
+        const BULLET_FONT = 0x0010;
+        /// Bullet color present
+        const BULLET_COLOR = 0x0020;
+        /// Bullet size present
+        const BULLET_SIZE = 0x0040;
+        /// Bullet character present
+        const BULLET_CHAR = 0x0080;
+        /// Left margin present
+        const LEFT_MARGIN = 0x0100;
+        /// Unused
+        const UNUSED = 0x0200;
+        /// Indent present
+        const INDENT = 0x0400;
+        /// Alignment present
+        const ALIGN = 0x0800;
+        /// Line spacing present
+        const LINE_SPACING = 0x1000;
+        /// Space before present
+        const SPACE_BEFORE = 0x2000;
+        /// Space after present
+        const SPACE_AFTER = 0x4000;
+        /// Default tab size present
+        const DEFAULT_TAB_SIZE = 0x8000;
+        /// Font alignment present
+        const FONT_ALIGN = 0x0001_0000;
+        /// Wrap flags present
+        const WRAP_FLAGS = 0x0002_0000;
+        /// Text direction present
+        const TEXT_DIRECTION = 0x0004_0000;
+    }
+}
+
+// =============================================================================
+// TextCFException mask bits (MS-PPT 2.9.6)
+// =============================================================================
+
+bitflags! {
+    /// Character formatting mask bits (MS-PPT 2.9.6)
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct CharacterMask: u16 {
+        /// Bold
+        const BOLD = 0x0001;
+        /// Italic
+        const ITALIC = 0x0002;
+        /// Underline
+        const UNDERLINE = 0x0004;
+        /// Unused
+        const UNUSED1 = 0x0008;
+        /// Shadow
+        const SHADOW = 0x0010;
+        /// FEHint (East Asian)
+        const FEHINT = 0x0020;
+        /// Unused
+        const UNUSED2 = 0x0040;
+        /// Kumimoji
+        const KUMI = 0x0080;
+        /// Unused
+        const UNUSED3 = 0x0100;
+        /// Emboss
+        const EMBOSS = 0x0200;
+        /// Style index present
+        const STYLE_INDEX = 0x0800;
+        /// Has scheme color
+        const HAS_SCHEME_COLOR = 0x1000;
+        /// Has shadow color
+        const HAS_SHADOW_COLOR = 0x2000;
+    }
+}
+
 // =============================================================================
 // Zerocopy Structs for Text Formatting
 // =============================================================================
@@ -246,11 +250,12 @@ pub struct SimpleLevelEntry {
     pub pf_mask: u32,
     /// CF mask (usually 0 or font size only)
     pub cf_mask: u16,
-    /// Font size (if cf_mask includes font size)
+    /// Font size (if `cf_mask` includes font size)
     pub font_size: u16,
 }
 
 impl SimpleLevelEntry {
+    #[must_use]
     pub const fn new(pf_mask: u32, cf_mask: u16, font_size: u16) -> Self {
         Self {
             pf_mask,
@@ -267,6 +272,7 @@ impl SimpleLevelEntry {
     };
 
     /// Entry with only font size
+    #[must_use]
     pub const fn with_font_size(font_size: u16) -> Self {
         Self {
             pf_mask: 0,
@@ -293,6 +299,7 @@ pub struct IndentedLevelEntry {
 }
 
 impl IndentedLevelEntry {
+    #[must_use]
     pub const fn new(left_margin: u16, indent: u16) -> Self {
         Self {
             pf_mask: pf_mask::LEFT_MARGIN | pf_mask::INDENT,
@@ -305,6 +312,10 @@ impl IndentedLevelEntry {
 }
 
 /// Full style level (Title, Body, Notes, Other).
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "the four `has_*` flags mirror the independent field-presence bits serialized into the `TxMasterStyleAtom`; merging them would obscure which optional fields are emitted"
+)]
 #[derive(Debug, Clone)]
 pub struct FullStyleLevel {
     // Paragraph formatting
@@ -335,7 +346,7 @@ pub struct FullStyleLevel {
     pub has_font_index: bool,
 }
 
-/// Simple style level (CenterBody, HalfBody, QuarterBody, CenterTitle).
+/// Simple style level (`CenterBody`, `HalfBody`, `QuarterBody`, `CenterTitle`).
 #[derive(Debug, Clone)]
 pub struct SimpleStyleLevel {
     pub pf_mask: u32,

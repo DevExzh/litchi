@@ -1,6 +1,6 @@
 //! Typed payload models shared by the animation behavior parsers.
 
-use super::super::support::{parse_bool1, read_i32, read_u32};
+use super::super::support::{parse_bool1, read_f32, read_i32, read_u32};
 use crate::animation::types::{
     TimeAnimateColor, TimeAnimateColorBy, TimeVariantValue, is_valid_time_formula,
 };
@@ -109,9 +109,7 @@ pub(super) fn parse_time_variant_i32(record: &Record) -> Result<i32> {
             "invalid integer time variant".to_string(),
         ));
     }
-    Ok(i32::from_le_bytes(
-        record.data[1..5].try_into().expect("length checked"),
-    ))
+    Ok(read_i32(&record.data, 1))
 }
 
 pub(super) fn parse_time_variant_f32(record: &Record) -> Result<f32> {
@@ -121,9 +119,7 @@ pub(super) fn parse_time_variant_f32(record: &Record) -> Result<f32> {
             "invalid floating-point time variant".to_string(),
         ));
     }
-    Ok(f32::from_le_bytes(
-        record.data[1..5].try_into().expect("length checked"),
-    ))
+    Ok(read_f32(&record.data, 1))
 }
 
 pub(super) fn parse_time_variant_bool(record: &Record) -> Result<bool> {
@@ -149,7 +145,7 @@ pub(crate) fn parse_time_variant_string(record: &Record) -> Result<String> {
             .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
             .collect::<Vec<_>>(),
     )
-    .map_err(|_| Error::InvalidFormat("invalid UTF-16 time variant".to_string()))
+    .map_err(|_err| Error::InvalidFormat("invalid UTF-16 time variant".to_string()))
 }
 
 pub(crate) fn require_time_variant_payload(record: &Record) -> Result<()> {

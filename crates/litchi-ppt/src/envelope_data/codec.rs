@@ -1,4 +1,8 @@
-use super::model::*;
+use super::model::{
+    EnvelopeData, EnvelopePayload, MSO_ENVELOPE_CLSID, MsoAttachment, MsoEnvelope, MsoEnvelopeText,
+    MsoEnvelopeVersion, MsoFollowUpStatus, MsoImportance, MsoPropertyValue, MsoRecipientCollection,
+    MsoRecipientProperties, MsoRecipientProperty, MsoSecurityFlags, MsoSensitivity,
+};
 use crate::consts::RecordType;
 use crate::package::{Error, Result};
 use crate::records::Record;
@@ -12,6 +16,11 @@ pub(super) const MAX_MINUTE_TIME: u32 = 0x5ae9_80e0;
 
 impl EnvelopeData {
     /// Parse one exact `EnvelopeData9Atom`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record header or atom size is invalid, or the
+    /// embedded MSO envelope payload is malformed.
     pub fn parse(record: &Record) -> Result<Self> {
         if record.record_type_raw != ENVELOPE_DATA_RECORD_TYPE
             || record.version != 0
@@ -33,6 +42,12 @@ impl EnvelopeData {
     }
 
     /// Encode a canonical inert atom.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the CLSID and payload kind disagree, the MSO
+    /// envelope payload fails validation, or the encoded atom exceeds the
+    /// resource cap.
     pub fn to_record(&self) -> Result<Record> {
         let mut data = Vec::from(self.clsid);
         match (&self.clsid, &self.payload) {
@@ -48,7 +63,7 @@ impl EnvelopeData {
             return corrupted("EnvelopeData9Atom exceeds the resource cap");
         }
         let data_length = u32::try_from(data.len())
-            .map_err(|_| Error::Corrupted("envelope length overflow".to_string()))?;
+            .map_err(|_err| Error::Corrupted("envelope length overflow".to_string()))?;
         Ok(Record {
             record_type: RecordType::from(ENVELOPE_DATA_RECORD_TYPE),
             record_type_raw: ENVELOPE_DATA_RECORD_TYPE,
@@ -253,7 +268,7 @@ impl<'a> Cursor<'a> {
 
     fn u32_blob(&mut self) -> Result<Vec<u8>> {
         let length = usize::try_from(self.u32()?)
-            .map_err(|_| Error::Corrupted("envelope blob length overflow".to_string()))?;
+            .map_err(|_err| Error::Corrupted("envelope blob length overflow".to_string()))?;
         Ok(self.take(length)?.to_vec())
     }
 
@@ -303,7 +318,7 @@ impl<'a> Cursor<'a> {
     fn property(&mut self) -> Result<MsoRecipientProperty> {
         let tag = self.u32()?;
         let property_id = (tag >> 16) as u16;
-        let value = match tag as u16 {
+        let value = match tag & 0xFFFF {
             0x0003 => MsoPropertyValue::Long(self.u32()?),
             0x0001 => MsoPropertyValue::Null(self.u32()?),
             0x000b => match self.u16()? {
@@ -352,9 +367,9 @@ impl<'a> Cursor<'a> {
             let name = self.utf16_bytes(checked_double(name_characters)?)?;
             let low = u64::from(self.u32()?);
             let high = u64::from(self.u32()?);
-            let size = (high << 32) | low;
-            let size = usize::try_from(size)
-                .map_err(|_| Error::Corrupted("attachment length overflow".to_string()))?;
+            let size_u64 = (high << 32) | low;
+            let size = usize::try_from(size_u64)
+                .map_err(|_err| Error::Corrupted("attachment length overflow".to_string()))?;
             let data = self.take(size)?.to_vec();
             attachments.push(MsoAttachment { method, name, data });
         }
@@ -363,7 +378,7 @@ impl<'a> Cursor<'a> {
 
     fn intro_text(&mut self) -> Result<Vec<u16>> {
         let bytes = usize::try_from(self.u32()?)
-            .map_err(|_| Error::Corrupted("intro-text length overflow".to_string()))?;
+            .map_err(|_err| Error::Corrupted("intro-text length overflow".to_string()))?;
         self.utf16_bytes(bytes)
     }
 
@@ -468,14 +483,13 @@ fn write_attachments(out: &mut Vec<u8>, attachments: &[MsoAttachment]) -> Result
     for attachment in attachments {
         validate_utf16(&attachment.name, "attachment name")?;
         let name_length = u8::try_from(attachment.name.len())
-            .map_err(|_| Error::Corrupted("attachment name is too long".to_string()))?;
+            .map_err(|_err| Error::Corrupted("attachment name is too long".to_string()))?;
         put_u32(out, attachment.method);
         out.push(name_length);
         put_utf16(out, &attachment.name);
         let length = u64::try_from(attachment.data.len())
-            .map_err(|_| Error::Corrupted("attachment length overflow".to_string()))?;
-        put_u32(out, length as u32);
-        put_u32(out, (length >> 32) as u32);
+            .map_err(|_err| Error::Corrupted("attachment length overflow".to_string()))?;
+        out.extend_from_slice(&length.to_le_bytes());
         out.extend_from_slice(&attachment.data);
     }
     Ok(())
@@ -501,16 +515,16 @@ fn write_u32_blob(out: &mut Vec<u8>, value: &[u8]) -> Result<()> {
 }
 
 fn put_u16_len(out: &mut Vec<u8>, length: usize, name: &str) -> Result<()> {
-    let length =
-        u16::try_from(length).map_err(|_| Error::Corrupted(format!("{name} length overflow")))?;
-    put_u16(out, length);
+    let wire_length = u16::try_from(length)
+        .map_err(|_err| Error::Corrupted(format!("{name} length overflow")))?;
+    put_u16(out, wire_length);
     Ok(())
 }
 
 fn put_u32_len(out: &mut Vec<u8>, length: usize, name: &str) -> Result<()> {
-    let length =
-        u32::try_from(length).map_err(|_| Error::Corrupted(format!("{name} length overflow")))?;
-    put_u32(out, length);
+    let wire_length = u32::try_from(length)
+        .map_err(|_err| Error::Corrupted(format!("{name} length overflow")))?;
+    put_u32(out, wire_length);
     Ok(())
 }
 
@@ -543,12 +557,12 @@ fn validate_utf16(value: &[u16], name: &str) -> Result<()> {
 }
 
 fn bounded_count(value: u32, cap: usize, name: &str) -> Result<usize> {
-    let value =
-        usize::try_from(value).map_err(|_| Error::Corrupted(format!("{name} count overflow")))?;
-    if value > cap {
+    let count = usize::try_from(value)
+        .map_err(|_err| Error::Corrupted(format!("{name} count overflow")))?;
+    if count > cap {
         return corrupted(&format!("{name} count exceeds the resource cap"));
     }
-    Ok(value)
+    Ok(count)
 }
 
 fn minute_time(value: u32, name: &str) -> Result<u32> {

@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use litchi_opc::constants::relationship_type::{CHART, STRICT_CHART};
 use litchi_opc::{OpcError, OpcPackage, PackURI};
 use litchi_pptx::chart::{self, Chart, Series, Type};

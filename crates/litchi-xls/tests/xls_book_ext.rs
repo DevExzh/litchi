@@ -1,4 +1,4 @@
-//! Round-trip tests for the BIFF8 BookExt record (workbook extension flags).
+//! Round-trip tests for the BIFF8 `BookExt` record (workbook extension flags).
 
 use litchi_xls::writer::Writer;
 use litchi_xls::{BookExt, BookExtConditional11, BookExtConditional12, FactoidDisplay, Workbook};

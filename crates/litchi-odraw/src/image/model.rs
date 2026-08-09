@@ -449,7 +449,7 @@ impl<'data> Blip<'data> {
     pub const fn meta(&self) -> Option<&Meta<'data>> {
         match self {
             Self::Emf(meta) | Self::Wmf(meta) | Self::Pict(meta) => Some(meta),
-            _ => None,
+            Self::Jpeg(_) | Self::Png(_) | Self::Dib(_) | Self::Tiff(_) | Self::Opaque(_) => None,
         }
     }
 
@@ -460,7 +460,7 @@ impl<'data> Blip<'data> {
             Self::Jpeg(bitmap) | Self::Png(bitmap) | Self::Dib(bitmap) | Self::Tiff(bitmap) => {
                 Some(bitmap)
             },
-            _ => None,
+            Self::Emf(_) | Self::Wmf(_) | Self::Pict(_) | Self::Opaque(_) => None,
         }
     }
 }
@@ -472,14 +472,19 @@ pub struct Id(NonZeroU16);
 
 impl Id {
     /// Creates an identifier in the representable `OfficeArt` range.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::InvalidBlipId` if `value` is zero or exceeds the
+    /// representable `OfficeArt` BLIP identifier range.
     pub fn new(value: u32) -> Result<Self> {
-        let value = u16::try_from(value).map_err(|_err| Error::InvalidBlipId { value })?;
-        if value > MAX_STORE_ENTRIES {
+        let id = u16::try_from(value).map_err(|_err| Error::InvalidBlipId { value })?;
+        if id > MAX_STORE_ENTRIES {
             return Err(Error::InvalidBlipId {
-                value: u32::from(value),
+                value: u32::from(id),
             });
         }
-        NonZeroU16::new(value)
+        NonZeroU16::new(id)
             .map(Self)
             .ok_or(Error::InvalidBlipId { value: 0 })
     }
@@ -532,6 +537,11 @@ impl<'data> Name<'data> {
     }
 
     /// Decodes the name, omitting the terminating NUL.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::MalformedImage` if the encoded bytes are not valid
+    /// UTF-16.
     pub fn to_string(self) -> Result<String> {
         char::decode_utf16(
             self.bytes[..self.bytes.len() - 2]
@@ -583,6 +593,11 @@ impl<'data> Entry<'data> {
     }
 
     /// Returns the persistence kind selected by the FBSE record instance.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::MalformedImage` if the record instance is not a valid
+    /// `MSOBLIPTYPE` value.
     pub fn kind(&self) -> Result<Kind> {
         let raw = u8::try_from(self.record.instance()).map_err(|_err| Error::MalformedImage {
             reason: "FBSE instance is not an MSOBLIPTYPE value",

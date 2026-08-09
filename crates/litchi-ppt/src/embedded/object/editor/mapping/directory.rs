@@ -1,4 +1,4 @@
-//! Decodes one full or incremental PersistDirectoryAtom.
+//! Decodes one full or incremental `PersistDirectoryAtom`.
 
 use crate::embedded::object::editor::{Result, rewrite};
 use std::collections::BTreeMap;

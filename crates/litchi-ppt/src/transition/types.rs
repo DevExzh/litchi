@@ -1,6 +1,6 @@
 //! Slide transition data types.
 //!
-//! Provides structures representing PowerPoint slide transitions.
+//! Provides structures representing `PowerPoint` slide transitions.
 
 /// Slide transition information.
 #[derive(Debug, Clone, PartialEq)]
@@ -11,7 +11,7 @@ pub struct TransitionInfo {
     pub speed: TransitionSpeed,
     /// Advance mode (on click, automatic, or both)
     pub advance_mode: AdvanceMode,
-    /// Automatic advance time in milliseconds (if advance_mode includes automatic)
+    /// Automatic advance time in milliseconds (if `advance_mode` includes automatic)
     pub advance_time_ms: Option<u32>,
     /// Transition direction
     pub direction: TransitionDirection,
@@ -29,6 +29,7 @@ impl Default for TransitionInfo {
 
 impl TransitionInfo {
     /// Create a new transition with no effect.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             transition_type: TransitionType::None,
@@ -42,6 +43,7 @@ impl TransitionInfo {
     }
 
     /// Create a transition with a specific type.
+    #[must_use]
     pub fn with_type(transition_type: TransitionType) -> Self {
         Self {
             transition_type,
@@ -50,30 +52,35 @@ impl TransitionInfo {
     }
 
     /// Set transition speed.
+    #[must_use]
     pub fn with_speed(mut self, speed: TransitionSpeed) -> Self {
         self.speed = speed;
         self
     }
 
     /// Set advance mode.
+    #[must_use]
     pub fn with_advance_mode(mut self, advance_mode: AdvanceMode) -> Self {
         self.advance_mode = advance_mode;
         self
     }
 
     /// Set automatic advance time in milliseconds.
+    #[must_use]
     pub fn with_advance_time(mut self, time_ms: u32) -> Self {
         self.advance_time_ms = Some(time_ms);
         self
     }
 
     /// Set transition direction.
+    #[must_use]
     pub fn with_direction(mut self, direction: TransitionDirection) -> Self {
         self.direction = direction;
         self
     }
 
     /// Check if this transition has an effect.
+    #[must_use]
     pub fn has_effect(&self) -> bool {
         self.transition_type != TransitionType::None
     }
@@ -161,7 +168,7 @@ pub enum TransitionType {
     Crush,
     /// Peel
     Peel,
-    /// PageCurl
+    /// `PageCurl`
     PageCurl,
     /// Airplane
     Airplane,
@@ -185,6 +192,7 @@ pub enum TransitionSpeed {
 
 impl TransitionSpeed {
     /// Get duration in milliseconds.
+    #[must_use]
     pub fn duration_ms(&self) -> u32 {
         match self {
             TransitionSpeed::Slow => 2000,

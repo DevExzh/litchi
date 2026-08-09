@@ -45,6 +45,11 @@ impl Default for CharacterPositioning {
 }
 
 impl CharacterPositioning {
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "adjacent range checks bound each narrowing conversion to the target type's range"
+    )]
     fn bounded_nonnegative(value: i32, maximum: i32, name: &str) -> RtfResult<u16> {
         if !(0..=maximum).contains(&value) {
             return Err(RtfError::MalformedDocument(format!(
@@ -75,25 +80,29 @@ impl CharacterPositioning {
     }
 
     pub(crate) fn set_raised(&mut self, value: i32) -> RtfResult<()> {
-        let value = Self::bounded_nonnegative(value, MAX_CHARACTER_BASELINE_HALF_POINTS, "up")?;
-        self.baseline = if value == 0 {
+        let bounded = Self::bounded_nonnegative(value, MAX_CHARACTER_BASELINE_HALF_POINTS, "up")?;
+        self.baseline = if bounded == 0 {
             CharacterBaseline::Normal
         } else {
-            CharacterBaseline::RaisedHalfPoints(value)
+            CharacterBaseline::RaisedHalfPoints(bounded)
         };
         Ok(())
     }
 
     pub(crate) fn set_lowered(&mut self, value: i32) -> RtfResult<()> {
-        let value = Self::bounded_nonnegative(value, MAX_CHARACTER_BASELINE_HALF_POINTS, "dn")?;
-        self.baseline = if value == 0 {
+        let bounded = Self::bounded_nonnegative(value, MAX_CHARACTER_BASELINE_HALF_POINTS, "dn")?;
+        self.baseline = if bounded == 0 {
             CharacterBaseline::Normal
         } else {
-            CharacterBaseline::LoweredHalfPoints(value)
+            CharacterBaseline::LoweredHalfPoints(bounded)
         };
         Ok(())
     }
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "adjacent range checks bound each narrowing conversion to the target type's range"
+    )]
     pub(crate) fn set_quarter_point_expansion(&mut self, value: i32) -> RtfResult<()> {
         if !(-MAX_CHARACTER_EXPANSION..=MAX_CHARACTER_EXPANSION).contains(&value) {
             return Err(RtfError::MalformedDocument(
@@ -108,6 +117,10 @@ impl CharacterPositioning {
         Ok(())
     }
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "adjacent range checks bound each narrowing conversion to the target type's range"
+    )]
     pub(crate) fn set_twip_expansion(&mut self, value: i32) -> RtfResult<()> {
         if !(-MAX_CHARACTER_EXPANSION..=MAX_CHARACTER_EXPANSION).contains(&value) {
             return Err(RtfError::MalformedDocument(
@@ -122,6 +135,11 @@ impl CharacterPositioning {
         Ok(())
     }
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "adjacent range checks bound each narrowing conversion to the target type's range"
+    )]
     pub(crate) fn set_scale(&mut self, value: i32) -> RtfResult<()> {
         if !(1..=MAX_CHARACTER_SCALE_PERCENT).contains(&value) {
             return Err(RtfError::MalformedDocument(
@@ -137,7 +155,13 @@ impl CharacterPositioning {
             Self::bounded_nonnegative(value, MAX_CHARACTER_KERNING_HALF_POINTS, "kerning")?;
         Ok(())
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the crate scale constant is defined within the u16 range"
+    )]
     pub fn validate(&self) -> RtfResult<()> {
         match self.baseline {
             CharacterBaseline::RaisedHalfPoints(value)
@@ -148,7 +172,11 @@ impl CharacterPositioning {
                     "RTF character baseline is out of range".to_string(),
                 ));
             },
-            _ => {},
+            CharacterBaseline::Normal
+            | CharacterBaseline::Superscript
+            | CharacterBaseline::Subscript
+            | CharacterBaseline::RaisedHalfPoints(_)
+            | CharacterBaseline::LoweredHalfPoints(_) => {},
         }
         match self.expansion {
             CharacterExpansion::QuarterPoints(value) | CharacterExpansion::Twips(value)
@@ -158,7 +186,9 @@ impl CharacterPositioning {
                     "RTF character expansion is out of range".to_string(),
                 ));
             },
-            _ => {},
+            CharacterExpansion::None
+            | CharacterExpansion::QuarterPoints(_)
+            | CharacterExpansion::Twips(_) => {},
         }
         if !(1..=MAX_CHARACTER_SCALE_PERCENT as u16).contains(&self.horizontal_scale_percent) {
             return Err(RtfError::MalformedDocument(

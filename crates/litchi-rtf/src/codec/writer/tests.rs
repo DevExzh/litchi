@@ -1,12 +1,21 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use super::super::*;
 use super::codec::{Charset, RtfWriter, WriterOptions};
 use litchi_codepage::Mbcs;
 use std::io;
 
 fn write_body_story_for_test(
-    shapes: &[crate::Shape<'_>],
-    drawing_order: &[crate::StoryDrawing],
-    story_events: &[crate::BodyStoryEvent],
+    shapes: &[Shape<'_>],
+    drawing_order: &[StoryDrawing],
+    story_events: &[BodyStoryEvent],
 ) -> io::Result<Vec<u8>> {
     let bookmarks = BookmarkTable::new();
     let mut output = Vec::new();
@@ -48,9 +57,7 @@ fn body_story_writer_rejects_out_of_range_resource_references() {
     let error = write_body_story_for_test(
         &[],
         &[],
-        &[crate::BodyStoryEvent::Drawing(crate::StoryDrawing::Shape(
-            usize::MAX,
-        ))],
+        &[BodyStoryEvent::Drawing(StoryDrawing::Shape(usize::MAX))],
     )
     .unwrap_err();
 
@@ -59,11 +66,11 @@ fn body_story_writer_rejects_out_of_range_resource_references() {
 
 #[test]
 fn body_story_writer_rejects_duplicate_resource_references() {
-    let shapes = [crate::Shape::new(crate::ShapeType::Rectangle)];
-    let drawing_order = [crate::StoryDrawing::Shape(0)];
+    let shapes = [Shape::new(ShapeType::Rectangle)];
+    let drawing_order = [StoryDrawing::Shape(0)];
     let story_events = [
-        crate::BodyStoryEvent::Drawing(crate::StoryDrawing::Shape(0)),
-        crate::BodyStoryEvent::Drawing(crate::StoryDrawing::Shape(0)),
+        BodyStoryEvent::Drawing(StoryDrawing::Shape(0)),
+        BodyStoryEvent::Drawing(StoryDrawing::Shape(0)),
     ];
 
     let error = write_body_story_for_test(&shapes, &drawing_order, &story_events).unwrap_err();
@@ -81,7 +88,7 @@ fn header_footer_writer_rejects_non_utf8_story_boundaries() {
     ));
     header
         .story_events
-        .push(crate::StoryEvent::PageBreak(crate::PageBreak::new(1)));
+        .push(StoryEvent::PageBreak(PageBreak::new(1)));
     let mut output = Vec::new();
 
     let error = RtfWriter::new(&mut output)
@@ -213,7 +220,7 @@ fn document_info_writer_round_trips() {
 
 #[test]
 fn document_writer_round_trips_bookmark_ranges() {
-    let source = r#"{\rtf1\ansi Start {\*\bkmkstart\bkmkcolf2\bkmkcoll4\bkmkpub Link}R\'e9sum\'e9 \u20320?{\*\bkmkend Link} end}"#;
+    let source = r"{\rtf1\ansi Start {\*\bkmkstart\bkmkcolf2\bkmkcoll4\bkmkpub Link}R\'e9sum\'e9 \u20320?{\*\bkmkend Link} end}";
     let document = RtfDocument::parse(source).unwrap();
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
@@ -231,7 +238,7 @@ fn document_writer_round_trips_bookmark_ranges() {
 
 #[test]
 fn document_writer_preserves_bookmark_in_empty_body() {
-    let document = RtfDocument::parse(r#"{\rtf1{\*\bkmkstart Empty}{\*\bkmkend Empty}}"#).unwrap();
+    let document = RtfDocument::parse(r"{\rtf1{\*\bkmkstart Empty}{\*\bkmkend Empty}}").unwrap();
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(&document)
@@ -246,7 +253,7 @@ fn document_writer_preserves_bookmark_in_empty_body() {
 
 #[test]
 fn document_writer_round_trips_annotations() {
-    let source = r#"{\rtf1\ansi Before {\*\atrfstart 12}range{\*\atrfend 12}{\*\atnid AM}{\*\atnauthor Ada M}\chatn{\*\annotation{\*\atnref 12}{\*\atndate 12345}{\*\atnparent 4}{\*\atnicn 3}{\*\atntime 99}Review \u20320? now} after}"#;
+    let source = r"{\rtf1\ansi Before {\*\atrfstart 12}range{\*\atrfend 12}{\*\atnid AM}{\*\atnauthor Ada M}\chatn{\*\annotation{\*\atnref 12}{\*\atndate 12345}{\*\atnparent 4}{\*\atnicn 3}{\*\atntime 99}Review \u20320? now} after}";
     let document = RtfDocument::parse(source).unwrap();
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
@@ -272,7 +279,7 @@ fn document_writer_round_trips_annotations() {
 #[test]
 fn document_writer_round_trips_headers_and_footers() {
     let document = RtfDocument::parse(
-        r#"{\rtf1\ansi\sectd\sbkodd\pgwsxn11000\pghsxn15000\marglsxn910\margrsxn810\margtsxn710\margbsxn610\guttersxn130\headery310\footery410\lndscpsxn\cols3\colsx370\pgnstarts6\pgnlcltr\vertalb\linemod1\lineppage{\header Header \u20320? one\par Header two}{\footer Footer}Body}"#,
+        r"{\rtf1\ansi\sectd\sbkodd\pgwsxn11000\pghsxn15000\marglsxn910\margrsxn810\margtsxn710\margbsxn610\guttersxn130\headery310\footery410\lndscpsxn\cols3\colsx370\pgnstarts6\pgnlcltr\vertalb\linemod1\lineppage{\header Header \u20320? one\par Header two}{\footer Footer}Body}",
     )
     .unwrap();
     let mut output = Vec::new();
@@ -298,7 +305,7 @@ fn document_writer_round_trips_headers_and_footers() {
 #[test]
 fn document_writer_round_trips_stylesheets() {
     let document = RtfDocument::parse(
-        r#"{\rtf1\ansi{\stylesheet{\s0\snext0 Normal;}{\s1\b\qc\sbasedon0\snext0\slink2\sautoupd\shidden\slocked\ssemihidden\sunhideused\sqformat\spriority9\styrsid42 Heading \u20320?;}{\*\cs2\i\additive\slink1 Emphasis;}{\*\ds3 Section;}{\*\ts4 Table;}}Body}"#,
+        r"{\rtf1\ansi{\stylesheet{\s0\snext0 Normal;}{\s1\b\qc\sbasedon0\snext0\slink2\sautoupd\shidden\slocked\ssemihidden\sunhideused\sqformat\spriority9\styrsid42 Heading \u20320?;}{\*\cs2\i\additive\slink1 Emphasis;}{\*\ds3 Section;}{\*\ts4 Table;}}Body}",
     )
     .unwrap();
     let mut output = Vec::new();
@@ -349,7 +356,7 @@ fn document_writer_round_trips_stylesheets() {
 #[test]
 fn document_writer_round_trips_list_tables() {
     let document = RtfDocument::parse(
-        r#"{\rtf1\ansi{\*\listtable{\list\listtemplateid42\listhybrid{\listlevel\levelnfc0\leveljc2\levelfollow1\levelstartat3\levelspace120\levelindent360{\leveltext\'02\'00.;}{\levelnumbers\'01;}\f2}{\listlevel\levelnfc77\leveljc0\levelfollow2\levelstartat1{\leveltext\'01\u8226?;}{\levelnumbers;}}{\listname Outline;}\listid77}}{\*\listoverridetable{\listoverride\listid77\listoverridecount1{\lfolevel\listoverridestartat\levelstartat9}\ls4}}\pard\ls4\ilvl1 Body}"#,
+        r"{\rtf1\ansi{\*\listtable{\list\listtemplateid42\listhybrid{\listlevel\levelnfc0\leveljc2\levelfollow1\levelstartat3\levelspace120\levelindent360{\leveltext\'02\'00.;}{\levelnumbers\'01;}\f2}{\listlevel\levelnfc77\leveljc0\levelfollow2\levelstartat1{\leveltext\'01\u8226?;}{\levelnumbers;}}{\listname Outline;}\listid77}}{\*\listoverridetable{\listoverride\listid77\listoverridecount1{\lfolevel\listoverridestartat\levelstartat9}\ls4}}\pard\ls4\ilvl1 Body}",
     )
     .unwrap();
     let mut output = Vec::new();
@@ -381,7 +388,7 @@ fn document_writer_round_trips_list_tables() {
 #[test]
 fn document_writer_round_trips_tracked_revision_ranges() {
     let document = RtfDocument::parse(
-        r#"{\rtf1\ansi{\*\revtbl{Unknown;}{Ada;}}Before {\deleted\revauthdel1\revdttmdel123 old}{\revised\revauth1\revdttm-456 new \u20320?} after}"#,
+        r"{\rtf1\ansi{\*\revtbl{Unknown;}{Ada;}}Before {\deleted\revauthdel1\revdttmdel123 old}{\revised\revauth1\revdttm-456 new \u20320?} after}",
     )
     .unwrap();
     let mut output = Vec::new();
@@ -411,7 +418,7 @@ fn document_writer_round_trips_tracked_revision_ranges() {
 #[test]
 fn document_writer_round_trips_multiple_section_boundaries() {
     let document = RtfDocument::parse(
-        r#"{\rtf1\ansi\sectd\sbkpage\pgwsxn10000{\header First}One\sect\sectd\sbknone\pgwsxn12000{\header Second}Two\sect\sectd\sbkeven\pgwsxn14000{\header Third}Three}"#,
+        r"{\rtf1\ansi\sectd\sbkpage\pgwsxn10000{\header First}One\sect\sectd\sbknone\pgwsxn12000{\header Second}Two\sect\sectd\sbkeven\pgwsxn14000{\header Third}Three}",
     )
     .unwrap();
     assert_eq!(document.text(), "OneTwoThree");
@@ -419,8 +426,8 @@ fn document_writer_round_trips_multiple_section_boundaries() {
     assert_eq!(
         document.section_breaks().copied().collect::<Vec<_>>(),
         vec![
-            crate::SectionBreak::new("One".len(), Some(1)),
-            crate::SectionBreak::new("OneTwo".len(), Some(2)),
+            SectionBreak::new("One".len(), Some(1)),
+            SectionBreak::new("OneTwo".len(), Some(2)),
         ]
     );
 
@@ -440,17 +447,17 @@ fn document_writer_round_trips_multiple_section_boundaries() {
     );
     assert_eq!(
         reparsed.sections()[0].properties.break_type,
-        crate::SectionBreakType::Page
+        SectionBreakType::Page
     );
     assert_eq!(reparsed.sections()[0].properties.page_width, 10000);
     assert_eq!(
         reparsed.sections()[1].properties.break_type,
-        crate::SectionBreakType::Continuous
+        SectionBreakType::Continuous
     );
     assert_eq!(reparsed.sections()[1].properties.page_width, 12000);
     assert_eq!(
         reparsed.sections()[2].properties.break_type,
-        crate::SectionBreakType::EvenPage
+        SectionBreakType::EvenPage
     );
     assert_eq!(reparsed.sections()[2].properties.page_width, 14000);
     for (section, expected_header) in reparsed.sections().iter().zip(["First", "Second", "Third"]) {
@@ -464,13 +471,12 @@ fn document_writer_round_trips_multiple_section_boundaries() {
 #[test]
 fn document_writer_round_trips_boundary_to_first_explicit_section() {
     let document =
-        RtfDocument::parse(r#"{\rtf1\ansi Before\sect\sectd\sbknone{\header Second}After}"#)
-            .unwrap();
+        RtfDocument::parse(r"{\rtf1\ansi Before\sect\sectd\sbknone{\header Second}After}").unwrap();
     assert_eq!(document.text(), "BeforeAfter");
     assert_eq!(document.sections().len(), 1);
     assert_eq!(
         document.section_breaks().copied().collect::<Vec<_>>(),
-        vec![crate::SectionBreak::new("Before".len(), Some(0))]
+        vec![SectionBreak::new("Before".len(), Some(0))]
     );
 
     let mut output = Vec::new();
@@ -495,12 +501,12 @@ fn document_writer_round_trips_boundary_to_first_explicit_section() {
 
 #[test]
 fn document_writer_preserves_inherited_section_boundary() {
-    let document = RtfDocument::parse(r#"{\rtf1\ansi\sectd\sbknone One\sect Two}"#).unwrap();
+    let document = RtfDocument::parse(r"{\rtf1\ansi\sectd\sbknone One\sect Two}").unwrap();
     assert_eq!(document.text(), "OneTwo");
     assert_eq!(document.sections().len(), 1);
     assert_eq!(
         document.section_breaks().copied().collect::<Vec<_>>(),
-        vec![crate::SectionBreak::new("One".len(), None)]
+        vec![SectionBreak::new("One".len(), None)]
     );
 
     let mut output = Vec::new();
@@ -519,14 +525,14 @@ fn document_writer_preserves_inherited_section_boundary() {
 #[test]
 fn document_writer_preserves_page_then_section_break_order() {
     let document =
-        RtfDocument::parse(r#"{\rtf1\ansi\sectd One\page\sect\sectd\sbknone Two}"#).unwrap();
+        RtfDocument::parse(r"{\rtf1\ansi\sectd One\page\sect\sectd\sbknone Two}").unwrap();
     assert_eq!(document.text(), "OneTwo");
     assert_eq!(document.sections().len(), 2);
     assert_eq!(
         document.body_story_events(),
         [
-            crate::BodyStoryEvent::PageBreak(crate::PageBreak::new("One".len())),
-            crate::BodyStoryEvent::SectionBreak(crate::SectionBreak::new("One".len(), Some(1),)),
+            BodyStoryEvent::PageBreak(PageBreak::new("One".len())),
+            BodyStoryEvent::SectionBreak(SectionBreak::new("One".len(), Some(1),)),
         ]
     );
 

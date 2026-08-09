@@ -1,4 +1,4 @@
-//! Low-level PresentationML part views.
+//! Low-level `PresentationML` part views.
 //!
 //! These wrappers own only vocabulary validation and relationship traversal.
 //! They deliberately borrow the OPC graph so an opened package can retain
@@ -52,13 +52,13 @@ pub(crate) fn invalid(message: impl Into<String>) -> Error {
 pub(crate) fn parse_u32(value: &str, field: &str) -> Result<u32> {
     value
         .parse()
-        .map_err(|_| invalid(format!("invalid {field} value '{value}'")))
+        .map_err(|_err| invalid(format!("invalid {field} value '{value}'")))
 }
 
 pub(crate) fn parse_i64(value: &str, field: &str) -> Result<i64> {
     value
         .parse()
-        .map_err(|_| invalid(format!("invalid {field} value '{value}'")))
+        .map_err(|_err| invalid(format!("invalid {field} value '{value}'")))
 }
 
 pub(crate) fn parse_bool(value: &str, field: &str) -> Result<bool> {

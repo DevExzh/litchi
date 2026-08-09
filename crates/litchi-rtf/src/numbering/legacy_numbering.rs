@@ -40,7 +40,8 @@ pub struct LegacySectionNumberingLevel<'a> {
     pub text_after: Cow<'a, str>,
 }
 
-impl<'a> LegacySectionNumberingLevel<'a> {
+impl LegacySectionNumberingLevel<'_> {
+    #[must_use]
     pub fn new(level: u8, format: LegacyNumberingFormat) -> Self {
         Self {
             level,
@@ -56,7 +57,9 @@ impl<'a> LegacySectionNumberingLevel<'a> {
             text_after: Cow::Borrowed(""),
         }
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if !(1..=9).contains(&self.level) {
             return Err(RtfError::MalformedDocument(
@@ -106,18 +109,23 @@ pub struct LegacySectionNumbering<'a> {
 }
 
 impl<'a> LegacySectionNumbering<'a> {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use]
     pub fn levels(&self) -> &[LegacySectionNumberingLevel<'a>] {
         &self.levels
     }
 
+    #[must_use]
     pub fn get(&self, level: u8) -> Option<&LegacySectionNumberingLevel<'a>> {
         self.levels.iter().find(|entry| entry.level == level)
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn add(&mut self, level: LegacySectionNumberingLevel<'a>) -> RtfResult<()> {
         level.validate()?;
         if self.levels.len() >= MAX_LEGACY_NUMBERING_LEVELS {
@@ -137,7 +145,9 @@ impl<'a> LegacySectionNumbering<'a> {
         self.levels.push(level);
         Ok(())
     }
-
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> RtfResult<()> {
         if self.levels.len() > MAX_LEGACY_NUMBERING_LEVELS {
             return Err(RtfError::MalformedDocument(

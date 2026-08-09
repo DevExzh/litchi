@@ -385,7 +385,10 @@ pub(crate) fn write_definitions<'a>(
     out.push_str("</table:named-expressions>");
 }
 
-pub(crate) fn write_definition_fragment(definition: &Definition) -> Result<String> {
+/// # Errors
+///
+/// Returns an error when the value cannot be serialized.
+pub fn write_definition_fragment(definition: &Definition) -> Result<String> {
     definition.validate()?;
     let mut output = String::with_capacity(256);
     match definition {
@@ -487,7 +490,8 @@ pub(crate) fn validate_collection(definitions: &[Definition]) -> Result<()> {
     validate_named_dependencies(definitions)
 }
 
-pub(crate) fn expression_references_name(expression: &str, name: &str) -> bool {
+#[must_use]
+pub fn expression_references_name(expression: &str, name: &str) -> bool {
     formula_identifiers(expression)
         .into_iter()
         .any(|identifier| identifier == name)
@@ -576,7 +580,10 @@ fn formula_identifiers(expression: &str) -> Vec<&str> {
     identifiers
 }
 
-pub(crate) fn ensure_unique(definitions: &[Definition], candidate: &Definition) -> Result<()> {
+/// # Errors
+///
+/// Returns an error when a duplicate named definition is found.
+pub fn ensure_unique(definitions: &[Definition], candidate: &Definition) -> Result<()> {
     if definitions.iter().any(|existing| {
         existing.name() == candidate.name() && existing.scope() == candidate.scope()
     }) {

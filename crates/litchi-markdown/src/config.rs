@@ -27,7 +27,7 @@
 /// making it cheap to pass around without cloning overhead.
 #[derive(Debug, Copy, Clone)]
 pub struct MarkdownOptions {
-    /// Whether to include text styles (bold, italic, underline, etc.)
+    /// Whether to include text styles (bold, italic, underline, strikethrough, super/subscript)
     pub include_styles: bool,
     /// Whether to include document metadata at the beginning
     pub include_metadata: bool,

@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::*;
 use crate::consts::RecordType;
 use crate::records::Record;
@@ -8,7 +14,7 @@ fn atom(record_type: RecordType, version: u16, instance: u16, data: Vec<u8>) -> 
         record_type_raw: record_type.as_u16(),
         version,
         instance,
-        data_length: data.len() as u32,
+        data_length: u32::try_from(data.len()).unwrap(),
         data,
         children: Vec::new(),
     }
@@ -20,7 +26,7 @@ fn opaque(raw_type: u16, version: u16, instance: u16, data: Vec<u8>) -> Record {
         record_type_raw: raw_type,
         version,
         instance,
-        data_length: data.len() as u32,
+        data_length: u32::try_from(data.len()).unwrap(),
         data,
         children: Vec::new(),
     }

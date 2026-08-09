@@ -63,7 +63,7 @@ fn parses_real_sparse_and_rowless_dbcell_blocks() {
     assert!(
         strict
             .sheet(13)
-            .and_then(|sheet| sheet.parsed_worksheet_index())
+            .and_then(litchi_xls::SheetMetadata::parsed_worksheet_index)
             .is_none(),
         "strict workbook parsing must not accept the malformed Formula metadata"
     );
@@ -75,7 +75,7 @@ fn parses_real_sparse_and_rowless_dbcell_blocks() {
     .unwrap();
     let worksheet_index = workbook
         .sheet(13)
-        .and_then(|sheet| sheet.parsed_worksheet_index())
+        .and_then(litchi_xls::SheetMetadata::parsed_worksheet_index)
         .expect("workbook tab 13 must project to a parsed worksheet");
     let worksheet = workbook.xls_worksheet(worksheet_index).unwrap();
     let defect = worksheet

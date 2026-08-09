@@ -37,6 +37,9 @@ pub struct ProtectionRange<'a> {
 
 impl<'a> ProtectionRange<'a> {
     /// Create a validated protection-exception range.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn new(id: Cow<'a, str>, position: usize, content: Cow<'a, str>) -> RtfResult<Self> {
         let range = Self {
             id,

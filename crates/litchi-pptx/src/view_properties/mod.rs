@@ -1,4 +1,4 @@
-//! Typed PresentationML view properties.
+//! Typed `PresentationML` view properties.
 //!
 //! The model, XML codec, and package relationship handling are kept in
 //! separate layers while this module preserves the historical public API.

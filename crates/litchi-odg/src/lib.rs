@@ -9,8 +9,12 @@ mod model;
 mod package;
 
 pub use facade::{Builder, Drawing};
+pub use facade::{
+    Commit as PackageCommit, Patch as PackagePatch, Snapshot as PackageSnapshot,
+    TextChange as PackageTextChange, Transaction as PackageTransaction,
+};
 pub use flat::{
     FlatDrawing, FlatDrawingCommit, FlatDrawingEdit, FlatDrawingPatch, FlatPage, FlatShape,
     TextChange,
 };
-pub use model::{layer, page};
+pub use model::{layer, page, shape};

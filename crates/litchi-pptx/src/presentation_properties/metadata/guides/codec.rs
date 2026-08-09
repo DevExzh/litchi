@@ -1,6 +1,6 @@
-//! Typed, bounded PowerPoint 2013 extended presentation guides.
+//! Typed, bounded `PowerPoint` 2013 extended presentation guides.
 
-use super::model::*;
+use super::model::{Color, ColorKind, Guide, Guides, List, Orientation};
 use crate::{Error, Result};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -26,6 +26,10 @@ const MAX_STRING_BYTES: usize = 1024 * 1024;
 
 impl Guides {
     /// Parse guide extensions from a complete `p:presentation` document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_xml(xml: &[u8]) -> Result<Self> {
         if xml.len() > MAX_BYTES {
             return Err(invalid("presentation guides exceed 8 MiB"));
@@ -38,6 +42,10 @@ impl Guides {
     }
 
     /// Serialize the guide entries as a complete `p:extLst` fragment.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
     pub fn to_xml(&self, strict: bool) -> Result<String> {
         validate(self)?;
         if self.slide.is_none() && self.notes.is_none() {
@@ -173,7 +181,7 @@ fn scan_source(source: &[u8]) -> Result<SourceLayout> {
 
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("presentation-guide XML offset overflow"))?;
+            .map_err(|_err| invalid("presentation-guide XML offset overflow"))?;
         let decoder = reader.decoder();
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
@@ -274,7 +282,7 @@ fn scan_source(source: &[u8]) -> Result<SourceLayout> {
                     return Err(invalid("mismatched presentation-guide closing element"));
                 }
                 let end = usize::try_from(reader.buffer_position())
-                    .map_err(|_| invalid("presentation-guide XML offset overflow"))?;
+                    .map_err(|_err| invalid("presentation-guide XML offset overflow"))?;
                 let span = SourceSpan {
                     start: frame.start,
                     end,
@@ -733,7 +741,7 @@ fn parse_list(node: &Node) -> Result<List> {
 fn parse_guide(node: &Node) -> Result<Guide> {
     let id = required_attr(node, "id")?
         .parse::<u32>()
-        .map_err(|_| invalid("invalid extended guide ID"))?;
+        .map_err(|_err| invalid("invalid extended guide ID"))?;
     let name = optional_attr(node, "name")?;
     if let Some(name) = &name {
         bounded_string(name)?;
@@ -749,7 +757,7 @@ fn parse_guide(node: &Node) -> Result<Guide> {
         .map(|value| {
             value
                 .parse::<i32>()
-                .map_err(|_| invalid("invalid extended guide position"))
+                .map_err(|_err| invalid("invalid extended guide position"))
         })
         .transpose()?;
     let user_drawn = optional_attr(node, "userDrawn")?
@@ -920,7 +928,7 @@ fn write_guide(xml: &mut String, guide: &Guide, strict: bool) -> Result<()> {
         write!(xml, " pos=\"{position}\"").map_err(|error| Error::Xml(error.to_string()))?;
     }
     if let Some(user_drawn) = guide.user_drawn {
-        write!(xml, " userDrawn=\"{}\"", if user_drawn { 1 } else { 0 })
+        write!(xml, " userDrawn=\"{}\"", i32::from(user_drawn))
             .map_err(|error| Error::Xml(error.to_string()))?;
     }
     xml.push_str("><p15:clr>");
@@ -1152,6 +1160,11 @@ fn xml_error(error: impl std::fmt::Display) -> Error {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
 

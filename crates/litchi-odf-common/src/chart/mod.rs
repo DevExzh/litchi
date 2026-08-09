@@ -9,6 +9,7 @@
 
 pub mod authoring;
 pub mod axis;
+pub mod class;
 pub mod grid;
 pub mod legend;
 pub mod plot_area;
@@ -16,6 +17,7 @@ pub mod reader;
 pub mod view;
 
 pub use axis::Dimension;
+pub use class::{ChartClass, ChartClassKind};
 pub use grid::Class;
 pub use legend::Position;
 pub use plot_area::Labels;

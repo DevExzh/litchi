@@ -29,26 +29,26 @@ pub(super) struct ConvertedLineProperties {
 }
 
 pub(super) fn convert_line_properties(line: Option<&LineStyleConfig>) -> ConvertedLineProperties {
-    let Some(line) = line.filter(|line| line.enabled && line.width > 0) else {
+    let Some(active) = line.filter(|config| config.enabled && config.width > 0) else {
         return ConvertedLineProperties::default();
     };
-    let has_start_arrow = line.start_arrow != ArrowStyle::None;
-    let has_end_arrow = line.end_arrow != ArrowStyle::None;
+    let has_start_arrow = active.start_arrow != ArrowStyle::None;
+    let has_end_arrow = active.end_arrow != ArrowStyle::None;
     ConvertedLineProperties {
-        color: Some(line.color.to_rgbx()),
-        width: Some(line.width as i32),
-        opacity: (line.opacity < 100).then(|| (u32::from(line.opacity) * 65536) / 100),
-        style: (line.style != LineStyle::Simple).then_some(line.style as u32),
-        dash_style: (line.dash != super::super::shape_style::LineDashStyle::Solid)
-            .then_some(line.dash as u32),
-        start_arrow: has_start_arrow.then_some(line.start_arrow as u32),
-        end_arrow: has_end_arrow.then_some(line.end_arrow as u32),
-        start_arrow_width: has_start_arrow.then_some(line.start_arrow_width as u32),
-        start_arrow_length: has_start_arrow.then_some(line.start_arrow_length as u32),
-        end_arrow_width: has_end_arrow.then_some(line.end_arrow_width as u32),
-        end_arrow_length: has_end_arrow.then_some(line.end_arrow_length as u32),
-        join_style: (line.join != LineJoinStyle::Miter).then_some(line.join as u32),
-        end_cap_style: (line.cap != LineCapStyle::Round).then_some(line.cap as u32),
+        color: Some(active.color.to_rgbx()),
+        width: Some(i32::try_from(active.width).unwrap_or(i32::MAX)),
+        opacity: (active.opacity < 100).then(|| (u32::from(active.opacity) * 65536) / 100),
+        style: (active.style != LineStyle::Simple).then_some(active.style as u32),
+        dash_style: (active.dash != super::super::shape_style::LineDashStyle::Solid)
+            .then_some(active.dash as u32),
+        start_arrow: has_start_arrow.then_some(active.start_arrow as u32),
+        end_arrow: has_end_arrow.then_some(active.end_arrow as u32),
+        start_arrow_width: has_start_arrow.then_some(active.start_arrow_width as u32),
+        start_arrow_length: has_start_arrow.then_some(active.start_arrow_length as u32),
+        end_arrow_width: has_end_arrow.then_some(active.end_arrow_width as u32),
+        end_arrow_length: has_end_arrow.then_some(active.end_arrow_length as u32),
+        join_style: (active.join != LineJoinStyle::Miter).then_some(active.join as u32),
+        end_cap_style: (active.cap != LineCapStyle::Round).then_some(active.cap as u32),
     }
 }
 pub(super) fn build_writer_sound_collection(
@@ -127,6 +127,10 @@ pub(super) fn build_writer_sound_collection(
     builder.build().map_err(sound_collection_error)
 }
 
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "used as a `map_err` function pointer, which receives the io error by value"
+)]
 pub(super) fn sound_collection_error(error: std::io::Error) -> WriteError {
     WriteError::InvalidData(error.to_string())
 }
@@ -156,12 +160,11 @@ pub(super) fn append_child_to_built_container(
     Ok(())
 }
 
-/// Convert ShapeType to Escher MSOSPT value
+/// Convert `ShapeType` to Escher MSOSPT value
 fn shape_type_to_escher(shape_type: ShapeType) -> u16 {
     match shape_type {
-        ShapeType::Rectangle => escher_shape_type::RECTANGLE,
+        ShapeType::Rectangle | ShapeType::Placeholder => escher_shape_type::RECTANGLE,
         ShapeType::TextBox => escher_shape_type::TEXT_BOX,
-        ShapeType::Placeholder => escher_shape_type::RECTANGLE,
         ShapeType::Line => escher_shape_type::LINE,
         ShapeType::Ellipse => escher_shape_type::ELLIPSE,
         ShapeType::RoundRectangle => escher_shape_type::ROUND_RECTANGLE,
@@ -175,7 +178,7 @@ fn shape_type_to_escher(shape_type: ShapeType) -> u16 {
     }
 }
 
-/// Convert WritableShape to UserShapeData for Escher serialization
+/// Convert `WritableShape` to `UserShapeData` for Escher serialization
 #[cfg(test)]
 pub(super) fn convert_shape_to_escher(
     shape: &WritableShape,
@@ -205,19 +208,22 @@ pub(super) fn convert_shape_to_escher_with_sound_mapping(
 
             // Opacity: convert 0-100 to 0-65536
             let opacity = if fill.opacity < 100 {
-                Some(((fill.opacity as u32) * 65536) / 100)
+                Some((u32::from(fill.opacity) * 65536) / 100)
             } else {
                 None
             };
 
             // Back color for gradients
-            let back_color = fill.back_color.as_ref().map(|c| c.to_rgbx());
+            let back_color = fill
+                .back_color
+                .as_ref()
+                .map(super::super::shape_style::ShapeColor::to_rgbx);
 
             // Gradient angle (degrees * 65536)
             // Per Apache POI HSLFFill.java: "Zero degrees represents a vertical vector from bottom to top"
             // Standard: 0° = horizontal right, 90° = vertical up
             // PPT format: 0° = vertical up, so we need: PPT_angle = 90 - user_angle
-            let angle = fill.gradient_angle.map(|a| ((90 - a) as i32) * 65536);
+            let angle = fill.gradient_angle.map(|a| i32::from(90 - a) * 65536);
 
             (
                 color,
@@ -237,17 +243,17 @@ pub(super) fn convert_shape_to_escher_with_sound_mapping(
             .shadow
             .as_ref()
             .map_or((false, None, None, None, None, None), |shadow| {
-                if !shadow.enabled {
-                    (false, None, None, None, None, None)
-                } else {
+                if shadow.enabled {
                     (
                         true,
                         Some(shadow.color.to_rgbx()),
                         Some(shadow.offset_x),
                         Some(shadow.offset_y),
-                        Some(((shadow.opacity as u32) * 65536) / 100),
+                        Some((u32::from(shadow.opacity) * 65536) / 100),
                         Some(shadow.shadow_type as u32),
                     )
+                } else {
+                    (false, None, None, None, None, None)
                 }
             });
 
@@ -262,8 +268,8 @@ pub(super) fn convert_shape_to_escher_with_sound_mapping(
                 .map(|text| vec![Paragraph::new(text.clone()).align(props.alignment.into())])
         }
     });
-    let smart_tag_runs = paragraphs.as_mut().and_then(|paragraphs| {
-        if !paragraphs
+    let smart_tag_runs = paragraphs.as_mut().and_then(|paragraphs_mut| {
+        if !paragraphs_mut
             .iter()
             .flat_map(|paragraph| &paragraph.runs)
             .any(|run| {
@@ -275,14 +281,13 @@ pub(super) fn convert_shape_to_escher_with_sound_mapping(
             return None;
         }
         let mut mappings = Vec::new();
-        for (ordinal, run) in paragraphs
+        for (ordinal, run) in paragraphs_mut
             .iter_mut()
             .flat_map(|paragraph| &mut paragraph.runs)
             .enumerate()
         {
-            run.style.pp9_run_id = Some(
-                u8::try_from(ordinal % 16).expect("a modulo-16 run identifier always fits u8"),
-            );
+            // A modulo-16 run identifier always fits `u8`.
+            run.style.pp9_run_id = Some(u8::try_from(ordinal % 16).unwrap_or_default());
             mappings.push(crate::writer::smart_tags::ShapeTextExtensionRun {
                 smart_tags: run
                     .smart_tag_indices
@@ -388,11 +393,16 @@ fn shape_rotation_to_fixed(degrees: f32) -> Option<i32> {
     if !degrees.is_finite() || degrees.abs() <= 0.001 {
         return None;
     }
-    Some(((f64::from(degrees) % 360.0) * 65536.0).round() as i32)
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the value is reduced modulo 360 and scaled by 65536, bounding it well inside i32"
+    )]
+    let fixed = ((f64::from(degrees) % 360.0) * 65536.0).round() as i32;
+    Some(fixed)
 }
 
 /// Get hyperlink interactive info values based on hyperlink target
-/// Returns (action, jump, hyperlink_type)
+/// Returns (action, jump, `hyperlink_type`)
 pub(super) fn get_hyperlink_info(
     hyperlink_id: Option<u32>,
     hyperlinks: &HyperlinkCollection,
@@ -468,6 +478,39 @@ pub(super) fn interaction_for_hyperlink(
     Some(interaction)
 }
 
+/// PPT file writer
+///
+/// Provides methods to create and modify PPT files with full support for:
+/// - Shapes with fill, line, and shadow styling
+/// - Rich text formatting (bold, italic, colors, sizes)
+/// - Pictures/images
+/// - Hyperlinks
+/// - Speaker notes
+impl Writer {
+    pub(super) fn build_docinfo_list(
+        &self,
+        vba_persist_id: Option<u32>,
+        ppt10_font_records: &[Vec<u8>],
+        modify_password: Option<&[u8]>,
+    ) -> Result<Vec<u8>, WriteError> {
+        let ppt11 = super::super::smart_tags::build_document_binary_tag(&self.smart_tags)?;
+        Ok(
+            super::super::records::create_docinfo_list_container_with_extensions(
+                self.slide_view_info.as_ref(),
+                self.notes_view_info.as_ref(),
+                super::super::env_data::VBAInfoAtom {
+                    persist_id_ref: vba_persist_id.unwrap_or(0),
+                    has_macros: vba_persist_id.is_some(),
+                    runtime_version: 2,
+                },
+                ppt10_font_records.iter().map(Vec::as_slice),
+                modify_password,
+                ppt11.as_deref(),
+            )?,
+        )
+    }
+}
+
 pub(super) fn shape_text_unit_count(properties: &ShapeProperties) -> Result<u32, WriteError> {
     let units = if let Some(paragraphs) = &properties.paragraphs {
         let mut units = 0usize;
@@ -495,40 +538,7 @@ pub(super) fn shape_text_unit_count(properties: &ShapeProperties) -> Result<u32,
             "Shape has no text for a text interaction".to_string(),
         ));
     };
-    u32::try_from(units)
-        .map_err(|_| WriteError::InvalidData("Shape text exceeds the PPT size limit".to_string()))
-}
-
-/// PPT file writer
-///
-/// Provides methods to create and modify PPT files with full support for:
-/// - Shapes with fill, line, and shadow styling
-/// - Rich text formatting (bold, italic, colors, sizes)
-/// - Pictures/images
-/// - Hyperlinks
-/// - Speaker notes
-
-impl Writer {
-    pub(super) fn build_docinfo_list(
-        &self,
-        vba_persist_id: Option<u32>,
-        ppt10_font_records: &[Vec<u8>],
-        modify_password: Option<&[u8]>,
-    ) -> Result<Vec<u8>, WriteError> {
-        let ppt11 = super::super::smart_tags::build_document_binary_tag(&self.smart_tags)?;
-        Ok(
-            super::super::records::create_docinfo_list_container_with_extensions(
-                self.slide_view_info.as_ref(),
-                self.notes_view_info.as_ref(),
-                super::super::env_data::VBAInfoAtom {
-                    persist_id_ref: vba_persist_id.unwrap_or(0),
-                    has_macros: vba_persist_id.is_some(),
-                    runtime_version: 2,
-                },
-                ppt10_font_records.iter().map(Vec::as_slice),
-                modify_password,
-                ppt11.as_deref(),
-            )?,
-        )
-    }
+    u32::try_from(units).map_err(|_err| {
+        WriteError::InvalidData("Shape text exceeds the PPT size limit".to_string())
+    })
 }

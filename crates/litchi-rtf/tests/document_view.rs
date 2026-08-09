@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{DocumentView, DocumentViewKind, DocumentZoomKind, RtfDocument, RtfWriter};
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
@@ -11,7 +20,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 #[test]
 fn parses_view_and_zoom_metadata_and_round_trips_in_stable_order() {
     let document =
-        RtfDocument::parse(r#"{\rtf1\viewkind4\viewscale135\viewzk3\viewbksp1\viewnobound Body}"#)
+        RtfDocument::parse(r"{\rtf1\viewkind4\viewscale135\viewzk3\viewbksp1\viewnobound Body}")
             .unwrap();
     assert_eq!(
         *document.document_view(),
@@ -36,7 +45,7 @@ fn parses_view_and_zoom_metadata_and_round_trips_in_stable_order() {
 
 #[test]
 fn typed_api_preserves_absence_and_clear() {
-    let mut document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
+    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
     assert!(document.document_view().is_empty());
     document
         .set_document_view(DocumentView {
@@ -56,25 +65,25 @@ fn typed_api_preserves_absence_and_clear() {
 #[test]
 fn rejects_invalid_values_duplicates_and_bad_placement_or_group_shape() {
     for source in [
-        r#"{\rtf1\viewkind Body}"#,
-        r#"{\rtf1\viewkind6 Body}"#,
-        r#"{\rtf1\viewscale Body}"#,
-        r#"{\rtf1\viewscale0 Body}"#,
-        r#"{\rtf1\viewscale10001 Body}"#,
-        r#"{\rtf1\viewzk Body}"#,
-        r#"{\rtf1\viewzk4 Body}"#,
-        r#"{\rtf1\viewbksp Body}"#,
-        r#"{\rtf1\viewbksp2 Body}"#,
-        r#"{\rtf1\viewnobound1 Body}"#,
-        r#"{\rtf1\viewbksp1\viewbksp0 Body}"#,
-        r#"{\rtf1\viewnobound\viewnobound Body}"#,
-        r#"{\rtf1\viewkind1\viewkind4 Body}"#,
-        r#"{\rtf1\viewkind1{\*\viewkind4}Body}"#,
-        r#"{\rtf1{\viewkind1 nested}Body}"#,
-        r#"{\rtf1 Body\viewscale100}"#,
-        r#"{\rtf1{\*\viewscale100 extra}Body}"#,
-        r#"{\rtf1{\*\viewkind1\b}Body}"#,
-        r#"{\rtf1{{\*\viewkind1}}Body}"#,
+        r"{\rtf1\viewkind Body}",
+        r"{\rtf1\viewkind6 Body}",
+        r"{\rtf1\viewscale Body}",
+        r"{\rtf1\viewscale0 Body}",
+        r"{\rtf1\viewscale10001 Body}",
+        r"{\rtf1\viewzk Body}",
+        r"{\rtf1\viewzk4 Body}",
+        r"{\rtf1\viewbksp Body}",
+        r"{\rtf1\viewbksp2 Body}",
+        r"{\rtf1\viewnobound1 Body}",
+        r"{\rtf1\viewbksp1\viewbksp0 Body}",
+        r"{\rtf1\viewnobound\viewnobound Body}",
+        r"{\rtf1\viewkind1\viewkind4 Body}",
+        r"{\rtf1\viewkind1{\*\viewkind4}Body}",
+        r"{\rtf1{\viewkind1 nested}Body}",
+        r"{\rtf1 Body\viewscale100}",
+        r"{\rtf1{\*\viewscale100 extra}Body}",
+        r"{\rtf1{\*\viewkind1\b}Body}",
+        r"{\rtf1{{\*\viewkind1}}Body}",
     ] {
         assert!(
             RtfDocument::parse(source).is_err(),

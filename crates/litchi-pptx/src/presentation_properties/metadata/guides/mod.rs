@@ -1,4 +1,4 @@
-//! Extended guide values and bounded PresentationML extension codec.
+//! Extended guide values and bounded `PresentationML` extension codec.
 
 mod codec;
 mod model;

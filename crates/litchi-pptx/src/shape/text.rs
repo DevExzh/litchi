@@ -1,4 +1,4 @@
-//! Bounded DrawingML text extraction and borrowed element-range scanning.
+//! Bounded `DrawingML` text extraction and borrowed element-range scanning.
 //!
 //! The functions in this focused module operate on one shape owner at a time;
 //! they preserve the source bytes and allocate only the requested text result
@@ -13,10 +13,10 @@ use quick_xml::events::Event;
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
-/// Maximum nesting depth accepted when extracting DrawingML text, matching
+/// Maximum nesting depth accepted when extracting `DrawingML` text, matching
 /// the hardened slide element scanner.
 const MAX_TEXT_SCAN_DEPTH: usize = 128;
-/// Maximum number of elements scanned while extracting DrawingML text.
+/// Maximum number of elements scanned while extracting `DrawingML` text.
 const MAX_TEXT_SCAN_NODES: usize = 1_000_000;
 
 fn is_drawingml_name(
@@ -43,7 +43,11 @@ fn is_drawingml_name(
     }
 }
 
-/// Extract visible DrawingML text from a shape or text-body fragment.
+/// Extract visible `DrawingML` text from a shape or text-body fragment.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn extract(xml_bytes: &[u8], paragraph_separator: Option<char>) -> Result<String> {
     let mut reader = NsReader::from_reader(xml_bytes);
     let mut result = String::with_capacity(xml_bytes.len() / 8);
@@ -170,7 +174,11 @@ pub fn extract(xml_bytes: &[u8], paragraph_separator: Option<char>) -> Result<St
     Ok(result)
 }
 
-/// Scan checked byte ranges for DrawingML elements with the requested local name.
+/// Scan checked byte ranges for `DrawingML` elements with the requested local name.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
 pub fn scan_ranges(
     xml_bytes: &[u8],
     target: &[u8],
@@ -190,7 +198,7 @@ pub fn scan_ranges(
     let mut capture: Option<(usize, usize)> = None;
     loop {
         let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::Invalid("DrawingML offset does not fit usize".to_string()))?;
+            .map_err(|_err| Error::Invalid("DrawingML offset does not fit usize".to_string()))?;
         let event = {
             let (namespace, event) = reader
                 .read_resolved_event()
@@ -230,7 +238,7 @@ pub fn scan_ranges(
             }
         };
         let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::Invalid("DrawingML offset does not fit usize".to_string()))?;
+            .map_err(|_err| Error::Invalid("DrawingML offset does not fit usize".to_string()))?;
 
         match event {
             ScanEvent::Start => capture = Some((event_start, 1)),
@@ -283,13 +291,18 @@ fn emit_drawingml_range(
         .ok_or_else(|| Error::Invalid("invalid DrawingML element range".to_string()))?;
     emit(
         u32::try_from(start)
-            .map_err(|_| Error::Invalid("DrawingML offset exceeds u32".to_string()))?,
+            .map_err(|_err| Error::Invalid("DrawingML offset exceeds u32".to_string()))?,
         u32::try_from(length)
-            .map_err(|_| Error::Invalid("DrawingML element length exceeds u32".to_string()))?,
+            .map_err(|_err| Error::Invalid("DrawingML element length exceeds u32".to_string()))?,
     )
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod tests {
     use super::*;
     use litchi_ooxml_common::xml::extract_omml_formulas;
@@ -318,7 +331,7 @@ mod tests {
 
     #[test]
     fn drawingml_paragraph_text_accepts_inherited_conventional_prefix() {
-        let paragraph = br#"<a:p><a:r><a:t>one</a:t></a:r><a:r><a:t>two</a:t></a:r></a:p>"#;
+        let paragraph = br"<a:p><a:r><a:t>one</a:t></a:r><a:r><a:t>two</a:t></a:r></a:p>";
         assert_eq!(extract(paragraph, None).unwrap(), "onetwo");
     }
 
@@ -362,7 +375,7 @@ mod tests {
         );
 
         assert_eq!(
-            extract_omml_formulas(br#"<a:p><m:oMath><m:r/></m:oMath></a:p>"#).unwrap(),
+            extract_omml_formulas(br"<a:p><m:oMath><m:r/></m:oMath></a:p>").unwrap(),
             vec!["<m:oMath><m:r/></m:oMath>"]
         );
     }

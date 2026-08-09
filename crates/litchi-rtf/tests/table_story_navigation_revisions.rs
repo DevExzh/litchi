@@ -1,3 +1,12 @@
+#![allow(
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design and rebind fixture names across steps"
+)]
+
 use litchi_rtf::{
     CellStoryEvent, IndexEntry, NavigationEntry, Revision, RevisionAuthor, RevisionType,
     RtfDocument, RtfWriter, TableCellCoordinate, TableCellPath,
@@ -86,10 +95,10 @@ fn nested_cell_and_body_metadata_remain_independent() {
 #[test]
 fn rejects_missing_metadata_conflicts_and_active_destinations() {
     for source in [
-        r#"{\rtf1\trowd\cellx1000{\intbl{\revised x}\cell}\row}"#,
-        r#"{\rtf1{\*\revtbl{A;}}\trowd\cellx1000{\intbl{\revised\deleted\revauth0 x}\cell}\row}"#,
-        r#"{\rtf1\trowd\cellx1000{\intbl{\xe x{\field danger}}\cell}\row}"#,
-        r#"{\rtf1\trowd\cellx1000{\intbl{\tc\tcl10 bad}\cell}\row}"#,
+        r"{\rtf1\trowd\cellx1000{\intbl{\revised x}\cell}\row}",
+        r"{\rtf1{\*\revtbl{A;}}\trowd\cellx1000{\intbl{\revised\deleted\revauth0 x}\cell}\row}",
+        r"{\rtf1\trowd\cellx1000{\intbl{\xe x{\field danger}}\cell}\row}",
+        r"{\rtf1\trowd\cellx1000{\intbl{\tc\tcl10 bad}\cell}\row}",
     ] {
         assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
     }
@@ -97,7 +106,7 @@ fn rejects_missing_metadata_conflicts_and_active_destinations() {
 
 #[test]
 fn writer_rejects_unowned_multiple_wrong_kind_and_out_of_range_mutations() {
-    let mut unowned = RtfDocument::parse(r#"{\rtf1\trowd\cellx1000{\intbl A\cell}\row}"#).unwrap();
+    let mut unowned = RtfDocument::parse(r"{\rtf1\trowd\cellx1000{\intbl A\cell}\row}").unwrap();
     unowned
         .push_cell_navigation_entry_metadata(NavigationEntry::Index(
             IndexEntry::new(0, Cow::Borrowed("x")).unwrap(),
@@ -106,7 +115,7 @@ fn writer_rejects_unowned_multiple_wrong_kind_and_out_of_range_mutations() {
     assert!(RtfWriter::new(Vec::new()).write_document(&unowned).is_err());
 
     let mut duplicate = RtfDocument::parse(
-        r#"{\rtf1\trowd\cellx1000\cellx2000{\intbl A{\xe\v x}\cell}{\intbl B\cell}\row}"#,
+        r"{\rtf1\trowd\cellx1000\cellx2000{\intbl A{\xe\v x}\cell}{\intbl B\cell}\row}",
     )
     .unwrap();
     duplicate.tables_mut()[0].rows_mut()[0].cells_mut()[1]
@@ -119,7 +128,7 @@ fn writer_rejects_unowned_multiple_wrong_kind_and_out_of_range_mutations() {
     );
 
     let mut wrong = RtfDocument::parse(
-        r#"{\rtf1{\*\revtbl{A;}}\trowd\cellx1000{\intbl{\revised\revauth0 x}\cell}\row}"#,
+        r"{\rtf1{\*\revtbl{A;}}\trowd\cellx1000{\intbl{\revised\revauth0 x}\cell}\row}",
     )
     .unwrap();
     let cell = &mut wrong.tables_mut()[0].rows_mut()[0].cells_mut()[0];
@@ -128,7 +137,7 @@ fn writer_rejects_unowned_multiple_wrong_kind_and_out_of_range_mutations() {
     assert!(RtfWriter::new(Vec::new()).write_document(&wrong).is_err());
 
     let mut out_of_range =
-        RtfDocument::parse(r#"{\rtf1\trowd\cellx1000{\intbl A\cell}\row}"#).unwrap();
+        RtfDocument::parse(r"{\rtf1\trowd\cellx1000{\intbl A\cell}\row}").unwrap();
     out_of_range.tables_mut()[0].rows_mut()[0].cells_mut()[0]
         .push_navigation_entry_reference(99, 0)
         .unwrap();

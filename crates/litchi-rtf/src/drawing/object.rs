@@ -44,7 +44,7 @@ pub enum ObjectResultKind {
     Rtf,
     /// Plain text (`rslttxt`)
     Text,
-    /// Windows metafile or MacPict (`rsltpict`)
+    /// Windows metafile or `MacPict` (`rsltpict`)
     Picture,
     /// Bitmap (`rsltbmp`)
     Bitmap,
@@ -52,10 +52,10 @@ pub enum ObjectResultKind {
     Html,
 }
 
-/// Bounds-checked view of the OLE ObjectHeader stored in `objdata`.
+/// Bounds-checked view of the OLE `ObjectHeader` stored in `objdata`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OleObjectHeader<'a> {
-    /// OLE version from the ObjectHeader
+    /// OLE version from the `ObjectHeader`
     pub ole_version: u32,
     /// OLE format identifier
     pub format_id: u32,
@@ -72,11 +72,16 @@ pub struct OleObjectHeader<'a> {
 impl OleObjectHeader<'_> {
     /// Whether the native payload starts with the OLE2 Compound File signature.
     #[inline]
+    #[must_use]
     pub fn is_compound_file(&self) -> bool {
         self.native_data.starts_with(&COMPOUND_FILE_SIGNATURE)
     }
 }
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent RTF feature flags stay flat for direct access"
+)]
 /// An RTF embedded or linked object.
 #[derive(Debug, Clone)]
 pub struct EmbeddedObject<'a> {
@@ -132,13 +137,14 @@ pub struct EmbeddedObject<'a> {
     pub result_text: Cow<'a, str>,
     /// Indices into `RtfDocument::pictures()` for rendered fallback images
     pub result_picture_indices: Vec<usize>,
-    /// Decoded `objdata`, including the OLE ObjectHeader
+    /// Decoded `objdata`, including the OLE `ObjectHeader`
     pub data: Vec<u8>,
 }
 
-impl<'a> EmbeddedObject<'a> {
+impl EmbeddedObject<'_> {
     /// Construct an empty object record.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             position: 0,
@@ -171,7 +177,8 @@ impl<'a> EmbeddedObject<'a> {
         }
     }
 
-    /// Parse the decoded ObjectHeader without copying its strings or native payload.
+    /// Parse the decoded `ObjectHeader` without copying its strings or native payload.
+    #[must_use]
     pub fn ole_header(&self) -> Option<OleObjectHeader<'_>> {
         let mut offset = 0usize;
         let ole_version = read_u32(&self.data, &mut offset)?;
@@ -191,8 +198,10 @@ impl<'a> EmbeddedObject<'a> {
             native_data,
         })
     }
-
     /// Validate positional metadata and references into the shared picture store.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self, body: &str, picture_count: usize) -> RtfResult<()> {
         if body.get(..self.position).is_none() {
             return Err(RtfError::MalformedDocument(
@@ -260,6 +269,11 @@ fn read_counted_bytes<'a>(data: &'a [u8], offset: &mut usize) -> Option<&'a [u8]
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::*;
 
     #[test]

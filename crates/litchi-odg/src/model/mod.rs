@@ -2,3 +2,4 @@
 
 pub mod layer;
 pub mod page;
+pub mod shape;

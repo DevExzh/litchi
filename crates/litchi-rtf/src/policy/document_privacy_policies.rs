@@ -14,6 +14,7 @@ pub struct DocumentPrivacyPolicies {
 
 impl DocumentPrivacyPolicies {
     /// Return whether no privacy-removal request was present.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         !self.remove_personal_information && !self.remove_date_time_information
     }
