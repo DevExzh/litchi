@@ -23,16 +23,19 @@ impl TableRange {
     }
 
     /// Byte offset of the range in the table stream.
+    #[must_use]
     pub const fn offset(self) -> usize {
         self.offset
     }
 
     /// Exact byte length of the range.
+    #[must_use]
     pub const fn length(self) -> usize {
         self.length
     }
 
     /// Exclusive byte end of the range.
+    #[must_use]
     pub fn end(self) -> Option<usize> {
         self.offset.checked_add(self.length)
     }
@@ -47,11 +50,13 @@ pub struct SourceRanges {
 
 impl SourceRanges {
     /// The `SttbFnm` range, when its FIB length is nonzero.
+    #[must_use]
     pub const fn referenced_files(self) -> Option<TableRange> {
         self.referenced_files
     }
 
     /// The `PlcfWKB` range, when its FIB length is nonzero.
+    #[must_use]
     pub const fn subdocuments(self) -> Option<TableRange> {
         self.subdocuments
     }
@@ -74,16 +79,19 @@ pub struct SourceContext {
 
 impl SourceContext {
     /// The main-document `ccpText` used to validate the terminal WKB CP.
+    #[must_use]
     pub const fn main_document_chars(self) -> u32 {
         self.main_document_chars
     }
 
     /// Length of the complete source table stream.
+    #[must_use]
     pub const fn table_stream_length(self) -> usize {
         self.table_stream_length
     }
 
     /// Exact FIB-addressed ranges captured with the source.
+    #[must_use]
     pub const fn ranges(self) -> SourceRanges {
         self.ranges
     }
@@ -102,21 +110,25 @@ impl TablePatch {
     }
 
     /// The source context required by this patch.
+    #[must_use]
     pub const fn before_context(&self) -> SourceContext {
         self.before.context
     }
 
     /// The context produced after this patch is applied.
+    #[must_use]
     pub const fn after_context(&self) -> SourceContext {
         self.after.context
     }
 
     /// The independently encoded `SttbFnm` replacement bytes.
+    #[must_use]
     pub fn after_referenced_files(&self) -> Option<&[u8]> {
         self.after.referenced_files.as_deref()
     }
 
     /// The independently encoded `PlcfWKB` replacement bytes.
+    #[must_use]
     pub fn after_subdocuments(&self) -> Option<&[u8]> {
         self.after.subdocuments.as_deref()
     }
@@ -322,7 +334,7 @@ impl WireImage {
         let context = source
             .context
             .after(layout, ranges, main_document_chars)
-            .map_err(|message| crate::package::Error::Corrupted(message.to_string()))?;
+            .map_err(|message| crate::package::Error::Corrupted(message.clone()))?;
         Ok(Self {
             context,
             referenced_files,

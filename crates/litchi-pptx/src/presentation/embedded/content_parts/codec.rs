@@ -412,7 +412,10 @@ pub(crate) fn rewrite_anchor_relationship_id(xml: &[u8], value: &str) -> Result<
         if anchors.len() != 1 {
             return Err(invalid("content-part anchor has an invalid element count"));
         }
-        let anchor = anchors.into_iter().next().unwrap();
+        let anchor = anchors
+            .into_iter()
+            .next()
+            .ok_or_else(|| invalid("content-part anchor is missing"))?;
         if anchor.range.start != offset || anchor.range.end != offset + xml.len() {
             return Err(invalid("content-part anchor has an invalid source span"));
         }

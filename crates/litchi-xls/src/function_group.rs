@@ -24,6 +24,7 @@ pub enum BuiltInFunctionCategories {
 }
 
 impl BuiltInFunctionCategories {
+    #[must_use]
     pub const fn count(self) -> u16 {
         match self {
             Self::Fourteen => 14,
@@ -42,15 +43,19 @@ pub struct FunctionGroups {
 }
 
 impl FunctionGroups {
+    #[must_use]
     pub fn built_in(&self) -> BuiltInFunctionCategories {
         self.built_in
     }
+    #[must_use]
     pub fn custom_categories(&self) -> &[String] {
         &self.custom_categories
     }
+    #[must_use]
     pub fn classic_categories(&self) -> &[String] {
         &self.custom_categories[..self.classic_category_count]
     }
+    #[must_use]
     pub fn extended_categories(&self) -> &[String] {
         &self.custom_categories[self.classic_category_count..]
     }
@@ -299,7 +304,7 @@ fn read_u16(data: &[u8], offset: usize) -> Result<u16> {
         expected: end,
         found: data.len(),
     })?;
-    let bytes = bytes.try_into().map_err(|_| Error::InvalidLength {
+    let bytes = bytes.try_into().map_err(|_error| Error::InvalidLength {
         expected: 2,
         found: bytes.len(),
     })?;

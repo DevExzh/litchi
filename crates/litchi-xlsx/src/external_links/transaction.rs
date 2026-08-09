@@ -33,16 +33,19 @@ impl<'a> Transaction<'a> {
     }
 
     /// Immutable source snapshot used for conflict checks and inverse patches.
+    #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Borrow the currently staged external-link entries.
+    #[must_use]
     pub fn entries(&self) -> &[super::package::Entry] {
         &self.draft
     }
 
     /// Contextual alias for [`Self::entries`].
+    #[must_use]
     pub fn links(&self) -> &[super::package::Entry] {
         self.entries()
     }
@@ -114,6 +117,7 @@ impl<'a> Transaction<'a> {
     }
 
     /// Whether staged entries differ from the captured source graph.
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.before.entries() != self.draft.as_slice()
     }

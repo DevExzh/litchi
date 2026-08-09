@@ -66,6 +66,9 @@ pub struct AxesUsed {
 
 impl AxesUsed {
     /// Parse an `AxesUsed` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != 2 {
             return Err(Error::InvalidLength {
@@ -79,11 +82,13 @@ impl AxesUsed {
     }
 
     /// Serialize back to a complete `AxesUsed` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         (self.count as u16).to_le_bytes().to_vec()
     }
 
     /// The number of axis groups (`cAxes`).
+    #[must_use]
     pub fn count(&self) -> AxesUsedCount {
         self.count
     }
@@ -128,6 +133,12 @@ pub struct AxisParent {
 
 impl AxisParent {
     /// Parse an `AxisParent` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// # Panics
+    ///
+    /// Panics only if an internal BIFF invariant has been violated.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != AXIS_PARENT_LEN {
             return Err(Error::InvalidLength {
@@ -142,6 +153,7 @@ impl AxisParent {
     }
 
     /// Serialize back to a complete `AxisParent` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(AXIS_PARENT_LEN);
         payload.extend_from_slice(&(self.position as u16).to_le_bytes());
@@ -150,11 +162,13 @@ impl AxisParent {
     }
 
     /// Whether the axis group is primary or secondary (`iax`).
+    #[must_use]
     pub fn position(&self) -> AxisGroupPosition {
         self.position
     }
 
     /// The preserved undefined `unused` bytes.
+    #[must_use]
     pub fn unused(&self) -> [u8; 16] {
         self.unused
     }

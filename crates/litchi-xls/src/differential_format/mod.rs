@@ -36,7 +36,7 @@ fn read_bytes<const N: usize>(data: &[u8], offset: usize, field: &str) -> Result
         .ok_or_else(|| invalid(format!("truncated {field}")))?;
     bytes
         .try_into()
-        .map_err(|_| invalid(format!("truncated {field}")))
+        .map_err(|_error| invalid(format!("truncated {field}")))
 }
 
 fn read_u8(data: &[u8], offset: usize, field: &str) -> Result<u8> {
@@ -54,7 +54,9 @@ fn read_u32(data: &[u8], offset: usize, field: &str) -> Result<u32> {
 }
 
 fn read_i16(data: &[u8], offset: usize, field: &str) -> Result<i16> {
-    Ok(read_u16(data, offset, field)? as i16)
+    Ok(crate::utils::wrap_u16_to_i16(read_u16(
+        data, offset, field,
+    )?))
 }
 
 fn read_f64(data: &[u8], offset: usize, field: &str) -> Result<f64> {
@@ -98,6 +100,9 @@ pub struct XfColor {
 }
 
 impl XfColor {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(source: XfColorSource, tint: i16, rgba: [u8; 4]) -> Result<Self> {
         if tint == i16::MIN {
             return Err(invalid("XFPropColor tint cannot equal -32768"));
@@ -120,12 +125,15 @@ impl XfColor {
         })
     }
 
+    #[must_use]
     pub const fn source(&self) -> XfColorSource {
         self.source
     }
+    #[must_use]
     pub const fn tint(&self) -> i16 {
         self.tint
     }
+    #[must_use]
     pub const fn rgba(&self) -> [u8; 4] {
         self.rgba
     }
@@ -139,12 +147,15 @@ pub struct XfBorder {
 }
 
 impl XfBorder {
+    #[must_use]
     pub const fn new(color: XfColor, style: BorderStyle) -> Self {
         Self { color, style }
     }
+    #[must_use]
     pub const fn color(&self) -> XfColor {
         self.color
     }
+    #[must_use]
     pub const fn style(&self) -> BorderStyle {
         self.style
     }
@@ -162,6 +173,9 @@ pub struct XfGradient {
 }
 
 impl XfGradient {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn linear(degree: f64) -> Result<Self> {
         if !degree.is_finite() {
             return Err(invalid("linear gradient degree must be finite"));
@@ -176,6 +190,9 @@ impl XfGradient {
         })
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn rectangular(left: f64, right: f64, top: f64, bottom: f64) -> Result<Self> {
         validate_unit_interval(left, "left")?;
         validate_unit_interval(right, "right")?;
@@ -191,21 +208,27 @@ impl XfGradient {
         })
     }
 
+    #[must_use]
     pub const fn is_rectangular(&self) -> bool {
         self.rectangular
     }
+    #[must_use]
     pub const fn degree(&self) -> f64 {
         self.degree
     }
+    #[must_use]
     pub const fn fill_to_left(&self) -> f64 {
         self.fill_to_left
     }
+    #[must_use]
     pub const fn fill_to_right(&self) -> f64 {
         self.fill_to_right
     }
+    #[must_use]
     pub const fn fill_to_top(&self) -> f64 {
         self.fill_to_top
     }
+    #[must_use]
     pub const fn fill_to_bottom(&self) -> f64 {
         self.fill_to_bottom
     }
@@ -220,6 +243,9 @@ pub struct XfGradientStop {
 }
 
 impl XfGradientStop {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(position: f64, color: XfColor) -> Result<Self> {
         validate_unit_interval(position, "stop")?;
         Ok(Self {
@@ -228,9 +254,11 @@ impl XfGradientStop {
             unused: 0,
         })
     }
+    #[must_use]
     pub const fn position(&self) -> f64 {
         self.position
     }
+    #[must_use]
     pub const fn color(&self) -> XfColor {
         self.color
     }
@@ -308,16 +336,21 @@ pub struct XfProperties {
 }
 
 impl XfProperties {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(properties: Vec<XfProperty>) -> Result<Self> {
         let value = Self { properties };
         validation::validate_properties(&value)?;
         Ok(value)
     }
 
+    #[must_use]
     pub fn properties(&self) -> &[XfProperty] {
         &self.properties
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.properties.is_empty()
     }
@@ -332,6 +365,9 @@ pub struct DifferentialFormat {
 }
 
 impl DifferentialFormat {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(new_border: bool, properties: Vec<XfProperty>) -> Result<Self> {
         let value = Self {
             new_border,
@@ -342,9 +378,11 @@ impl DifferentialFormat {
         Ok(value)
     }
 
+    #[must_use]
     pub const fn has_new_border(&self) -> bool {
         self.new_border
     }
+    #[must_use]
     pub fn properties(&self) -> &XfProperties {
         &self.properties
     }

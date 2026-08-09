@@ -1,11 +1,11 @@
-//! Exact lexical codecs shared by DrawingML text primitives.
+//! Exact lexical codecs shared by `DrawingML` text primitives.
 
 use std::fmt;
 use std::str::FromStr;
 
 use super::model::{Anchor, Direction, Underline, Wrap};
 
-/// Failure to parse or construct a DrawingML text primitive.
+/// Failure to parse or construct a `DrawingML` text primitive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ParseError {
@@ -56,7 +56,7 @@ impl From<crate::coordinate::ParseError> for ParseError {
 }
 
 impl Anchor {
-    /// Return the exact DrawingML token.
+    /// Return the exact `DrawingML` token.
     #[must_use]
     pub const fn token(self) -> &'static str {
         match self {
@@ -91,7 +91,7 @@ impl fmt::Display for Anchor {
 }
 
 impl Direction {
-    /// Return the exact DrawingML token.
+    /// Return the exact `DrawingML` token.
     #[must_use]
     pub const fn token(self) -> &'static str {
         match self {
@@ -130,7 +130,7 @@ impl fmt::Display for Direction {
 }
 
 impl Wrap {
-    /// Return the exact DrawingML token.
+    /// Return the exact `DrawingML` token.
     #[must_use]
     pub const fn token(self) -> &'static str {
         match self {
@@ -159,7 +159,7 @@ impl fmt::Display for Wrap {
 }
 
 impl Underline {
-    /// Parse an `a:rPr@u` DrawingML token.
+    /// Parse an `a:rPr@u` `DrawingML` token.
     pub fn from_dml(value: &str) -> Result<Self, ParseError> {
         match value {
             "none" => Ok(Self::None),
@@ -184,7 +184,7 @@ impl Underline {
         }
     }
 
-    /// Return the exact `a:rPr@u` DrawingML token.
+    /// Return the exact `a:rPr@u` `DrawingML` token.
     #[must_use]
     pub const fn dml(self) -> &'static str {
         match self {
@@ -209,7 +209,7 @@ impl Underline {
         }
     }
 
-    /// Parse a `w:u@w:val` WordprocessingML token.
+    /// Parse a `w:u@w:val` `WordprocessingML` token.
     pub fn from_wml(value: &str) -> Result<Self, ParseError> {
         match value {
             "none" => Ok(Self::None),
@@ -234,7 +234,7 @@ impl Underline {
         }
     }
 
-    /// Return the exact `w:u@w:val` WordprocessingML token.
+    /// Return the exact `w:u@w:val` `WordprocessingML` token.
     #[must_use]
     pub const fn wml(self) -> &'static str {
         match self {
@@ -269,7 +269,7 @@ pub fn parse_bool(value: &str) -> Result<bool, ParseError> {
     }
 }
 
-/// Parse WordprocessingML `ST_OnOff`, including transitional `on`/`off`.
+/// Parse `WordprocessingML` `ST_OnOff`, including transitional `on`/`off`.
 pub fn parse_on_off(value: &str) -> Result<bool, ParseError> {
     match value {
         "on" => Ok(true),

@@ -22,6 +22,7 @@ impl Opaque {
     }
 
     /// The retained, inert XML bytes.
+    #[must_use]
     pub fn xml(&self) -> &[u8] {
         &self.xml
     }
@@ -303,6 +304,7 @@ pub enum Property {
 
 impl Property {
     /// The semantic key, when this is a typed feature property.
+    #[must_use]
     pub fn key(&self) -> Option<&str> {
         match self {
             Self::Array { key, .. }
@@ -330,6 +332,7 @@ pub struct Bag {
 
 impl Bag {
     /// Find the first typed property with the requested producer key.
+    #[must_use]
     pub fn property(&self, key: &str) -> Option<&Property> {
         self.properties
             .iter()
@@ -366,6 +369,7 @@ pub struct Bags {
 
 impl Bags {
     /// Find a bag by its zero-based package-local index.
+    #[must_use]
     pub fn get(&self, index: usize) -> Option<&Bag> {
         self.values.get(index)
     }

@@ -1,4 +1,4 @@
-//! Semantic WordprocessingML section and page-layout APIs.
+//! Semantic `WordprocessingML` section and page-layout APIs.
 //!
 //! The facade intentionally keeps the section owner small and contextual. The
 //! semantic values live in [`model`], while [`codec`] owns the bounded,

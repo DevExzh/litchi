@@ -84,7 +84,9 @@ mod authors {
                     } else {
                         child_frame(
                             &mut authors,
-                            stack.last_mut().expect("nonempty stack"),
+                            stack.last_mut().ok_or_else(|| {
+                                invalid("modern Comment Author child has no parent")
+                            })?,
                             &element,
                             decoder,
                             &namespace,

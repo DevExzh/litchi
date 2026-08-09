@@ -936,7 +936,7 @@ impl TimingParser {
                 let pending = self
                     .pending_graphic_build
                     .take()
-                    .expect("pending graphical-object build checked above");
+                    .ok_or_else(|| invalid("graphical-object build state is missing"))?;
                 if pending.sub_build_depth.is_some() {
                     return Err(invalid(
                         "graphical-object build has an incomplete sub-build",
@@ -982,7 +982,7 @@ impl TimingParser {
                 let pending = self
                     .pending_template
                     .take()
-                    .expect("pending template checked above");
+                    .ok_or_else(|| invalid("paragraph template state is missing"))?;
                 if pending.time_list_depth.is_some() || !pending.saw_time_list {
                     return Err(invalid("paragraph template has an incomplete time list"));
                 }

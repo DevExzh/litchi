@@ -1,6 +1,10 @@
 //! Bounded XML codecs for Office 2013 chart-style companion parts.
 
-use super::model::*;
+use super::model::{
+    Color, ColorDocument, ColorInfo, ColorKind, ColorMethod, ColorValue, Document, Entry,
+    EntryKind, FontIndex, FontReference, Info, MarkerLayout, MarkerSymbol, Payload, Reference,
+    Transform, TransformKind, Variation,
+};
 use crate::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -23,20 +27,24 @@ const MAX_VARIATIONS: usize = 4_096;
 const MAX_TRANSFORMS: usize = 4_096;
 
 impl Document {
+    #[must_use]
     pub fn info(&self) -> &Info {
         &self.info
     }
 
+    #[must_use]
     pub fn to_xml(&self) -> Vec<u8> {
         self.xml.clone()
     }
 }
 
 impl ColorDocument {
+    #[must_use]
     pub fn info(&self) -> &ColorInfo {
         &self.info
     }
 
+    #[must_use]
     pub fn to_xml(&self) -> Vec<u8> {
         self.xml.clone()
     }
@@ -852,7 +860,12 @@ fn color_kind(name: &str) -> Option<ColorKind> {
 }
 
 fn transform_kind(name: &str) -> Option<(TransformKind, bool)> {
-    use TransformKind::*;
+    use TransformKind::{
+        Alpha, AlphaModulation, AlphaOffset, Blue, BlueModulation, BlueOffset, Complement, Gamma,
+        Grayscale, Green, GreenModulation, GreenOffset, Hue, HueModulation, HueOffset, Inverse,
+        InverseGamma, Luminance, LuminanceModulation, LuminanceOffset, Red, RedModulation,
+        RedOffset, Saturation, SaturationModulation, SaturationOffset, Shade, Tint,
+    };
     Some(match name {
         "tint" => (Tint, true),
         "shade" => (Shade, true),

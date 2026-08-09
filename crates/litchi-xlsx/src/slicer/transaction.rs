@@ -25,6 +25,7 @@ impl<'a> Transaction<'a> {
     }
 
     /// Borrow the staged package for diagnostics only.
+    #[must_use]
     pub fn package(&self) -> &OpcPackage {
         &self.staged
     }

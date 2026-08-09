@@ -1,6 +1,14 @@
-//! Bounded, inert SmartArt (DrawingML diagram) inventory owned by a DOCX main document.
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::struct_field_names,
+    reason = "the public model retains established field names"
+)]
+//! Bounded, inert `SmartArt` (`DrawingML` diagram) inventory owned by a DOCX main document.
 //!
-//! A Word SmartArt graphic is anchored in the document body as a
+//! A Word `SmartArt` graphic is anchored in the document body as a
 //! `w:drawing`/`a:graphicData` element in the `drawingml/diagram` namespace
 //! holding a `dgm:relIds` reference with four relationship IDs (data, layout,
 //! quick style, colors). The relationships on the main document part point at
@@ -44,7 +52,7 @@ const MAX_TOTAL_BYTES: usize = 256 * 1024 * 1024;
 const MAX_NODES: usize = 200_000;
 const MAX_DEPTH: usize = 128;
 
-/// Namespace dialect of a DOCX SmartArt graph.
+/// Namespace dialect of a DOCX `SmartArt` graph.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DiagramConformance {
     /// Transitional (`schemas.openxmlformats.org`) namespaces.
@@ -100,7 +108,7 @@ impl DiagramConformance {
     }
 }
 
-/// A typed, inert SmartArt diagram anchored in a Word document.
+/// A typed, inert `SmartArt` diagram anchored in a Word document.
 #[derive(Clone, Debug)]
 pub struct Diagram {
     /// Namespace dialect of the owning document.
@@ -136,6 +144,7 @@ pub struct Diagram {
 impl Diagram {
     /// Best-effort diagram type, inferred from the data model's layout type
     /// identifier, falling back to the layout part's `uniqueId`.
+    #[must_use]
     pub fn diagram_type(&self) -> DiagramType {
         if let Some(uri) = self
             .data
@@ -155,11 +164,13 @@ impl Diagram {
     }
 
     /// Content-node hierarchy implied by the data model's connection graph.
+    #[must_use]
     pub fn node_tree(&self) -> Vec<DiagramNode> {
         self.data.node_tree()
     }
 
     /// All text content of the diagram, one line per content node.
+    #[must_use]
     pub fn text(&self) -> String {
         self.data.text()
     }
@@ -174,11 +185,15 @@ struct DiagramAnchor {
     colors_id: Option<String>,
 }
 
-/// Load the typed SmartArt inventory anchored in the given main document part.
+/// Load the typed `SmartArt` inventory anchored in the given main document part.
 ///
 /// Diagrams are returned in document order. The diagram parts are validated
 /// (relationship types, `word/diagrams/` containment, content types, size
 /// caps) and parsed as inert metadata.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn load_smart_arts(package: &OpcPackage, document_name: &PackURI) -> Result<Vec<Diagram>> {
     let document = package.get_part(document_name)?;
     if document.content_type() != DOCUMENT_CT {
@@ -312,7 +327,10 @@ pub fn load_smart_arts(package: &OpcPackage, document_name: &PackURI) -> Result<
 }
 
 /// Resolve and parse an optional definition part (layout, quick style, colors).
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "signature mirrors the corresponding OOXML record"
+)]
 fn resolve_definition(
     package: &OpcPackage,
     document: &dyn Part,
@@ -377,7 +395,7 @@ fn resolve_part(
     Ok((name, xml))
 }
 
-/// Scan the document body for `dgm:relIds` SmartArt anchors, detecting the
+/// Scan the document body for `dgm:relIds` `SmartArt` anchors, detecting the
 /// namespace dialect from the document root.
 fn document_anchors(xml: &[u8]) -> Result<(DiagramConformance, Vec<DiagramAnchor>)> {
     for conformance in [DiagramConformance::Transitional, DiagramConformance::Strict] {
@@ -482,7 +500,7 @@ fn scan_document_xml(xml: &[u8], conformance: DiagramConformance) -> Result<Vec<
             },
             Event::CData(_) => return Err(invalid("CDATA is rejected")),
             Event::Eof => break,
-            _ => {},
+            Event::Text(_) | Event::Comment(_) | Event::Decl(_) | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }

@@ -69,6 +69,9 @@ pub struct Fbi {
 
 impl Fbi {
     /// Parse an `Fbi` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
             return Err(Error::InvalidLength {
@@ -101,6 +104,7 @@ impl Fbi {
     }
 
     /// Serialize back to a complete `Fbi` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(PAYLOAD_LEN);
         payload.extend_from_slice(&self.width_basis.to_le_bytes());
@@ -112,26 +116,31 @@ impl Fbi {
     }
 
     /// Font width in twips when the font was first applied (`dmixBasis`).
+    #[must_use]
     pub fn width_basis(&self) -> u16 {
         self.width_basis
     }
 
     /// Font height in twips when the font was first applied (`dmiyBasis`).
+    #[must_use]
     pub fn height_basis(&self) -> u16 {
         self.height_basis
     }
 
     /// Default font height in twips (`twpHeightBasis`).
+    #[must_use]
     pub fn font_height_basis(&self) -> u16 {
         self.font_height_basis
     }
 
     /// The scale basis (`scab`).
+    #[must_use]
     pub fn scale(&self) -> FontScaleBasis {
         self.scale
     }
 
     /// The font index (`ifnt`).
+    #[must_use]
     pub fn font_index(&self) -> u16 {
         self.font_index
     }

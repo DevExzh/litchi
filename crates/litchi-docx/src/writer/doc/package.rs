@@ -1,3 +1,19 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::expect_used,
+    reason = "the invariant is established immediately before extraction"
+)]
+#![expect(
+    clippy::format_collect,
+    reason = "the existing formatter preserves output ordering"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 use crate::alt::{Chunk, Conformance, scan};
 use crate::error::{Error, Result};
 use crate::parts::document_part::active_block_ranges;
@@ -91,11 +107,11 @@ impl DocumentBody {
             if target != 2 {
                 continue;
             }
-            let start_usize = usize::try_from(start).map_err(|_| {
+            let start_usize = usize::try_from(start).map_err(|_source_error| {
                 Error::InvalidFormat("altChunk offset does not fit usize".to_string())
             })?;
             let end = start_usize
-                .checked_add(usize::try_from(length).map_err(|_| {
+                .checked_add(usize::try_from(length).map_err(|_source_error| {
                     Error::InvalidFormat("altChunk length does not fit usize".to_string())
                 })?)
                 .ok_or_else(|| Error::InvalidFormat("altChunk range overflowed".to_string()))?;
@@ -120,9 +136,10 @@ impl DocumentBody {
         let mut capture: Option<(PreservedBodyKind, usize, usize)> = None;
 
         loop {
-            let event_start = usize::try_from(reader.buffer_position()).map_err(|_| {
-                Error::InvalidFormat("Word document offset does not fit usize".to_string())
-            })?;
+            let event_start =
+                usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+                    Error::InvalidFormat("Word document offset does not fit usize".to_string())
+                })?;
             let event = {
                 let (namespace, event) = reader
                     .read_resolved_event()
@@ -155,10 +172,17 @@ impl DocumentBody {
                     },
                     Event::End(_) => ScanEvent::EndOther,
                     Event::Eof => ScanEvent::Eof,
-                    _ => ScanEvent::Other,
+                    Event::Empty(_)
+                    | Event::Text(_)
+                    | Event::CData(_)
+                    | Event::Comment(_)
+                    | Event::Decl(_)
+                    | Event::PI(_)
+                    | Event::DocType(_)
+                    | Event::GeneralRef(_) => ScanEvent::Other,
                 }
             };
-            let event_end = usize::try_from(reader.buffer_position()).map_err(|_| {
+            let event_end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
                 Error::InvalidFormat("Word document offset does not fit usize".to_string())
             })?;
 
@@ -436,7 +460,12 @@ impl DocumentBody {
             .iter()
             .filter_map(|element| match element {
                 BodyElement::PreservedAlt(_, chunk) => Some(chunk.clone()),
-                _ => None,
+                BodyElement::Paragraph(_)
+                | BodyElement::Table(_)
+                | BodyElement::PreservedParagraph(_)
+                | BodyElement::PreservedTable(_)
+                | BodyElement::PreservedSectionProperties(_)
+                | BodyElement::PreservedOther(_) => None,
             })
             .collect()
     }
@@ -478,7 +507,12 @@ impl DocumentBody {
         })?;
         match std::mem::replace(slot, BodyElement::PreservedAlt(xml, chunk)) {
             BodyElement::PreservedAlt(_, old) => Ok(old),
-            other => {
+            other @ (BodyElement::Paragraph(_)
+            | BodyElement::Table(_)
+            | BodyElement::PreservedParagraph(_)
+            | BodyElement::PreservedTable(_)
+            | BodyElement::PreservedSectionProperties(_)
+            | BodyElement::PreservedOther(_)) => {
                 *slot = other;
                 Err(Error::InvalidFormat(
                     "alternative-format position does not contain an anchor".into(),
@@ -498,7 +532,12 @@ impl DocumentBody {
         }
         match self.elements.remove(position) {
             BodyElement::PreservedAlt(_, chunk) => Ok((position, chunk)),
-            other => {
+            other @ (BodyElement::Paragraph(_)
+            | BodyElement::Table(_)
+            | BodyElement::PreservedParagraph(_)
+            | BodyElement::PreservedTable(_)
+            | BodyElement::PreservedSectionProperties(_)
+            | BodyElement::PreservedOther(_)) => {
                 self.elements.insert(position, other);
                 Err(Error::InvalidFormat(
                     "alternative-format position does not contain an anchor".into(),
@@ -582,7 +621,11 @@ impl DocumentBody {
                     }
                     count += 1;
                 },
-                _ => {},
+                BodyElement::Table(_)
+                | BodyElement::PreservedTable(_)
+                | BodyElement::PreservedSectionProperties(_)
+                | BodyElement::PreservedAlt(..)
+                | BodyElement::PreservedOther(_) => {},
             }
         }
         None
@@ -604,7 +647,11 @@ impl DocumentBody {
                     }
                     count += 1;
                 },
-                _ => {},
+                BodyElement::Paragraph(_)
+                | BodyElement::PreservedParagraph(_)
+                | BodyElement::PreservedSectionProperties(_)
+                | BodyElement::PreservedAlt(..)
+                | BodyElement::PreservedOther(_) => {},
             }
         }
         None
@@ -641,7 +688,12 @@ impl DocumentBody {
                 BodyElement::PreservedSectionProperties(raw) => {
                     Some(SectionProperties::from_xml(raw))
                 },
-                _ => None,
+                BodyElement::Paragraph(_)
+                | BodyElement::Table(_)
+                | BodyElement::PreservedParagraph(_)
+                | BodyElement::PreservedTable(_)
+                | BodyElement::PreservedAlt(..)
+                | BodyElement::PreservedOther(_) => None,
             })
             .transpose()
     }
@@ -661,7 +713,11 @@ impl DocumentBody {
                 BodyElement::PreservedParagraph(raw) => {
                     paragraph_section_range(raw)?;
                 },
-                _ => {},
+                BodyElement::Paragraph(_)
+                | BodyElement::Table(_)
+                | BodyElement::PreservedTable(_)
+                | BodyElement::PreservedAlt(..)
+                | BodyElement::PreservedOther(_) => {},
             }
         }
         if let Some(index) = final_section
@@ -686,7 +742,13 @@ impl DocumentBody {
                 BodyElement::PreservedParagraph(raw) if paragraph_section_range(raw)?.is_some() => {
                     count += 1;
                 },
-                _ => {},
+                BodyElement::Paragraph(_)
+                | BodyElement::Table(_)
+                | BodyElement::PreservedParagraph(_)
+                | BodyElement::PreservedTable(_)
+                | BodyElement::PreservedSectionProperties(_)
+                | BodyElement::PreservedAlt(..)
+                | BodyElement::PreservedOther(_) => {},
             }
         }
         Ok(count)
@@ -720,7 +782,11 @@ impl DocumentBody {
                 *raw = insert_paragraph_property(raw, &section_xml)?;
                 Ok(())
             },
-            _ => unreachable!(),
+            BodyElement::Table(_)
+            | BodyElement::PreservedTable(_)
+            | BodyElement::PreservedSectionProperties(_)
+            | BodyElement::PreservedAlt(..)
+            | BodyElement::PreservedOther(_) => unreachable!(),
         }
     }
 
@@ -744,7 +810,11 @@ impl DocumentBody {
                         current += 1;
                     }
                 },
-                _ => {},
+                BodyElement::Table(_)
+                | BodyElement::PreservedTable(_)
+                | BodyElement::PreservedSectionProperties(_)
+                | BodyElement::PreservedAlt(..)
+                | BodyElement::PreservedOther(_) => {},
             }
         }
         Err(Error::InvalidFormat(format!(
@@ -784,7 +854,11 @@ impl DocumentBody {
                         current += 1;
                     }
                 },
-                _ => {},
+                BodyElement::Table(_)
+                | BodyElement::PreservedTable(_)
+                | BodyElement::PreservedSectionProperties(_)
+                | BodyElement::PreservedAlt(..)
+                | BodyElement::PreservedOther(_) => {},
             }
         }
         Err(Error::InvalidFormat(format!(
@@ -814,7 +888,12 @@ impl DocumentBody {
                         current += 1;
                     }
                 },
-                _ => {},
+                BodyElement::Paragraph(_)
+                | BodyElement::Table(_)
+                | BodyElement::PreservedTable(_)
+                | BodyElement::PreservedSectionProperties(_)
+                | BodyElement::PreservedAlt(..)
+                | BodyElement::PreservedOther(_) => {},
             }
         }
         Err(Error::InvalidFormat(format!(
@@ -857,7 +936,11 @@ impl DocumentBody {
                         )?;
                     }
                 },
-                _ => {},
+                BodyElement::Table(_)
+                | BodyElement::PreservedTable(_)
+                | BodyElement::PreservedSectionProperties(_)
+                | BodyElement::PreservedAlt(..)
+                | BodyElement::PreservedOther(_) => {},
             }
         }
         Ok(())
@@ -882,7 +965,11 @@ impl DocumentBody {
                         );
                     }
                 },
-                _ => {},
+                BodyElement::Table(_)
+                | BodyElement::PreservedTable(_)
+                | BodyElement::PreservedSectionProperties(_)
+                | BodyElement::PreservedAlt(..)
+                | BodyElement::PreservedOther(_) => {},
             }
         }
         Ok(())
@@ -962,9 +1049,9 @@ fn word_ranges(xml: &str, target: &[u8]) -> Result<Vec<(usize, usize)>> {
     let mut ranges = Vec::new();
     crate::namespace::scan_word_element_ranges(xml.as_bytes(), &[target], |_, start, length| {
         let start = usize::try_from(start)
-            .map_err(|_| Error::InvalidFormat("Word range overflow".to_string()))?;
+            .map_err(|_source_error| Error::InvalidFormat("Word range overflow".to_string()))?;
         let length = usize::try_from(length)
-            .map_err(|_| Error::InvalidFormat("Word range overflow".to_string()))?;
+            .map_err(|_source_error| Error::InvalidFormat("Word range overflow".to_string()))?;
         ranges.push((start, start + length));
         Ok(())
     })?;
@@ -1213,7 +1300,10 @@ fn push_raw_body_xml(
 
 /// A body element (paragraph, table, or exact preserved XML).
 #[derive(Debug)]
-#[allow(clippy::large_enum_variant)] // writer-internal type; variants are moved, not compared
+#[allow(
+    clippy::large_enum_variant,
+    reason = "writer-internal variants are moved and boxing would add churn"
+)] // writer-internal type; variants are moved, not compared
 pub(crate) enum BodyElement {
     Paragraph(MutableParagraph),
     Table(MutableTable),

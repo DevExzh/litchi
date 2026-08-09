@@ -8,6 +8,9 @@ use super::model::{
 };
 use super::{RECORD_TYPE, validation};
 
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn parse(input: &[u8]) -> Result<Snapshot> {
     if input.len() > MAX_STREAM_BYTES {
         return Err(invalid("record stream exceeds 1 MiB"));
@@ -51,6 +54,9 @@ pub fn parse(input: &[u8]) -> Result<Snapshot> {
     Snapshot::try_new(records)
 }
 
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn write(snapshot: &Snapshot) -> Result<Vec<u8>> {
     validation::validate(snapshot)?;
     let mut output = Vec::new();
@@ -70,7 +76,7 @@ pub fn write(snapshot: &Snapshot) -> Result<Vec<u8>> {
 
 fn append_record(output: &mut Vec<u8>, record_type: u16, payload: &[u8]) -> Result<()> {
     let payload_len = u16::try_from(payload.len())
-        .map_err(|_| invalid("record payload length does not fit BIFF framing"))?;
+        .map_err(|_error| invalid("record payload length does not fit BIFF framing"))?;
     output.extend_from_slice(&record_type.to_le_bytes());
     output.extend_from_slice(&payload_len.to_le_bytes());
     output.extend_from_slice(payload);

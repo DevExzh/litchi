@@ -1,11 +1,11 @@
-//! Exact lexical codecs for DrawingML coordinate domains.
+//! Exact lexical codecs for `DrawingML` coordinate domains.
 
 use std::fmt;
 use std::str::FromStr;
 
 use super::model::{Coordinate, Extent, MAX_BYTES, MAX_EMU, MIN_EMU, Repr, Unit};
 
-/// Failure to construct or parse a DrawingML coordinate.
+/// Failure to construct or parse a `DrawingML` coordinate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ParseError {
     Empty,

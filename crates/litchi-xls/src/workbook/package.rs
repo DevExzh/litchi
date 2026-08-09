@@ -70,11 +70,17 @@ impl<R: Read + Seek> Workbook<R> {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(reader: R) -> Result<Self> {
         Self::new_with_options(reader, OpenOptions::default())
     }
 
     /// Open an XLS workbook with an explicit password contract.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new_with_options(reader: R, options: OpenOptions<'_>) -> Result<Self> {
         let mut workbook = Self::empty(OleFile::open(reader)?);
 
@@ -91,11 +97,17 @@ impl<R: Read + Seek> Workbook<R> {
     /// # Arguments
     ///
     /// * `ole_file` - An already-parsed OLE file
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn from_ole_file(ole_file: OleFile<R>) -> Result<Self> {
         Self::from_ole_file_with_options(ole_file, OpenOptions::default())
     }
 
     /// Create a workbook from a parsed OLE file with explicit open options.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn from_ole_file_with_options(
         ole_file: OleFile<R>,
         options: OpenOptions<'_>,
@@ -251,7 +263,7 @@ impl<R: Read + Seek> Workbook<R> {
                     .parsed_worksheet_index()
                     .and_then(|index| self.worksheets.get(index))
                     .and_then(|worksheet| worksheet.worksheet_view())
-                    .map(|view| view.is_selected())
+                    .map(crate::view::View::is_selected)
             })
             .collect::<Vec<_>>();
         self.workbook_view
@@ -261,12 +273,18 @@ impl<R: Read + Seek> Workbook<R> {
     }
 
     /// Read the legacy Custom XML Data Storage without resolving schema URIs.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn custom_xml_data_store(
         &mut self,
     ) -> litchi_ole_common::custom_xml::Result<Option<litchi_ole_common::custom_xml::Store>> {
         litchi_ole_common::custom_xml::inspect(&mut self.ole_file)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn summary_information(&mut self) -> Result<Option<Stream>> {
         match self
             .ole_file
@@ -280,11 +298,17 @@ impl<R: Read + Seek> Workbook<R> {
 
     /// Verify workbook XML signatures with the safe strict policy, without
     /// evaluating certificate trust or executing any macro content.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn signatures(&mut self) -> litchi_sign::Result<Vec<litchi_sign::cfb::Report>> {
         self.signatures_with(&litchi_sign::Policy::strict())
     }
 
     /// Verify workbook XML signatures with an explicit trust-neutral policy.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn signatures_with(
         &mut self,
         policy: &litchi_sign::Policy,
@@ -292,6 +316,9 @@ impl<R: Read + Seek> Workbook<R> {
         litchi_sign::cfb::verify(&mut self.ole_file, litchi_sign::cfb::Format::Xls, policy)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn document_summary_information(&mut self) -> Result<Option<Stream>> {
         match self
             .ole_file
@@ -307,7 +334,10 @@ impl<R: Read + Seek> Workbook<R> {
     ///
     /// The returned value owns decoded strings and visual bytes because the
     /// compound-file stream buffer is temporary. No command, macro, UI, or
-    /// ActiveX behavior is activated while reading this stream.
+    /// `ActiveX` behavior is activated while reading this stream.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn toolbar(&mut self) -> Result<Option<crate::Wrapper<'static>>> {
         match self.ole_file.open_stream(&["XCB"]) {
             Ok(data) => crate::toolbar::parse(&data)
@@ -318,6 +348,9 @@ impl<R: Read + Seek> Workbook<R> {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn user_defined_properties(&mut self) -> Result<Option<Section>> {
         Ok(self
             .document_summary_information()?
@@ -344,6 +377,9 @@ impl<R: Read + Seek> Workbook<R> {
     /// The method returns `None` when no structurally complete VBA project is
     /// present. Source is only decompressed and decoded; it is never compiled,
     /// interpreted, or executed.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn vba(
         &mut self,
     ) -> std::result::Result<Option<litchi_vba::project::Project>, litchi_vba::Error> {
@@ -351,6 +387,9 @@ impl<R: Read + Seek> Workbook<R> {
     }
 
     /// Parse the `_VBA_PROJECT_CUR` project with explicit resource limits.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn vba_with(
         &mut self,
         limits: &litchi_vba::Limits,
@@ -379,6 +418,9 @@ impl<R: Read + Seek> Workbook<R> {
     ///
     /// The result is a typed, inert model of the RRD revision records.
     /// Parsing never applies, rejects, or replays any recorded revision.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn revision_log(&mut self) -> Result<Option<crate::revision_log::RevisionLog>> {
         let Some(name) =
             crate::revision_log::find_revision_log_stream(&self.ole_file.list_streams())

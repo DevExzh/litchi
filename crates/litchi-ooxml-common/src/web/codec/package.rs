@@ -124,13 +124,13 @@ pub(in crate::web) fn load_snapshot_resources(
 }
 
 pub(in crate::web) fn require_content_type(part: &dyn Part, expected: &str) -> Result<()> {
-    if part.content_type() != expected {
+    if part.content_type() == expected {
+        Ok(())
+    } else {
         Err(Error::ContentType {
             expected: expected.into(),
             actual: part.content_type().into(),
         })
-    } else {
-        Ok(())
     }
 }
 

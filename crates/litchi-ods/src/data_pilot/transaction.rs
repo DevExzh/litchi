@@ -1,4 +1,4 @@
-//! Clone-staged DataPilot transactions and contextual CRUD editors.
+//! Clone-staged `DataPilot` transactions and contextual CRUD editors.
 
 use std::borrow::Cow;
 
@@ -9,7 +9,7 @@ use litchi_core::{Error, Result};
 use super::model::{Catalog, Selector, select};
 use super::{codec::Location, package, validation};
 
-/// An isolated mutable draft derived from an immutable DataPilot catalog.
+/// An isolated mutable draft derived from an immutable `DataPilot` catalog.
 pub struct Transaction<'source> {
     pub(crate) source: &'source Package,
     pub(crate) source_xml: &'source str,
@@ -32,6 +32,7 @@ impl<'source> Transaction<'source> {
 
     /// Borrow the current staged declarations.  An absent owner is an empty
     /// semantic catalog, while [`Self::has_owner`] retains physical presence.
+    #[must_use]
     pub fn tables(&self) -> &[Table] {
         self.draft.as_deref().unwrap_or(&[])
     }
@@ -47,7 +48,10 @@ impl<'source> Transaction<'source> {
         Editor { transaction: self }
     }
 
-    /// Replace the complete ordered DataPilot catalog.
+    /// Replace the complete ordered `DataPilot` catalog.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn replace(&mut self, tables: Vec<Table>) -> Result<()> {
         let candidate = Some(tables);
         validation::validate_candidate(&self.location, &self.original, &candidate)?;
@@ -55,7 +59,10 @@ impl<'source> Transaction<'source> {
         Ok(())
     }
 
-    /// Remove the physical DataPilot owner.
+    /// Remove the physical `DataPilot` owner.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn remove(&mut self) -> Result<()> {
         let candidate = None;
         validation::validate_candidate(&self.location, &self.original, &candidate)?;
@@ -64,6 +71,9 @@ impl<'source> Transaction<'source> {
     }
 
     /// Publish the staged catalog as one package transaction.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn commit(self) -> Result<Commit<'source>> {
         validation::validate_candidate(&self.location, &self.original, &self.draft)?;
         if self.original == self.draft {
@@ -90,18 +100,22 @@ impl<'source> Transaction<'source> {
     }
 }
 
-/// A short-lived semantic DataPilot editor.
+/// A short-lived semantic `DataPilot` editor.
 pub struct Editor<'transaction, 'source> {
     pub(crate) transaction: &'transaction mut Transaction<'source>,
 }
 
-impl<'transaction, 'source> Editor<'transaction, 'source> {
+impl Editor<'_, '_> {
     /// Borrow the current staged declarations.
+    #[must_use]
     pub fn tables(&self) -> &[Table] {
         self.transaction.tables()
     }
 
     /// Add one validated declaration at the catalog tail.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn add(&mut self, table: Table) -> Result<()> {
         let mut candidate = self.transaction.draft.clone().unwrap_or_default();
         candidate.push(table);
@@ -109,6 +123,9 @@ impl<'transaction, 'source> Editor<'transaction, 'source> {
     }
 
     /// Replace one declaration selected by exact name or source position.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn replace<'a, S>(&mut self, selector: S, table: Table) -> Result<()>
     where
         S: Into<Selector<'a>>,
@@ -122,6 +139,9 @@ impl<'transaction, 'source> Editor<'transaction, 'source> {
     }
 
     /// Apply a checked update to one selected declaration.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn update<'a, S, F>(&mut self, selector: S, update: F) -> Result<()>
     where
         S: Into<Selector<'a>>,
@@ -136,6 +156,9 @@ impl<'transaction, 'source> Editor<'transaction, 'source> {
     }
 
     /// Remove one selected declaration and return the detached value.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn remove<'a, S>(&mut self, selector: S) -> Result<Table>
     where
         S: Into<Selector<'a>>,
@@ -154,12 +177,15 @@ impl<'transaction, 'source> Editor<'transaction, 'source> {
     }
 
     /// Remove all declarations and the physical owner.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn clear(&mut self) -> Result<()> {
         self.transaction.remove()
     }
 }
 
-/// The result of publishing a DataPilot transaction.
+/// The result of publishing a `DataPilot` transaction.
 pub struct Commit<'source> {
     bytes: Cow<'source, [u8]>,
     tables: Vec<Table>,
@@ -195,11 +221,13 @@ impl Commit<'_> {
 
 impl<'source> Commit<'source> {
     /// Consume the commit while retaining a borrow for a no-op result.
+    #[must_use]
     pub fn into_bytes(self) -> Cow<'source, [u8]> {
         self.bytes
     }
 
     /// Consume the commit into package-owned bytes.
+    #[must_use]
     pub fn into_owned_bytes(self) -> Vec<u8> {
         self.bytes.into_owned()
     }

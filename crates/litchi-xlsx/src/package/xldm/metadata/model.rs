@@ -33,15 +33,18 @@ pub type MetadataResult<T> = Result<T, MetadataError>;
 pub struct MetadataClass(pub(crate) String);
 
 impl MetadataClass {
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
     /// The persisted no-split bit width, if this is a no-split or hybrid class.
+    #[must_use]
     pub fn no_split_width(&self) -> Option<u8> {
         no_split_width(&self.0).or_else(|| hybrid_width(&self.0))
     }
 
+    #[must_use]
     pub fn is_hybrid_compression(&self) -> bool {
         self.0.starts_with("XMHybridRLECompressionInfo<class ")
     }
@@ -84,6 +87,7 @@ pub struct MetadataObject {
 }
 
 impl MetadataObject {
+    #[must_use]
     pub fn property(&self, name: &str) -> Option<&str> {
         self.properties
             .iter()
@@ -91,6 +95,7 @@ impl MetadataObject {
             .map(|item| item.value.as_str())
     }
 
+    #[must_use]
     pub fn member(&self, name: &str) -> Option<&MetadataObject> {
         self.members
             .iter()
@@ -98,6 +103,7 @@ impl MetadataObject {
             .map(|item| item.object.as_ref())
     }
 
+    #[must_use]
     pub fn collection(&self, name: &str) -> Option<&[MetadataObject]> {
         self.collections
             .iter()
@@ -181,6 +187,7 @@ pub struct HierarchyPolicy {
 
 impl MetadataModel<'_> {
     /// Section 2.5 `DictionaryFlags` bindings needed to parse string stores.
+    #[must_use]
     pub fn native_parse_options(&self) -> NativeParseOptions {
         let string_hash_overrides = self
             .columns

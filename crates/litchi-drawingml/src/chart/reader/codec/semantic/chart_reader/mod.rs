@@ -1,6 +1,6 @@
 //! Layered semantic chart-reader implementation.
 //!
-//! Each included owner below keeps one coherent part of the DrawingML chart
+//! Each included owner below keeps one coherent part of the `DrawingML` chart
 //! grammar in a separate source unit while sharing the same borrowed XML
 //! reader and typed validation context.
 

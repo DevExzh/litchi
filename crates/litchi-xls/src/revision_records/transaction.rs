@@ -82,12 +82,18 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parses and retains a validated BIFF8 `Revision Log` stream.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(bytes: impl AsRef<[u8]>) -> Result<Self> {
         let bytes = Arc::<[u8]>::from(bytes.as_ref().to_vec().into_boxed_slice());
         Self::parse_shared(bytes)
     }
 
     /// Parses a shared byte allocation without copying it.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse_shared(bytes: Arc<[u8]>) -> Result<Self> {
         let log = parse_revision_log_stream(&bytes)?;
         Ok(Self {
@@ -176,6 +182,9 @@ impl Transaction {
     }
 
     /// Parses the current candidate without publishing it.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn snapshot(&self) -> Result<Snapshot> {
         if self.candidate.as_slice() == self.source.bytes() {
             Ok(self.source.clone())
@@ -195,6 +204,9 @@ impl Transaction {
     /// `revision_id` is unique within a valid shared-workbook revision
     /// sequence.  If a producer violates that identity rule, the edit is
     /// rejected as ambiguous instead of changing more than one record.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_revision_flags(
         &mut self,
         revision_id: i32,
@@ -228,12 +240,18 @@ impl Transaction {
     }
 
     /// Updates only the accepted bit of one revision.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_revision_accepted(&mut self, revision_id: i32, accepted: bool) -> Result<&mut Self> {
         let current = revision_flags(&self.candidate, revision_id)?;
         self.set_revision_flags(revision_id, current.with_accepted(accepted))
     }
 
     /// Updates only the undo-action bit of one revision.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_revision_undo_action(
         &mut self,
         revision_id: i32,
@@ -245,6 +263,9 @@ impl Transaction {
 
     /// Replaces one `RRDHead.stUser` value while retaining its fixed wire
     /// envelope, timestamp, GUID, and all other headers.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_header_user_name(
         &mut self,
         header_index: usize,
@@ -273,6 +294,9 @@ impl Transaction {
 
     /// Validates and publishes the candidate with a reversible source-checked
     /// patch.  Failed validation leaves the transaction's candidate intact.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn commit(self) -> Result<Commit> {
         let source = self.source;
         if self.candidate.as_slice() == source.bytes() {
@@ -394,6 +418,9 @@ impl Patch {
     }
 
     /// Applies the patch only to its exact source snapshot.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.fingerprint() != self.source_fingerprint || source.bytes() != self.before() {
             return Err(Error::UnsafeEdit(
@@ -408,6 +435,9 @@ impl Patch {
     }
 
     /// Applies the exact inverse replacement to its target snapshot.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn revert(&self, target: &Snapshot) -> Result<Snapshot> {
         if target.fingerprint() != self.target_fingerprint || target.bytes() != self.after() {
             return Err(Error::UnsafeEdit(
@@ -556,7 +586,7 @@ fn encode_user_name(field: &mut [u8], user_name: &str) -> Result<u16> {
         ));
     }
 
-    field[0] = if compressed { 0 } else { 1 };
+    field[0] = u8::from(!compressed);
     if compressed {
         for (index, character) in user_name.chars().enumerate() {
             field[1 + index] = character as u8;
@@ -567,7 +597,7 @@ fn encode_user_name(field: &mut [u8], user_name: &str) -> Result<u16> {
             field[start..start + 2].copy_from_slice(&unit.to_le_bytes());
         }
     }
-    u16::try_from(count).map_err(|_| Error::Allocation("encoding RRDHead user name"))
+    u16::try_from(count).map_err(|_error| Error::Allocation("encoding RRDHead user name"))
 }
 
 fn frame(bytes: &[u8], offset: usize) -> Result<(u16, usize, usize)> {

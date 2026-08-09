@@ -1,4 +1,4 @@
-//! SpreadsheetML XML codecs for pivot tables, cache definitions, and records.
+//! `SpreadsheetML` XML codecs for pivot tables, cache definitions, and records.
 
 use super::super::cache::{CacheRecord, Definition, Field, Item, Records};
 use super::super::{PivotAxis, PivotDataField, PivotFieldRole, PivotTable, PivotValueFunction};
@@ -1066,7 +1066,7 @@ fn build_roles(
         let name = pivot_field_names
             .get(*idx as usize)
             .cloned()
-            .unwrap_or_else(|| format!("Field{}", idx));
+            .unwrap_or_else(|| format!("Field{idx}"));
         roles.push(PivotFieldRole {
             field_name: name,
             axis,

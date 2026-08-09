@@ -27,7 +27,7 @@ pub(super) fn write_text_element<W: Write>(
     write!(writer, "<c:{name}>{}</c:{name}>", escape_xml(value))
 }
 
-/// Append an already validated DrawingML fragment without reformatting it.
+/// Append an already validated `DrawingML` fragment without reformatting it.
 #[inline]
 pub(super) fn write_fragment<W: Write>(writer: &mut W, fragment: &[u8]) -> std::io::Result<()> {
     writer.write_all(fragment)

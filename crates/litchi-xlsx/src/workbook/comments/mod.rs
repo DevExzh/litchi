@@ -1,4 +1,4 @@
-//! Classic SpreadsheetML comments owned by one worksheet.
+//! Classic `SpreadsheetML` comments owned by one worksheet.
 //!
 //! The owner is layered by responsibility: the semantic author/comment graph
 //! lives in [`model`], bounded XML conversion in [`codec`], and worksheet OPC

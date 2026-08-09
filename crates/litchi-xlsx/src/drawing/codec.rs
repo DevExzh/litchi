@@ -1,4 +1,4 @@
-//! Namespace-aware SpreadsheetDrawing reader.
+//! Namespace-aware `SpreadsheetDrawing` reader.
 //!
 //! Both `xdr:twoCellAnchor` (worksheets) and `xdr:absoluteAnchor`
 //! (chartsheets) are understood; absolute anchors record a zero placeholder

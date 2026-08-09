@@ -1,4 +1,4 @@
-//! Layered, namespace-aware parser for sparse SpreadsheetML worksheet data.
+//! Layered, namespace-aware parser for sparse `SpreadsheetML` worksheet data.
 //!
 //! The facade keeps worksheet consumers independent from the streaming codec;
 //! raw records, semantic materialization, and validation rules live in focused

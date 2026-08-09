@@ -1,6 +1,6 @@
 //! Layered, inert XLSX pivot-chart ownership.
 //!
-//! Semantic objects live in [`model`], bounded DrawingML conversion in
+//! Semantic objects live in [`model`], bounded `DrawingML` conversion in
 //! [`codec`], and workbook relationship-graph resolution in [`package`].
 //! Pivot charts remain read-only and inert: this owner never refreshes a
 //! pivot cache or renders a chart.

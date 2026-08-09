@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 use super::validation::{parse_id, validate_ids};
 
-/// Word 2010 WordprocessingML extension namespace.
+/// Word 2010 `WordprocessingML` extension namespace.
 pub const WORD_2010_NAMESPACE: &str = "http://schemas.microsoft.com/office/word/2010/wordml";
 
 /// A checked `ST_LongHexNumber` used by `paraId` and `textId`.
@@ -34,6 +34,10 @@ impl Id {
     }
 
     /// Parse the exact eight-digit hexadecimal wire form.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn parse(value: &str) -> Result<Self> {
         parse_id(value, "paragraph extension identifier")
     }
@@ -84,6 +88,10 @@ impl Ids {
     }
 
     /// Construct a checked pair from optional values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_parts(para_id: Option<Id>, text_id: Option<Id>) -> Result<Self> {
         let value = Self { para_id, text_id };
         validate_ids(&value)?;
@@ -106,6 +114,10 @@ impl Ids {
     ///
     /// Removing `paraId` while `textId` is present is rejected and leaves the
     /// value unchanged, preserving the schema dependency atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_para_id(&mut self, para_id: Option<Id>) -> Result<&mut Self> {
         let candidate = Self {
             para_id,
@@ -120,6 +132,10 @@ impl Ids {
     ///
     /// A present `textId` requires a present `paraId`; failed validation does
     /// not modify the current value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_text_id(&mut self, text_id: Option<Id>) -> Result<&mut Self> {
         let candidate = Self {
             para_id: self.para_id,
@@ -131,6 +147,10 @@ impl Ids {
     }
 
     /// Validate the complete identifier dependency.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn validate(self) -> Result<()> {
         validate_ids(&self)
     }
@@ -170,6 +190,10 @@ impl Extensions {
     }
 
     /// Set the checked identifier pair.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_ids(&mut self, ids: Ids) -> Result<&mut Self> {
         ids.validate()?;
         self.ids = ids;
@@ -177,12 +201,20 @@ impl Extensions {
     }
 
     /// Set or remove `paraId` while preserving the `textId` dependency.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_para_id(&mut self, value: Option<Id>) -> Result<&mut Self> {
         self.ids.set_para_id(value)?;
         Ok(self)
     }
 
     /// Set or remove `textId` while preserving the `paraId` dependency.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_text_id(&mut self, value: Option<Id>) -> Result<&mut Self> {
         self.ids.set_text_id(value)?;
         Ok(self)
@@ -195,6 +227,10 @@ impl Extensions {
     }
 
     /// Validate the complete paragraph extension value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn validate(self) -> Result<()> {
         self.ids.validate()
     }

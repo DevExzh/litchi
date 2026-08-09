@@ -47,7 +47,7 @@ impl Cell {
         let bytes = reference.as_bytes();
         let column_end = bytes
             .iter()
-            .position(|byte| byte.is_ascii_digit())
+            .position(u8::is_ascii_digit)
             .ok_or_else(|| invalid(format!("invalid cell reference '{reference}'")))?;
         if column_end == 0 || column_end == bytes.len() {
             return Err(invalid(format!("invalid cell reference '{reference}'")));
@@ -105,6 +105,7 @@ pub enum View<'a> {
 
 impl<'a> View<'a> {
     /// Borrow the physical cell state when this coordinate owns one.
+    #[must_use]
     pub const fn stored(self) -> Option<&'a Cell> {
         match self {
             Self::Stored(cell) => Some(cell),
@@ -113,6 +114,7 @@ impl<'a> View<'a> {
     }
 
     /// Covering merged range, if this is a non-anchor coordinate.
+    #[must_use]
     pub const fn merge(self) -> Option<Rect> {
         match self {
             Self::Covered(range) => Some(range),
@@ -121,12 +123,13 @@ impl<'a> View<'a> {
     }
 
     /// Whether this coordinate has neither a record nor merge coverage.
+    #[must_use]
     pub const fn is_missing(self) -> bool {
         matches!(self, Self::Missing)
     }
 }
 
-/// Exact value stored by SpreadsheetML.
+/// Exact value stored by `SpreadsheetML`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Value {
@@ -170,7 +173,7 @@ impl Value {
     }
 }
 
-/// A checked ISO 8601 lexical value for a SpreadsheetML date cell.
+/// A checked ISO 8601 lexical value for a `SpreadsheetML` date cell.
 ///
 /// The original lexical form is retained so a read/write cycle does not
 /// silently normalize producer data.
@@ -194,6 +197,7 @@ impl Date {
     }
 
     /// Exact stored lexical form.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         self.0.as_str()
     }
@@ -321,7 +325,7 @@ where
     }
 }
 
-/// An exact SpreadsheetML number.
+/// An exact `SpreadsheetML` number.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Number(Box<str>);
 
@@ -340,6 +344,7 @@ impl Number {
     }
 
     /// Exact stored lexical form.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -348,6 +353,7 @@ impl Number {
     ///
     /// `None` keeps this accessor safe if a future lossless reader accepts a
     /// numeric lexical form outside Rust's binary64 parser.
+    #[must_use]
     pub fn as_f64(&self) -> Option<f64> {
         self.0
             .trim()
@@ -399,6 +405,7 @@ impl Text {
     }
 
     /// Borrow the text.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -483,6 +490,7 @@ impl ErrorValue {
     }
 
     /// Spreadsheet lexical form.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         match self {
             Self::Null => "#NULL!",
@@ -525,16 +533,19 @@ impl Unknown {
     }
 
     /// Producer cell type or formula form that was not recognized.
+    #[must_use]
     pub fn kind(&self) -> &str {
         &self.kind
     }
 
     /// Uninterpreted value text, when present.
+    #[must_use]
     pub fn value(&self) -> Option<&str> {
         self.value.as_deref()
     }
 
     /// Uninterpreted formula text, when present.
+    #[must_use]
     pub fn formula(&self) -> Option<&str> {
         self.formula.as_deref()
     }
@@ -547,9 +558,15 @@ pub(crate) struct Stored {
     // Retained for the shared-style facade. Native indexes never escape this
     // migration boundary.
     pub(crate) style: Option<u32>,
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "the cached column supports internal sparse-cell indexing"
+    )]
     pub(crate) cell_metadata: Option<u32>,
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "the cached row supports internal sparse-cell indexing"
+    )]
     pub(crate) value_metadata: Option<u32>,
 }
 
@@ -578,21 +595,25 @@ pub struct Extents {
 
 impl Extents {
     /// Producer-declared worksheet `dimension`, when present.
+    #[must_use]
     pub const fn declared(&self) -> Option<Rect> {
         self.declared
     }
 
     /// Bounds of every explicit cell record, including empty metadata cells.
+    #[must_use]
     pub const fn stored(&self) -> Option<Rect> {
         self.stored
     }
 
     /// Bounds of cells with a value, formula, or unknown primary payload.
+    #[must_use]
     pub const fn content(&self) -> Option<Rect> {
         self.content
     }
 
     /// Bounds of cells with an explicit local shared-style reference.
+    #[must_use]
     pub const fn styled(&self) -> Option<Rect> {
         self.styled
     }
@@ -600,6 +621,7 @@ impl Extents {
     /// Bounds of cells with content or direct local formatting.
     ///
     /// This does not include formatting inherited from row/column defaults.
+    #[must_use]
     pub const fn used(&self) -> Option<Rect> {
         match (self.content, self.styled) {
             (Some(content), Some(styled)) => Some(content.union(styled)),

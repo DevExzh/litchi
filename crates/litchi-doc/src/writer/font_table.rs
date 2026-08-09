@@ -9,6 +9,7 @@
 /// - stringCount (u16)
 /// - extraDataSz (u16) -> 0
 /// - repeated FFN structures (cbFfnM1 header + UTF-16LE name with null)
+#[must_use]
 pub fn generate_minimal_font_table() -> Vec<u8> {
     let mut sttbfffn = Vec::new();
     sttbfffn.extend_from_slice(&1u16.to_le_bytes()); // stringCount
@@ -30,6 +31,7 @@ pub struct FontTableBuilder {
 
 impl FontTableBuilder {
     /// Create a new builder with default font "Times New Roman"
+    #[must_use]
     pub fn new() -> Self {
         let mut b = Self { fonts: Vec::new() };
         b.get_or_add("Times New Roman");
@@ -46,6 +48,7 @@ impl FontTableBuilder {
     }
 
     /// Generate the STTBFFFN bytes for all collected fonts (POI-compatible)
+    #[must_use]
     pub fn generate(&self) -> Vec<u8> {
         let mut sttbfffn = Vec::new();
         sttbfffn.extend_from_slice(&(self.fonts.len() as u16).to_le_bytes());

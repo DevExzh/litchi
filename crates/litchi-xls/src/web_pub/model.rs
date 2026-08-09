@@ -15,13 +15,13 @@ pub enum WebSourceType {
     Sheet,
     /// A print area.
     PrintArea,
-    /// An AutoFilter range.
+    /// An `AutoFilter` range.
     AutoFilter,
     /// A range of cells; the record's `FrtRefHeaderU.ref8` applies.
     Range,
     /// A chart; the record carries the chart's shape identifier.
     Chart,
-    /// A PivotTable report.
+    /// A `PivotTable` report.
     PivotTable,
     /// A query table (external data range).
     QueryTable,
@@ -70,7 +70,7 @@ pub enum WebPageType {
     ViewOnly,
     /// An interactive page using workbook functionality.
     WorkbookFunctionality,
-    /// An interactive page using PivotTable functionality.
+    /// An interactive page using `PivotTable` functionality.
     PivotTableFunctionality,
     /// An interactive page using chart functionality.
     ChartFunctionality,
@@ -114,16 +114,19 @@ pub struct WebPubRange {
 
 impl WebPubRange {
     /// Create a checked, inclusive BIFF8 publication range.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(first_row: u32, last_row: u32, first_column: u16, last_column: u16) -> Result<Self> {
         let invalid = || {
             Error::InvalidCellReference(format!(
                 "WebPub range ({first_row}, {first_column})..=({last_row}, {last_column}) is outside the BIFF8 grid"
             ))
         };
-        let first_row = u16::try_from(first_row).map_err(|_| invalid())?;
-        let last_row = u16::try_from(last_row).map_err(|_| invalid())?;
-        let first_column = u8::try_from(first_column).map_err(|_| invalid())?;
-        let last_column = u8::try_from(last_column).map_err(|_| invalid())?;
+        let first_row = u16::try_from(first_row).map_err(|_error| invalid())?;
+        let last_row = u16::try_from(last_row).map_err(|_error| invalid())?;
+        let first_column = u8::try_from(first_column).map_err(|_error| invalid())?;
+        let last_column = u8::try_from(last_column).map_err(|_error| invalid())?;
         if first_row > last_row || first_column > last_column {
             return Err(invalid());
         }
@@ -147,21 +150,25 @@ impl WebPubRange {
             first_column,
             last_column,
         )
-        .map_err(|_| invalid("WebPub range is outside the BIFF8 grid"))
+        .map_err(|_error| invalid("WebPub range is outside the BIFF8 grid"))
     }
 
+    #[must_use]
     pub const fn first_row(self) -> u16 {
         self.first_row
     }
 
+    #[must_use]
     pub const fn last_row(self) -> u16 {
         self.last_row
     }
 
+    #[must_use]
     pub const fn first_column(self) -> u8 {
         self.first_column
     }
 
+    #[must_use]
     pub const fn last_column(self) -> u8 {
         self.last_column
     }

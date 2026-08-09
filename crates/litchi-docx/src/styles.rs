@@ -1,3 +1,27 @@
+#![expect(
+    clippy::expect_used,
+    reason = "the invariant is established immediately before extraction"
+)]
+#![expect(
+    clippy::iter_not_returning_iterator,
+    reason = "the method name is retained for public API compatibility"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::struct_excessive_bools,
+    reason = "the public model preserves independent OOXML flags"
+)]
+#![expect(
+    clippy::struct_field_names,
+    reason = "the public model retains established field names"
+)]
+#![expect(
+    clippy::unwrap_used,
+    reason = "the invariant is established immediately before extraction"
+)]
 /// Styles - document styles and formatting definitions.
 use crate::error::{Error, Result};
 use crate::numbering::Paragraph;
@@ -24,6 +48,7 @@ pub enum Type {
 impl Type {
     /// Convert the style kind to its XML attribute value.
     #[inline]
+    #[must_use]
     pub const fn to_xml(self) -> &'static str {
         match self {
             Self::Paragraph => "paragraph",
@@ -35,6 +60,7 @@ impl Type {
 
     /// Parse a style kind from its XML attribute value.
     #[inline]
+    #[must_use]
     pub fn from_xml(value: &str) -> Option<Self> {
         match value {
             "paragraph" => Some(Self::Paragraph),
@@ -84,6 +110,7 @@ pub enum Outline {
 
 impl Outline {
     /// Convert a wire level into its typed heading rank.
+    #[must_use]
     pub const fn new(level: u8) -> Option<Self> {
         match level {
             0 => Some(Self::H1),
@@ -99,7 +126,8 @@ impl Outline {
         }
     }
 
-    /// Return the zero-based WordprocessingML wire level.
+    /// Return the zero-based `WordprocessingML` wire level.
+    #[must_use]
     pub const fn level(self) -> u8 {
         self as u8
     }
@@ -132,12 +160,12 @@ pub struct Styles<'a> {
     style_list: Option<SmallVec<[Style; 32]>>,
 }
 
-impl<'a> std::fmt::Debug for Styles<'a> {
+impl std::fmt::Debug for Styles<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Styles")
             .field(
                 "style_count",
-                &self.style_list.as_ref().map(|s| s.len()).unwrap_or(0),
+                &self.style_list.as_ref().map_or(0, SmallVec::len),
             )
             .finish()
     }
@@ -156,17 +184,29 @@ impl<'a> Styles<'a> {
     }
 
     /// Get the number of styles in the document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn len(&mut self) -> Result<usize> {
         self.ensure_styles_loaded()?;
-        Ok(self.style_list.as_ref().map_or(0, |list| list.len()))
+        Ok(self.style_list.as_ref().map_or(0, SmallVec::len))
     }
 
     /// Check if there are no styles defined.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn is_empty(&mut self) -> Result<bool> {
         Ok(self.len()? == 0)
     }
 
     /// Get an iterator over all styles.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn iter(&mut self) -> Result<std::slice::Iter<'_, Style>> {
         self.ensure_styles_loaded()?;
         Ok(self
@@ -178,6 +218,10 @@ impl<'a> Styles<'a> {
     /// Get a style by its ID.
     ///
     /// Returns `None` if no style with the given ID is found.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn get_by_id(&mut self, style_id: &str) -> Result<Option<&Style>> {
         self.ensure_styles_loaded()?;
         Ok(self
@@ -189,6 +233,10 @@ impl<'a> Styles<'a> {
     /// Get a style by its name.
     ///
     /// Returns `None` if no style with the given name is found.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn get_by_name(&mut self, name: &str) -> Result<Option<&Style>> {
         self.ensure_styles_loaded()?;
         Ok(self
@@ -200,6 +248,10 @@ impl<'a> Styles<'a> {
     /// Get the default style for a given style type.
     ///
     /// Returns `None` if no default style is defined for that type.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn get_default(&mut self, style_type: Type) -> Result<Option<&Style>> {
         self.ensure_styles_loaded()?;
         Ok(self.style_list.as_ref().and_then(|list| {
@@ -209,6 +261,14 @@ impl<'a> Styles<'a> {
     }
 
     /// Resolve inherited paragraph numbering with a bounded, cycle-checked `basedOn` walk.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal writer invariant is violated.
     pub fn resolved_numbering(&mut self, style_id: &str) -> Result<Option<Paragraph>> {
         self.ensure_styles_loaded()?;
         let styles = self.style_list.as_ref().expect("styles loaded");
@@ -305,7 +365,7 @@ impl<'a> Styles<'a> {
                 Ok(Event::Start(e))
                     if current_style.is_some() && e.local_name().as_ref() == b"pPr" =>
                 {
-                    in_ppr = true
+                    in_ppr = true;
                 },
                 Ok(Event::Start(e))
                     if current_style.is_some() && in_ppr && e.local_name().as_ref() == b"numPr" =>
@@ -327,7 +387,7 @@ impl<'a> Styles<'a> {
                                 ));
                             }
                             let raw = required_style_value(&e, reader.decoder())?;
-                            pending_num_id = Some(raw.parse::<u32>().map_err(|_| {
+                            pending_num_id = Some(raw.parse::<u32>().map_err(|_source_error| {
                                 Error::InvalidFormat(format!("invalid style numId '{raw}'"))
                             })?);
                         },
@@ -354,7 +414,7 @@ impl<'a> Styles<'a> {
                                 ));
                             }
                             let raw = required_style_value(&e, reader.decoder())?;
-                            let level = raw.parse::<u8>().map_err(|_| {
+                            let level = raw.parse::<u8>().map_err(|_source_error| {
                                 Error::InvalidFormat(format!("invalid style outlineLvl '{raw}'"))
                             })?;
                             builder.outline = Some(Outline::new(level).ok_or_else(|| {
@@ -511,6 +571,7 @@ pub struct Style {
 impl Style {
     /// Get the style identifier.
     #[inline]
+    #[must_use]
     pub fn style_id(&self) -> &str {
         &self.style_id
     }
@@ -519,18 +580,21 @@ impl Style {
     ///
     /// Returns `None` if no name is defined.
     #[inline]
+    #[must_use]
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
     }
 
     /// Get the style type.
     #[inline]
+    #[must_use]
     pub fn style_type(&self) -> Type {
         self.style_type
     }
 
     /// Check if this is the default style for its type.
     #[inline]
+    #[must_use]
     pub fn is_default(&self) -> bool {
         self.is_default
     }
@@ -539,30 +603,35 @@ impl Style {
     ///
     /// Returns `true` if this is a built-in Word style, `false` for custom styles.
     #[inline]
+    #[must_use]
     pub fn is_builtin(&self) -> bool {
         !self.is_custom
     }
 
     /// Check if this is a custom (user-defined) style.
     #[inline]
+    #[must_use]
     pub fn is_custom(&self) -> bool {
         self.is_custom
     }
 
     /// Get the ID of the style this is based on.
     #[inline]
+    #[must_use]
     pub fn based_on(&self) -> Option<&str> {
         self.based_on.as_deref()
     }
 
     /// Direct paragraph numbering declared by this style.
     #[inline]
+    #[must_use]
     pub fn numbering(&self) -> Option<Paragraph> {
         self.numbering
     }
 
     /// Direct outline level declared by this paragraph style.
     #[inline]
+    #[must_use]
     pub const fn outline(&self) -> Option<Outline> {
         self.outline
     }
@@ -571,18 +640,21 @@ impl Style {
     ///
     /// Lower values appear first in style lists.
     #[inline]
+    #[must_use]
     pub fn priority(&self) -> Option<i32> {
         self.priority
     }
 
     /// Check if this style appears in the quick style gallery.
     #[inline]
+    #[must_use]
     pub fn is_quick_style(&self) -> bool {
         self.is_quick_style
     }
 
     /// Check if this style is hidden from the UI.
     #[inline]
+    #[must_use]
     pub fn is_hidden(&self) -> bool {
         self.is_hidden
     }
@@ -591,6 +663,7 @@ impl Style {
     ///
     /// Locked styles cannot be applied when formatting protection is enabled.
     #[inline]
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.is_locked
     }
@@ -605,7 +678,7 @@ fn required_style_value(
         if attribute.key.local_name().as_ref() == b"val" {
             return attribute
                 .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
-                .map(|value| value.into_owned())
+                .map(std::borrow::Cow::into_owned)
                 .map_err(|error| Error::Xml(error.to_string()));
         }
     }

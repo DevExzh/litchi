@@ -25,6 +25,9 @@ impl<'xml> Snapshot<'xml> {
     /// `office:body/office:spreadsheet` host.  Unknown XML outside the owned
     /// calculation-settings element is not interpreted and remains part of
     /// the borrowed source snapshot.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn from_content_xml(source: &'xml str) -> Result<Self> {
         let calculation = parse(source)?;
         let location = locate(source)?;
@@ -41,16 +44,19 @@ impl<'xml> Snapshot<'xml> {
     }
 
     /// Borrow the original content XML without normalization.
+    #[must_use]
     pub fn content_xml(&self) -> &'xml str {
         self.source
     }
 
     /// Return the typed calculation settings, if the document declares them.
+    #[must_use]
     pub fn calculation(&self) -> Option<&Settings> {
         self.calculation.as_ref()
     }
 
     /// Start an isolated transaction against this immutable snapshot.
+    #[must_use]
     pub fn transaction(&self) -> Transaction<'xml> {
         Transaction::from_snapshot(self)
     }

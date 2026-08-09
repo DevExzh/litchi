@@ -78,7 +78,10 @@ impl WorkbookPropRecord {
 
 /// Bundle sheet record (worksheet metadata)
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "retained for BIFF12 codec completeness and staged host integration"
+)]
 pub struct BundleSheetRecord {
     pub id: u32,
     pub name: String,
@@ -179,14 +182,20 @@ impl BundleSheetRecord {
 
 /// Row header record
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "retained for BIFF12 codec completeness and staged host integration"
+)]
 pub struct RowHeaderRecord {
     pub row: u32,
     pub first_col: u16,
     pub last_col: u16,
 }
 
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "retained for BIFF12 codec completeness and staged host integration"
+)]
 impl RowHeaderRecord {
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < 8 {
@@ -393,7 +402,10 @@ impl CellRecord {
 }
 
 /// Column information record
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "retained for BIFF12 codec completeness and staged host integration"
+)]
 #[derive(Debug, Clone)]
 pub struct ColInfoRecord {
     pub first_col: u32,
@@ -406,7 +418,10 @@ pub struct ColInfoRecord {
 }
 
 impl ColInfoRecord {
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "retained for BIFF12 codec completeness and staged host integration"
+    )]
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < 12 {
             return Err(Error::InvalidLength {
@@ -450,7 +465,10 @@ impl ColInfoRecord {
 }
 
 /// Merged cell record
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "retained for BIFF12 codec completeness and staged host integration"
+)]
 #[derive(Debug, Clone)]
 pub struct MergeCellRecord {
     pub row_first: u32,
@@ -460,7 +478,10 @@ pub struct MergeCellRecord {
 }
 
 impl MergeCellRecord {
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "retained for BIFF12 codec completeness and staged host integration"
+    )]
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < 16 {
             return Err(Error::InvalidLength {
@@ -479,7 +500,10 @@ impl MergeCellRecord {
 }
 
 /// Hyperlink record
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "retained for BIFF12 codec completeness and staged host integration"
+)]
 #[derive(Debug, Clone)]
 pub struct HyperlinkRecord {
     pub row_first: u32,
@@ -493,7 +517,10 @@ pub struct HyperlinkRecord {
 }
 
 impl HyperlinkRecord {
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "retained for BIFF12 codec completeness and staged host integration"
+    )]
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < 16 {
             return Err(Error::InvalidLength {
@@ -553,7 +580,10 @@ impl HyperlinkRecord {
 }
 
 /// Named range record
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "retained for BIFF12 codec completeness and staged host integration"
+)]
 #[derive(Debug, Clone)]
 pub struct NameRecord {
     pub name: String,
@@ -564,7 +594,10 @@ pub struct NameRecord {
 }
 
 impl NameRecord {
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "retained for BIFF12 codec completeness and staged host integration"
+    )]
     pub fn parse(data: &[u8]) -> Result<Self> {
         let named_range = Definition::parse(data)?;
 

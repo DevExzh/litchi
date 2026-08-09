@@ -1,4 +1,4 @@
-//! Semantic SpreadsheetML data-validation declarations.
+//! Semantic `SpreadsheetML` data-validation declarations.
 ///
 use super::codec::{
     invalid, parse_sqref, validate_collection, validate_optional_text, validate_rule, validate_text,
@@ -204,6 +204,7 @@ impl Range {
             .ok_or_else(|| invalid("data-validation range is empty"))
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -218,6 +219,7 @@ impl Formula {
         Ok(Self(value))
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -259,18 +261,23 @@ impl Sqref {
         Ok(self)
     }
 
+    #[must_use]
     pub fn ranges(&self) -> &[Range] {
         &self.ranges
     }
+    #[must_use]
     pub fn edited(&self) -> bool {
         self.edited
     }
+    #[must_use]
     pub fn split(&self) -> bool {
         self.split
     }
+    #[must_use]
     pub fn adjusted(&self) -> bool {
         self.adjusted
     }
+    #[must_use]
     pub fn adjust(&self) -> bool {
         self.adjust
     }
@@ -298,6 +305,7 @@ pub struct Validation {
 }
 
 impl Validation {
+    #[must_use]
     pub fn new(source: Source, validation_type: ValidationType, sqref: Sqref) -> Self {
         Self {
             source,
@@ -395,54 +403,71 @@ impl Validation {
         validate_rule(self)
     }
 
+    #[must_use]
     pub fn source(&self) -> Source {
         self.source
     }
+    #[must_use]
     pub fn validation_type(&self) -> ValidationType {
         self.validation_type
     }
+    #[must_use]
     pub fn operator(&self) -> ValidationOperator {
         self.operator
     }
+    #[must_use]
     pub fn error_style(&self) -> ValidationErrorStyle {
         self.error_style
     }
+    #[must_use]
     pub fn ime_mode(&self) -> ValidationImeMode {
         self.ime_mode
     }
+    #[must_use]
     pub fn allow_blank(&self) -> bool {
         self.allow_blank
     }
+    #[must_use]
     pub fn show_drop_down(&self) -> bool {
         self.show_drop_down
     }
+    #[must_use]
     pub fn show_input_message(&self) -> bool {
         self.show_input_message
     }
+    #[must_use]
     pub fn show_error_message(&self) -> bool {
         self.show_error_message
     }
+    #[must_use]
     pub fn error_title(&self) -> Option<&str> {
         self.error_title.as_deref()
     }
+    #[must_use]
     pub fn error(&self) -> Option<&str> {
         self.error.as_deref()
     }
+    #[must_use]
     pub fn prompt_title(&self) -> Option<&str> {
         self.prompt_title.as_deref()
     }
+    #[must_use]
     pub fn prompt(&self) -> Option<&str> {
         self.prompt.as_deref()
     }
+    #[must_use]
     pub fn formula1(&self) -> Option<&ListSource> {
         self.formula1.as_ref()
     }
+    #[must_use]
     pub fn formula2(&self) -> Option<&Formula> {
         self.formula2.as_ref()
     }
+    #[must_use]
     pub fn sqref(&self) -> &Sqref {
         &self.sqref
     }
+    #[must_use]
     pub fn uid(&self) -> Option<&str> {
         self.uid.as_deref()
     }
@@ -496,21 +521,27 @@ impl Collection {
         Ok(())
     }
 
+    #[must_use]
     pub fn source(&self) -> Source {
         self.source
     }
+    #[must_use]
     pub fn disable_prompts(&self) -> bool {
         self.disable_prompts
     }
+    #[must_use]
     pub fn x_window(&self) -> Option<u32> {
         self.x_window
     }
+    #[must_use]
     pub fn y_window(&self) -> Option<u32> {
         self.y_window
     }
+    #[must_use]
     pub fn declared_count(&self) -> Option<u32> {
         self.declared_count
     }
+    #[must_use]
     pub fn validations(&self) -> &[Validation] {
         &self.validations
     }

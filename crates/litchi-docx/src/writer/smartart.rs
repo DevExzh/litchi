@@ -1,6 +1,10 @@
-//! SmartArt (DrawingML diagram) authoring for DOCX documents.
+#![expect(
+    clippy::struct_field_names,
+    reason = "the public model retains established field names"
+)]
+//! `SmartArt` (`DrawingML` diagram) authoring for DOCX documents.
 //!
-//! A SmartArt graphic is anchored in the document body as a `w:drawing` whose
+//! A `SmartArt` graphic is anchored in the document body as a `w:drawing` whose
 //! `a:graphicData` (in the `drawingml/diagram` namespace) carries a
 //! `dgm:relIds` element with the relationship IDs of the four diagram parts
 //! (data, layout, quick style, colors) generated under `/word/diagrams/`.
@@ -9,7 +13,7 @@
 //! through [`crate::Document::smart_arts`].
 //!
 //! The optional pre-rendered `drawingN.xml` part is deliberately not
-//! generated: Word and LibreOffice re-render the diagram from the layout and
+//! generated: Word and `LibreOffice` re-render the diagram from the layout and
 //! data parts when it is absent.
 
 use crate::error::{Error, Result};
@@ -21,7 +25,7 @@ use litchi_drawingml::diagram::{
 };
 use std::fmt::Write as FmtWrite;
 
-/// Maximum SmartArt diagrams in one document, matching the read-side bound.
+/// Maximum `SmartArt` diagrams in one document, matching the read-side bound.
 pub const MAX_SMART_ARTS: usize = 64;
 /// Maximum total nodes in an authored diagram.
 const MAX_DIAGRAM_NODES: usize = 4096;
@@ -32,7 +36,7 @@ const DEFAULT_WIDTH_EMU: i64 = 4 * EMUS_PER_INCH;
 /// Default anchor height (2 inches) when no explicit size is set.
 const DEFAULT_HEIGHT_EMU: i64 = 2 * EMUS_PER_INCH;
 
-/// The four relationship IDs of a SmartArt anchor (`dgm:relIds`).
+/// The four relationship IDs of a `SmartArt` anchor (`dgm:relIds`).
 #[derive(Clone, Debug)]
 pub(crate) struct SmartArtRelIds {
     /// Relationship ID of the data-model part (`r:dm`).
@@ -45,7 +49,7 @@ pub(crate) struct SmartArtRelIds {
     pub(crate) colors: String,
 }
 
-/// The generated content of one SmartArt part graph.
+/// The generated content of one `SmartArt` part graph.
 pub(crate) struct SmartArtPartXml {
     /// `dgm:dataModel` part XML.
     pub(crate) data_xml: String,
@@ -57,7 +61,7 @@ pub(crate) struct SmartArtPartXml {
     pub(crate) colors_xml: String,
 }
 
-/// A mutable SmartArt diagram being authored in a document.
+/// A mutable `SmartArt` diagram being authored in a document.
 ///
 /// Wraps a semantic [`SmartArt`] built with
 /// [`litchi_drawingml::diagram::SmartArtBuilder`], adding the drawing anchor
@@ -89,7 +93,7 @@ pub struct MutableSmartArt {
     pub(crate) name: String,
     /// Drawing element ID written to `wp:docPr@id`.
     pub(crate) doc_pr_id: u32,
-    /// Anchor width in EMUs (English Metric Units, 1 inch = 914400 EMUs).
+    /// Anchor width in EMUs (English Metric Units, 1 inch = `914_400` EMUs).
     pub(crate) width_emu: i64,
     /// Anchor height in EMUs.
     pub(crate) height_emu: i64,
@@ -104,6 +108,10 @@ impl MutableSmartArt {
     /// Validates the diagram: it must contain at least one node, and the node
     /// tree is bounded to `MAX_DIAGRAM_NODES` nodes and `MAX_DIAGRAM_DEPTH`
     /// levels.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(smartart: SmartArt) -> Result<Self> {
         validate_smartart(&smartart)?;
         Ok(Self {
@@ -120,6 +128,7 @@ impl MutableSmartArt {
     }
 
     /// Get the semantic diagram model.
+    #[must_use]
     pub fn smartart(&self) -> &SmartArt {
         &self.smartart
     }
@@ -137,6 +146,10 @@ impl MutableSmartArt {
     }
 
     /// Set the anchor extents in EMUs (both must be positive).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_size_emu(&mut self, width_emu: i64, height_emu: i64) -> Result<&mut Self> {
         if width_emu <= 0 || height_emu <= 0 {
             return Err(Error::InvalidFormat(
@@ -150,6 +163,7 @@ impl MutableSmartArt {
 
     /// Get the assigned anchor key (empty until the diagram is added to a
     /// document).
+    #[must_use]
     pub fn anchor_key(&self) -> &str {
         &self.anchor_key
     }
@@ -179,27 +193,26 @@ impl MutableSmartArt {
         }
         let placeholder = |part: &str| format!("{{{{SMARTART_{part}_{}}}}}", self.anchor_key);
         let placeholders;
-        let (data, layout, quick_style, colors) = match rel_ids {
-            Some(ids) => (
+        let (data, layout, quick_style, colors) = if let Some(ids) = rel_ids {
+            (
                 ids.data.as_str(),
                 ids.layout.as_str(),
                 ids.quick_style.as_str(),
                 ids.colors.as_str(),
-            ),
-            None => {
-                placeholders = (
-                    placeholder("DM"),
-                    placeholder("LO"),
-                    placeholder("QS"),
-                    placeholder("CS"),
-                );
-                (
-                    placeholders.0.as_str(),
-                    placeholders.1.as_str(),
-                    placeholders.2.as_str(),
-                    placeholders.3.as_str(),
-                )
-            },
+            )
+        } else {
+            placeholders = (
+                placeholder("DM"),
+                placeholder("LO"),
+                placeholder("QS"),
+                placeholder("CS"),
+            );
+            (
+                placeholders.0.as_str(),
+                placeholders.1.as_str(),
+                placeholders.2.as_str(),
+                placeholders.3.as_str(),
+            )
         };
         write!(
             xml,
@@ -302,9 +315,9 @@ mod tests {
     #[test]
     fn rejects_invalid_extents() {
         let mut smartart = MutableSmartArt::new(built()).unwrap();
-        assert!(smartart.set_size_emu(0, 914400).is_err());
-        assert!(smartart.set_size_emu(914400, -1).is_err());
-        assert!(smartart.set_size_emu(914400, 914400).is_ok());
+        assert!(smartart.set_size_emu(0, 914_400).is_err());
+        assert!(smartart.set_size_emu(914_400, -1).is_err());
+        assert!(smartart.set_size_emu(914_400, 914_400).is_ok());
     }
 
     #[test]
@@ -416,13 +429,13 @@ mod tests {
         {
             let document = package.document_mut().unwrap();
 
-            let mut text_box = MutableTextBox::new("Companion Box", 914400, 457200).unwrap();
+            let mut text_box = MutableTextBox::new("Companion Box", 914_400, 457200).unwrap();
             text_box.add_run("box story").unwrap();
             document.add_text_box(text_box);
 
             document
                 .add_paragraph()
-                .add_picture_from_bytes(PNG_HEADER.to_vec(), Some(914400), Some(914400))
+                .add_picture_from_bytes(PNG_HEADER.to_vec(), Some(914_400), Some(914_400))
                 .unwrap();
 
             document

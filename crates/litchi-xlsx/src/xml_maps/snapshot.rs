@@ -45,42 +45,50 @@ impl Snapshot {
     }
 
     /// Borrow the typed Custom XML Maps value when the workbook owns one.
+    #[must_use]
     pub fn info(&self) -> Option<&XmlMapInfo> {
         self.info.as_ref()
     }
 
     /// Contextual alias for [`Self::info`].
+    #[must_use]
     pub fn xml_maps(&self) -> Option<&XmlMapInfo> {
         self.info()
     }
 
     /// Contextual catalog alias for [`Self::info`].
+    #[must_use]
     pub fn catalog(&self) -> Option<&XmlMapInfo> {
         self.info()
     }
 
     /// Explicit alias for the typed `MapInfo` value.
+    #[must_use]
     pub fn map_info(&self) -> Option<&XmlMapInfo> {
         self.info()
     }
 
     /// Contextual value alias for [`Self::info`].
+    #[must_use]
     pub fn value(&self) -> Option<&XmlMapInfo> {
         self.info()
     }
 
     /// The namespace conformance used by the owned part, or Transitional for
     /// an absent owner.
+    #[must_use]
     pub fn conformance(&self) -> XmlMapConformance {
         self.conformance
     }
 
     /// The workbook part that owns the Custom XML Maps relationship.
+    #[must_use]
     pub fn workbook_part_name(&self) -> &str {
         &self.source.workbook_part_name
     }
 
     /// The owned Custom XML Maps part identity, when present.
+    #[must_use]
     pub fn part_name(&self) -> Option<&PackURI> {
         self.source.part.as_ref().map(|part| &part.part_uri)
     }
@@ -91,6 +99,7 @@ impl Snapshot {
     }
 
     /// Whether this workbook currently has no Custom XML Maps owner.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.info.is_none()
     }

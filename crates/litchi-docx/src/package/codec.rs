@@ -1,6 +1,27 @@
+#![expect(
+    clippy::cast_possible_truncation,
+    reason = "OOXML numeric values are bounded before conversion"
+)]
+#![expect(
+    clippy::items_after_statements,
+    reason = "the local helper remains adjacent to its sole use"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
+#![expect(
+    clippy::used_underscore_binding,
+    reason = "the named ignored error records intentional source collapse"
+)]
 //! OPC construction, validation, and publication codecs for DOCX packages.
 
-use super::model::*;
+use super::model::{
+    CustomProps, CustomPropsHost, DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL,
+    DIAGRAM_QUICK_STYLE_REL, Error, MutableDocument, OpcPackage, PackURI, Package, Path, Read,
+    Result, Seek, Slot, Write, WriteRollbackGuard, ct, docx_web,
+    validate_document_main_content_type,
+};
 #[cfg(feature = "encryption")]
 pub(super) use super::model::{Limits, Mode};
 
@@ -19,6 +40,10 @@ impl Package {
     /// pkg.save("new_document.docx")?;
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new() -> Result<Self> {
         use crate::template;
         use litchi_opc::constants::content_type as ct;
@@ -30,7 +55,7 @@ impl Package {
 
         // Create document.xml part
         let doc_partname = PackURI::new("/word/document.xml")
-            .map_err(|e| Error::InvalidUri(format!("document partname: {}", e)))?;
+            .map_err(|e| Error::InvalidUri(format!("document partname: {e}")))?;
         let doc_part = BlobPart::new(
             doc_partname.clone(),
             ct::WML_DOCUMENT_MAIN.to_string(),
@@ -43,7 +68,7 @@ impl Package {
 
         // Create styles.xml part with dynamic style generation
         let styles_partname = PackURI::new("/word/styles.xml")
-            .map_err(|e| Error::InvalidUri(format!("styles partname: {}", e)))?;
+            .map_err(|e| Error::InvalidUri(format!("styles partname: {e}")))?;
 
         // Generate default styles dynamically
         use crate::writer::style::{MutableStyle, generate_styles_xml};
@@ -86,7 +111,7 @@ impl Package {
 
         // Create settings.xml part
         let settings_partname = PackURI::new("/word/settings.xml")
-            .map_err(|e| Error::InvalidUri(format!("settings partname: {}", e)))?;
+            .map_err(|e| Error::InvalidUri(format!("settings partname: {e}")))?;
         let settings_part = BlobPart::new(
             settings_partname,
             ct::WML_SETTINGS.to_string(),
@@ -100,7 +125,7 @@ impl Package {
 
         // Create fontTable.xml part
         let font_table_partname = PackURI::new("/word/fontTable.xml")
-            .map_err(|e| Error::InvalidUri(format!("fontTable partname: {}", e)))?;
+            .map_err(|e| Error::InvalidUri(format!("fontTable partname: {e}")))?;
         let font_table_part = BlobPart::new(
             font_table_partname,
             ct::WML_FONT_TABLE.to_string(),
@@ -114,7 +139,7 @@ impl Package {
 
         // Create webSettings.xml part
         let web_settings_partname = PackURI::new("/word/webSettings.xml")
-            .map_err(|e| Error::InvalidUri(format!("webSettings partname: {}", e)))?;
+            .map_err(|e| Error::InvalidUri(format!("webSettings partname: {e}")))?;
         let web_settings_xml = docx_web::write(
             &docx_web::Settings::default(),
             docx_web::Conformance::Transitional,
@@ -132,7 +157,7 @@ impl Package {
 
         // Create core.xml part (core properties)
         let core_props_partname = PackURI::new("/docProps/core.xml")
-            .map_err(|e| Error::InvalidUri(format!("core.xml partname: {}", e)))?;
+            .map_err(|e| Error::InvalidUri(format!("core.xml partname: {e}")))?;
         let core_props_part = BlobPart::new(
             core_props_partname,
             ct::OPC_CORE_PROPERTIES.to_string(),
@@ -144,7 +169,7 @@ impl Package {
 
         // Create app.xml part (extended properties)
         let app_props_partname = PackURI::new("/docProps/app.xml")
-            .map_err(|e| Error::InvalidUri(format!("app.xml partname: {}", e)))?;
+            .map_err(|e| Error::InvalidUri(format!("app.xml partname: {e}")))?;
         let app_props_part = BlobPart::new(
             app_props_partname,
             ct::OFC_EXTENDED_PROPERTIES.to_string(),
@@ -156,7 +181,7 @@ impl Package {
 
         // Create theme1.xml part
         let theme_partname = PackURI::new("/word/theme/theme1.xml")
-            .map_err(|e| Error::InvalidUri(format!("theme partname: {}", e)))?;
+            .map_err(|e| Error::InvalidUri(format!("theme partname: {e}")))?;
         let theme_part = BlobPart::new(
             theme_partname,
             ct::OFC_THEME.to_string(),
@@ -171,7 +196,7 @@ impl Package {
 
         // Create numbering.xml part
         let numbering_partname = PackURI::new("/word/numbering.xml")
-            .map_err(|e| Error::InvalidUri(format!("numbering partname: {}", e)))?;
+            .map_err(|e| Error::InvalidUri(format!("numbering partname: {e}")))?;
         let numbering_part = BlobPart::new(
             numbering_partname,
             ct::WML_NUMBERING.to_string(),
@@ -209,8 +234,12 @@ impl Package {
 
     /// Create a new empty macro-free Word template (`.dotx`) package.
     ///
-    /// Template packages are the native container for reusable AutoText and
+    /// Template packages are the native container for reusable `AutoText` and
     /// other building blocks authored through [`Self::put_glossary`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new_template() -> Result<Self> {
         let mut package = Self::new()?;
         let main = package.opc.main_document_part()?.partname().clone();
@@ -235,11 +264,19 @@ impl Package {
     /// let pkg = Package::open("document.docx")?;
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         Self::open_with_limits(path, litchi_opc::ReadLimits::default())
     }
 
     /// Open a DOCX package from a file path with explicit OPC resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn open_with_limits<P: AsRef<Path>>(
         path: P,
         limits: litchi_opc::ReadLimits,
@@ -248,6 +285,10 @@ impl Package {
     }
 
     #[cfg(feature = "encryption")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn open_with_password<P: AsRef<Path>>(path: P, password: &str) -> Result<Self> {
         Self::open_with_password_and_limits(
             path,
@@ -263,6 +304,10 @@ impl Package {
     /// Use [`Self::open_with_password_and_limits`] to select both independent
     /// resource policies.
     #[cfg(feature = "encryption")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn open_with<P: AsRef<Path>>(path: P, password: &str, limits: &Limits) -> Result<Self> {
         Self::open_with_password_and_limits(
             path,
@@ -279,6 +324,10 @@ impl Package {
     /// is applied to the decrypted archive before it is adopted as a DOCX
     /// package.
     #[cfg(feature = "encryption")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn open_with_password_and_limits<P: AsRef<Path>>(
         path: P,
         password: &str,
@@ -311,11 +360,15 @@ impl Package {
     /// let pkg = Package::from_opc_package(opc)?;
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_opc_package(opc: OpcPackage) -> Result<Self> {
         // Verify it's a Word document by checking the main part's content type
         let main_part = opc
             .main_document_part()
-            .map_err(|e| Error::PartNotFound(format!("main document part: {}", e)))?;
+            .map_err(|e| Error::PartNotFound(format!("main document part: {e}")))?;
 
         validate_document_main_content_type(main_part.content_type())?;
 
@@ -353,11 +406,19 @@ impl Package {
     /// let pkg = Package::from_reader(cursor)?;
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_reader<R: Read + Seek>(reader: R) -> Result<Self> {
         Self::from_reader_with_limits(reader, litchi_opc::ReadLimits::default())
     }
 
     /// Create a DOCX package from a reader with explicit OPC resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_reader_with_limits<R: Read + Seek>(
         reader: R,
         limits: litchi_opc::ReadLimits,
@@ -366,6 +427,10 @@ impl Package {
     }
 
     #[cfg(feature = "encryption")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_reader_with_password<R: Read>(reader: R, password: &str) -> Result<Self> {
         Self::from_reader_with_password_and_limits(
             reader,
@@ -381,6 +446,10 @@ impl Package {
     /// Use [`Self::from_reader_with_password_and_limits`] to select both
     /// independent resource policies.
     #[cfg(feature = "encryption")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_reader_with<R: Read>(reader: R, password: &str, limits: &Limits) -> Result<Self> {
         Self::from_reader_with_password_and_limits(
             reader,
@@ -393,6 +462,10 @@ impl Package {
     /// Open an encrypted DOCX reader with independent outer-encryption and
     /// inner-OPC resource policies.
     #[cfg(feature = "encryption")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_reader_with_password_and_limits<R: Read>(
         reader: R,
         password: &str,
@@ -435,12 +508,20 @@ impl Package {
     /// pkg.save("output.docx")?;
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn save<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
         self.ensure_plain_output("save")?;
         self.save_plain_impl(path)
     }
 
     /// Explicitly save a plaintext package, even when the source was encrypted.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn save_plain<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
         self.save_plain_impl(path)
     }
@@ -471,18 +552,30 @@ impl Package {
     /// pkg.to_stream(&mut cursor)?;
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn to_stream<W: Write + Seek>(&mut self, writer: W) -> Result<()> {
         self.ensure_plain_output("to_stream")?;
         self.write_plain(writer)
     }
 
     /// Explicitly write a plaintext package to a stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn to_plain_stream<W: Write + Seek>(&mut self, writer: W) -> Result<()> {
         self.write_plain(writer)
     }
 
     /// Serialize and encrypt this package entirely in memory.
     #[cfg(feature = "encryption")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn to_encrypted(&mut self, password: &str, mode: Mode) -> Result<Vec<u8>> {
         let mut output = std::io::Cursor::new(Vec::new());
         self.write_plain(&mut output)?;
@@ -491,6 +584,10 @@ impl Package {
 
     /// Serialize and encrypt using the source package's retained profile.
     #[cfg(feature = "encryption")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn to_reencrypted(&mut self, password: &str) -> Result<Vec<u8>> {
         let mode = self.preserved_mode("to_reencrypted")?;
         self.to_encrypted(password, mode)
@@ -498,6 +595,10 @@ impl Package {
 
     /// Save with an explicit encryption profile and a borrowed password.
     #[cfg(feature = "encryption")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn save_encrypted<P: AsRef<Path>>(
         &mut self,
         path: P,
@@ -515,6 +616,10 @@ impl Package {
 
     /// Save using the encrypted source's retained profile.
     #[cfg(feature = "encryption")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn save_reencrypted<P: AsRef<Path>>(&mut self, path: P, password: &str) -> Result<()> {
         let mode = self.preserved_mode("save_reencrypted")?;
         self.save_encrypted(path, password, mode)
@@ -522,6 +627,7 @@ impl Package {
 
     /// Encryption profile of the opened or most recently encrypted package.
     #[cfg(feature = "encryption")]
+    #[must_use]
     pub const fn encryption(&self) -> Option<Mode> {
         self.source_encryption
     }
@@ -629,7 +735,7 @@ impl Package {
                     };
                     let filename = format!("{stem}{}.xml", index + 1);
                     let uri = PackURI::new(format!("/word/{filename}"))
-                        .map_err(|error| Error::InvalidUri(error.to_string()))?;
+                        .map_err(|error| Error::InvalidUri(error.clone()))?;
                     if self.opc.get_part(&uri).is_ok() {
                         return Err(Error::InvalidFormat(format!(
                             "section header/footer part {uri} already exists"
@@ -643,14 +749,15 @@ impl Package {
 
                 // Create the document part first (we'll update it later)
                 let doc_uri = PackURI::new("/word/document.xml")
-                    .map_err(|e| Error::InvalidUri(format!("document URI: {}", e)))?;
+                    .map_err(|e| Error::InvalidUri(format!("document URI: {e}")))?;
 
                 if !explicit_section_relationships.is_empty() {
-                    let existing_document = self.opc.get_part(&doc_uri).map_err(|_| {
-                        Error::InvalidFormat(
-                            "section references exist without a document part".to_string(),
-                        )
-                    })?;
+                    let existing_document =
+                        self.opc.get_part(&doc_uri).map_err(|_source_error| {
+                            Error::InvalidFormat(
+                                "section references exist without a document part".to_string(),
+                            )
+                        })?;
                     for (id, header) in &explicit_section_relationships {
                         let relationship = existing_document.rels().get(id).ok_or_else(|| {
                             Error::InvalidFormat(format!("section relationship {id:?} is missing"))
@@ -678,7 +785,7 @@ impl Package {
                                 "invalid section relationship {id:?}: {error}"
                             ))
                         })?;
-                        let part = self.opc.get_part(&target).map_err(|_| {
+                        let part = self.opc.get_part(&target).map_err(|_source_error| {
                             Error::InvalidFormat(format!(
                                 "section relationship {id:?} targets a missing part"
                             ))
@@ -697,11 +804,10 @@ impl Package {
                 }
 
                 // Get or create the document part to add relationships to
-                let content_type = self
-                    .opc
-                    .get_part(&doc_uri)
-                    .map(|p| p.content_type().to_string())
-                    .unwrap_or_else(|_| ct::WML_DOCUMENT_MAIN.to_string());
+                let content_type = self.opc.get_part(&doc_uri).map_or_else(
+                    |_| ct::WML_DOCUMENT_MAIN.to_string(),
+                    |p| p.content_type().to_string(),
+                );
 
                 // Create new temporary part for relationships
                 use litchi_opc::part::{BlobPart, Part};
@@ -745,9 +851,9 @@ impl Package {
                 for (i, (image_data, image_format)) in images.iter().enumerate() {
                     let image_num = i + 1;
                     let ext = image_format.extension();
-                    let image_partname = format!("/word/media/image{}.{}", image_num, ext);
+                    let image_partname = format!("/word/media/image{image_num}.{ext}");
                     let image_uri = PackURI::new(&image_partname)
-                        .map_err(|e| Error::InvalidUri(format!("image URI: {}", e)))?;
+                        .map_err(|e| Error::InvalidUri(format!("image URI: {e}")))?;
 
                     // Create and add image part
                     let image_part = BlobPart::new(
@@ -769,7 +875,7 @@ impl Package {
                     let object_num = i + 1;
                     let object_partname = format!("/word/embeddings/oleObject{object_num}.bin");
                     let object_uri = PackURI::new(&object_partname)
-                        .map_err(|e| Error::InvalidUri(format!("OLE object URI: {}", e)))?;
+                        .map_err(|e| Error::InvalidUri(format!("OLE object URI: {e}")))?;
                     self.opc.add_part(Box::new(BlobPart::new(
                         object_uri,
                         ct::OFC_OLE_OBJECT.to_string(),
@@ -784,7 +890,7 @@ impl Package {
                             preview_format.extension()
                         );
                         let preview_uri = PackURI::new(&preview_partname)
-                            .map_err(|e| Error::InvalidUri(format!("OLE preview URI: {}", e)))?;
+                            .map_err(|e| Error::InvalidUri(format!("OLE preview URI: {e}")))?;
                         self.opc.add_part(Box::new(BlobPart::new(
                             preview_uri,
                             preview_format.mime_type().to_string(),
@@ -815,9 +921,7 @@ impl Package {
                             format!("/word/diagrams/colors{diagram_index}.xml"),
                         );
                         let taken = [&names.0, &names.1, &names.2, &names.3].iter().any(|name| {
-                            PackURI::new(*name)
-                                .map(|uri| self.opc.get_part(&uri).is_ok())
-                                .unwrap_or(true)
+                            PackURI::new(*name).map_or(true, |uri| self.opc.get_part(&uri).is_ok())
                         });
                         if !taken {
                             break names;
@@ -835,7 +939,7 @@ impl Package {
                         (&colors_name, ct::DML_DIAGRAM_COLORS, parts.colors_xml),
                     ] {
                         let uri = PackURI::new(partname)
-                            .map_err(|e| Error::InvalidUri(format!("diagram URI: {}", e)))?;
+                            .map_err(|e| Error::InvalidUri(format!("diagram URI: {e}")))?;
                         self.opc.add_part(Box::new(BlobPart::new(
                             uri,
                             content_type.to_string(),
@@ -860,7 +964,7 @@ impl Package {
                     && let Some(header_xml) = mutable_doc.generate_header_xml()?
                 {
                     let header_uri = PackURI::new("/word/header1.xml")
-                        .map_err(|e| Error::InvalidUri(format!("header URI: {}", e)))?;
+                        .map_err(|e| Error::InvalidUri(format!("header URI: {e}")))?;
                     let header_part = BlobPart::new(
                         header_uri,
                         ct::WML_HEADER.to_string(),
@@ -874,7 +978,7 @@ impl Package {
 
                 if has_footer && let Some(footer_xml) = mutable_doc.generate_footer_xml()? {
                     let footer_uri = PackURI::new("/word/footer1.xml")
-                        .map_err(|e| Error::InvalidUri(format!("footer URI: {}", e)))?;
+                        .map_err(|e| Error::InvalidUri(format!("footer URI: {e}")))?;
                     let footer_part = BlobPart::new(
                         footer_uri,
                         ct::WML_FOOTER.to_string(),
@@ -889,7 +993,7 @@ impl Package {
                 // Add footnotes parts and relationships BEFORE document XML generation
                 if let Some(footnotes_xml) = mutable_doc.generate_footnotes_xml()? {
                     let footnotes_uri = PackURI::new("/word/footnotes.xml")
-                        .map_err(|e| Error::InvalidUri(format!("footnotes URI: {}", e)))?;
+                        .map_err(|e| Error::InvalidUri(format!("footnotes URI: {e}")))?;
                     let footnotes_part = BlobPart::new(
                         footnotes_uri,
                         ct::WML_FOOTNOTES.to_string(),
@@ -903,7 +1007,7 @@ impl Package {
                 // Add endnotes parts and relationships BEFORE document XML generation
                 if let Some(endnotes_xml) = mutable_doc.generate_endnotes_xml()? {
                     let endnotes_uri = PackURI::new("/word/endnotes.xml")
-                        .map_err(|e| Error::InvalidUri(format!("endnotes URI: {}", e)))?;
+                        .map_err(|e| Error::InvalidUri(format!("endnotes URI: {e}")))?;
                     let endnotes_part = BlobPart::new(
                         endnotes_uri,
                         ct::WML_ENDNOTES.to_string(),
@@ -926,24 +1030,24 @@ impl Package {
 
                     // Store the watermark image as an ordinary media part,
                     // shared by all three headers.
-                    let image_media_name =
-                        if let Some(image_watermark) = mutable_doc.image_watermark.as_ref() {
-                            let media_name = format!(
-                                "/word/media/watermarkImage1.{}",
-                                image_watermark.format().extension()
-                            );
-                            let media_uri = PackURI::new(&media_name).map_err(|e| {
-                                Error::InvalidUri(format!("watermark image URI: {}", e))
-                            })?;
-                            self.opc.add_part(Box::new(BlobPart::new(
-                                media_uri,
-                                image_watermark.format().mime_type().to_string(),
-                                image_watermark.data().to_vec(),
-                            )));
-                            Some(media_name)
-                        } else {
-                            None
-                        };
+                    let image_media_name = if let Some(image_watermark) =
+                        mutable_doc.image_watermark.as_ref()
+                    {
+                        let media_name = format!(
+                            "/word/media/watermarkImage1.{}",
+                            image_watermark.format().extension()
+                        );
+                        let media_uri = PackURI::new(&media_name)
+                            .map_err(|e| Error::InvalidUri(format!("watermark image URI: {e}")))?;
+                        self.opc.add_part(Box::new(BlobPart::new(
+                            media_uri,
+                            image_watermark.format().mime_type().to_string(),
+                            image_watermark.data().to_vec(),
+                        )));
+                        Some(media_name)
+                    } else {
+                        None
+                    };
 
                     // Create three headers (default, first, even) with watermark
                     let header_types = [
@@ -960,7 +1064,7 @@ impl Package {
                         }
 
                         let header_uri = PackURI::new(*header_uri_path)
-                            .map_err(|e| Error::InvalidUri(format!("header URI: {}", e)))?;
+                            .map_err(|e| Error::InvalidUri(format!("header URI: {e}")))?;
                         let mut header_part =
                             BlobPart::new(header_uri, ct::WML_HEADER.to_string(), Vec::new());
 
@@ -995,14 +1099,12 @@ impl Package {
 
                             // Combine watermark and user content
                             format!(
-                                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">{}{}</w:hdr>"#,
-                                watermark_xml, user_paragraphs
+                                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">{watermark_xml}{user_paragraphs}</w:hdr>"#
                             )
                         } else {
                             // Just watermark for first and even headers
                             format!(
-                                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">{}</w:hdr>"#,
-                                watermark_xml
+                                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">{watermark_xml}</w:hdr>"#
                             )
                         };
 
@@ -1088,8 +1190,7 @@ impl Package {
 
             self.opc.to_stream(writer).map_err(|e| {
                 Error::Io(std::io::Error::other(format!(
-                    "Failed to save package: {}",
-                    e
+                    "Failed to save package: {e}"
                 )))
             })?;
             staged_properties.commit();

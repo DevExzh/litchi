@@ -24,6 +24,7 @@ pub struct Settings {
 
 impl Settings {
     /// Creates a canonical record with a zeroed `FrtHeader` except for `rt`.
+    #[must_use]
     pub fn new(recommend_compression: bool) -> Self {
         let mut header = [0; HEADER_LEN];
         header[..2].copy_from_slice(&RECORD_TYPE.to_le_bytes());
@@ -35,20 +36,26 @@ impl Settings {
     }
 
     /// Parses one `CompressPictures` payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(payload: &[u8]) -> Result<Self> {
         super::codec::parse_settings(payload)
     }
 
+    #[must_use]
     pub const fn recommends_compression(&self) -> bool {
         self.recommend_compression
     }
 
     /// Bytes of the future-record header, including the validated `rt`.
+    #[must_use]
     pub const fn header(&self) -> &[u8; HEADER_LEN] {
         &self.header
     }
 
     /// Retained bytes not modeled by the current MS-XLS owner.
+    #[must_use]
     pub fn opaque_tail(&self) -> &[u8] {
         &self.opaque_tail
     }
@@ -89,6 +96,9 @@ pub struct Unknown {
 }
 
 impl Unknown {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(record_type: u16, payload: impl Into<Vec<u8>>) -> Result<Self> {
         if record_type == RECORD_TYPE {
             return Err(invalid("CompressPictures must use Record::Settings"));
@@ -103,10 +113,12 @@ impl Unknown {
         })
     }
 
+    #[must_use]
     pub const fn record_type(&self) -> u16 {
         self.record_type
     }
 
+    #[must_use]
     pub fn payload(&self) -> &[u8] {
         &self.payload
     }
@@ -120,6 +132,9 @@ pub enum Record {
 }
 
 impl Record {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn unknown(record_type: u16, payload: impl Into<Vec<u8>>) -> Result<Self> {
         Unknown::try_new(record_type, payload).map(Self::Unknown)
     }
@@ -132,22 +147,28 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(records: Vec<Record>) -> Result<Self> {
         let value = Self { records };
         super::validation::validate(&value)?;
         Ok(value)
     }
 
+    #[must_use]
     pub const fn empty() -> Self {
         Self {
             records: Vec::new(),
         }
     }
 
+    #[must_use]
     pub fn records(&self) -> &[Record] {
         &self.records
     }
 
+    #[must_use]
     pub fn settings(&self) -> Option<&Settings> {
         self.records.iter().find_map(|record| match record {
             Record::Settings(value) => Some(value),
@@ -162,10 +183,14 @@ impl Snapshot {
         })
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn encode(&self) -> Result<Vec<u8>> {
         super::codec::write(self)
     }
 
+    #[must_use]
     pub fn edit(&self) -> super::Transaction {
         super::Transaction::new(self.clone())
     }

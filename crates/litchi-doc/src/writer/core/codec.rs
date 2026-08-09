@@ -6,11 +6,38 @@ use crate::parts::pap::{
     FrameVerticalPosition, LegacyAutoNumbering, PhysicalJustification, TabAlignment, TabLeader,
     TabStop,
 };
-use crate::sprm_operations::*;
+use crate::sprm_operations::{
+    SPRM_C_CV, SPRM_C_DISP_FLD_RMARK, SPRM_C_DTTM_RMARK, SPRM_C_DTTM_RMARK_DEL, SPRM_C_F_BOLD,
+    SPRM_C_F_CAPS, SPRM_C_F_D_STRIKE, SPRM_C_F_FLD_VANISH, SPRM_C_F_ITALIC, SPRM_C_F_RMARK,
+    SPRM_C_F_RMARK_DEL, SPRM_C_F_SMALL_CAPS, SPRM_C_F_SPEC, SPRM_C_F_STRIKE, SPRM_C_F_VANISH,
+    SPRM_C_FTC_DEFAULT, SPRM_C_HPS, SPRM_C_HPS_POS, SPRM_C_HRESI, SPRM_C_IBST_RMARK,
+    SPRM_C_IBST_RMARK_DEL, SPRM_C_IDSL_RMARK, SPRM_C_IDSL_RMARK_DEL, SPRM_C_ISS, SPRM_C_ISTD,
+    SPRM_C_KUL, SPRM_C_PROP_RMARK_CURRENT, SPRM_C_RSID_PROP, SPRM_C_RSID_RM_DEL, SPRM_C_RSID_TEXT,
+    SPRM_C_SFXT_TEXT, SPRM_C_WALL, SPRM_P_ANLD, SPRM_P_BRC_BAR, SPRM_P_BRC_BETWEEN,
+    SPRM_P_BRC_BOTTOM, SPRM_P_BRC_LEFT, SPRM_P_BRC_RIGHT, SPRM_P_BRC_TOP, SPRM_P_BRCL, SPRM_P_BRCP,
+    SPRM_P_CHG_TABS_PAPX, SPRM_P_DCS, SPRM_P_DXA_ABS, SPRM_P_DXA_FROM_TEXT, SPRM_P_DXA_LEFT,
+    SPRM_P_DXA_LEFT_2000, SPRM_P_DXA_LEFT1, SPRM_P_DXA_LEFT1_2000, SPRM_P_DXA_RIGHT,
+    SPRM_P_DXA_RIGHT_2000, SPRM_P_DXA_WIDTH, SPRM_P_DXC_LEFT, SPRM_P_DXC_LEFT1, SPRM_P_DXC_RIGHT,
+    SPRM_P_DYA_ABS, SPRM_P_DYA_AFTER, SPRM_P_DYA_BEFORE, SPRM_P_DYA_FROM_TEXT, SPRM_P_DYA_LINE,
+    SPRM_P_DYL_AFTER, SPRM_P_DYL_BEFORE, SPRM_P_F_ADJUST_RIGHT, SPRM_P_F_AUTO_SPACE_DE,
+    SPRM_P_F_AUTO_SPACE_DN, SPRM_P_F_BI_DI, SPRM_P_F_CONTEXTUAL_SPACING, SPRM_P_F_DYA_AFTER_AUTO,
+    SPRM_P_F_DYA_BEFORE_AUTO, SPRM_P_F_IN_TABLE, SPRM_P_F_KEEP, SPRM_P_F_KEEP_FOLLOW,
+    SPRM_P_F_KINSOKU, SPRM_P_F_LOCKED, SPRM_P_F_MIRROR_INDENTS, SPRM_P_F_NO_ALLOW_OVERLAP,
+    SPRM_P_F_NO_AUTO_HYPH, SPRM_P_F_NO_LINE_NUMB, SPRM_P_F_NUM_RM_INS, SPRM_P_F_OPEN_TCH,
+    SPRM_P_F_OVERFLOW_PUNCT, SPRM_P_F_PAGE_BREAK_BEFORE, SPRM_P_F_SIDE_BY_SIDE,
+    SPRM_P_F_TOP_LINE_PUNCT, SPRM_P_F_TTP, SPRM_P_F_USE_PGSU_SETTINGS, SPRM_P_F_WIDOW_CONTROL,
+    SPRM_P_F_WORD_WRAP, SPRM_P_FRAME_TEXT_FLOW, SPRM_P_ILFO, SPRM_P_ILVL, SPRM_P_ISTD, SPRM_P_ITAP,
+    SPRM_P_JC, SPRM_P_JC_LOGICAL, SPRM_P_NUM_RM, SPRM_P_OUT_LVL, SPRM_P_PC,
+    SPRM_P_PROP_RMARK_CURRENT, SPRM_P_RSID, SPRM_P_SHD, SPRM_P_TTWO, SPRM_P_W_ALIGN_FONT,
+    SPRM_P_W_HEIGHT_ABS, SPRM_P_WALL, SPRM_P_WR,
+};
 use crate::writer::font_table::FontTableBuilder;
 use crate::writer::revisions::TextRevision;
 
-use super::model::*;
+use super::model::{
+    CharacterFormatting, ParagraphFormatting, RevisionWriterData, WriteError, pack_dttm,
+    utf16_code_unit_len,
+};
 pub(super) fn write_textbox_story_text(
     texts: &[&str],
     text_stream: &mut Vec<u8>,
@@ -38,7 +65,7 @@ pub(super) fn write_textbox_story_text(
     Ok((start_cps, *current_cp - story_start_cp))
 }
 
-/// Build a CHPX grpprl (group of SPRMs) from CharacterFormatting
+/// Build a CHPX grpprl (group of SPRMs) from `CharacterFormatting`
 pub(super) fn build_chpx_grpprl(
     fmt: &CharacterFormatting,
     font_builder: &mut FontTableBuilder,
@@ -68,23 +95,23 @@ pub(super) fn build_chpx_grpprl(
     }
     // Bold
     if let Some(b) = fmt.bold {
-        push_byte(&mut grp, SPRM_C_F_BOLD, if b { 1 } else { 0 });
+        push_byte(&mut grp, SPRM_C_F_BOLD, u8::from(b));
     }
     // Italic
     if let Some(i) = fmt.italic {
-        push_byte(&mut grp, SPRM_C_F_ITALIC, if i { 1 } else { 0 });
+        push_byte(&mut grp, SPRM_C_F_ITALIC, u8::from(i));
     }
     // Underline (1 = single, 0 = none)
     if let Some(u) = fmt.underline {
-        push_byte(&mut grp, SPRM_C_KUL, if u { 1 } else { 0 });
+        push_byte(&mut grp, SPRM_C_KUL, u8::from(u));
     }
     // Strikethrough
     if let Some(s) = fmt.strike {
-        push_byte(&mut grp, SPRM_C_F_STRIKE, if s { 1 } else { 0 });
+        push_byte(&mut grp, SPRM_C_F_STRIKE, u8::from(s));
     }
     // Double strikethrough
     if let Some(ds) = fmt.double_strike {
-        push_byte(&mut grp, SPRM_C_F_D_STRIKE, if ds { 1 } else { 0 });
+        push_byte(&mut grp, SPRM_C_F_D_STRIKE, u8::from(ds));
     }
     // Superscript/Subscript via sprmCIss (0=none,1=super,2=sub)
     let mut iss: Option<u8> = None;
@@ -98,20 +125,20 @@ pub(super) fn build_chpx_grpprl(
     }
     // Small caps / All caps / Hidden
     if let Some(sc) = fmt.small_caps {
-        push_byte(&mut grp, SPRM_C_F_SMALL_CAPS, if sc { 1 } else { 0 });
+        push_byte(&mut grp, SPRM_C_F_SMALL_CAPS, u8::from(sc));
     }
     if let Some(ac) = fmt.all_caps {
-        push_byte(&mut grp, SPRM_C_F_CAPS, if ac { 1 } else { 0 });
+        push_byte(&mut grp, SPRM_C_F_CAPS, u8::from(ac));
     }
     if let Some(h) = fmt.hidden {
-        push_byte(&mut grp, SPRM_C_F_VANISH, if h { 1 } else { 0 });
+        push_byte(&mut grp, SPRM_C_F_VANISH, u8::from(h));
     }
     // Special/Field vanish (for field codes and control chars)
     if let Some(sp) = fmt.special {
-        push_byte(&mut grp, SPRM_C_F_SPEC, if sp { 1 } else { 0 });
+        push_byte(&mut grp, SPRM_C_F_SPEC, u8::from(sp));
     }
     if let Some(vn) = fmt.field_vanish {
-        push_byte(&mut grp, SPRM_C_F_FLD_VANISH, if vn { 1 } else { 0 });
+        push_byte(&mut grp, SPRM_C_F_FLD_VANISH, u8::from(vn));
     }
     // Font size (half-points)
     if let Some(hps) = fmt.font_size {
@@ -132,7 +159,7 @@ pub(super) fn build_chpx_grpprl(
     }
     // Color (RGB) -> sprmCCv expects a 4-byte value
     if let Some((r, g, b)) = fmt.color {
-        let cv: u32 = (r as u32) | ((g as u32) << 8) | ((b as u32) << 16);
+        let cv: u32 = u32::from(r) | (u32::from(g) << 8) | (u32::from(b) << 16);
         push_dword(&mut grp, SPRM_C_CV, cv);
     }
     if let Some(effect) = fmt.text_effect {
@@ -290,7 +317,7 @@ pub(super) fn build_revision_chpx_grpprl(
     Ok(grp)
 }
 
-/// Build a PAPX grpprl (group of SPRMs) from ParagraphFormatting
+/// Build a PAPX grpprl (group of SPRMs) from `ParagraphFormatting`
 pub(super) fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
     let mut grp = Vec::with_capacity(16);
 
@@ -315,7 +342,7 @@ pub(super) fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
     #[inline]
     fn push_bool(grp: &mut Vec<u8>, opcode: u16, val: bool) {
         grp.extend_from_slice(&opcode.to_le_bytes());
-        grp.push(if val { 1 } else { 0 });
+        grp.push(u8::from(val));
     }
 
     if let Some(style_index) = fmt.style_index {
@@ -353,17 +380,17 @@ pub(super) fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
     }
     // Indents (twips). Emit legacy and modern variants. Values are signed twips.
     if let Some(dxa_left) = fmt.left_indent {
-        let v = dxa_left.clamp(i16::MIN as i32, i16::MAX as i32) as i16;
+        let v = dxa_left.clamp(i32::from(i16::MIN), i32::from(i16::MAX)) as i16;
         push_i16(&mut grp, SPRM_P_DXA_LEFT, v);
         push_i16(&mut grp, SPRM_P_DXA_LEFT_2000, v);
     }
     if let Some(dxa_right) = fmt.right_indent {
-        let v = dxa_right.clamp(i16::MIN as i32, i16::MAX as i32) as i16;
+        let v = dxa_right.clamp(i32::from(i16::MIN), i32::from(i16::MAX)) as i16;
         push_i16(&mut grp, SPRM_P_DXA_RIGHT, v);
         push_i16(&mut grp, SPRM_P_DXA_RIGHT_2000, v);
     }
     if let Some(dxa_first) = fmt.first_line_indent {
-        let v = dxa_first.clamp(i16::MIN as i32, i16::MAX as i32) as i16;
+        let v = dxa_first.clamp(i32::from(i16::MIN), i32::from(i16::MAX)) as i16;
         push_i16(&mut grp, SPRM_P_DXA_LEFT1, v);
         push_i16(&mut grp, SPRM_P_DXA_LEFT1_2000, v);
     }
@@ -597,7 +624,7 @@ pub(super) fn build_papx_grpprl(fmt: &ParagraphFormatting) -> Vec<u8> {
     // Line spacing (LSPD: 4 bytes = dyaLine (i16 LE), fMulti (i16 LE))
     if let Some(ls) = fmt.line_spacing {
         let mut bytes = [0u8; 4];
-        let f_multi: u16 = if ls.is_multiple { 1 } else { 0 };
+        let f_multi: u16 = u16::from(ls.is_multiple);
         bytes[0..2].copy_from_slice(&(ls.dya_line as u16).to_le_bytes());
         bytes[2..4].copy_from_slice(&f_multi.to_le_bytes());
         grp.extend_from_slice(&SPRM_P_DYA_LINE.to_le_bytes());

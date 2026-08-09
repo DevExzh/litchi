@@ -79,7 +79,7 @@ impl DefinedNameSlot {
                 .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
                 .collect();
             String::from_utf16(&units)
-                .map_err(|_| invalid_error("Lbl name contains invalid UTF-16"))?
+                .map_err(|_error| invalid_error("Lbl name contains invalid UTF-16"))?
         };
 
         let built_in = flags & FLAG_BUILT_IN != 0;
@@ -354,7 +354,7 @@ fn parse_name_fn_grp12(data: &[u8]) -> Result<NameFnGrp12> {
     }
     Ok(NameFnGrp12 {
         function_name: name,
-        category: category as u8,
+        category: crate::utils::truncate_u16_to_u8(category),
     })
 }
 
@@ -425,7 +425,7 @@ fn parse_xl_name_unicode(
             .chunks_exact(2)
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect::<Vec<_>>();
-        String::from_utf16(&units).map_err(|_| {
+        String::from_utf16(&units).map_err(|_error| {
             optional_invalid_error(record_type, "XLNameUnicodeString contains invalid UTF-16")
         })?
     };
@@ -465,7 +465,7 @@ fn parse_no_cch_string(data: &[u8], offset: usize, count: usize) -> Result<(Stri
             .chunks_exact(2)
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect::<Vec<_>>();
-        String::from_utf16(&units).map_err(|_| {
+        String::from_utf16(&units).map_err(|_error| {
             optional_invalid_error(NAME_CMT_RECORD_TYPE, "NameCmt contains invalid UTF-16")
         })?
     };

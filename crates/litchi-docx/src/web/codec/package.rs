@@ -28,6 +28,10 @@ impl Settings {
 }
 
 /// Read one bounded web-settings part and validate its frame relationships.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn read(part: &dyn Part) -> Result<(Settings, Conformance)> {
     Settings::read_part(part)
 }

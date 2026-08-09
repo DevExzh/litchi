@@ -1,8 +1,12 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
 //! Glossary XML, semantic, and package boundary validation.
 
 use super::super::graph::{is_reserved_physical_part, is_signature_part};
-use super::super::model::*;
-use super::super::*;
+use super::super::model::{Catalog, Category, Conformance, Entry, Insert, Kind};
+use super::super::{Caseless, ContentType, Error, PackURI, Result, UnicodeNormalization, ct};
 use super::super::{MAX_GRAPH_BYTES, MAX_NAME_KEY, MAX_PARTS, MAX_STRING, R, RS, VML, W, WS};
 use super::xml::{Content, Node};
 
@@ -184,7 +188,9 @@ pub(in crate::glossary) fn kids(n: &Node) -> Result<Vec<&Node>> {
             Content::Node(x) => v.push(x),
             Content::Text(x) if x.trim().is_empty() => {},
             Content::Comment(_) => {},
-            _ => return Err(invalid("unexpected text in typed glossary metadata")),
+            Content::Text(_) | Content::CData(_) => {
+                return Err(invalid("unexpected text in typed glossary metadata"));
+            },
         }
     }
     Ok(v)

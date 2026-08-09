@@ -1,4 +1,4 @@
-//! Bounded SpreadsheetML chartsheet XML codec.
+//! Bounded `SpreadsheetML` chartsheet XML codec.
 
 use crate::error::{Error, Result};
 use litchi_ooxml_common::custom_xml::valid_guid;
@@ -9,7 +9,11 @@ use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
-use super::model::*;
+use super::model::{
+    Chart, Color, Conformance, CustomView, Extension, ExtensionList, HeaderFooter, Margins,
+    PageOrientation, PageSetup, Properties, Protection, State, View, WebPublishItem,
+    WebPublishItems, WebSourceType,
+};
 use super::model::{SML, STRICT_SML};
 
 const MAX_XML_BYTES: usize = 32 * 1024 * 1024;
@@ -1034,7 +1038,7 @@ fn write_canonical_node<T: XmlOutput>(
                     .children
                     .get(*index)
                     .ok_or_else(|| invalid("invalid canonical XML child index"))?;
-                write_canonical_node(out, child, prefixes, false)?
+                write_canonical_node(out, child, prefixes, false)?;
             },
         }
     }
@@ -1132,7 +1136,7 @@ fn parse_document_with_capabilities(
             },
             Event::Decl(_) | Event::Comment(_) => {},
             Event::Eof => break,
-        };
+        }
         buffer.clear();
     }
     if !stack.is_empty() {

@@ -89,7 +89,10 @@ pub fn parse_cell_reference(ref_str: &str) -> Result<(u32, u32)> {
 }
 
 /// Convert serial date to datetime
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "retained for BIFF12 codec completeness and staged host integration"
+)]
 pub fn excel_date_to_datetime(serial: f64, is_1904: bool) -> Option<chrono::NaiveDateTime> {
     use chrono::{Duration, NaiveDate};
 

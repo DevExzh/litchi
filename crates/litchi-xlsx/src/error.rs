@@ -46,7 +46,7 @@ pub enum Error {
     /// Shared OOXML decoding failed.
     #[error("OOXML decoding error: {0}")]
     Xml(#[from] litchi_ooxml_common::XmlError),
-    /// DrawingML chart or geometry decoding failed.
+    /// `DrawingML` chart or geometry decoding failed.
     #[error("DrawingML error: {0}")]
     Drawing(#[from] litchi_drawingml::Error),
     /// A host-neutral OOXML package service failed.

@@ -19,7 +19,7 @@ pub(super) use wire::pivot_cache_stream_paths;
 
 /// Inputs owned by the workbook package and consumed by the globals collector.
 pub(crate) struct WorkbookGlobalsSink<'a> {
-    /// BoundSheet8 entries in stream order.
+    /// `BoundSheet8` entries in stream order.
     pub(super) bound_sheets: &'a mut Vec<BoundSheetRecord>,
     /// Shared-string table contents.
     pub(super) strings: &'a mut Vec<String>,

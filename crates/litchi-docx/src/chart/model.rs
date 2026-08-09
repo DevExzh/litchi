@@ -1,3 +1,7 @@
+#![expect(
+    clippy::unused_self,
+    reason = "the method receiver preserves trait-like builder ergonomics"
+)]
 //! Semantic DOCX chart-host snapshots.
 
 use litchi_opc::constants::relationship_type as rt;
@@ -83,6 +87,7 @@ pub enum EmbeddedWorkbookContentType {
 }
 
 impl EmbeddedWorkbookContentType {
+    #[must_use]
     pub fn as_str(self) -> &'static str {
         WORKBOOK_CT
     }

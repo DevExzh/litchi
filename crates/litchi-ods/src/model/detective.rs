@@ -102,6 +102,9 @@ pub struct HighlightedRange {
 
 impl HighlightedRange {
     /// Create and validate a directional dependency range.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn valid(
         cell_range_address: Option<String>,
         direction: Direction,
@@ -120,6 +123,7 @@ impl HighlightedRange {
     }
 
     /// Create an invalid-range marker.
+    #[must_use]
     pub fn invalid(marked_invalid: bool) -> Self {
         Self {
             kind: HighlightedRangeKind::Invalid { marked_invalid },
@@ -127,6 +131,7 @@ impl HighlightedRange {
     }
 
     /// Optional ODF range address for a valid directional highlight.
+    #[must_use]
     pub fn cell_range_address(&self) -> Option<&str> {
         match &self.kind {
             HighlightedRangeKind::Valid {
@@ -137,6 +142,7 @@ impl HighlightedRange {
     }
 
     /// Dependency direction, or `None` for an invalid-range marker.
+    #[must_use]
     pub fn direction(&self) -> Option<Direction> {
         match self.kind {
             HighlightedRangeKind::Valid { direction, .. } => Some(direction),
@@ -145,6 +151,7 @@ impl HighlightedRange {
     }
 
     /// Preserved error flag for a valid directional highlight.
+    #[must_use]
     pub fn contains_error(&self) -> Option<bool> {
         match self.kind {
             HighlightedRangeKind::Valid { contains_error, .. } => contains_error,
@@ -153,6 +160,7 @@ impl HighlightedRange {
     }
 
     /// Preserved invalid-marker value, if this is an invalid-range marker.
+    #[must_use]
     pub fn marked_invalid(&self) -> Option<bool> {
         match self.kind {
             HighlightedRangeKind::Invalid { marked_invalid } => Some(marked_invalid),
@@ -172,6 +180,7 @@ pub struct Operation {
 
 impl Operation {
     /// Create an auditing operation.
+    #[must_use]
     pub fn new(kind: OperationKind, index: usize) -> Self {
         Self { kind, index }
     }
@@ -186,16 +195,19 @@ pub struct Detective {
 
 impl Detective {
     /// Create empty detective metadata.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Highlighted ranges, in document order.
+    #[must_use]
     pub fn highlighted_ranges(&self) -> &[HighlightedRange] {
         &self.highlighted_ranges
     }
 
     /// Auditing operations, in document order.
+    #[must_use]
     pub fn operations(&self) -> &[Operation] {
         &self.operations
     }
@@ -213,6 +225,7 @@ impl Detective {
     }
 
     /// Whether this container has no ranges or operations.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.highlighted_ranges.is_empty() && self.operations.is_empty()
     }

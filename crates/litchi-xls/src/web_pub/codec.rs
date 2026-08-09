@@ -49,6 +49,9 @@ fn read_u32(data: &[u8], offset: usize) -> u32 {
 
 impl WebPub {
     /// Parse a `WebPub` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         Self::parse_with_layout(data).map(|(value, _)| value)
     }
@@ -240,7 +243,7 @@ impl WebPub {
         payload.extend_from_slice(&flags.to_le_bytes());
         payload.extend_from_slice(&[0u8; 4]); // reserved3 + unused2
         payload.extend_from_slice(&self.style_id.to_le_bytes());
-        payload.extend_from_slice(&(tail.len() as u32).to_le_bytes());
+        payload.extend_from_slice(&crate::utils::truncate_usize_to_u32(tail.len()).to_le_bytes());
         payload.extend_from_slice(&tail);
         Ok(payload)
     }
@@ -320,7 +323,7 @@ pub(super) fn rewrite_preserving_source(
     tail.extend_from_slice(&source[layout.trailing_unused.clone()]);
 
     let tail_len = u32::try_from(tail.len())
-        .map_err(|_| Error::InvalidData("WebPub payload tail exceeds u32".into()))?;
+        .map_err(|_error| Error::InvalidData("WebPub payload tail exceeds u32".into()))?;
     let mut payload = source[..FIXED_LEN].to_vec();
     if replacement.range != current.range {
         let (first_row, last_row, first_column, last_column) =
@@ -372,7 +375,7 @@ fn append_string(
 /// character is in U+0000..=U+00FF and wide otherwise.
 fn write_web_pub_string(out: &mut Vec<u8>, text: &str) -> Result<()> {
     let (compressible, char_count) = web_pub_string_layout(text)?;
-    out.extend_from_slice(&(char_count as u16).to_le_bytes());
+    out.extend_from_slice(&crate::utils::truncate_usize_to_u16(char_count).to_le_bytes());
     if compressible {
         out.push(0u8); // fHighByte = 0
         out.extend(text.chars().map(|ch| ch as u8));
@@ -425,7 +428,8 @@ fn parse_web_pub_string(data: &[u8]) -> Result<(String, usize)> {
             .chunks_exact(2)
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect();
-        String::from_utf16(&units).map_err(|_| invalid("WebPubString is not valid UTF-16LE"))?
+        String::from_utf16(&units)
+            .map_err(|_error| invalid("WebPubString is not valid UTF-16LE"))?
     } else {
         bytes.iter().map(|&byte| char::from(byte)).collect()
     };

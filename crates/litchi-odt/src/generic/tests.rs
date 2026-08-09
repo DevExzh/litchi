@@ -3,6 +3,24 @@
 use super::{Family, FlatDocument, Package};
 use crate::constants;
 use crate::core::PackageWriter;
+use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
+
+fn replace_zip_member_raw(package: &[u8], path: &str, replacement: &[u8]) -> Vec<u8> {
+    let archive = ArchiveReader::new(package).unwrap();
+    let mut writer = StreamingArchiveWriter::new();
+    let mut replaced = false;
+    for name in archive.file_names() {
+        let data = if name == path {
+            replaced = true;
+            replacement.to_vec()
+        } else {
+            archive.read(name).unwrap()
+        };
+        writer.write_stored(name, &data).unwrap();
+    }
+    assert!(replaced, "test ZIP member {path} must exist");
+    writer.finish_to_bytes().unwrap()
+}
 
 fn package(mimetype: &str) -> Vec<u8> {
     let mut writer = PackageWriter::new();
@@ -75,8 +93,10 @@ fn rejects_non_odf_missing_content_and_invalid_xml_bytes() {
 
     let mut writer = PackageWriter::new();
     writer.set_mimetype(constants::ODF_CHART).unwrap();
-    writer.add_file(constants::ODF_CONTENT, &[0xff]).unwrap();
-    assert!(Package::from_bytes(writer.finish_to_bytes().unwrap()).is_err());
+    writer.add_file(constants::ODF_CONTENT, b"<x/>").unwrap();
+    let package = writer.finish_to_bytes().unwrap();
+    let invalid_xml = replace_zip_member_raw(&package, constants::ODF_CONTENT, &[0xff]);
+    assert!(Package::from_bytes(invalid_xml).is_err());
 }
 
 #[test]

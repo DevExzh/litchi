@@ -48,7 +48,7 @@ pub(crate) fn parse_document(xml: &[u8]) -> Result<Node> {
                     return Err(limit("XML structure"));
                 }
                 let is_empty = matches!(&event, Event::Empty(_));
-                let node = make_node(&reader, &element, reader.decoder(), &mut strings)?;
+                let node = make_node(&reader, element, reader.decoder(), &mut strings)?;
                 if is_empty {
                     attach(node, &mut stack, &mut root)?;
                 } else {

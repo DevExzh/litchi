@@ -40,6 +40,12 @@ impl Master {
             .map(Self::from_snapshot)
     }
 
+    pub(crate) fn with_parts(&self, content_xml: &str, meta_xml: Option<&str>) -> Result<Self> {
+        self.package
+            .with_parts(content_xml, meta_xml)
+            .map(Self::from_snapshot)
+    }
+
     pub(crate) fn href_span(&self, reference: usize) -> Option<&std::ops::Range<usize>> {
         self.package.href_span(reference)
     }
@@ -60,6 +66,18 @@ impl Master {
     /// Returns an error if the bytes are not a valid package.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         crate::package::Snapshot::from_bytes(bytes).map(|package| Self { package })
+    }
+
+    /// Opens a password-encrypted master-document package from bytes.
+    ///
+    /// The resulting snapshot remains readable, but any changed transaction
+    /// is refused because this crate does not publish or retain credentials.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid package, password, or encrypted entry.
+    pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
+        crate::package::Snapshot::from_bytes_with_password(bytes, password).map(Self::from_snapshot)
     }
 
     /// Returns the `content.xml` document.
@@ -140,6 +158,45 @@ impl Master {
     #[must_use]
     pub fn subdocuments(&self) -> &[crate::model::subdocument::Reference] {
         self.package.references()
+    }
+
+    /// Returns the bounded section tree projected from `content.xml`.
+    #[must_use]
+    pub fn section_tree(&self) -> &crate::section::Tree {
+        self.package.section_tree()
+    }
+
+    /// Returns named style definitions from `content.xml` and `styles.xml`.
+    #[must_use]
+    pub fn styles(&self) -> &[crate::style::Definition] {
+        self.package.styles()
+    }
+
+    /// Returns the inert package-resource graph.
+    #[must_use]
+    pub fn resources(&self) -> &crate::resource::Graph {
+        self.package.resources()
+    }
+
+    /// Starts one atomic title and linked-section transaction.
+    #[must_use]
+    pub fn edit(&self) -> crate::transaction::Edit<'_> {
+        crate::transaction::Edit::new(self)
+    }
+
+    /// Applies a unified patch only to its exact source package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when this package is not the patch source.
+    pub fn apply_patch(&self, patch: &crate::transaction::Patch) -> Result<Self> {
+        patch.apply(self)
+    }
+
+    /// Creates explicit bounded undo/redo history at this snapshot.
+    #[must_use]
+    pub fn history(&self, limits: litchi_core::HistoryLimits) -> crate::transaction::History {
+        crate::transaction::History::new(self.clone(), limits)
     }
 
     /// Returns the raw package bytes.

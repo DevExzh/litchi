@@ -1,4 +1,4 @@
-//! Typed, host-neutral DrawingML text-body values.
+//! Typed, host-neutral `DrawingML` text-body values.
 
 use super::super::{Anchor, Autofit, Columns, Coordinate32, Direction, TextSize, Underline, Wrap};
 
@@ -67,7 +67,7 @@ impl Default for Properties {
     }
 }
 
-/// One DrawingML run inside a text-body paragraph.
+/// One `DrawingML` run inside a text-body paragraph.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Run {
     /// Run text.
@@ -82,7 +82,7 @@ pub struct Run {
     pub font_size: Option<TextSize>,
 }
 
-/// One paragraph inside a DrawingML text body.
+/// One paragraph inside a `DrawingML` text body.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Paragraph {
     /// Runs in document order.
@@ -91,15 +91,16 @@ pub struct Paragraph {
 
 impl Paragraph {
     /// Concatenate the paragraph's run text without evaluating fields.
+    #[must_use]
     pub fn text(&self) -> String {
         self.runs.iter().map(|run| run.text.as_str()).collect()
     }
 }
 
-/// One host-neutral DrawingML text story.
+/// One host-neutral `DrawingML` text story.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Body {
-    /// Body properties with DrawingML defaults applied.
+    /// Body properties with `DrawingML` defaults applied.
     pub properties: Properties,
     /// Paragraphs in document order.
     pub paragraphs: Vec<Paragraph>,

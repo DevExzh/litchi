@@ -150,7 +150,10 @@ pub(in crate::parts::fields) fn parse_compare_field_comparison(
     (!comparison.is_empty()).then_some(comparison.to_string())
 }
 
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "the tuple shape directly represents the parsed mail-merge grammar"
+)]
 pub(in crate::parts::fields) fn parse_prompt_field_parts(
     instruction: &str,
 ) -> Option<(
@@ -300,7 +303,10 @@ pub(in crate::parts::fields) fn parse_user_identity_field_parts(
     Some((kind, override_value, formatting))
 }
 
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "the tuple shape directly represents the parsed mail-merge grammar"
+)]
 pub(in crate::parts::fields) fn parse_mail_merge_recipient_field_parts(
     instruction: &str,
 ) -> Option<(

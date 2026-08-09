@@ -79,7 +79,7 @@ pub enum Aspect {
 }
 
 impl Aspect {
-    /// Return the exact SpreadsheetML token.
+    /// Return the exact `SpreadsheetML` token.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -122,7 +122,7 @@ pub enum OleObjectUpdate {
 }
 
 impl OleObjectUpdate {
-    /// Return the exact SpreadsheetML token.
+    /// Return the exact `SpreadsheetML` token.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {

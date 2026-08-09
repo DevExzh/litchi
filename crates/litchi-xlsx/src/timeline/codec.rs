@@ -1,4 +1,4 @@
-//! Bounded SpreadsheetML timeline XML conversion.
+//! Bounded `SpreadsheetML` timeline XML conversion.
 
 use super::model::{CacheDefinition, Views};
 use crate::error::Result;

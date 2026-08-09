@@ -1,5 +1,8 @@
 use crate::writer::bookmarks::BookmarkEntry;
-use crate::writer::core::{Writer, model::*};
+use crate::writer::core::{
+    Writer,
+    model::{BookmarkTableData, WriteError},
+};
 use crate::writer::fib::FibBuilder;
 use std::collections::HashMap;
 impl Writer {

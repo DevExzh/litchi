@@ -1,3 +1,11 @@
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
+#![expect(
+    clippy::struct_excessive_bools,
+    reason = "the public model preserves independent OOXML flags"
+)]
 //! Style writer support for DOCX documents.
 //!
 //! This module provides functionality for creating and writing document styles.
@@ -82,7 +90,7 @@ impl MutableStyle {
     ///
     /// # Arguments
     ///
-    /// * `style_id` - Unique identifier for the style (e.g., "MyStyle1")
+    /// * `style_id` - Unique identifier for the style (e.g., "`MyStyle1`")
     /// * `name` - Display name for the style (e.g., "My Custom Style")
     /// * `style_type` - Type of style (paragraph, character, table, or list)
     ///
@@ -126,12 +134,14 @@ impl MutableStyle {
 
     /// Get the style identifier.
     #[inline]
+    #[must_use]
     pub fn style_id(&self) -> &str {
         &self.style_id
     }
 
     /// Get the style name.
     #[inline]
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -143,6 +153,7 @@ impl MutableStyle {
 
     /// Get the style type.
     #[inline]
+    #[must_use]
     pub fn style_type(&self) -> Type {
         self.style_type
     }
@@ -154,6 +165,7 @@ impl MutableStyle {
 
     /// Check if this is the default style.
     #[inline]
+    #[must_use]
     pub fn is_default(&self) -> bool {
         self.is_default
     }
@@ -165,6 +177,7 @@ impl MutableStyle {
 
     /// Check if this is a custom style.
     #[inline]
+    #[must_use]
     pub fn is_custom(&self) -> bool {
         self.is_custom
     }
@@ -178,6 +191,7 @@ impl MutableStyle {
 
     /// Get the base style ID.
     #[inline]
+    #[must_use]
     pub fn based_on(&self) -> Option<&str> {
         self.based_on.as_deref()
     }
@@ -273,6 +287,7 @@ impl MutableStyle {
     }
 
     /// Return the paragraph outline level.
+    #[must_use]
     pub const fn outline(&self) -> Option<Outline> {
         self.outline
     }
@@ -308,7 +323,7 @@ impl MutableStyle {
 
         // Priority
         if let Some(priority) = self.priority {
-            write!(&mut xml, r#"<w:uiPriority w:val="{}"/>"#, priority)?;
+            write!(&mut xml, r#"<w:uiPriority w:val="{priority}"/>"#)?;
         }
 
         // Quick style
@@ -341,7 +356,7 @@ impl MutableStyle {
                 xml.push_str("<w:pPr>");
 
                 if let Some(ref alignment) = self.alignment {
-                    write!(&mut xml, r#"<w:jc w:val="{}"/>"#, alignment)?;
+                    write!(&mut xml, r#"<w:jc w:val="{alignment}"/>"#)?;
                 }
 
                 if self.space_before.is_some()
@@ -350,13 +365,13 @@ impl MutableStyle {
                 {
                     xml.push_str("<w:spacing");
                     if let Some(before) = self.space_before {
-                        write!(&mut xml, r#" w:before="{}""#, before)?;
+                        write!(&mut xml, r#" w:before="{before}""#)?;
                     }
                     if let Some(after) = self.space_after {
-                        write!(&mut xml, r#" w:after="{}""#, after)?;
+                        write!(&mut xml, r#" w:after="{after}""#)?;
                     }
                     if let Some(line) = self.line_spacing {
-                        write!(&mut xml, r#" w:line="{}""#, line)?;
+                        write!(&mut xml, r#" w:line="{line}""#)?;
                     }
                     xml.push_str("/>");
                 }
@@ -367,14 +382,14 @@ impl MutableStyle {
                 {
                     xml.push_str("<w:ind");
                     if let Some(left) = self.indent_left {
-                        write!(&mut xml, r#" w:left="{}""#, left)?;
+                        write!(&mut xml, r#" w:left="{left}""#)?;
                     }
                     if let Some(right) = self.indent_right {
-                        write!(&mut xml, r#" w:right="{}""#, right)?;
+                        write!(&mut xml, r#" w:right="{right}""#)?;
                     }
                     if let Some(first_line) = self.indent_first_line {
                         if first_line >= 0 {
-                            write!(&mut xml, r#" w:firstLine="{}""#, first_line)?;
+                            write!(&mut xml, r#" w:firstLine="{first_line}""#)?;
                         } else {
                             write!(&mut xml, r#" w:hanging="{}""#, -first_line)?;
                         }
@@ -424,8 +439,8 @@ impl MutableStyle {
             }
 
             if let Some(size) = self.font_size {
-                write!(&mut xml, r#"<w:sz w:val="{}"/>"#, size)?;
-                write!(&mut xml, r#"<w:szCs w:val="{}"/>"#, size)?;
+                write!(&mut xml, r#"<w:sz w:val="{size}"/>"#)?;
+                write!(&mut xml, r#"<w:szCs w:val="{size}"/>"#)?;
             }
 
             if let Some(ref color) = self.color {
@@ -443,6 +458,7 @@ impl MutableStyle {
     /// Factory methods for common built-in styles
     ///
     /// Create a "Normal" paragraph style (base style).
+    #[must_use]
     pub fn normal() -> Self {
         let mut style = Self::new("Normal", "Normal", Type::Paragraph);
         style.set_default(true);
@@ -453,6 +469,7 @@ impl MutableStyle {
     }
 
     /// Create a "Heading 1" style.
+    #[must_use]
     pub fn heading_1() -> Self {
         let mut style = Self::new("Heading1", "Heading 1", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
@@ -469,6 +486,7 @@ impl MutableStyle {
     }
 
     /// Create a "Heading 2" style.
+    #[must_use]
     pub fn heading_2() -> Self {
         let mut style = Self::new("Heading2", "Heading 2", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
@@ -485,6 +503,7 @@ impl MutableStyle {
     }
 
     /// Create a "Heading 3" style.
+    #[must_use]
     pub fn heading_3() -> Self {
         let mut style = Self::new("Heading3", "Heading 3", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
@@ -501,6 +520,7 @@ impl MutableStyle {
     }
 
     /// Create a "Heading 4" style.
+    #[must_use]
     pub fn heading_4() -> Self {
         let mut style = Self::new("Heading4", "Heading 4", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
@@ -518,6 +538,7 @@ impl MutableStyle {
     }
 
     /// Create a "Heading 5" style.
+    #[must_use]
     pub fn heading_5() -> Self {
         let mut style = Self::new("Heading5", "Heading 5", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
@@ -534,6 +555,7 @@ impl MutableStyle {
     }
 
     /// Create a "Heading 6" style.
+    #[must_use]
     pub fn heading_6() -> Self {
         let mut style = Self::new("Heading6", "Heading 6", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
@@ -551,6 +573,7 @@ impl MutableStyle {
     }
 
     /// Create a "Heading 7" style.
+    #[must_use]
     pub fn heading_7() -> Self {
         let mut style = Self::new("Heading7", "Heading 7", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
@@ -568,6 +591,7 @@ impl MutableStyle {
     }
 
     /// Create a "Heading 8" style.
+    #[must_use]
     pub fn heading_8() -> Self {
         let mut style = Self::new("Heading8", "Heading 8", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
@@ -584,6 +608,7 @@ impl MutableStyle {
     }
 
     /// Create a "Heading 9" style.
+    #[must_use]
     pub fn heading_9() -> Self {
         let mut style = Self::new("Heading9", "Heading 9", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
@@ -601,6 +626,7 @@ impl MutableStyle {
     }
 
     /// Create a "Title" style.
+    #[must_use]
     pub fn title() -> Self {
         let mut style = Self::new("Title", "Title", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
@@ -614,6 +640,7 @@ impl MutableStyle {
     }
 
     /// Create a default character style.
+    #[must_use]
     pub fn default_paragraph_font() -> Self {
         let mut style = Self::new(
             "DefaultParagraphFont",
@@ -627,6 +654,7 @@ impl MutableStyle {
     }
 
     /// Create a TOC heading style (for "Table of Contents" title).
+    #[must_use]
     pub fn toc_heading() -> Self {
         let mut style = Self::new("TOCHeading", "TOC Heading", Type::Paragraph);
         style.set_based_on(Some("Heading1".to_string()));
@@ -636,6 +664,7 @@ impl MutableStyle {
     }
 
     /// Create a TOC level 1 style.
+    #[must_use]
     pub fn toc1() -> Self {
         let mut style = Self::new("TOC1", "toc 1", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
@@ -646,6 +675,7 @@ impl MutableStyle {
     }
 
     /// Create a TOC level 2 style.
+    #[must_use]
     pub fn toc2() -> Self {
         let mut style = Self::new("TOC2", "toc 2", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
@@ -657,6 +687,7 @@ impl MutableStyle {
     }
 
     /// Create a TOC level 3 style.
+    #[must_use]
     pub fn toc3() -> Self {
         let mut style = Self::new("TOC3", "toc 3", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
@@ -668,6 +699,7 @@ impl MutableStyle {
     }
 
     /// Create a hyperlink character style.
+    #[must_use]
     pub fn hyperlink() -> Self {
         let mut style = Self::new("Hyperlink", "Hyperlink", Type::Character);
         style.set_based_on(Some("DefaultParagraphFont".to_string()));
@@ -679,6 +711,7 @@ impl MutableStyle {
     }
 
     /// Create a header paragraph style.
+    #[must_use]
     pub fn header() -> Self {
         let mut style = Self::new("Header", "header", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
@@ -688,6 +721,7 @@ impl MutableStyle {
     }
 
     /// Create a footer paragraph style.
+    #[must_use]
     pub fn footer() -> Self {
         let mut style = Self::new("Footer", "footer", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
@@ -697,6 +731,7 @@ impl MutableStyle {
     }
 
     /// Create a footnote text paragraph style.
+    #[must_use]
     pub fn footnote_text() -> Self {
         let mut style = Self::new("FootnoteText", "footnote text", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
@@ -707,6 +742,7 @@ impl MutableStyle {
     }
 
     /// Create an endnote text paragraph style.
+    #[must_use]
     pub fn endnote_text() -> Self {
         let mut style = Self::new("EndnoteText", "endnote text", Type::Paragraph);
         style.set_based_on(Some("Normal".to_string()));
@@ -726,6 +762,10 @@ impl MutableStyle {
 /// # Returns
 ///
 /// XML string representing the complete styles.xml content
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn generate_styles_xml(styles: &[MutableStyle]) -> Result<String> {
     let mut xml = String::with_capacity(4096);
 

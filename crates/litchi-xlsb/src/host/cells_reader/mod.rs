@@ -12,5 +12,8 @@ mod validation;
 mod tests;
 
 pub(crate) use model::CellsReader;
-#[allow(unused_imports)]
+#[allow(
+    unused_imports,
+    reason = "module re-exports preserve stable wire and semantic API paths"
+)]
 pub(crate) use model::Dimensions;

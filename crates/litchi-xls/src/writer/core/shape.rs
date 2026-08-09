@@ -1,6 +1,6 @@
 use crate::{Error, Result};
 
-/// Safe, inert OfficeArt primitive supported by the BIFF8 writer.
+/// Safe, inert `OfficeArt` primitive supported by the BIFF8 writer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShapeKind {
     Rectangle,
@@ -40,6 +40,7 @@ pub struct ShapeColor {
 }
 
 impl ShapeColor {
+    #[must_use]
     pub const fn rgb(red: u8, green: u8, blue: u8) -> Self {
         Self { red, green, blue }
     }
@@ -100,15 +101,21 @@ pub struct Point {
 
 impl Point {
     /// Create a point at a cell boundary, rejecting locations outside the BIFF8 grid.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(row: u32, column: u16) -> Result<Self> {
-        let row = u16::try_from(row)
-            .map_err(|_| Error::InvalidData("shape anchor row must be <= 65535".to_string()))?;
-        let column = u8::try_from(column)
-            .map_err(|_| Error::InvalidData("shape anchor column must be <= 255".to_string()))?;
+        let row = u16::try_from(row).map_err(|_error| {
+            Error::InvalidData("shape anchor row must be <= 65535".to_string())
+        })?;
+        let column = u8::try_from(column).map_err(|_error| {
+            Error::InvalidData("shape anchor column must be <= 255".to_string())
+        })?;
         Ok(Self::cell(row, column))
     }
 
     /// Create a zero-offset point from already narrow BIFF8 coordinates.
+    #[must_use]
     pub const fn cell(row: u16, column: u8) -> Self {
         Self {
             row,
@@ -119,8 +126,11 @@ impl Point {
     }
 
     /// Set the row and column fractions, moving the checked point on success.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn offset(mut self, row: u16, column: u16) -> Result<Self> {
-        let row = u8::try_from(row).map_err(|_| {
+        let row = u8::try_from(row).map_err(|_error| {
             Error::InvalidData("shape anchor row offset must be <= 255".to_string())
         })?;
         if column > 1023 {
@@ -134,21 +144,25 @@ impl Point {
     }
 
     /// Return the zero-based row.
+    #[must_use]
     pub const fn row(self) -> u16 {
         self.row
     }
 
     /// Return the zero-based column.
+    #[must_use]
     pub const fn column(self) -> u8 {
         self.column
     }
 
     /// Return the offset in 256ths of the row height.
+    #[must_use]
     pub const fn row_offset(self) -> u8 {
         self.row_offset
     }
 
     /// Return the offset in 1024ths of the column width.
+    #[must_use]
     pub const fn column_offset(self) -> u16 {
         self.column_offset
     }
@@ -164,6 +178,9 @@ pub struct Anchor {
 
 impl Anchor {
     /// Create an anchor whose horizontal and vertical endpoints are strictly ordered.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(first: Point, last: Point, behavior: Behavior) -> Result<Self> {
         let horizontal_order =
             (first.column, first.column_offset) < (last.column, last.column_offset);
@@ -181,6 +198,9 @@ impl Anchor {
     }
 
     /// Create a zero-offset anchor directly from wide worksheet coordinates.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn cells(
         first_row: u32,
         first_column: u16,
@@ -196,16 +216,19 @@ impl Anchor {
     }
 
     /// Return the cell-change behavior.
+    #[must_use]
     pub const fn behavior(self) -> Behavior {
         self.behavior
     }
 
     /// Return the top-left point.
+    #[must_use]
     pub const fn first(self) -> Point {
         self.first
     }
 
     /// Return the bottom-right point.
+    #[must_use]
     pub const fn last(self) -> Point {
         self.last
     }
@@ -253,6 +276,9 @@ impl Rect {
     };
 
     /// Create a rectangle with strictly increasing axes.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(left: i32, top: i32, right: i32, bottom: i32) -> Result<Self> {
         if left >= right || top >= bottom {
             return Err(Error::InvalidData(
@@ -268,21 +294,25 @@ impl Rect {
     }
 
     /// Return the left coordinate.
+    #[must_use]
     pub const fn left(self) -> i32 {
         self.left
     }
 
     /// Return the top coordinate.
+    #[must_use]
     pub const fn top(self) -> i32 {
         self.top
     }
 
     /// Return the right coordinate.
+    #[must_use]
     pub const fn right(self) -> i32 {
         self.right
     }
 
     /// Return the bottom coordinate.
+    #[must_use]
     pub const fn bottom(self) -> i32 {
         self.bottom
     }
@@ -321,7 +351,7 @@ impl ShapeText {
         let mut units = Vec::new();
         units
             .try_reserve_exact(self.value.len())
-            .map_err(|_| Error::Allocation("reserving shape text validation storage"))?;
+            .map_err(|_error| Error::Allocation("reserving shape text validation storage"))?;
         units.extend(self.value.encode_utf16());
         if units.len() > usize::from(u16::MAX) {
             return Err(Error::InvalidData(
@@ -387,6 +417,7 @@ pub struct ShapeWrite {
 }
 
 impl ShapeWrite {
+    #[must_use]
     pub fn new(kind: ShapeKind, anchor: Anchor) -> Self {
         Self {
             kind,

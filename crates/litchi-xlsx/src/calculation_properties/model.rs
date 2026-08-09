@@ -60,6 +60,7 @@ pub struct Properties {
 
 impl Properties {
     /// Creates calculation properties with no explicitly authored values.
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             calculation_id: None,
@@ -79,16 +80,19 @@ impl Properties {
     }
 
     /// Starts a builder which records explicitly authored values.
+    #[must_use]
     pub const fn builder() -> Builder {
         Builder::new()
     }
 
     /// Returns the exact authored-value view, before effective defaults are applied.
+    #[must_use]
     pub const fn specified(&self) -> Specified<'_> {
         Specified { properties: self }
     }
 
     /// Returns whether the same values were authored, including attribute presence.
+    #[must_use]
     pub fn same_specification(&self, other: &Self) -> bool {
         self.calculation_id == other.calculation_id
             && self.calculation_mode == other.calculation_mode
@@ -106,55 +110,68 @@ impl Properties {
     }
 
     /// Calculation-engine identifier. Excel's effective default is zero.
+    #[must_use]
     pub fn calculation_id(&self) -> u32 {
         self.calculation_id.unwrap_or(0)
     }
 
+    #[must_use]
     pub fn calculation_mode(&self) -> Mode {
         self.calculation_mode.unwrap_or_default()
     }
 
+    #[must_use]
     pub fn full_calculation_on_load(&self) -> bool {
         self.full_calculation_on_load.unwrap_or(false)
     }
 
+    #[must_use]
     pub fn reference_mode(&self) -> ReferenceMode {
         self.reference_mode.unwrap_or_default()
     }
 
+    #[must_use]
     pub fn iterative_calculation(&self) -> bool {
         self.iterative_calculation.unwrap_or(false)
     }
 
+    #[must_use]
     pub fn iteration_count(&self) -> u32 {
         self.iteration_count.unwrap_or(100)
     }
 
+    #[must_use]
     pub fn iteration_delta(&self) -> f64 {
         self.iteration_delta.unwrap_or(0.001)
     }
 
+    #[must_use]
     pub fn full_precision(&self) -> bool {
         self.full_precision.unwrap_or(true)
     }
 
+    #[must_use]
     pub fn calculation_completed(&self) -> bool {
         self.calculation_completed.unwrap_or(true)
     }
 
+    #[must_use]
     pub fn calculate_on_save(&self) -> bool {
         self.calculate_on_save.unwrap_or(true)
     }
 
+    #[must_use]
     pub fn concurrent_calculation(&self) -> bool {
         self.concurrent_calculation.unwrap_or(true)
     }
 
+    #[must_use]
     pub fn concurrent_manual_count(&self) -> Option<u32> {
         self.concurrent_manual_count
     }
 
     /// Whether Excel should perform a full calculation on the next calculation cycle.
+    #[must_use]
     pub fn force_full_calculation(&self) -> bool {
         self.force_full_calculation.unwrap_or(false)
     }
@@ -213,31 +230,37 @@ impl Properties {
         self.force_full_calculation = value;
     }
 
+    #[must_use]
     pub fn with_calculation_id(mut self, value: Option<u32>) -> Self {
         self.set_calculation_id(value);
         self
     }
 
+    #[must_use]
     pub fn with_calculation_mode(mut self, value: Option<Mode>) -> Self {
         self.set_calculation_mode(value);
         self
     }
 
+    #[must_use]
     pub fn with_full_calculation_on_load(mut self, value: Option<bool>) -> Self {
         self.set_full_calculation_on_load(value);
         self
     }
 
+    #[must_use]
     pub fn with_reference_mode(mut self, value: Option<ReferenceMode>) -> Self {
         self.set_reference_mode(value);
         self
     }
 
+    #[must_use]
     pub fn with_iterative_calculation(mut self, value: Option<bool>) -> Self {
         self.set_iterative_calculation(value);
         self
     }
 
+    #[must_use]
     pub fn with_iteration_count(mut self, value: Option<u32>) -> Self {
         self.set_iteration_count(value);
         self
@@ -248,31 +271,37 @@ impl Properties {
         Ok(self)
     }
 
+    #[must_use]
     pub fn with_full_precision(mut self, value: Option<bool>) -> Self {
         self.set_full_precision(value);
         self
     }
 
+    #[must_use]
     pub fn with_calculation_completed(mut self, value: Option<bool>) -> Self {
         self.set_calculation_completed(value);
         self
     }
 
+    #[must_use]
     pub fn with_calculate_on_save(mut self, value: Option<bool>) -> Self {
         self.set_calculate_on_save(value);
         self
     }
 
+    #[must_use]
     pub fn with_concurrent_calculation(mut self, value: Option<bool>) -> Self {
         self.set_concurrent_calculation(value);
         self
     }
 
+    #[must_use]
     pub fn with_concurrent_manual_count(mut self, value: Option<u32>) -> Self {
         self.set_concurrent_manual_count(value);
         self
     }
 
+    #[must_use]
     pub fn with_force_full_calculation(mut self, value: Option<bool>) -> Self {
         self.set_force_full_calculation(value);
         self
@@ -345,6 +374,7 @@ macro_rules! builder_methods {
 }
 
 impl Builder {
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             properties: Properties::new(),
@@ -356,6 +386,7 @@ impl Builder {
         Ok(self)
     }
 
+    #[must_use]
     pub fn build(self) -> Properties {
         self.properties
     }

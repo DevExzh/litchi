@@ -6,7 +6,7 @@ use super::{
     query::Query,
     table::{
         Column, ColumnSchema, DataType, Index, IndexColumn, Key, KeyColumn, KeyKind,
-        ReferentialAction, Table, TableKind,
+        ReferentialAction, Relation, Table, TableKind,
     },
 };
 use litchi_core::{Error, Result};
@@ -172,6 +172,12 @@ impl<'source> Catalog<'source> {
         self.owned.components()
     }
 
+    /// Returns foreign-key relations in table/key source order.
+    #[must_use]
+    pub fn relations(&self) -> &[Relation] {
+        self.owned.relations()
+    }
+
     /// Returns the inert connection declaration, if the data source has one.
     #[must_use]
     pub const fn connection(&self) -> Option<&Connection> {
@@ -211,6 +217,7 @@ pub struct OwnedCatalog {
     tables: Vec<Table>,
     queries: Vec<Query>,
     components: Vec<Component>,
+    relations: Vec<Relation>,
     connection: Option<Connection>,
 }
 
@@ -231,6 +238,12 @@ impl OwnedCatalog {
     #[must_use]
     pub fn components(&self) -> &[Component] {
         &self.components
+    }
+
+    /// Returns foreign-key relations in table/key source order.
+    #[must_use]
+    pub fn relations(&self) -> &[Relation] {
+        &self.relations
     }
 
     /// Returns the inert connection declaration, if the data source has one.
@@ -411,7 +424,39 @@ fn parse(source: &str, limits: Limits) -> Result<OwnedCatalog> {
             "ODB semantic catalog has no valid office:database body",
         ));
     }
+    catalog.relations = collect_relations(&catalog.tables)?;
     Ok(catalog)
+}
+
+fn collect_relations(tables: &[Table]) -> Result<Vec<Relation>> {
+    let count = tables
+        .iter()
+        .map(|table| {
+            table
+                .keys()
+                .iter()
+                .filter(|key| key.kind() == KeyKind::Foreign && key.referenced_table().is_some())
+                .count()
+        })
+        .try_fold(0usize, usize::checked_add)
+        .ok_or_else(|| invalid("ODB relation count overflow"))?;
+    let mut relations = Vec::new();
+    relations
+        .try_reserve_exact(count)
+        .map_err(|source| Error::Allocation {
+            resource: "ODB relation catalog",
+            source,
+        })?;
+    for table in tables {
+        for key in table.keys() {
+            if key.kind() == KeyKind::Foreign
+                && let Some(relation) = Relation::from_key(table.name(), key)
+            {
+                relations.push(relation);
+            }
+        }
+    }
+    Ok(relations)
 }
 
 #[allow(

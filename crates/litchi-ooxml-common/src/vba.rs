@@ -182,13 +182,13 @@ fn store_project_graph_in_place(
     }
 
     let project_name =
-        PackURI::new(host.project_part()).map_err(|error| Error::Uri(error.to_string()))?;
+        PackURI::new(host.project_part()).map_err(|error| Error::Uri(error.clone()))?;
     let mut project = BlobPart::new(project_name, ct::OFC_VBA_PROJECT.to_string(), Vec::new());
     project.set_blob_shared(project_payload);
     if let Some(xml) = word_supplemental_xml {
         project.relate_to(WORD_SUPPLEMENTAL_TARGET, rt::WORD_VBA_DATA);
         let supplemental_name =
-            PackURI::new(WORD_SUPPLEMENTAL_PART).map_err(|error| Error::Uri(error.to_string()))?;
+            PackURI::new(WORD_SUPPLEMENTAL_PART).map_err(|error| Error::Uri(error.clone()))?;
         package.try_add_part(Box::new(BlobPart::new(
             supplemental_name,
             ct::WML_VBA_DATA.to_string(),
@@ -350,14 +350,14 @@ fn ensure_replacement_targets_available(
     existing: Option<&ExistingGraph>,
 ) -> Result<()> {
     let canonical_project =
-        PackURI::new(host.project_part()).map_err(|error| Error::Uri(error.to_string()))?;
+        PackURI::new(host.project_part()).map_err(|error| Error::Uri(error.clone()))?;
     if existing.is_none_or(|graph| graph.project_part != canonical_project) {
         package.validate_new_part_name(&canonical_project)?;
         ensure_no_inbound_reference(package, &canonical_project)?;
     }
     if host == Host::Word {
         let canonical_supplemental =
-            PackURI::new(WORD_SUPPLEMENTAL_PART).map_err(|error| Error::Uri(error.to_string()))?;
+            PackURI::new(WORD_SUPPLEMENTAL_PART).map_err(|error| Error::Uri(error.clone()))?;
         if existing
             .and_then(|graph| graph.supplemental.as_ref())
             .map(|(part, _)| part)

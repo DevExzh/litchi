@@ -1,4 +1,4 @@
-//! Layered SpreadsheetML table ownership.
+//! Layered `SpreadsheetML` table ownership.
 //!
 //! Typed table models and semantic validation live in `model`, bounded XML
 //! conversion in `codec`, package serialization in `package`, and focused

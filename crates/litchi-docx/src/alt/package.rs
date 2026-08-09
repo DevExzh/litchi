@@ -31,24 +31,28 @@ impl<'a> Part<'a> {
 
     /// OPC part name.
     #[inline]
+    #[must_use]
     pub fn name(&self) -> &PackURI {
         self.part.partname()
     }
 
     /// Preserved OPC media type.
     #[inline]
+    #[must_use]
     pub fn media_type(&self) -> &str {
         self.part.content_type()
     }
 
     /// Classified media family.
     #[inline]
+    #[must_use]
     pub const fn kind(&self) -> Kind {
         self.kind
     }
 
     /// Return the raw OPC part bytes without interpreting them.
     #[inline]
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         self.part.blob()
     }

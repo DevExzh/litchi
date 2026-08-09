@@ -81,7 +81,7 @@ impl Commit {
     }
 }
 
-/// Transactional DOC editor for the WordDocument and selected table stream.
+/// Transactional DOC editor for the `WordDocument` and selected table stream.
 #[derive(Debug, Clone)]
 pub struct Editor {
     package: ObjectEditor,
@@ -119,8 +119,7 @@ impl Editor {
         let table = package
             .stream(&table_path)
             .ok_or_else(|| PackageError::StreamNotFound(table_name.to_owned()))?;
-        let route_slip = TransactionSnapshot::from_option(codec::parse(&fib, table)?)
-            .map_err(PackageError::from)?;
+        let route_slip = TransactionSnapshot::from_option(codec::parse(&fib, table)?)?;
         Ok(Self {
             package,
             table_name: table_name.to_owned(),

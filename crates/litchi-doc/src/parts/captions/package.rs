@@ -1,4 +1,4 @@
-//! DOC/OLE package ownership for caption and AutoCaption metadata.
+//! DOC/OLE package ownership for caption and `AutoCaption` metadata.
 
 use super::codec::{AUTO_CAPTION_FIB_INDEX, CAPTION_FIB_INDEX};
 use super::semantic::Tables;

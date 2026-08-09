@@ -104,6 +104,9 @@ pub struct FullColorExt {
 
 impl FullColorExt {
     /// A color; `Automatic` and `NotSet` colors must carry a zero value.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(color_type: FullColorType, tint: i16, value: u32) -> Result<Self> {
         if matches!(color_type, FullColorType::Automatic | FullColorType::NotSet) && value != 0 {
             return Err(invalid(
@@ -118,12 +121,15 @@ impl FullColorExt {
         })
     }
 
+    #[must_use]
     pub const fn color_type(&self) -> FullColorType {
         self.color_type
     }
+    #[must_use]
     pub const fn tint(&self) -> i16 {
         self.tint
     }
+    #[must_use]
     pub const fn value(&self) -> u32 {
         self.value
     }
@@ -307,7 +313,9 @@ impl ExtProp {
                     return Err(invalid("XFExtGradient stop count exceeds 256"));
                 }
                 gradient.write_to(&mut data);
-                data.extend_from_slice(&(stops.len() as u32).to_le_bytes());
+                data.extend_from_slice(
+                    &crate::utils::truncate_usize_to_u32(stops.len()).to_le_bytes(),
+                );
                 for stop in stops {
                     stop.write_to(&mut data);
                 }
@@ -344,6 +352,9 @@ pub struct XfExt {
 
 impl XfExt {
     /// Extensions for the `XF` record at `xf_index` (at most 4050).
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(xf_index: u16, properties: Vec<ExtProp>) -> Result<Self> {
         if xf_index > MAX_XF_INDEX {
             return Err(invalid(format!("XFExt index {xf_index} exceeds 4050")));
@@ -358,11 +369,13 @@ impl XfExt {
     }
 
     /// Index of the `XF` record these properties extend.
+    #[must_use]
     pub const fn xf_index(&self) -> u16 {
         self.xf_index
     }
 
     /// The formatting property extensions, in record order.
+    #[must_use]
     pub fn properties(&self) -> &[ExtProp] {
         &self.properties
     }
@@ -428,11 +441,13 @@ impl XfExt {
         payload.extend_from_slice(&[0; 2]); // reserved1
         payload.extend_from_slice(&self.xf_index.to_le_bytes());
         payload.extend_from_slice(&[0; 2]); // reserved2
-        payload.extend_from_slice(&(self.properties.len() as u16).to_le_bytes());
+        payload.extend_from_slice(
+            &crate::utils::truncate_usize_to_u16(self.properties.len()).to_le_bytes(),
+        );
         for property in &self.properties {
             let blob = property.data_bytes()?;
-            let size =
-                u16::try_from(4 + blob.len()).map_err(|_| invalid("ExtProp size exceeds u16"))?;
+            let size = u16::try_from(4 + blob.len())
+                .map_err(|_error| invalid("ExtProp size exceeds u16"))?;
             payload.extend_from_slice(&property.ext_type().to_le_bytes());
             payload.extend_from_slice(&size.to_le_bytes());
             payload.extend_from_slice(&blob);

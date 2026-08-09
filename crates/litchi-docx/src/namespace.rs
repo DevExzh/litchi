@@ -1,3 +1,27 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::needless_pass_by_value,
+    reason = "the public API shape is retained for compatibility"
+)]
+#![expect(
+    clippy::option_option,
+    reason = "nested options distinguish omitted, present-empty, and present-valued XML"
+)]
+#![expect(
+    clippy::ref_option,
+    reason = "the public API shape is retained for compatibility"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
 use crate::error::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -73,7 +97,7 @@ fn is_fragment_word_namespace(
     }
 }
 
-/// Maximum capture nesting depth accepted by the shared WordprocessingML
+/// Maximum capture nesting depth accepted by the shared `WordprocessingML`
 /// element scanner, matching the hardened settings and mail-merge parsers.
 const MAX_SCAN_DEPTH: usize = 128;
 /// Maximum number of elements scanned in one document part.
@@ -100,8 +124,9 @@ pub(crate) fn scan_word_element_ranges(
     let mut total_depth = 0usize;
 
     loop {
-        let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::InvalidFormat("Word XML offset does not fit usize".to_string()))?;
+        let event_start = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+            Error::InvalidFormat("Word XML offset does not fit usize".to_string())
+        })?;
         let event = {
             let (namespace, event) = reader
                 .read_resolved_event()
@@ -169,11 +194,21 @@ pub(crate) fn scan_word_element_ranges(
                 },
                 Event::End(_) if capture.is_some() => ScanEvent::End,
                 Event::Eof => ScanEvent::Eof,
-                _ => ScanEvent::Other,
+                Event::Start(_)
+                | Event::End(_)
+                | Event::Empty(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => ScanEvent::Other,
             }
         };
-        let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::InvalidFormat("Word XML offset does not fit usize".to_string()))?;
+        let event_end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+            Error::InvalidFormat("Word XML offset does not fit usize".to_string())
+        })?;
 
         match event {
             ScanEvent::Start(target) => capture = Some((target, event_start, 1)),
@@ -350,7 +385,13 @@ pub(crate) fn direct_word_property_value(
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 
@@ -428,9 +469,11 @@ fn emit_word_element_range(
     let length = end
         .checked_sub(start)
         .ok_or_else(|| Error::InvalidFormat("invalid Word element byte range".to_string()))?;
-    let start = u32::try_from(start)
-        .map_err(|_| Error::InvalidFormat("Word element offset exceeds u32".to_string()))?;
-    let length = u32::try_from(length)
-        .map_err(|_| Error::InvalidFormat("Word element length exceeds u32".to_string()))?;
+    let start = u32::try_from(start).map_err(|_source_error| {
+        Error::InvalidFormat("Word element offset exceeds u32".to_string())
+    })?;
+    let length = u32::try_from(length).map_err(|_source_error| {
+        Error::InvalidFormat("Word element length exceeds u32".to_string())
+    })?;
     emit(target, start, length)
 }

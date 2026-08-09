@@ -1,3 +1,11 @@
+#![expect(
+    clippy::needless_pass_by_value,
+    reason = "the public API shape is retained for compatibility"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Run text, break, font, and aggregate-property facade.
 
 use crate::UnderlineStyle;
@@ -24,18 +32,26 @@ impl Run {
     /// Extracts text from `<w:t>` elements and converts special characters:
     /// - `<w:tab/>` → tab character
     /// - `<w:br/>` → newline character
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn text(&self) -> Result<String> {
         extract_word_text(self.xml_bytes())
     }
 
     /// Parse all explicit break elements in this run, preserving type and clear behavior.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn breaks(&self) -> Result<SmallVec<[RunBreak; 2]>> {
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
         let mut breaks = SmallVec::new();
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.local_name().as_ref() == b"br" => {
+                Ok(Event::Start(e) | Event::Empty(e)) if e.local_name().as_ref() == b"br" => {
                     let mut run_break = RunBreak::default();
                     for attribute in e.attributes() {
                         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
@@ -85,13 +101,17 @@ impl Run {
     ///
     /// `<w:lastRenderedPageBreak>` is not an authored break; it records where Word last
     /// paginated content, so it is intentionally exposed separately from [`Self::breaks`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn last_rendered_page_break_count(&self) -> Result<usize> {
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
         let mut count = 0usize;
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e))
+                Ok(Event::Start(e) | Event::Empty(e))
                     if e.local_name().as_ref() == b"lastRenderedPageBreak" =>
                 {
                     count = count.checked_add(1).ok_or_else(|| {
@@ -113,6 +133,10 @@ impl Run {
     /// Returns `Some(true)` if bold is explicitly enabled,
     /// `Some(false)` if explicitly disabled,
     /// `None` if not specified (inherits from style).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn bold(&self) -> Result<Option<bool>> {
         self.get_bool_property(b"b")
     }
@@ -122,6 +146,10 @@ impl Run {
     /// Returns `Some(true)` if italic is explicitly enabled,
     /// `Some(false)` if explicitly disabled,
     /// `None` if not specified (inherits from style).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn italic(&self) -> Result<Option<bool>> {
         self.get_bool_property(b"i")
     }
@@ -130,6 +158,10 @@ impl Run {
     ///
     /// Returns `Some(false)` for an explicit `w:val="none"` and `None` when the
     /// run has no direct underline property and therefore inherits from styles.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn underline(&self) -> Result<Option<bool>> {
         Ok(self
             .underline_style()?
@@ -138,6 +170,10 @@ impl Run {
 
     /// Return the direct underline pattern, including an explicit
     /// [`UnderlineStyle::None`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn underline_style(&self) -> Result<Option<UnderlineStyle>> {
         Ok(self
             .underline_formatting()?
@@ -149,6 +185,10 @@ impl Run {
     /// This preserves all `CT_Underline` fields without resolving style or
     /// theme inheritance. A present `<w:u/>` is interpreted as a single
     /// underline for compatibility with documents emitted by Word processors.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn underline_formatting(&self) -> Result<Option<RunUnderline>> {
         parse_run_underline(self.xml_bytes())
     }
@@ -158,22 +198,38 @@ impl Run {
     /// The result is a detached semantic snapshot. Unsupported direct
     /// extension children remain bounded and ordered as
     /// [`crate::run_effects::OpaqueExtension`] values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn effects(&self) -> Result<Effects> {
         Effects::parse(self.xml_bytes())
     }
 
     /// Read the typed Word 2010 OpenType features attached directly to this run.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn open_type(&self) -> Result<OpenType> {
         OpenType::parse(self.xml_bytes())
     }
 
     /// Capture a source-preserving OpenType snapshot for an isolated edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn open_type_snapshot(&self) -> Result<OpenTypeSnapshot> {
         OpenTypeSnapshot::from_xml(self.xml_bytes().to_vec())
     }
 
     /// Replace the modeled OpenType features while preserving every other run
     /// child and unknown extension byte.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_open_type(&mut self, value: OpenType) -> Result<&mut Self> {
         let rewritten = crate::font::open_type::rewrite(self.xml_bytes(), &value)?;
         if rewritten.as_slice() != self.xml_bytes() {
@@ -186,6 +242,10 @@ impl Run {
     ///
     /// Returns `Some(true)` if strikethrough is present,
     /// `None` if not specified.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn strikethrough(&self) -> Result<Option<bool>> {
         self.get_bool_property(b"strike")
     }
@@ -193,7 +253,7 @@ impl Run {
     /// Get text and properties in a single XML parse.
     ///
     /// This is **the fastest way** to extract both text content and formatting properties
-    /// from a run, as it parses the XML only once instead of twice (text() + get_properties()).
+    /// from a run, as it parses the XML only once instead of twice (`text()` + `get_properties()`).
     ///
     /// # Performance
     ///
@@ -202,7 +262,7 @@ impl Run {
     ///
     /// # Returns
     ///
-    /// A tuple of (text_content, properties)
+    /// A tuple of (`text_content`, properties)
     ///
     /// # Example
     ///
@@ -213,6 +273,10 @@ impl Run {
     ///     write_bold(&text);
     /// }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn get_text_and_properties(&self) -> Result<(String, RunProperties)> {
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(false);
@@ -296,7 +360,7 @@ impl Run {
     /// Get all formatting properties in a single pass.
     ///
     /// This is **significantly faster** than calling individual property methods
-    /// (bold(), italic(), strikethrough(), vertical_position()) because it parses
+    /// (`bold()`, `italic()`, `strikethrough()`, `vertical_position()`) because it parses
     /// the XML only once instead of multiple times.
     ///
     /// # Performance
@@ -318,6 +382,10 @@ impl Run {
     ///     // Handle bold text
     /// }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn get_properties(&self) -> Result<RunProperties> {
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
@@ -356,6 +424,10 @@ impl Run {
     /// Get the vertical position of this run (superscript/subscript).
     ///
     /// Returns the vertical positioning if specified, None if normal.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn vertical_position(&self) -> Result<Option<VerticalPosition>> {
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
@@ -364,7 +436,7 @@ impl Run {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+                Ok(Event::Start(e) | Event::Empty(e)) => {
                     let name = e.local_name();
                     if name.as_ref() == b"rPr" {
                         in_r_pr = true;
@@ -398,6 +470,10 @@ impl Run {
     /// Get the font name for this run.
     ///
     /// Returns the typeface name if specified, None if inherited.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn font_name(&self) -> Result<Option<String>> {
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
@@ -406,7 +482,7 @@ impl Run {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+                Ok(Event::Start(e) | Event::Empty(e)) => {
                     let name = e.local_name();
                     if name.as_ref() == b"rPr" {
                         in_r_pr = true;
@@ -440,6 +516,10 @@ impl Run {
     ///
     /// Returns the size if specified, None if inherited.
     /// Note: Word stores font size in half-points (e.g., 24 = 12pt).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn font_size(&self) -> Result<Option<u32>> {
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
@@ -448,7 +528,7 @@ impl Run {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+                Ok(Event::Start(e) | Event::Empty(e)) => {
                     let name = e.local_name();
                     if name.as_ref() == b"rPr" {
                         in_r_pr = true;
@@ -481,6 +561,10 @@ impl Run {
     /// None otherwise. This method looks for `<m:oMath>` elements embedded in the run.
     ///
     /// The returned string preserves the exact source XML for the first formula in the run.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn omml_formula(&self) -> Result<Option<String>> {
         Ok(extract_omml_formulas(self.xml_bytes())?.into_iter().next())
     }
@@ -496,7 +580,7 @@ impl Run {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+                Ok(Event::Start(e) | Event::Empty(e)) => {
                     let name = e.local_name();
                     if name.as_ref() == b"rPr" {
                         in_r_pr = true;

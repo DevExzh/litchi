@@ -1,6 +1,10 @@
 //! Image package authoring.
 
-use crate::{frame::Frame, source::Source};
+use crate::{
+    frame::Frame,
+    map::{Area, AreaKind, ImageMap},
+    source::Source,
+};
 use litchi_core::{Error, Result};
 use litchi_odf_common::{compact_xml, core::PackageWriter};
 
@@ -17,6 +21,8 @@ struct Resource {
 #[derive(Clone, Debug)]
 pub struct Builder {
     content_xml: String,
+    styles_xml: Option<String>,
+    meta_xml: Option<String>,
     resources: Vec<Resource>,
 }
 
@@ -26,6 +32,8 @@ impl Builder {
     pub fn new() -> Self {
         Self {
             content_xml: empty_content().to_owned(),
+            styles_xml: None,
+            meta_xml: None,
             resources: Vec::new(),
         }
     }
@@ -45,6 +53,20 @@ impl Builder {
     #[must_use]
     pub fn frame(mut self, frame: &Frame) -> Self {
         self.content_xml = frame_content(frame);
+        self
+    }
+
+    /// Adds an exact compact `styles.xml` part.
+    #[must_use]
+    pub fn styles_xml(mut self, xml: impl Into<String>) -> Self {
+        self.styles_xml = Some(xml.into());
+        self
+    }
+
+    /// Adds an exact compact `meta.xml` part.
+    #[must_use]
+    pub fn meta_xml(mut self, xml: impl Into<String>) -> Self {
+        self.meta_xml = Some(xml.into());
         self
     }
 
@@ -81,9 +103,18 @@ impl Builder {
         }
         compact_xml::validate(self.content_xml.as_bytes())?;
         crate::codec::validate(&self.content_xml)?;
+        for xml in [&self.styles_xml, &self.meta_xml].into_iter().flatten() {
+            compact_xml::validate(xml.as_bytes())?;
+        }
         let mut writer = PackageWriter::new_bounded(256 * 1024 * 1024);
         writer.set_mimetype(crate::package::MIMETYPE)?;
         writer.add_file("content.xml", self.content_xml.as_bytes())?;
+        if let Some(styles_xml) = self.styles_xml {
+            writer.add_file("styles.xml", styles_xml.as_bytes())?;
+        }
+        if let Some(meta_xml) = self.meta_xml {
+            writer.add_file("meta.xml", meta_xml.as_bytes())?;
+        }
         for resource in self.resources {
             writer.add_file_with_media_type(
                 &resource.path,
@@ -108,22 +139,32 @@ fn empty_content() -> &'static str {
 
 fn frame_content(frame: &Frame) -> String {
     let mut xml = String::from(
-        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" office:version="1.4"><office:body><office:image><draw:frame"#,
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.4"><office:body><office:image><draw:frame"#,
     );
     if let Some(name) = frame.name() {
         push_attribute(&mut xml, "draw:name", name);
     }
+    for (name, value) in [
+        ("draw:style-name", frame.style_name()),
+        ("draw:text-style-name", frame.text_style_name()),
+        ("draw:layer", frame.layer()),
+        ("draw:transform", frame.transform()),
+        ("text:anchor-type", frame.anchor_type()),
+        ("svg:x", frame.x()),
+        ("svg:y", frame.y()),
+        ("svg:width", frame.width()),
+        ("svg:height", frame.height()),
+        ("style:rel-width", frame.relative_width()),
+        ("style:rel-height", frame.relative_height()),
+    ] {
+        if let Some(value) = value {
+            push_attribute(&mut xml, name, value);
+        }
+    }
+    if let Some(z_index) = frame.z_index() {
+        push_attribute(&mut xml, "draw:z-index", &z_index.to_string());
+    }
     xml.push('>');
-    if let Some(title) = frame.title() {
-        xml.push_str("<svg:title>");
-        xml.push_str(&quick_xml::escape::escape(title));
-        xml.push_str("</svg:title>");
-    }
-    if let Some(description) = frame.description() {
-        xml.push_str("<svg:desc>");
-        xml.push_str(&quick_xml::escape::escape(description));
-        xml.push_str("</svg:desc>");
-    }
     match frame.source() {
         Source::Linked(href) => {
             xml.push_str("<draw:image");
@@ -136,8 +177,114 @@ fn frame_content(frame: &Frame) -> String {
             xml.push_str("</office:binary-data></draw:image>");
         },
     }
+    if let Some(image_map) = frame.image_map() {
+        push_image_map(&mut xml, image_map);
+    }
+    if let Some(title) = frame.title() {
+        xml.push_str("<svg:title>");
+        xml.push_str(&quick_xml::escape::escape(title));
+        xml.push_str("</svg:title>");
+    }
+    if let Some(description) = frame.description() {
+        xml.push_str("<svg:desc>");
+        xml.push_str(&quick_xml::escape::escape(description));
+        xml.push_str("</svg:desc>");
+    }
     xml.push_str("</draw:frame></office:image></office:body></office:document-content>");
     xml
+}
+
+fn push_image_map(xml: &mut String, image_map: &ImageMap) {
+    xml.push_str("<draw:image-map>");
+    for area in image_map.areas() {
+        push_area(xml, area);
+    }
+    xml.push_str("</draw:image-map>");
+}
+
+fn push_area(xml: &mut String, area: &Area) {
+    let element = match area.kind() {
+        AreaKind::Rectangle {
+            x,
+            y,
+            width,
+            height,
+        } => {
+            xml.push_str("<draw:area-rectangle");
+            for (name, value) in [
+                ("svg:x", x.as_str()),
+                ("svg:y", y.as_str()),
+                ("svg:width", width.as_str()),
+                ("svg:height", height.as_str()),
+            ] {
+                push_attribute(xml, name, value);
+            }
+            "draw:area-rectangle"
+        },
+        AreaKind::Circle {
+            center_x,
+            center_y,
+            radius,
+        } => {
+            xml.push_str("<draw:area-circle");
+            push_attribute(xml, "svg:cx", center_x);
+            push_attribute(xml, "svg:cy", center_y);
+            push_attribute(xml, "svg:r", radius);
+            "draw:area-circle"
+        },
+        AreaKind::Polygon {
+            x,
+            y,
+            width,
+            height,
+            view_box,
+            points,
+        } => {
+            xml.push_str("<draw:area-polygon");
+            for (name, value) in [
+                ("svg:x", x.as_str()),
+                ("svg:y", y.as_str()),
+                ("svg:width", width.as_str()),
+                ("svg:height", height.as_str()),
+                ("svg:viewBox", view_box.as_str()),
+                ("draw:points", points.as_str()),
+            ] {
+                push_attribute(xml, name, value);
+            }
+            "draw:area-polygon"
+        },
+    };
+    if let Some(href) = area.href() {
+        push_attribute(xml, "xlink:type", "simple");
+        push_attribute(xml, "xlink:href", href);
+    }
+    if let Some(target) = area.target_frame_name() {
+        push_attribute(xml, "office:target-frame-name", target);
+    }
+    if let Some(name) = area.name() {
+        push_attribute(xml, "office:name", name);
+    }
+    if area.has_no_href() {
+        push_attribute(xml, "draw:nohref", "nohref");
+    }
+    if area.title().is_none() && area.description().is_none() {
+        xml.push_str("/>");
+        return;
+    }
+    xml.push('>');
+    if let Some(title) = area.title() {
+        xml.push_str("<svg:title>");
+        xml.push_str(&quick_xml::escape::escape(title));
+        xml.push_str("</svg:title>");
+    }
+    if let Some(description) = area.description() {
+        xml.push_str("<svg:desc>");
+        xml.push_str(&quick_xml::escape::escape(description));
+        xml.push_str("</svg:desc>");
+    }
+    xml.push_str("</");
+    xml.push_str(element);
+    xml.push('>');
 }
 
 fn push_attribute(xml: &mut String, name: &str, value: &str) {

@@ -2,7 +2,10 @@
 //!
 //! Wire/XML boundaries live in `wire`, parsing in `parser`, semantic
 //! invariants in `validation`, and canonical serialization in `writer`.
-#![allow(clippy::module_inception)]
+#![allow(
+    clippy::module_inception,
+    reason = "the nested codec module distinguishes the codec facade from its implementation"
+)]
 
 mod parser;
 mod validation;

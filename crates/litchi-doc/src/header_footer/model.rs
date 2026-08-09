@@ -17,6 +17,7 @@ pub struct HeaderFooter {
 
 impl HeaderFooter {
     /// Create a semantic story from its decoded DOC payload.
+    #[must_use]
     pub fn new(header_footer_type: HeaderFooterType, text: String) -> Self {
         super::codec::decode(super::package::Story::new(
             header_footer_type,
@@ -27,6 +28,7 @@ impl HeaderFooter {
 
     /// Get the text content.
     #[inline]
+    #[must_use]
     pub fn text(&self) -> &str {
         &self.text
     }
@@ -38,12 +40,14 @@ impl HeaderFooter {
 
     /// Check if this is a header.
     #[inline]
+    #[must_use]
     pub fn is_header(&self) -> bool {
         self.header_footer_type.is_header()
     }
 
     /// Check if this is a footer.
     #[inline]
+    #[must_use]
     pub fn is_footer(&self) -> bool {
         self.header_footer_type.is_footer()
     }

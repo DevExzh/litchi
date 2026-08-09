@@ -1,3 +1,27 @@
+#![expect(
+    clippy::cast_possible_truncation,
+    reason = "OOXML numeric values are bounded before conversion"
+)]
+#![expect(
+    clippy::cast_sign_loss,
+    reason = "the value is validated as nonnegative before conversion"
+)]
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
+#![expect(
+    clippy::unwrap_used,
+    reason = "the invariant is established immediately before extraction"
+)]
 //! Paragraph types and implementation for DOCX documents.
 use crate::error::{Error, Result};
 use crate::namespace::normalize_xml_integer;
@@ -35,11 +59,11 @@ pub(crate) enum ParagraphElement {
     DisplayOfficeMath(OfficeMathParagraph),
     Hyperlink(MutableHyperlink),
     InlineImage(MutableInlineImage),
-    /// Inline DrawingML text box (wordprocessing shape).
+    /// Inline `DrawingML` text box (wordprocessing shape).
     TextBox(MutableTextBox),
     /// Embedded OLE/package object (`w:object` with `o:OLEObject`).
     OleObject(MutableOleObject),
-    /// SmartArt (DrawingML diagram) anchor with `dgm:relIds`.
+    /// `SmartArt` (`DrawingML` diagram) anchor with `dgm:relIds`.
     SmartArt(MutableSmartArt),
     /// Legacy VML shape (`w:pict` with `v:rect`/`v:oval`/…).
     VmlShape(MutableVmlShape),
@@ -130,7 +154,7 @@ impl ParagraphElement {
                 xml.push_str(&bookmark.to_xml_start()?);
                 Ok(())
             },
-            Self::BookmarkEnd(id) => write!(xml, r#"<w:bookmarkEnd w:id="{}"/>"#, id)
+            Self::BookmarkEnd(id) => write!(xml, r#"<w:bookmarkEnd w:id="{id}"/>"#)
                 .map_err(|error| Error::Xml(error.to_string())),
             Self::Field(field) => {
                 xml.push_str("<w:r>");
@@ -245,7 +269,7 @@ impl ParagraphElement {
                 xml.push_str(&bookmark.to_xml_start()?);
                 Ok(())
             },
-            Self::BookmarkEnd(id) => write!(xml, r#"<w:bookmarkEnd w:id="{}"/>"#, id)
+            Self::BookmarkEnd(id) => write!(xml, r#"<w:bookmarkEnd w:id="{id}"/>"#)
                 .map_err(|error| Error::Xml(error.to_string())),
             Self::Field(field) => {
                 xml.push_str("<w:r>");
@@ -277,7 +301,18 @@ impl ParagraphElement {
             },
             Self::SmartTag(tag) => tag.collect_hyperlink_urls(urls),
             Self::Revision(revision) => revision.collect_hyperlink_urls(urls),
-            _ => {},
+            Self::Run(_)
+            | Self::DisplayOfficeMath(_)
+            | Self::InlineImage(_)
+            | Self::TextBox(_)
+            | Self::OleObject(_)
+            | Self::SmartArt(_)
+            | Self::VmlShape(_)
+            | Self::BookmarkStart(_)
+            | Self::BookmarkEnd(_)
+            | Self::Field(_)
+            | Self::Conflict(_)
+            | Self::CustomXmlConflictRange(_) => {},
         }
     }
 
@@ -289,7 +324,18 @@ impl ParagraphElement {
             Self::InlineImage(image) => images.push((image.data(), image.format())),
             Self::SmartTag(tag) => tag.collect_images(images),
             Self::Revision(revision) => revision.collect_images(images),
-            _ => {},
+            Self::Run(_)
+            | Self::DisplayOfficeMath(_)
+            | Self::Hyperlink(_)
+            | Self::TextBox(_)
+            | Self::OleObject(_)
+            | Self::SmartArt(_)
+            | Self::VmlShape(_)
+            | Self::BookmarkStart(_)
+            | Self::BookmarkEnd(_)
+            | Self::Field(_)
+            | Self::Conflict(_)
+            | Self::CustomXmlConflictRange(_) => {},
         }
     }
 
@@ -300,7 +346,16 @@ impl ParagraphElement {
             Self::Revision(revision) => revision.append_run_text(text),
             Self::Conflict(conflict) => conflict.append_run_text(text),
             Self::CustomXmlConflictRange(range) => range.append_run_text(text),
-            _ => {},
+            Self::DisplayOfficeMath(_)
+            | Self::Hyperlink(_)
+            | Self::InlineImage(_)
+            | Self::TextBox(_)
+            | Self::OleObject(_)
+            | Self::SmartArt(_)
+            | Self::VmlShape(_)
+            | Self::BookmarkStart(_)
+            | Self::BookmarkEnd(_)
+            | Self::Field(_) => {},
         }
     }
 
@@ -338,11 +393,28 @@ impl MutableParagraph {
     }
 
     /// Add a new run to the paragraph.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal writer invariant is violated.
     pub fn add_run(&mut self) -> &mut MutableRun {
         self.elements.push(ParagraphElement::Run(MutableRun::new()));
         match self.elements.last_mut().unwrap() {
             ParagraphElement::Run(r) => r,
-            _ => unreachable!(),
+            ParagraphElement::DisplayOfficeMath(_)
+            | ParagraphElement::Hyperlink(_)
+            | ParagraphElement::InlineImage(_)
+            | ParagraphElement::TextBox(_)
+            | ParagraphElement::OleObject(_)
+            | ParagraphElement::SmartArt(_)
+            | ParagraphElement::VmlShape(_)
+            | ParagraphElement::BookmarkStart(_)
+            | ParagraphElement::BookmarkEnd(_)
+            | ParagraphElement::Field(_)
+            | ParagraphElement::SmartTag(_)
+            | ParagraphElement::Revision(_)
+            | ParagraphElement::Conflict(_)
+            | ParagraphElement::CustomXmlConflictRange(_) => unreachable!(),
         }
     }
 
@@ -363,6 +435,10 @@ impl MutableParagraph {
     }
 
     /// Parse and add an inline Office Math equation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_inline_office_math_xml(&mut self, xml: impl Into<String>) -> Result<&mut Self> {
         let equation = OfficeMath::from_xml(xml)?;
         Ok(self.add_inline_office_math(equation))
@@ -377,6 +453,10 @@ impl MutableParagraph {
     }
 
     /// Parse and add a display Office Math equation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_display_office_math_xml(&mut self, xml: impl Into<String>) -> Result<&mut Self> {
         let equation = OfficeMath::from_xml(xml)?;
         Ok(self.add_display_office_math(equation))
@@ -390,6 +470,10 @@ impl MutableParagraph {
     }
 
     /// Parse and add a fully specified display-math paragraph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_office_math_paragraph_xml(&mut self, xml: impl Into<String>) -> Result<&mut Self> {
         let paragraph = OfficeMathParagraph::from_xml(xml)?;
         Ok(self.add_office_math_paragraph(paragraph))
@@ -401,6 +485,10 @@ impl MutableParagraph {
     ///
     /// * `url` - The URL to link to
     /// * `text` - The display text for the hyperlink
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal writer invariant is violated.
     pub fn add_hyperlink(&mut self, url: &str, text: &str) -> &mut MutableHyperlink {
         self.elements
             .push(ParagraphElement::Hyperlink(MutableHyperlink::new(
@@ -409,11 +497,32 @@ impl MutableParagraph {
             )));
         match self.elements.last_mut().unwrap() {
             ParagraphElement::Hyperlink(h) => h,
-            _ => unreachable!(),
+            ParagraphElement::Run(_)
+            | ParagraphElement::DisplayOfficeMath(_)
+            | ParagraphElement::InlineImage(_)
+            | ParagraphElement::TextBox(_)
+            | ParagraphElement::OleObject(_)
+            | ParagraphElement::SmartArt(_)
+            | ParagraphElement::VmlShape(_)
+            | ParagraphElement::BookmarkStart(_)
+            | ParagraphElement::BookmarkEnd(_)
+            | ParagraphElement::Field(_)
+            | ParagraphElement::SmartTag(_)
+            | ParagraphElement::Revision(_)
+            | ParagraphElement::Conflict(_)
+            | ParagraphElement::CustomXmlConflictRange(_) => unreachable!(),
         }
     }
 
     /// Add an inline image to the paragraph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal writer invariant is violated.
     pub fn add_picture(
         &mut self,
         image_path: &str,
@@ -426,11 +535,32 @@ impl MutableParagraph {
         self.elements.push(ParagraphElement::InlineImage(image));
         match self.elements.last_mut().unwrap() {
             ParagraphElement::InlineImage(img) => Ok(img),
-            _ => unreachable!(),
+            ParagraphElement::Run(_)
+            | ParagraphElement::DisplayOfficeMath(_)
+            | ParagraphElement::Hyperlink(_)
+            | ParagraphElement::TextBox(_)
+            | ParagraphElement::OleObject(_)
+            | ParagraphElement::SmartArt(_)
+            | ParagraphElement::VmlShape(_)
+            | ParagraphElement::BookmarkStart(_)
+            | ParagraphElement::BookmarkEnd(_)
+            | ParagraphElement::Field(_)
+            | ParagraphElement::SmartTag(_)
+            | ParagraphElement::Revision(_)
+            | ParagraphElement::Conflict(_)
+            | ParagraphElement::CustomXmlConflictRange(_) => unreachable!(),
         }
     }
 
     /// Add an inline image from bytes to the paragraph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal writer invariant is violated.
     pub fn add_picture_from_bytes(
         &mut self,
         data: Vec<u8>,
@@ -441,20 +571,50 @@ impl MutableParagraph {
         self.elements.push(ParagraphElement::InlineImage(image));
         match self.elements.last_mut().unwrap() {
             ParagraphElement::InlineImage(img) => Ok(img),
-            _ => unreachable!(),
+            ParagraphElement::Run(_)
+            | ParagraphElement::DisplayOfficeMath(_)
+            | ParagraphElement::Hyperlink(_)
+            | ParagraphElement::TextBox(_)
+            | ParagraphElement::OleObject(_)
+            | ParagraphElement::SmartArt(_)
+            | ParagraphElement::VmlShape(_)
+            | ParagraphElement::BookmarkStart(_)
+            | ParagraphElement::BookmarkEnd(_)
+            | ParagraphElement::Field(_)
+            | ParagraphElement::SmartTag(_)
+            | ParagraphElement::Revision(_)
+            | ParagraphElement::Conflict(_)
+            | ParagraphElement::CustomXmlConflictRange(_) => unreachable!(),
         }
     }
 
     /// Add an inline text box to the paragraph.
     ///
-    /// The text box is serialized as a DrawingML wordprocessing shape
+    /// The text box is serialized as a `DrawingML` wordprocessing shape
     /// (`wps:wsp`) and reappears in the
     /// [`crate::Document::text_boxes`] inventory after save and reopen.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal writer invariant is violated.
     pub fn add_text_box(&mut self, text_box: MutableTextBox) -> &mut MutableTextBox {
         self.elements.push(ParagraphElement::TextBox(text_box));
         match self.elements.last_mut().unwrap() {
             ParagraphElement::TextBox(text_box) => text_box,
-            _ => unreachable!(),
+            ParagraphElement::Run(_)
+            | ParagraphElement::DisplayOfficeMath(_)
+            | ParagraphElement::Hyperlink(_)
+            | ParagraphElement::InlineImage(_)
+            | ParagraphElement::OleObject(_)
+            | ParagraphElement::SmartArt(_)
+            | ParagraphElement::VmlShape(_)
+            | ParagraphElement::BookmarkStart(_)
+            | ParagraphElement::BookmarkEnd(_)
+            | ParagraphElement::Field(_)
+            | ParagraphElement::SmartTag(_)
+            | ParagraphElement::Revision(_)
+            | ParagraphElement::Conflict(_)
+            | ParagraphElement::CustomXmlConflictRange(_) => unreachable!(),
         }
     }
 
@@ -467,11 +627,24 @@ impl MutableParagraph {
         self.elements.push(ParagraphElement::OleObject(object));
         match self.elements.last_mut().unwrap() {
             ParagraphElement::OleObject(object) => object,
-            _ => unreachable!(),
+            ParagraphElement::Run(_)
+            | ParagraphElement::DisplayOfficeMath(_)
+            | ParagraphElement::Hyperlink(_)
+            | ParagraphElement::InlineImage(_)
+            | ParagraphElement::TextBox(_)
+            | ParagraphElement::SmartArt(_)
+            | ParagraphElement::VmlShape(_)
+            | ParagraphElement::BookmarkStart(_)
+            | ParagraphElement::BookmarkEnd(_)
+            | ParagraphElement::Field(_)
+            | ParagraphElement::SmartTag(_)
+            | ParagraphElement::Revision(_)
+            | ParagraphElement::Conflict(_)
+            | ParagraphElement::CustomXmlConflictRange(_) => unreachable!(),
         }
     }
 
-    /// Add a SmartArt (DrawingML diagram) anchor to the paragraph.
+    /// Add a `SmartArt` (`DrawingML` diagram) anchor to the paragraph.
     ///
     /// Crate-internal: public authoring goes through
     /// [`crate::writer::MutableDocument::add_smart_art`], which assigns
@@ -480,7 +653,20 @@ impl MutableParagraph {
         self.elements.push(ParagraphElement::SmartArt(smartart));
         match self.elements.last_mut().unwrap() {
             ParagraphElement::SmartArt(smartart) => smartart,
-            _ => unreachable!(),
+            ParagraphElement::Run(_)
+            | ParagraphElement::DisplayOfficeMath(_)
+            | ParagraphElement::Hyperlink(_)
+            | ParagraphElement::InlineImage(_)
+            | ParagraphElement::TextBox(_)
+            | ParagraphElement::OleObject(_)
+            | ParagraphElement::VmlShape(_)
+            | ParagraphElement::BookmarkStart(_)
+            | ParagraphElement::BookmarkEnd(_)
+            | ParagraphElement::Field(_)
+            | ParagraphElement::SmartTag(_)
+            | ParagraphElement::Revision(_)
+            | ParagraphElement::Conflict(_)
+            | ParagraphElement::CustomXmlConflictRange(_) => unreachable!(),
         }
     }
 
@@ -493,7 +679,20 @@ impl MutableParagraph {
         self.elements.push(ParagraphElement::VmlShape(shape));
         match self.elements.last_mut().unwrap() {
             ParagraphElement::VmlShape(shape) => shape,
-            _ => unreachable!(),
+            ParagraphElement::Run(_)
+            | ParagraphElement::DisplayOfficeMath(_)
+            | ParagraphElement::Hyperlink(_)
+            | ParagraphElement::InlineImage(_)
+            | ParagraphElement::TextBox(_)
+            | ParagraphElement::OleObject(_)
+            | ParagraphElement::SmartArt(_)
+            | ParagraphElement::BookmarkStart(_)
+            | ParagraphElement::BookmarkEnd(_)
+            | ParagraphElement::Field(_)
+            | ParagraphElement::SmartTag(_)
+            | ParagraphElement::Revision(_)
+            | ParagraphElement::Conflict(_)
+            | ParagraphElement::CustomXmlConflictRange(_) => unreachable!(),
         }
     }
 
@@ -578,6 +777,10 @@ impl MutableParagraph {
     }
 
     /// Add an inert Word 2010 co-authoring conflict wrapper.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_conflict(
         &mut self,
         kind: ConflictKind,
@@ -595,6 +798,10 @@ impl MutableParagraph {
     ///
     /// The matching end marker is owned by the returned range and cannot be
     /// emitted independently or with a different ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_custom_xml_conflict_range(
         &mut self,
         kind: ConflictKind,
@@ -628,6 +835,10 @@ impl MutableParagraph {
     ///
     /// Division IDs are XML Schema integers and are kept as strings so values
     /// larger than the native integer types can be written without truncation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_division_id(&mut self, id: impl Into<String>) -> Result<&mut Self> {
         self.properties.division_id = Some(normalize_xml_integer(
             id.into(),
@@ -637,6 +848,7 @@ impl MutableParagraph {
     }
 
     /// Return the HTML division ID referenced by this paragraph, if set.
+    #[must_use]
     pub fn division_id(&self) -> Option<&str> {
         self.properties.division_id.as_deref()
     }
@@ -684,7 +896,7 @@ impl MutableParagraph {
 
     /// Set this paragraph as a list item.
     ///
-    /// The num_id values correspond to the numbering definitions in numbering.xml:
+    /// The `num_id` values correspond to the numbering definitions in numbering.xml:
     /// - numId 1: Bullet list (using Symbol font)
     /// - numId 9: Decimal list (1. 2. 3. ...)
     /// - Other formats use different IDs as needed
@@ -705,6 +917,7 @@ impl MutableParagraph {
     }
 
     /// Get the number of elements (runs and hyperlinks).
+    #[must_use]
     pub fn element_count(&self) -> usize {
         self.elements.len()
     }
@@ -715,6 +928,10 @@ impl MutableParagraph {
     }
 
     /// Set the section break ending at this paragraph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_section_break(&mut self, properties: SectionProperties) -> Result<()> {
         properties.validate()?;
         self.properties.section = Some(properties);
@@ -727,6 +944,7 @@ impl MutableParagraph {
     }
 
     /// Return this paragraph's section-break properties.
+    #[must_use]
     pub fn section_break(&self) -> Option<&SectionProperties> {
         self.properties.section.as_ref()
     }
@@ -781,11 +999,10 @@ impl MutableParagraph {
             {
                 xml.push_str("<w:spacing");
                 if let Some(before) = self.properties.space_before {
-                    write!(xml, " w:before=\"{}\"", before)
-                        .map_err(|e| Error::Xml(e.to_string()))?;
+                    write!(xml, " w:before=\"{before}\"").map_err(|e| Error::Xml(e.to_string()))?;
                 }
                 if let Some(after) = self.properties.space_after {
-                    write!(xml, " w:after=\"{}\"", after).map_err(|e| Error::Xml(e.to_string()))?;
+                    write!(xml, " w:after=\"{after}\"").map_err(|e| Error::Xml(e.to_string()))?;
                 }
                 if let Some(ref line_spacing) = self.properties.line_spacing {
                     match line_spacing {
@@ -803,17 +1020,17 @@ impl MutableParagraph {
                         },
                         LineSpacing::Multiple(factor) => {
                             let value = (factor * 240.0) as u32;
-                            write!(xml, " w:line=\"{}\" w:lineRule=\"auto\"", value)
+                            write!(xml, " w:line=\"{value}\" w:lineRule=\"auto\"")
                                 .map_err(|e| Error::Xml(e.to_string()))?;
                         },
                         LineSpacing::Exact(points) => {
                             let value = (points * 20.0) as u32;
-                            write!(xml, " w:line=\"{}\" w:lineRule=\"exact\"", value)
+                            write!(xml, " w:line=\"{value}\" w:lineRule=\"exact\"")
                                 .map_err(|e| Error::Xml(e.to_string()))?;
                         },
                         LineSpacing::AtLeast(points) => {
                             let value = (points * 20.0) as u32;
-                            write!(xml, " w:line=\"{}\" w:lineRule=\"atLeast\"", value)
+                            write!(xml, " w:line=\"{value}\" w:lineRule=\"atLeast\"")
                                 .map_err(|e| Error::Xml(e.to_string()))?;
                         },
                     }
@@ -828,14 +1045,14 @@ impl MutableParagraph {
             {
                 xml.push_str("<w:ind");
                 if let Some(left) = self.properties.indent_left {
-                    write!(xml, " w:left=\"{}\"", left).map_err(|e| Error::Xml(e.to_string()))?;
+                    write!(xml, " w:left=\"{left}\"").map_err(|e| Error::Xml(e.to_string()))?;
                 }
                 if let Some(right) = self.properties.indent_right {
-                    write!(xml, " w:right=\"{}\"", right).map_err(|e| Error::Xml(e.to_string()))?;
+                    write!(xml, " w:right=\"{right}\"").map_err(|e| Error::Xml(e.to_string()))?;
                 }
                 if let Some(first_line) = self.properties.indent_first_line {
                     if first_line >= 0 {
-                        write!(xml, " w:firstLine=\"{}\"", first_line)
+                        write!(xml, " w:firstLine=\"{first_line}\"")
                             .map_err(|e| Error::Xml(e.to_string()))?;
                     } else {
                         write!(xml, " w:hanging=\"{}\"", -first_line)
@@ -897,7 +1114,7 @@ impl MutableParagraph {
 
     /// Generate XML with actual relationship IDs from the mapper.
     ///
-    /// The hyperlink_counter and image_counter are used to track the global index
+    /// The `hyperlink_counter` and `image_counter` are used to track the global index
     /// across all paragraphs, and are updated as elements are processed.
     pub(crate) fn to_xml_with_rels(
         &self,
@@ -950,11 +1167,10 @@ impl MutableParagraph {
             {
                 xml.push_str("<w:spacing");
                 if let Some(before) = self.properties.space_before {
-                    write!(xml, " w:before=\"{}\"", before)
-                        .map_err(|e| Error::Xml(e.to_string()))?;
+                    write!(xml, " w:before=\"{before}\"").map_err(|e| Error::Xml(e.to_string()))?;
                 }
                 if let Some(after) = self.properties.space_after {
-                    write!(xml, " w:after=\"{}\"", after).map_err(|e| Error::Xml(e.to_string()))?;
+                    write!(xml, " w:after=\"{after}\"").map_err(|e| Error::Xml(e.to_string()))?;
                 }
                 if let Some(ref line_spacing) = self.properties.line_spacing {
                     match line_spacing {
@@ -972,17 +1188,17 @@ impl MutableParagraph {
                         },
                         LineSpacing::Multiple(factor) => {
                             let value = (factor * 240.0) as u32;
-                            write!(xml, " w:line=\"{}\" w:lineRule=\"auto\"", value)
+                            write!(xml, " w:line=\"{value}\" w:lineRule=\"auto\"")
                                 .map_err(|e| Error::Xml(e.to_string()))?;
                         },
                         LineSpacing::Exact(points) => {
                             let value = (points * 20.0) as u32;
-                            write!(xml, " w:line=\"{}\" w:lineRule=\"exact\"", value)
+                            write!(xml, " w:line=\"{value}\" w:lineRule=\"exact\"")
                                 .map_err(|e| Error::Xml(e.to_string()))?;
                         },
                         LineSpacing::AtLeast(points) => {
                             let value = (points * 20.0) as u32;
-                            write!(xml, " w:line=\"{}\" w:lineRule=\"atLeast\"", value)
+                            write!(xml, " w:line=\"{value}\" w:lineRule=\"atLeast\"")
                                 .map_err(|e| Error::Xml(e.to_string()))?;
                         },
                     }
@@ -997,14 +1213,14 @@ impl MutableParagraph {
             {
                 xml.push_str("<w:ind");
                 if let Some(left) = self.properties.indent_left {
-                    write!(xml, " w:left=\"{}\"", left).map_err(|e| Error::Xml(e.to_string()))?;
+                    write!(xml, " w:left=\"{left}\"").map_err(|e| Error::Xml(e.to_string()))?;
                 }
                 if let Some(right) = self.properties.indent_right {
-                    write!(xml, " w:right=\"{}\"", right).map_err(|e| Error::Xml(e.to_string()))?;
+                    write!(xml, " w:right=\"{right}\"").map_err(|e| Error::Xml(e.to_string()))?;
                 }
                 if let Some(first_line) = self.properties.indent_first_line {
                     if first_line >= 0 {
-                        write!(xml, " w:firstLine=\"{}\"", first_line)
+                        write!(xml, " w:firstLine=\"{first_line}\"")
                             .map_err(|e| Error::Xml(e.to_string()))?;
                     } else {
                         write!(xml, " w:hanging=\"{}\"", -first_line)
@@ -1075,7 +1291,19 @@ impl MutableParagraph {
                 ParagraphElement::CustomXmlConflictRange(range) => {
                     range.validate_passive_children()?;
                 },
-                _ => {},
+                ParagraphElement::Run(_)
+                | ParagraphElement::DisplayOfficeMath(_)
+                | ParagraphElement::Hyperlink(_)
+                | ParagraphElement::InlineImage(_)
+                | ParagraphElement::TextBox(_)
+                | ParagraphElement::OleObject(_)
+                | ParagraphElement::SmartArt(_)
+                | ParagraphElement::VmlShape(_)
+                | ParagraphElement::BookmarkStart(_)
+                | ParagraphElement::BookmarkEnd(_)
+                | ParagraphElement::Field(_)
+                | ParagraphElement::SmartTag(_)
+                | ParagraphElement::Revision(_) => {},
             }
         }
         Ok(())

@@ -1,4 +1,4 @@
-//! Bounded SpreadsheetML worksheet page-setup XML codec.
+//! Bounded `SpreadsheetML` worksheet page-setup XML codec.
 
 use std::fmt::Display;
 

@@ -18,7 +18,7 @@ pub(super) struct RecordSpan {
 }
 
 impl RecordSpan {
-    pub(super) fn payload<'a>(self, bytes: &'a [u8]) -> &'a [u8] {
+    pub(super) fn payload(self, bytes: &[u8]) -> &[u8] {
         &bytes[self.payload_start..self.payload_end]
     }
 }
@@ -26,8 +26,7 @@ impl RecordSpan {
 pub(super) fn scan_records(bytes: &[u8]) -> Result<Vec<RecordSpan>> {
     if bytes.len() > MAX_STREAM_BYTES {
         return Err(Error::UnsafeEdit(format!(
-            "external-link stream exceeds the {}-byte resource bound",
-            MAX_STREAM_BYTES
+            "external-link stream exceeds the {MAX_STREAM_BYTES}-byte resource bound"
         )));
     }
     let mut records = Vec::new();
@@ -88,7 +87,7 @@ pub(super) fn replace_record(
             "replacement BIFF8 payload exceeds {MAX_RECORD_PAYLOAD} bytes"
         )));
     }
-    let replacement_len = u16::try_from(replacement.len()).map_err(|_| {
+    let replacement_len = u16::try_from(replacement.len()).map_err(|_error| {
         Error::UnsafeEdit("replacement BIFF8 payload length exceeds u16".to_string())
     })?;
     let old_end = span.payload_end;
@@ -105,8 +104,7 @@ pub(super) fn replace_record(
     output.extend_from_slice(&bytes[old_end..]);
     if output.len() > MAX_STREAM_BYTES {
         return Err(Error::UnsafeEdit(format!(
-            "edited external-link stream exceeds the {}-byte resource bound",
-            MAX_STREAM_BYTES
+            "edited external-link stream exceeds the {MAX_STREAM_BYTES}-byte resource bound"
         )));
     }
     Ok(output)

@@ -1,10 +1,10 @@
-//! Owned DataPilot snapshots, edits, commits, and reversible patches.
+//! Owned `DataPilot` snapshots, edits, commits, and reversible patches.
 
 use super::{Catalog, Selector, validation};
 use crate::{model::data_pilot::Table, package::Package};
 use litchi_core::{Error, Result};
 
-/// Immutable DataPilot owner bound to one complete ODS package source.
+/// Immutable `DataPilot` owner bound to one complete ODS package source.
 #[derive(Clone, Debug)]
 pub struct Snapshot {
     source: Vec<u8>,
@@ -13,7 +13,10 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Parse the DataPilot owner from an owned ODS package snapshot.
+    /// Parse the `DataPilot` owner from an owned ODS package snapshot.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn from_bytes(source: Vec<u8>) -> Result<Self> {
         let package = Package::from_bytes(source.clone())?;
         let catalog = Catalog::load(&package)?;
@@ -43,6 +46,9 @@ impl Snapshot {
     }
 
     /// Resolve one declaration by exact name or checked source position.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn get<'a, S>(&self, selector: S) -> Result<Option<&Table>>
     where
         S: Into<Selector<'a>>,
@@ -61,7 +67,7 @@ impl Snapshot {
     }
 }
 
-/// A staged DataPilot edit derived from one immutable [`Snapshot`].
+/// A staged `DataPilot` edit derived from one immutable [`Snapshot`].
 #[derive(Clone, Debug)]
 pub struct Edit {
     before: Snapshot,
@@ -81,12 +87,18 @@ impl Edit {
         self.draft.is_some()
     }
 
-    /// Replace the complete ordered DataPilot catalog.
+    /// Replace the complete ordered `DataPilot` catalog.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn replace(&mut self, tables: Vec<Table>) -> Result<()> {
         self.stage(Some(tables))
     }
 
-    /// Remove the physical DataPilot owner.
+    /// Remove the physical `DataPilot` owner.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn remove(&mut self) -> Result<()> {
         self.stage(None)
     }
@@ -102,6 +114,9 @@ impl Edit {
     }
 
     /// Validate, rehydrate, and atomically publish one immutable snapshot.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn commit(self) -> Result<Commit> {
         validation::validate_candidate(
             &self.before_location()?,
@@ -163,6 +178,9 @@ pub struct OwnedEditor<'edit> {
 
 impl OwnedEditor<'_> {
     /// Add one declaration at the catalog tail.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn add(&mut self, table: Table) -> Result<()> {
         let mut candidate = self.edit.draft.clone().unwrap_or_default();
         candidate.push(table);
@@ -170,6 +188,9 @@ impl OwnedEditor<'_> {
     }
 
     /// Replace one declaration selected by exact name or checked source position.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn replace<'a, S>(&mut self, selector: S, table: Table) -> Result<()>
     where
         S: Into<Selector<'a>>,
@@ -183,6 +204,9 @@ impl OwnedEditor<'_> {
     }
 
     /// Apply one checked update to a selected declaration.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn update<'a, S, F>(&mut self, selector: S, update: F) -> Result<()>
     where
         S: Into<Selector<'a>>,
@@ -197,6 +221,9 @@ impl OwnedEditor<'_> {
     }
 
     /// Remove one selected declaration and return the detached semantic value.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn remove<'a, S>(&mut self, selector: S) -> Result<Table>
     where
         S: Into<Selector<'a>>,
@@ -239,6 +266,9 @@ impl Patch {
     }
 
     /// Apply only to the exact source package snapshot.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn apply(&self, snapshot: &Snapshot) -> Result<Commit> {
         if snapshot.source != self.source {
             return Err(Error::InvalidFormat(
@@ -254,7 +284,7 @@ impl Patch {
     }
 }
 
-/// A fully rehydrated DataPilot publication.
+/// A fully rehydrated `DataPilot` publication.
 #[derive(Clone, Debug)]
 pub struct Commit {
     snapshot: Snapshot,

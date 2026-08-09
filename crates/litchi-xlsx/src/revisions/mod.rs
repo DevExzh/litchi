@@ -1,4 +1,4 @@
-//! Layered SpreadsheetML workbook revision ownership.
+//! Layered `SpreadsheetML` workbook revision ownership.
 //!
 //! Revision values and invariants live in the model module, bounded XML in
 //! the codec module, and workbook/revisionLog OPC graph operations in package.

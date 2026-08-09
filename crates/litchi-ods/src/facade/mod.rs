@@ -17,11 +17,17 @@ pub struct Spreadsheet {
 }
 
 impl Spreadsheet {
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let package = crate::package::Package::open(path)?;
         Self::from_package(package)
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         let package = crate::package::Package::from_bytes(bytes)?;
         Self::from_package(package)
@@ -41,22 +47,30 @@ impl Spreadsheet {
         })
     }
 
+    #[must_use]
     pub fn content_xml(&self) -> &str {
         self.package.content_xml()
     }
 
+    #[must_use]
     pub fn styles_xml(&self) -> Option<&str> {
         self.package.styles_xml()
     }
 
     /// Capture document, sheet, and automatic cell-protection metadata in a
     /// source-checked immutable snapshot.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn protection(&self) -> Result<crate::protection::Snapshot> {
         crate::protection::Snapshot::parse(self.package.content_xml(), self.package.styles_xml())
     }
 
     /// Apply an exact-source reversible protection patch and fully rehydrate
     /// this facade only after the candidate has passed its typed readback.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn apply_protection_patch(&mut self, patch: &crate::protection::Patch) -> Result<()> {
         let commit = patch.apply(&self.protection()?)?;
         if commit.changed() {
@@ -69,6 +83,9 @@ impl Spreadsheet {
     /// Apply a failure-atomic protection edit and rebuild only `content.xml`.
     /// Password values remain inert verifiers; this method never authenticates
     /// or enforces a protection policy.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn update_protection<F>(&mut self, edit: F) -> Result<()>
     where
         F: FnOnce(&mut crate::protection::Transaction) -> Result<()>,
@@ -88,16 +105,25 @@ impl Spreadsheet {
     /// The owner retains the exact `content.xml` source and resolves cells by
     /// sheet name plus zero-based logical coordinates.  It is parsed on
     /// demand so an immutable spreadsheet does not retain a second XML copy.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn annotations(&self) -> Result<crate::annotations::Snapshot> {
         crate::annotations::Snapshot::parse(self.package.content_xml())
     }
 
     /// Capture the presence-aware, exact-source tracked-change owner.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn tracked_changes(&self) -> Result<crate::tracked_changes::Snapshot> {
         crate::tracked_changes::Snapshot::parse(self.package.content_xml())
     }
 
     /// Capture tracked changes under an explicit resource budget.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn tracked_changes_with(
         &self,
         limits: crate::tracked_changes::Limits,
@@ -137,6 +163,9 @@ impl Spreadsheet {
     }
 
     /// Stage, validate, rebuild, and fully rehydrate one inert tracked-change edit.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn update_tracked_changes<F>(&mut self, edit: F) -> Result<()>
     where
         F: FnOnce(&mut crate::tracked_changes::Transaction) -> Result<()>,
@@ -153,6 +182,9 @@ impl Spreadsheet {
     }
 
     /// Apply an exact-source tracked-change patch and fully rehydrate the candidate.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn apply_tracked_changes_patch(
         &mut self,
         patch: &crate::tracked_changes::Patch,
@@ -177,41 +209,53 @@ impl Spreadsheet {
     }
 
     /// Borrow the compact cross-format metadata projection.
+    #[must_use]
     pub fn metadata(&self) -> &litchi_core::Metadata {
         self.metadata.value()
     }
 
     /// Borrow the complete typed ODF metadata model.
+    #[must_use]
     pub fn odf_metadata(&self) -> &crate::metadata::Metadata {
         self.metadata.odf()
     }
 
     /// Borrow the retained metadata snapshot, including bounded source XML.
+    #[must_use]
     pub fn metadata_snapshot(&self) -> &crate::metadata::Snapshot {
         &self.metadata
     }
 
     /// Borrow spreadsheet calculation settings, if the document declares them.
+    #[must_use]
     pub fn settings(&self) -> Option<&crate::settings::Settings> {
         self.settings.as_ref()
     }
 
     /// Alias whose name makes the content-level ODF owner explicit.
+    #[must_use]
     pub fn calculation_settings(&self) -> Option<&crate::settings::Settings> {
         self.settings()
     }
 
-    /// Discover the typed DataPilot catalog owned by this spreadsheet.
+    /// Discover the typed `DataPilot` catalog owned by this spreadsheet.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn data_pilots(&self) -> Result<crate::data_pilot::Catalog<'_>> {
         crate::data_pilot::Catalog::load(&self.package)
     }
 
-    /// Capture the DataPilot owner as an immutable, exact-package snapshot.
+    /// Capture the `DataPilot` owner as an immutable, exact-package snapshot.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn data_pilot_snapshot(&self) -> Result<crate::data_pilot::Snapshot> {
         crate::data_pilot::Snapshot::from_bytes(self.package.package().as_bytes().to_vec())
     }
 
     /// Return the typed worksheet graph in document order.
+    #[must_use]
     pub fn sheets(&self) -> &[crate::worksheet::Sheet] {
         &self.sheets
     }
@@ -239,11 +283,17 @@ impl Spreadsheet {
     }
 
     /// Discover embedded charts in content-level drawing order.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn charts(&self) -> Result<crate::charts::Inventory<'_>> {
         self.charts_with(crate::charts::Limits::default())
     }
 
     /// Discover embedded charts with an explicit resource budget.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn charts_with(
         &self,
         limits: crate::charts::Limits,
@@ -252,11 +302,17 @@ impl Spreadsheet {
     }
 
     /// Capture embedded charts as an immutable, exact-package snapshot.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn chart_snapshot(&self) -> Result<crate::charts::Snapshot> {
         self.chart_snapshot_with(crate::charts::Limits::default())
     }
 
     /// Capture embedded charts with an explicit resource budget.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn chart_snapshot_with(
         &self,
         limits: crate::charts::Limits,
@@ -265,6 +321,9 @@ impl Spreadsheet {
     }
 
     /// Select one embedded chart by exact drawing name or checked position.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn chart<'a, S>(&self, selector: S) -> Result<Option<crate::charts::Chart>>
     where
         S: Into<crate::charts::Selector<'a>>,
@@ -273,12 +332,14 @@ impl Spreadsheet {
     }
 
     /// Find a worksheet by its exact ODF name.
+    #[must_use]
     pub fn sheet(&self, name: &str) -> Option<&crate::worksheet::Sheet> {
         self.sheets.iter().find(|sheet| sheet.name == name)
     }
 
     /// Look up a logical cell while retaining the distinction between a
     /// missing coordinate and a physical repeated cell run.
+    #[must_use]
     pub fn cell(
         &self,
         sheet_name: &str,
@@ -290,6 +351,9 @@ impl Spreadsheet {
     }
 
     /// Discover package, inline, missing, and inert linked images.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn images(&self) -> Result<Vec<crate::media::Image>> {
         let package = self.package.package().package()?;
         crate::media::scan_package(
@@ -301,11 +365,17 @@ impl Spreadsheet {
 
     /// Inspect inert conditional-format, sparkline, hyperlink, and in-table
     /// drawing source metadata without evaluating or dereferencing it.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn source_features(&self) -> Result<crate::source_features::Snapshot> {
         crate::source_features::Snapshot::parse(self.package.content_xml())
     }
 
     /// Discover package, inline, missing, and inert linked embedded objects.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn embedded_objects(&self) -> Result<Vec<crate::embedded::Object>> {
         let package = self.package.package().package()?;
         crate::embedded::scan_package(
@@ -317,21 +387,29 @@ impl Spreadsheet {
 
     /// Return bytes only for inline or verified package-contained images.
     /// Linked and missing images remain inert and are never fetched.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn image_bytes(&self, image: &crate::media::Image) -> Result<Option<Vec<u8>>> {
         match &image.source {
             crate::media::Source::Inline { bytes, .. } => Ok(Some(bytes.clone())),
             crate::media::Source::PackagePart { path, .. } => {
                 self.package.package().get_file(path).map(Some)
             },
-            _ => Ok(None),
+            crate::media::Source::MissingPackagePart { .. }
+            | crate::media::Source::Linked { .. }
+            | crate::media::Source::Missing
+            | _ => Ok(None),
         }
     }
 
+    #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
         self.package.into_bytes()
     }
 
     /// Return all global and sheet-local named definitions in document order.
+    #[must_use]
     pub fn definitions(&self) -> &[Definition] {
         &self.definitions
     }
@@ -380,28 +458,39 @@ impl Spreadsheet {
     }
 
     /// Find a named range by its exact name and visibility scope.
+    #[must_use]
     pub fn range(&self, name: &str, scope: &Scope) -> Option<&Range> {
         self.ranges()
             .find(|range| range.name == name && &range.scope == scope)
     }
 
     /// Find a named expression by its exact name and visibility scope.
+    #[must_use]
     pub fn expression(&self, name: &str, scope: &Scope) -> Option<&Expression> {
         self.expressions()
             .find(|expression| expression.name == name && &expression.scope == scope)
     }
 
     /// Atomically append a validated named range.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn add_range(&mut self, range: Range) -> Result<()> {
         self.add_definition(range.into())
     }
 
     /// Atomically append a validated named expression.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn add_expression(&mut self, expression: Expression) -> Result<()> {
         self.add_definition(expression.into())
     }
 
     /// Atomically append a validated named definition while preserving catalog order.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn add_definition(&mut self, definition: Definition) -> Result<()> {
         let mut candidate = self.definitions.clone();
         candidate.push(definition);
@@ -409,6 +498,9 @@ impl Spreadsheet {
     }
 
     /// Atomically replace the complete ordered named-definition catalog.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_definitions(&mut self, definitions: Vec<Definition>) -> Result<()> {
         let updated = crate::codec::names::replace(self.package.content_xml(), &definitions)?;
         let package = self.package.replace_content_xml(&updated)?;
@@ -605,8 +697,7 @@ impl Spreadsheet {
 mod tests {
     use super::*;
 
-    const ANNOTATED_CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
-<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:vendor="urn:example:vendor" office:version="1.3"><office:body><office:spreadsheet><vendor:keep/><table:table table:name="Data"><table:table-row><table:table-cell><office:annotation><text:p>existing</text:p></office:annotation></table:table-cell><table:table-cell/></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#;
+    const ANNOTATED_CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:vendor="urn:example:vendor" office:version="1.3"><office:body><office:spreadsheet><vendor:keep/><table:table table:name="Data"><table:table-row><table:table-cell><office:annotation><text:p>existing</text:p></office:annotation></table:table-cell><table:table-cell/></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#;
 
     #[test]
     fn builder_round_trips_through_facade() {
@@ -619,15 +710,7 @@ mod tests {
     fn shared_resource_inventory_is_available_from_spreadsheet() {
         let bytes = Builder::new()
             .content_xml(
-                r#"<?xml version="1.0" encoding="UTF-8"?>
-<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.3">
-  <office:body><office:spreadsheet>
-    <draw:frame draw:name="Photo">
-      <draw:image><office:binary-data>AQID</office:binary-data></draw:image>
-    </draw:frame>
-    <draw:object xlink:href="https://example.invalid/object" xlink:type="simple"/>
-  </office:spreadsheet></office:body>
-</office:document-content>"#,
+                r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.3"><office:body><office:spreadsheet><draw:frame draw:name="Photo"><draw:image><office:binary-data>AQID</office:binary-data></draw:image></draw:frame><draw:object xlink:href="https://example.invalid/object" xlink:type="simple"/></office:spreadsheet></office:body></office:document-content>"#,
             )
             .build()
             .unwrap();

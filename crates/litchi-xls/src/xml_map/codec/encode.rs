@@ -1,11 +1,14 @@
 //! Deterministic XML-map serializer.
 
-use super::super::model::{DataBinding, Map, MapInfo, OpaqueXml, Schema};
+use super::super::model::{DataBinding, Map, MapInfo, OpaqueXml, Schema, SchemaId};
 use super::super::validation;
 use super::parse::MAX_STREAM_BYTES;
 use crate::{Error, Result};
 
 /// Serialize a complete XML-map stream with canonical known markup.
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn write(value: &MapInfo) -> Result<Vec<u8>> {
     validation::validate(value)?;
     let mut output = Vec::with_capacity(512);
@@ -34,7 +37,7 @@ fn write_schema(output: &mut Vec<u8>, schema: &Schema) -> Result<()> {
     if let Some(references) = schema.schema_references() {
         let value = references
             .iter()
-            .map(|reference| reference.as_str())
+            .map(SchemaId::as_str)
             .collect::<Vec<_>>()
             .join(" ");
         attribute(output, b"SchemaRef", &value)?;

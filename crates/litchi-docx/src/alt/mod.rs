@@ -1,4 +1,4 @@
-//! Typed anchors and opaque payloads for WordprocessingML alternative-format imports.
+//! Typed anchors and opaque payloads for `WordprocessingML` alternative-format imports.
 //!
 //! Payloads are deliberately never parsed, executed, fetched, or opened as nested
 //! packages. The supported authoring media types follow the Microsoft Word notes

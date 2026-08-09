@@ -1,4 +1,8 @@
-use super::*;
+use super::{
+    BufRead, ChartXmlReader, Error, Event, ExtensionList, Layout, Legend, LegendEntry,
+    LegendPosition, Result, ShapeProperties, TextProperties, get_attr, invalid_attribute,
+    missing_attribute, parse_bool_attr, parse_layout, required_u32_attr,
+};
 
 pub(crate) fn parse_legend<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Legend> {
     let mut position = LegendPosition::Right;
@@ -108,7 +112,7 @@ pub(crate) fn parse_legend<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
-            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
+            Ok(Event::Start(ref e) | Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
                     b"legendPos" => {
@@ -200,7 +204,7 @@ pub(crate) fn parse_legend_entry<R: BufRead>(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
-            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
+            Ok(Event::Start(ref element) | Event::Empty(ref element)) => {
                 match element.local_name().as_ref() {
                     b"idx" => {
                         if index.is_some() {

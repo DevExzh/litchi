@@ -47,6 +47,7 @@ pub struct NameFnGrp12 {
 }
 
 impl NameFnGrp12 {
+    #[must_use]
     pub fn category_index(&self) -> usize {
         usize::from(self.category - 32)
     }
@@ -61,11 +62,13 @@ pub struct NamePublish {
 }
 
 impl DefinedName {
+    #[must_use]
     pub fn is_macro(&self) -> bool {
         self.function || self.vba_procedure || self.procedure
     }
 
     /// Whether the rendered definition contains a deleted reference.
+    #[must_use]
     pub fn is_deleted(&self) -> bool {
         self.formula
             .as_deref()

@@ -1,4 +1,4 @@
-//! Semantic values for the DrawingML `a:xfrm` subtree.
+//! Semantic values for the `DrawingML` `a:xfrm` subtree.
 
 use std::{fmt, str::FromStr};
 
@@ -17,7 +17,7 @@ impl Angle {
     /// The schema default for an omitted `rot` attribute.
     pub const ZERO: Self = Self(0);
 
-    /// Construct a checked DrawingML angle.
+    /// Construct a checked `DrawingML` angle.
     ///
     /// Every `i32` is valid for `ST_Angle`; keeping the constructor explicit
     /// makes the unit (60,000ths of a degree) visible at call sites.
@@ -37,6 +37,7 @@ impl Angle {
 
     /// Return the raw 60,000ths-of-a-degree value.
     #[inline]
+    #[must_use]
     pub const fn value(self) -> i32 {
         self.0
     }
@@ -68,7 +69,7 @@ impl fmt::Display for Angle {
     }
 }
 
-/// A checked `CT_Point2D` offset in DrawingML coordinates.
+/// A checked `CT_Point2D` offset in `DrawingML` coordinates.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[must_use]
 pub struct Point {
@@ -146,7 +147,7 @@ impl Size {
     }
 }
 
-/// The shared DrawingML two-dimensional transform (`a:CT_Transform2D`).
+/// The shared `DrawingML` two-dimensional transform (`a:CT_Transform2D`).
 ///
 /// `None` on an optional scalar preserves authored absence, even when the
 /// schema supplies an effective default. The accessors [`Self::rotation`],
@@ -166,7 +167,7 @@ pub struct Transform {
 }
 
 impl Transform {
-    /// Construct an empty transform using all DrawingML defaults.
+    /// Construct an empty transform using all `DrawingML` defaults.
     #[inline]
     pub const fn new() -> Self {
         Self {
@@ -182,24 +183,28 @@ impl Transform {
 
     /// Borrow the object offset (`a:off`).
     #[inline]
+    #[must_use]
     pub const fn offset(&self) -> Option<&Point> {
         self.offset.as_ref()
     }
 
     /// Borrow the object extent (`a:ext`).
     #[inline]
+    #[must_use]
     pub const fn extent(&self) -> Option<Size> {
         self.extent
     }
 
     /// Borrow the group child-coordinate offset (`a:chOff`).
     #[inline]
+    #[must_use]
     pub const fn child_offset(&self) -> Option<&Point> {
         self.child_offset.as_ref()
     }
 
     /// Return the group child-coordinate extent (`a:chExt`).
     #[inline]
+    #[must_use]
     pub const fn child_extent(&self) -> Option<Size> {
         self.child_extent
     }
@@ -215,12 +220,14 @@ impl Transform {
 
     /// Return the authored `rot` value, preserving omission versus zero.
     #[inline]
+    #[must_use]
     pub const fn authored_rotation(&self) -> Option<Angle> {
         self.rotation
     }
 
     /// Return the effective horizontal flip, whose omitted value is false.
     #[inline]
+    #[must_use]
     pub const fn flip_horizontal(&self) -> bool {
         match self.flip_horizontal {
             Some(value) => value,
@@ -230,12 +237,14 @@ impl Transform {
 
     /// Return the authored `flipH` value, preserving omission versus false.
     #[inline]
+    #[must_use]
     pub const fn authored_flip_horizontal(&self) -> Option<bool> {
         self.flip_horizontal
     }
 
     /// Return the effective vertical flip, whose omitted value is false.
     #[inline]
+    #[must_use]
     pub const fn flip_vertical(&self) -> bool {
         match self.flip_vertical {
             Some(value) => value,
@@ -245,6 +254,7 @@ impl Transform {
 
     /// Return the authored `flipV` value, preserving omission versus false.
     #[inline]
+    #[must_use]
     pub const fn authored_flip_vertical(&self) -> Option<bool> {
         self.flip_vertical
     }

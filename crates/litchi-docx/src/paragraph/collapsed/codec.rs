@@ -1,3 +1,19 @@
+#![expect(
+    clippy::expect_used,
+    reason = "the invariant is established immediately before extraction"
+)]
+#![expect(
+    clippy::option_option,
+    reason = "nested options distinguish omitted, present-empty, and present-valued XML"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::similar_names,
+    reason = "domain names mirror distinct OOXML roles"
+)]
 //! Bounded, loss-preserving XML codec for `w12:collapsed` in a paragraph.
 
 use crate::error::{Error, Result};
@@ -257,7 +273,13 @@ fn locate(xml_bytes: &[u8]) -> Result<(Layout, Option<Collapsed>)> {
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 
@@ -384,8 +406,9 @@ fn text(bytes: &[u8]) -> &str {
 }
 
 fn offset(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_| Error::InvalidFormat("paragraph XML offset does not fit usize".to_owned()))
+    usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+        Error::InvalidFormat("paragraph XML offset does not fit usize".to_owned())
+    })
 }
 
 fn splice(source: &[u8], range: ByteRange, replacement: &[u8]) -> Vec<u8> {

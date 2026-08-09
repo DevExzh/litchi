@@ -1,7 +1,7 @@
-//! Typed semantic values for the BIFF8 PivotTable OLAP extension records.
+//! Typed semantic values for the BIFF8 `PivotTable` OLAP extension records.
 
 /// Typed `SXViewEx` record content (MS-XLS 2.4.314): the header of the
-/// PivotTable view OLAP extension sequence.
+/// `PivotTable` view OLAP extension sequence.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PivotViewOlapHeader {
     /// Number of `SXTH` records that follow (`csxth`). MUST be at least 1.
@@ -15,7 +15,7 @@ pub struct PivotViewOlapHeader {
     pub future_bytes: Vec<u8>,
 }
 
-/// The PivotTable axis or axes a pivot hierarchy is present on (`SXAxis`,
+/// The `PivotTable` axis or axes a pivot hierarchy is present on (`SXAxis`,
 /// MS-XLS 2.5.254).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct PivotHierarchyAxis {
@@ -30,7 +30,7 @@ pub struct PivotHierarchyAxis {
 }
 
 /// A `HiddenMemberSet` structure (MS-XLS 2.5.157): the OLAP members hidden
-/// from the PivotTable view at one level of a pivot hierarchy.
+/// from the `PivotTable` view at one level of a pivot hierarchy.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HiddenMemberSet {
     /// Names of the hidden OLAP members (`rgMemberName`), each at most 255
@@ -74,7 +74,7 @@ pub struct PivotHierarchy {
     pub axis: PivotHierarchyAxis,
     /// The associated pivot field index (`isxvd`).
     pub pivot_field_index: i32,
-    /// Number of pivot fields on PivotTable axes for this hierarchy
+    /// Number of pivot fields on `PivotTable` axes for this hierarchy
     /// (`csxvdXl`). Related to `level_fields` by the `stAll` rule.
     pub axis_field_count: i32,
     /// Whether this hierarchy can be placed on the row axis (`fDragToRow`).
@@ -109,7 +109,7 @@ pub struct PivotHierarchy {
 }
 
 /// Typed `SXPIEx` record content (MS-XLS 2.4.299): the OLAP extension of one
-/// page-axis entry of a PivotTable view.
+/// page-axis entry of a `PivotTable` view.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PivotPageItemOlapExt {
     /// Pivot hierarchy index of the hierarchy on the page axis (`isxth`).
@@ -153,7 +153,7 @@ pub struct PivotFieldOlapExt {
     /// Whether this member property field is displayed in the report
     /// (`fMemPropDisplayInReport`).
     pub member_property_in_report: bool,
-    /// Whether this member property field is displayed in a ToolTip
+    /// Whether this member property field is displayed in a `ToolTip`
     /// (`fMemPropDisplayInTip`).
     pub member_property_in_tip: bool,
     /// Whether member property captions replace pivot item captions

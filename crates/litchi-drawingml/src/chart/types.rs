@@ -47,6 +47,7 @@ pub enum Type {
 impl Type {
     /// Returns the XML element name for this chart type.
     #[inline]
+    #[must_use]
     pub fn xml_element_name(&self) -> &'static str {
         match self {
             Self::Area => "areaChart",
@@ -71,6 +72,7 @@ impl Type {
 
     /// Returns true if this is a 3D chart type.
     #[inline]
+    #[must_use]
     pub const fn is_3d(&self) -> bool {
         matches!(
             self,
@@ -80,6 +82,7 @@ impl Type {
 
     /// Returns true if this chart type supports categories.
     #[inline]
+    #[must_use]
     pub const fn supports_categories(&self) -> bool {
         !matches!(self, Self::Scatter | Self::Bubble)
     }
@@ -97,6 +100,7 @@ pub enum OfPieType {
 impl OfPieType {
     /// Returns the XML value for this secondary plot type.
     #[inline]
+    #[must_use]
     pub const fn xml_value(self) -> &'static str {
         match self {
             Self::Pie => "pie",
@@ -123,6 +127,7 @@ pub enum OfPieSplitType {
 impl OfPieSplitType {
     /// Returns the XML value for this split rule.
     #[inline]
+    #[must_use]
     pub const fn xml_value(self) -> &'static str {
         match self {
             Self::Automatic => "auto",
@@ -156,6 +161,7 @@ pub enum AxisType {
 impl AxisType {
     /// Returns the XML element name for this axis type.
     #[inline]
+    #[must_use]
     pub const fn xml_element_name(&self) -> &'static str {
         match self {
             Self::Category => "catAx",
@@ -182,6 +188,7 @@ pub enum AxisPosition {
 impl AxisPosition {
     /// Returns the XML value for this position.
     #[inline]
+    #[must_use]
     pub const fn xml_value(&self) -> &'static str {
         match self {
             Self::Bottom => "b",
@@ -204,6 +211,7 @@ pub enum AxisOrientation {
 impl AxisOrientation {
     /// Returns the XML value for this orientation.
     #[inline]
+    #[must_use]
     pub const fn xml_value(&self) -> &'static str {
         match self {
             Self::MinMax => "minMax",
@@ -228,6 +236,7 @@ pub enum TickMark {
 impl TickMark {
     /// Returns the XML value for this tick mark style.
     #[inline]
+    #[must_use]
     pub const fn xml_value(&self) -> &'static str {
         match self {
             Self::Cross => "cross",
@@ -254,6 +263,7 @@ pub enum TickLabelPosition {
 impl TickLabelPosition {
     /// Returns the XML value for this position.
     #[inline]
+    #[must_use]
     pub const fn xml_value(&self) -> &'static str {
         match self {
             Self::High => "high",
@@ -276,6 +286,7 @@ pub enum BarDirection {
 impl BarDirection {
     /// Returns the XML value for this direction.
     #[inline]
+    #[must_use]
     pub const fn xml_value(&self) -> &'static str {
         match self {
             Self::Bar => "bar",
@@ -300,6 +311,7 @@ pub enum BarGrouping {
 impl BarGrouping {
     /// Returns the XML value for this grouping.
     #[inline]
+    #[must_use]
     pub const fn xml_value(&self) -> &'static str {
         match self {
             Self::Clustered => "clustered",
@@ -328,6 +340,7 @@ pub enum LegendPosition {
 impl LegendPosition {
     /// Returns the XML value for this position.
     #[inline]
+    #[must_use]
     pub const fn xml_value(&self) -> &'static str {
         match self {
             Self::Bottom => "b",
@@ -365,6 +378,7 @@ pub enum DataLabelPosition {
 impl DataLabelPosition {
     /// Returns the XML value for this position.
     #[inline]
+    #[must_use]
     pub const fn xml_value(&self) -> &'static str {
         match self {
             Self::BestFit => "bestFit",
@@ -412,6 +426,7 @@ pub enum MarkerStyle {
 impl MarkerStyle {
     /// Returns the XML value for this marker style.
     #[inline]
+    #[must_use]
     pub const fn xml_value(&self) -> &'static str {
         match self {
             Self::Circle => "circle",
@@ -450,6 +465,7 @@ pub enum ScatterStyle {
 impl ScatterStyle {
     /// Returns the XML value for this scatter style.
     #[inline]
+    #[must_use]
     pub const fn xml_value(&self) -> &'static str {
         match self {
             Self::LineMarker => "lineMarker",
@@ -476,6 +492,7 @@ pub enum RadarStyle {
 impl RadarStyle {
     /// Returns the XML value for this radar style.
     #[inline]
+    #[must_use]
     pub const fn xml_value(&self) -> &'static str {
         match self {
             Self::Standard => "standard",
@@ -499,6 +516,7 @@ pub enum DisplayBlanks {
 impl DisplayBlanks {
     /// Returns the XML value for this display mode.
     #[inline]
+    #[must_use]
     pub const fn xml_value(&self) -> &'static str {
         match self {
             Self::Gap => "gap",
@@ -520,6 +538,7 @@ pub enum LayoutMode {
 impl LayoutMode {
     /// Returns the XML value for this layout mode.
     #[inline]
+    #[must_use]
     pub const fn xml_value(&self) -> &'static str {
         match self {
             Self::Edge => "edge",
@@ -540,6 +559,7 @@ pub enum LayoutTarget {
 impl LayoutTarget {
     /// Returns the XML value for this layout target.
     #[inline]
+    #[must_use]
     pub const fn xml_value(&self) -> &'static str {
         match self {
             Self::Inner => "inner",

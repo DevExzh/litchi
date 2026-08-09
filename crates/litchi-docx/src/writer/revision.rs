@@ -1,4 +1,20 @@
-//! Typed WordprocessingML tracked-change authoring.
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
+//! Typed `WordprocessingML` tracked-change authoring.
 
 use super::content_control::MutableContentControl;
 use super::field::MutableField;
@@ -131,7 +147,7 @@ impl RevisionKind {
     pub(crate) fn text_mode(self) -> RevisionTextMode {
         match self {
             Self::Delete | Self::MoveFrom => RevisionTextMode::Deleted,
-            _ => RevisionTextMode::Normal,
+            Self::Insert | Self::MoveTo => RevisionTextMode::Normal,
         }
     }
 }
@@ -151,6 +167,10 @@ pub struct RevisionMetadata {
 }
 
 impl RevisionMetadata {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(id: impl AsRef<str>, author: impl Into<String>) -> Result<Self> {
         let id = id.as_ref();
         if id.is_empty() || !id.bytes().all(|b| b.is_ascii_digit()) {
@@ -158,7 +178,7 @@ impl RevisionMetadata {
                 "revision ID must be a nonnegative decimal integer".into(),
             ));
         }
-        let id = id.parse::<u32>().map_err(|_| {
+        let id = id.parse::<u32>().map_err(|_source_error| {
             Error::InvalidFormat("revision ID exceeds the supported u32 range".into())
         })?;
         let author = author.into();
@@ -170,29 +190,41 @@ impl RevisionMetadata {
             user_id: None,
         })
     }
+    #[must_use]
     pub fn id(&self) -> u32 {
         self.id
     }
+    #[must_use]
     pub fn author(&self) -> &str {
         &self.author
     }
+    #[must_use]
     pub fn date(&self) -> Option<&str> {
         self.date.as_deref()
     }
+    #[must_use]
     pub fn user_id(&self) -> Option<&str> {
         self.user_id.as_deref()
     }
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_date(&mut self, date: Option<impl Into<String>>) -> Result<&mut Self> {
         let candidate = date.map(Into::into);
         if let Some(value) = &candidate {
             validate_nonempty_xml("revision date", value)?;
-            DateTime::parse_from_rfc3339(value).map_err(|_| {
+            DateTime::parse_from_rfc3339(value).map_err(|_source_error| {
                 Error::InvalidFormat("revision date must be valid W3CDTF/RFC 3339".into())
             })?;
         }
         self.date = candidate;
         Ok(self)
     }
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_user_id(&mut self, user_id: Option<impl Into<String>>) -> Result<&mut Self> {
         let candidate = user_id.map(Into::into);
         if let Some(value) = &candidate {
@@ -301,7 +333,7 @@ pub struct MutableRevision {
 /// Mutable Word 2010 inline conflict content.
 ///
 /// The legal child surface intentionally mirrors [`MutableRevision`]. Nested
-/// revision or conflict wrappers are not exposed because WordprocessingML does
+/// revision or conflict wrappers are not exposed because `WordprocessingML` does
 /// not permit those wrappers in this context.
 #[derive(Debug)]
 pub struct MutableConflict {
@@ -311,6 +343,10 @@ pub struct MutableConflict {
 }
 
 impl MutableConflict {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(kind: ConflictKind, metadata: ConflictMetadata) -> Result<Self> {
         let metadata = validate_conflict_metadata(metadata)?;
         Ok(Self {
@@ -320,14 +356,17 @@ impl MutableConflict {
         })
     }
 
+    #[must_use]
     pub fn kind(&self) -> ConflictKind {
         self.kind
     }
 
+    #[must_use]
     pub fn metadata(&self) -> &ConflictMetadata {
         &self.metadata
     }
 
+    #[must_use]
     pub fn child_count(&self) -> usize {
         self.children.len()
     }
@@ -441,6 +480,10 @@ pub struct MutableCustomXmlConflictRange {
 }
 
 impl MutableCustomXmlConflictRange {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(kind: ConflictKind, metadata: ConflictMetadata) -> Result<Self> {
         let metadata = validate_conflict_metadata(metadata)?;
         Ok(Self {
@@ -450,14 +493,17 @@ impl MutableCustomXmlConflictRange {
         })
     }
 
+    #[must_use]
     pub fn kind(&self) -> ConflictKind {
         self.kind
     }
 
+    #[must_use]
     pub fn metadata(&self) -> &ConflictMetadata {
         &self.metadata
     }
 
+    #[must_use]
     pub fn child_count(&self) -> usize {
         self.children.len()
     }
@@ -608,6 +654,7 @@ pub(crate) fn write_conflict_attributes(
 }
 
 impl MutableRevision {
+    #[must_use]
     pub fn new(kind: RevisionKind, metadata: RevisionMetadata) -> Self {
         Self {
             kind,
@@ -615,12 +662,15 @@ impl MutableRevision {
             children: Vec::new(),
         }
     }
+    #[must_use]
     pub fn kind(&self) -> RevisionKind {
         self.kind
     }
+    #[must_use]
     pub fn metadata(&self) -> &RevisionMetadata {
         &self.metadata
     }
+    #[must_use]
     pub fn child_count(&self) -> usize {
         self.children.len()
     }
@@ -692,6 +742,10 @@ impl MutableRevision {
             _ => unreachable!(),
         }
     }
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_revision(&mut self, _nested: MutableRevision) -> Result<&mut Self> {
         Err(Error::InvalidFormat(
             "nested WordprocessingML revision wrappers are not supported".into(),
@@ -809,21 +863,21 @@ impl RevisionChild {
                 .elements
                 .iter()
                 .for_each(|e| e.collect_hyperlink_urls(urls)),
-            _ => {},
+            Self::CommentRangeStart(_) | Self::CommentRangeEnd(_) | Self::CommentReference(_) => {},
         }
     }
     fn collect_images<'a>(&'a self, images: &mut Vec<(&'a [u8], crate::format::ImageFormat)>) {
         match self {
             Self::Element(e) => e.collect_images(images),
             Self::ContentControl(c) => c.elements.iter().for_each(|e| e.collect_images(images)),
-            _ => {},
+            Self::CommentRangeStart(_) | Self::CommentRangeEnd(_) | Self::CommentReference(_) => {},
         }
     }
     fn append_run_text(&self, text: &mut String) {
         match self {
             Self::Element(e) => e.append_run_text(text),
             Self::ContentControl(c) => c.elements.iter().for_each(|e| e.append_run_text(text)),
-            _ => {},
+            Self::CommentRangeStart(_) | Self::CommentRangeEnd(_) | Self::CommentReference(_) => {},
         }
     }
 }

@@ -164,11 +164,8 @@ fn install(package: &mut OpcPackage, patch: &Patch) -> Result<()> {
         .map(|part| part.part_name.clone())
         .collect();
     for part_name in before_parts.keys() {
-        if !after_names.contains(part_name)
-            && !has_inbound_relationship(package, part_name)?
-            && package.remove_part(part_name)
-        {
-            continue;
+        if !after_names.contains(part_name) && !has_inbound_relationship(package, part_name)? {
+            package.remove_part(part_name);
         }
     }
     Ok(())

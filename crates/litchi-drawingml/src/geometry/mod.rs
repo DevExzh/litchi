@@ -1,4 +1,4 @@
-//! Custom DrawingML geometry (`a:custGeom`) and its XML codecs.
+//! Custom `DrawingML` geometry (`a:custGeom`) and its XML codecs.
 //!
 //! This module owns the format-neutral ECMA-376 `CT_CustomGeometry2D` model:
 //! guide formulas, adjustment handles, connection sites, text rectangles,

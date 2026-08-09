@@ -19,7 +19,7 @@ pub struct Writer {
     /// Document properties
     pub(in crate::writer::core) properties: HashMap<String, String>,
     /// Header/footer paragraphs (`None` means the story is not set).
-    /// Indices map to plcfHdd entries (following Apache POI HeaderStories indexing):
+    /// Indices map to plcfHdd entries (following Apache POI `HeaderStories` indexing):
     /// 0..5: footnote/endnote separators (unused here)
     /// 6: even header, 7: odd header, 10: first header
     /// 8: even footer, 9: odd footer, 11: first footer
@@ -47,7 +47,7 @@ pub struct Writer {
     pub(in crate::writer::core) associated_strings: DocumentAssociatedStrings,
     /// Optional Word 97/2000 save-history table.
     pub(in crate::writer::core) saved_by_table: Option<SavedByTable>,
-    /// Optional glossary-only AutoText metadata over the main story.
+    /// Optional glossary-only `AutoText` metadata over the main story.
     pub(in crate::writer::core) glossary_metadata: Option<GlossaryMetadata>,
     /// Optional distinct AutoText-only document attached to this template.
     pub(in crate::writer::core) attached_glossary: Option<Box<Writer>>,

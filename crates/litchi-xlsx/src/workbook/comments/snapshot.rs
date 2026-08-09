@@ -55,31 +55,37 @@ impl Snapshot {
     }
 
     /// Worksheet part selected by this snapshot.
+    #[must_use]
     pub fn worksheet(&self) -> &PackURI {
         &self.worksheet
     }
 
     /// Physical comments-part context, when the worksheet has legacy notes.
+    #[must_use]
     pub fn part(&self) -> Option<&Part> {
         self.part.as_ref()
     }
 
     /// Borrow the typed comments graph, if present.
+    #[must_use]
     pub fn comments(&self) -> Option<&Comments> {
         self.part.as_ref().map(|part| &part.comments)
     }
 
     /// Exact source bytes of the comments part, if present.
+    #[must_use]
     pub fn source_xml(&self) -> Option<&[u8]> {
         self.source.as_deref()
     }
 
     /// Exact worksheet-to-comments relationship type, when present.
+    #[must_use]
     pub fn relationship_type(&self) -> Option<&str> {
         self.relationship_type.as_deref()
     }
 
     /// Whether the worksheet has no classic comments part.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.part.is_none()
     }

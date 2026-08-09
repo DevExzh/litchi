@@ -1,9 +1,9 @@
-//! Typed inventory of WordprocessingML drawing anchors.
+//! Typed inventory of `WordprocessingML` drawing anchors.
 //!
 //! The owner is intentionally small: [`model`] contains the owned semantic
 //! inventory, [`codec`] contains the streaming `<w:drawing>`, `w:object`, and
 //! `w:pict` scanners, and [`validation`] owns checked Word 2010 extension
-//! values. DrawingML preset tokens remain the closed domain supplied by
+//! values. `DrawingML` preset tokens remain the closed domain supplied by
 //! [`litchi_drawingml::geom::Preset`]; unknown drawing children are inert.
 
 mod codec;

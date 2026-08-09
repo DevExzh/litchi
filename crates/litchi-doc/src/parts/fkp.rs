@@ -1,13 +1,13 @@
 //! FKP (Formatted Disk Page) parser for DOC files.
 //!
 //! FKPs are 512-byte pages used to store character and paragraph properties.
-//! Based on Apache POI's FormattedDiskPage and CHPFormattedDiskPage.
+//! Based on Apache POI's `FormattedDiskPage` and `CHPFormattedDiskPage`.
 //!
 //! References:
 //! - org.apache.poi.hwpf.model.FormattedDiskPage
 //! - org.apache.poi.hwpf.model.CHPFormattedDiskPage
 //! - org.apache.poi.hwpf.model.PAPFormattedDiskPage
-//! - [MS-DOC] 2.4.3 PnFkp* (Page Number FKP)
+//! - [MS-DOC] 2.4.3 `PnFkp`* (Page Number FKP)
 
 use litchi_core::binary::{read_i32_le, read_u16_le, read_u32_le};
 
@@ -20,7 +20,7 @@ const PAPX_BX_SIZE: usize = 13;
 /// Size of File Character position entry (4 bytes)
 const FC_SIZE: usize = 4;
 
-/// ParagraphHeight (PHE) structure - 12 bytes.
+/// `ParagraphHeight` (PHE) structure - 12 bytes.
 ///
 /// This structure is part of PAPX BX entries and contains paragraph height information.
 /// Based on org.apache.poi.hwpf.model.ParagraphHeight.
@@ -37,7 +37,7 @@ pub struct ParagraphHeight {
 }
 
 impl ParagraphHeight {
-    /// Parse ParagraphHeight from 12 bytes.
+    /// Parse `ParagraphHeight` from 12 bytes.
     ///
     /// # Arguments
     ///
@@ -46,8 +46,9 @@ impl ParagraphHeight {
     ///
     /// # Returns
     ///
-    /// Parsed ParagraphHeight or None if insufficient data
+    /// Parsed `ParagraphHeight` or None if insufficient data
     #[inline]
+    #[must_use]
     pub fn parse(data: &[u8], offset: usize) -> Option<Self> {
         if offset + 12 > data.len() {
             return None;
@@ -67,7 +68,7 @@ impl ParagraphHeight {
 /// Each entry contains a File Character position (FC) and associated property data.
 #[derive(Debug, Clone)]
 pub struct FkpEntry {
-    /// File Character position (byte offset in WordDocument stream)
+    /// File Character position (byte offset in `WordDocument` stream)
     pub fc: u32,
     /// Exclusive end File Character position from the next FKP boundary.
     pub end_fc: u32,
@@ -81,7 +82,7 @@ pub struct FkpEntry {
 
 /// CHPX FKP (Character Property Formatted Disk Page).
 ///
-/// Based on Apache POI's CHPFormattedDiskPage.
+/// Based on Apache POI's `CHPFormattedDiskPage`.
 /// Each 512-byte page contains:
 /// - FC array at start (4 bytes each)
 /// - BX array after FCs (1 byte each, offset to grpprl)
@@ -99,11 +100,12 @@ impl ChpxFkp {
     /// # Arguments
     ///
     /// * `page_data` - 512-byte FKP page data
-    /// * `data_stream` - The main data stream (WordDocument) for reading full CHPXs
+    /// * `data_stream` - The main data stream (`WordDocument`) for reading full CHPXs
     ///
     /// # Returns
     ///
     /// Parsed CHPX FKP or None if invalid
+    #[must_use]
     pub fn parse(page_data: &[u8], _data_stream: &[u8]) -> Option<Self> {
         if page_data.len() != FKP_PAGE_SIZE {
             return None;
@@ -195,18 +197,21 @@ impl ChpxFkp {
 
     /// Get the number of entries in this FKP.
     #[inline]
+    #[must_use]
     pub fn count(&self) -> usize {
         self.entries.len()
     }
 
     /// Get an entry by index.
     #[inline]
+    #[must_use]
     pub fn entry(&self, index: usize) -> Option<&FkpEntry> {
         self.entries.get(index)
     }
 
     /// Get all entries.
     #[inline]
+    #[must_use]
     pub fn entries(&self) -> &[FkpEntry] {
         &self.entries
     }
@@ -214,7 +219,7 @@ impl ChpxFkp {
 
 /// PAPX FKP (Paragraph Property Formatted Disk Page).
 ///
-/// Based on Apache POI's PAPFormattedDiskPage.
+/// Based on Apache POI's `PAPFormattedDiskPage`.
 /// Each 512-byte page contains:
 /// - FC array at start (4 bytes each)
 /// - BX array after FCs (13 bytes each: 1 byte offset + 12 bytes PHE)
@@ -223,7 +228,7 @@ impl ChpxFkp {
 ///
 /// The BX structure for PAPX is different from CHPX:
 /// - Byte 0: offset/2 to the grpprl
-/// - Bytes 1-12: ParagraphHeight (PHE) structure
+/// - Bytes 1-12: `ParagraphHeight` (PHE) structure
 #[derive(Debug, Clone)]
 pub struct PapxFkp {
     /// Entries in this FKP page
@@ -241,6 +246,7 @@ impl PapxFkp {
     /// # Returns
     ///
     /// Parsed PAPX FKP or None if invalid
+    #[must_use]
     pub fn parse(page_data: &[u8], _data_stream: &[u8]) -> Option<Self> {
         if page_data.len() != FKP_PAGE_SIZE {
             return None;
@@ -330,7 +336,7 @@ impl PapxFkp {
     /// - If first byte is 0: next byte contains size (in words)
     /// - Otherwise: first byte contains size (in words), subtract 1
     ///
-    /// Based on POI's PAPFormattedDiskPage.getGrpprl()
+    /// Based on POI's `PAPFormattedDiskPage.getGrpprl()`
     #[inline]
     fn parse_papx_grpprl(page_data: &[u8], papx_offset: usize) -> Option<Vec<u8>> {
         if papx_offset >= page_data.len() {
@@ -363,12 +369,14 @@ impl PapxFkp {
 
     /// Get the number of entries in this FKP.
     #[inline]
+    #[must_use]
     pub fn count(&self) -> usize {
         self.entries.len()
     }
 
     /// Get an entry by index.
     #[inline]
+    #[must_use]
     pub fn entry(&self, index: usize) -> Option<&FkpEntry> {
         self.entries.get(index)
     }

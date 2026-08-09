@@ -1,4 +1,4 @@
-//! Semantic DrawingML coordinate values.
+//! Semantic `DrawingML` coordinate values.
 
 use super::codec::ParseError;
 
@@ -119,7 +119,7 @@ impl From<i32> for Coordinate {
     }
 }
 
-/// An exact `a:ST_PositiveCoordinate` suitable for DrawingML extents.
+/// An exact `a:ST_PositiveCoordinate` suitable for `DrawingML` extents.
 ///
 /// Despite its name, the XSD type is an integer restriction with an inclusive
 /// lower bound of zero. It does not accept unit-bearing measurements.

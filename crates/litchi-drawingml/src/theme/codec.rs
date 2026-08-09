@@ -1,4 +1,4 @@
-//! Bounded DrawingML theme XML codecs.
+//! Bounded `DrawingML` theme XML codecs.
 
 use std::ops::Range;
 
@@ -241,13 +241,7 @@ fn parse(xml: &[u8], root_name: &str) -> Result<Parsed> {
                 }
                 let local = element.local_name().as_ref().to_vec();
                 let depth = stack.len();
-                if !root_seen {
-                    if local != root_name.as_bytes() {
-                        return Err(invalid("theme XML has an unexpected root"));
-                    }
-                    root_seen = true;
-                    parsed.name = attr(&element, b"name", reader.decoder())?;
-                } else {
+                if root_seen {
                     open(
                         &local,
                         depth,
@@ -260,6 +254,12 @@ fn parse(xml: &[u8], root_name: &str) -> Result<Parsed> {
                         &mut fonts,
                         &mut parsed,
                     )?;
+                } else {
+                    if local != root_name.as_bytes() {
+                        return Err(invalid("theme XML has an unexpected root"));
+                    }
+                    root_seen = true;
+                    parsed.name = attr(&element, b"name", reader.decoder())?;
                 }
                 if stack.len() >= MAX_DEPTH {
                     return Err(limit("theme XML depth", MAX_DEPTH));
@@ -275,13 +275,7 @@ fn parse(xml: &[u8], root_name: &str) -> Result<Parsed> {
                 }
                 let local = element.local_name().as_ref().to_vec();
                 let depth = stack.len();
-                if !root_seen {
-                    if local != root_name.as_bytes() {
-                        return Err(invalid("theme XML has an unexpected root"));
-                    }
-                    root_seen = true;
-                    parsed.name = attr(&element, b"name", reader.decoder())?;
-                } else {
+                if root_seen {
                     open(
                         &local,
                         depth,
@@ -304,6 +298,12 @@ fn parse(xml: &[u8], root_name: &str) -> Result<Parsed> {
                         &mut fonts,
                         &mut parsed,
                     )?;
+                } else {
+                    if local != root_name.as_bytes() {
+                        return Err(invalid("theme XML has an unexpected root"));
+                    }
+                    root_seen = true;
+                    parsed.name = attr(&element, b"name", reader.decoder())?;
                 }
             },
             Event::End(element) => {
@@ -373,10 +373,10 @@ fn open(
             target: None,
         });
     } else if parsed.colors.is_none() && depth == scheme_depth + 1 {
-        if let Some(slot) = std::str::from_utf8(local).ok().and_then(Slot::from_token) {
-            if current_slot.replace(slot).is_some() {
-                return Err(invalid("theme has nested color slots"));
-            }
+        if let Some(slot) = std::str::from_utf8(local).ok().and_then(Slot::from_token)
+            && current_slot.replace(slot).is_some()
+        {
+            return Err(invalid("theme has nested color slots"));
         }
     } else if parsed.colors.is_none() && depth == scheme_depth + 2 && current_slot.is_some() {
         let color = match local {
@@ -422,11 +422,11 @@ fn open(
             match local {
                 b"latin" => {
                     face.latin = attr(element, b"typeface", decoder)?
-                        .ok_or_else(|| invalid("latin face lacks typeface"))?
+                        .ok_or_else(|| invalid("latin face lacks typeface"))?;
                 },
                 b"ea" => face.east_asian = attr(element, b"typeface", decoder)?.unwrap_or_default(),
                 b"cs" => {
-                    face.complex_script = attr(element, b"typeface", decoder)?.unwrap_or_default()
+                    face.complex_script = attr(element, b"typeface", decoder)?.unwrap_or_default();
                 },
                 b"font" => face.scripts.push(super::model::Script {
                     code: attr(element, b"script", decoder)?.unwrap_or_default(),

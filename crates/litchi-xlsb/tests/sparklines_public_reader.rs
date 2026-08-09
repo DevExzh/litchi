@@ -1,3 +1,10 @@
+#![allow(
+    clippy::pedantic,
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "integration tests use panic-on-failure extraction and exact sparkline fixture comparisons"
+)]
+
 //! Public-reader regression fixtures for the MS-XLSB sparkline wire format.
 //!
 //! The BIFF12 bytes below are assembled directly from the record layouts and

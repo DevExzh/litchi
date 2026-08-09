@@ -26,17 +26,17 @@ pub(super) fn items(values: &[Item]) -> Result<()> {
                 value.source().as_str()
             )));
         }
-        if let Some(props) = value.props() {
-            if values[..index].iter().any(|other| {
+        if let Some(props) = value.props()
+            && values[..index].iter().any(|other| {
                 other
                     .props()
                     .is_some_and(|candidate| candidate.id.eq_ignore_ascii_case(&props.id))
-            }) {
-                return Err(Error::Invalid(format!(
-                    "duplicate custom XML itemID '{}'",
-                    props.id
-                )));
-            }
+            })
+        {
+            return Err(Error::Invalid(format!(
+                "duplicate custom XML itemID '{}'",
+                props.id
+            )));
         }
     }
     Ok(())

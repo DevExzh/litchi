@@ -60,7 +60,7 @@ pub struct CharacterFormatting {
     // Future enhancement: Additional properties (color, strikethrough, subscript, superscript, etc.)
 }
 
-/// Line spacing descriptor for paragraphs, equivalent to POI's LineSpacingDescriptor (LSPD).
+/// Line spacing descriptor for paragraphs, equivalent to POI's `LineSpacingDescriptor` (LSPD).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LineSpacing {
     /// Line height. If `is_multiple` is false, value is in twips. If true, value is in 240ths of a line.
@@ -71,6 +71,7 @@ pub struct LineSpacing {
 
 impl LineSpacing {
     /// Single-line spacing (240/240 of a line).
+    #[must_use]
     pub const fn single() -> Self {
         Self {
             dya_line: 240,
@@ -79,6 +80,7 @@ impl LineSpacing {
     }
 
     /// One-and-a-half-line spacing (360/240 of a line).
+    #[must_use]
     pub const fn one_and_half() -> Self {
         Self {
             dya_line: 360,
@@ -87,6 +89,7 @@ impl LineSpacing {
     }
 
     /// Double-line spacing (480/240 of a line).
+    #[must_use]
     pub const fn double() -> Self {
         Self {
             dya_line: 480,

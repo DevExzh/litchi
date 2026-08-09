@@ -62,7 +62,7 @@ fn append_frt_header(data: &mut Vec<u8>, record_type: u16) {
 
 fn with_record_header(record_type: u16, payload: Vec<u8>) -> Result<Vec<u8>> {
     let length = u16::try_from(payload.len())
-        .map_err(|_| invalid(record_type, "payload length exceeds BIFF u16"))?;
+        .map_err(|_error| invalid(record_type, "payload length exceeds BIFF u16"))?;
     let mut record = Vec::with_capacity(4 + payload.len());
     record.extend_from_slice(&record_type.to_le_bytes());
     record.extend_from_slice(&length.to_le_bytes());
@@ -71,6 +71,9 @@ fn with_record_header(record_type: u16, payload: Vec<u8>) -> Result<Vec<u8>> {
 }
 
 impl Header {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse_payload(data: &[u8]) -> Result<Self> {
         if data.len() != HEADER_PAYLOAD_LEN {
             return Err(invalid(
@@ -104,6 +107,7 @@ impl Header {
     }
 
     /// Serialize the complete `FeatHdr` payload deterministically.
+    #[must_use]
     pub fn to_payload(self) -> Vec<u8> {
         let mut data = Vec::with_capacity(HEADER_PAYLOAD_LEN);
         append_frt_header(&mut data, FEAT_HDR_RECORD_TYPE);
@@ -114,12 +118,18 @@ impl Header {
     }
 
     /// Serialize the complete BIFF record including its four-byte record header.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_record_bytes(self) -> Result<Vec<u8>> {
         with_record_header(FEAT_HDR_RECORD_TYPE, self.to_payload())
     }
 }
 
 impl Range {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(
         first_row: u16,
         last_row: u16,
@@ -141,13 +151,16 @@ impl Range {
         Ok(Self {
             first_row,
             last_row,
-            first_column: first_column as u8,
-            last_column: last_column as u8,
+            first_column: crate::utils::truncate_u16_to_u8(first_column),
+            last_column: crate::utils::truncate_u16_to_u8(last_column),
         })
     }
 }
 
 impl Feature {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(ranges: Vec<Range>, checks: Checks) -> Result<Self> {
         if ranges.len() > MAX_RANGES {
             return Err(invalid(
@@ -158,6 +171,9 @@ impl Feature {
         Ok(Self { ranges, checks })
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse_payload(data: &[u8]) -> Result<Self> {
         let minimum = FEATURE_FIXED_LEN + FEATURE_DATA_LEN;
         if !(minimum..=MAX_RECORD_PAYLOAD_LEN).contains(&data.len()) {
@@ -189,7 +205,9 @@ impl Feature {
                 format!("Feat range count exceeds {MAX_RANGES}"),
             ));
         }
-        if read_u32(data, 21, FEAT_RECORD_TYPE, "Feat.cbFeatData")? != FEATURE_DATA_LEN as u32 {
+        if read_u32(data, 21, FEAT_RECORD_TYPE, "Feat.cbFeatData")?
+            != crate::utils::truncate_usize_to_u32(FEATURE_DATA_LEN)
+        {
             return Err(invalid(FEAT_RECORD_TYPE, "ISFFEC2 cbFeatData must be four"));
         }
         if read_u16(data, 25, FEAT_RECORD_TYPE, "Feat.reserved3")? != 0 {
@@ -233,10 +251,16 @@ impl Feature {
                 "FFErrorCheck reserved bits must be zero",
             ));
         }
-        Self::try_new(ranges, Checks::from_bits(raw_checks as u8))
+        Self::try_new(
+            ranges,
+            Checks::from_bits(crate::utils::truncate_u32_to_u8(raw_checks)),
+        )
     }
 
     /// Serialize the complete `Feat` payload deterministically.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_payload(&self) -> Result<Vec<u8>> {
         let size = self
             .ranges
@@ -252,8 +276,12 @@ impl Feature {
         data.extend_from_slice(&ISF_FEC2.to_le_bytes());
         data.push(0);
         data.extend_from_slice(&0u32.to_le_bytes());
-        data.extend_from_slice(&(self.ranges.len() as u16).to_le_bytes());
-        data.extend_from_slice(&(FEATURE_DATA_LEN as u32).to_le_bytes());
+        data.extend_from_slice(
+            &crate::utils::truncate_usize_to_u16(self.ranges.len()).to_le_bytes(),
+        );
+        data.extend_from_slice(
+            &crate::utils::truncate_usize_to_u32(FEATURE_DATA_LEN).to_le_bytes(),
+        );
         data.extend_from_slice(&0u16.to_le_bytes());
         for range in &self.ranges {
             data.extend_from_slice(&range.first_row.to_le_bytes());
@@ -266,6 +294,9 @@ impl Feature {
     }
 
     /// Serialize the complete BIFF record including its four-byte record header.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         with_record_header(FEAT_RECORD_TYPE, self.to_payload()?)
     }

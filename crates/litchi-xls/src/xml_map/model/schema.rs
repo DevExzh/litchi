@@ -11,6 +11,9 @@ pub struct NamespaceDeclaration {
 }
 
 impl NamespaceDeclaration {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(prefix: impl Into<String>, uri: impl Into<String>) -> Result<Self> {
         let prefix = prefix.into();
         if !prefix.is_empty() && !valid_prefix(&prefix) {
@@ -23,10 +26,12 @@ impl NamespaceDeclaration {
         Ok(Self { prefix, uri })
     }
 
+    #[must_use]
     pub fn prefix(&self) -> &str {
         &self.prefix
     }
 
+    #[must_use]
     pub fn uri(&self) -> &str {
         &self.uri
     }
@@ -42,6 +47,9 @@ pub struct Schema {
 }
 
 impl Schema {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(id: SchemaId, payload: OpaqueXml) -> Result<Self> {
         Self::from_parts(id.as_str().to_string(), None, None, Vec::new(), payload)
     }
@@ -73,22 +81,27 @@ impl Schema {
         })
     }
 
+    #[must_use]
     pub fn id(&self) -> &SchemaId {
         &self.id
     }
 
+    #[must_use]
     pub fn schema_references(&self) -> Option<&[SchemaId]> {
         self.schema_ref.as_deref()
     }
 
+    #[must_use]
     pub fn namespace(&self) -> Option<&str> {
         self.namespace.as_deref()
     }
 
+    #[must_use]
     pub fn namespaces(&self) -> &[NamespaceDeclaration] {
         &self.namespaces
     }
 
+    #[must_use]
     pub fn payload(&self) -> &OpaqueXml {
         &self.payload
     }

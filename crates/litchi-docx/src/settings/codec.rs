@@ -1,11 +1,23 @@
-//! Namespace-aware bounded XML codec for WordprocessingML document settings.
+#![expect(
+    clippy::format_push_string,
+    reason = "serialization preserves the established byte-emission path"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::struct_excessive_bools,
+    reason = "the public model preserves independent OOXML flags"
+)]
+//! Namespace-aware bounded XML codec for `WordprocessingML` document settings.
 
-use super::colors::*;
-use super::compatibility::*;
-use super::editing::*;
+use super::colors::{ColorSchemeIndex, ColorSchemeMapping, ColorSchemeSlot};
+use super::compatibility::{CompatFlag, CompatibilityOption, CompatibilitySetting};
+use super::editing::{ProofState, ProofingState, ProtectionType, ThemeFontLanguages, View};
 use super::extensions::Extensions;
 use super::model::Settings;
-use super::notes::*;
+use super::notes::{NoteNumberFormat, NoteNumberingProperties, NoteNumberingRestart, NotePosition};
 use super::support::{invalid, reserve_one, xml_error};
 use super::{
     MAX_SETTINGS_XML_BYTES, MAX_SETTINGS_XML_DEPTH, MAX_SETTINGS_XML_NODES, STRICT_WORD_NAMESPACE,
@@ -51,6 +63,10 @@ impl<F: Copy> Settings<F> {
 
 impl Settings<NoteNumberFormat> {
     /// Parse the bounded format-owned portion of a `settings.xml` document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn parse(xml: &[u8]) -> Result<Self> {
         if xml.len() > MAX_SETTINGS_XML_BYTES {
             return Err(invalid(format!(
@@ -192,7 +208,13 @@ impl Settings<NoteNumberFormat> {
                     return Err(invalid("unterminated Word settings XML"));
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {},
             }
         }
 
@@ -203,6 +225,7 @@ impl Settings<NoteNumberFormat> {
     }
 
     /// Serialize the complete modeled format-owned settings fragment.
+    #[must_use]
     pub fn to_xml(&self, prefix: &str) -> String {
         let mut xml = String::new();
         if self.protected {
@@ -341,11 +364,12 @@ fn parse_group_child(
                 ));
             } else {
                 let local_name = element.local_name();
-                let raw = std::str::from_utf8(local_name.as_ref())
-                    .map_err(|_| invalid("compatibility flag name is not valid UTF-8"))?;
-                let flag = raw
-                    .parse::<CompatFlag>()
-                    .map_err(|_| invalid(format!("invalid compatibility flag '{raw}'")))?;
+                let raw = std::str::from_utf8(local_name.as_ref()).map_err(|_source_error| {
+                    invalid("compatibility flag name is not valid UTF-8")
+                })?;
+                let flag = raw.parse::<CompatFlag>().map_err(|_source_error| {
+                    invalid(format!("invalid compatibility flag '{raw}'"))
+                })?;
                 if strict_wordprocessingml && !flag.is_strict() {
                     return Err(invalid(format!(
                         "compatibility flag '{raw}' is not valid in Strict WordprocessingML"
@@ -386,7 +410,7 @@ fn parse_note_property_child(
             let value = required_attribute(element, b"val", decoder, resolver, "note position")?;
             let position = value
                 .parse::<NotePosition>()
-                .map_err(|_| invalid(format!("invalid note position '{value}'")))?;
+                .map_err(|_source_error| invalid(format!("invalid note position '{value}'")))?;
             if kind == NoteKind::Endnote && !position.valid_for_endnote() {
                 return Err(invalid(format!(
                     "position '{}' is not valid for an endnote",
@@ -400,22 +424,18 @@ fn parse_note_property_child(
                 return Err(invalid("duplicate note numbering format"));
             }
             let value = required_attribute(element, b"val", decoder, resolver, "note numFmt")?;
-            properties.format = Some(
-                value
-                    .parse()
-                    .map_err(|_| invalid(format!("invalid note numbering format '{value}'")))?,
-            );
+            properties.format = Some(value.parse().map_err(|_source_error| {
+                invalid(format!("invalid note numbering format '{value}'"))
+            })?);
         },
         b"numStart" => {
             if properties.start.is_some() {
                 return Err(invalid("duplicate note numbering start"));
             }
             let value = required_attribute(element, b"val", decoder, resolver, "note numStart")?;
-            properties.start = Some(
-                value
-                    .parse()
-                    .map_err(|_| invalid(format!("invalid note numbering start '{value}'")))?,
-            );
+            properties.start = Some(value.parse().map_err(|_source_error| {
+                invalid(format!("invalid note numbering start '{value}'"))
+            })?);
         },
         b"numRestart" => {
             if properties.restart.is_some() {
@@ -486,11 +506,10 @@ fn parse_setting(
                 return Err(invalid("duplicate defaultTabStop setting"));
             }
             let value = required_attribute(element, b"val", decoder, resolver, "default tab stop")?;
-            settings.default_tab_stop_twips = Some(
-                value
-                    .parse()
-                    .map_err(|_| invalid(format!("invalid default tab stop '{value}'")))?,
-            );
+            settings.default_tab_stop_twips =
+                Some(value.parse().map_err(|_source_error| {
+                    invalid(format!("invalid default tab stop '{value}'"))
+                })?);
         },
         b"themeFontLang" => {
             if std::mem::replace(&mut seen.theme_font_languages, true) {

@@ -11,6 +11,9 @@ pub(super) const MAX_EXTENSION_DEPTH: usize = 256;
 
 /// Validate a template's required band structure and style references.
 impl Template {
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn validate(&self) -> Result<()> {
         validate_template_value(&self.name, "table template name")?;
         if self.even_rows.is_some() != self.odd_rows.is_some() {

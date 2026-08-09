@@ -46,6 +46,7 @@ pub enum Leniency {
 impl Leniency {
     /// Whether stylesheet defects are repaired rather than rejected.
     #[inline]
+    #[must_use]
     pub fn tolerates_stylesheet_defects(self) -> bool {
         matches!(self, Self::TolerateStylesheetDefects)
     }
@@ -69,6 +70,7 @@ pub enum StylesheetDefect {
 
 impl StylesheetDefect {
     /// A short, stable description of what a lenient read did.
+    #[must_use]
     pub const fn repair(self) -> &'static str {
         match self {
             Self::DuplicateStyleName => "kept the duplicated name; styles are resolved by index",
@@ -98,24 +100,28 @@ pub struct ToleranceReport {
 impl ToleranceReport {
     /// Whether the document parsed without any repair.
     #[inline]
+    #[must_use]
     pub fn is_clean(&self) -> bool {
         self.defects.is_empty() && self.unrecorded == 0
     }
 
     /// The individually recorded defects, in discovery order.
     #[inline]
+    #[must_use]
     pub fn defects(&self) -> &[ToleratedDefect] {
         &self.defects
     }
 
     /// Defects that were repaired but not stored, once the bound was reached.
     #[inline]
+    #[must_use]
     pub fn unrecorded(&self) -> u32 {
         self.unrecorded
     }
 
     /// Total repairs performed, recorded or not.
     #[inline]
+    #[must_use]
     pub fn total(&self) -> u64 {
         self.defects.len() as u64 + u64::from(self.unrecorded)
     }

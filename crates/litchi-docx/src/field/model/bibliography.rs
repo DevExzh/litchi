@@ -1,3 +1,7 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Bibliography field models.
 
 use super::{Field, Switch};
@@ -68,36 +72,43 @@ impl Citation {
     }
 
     /// Return the complete stored field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
 
     /// Return the cached formatted citation, if present.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a word processor has marked the cached result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
 
     /// Whether a word processor has locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.locked
     }
 
     /// Return the primary source tag stored directly after `CITATION`.
+    #[must_use]
     pub fn primary_source_tag(&self) -> &str {
         &self.source_tags[0]
     }
 
     /// Return primary and `\m` multi-source tags in instruction order.
+    #[must_use]
     pub fn source_tags(&self) -> &[String] {
         &self.source_tags
     }
 
     /// Return the additional source tags introduced by `\m` switches.
+    #[must_use]
     pub fn additional_source_tags(&self) -> &[String] {
         &self.source_tags[1..]
     }
@@ -107,11 +118,13 @@ impl Citation {
     /// Switch semantics can apply to the primary or a preceding `\m` source,
     /// so callers that need producer-specific interpretation should retain this
     /// source order instead of assuming a global setting.
+    #[must_use]
     pub fn switches(&self) -> &[Switch] {
         &self.switches
     }
 
     /// Check whether a case-insensitive ASCII switch appears in this field.
+    #[must_use]
     pub fn has_switch(&self, name: char) -> bool {
         has_field_switch(&self.switches, name)
     }
@@ -146,31 +159,37 @@ impl Bibliography {
     }
 
     /// Return the complete stored field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
 
     /// Return the cached visible bibliography result, if present.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a word processor has marked the cached result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
 
     /// Whether a word processor has locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.locked
     }
 
     /// Return the field switches in source order.
+    #[must_use]
     pub fn switches(&self) -> &[Switch] {
         &self.switches
     }
 
     /// Check whether a case-insensitive ASCII switch appears in this field.
+    #[must_use]
     pub fn has_switch(&self, name: char) -> bool {
         has_field_switch(&self.switches, name)
     }
@@ -182,6 +201,7 @@ impl Field {
     /// Recognition is limited to the stored field instruction. It never looks
     /// up bibliography sources, formats a citation, follows a data-store
     /// reference, or refreshes the cached result.
+    #[must_use]
     pub fn is_citation(&self) -> bool {
         field_instruction_remainder(&self.instruction, "CITATION").is_some()
     }
@@ -191,6 +211,10 @@ impl Field {
     /// Returns `Ok(None)` for non-`CITATION` fields. The result exposes only
     /// stored source tags, switches, cached content, and dirty/lock state; it
     /// never resolves sources or formats a citation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn citation(&self) -> Result<Option<Citation>> {
         Citation::from_field(self)
     }
@@ -199,6 +223,7 @@ impl Field {
     ///
     /// This recognizes persisted configuration only. It does not enumerate
     /// sources, sort them, or generate bibliography text.
+    #[must_use]
     pub fn is_bibliography(&self) -> bool {
         field_instruction_remainder(&self.instruction, "BIBLIOGRAPHY").is_some()
     }
@@ -207,6 +232,10 @@ impl Field {
     ///
     /// Returns `Ok(None)` for non-`BIBLIOGRAPHY` fields. Stored switches and
     /// cached visible content remain data only; no bibliography is generated.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn bibliography(&self) -> Result<Option<Bibliography>> {
         Bibliography::from_field(self)
     }

@@ -34,6 +34,7 @@ pub struct NumericData {
 impl NumericData {
     /// Create a new numeric data set with values.
     #[inline]
+    #[must_use]
     pub fn from_values(values: Vec<f64>) -> Self {
         Self {
             source_ref: None,
@@ -61,6 +62,7 @@ impl NumericData {
 
     /// Add cached values.
     #[inline]
+    #[must_use]
     pub fn with_cached_values(mut self, values: Vec<f64>) -> Self {
         self.values = values;
         self
@@ -79,6 +81,7 @@ pub struct StringData {
 impl StringData {
     /// Create a new string data set with values.
     #[inline]
+    #[must_use]
     pub fn from_values(values: Vec<String>) -> Self {
         Self {
             source_ref: None,
@@ -97,6 +100,7 @@ impl StringData {
 
     /// Add cached values.
     #[inline]
+    #[must_use]
     pub fn with_cached_values(mut self, values: Vec<String>) -> Self {
         self.values = values;
         self
@@ -113,12 +117,14 @@ pub struct MultiLevelStringData {
 impl MultiLevelStringData {
     /// Create a new multi-level string data set.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self { levels: Vec::new() }
     }
 
     /// Add a level.
     #[inline]
+    #[must_use]
     pub fn add_level(mut self, level: StringData) -> Self {
         self.levels.push(level);
         self
@@ -153,12 +159,14 @@ impl NumberFormat {
 
     /// Create a General format.
     #[inline]
+    #[must_use]
     pub fn general() -> Self {
         Self::new("General")
     }
 
     /// Set whether the format is linked to source.
     #[inline]
+    #[must_use]
     pub fn with_source_linked(mut self, linked: bool) -> Self {
         self.source_linked = linked;
         self
@@ -198,6 +206,7 @@ pub struct Layout {
 impl Layout {
     /// Create a new manual layout.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             x: None,
@@ -214,6 +223,7 @@ impl Layout {
 
     /// Set position.
     #[inline]
+    #[must_use]
     pub fn with_position(mut self, x: f64, y: f64) -> Self {
         self.x = Some(x);
         self.y = Some(y);
@@ -222,6 +232,7 @@ impl Layout {
 
     /// Set size.
     #[inline]
+    #[must_use]
     pub fn with_size(mut self, width: f64, height: f64) -> Self {
         self.width = Some(width);
         self.height = Some(height);

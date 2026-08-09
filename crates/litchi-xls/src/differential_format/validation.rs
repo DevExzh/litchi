@@ -1,4 +1,4 @@
-//! Semantic invariants for typed DXF and XFProps values.
+//! Semantic invariants for typed DXF and `XFProps` values.
 
 use super::{DifferentialFormat, HorizontalAlignment, Result, XfProperties, XfProperty, invalid};
 

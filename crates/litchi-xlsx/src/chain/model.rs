@@ -68,6 +68,7 @@ impl Sheet {
     }
 
     /// Return the native one-based sheet identifier.
+    #[must_use]
     pub const fn get(self) -> u16 {
         self.0
     }
@@ -116,11 +117,13 @@ pub mod raw {
 
     impl Attr {
         /// Return the original qualified attribute name.
+        #[must_use]
         pub fn name(&self) -> &str {
             &self.name
         }
 
         /// Return the decoded attribute value.
+        #[must_use]
         pub fn value(&self) -> &str {
             &self.value
         }
@@ -157,26 +160,31 @@ impl Cell {
     }
 
     /// Return the original checked A1 spelling.
+    #[must_use]
     pub fn reference(&self) -> &str {
         &self.reference
     }
 
     /// Return the typed grid address.
+    #[must_use]
     pub const fn address(&self) -> Address {
         self.address
     }
 
     /// Return the effective sheet identifier.
+    #[must_use]
     pub const fn sheet(&self) -> Sheet {
         self.sheet
     }
 
     /// Return this cell's mutually exclusive dependency role.
+    #[must_use]
     pub const fn step(&self) -> Step {
         self.step
     }
 
     /// Return orthogonal producer markers.
+    #[must_use]
     pub const fn flags(&self) -> Flags {
         self.flags
     }
@@ -194,6 +202,7 @@ impl Cell {
     }
 
     /// Return bounded preserved attributes.
+    #[must_use]
     pub fn attrs(&self) -> &[Attr] {
         &self.attrs
     }
@@ -211,6 +220,7 @@ pub struct Chain {
 
 impl Chain {
     /// Create a non-empty chain. The first cell is always written with a sheet ID.
+    #[must_use]
     pub fn new(mut first: Cell) -> Self {
         first.explicit_sheet = true;
         Self {
@@ -223,16 +233,19 @@ impl Chain {
     }
 
     /// Borrow cells in calculation order.
+    #[must_use]
     pub fn cells(&self) -> &[Cell] {
         &self.cells
     }
 
     /// Return the number of calculation cells.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.cells.len()
     }
 
     /// A chain is statically non-empty.
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         false
     }
@@ -378,11 +391,13 @@ impl Chain {
     }
 
     /// Return the bounded, preserved extension-list XML, when present.
+    #[must_use]
     pub fn extension_list_xml(&self) -> Option<&str> {
         self.extension_list_xml.as_deref()
     }
 
     /// Return bounded, preserved attributes from the chain root.
+    #[must_use]
     pub fn attrs(&self) -> &[Attr] {
         &self.attrs
     }

@@ -8,7 +8,7 @@
 use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
 
-/// Table-pointer index of `fcPlcfTch`/`lcbPlcfTch` (MS-DOC 2.5.7 FibRgFcLcb2000).
+/// Table-pointer index of `fcPlcfTch`/`lcbPlcfTch` (MS-DOC 2.5.7 `FibRgFcLcb2000`).
 const TABLE_CHAR_FIB_INDEX: usize = 93;
 const MAX_TCH_ENTRIES: usize = 1_000_000;
 /// CPs are signed 31-bit positions (MS-DOC 2.2.1).
@@ -38,6 +38,7 @@ impl TableCharInfo {
     const FUNK_MASK: u32 = 0x1;
 
     /// Create table-character information for a CP range.
+    #[must_use]
     pub const fn new(is_unknown: bool) -> Self {
         Self { is_unknown }
     }
@@ -54,11 +55,13 @@ impl TableCharInfo {
     }
 
     /// Serialize with zeroed `unused` bits.
+    #[must_use]
     pub fn to_bytes(self) -> [u8; Self::SIZE] {
         u32::from(self.is_unknown).to_le_bytes()
     }
 
     /// Whether the table-character cache for the CP range is unknown (`fUnk`).
+    #[must_use]
     pub fn is_unknown(&self) -> bool {
         self.is_unknown
     }
@@ -72,13 +75,16 @@ pub struct TableCharEntry {
 }
 
 impl TableCharEntry {
+    #[must_use]
     pub const fn new(start_cp: u32, info: TableCharInfo) -> Self {
         Self { start_cp, info }
     }
 
+    #[must_use]
     pub fn start_cp(&self) -> u32 {
         self.start_cp
     }
+    #[must_use]
     pub fn info(&self) -> TableCharInfo {
         self.info
     }
@@ -142,16 +148,20 @@ impl TableCharacterCache {
         })
     }
 
+    #[must_use]
     pub fn entries(&self) -> &[TableCharEntry] {
         &self.entries
     }
     /// Final PLC CP; it only terminates the last range.
+    #[must_use]
     pub fn terminal_cp(&self) -> u32 {
         self.terminal_cp
     }
+    #[must_use]
     pub fn len(&self) -> usize {
         self.entries.len()
     }
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }

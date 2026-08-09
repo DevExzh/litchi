@@ -1,4 +1,4 @@
-//! Format-neutral SpreadsheetML Custom XML Maps model and bounded XML codec.
+//! Format-neutral `SpreadsheetML` Custom XML Maps model and bounded XML codec.
 
 mod codec;
 mod model;

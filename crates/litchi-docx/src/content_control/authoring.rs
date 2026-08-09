@@ -1,3 +1,11 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::struct_excessive_bools,
+    reason = "the public model preserves independent OOXML flags"
+)]
 use super::{
     Appearance, BindingFlavor, Calendar, DataBinding, FORMATTING_ALLOWED_NAMESPACE,
     FormattingAllowed, Kind, Limits, Lock, STORE_ITEM_CHECKSUM_NAMESPACE, SdtColor,
@@ -243,6 +251,10 @@ impl AuthoredProperties {
 }
 
 /// Author one complete, canonical w:sdtPr element.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn write_sdt_pr(view: &AuthoringView<'_>, limits: &Limits) -> Result<AuthoredProperties> {
     limits.validate()?;
     if view.id > MAX_SDT_ID {
@@ -262,7 +274,8 @@ pub fn write_sdt_pr(view: &AuthoringView<'_>, limits: &Limits) -> Result<Authore
     }
 
     let mut xml = String::new();
-    xml.try_reserve(estimate).map_err(|_| output_limit())?;
+    xml.try_reserve(estimate)
+        .map_err(|_source_error| output_limit())?;
     xml.push_str("<w:sdtPr");
     if requirements.needs_mce() {
         write!(&mut xml, r#" xmlns:mc="{MC_NAMESPACE}""#)?;
@@ -421,7 +434,7 @@ fn validate_view(view: &AuthoringView<'_>, limits: &Limits) -> Result<()> {
         validate_xml_scalars(value, "list-item value")?;
     }
     if let Some(value) = view.date_value {
-        DateTime::new(value.to_owned()).map_err(|_| {
+        DateTime::new(value.to_owned()).map_err(|_source_error| {
             Error::InvalidFormat("date fullDate is not a valid bounded xsd:dateTime".into())
         })?;
     }
@@ -570,7 +583,15 @@ fn write_kind(xml: &mut String, view: &AuthoringView<'_>) -> Result<()> {
             xml.push_str("</w15:repeatingSection>");
         },
         Kind::RepeatingItem => xml.push_str("<w15:repeatingSectionItem/>"),
-        kind => write!(xml, "<w:{}/>", kind.as_str())?,
+        kind @ (Kind::RichText
+        | Kind::Text
+        | Kind::Picture
+        | Kind::Citation
+        | Kind::Equation
+        | Kind::Group
+        | Kind::DocPartList
+        | Kind::DocPart
+        | Kind::Bibliography) => write!(xml, "<w:{}/>", kind.as_str())?,
     }
     Ok(())
 }

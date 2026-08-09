@@ -57,6 +57,27 @@ impl Page {
         }
     }
 
+    /// Sets an XML identity on a detached page.
+    #[must_use]
+    pub fn with_xml_id(mut self, xml_id: impl Into<String>) -> Self {
+        self.xml_id = Some(xml_id.into());
+        self
+    }
+
+    /// Sets the drawing-page style reference on a detached page.
+    #[must_use]
+    pub fn with_style_name(mut self, style_name: impl Into<String>) -> Self {
+        self.style_name = Some(style_name.into());
+        self
+    }
+
+    /// Sets the master-page reference on a detached page.
+    #[must_use]
+    pub fn with_master_page_name(mut self, name: impl Into<String>) -> Self {
+        self.master_page_name = Some(name.into());
+        self
+    }
+
     pub(crate) fn parsed(
         name: Option<String>,
         xml_id: Option<String>,

@@ -1,4 +1,4 @@
-//! Contextual ODS DataPilot ownership.
+//! Contextual ODS `DataPilot` ownership.
 //!
 //! The lower [`crate::model::data_pilot`] module owns the ODF vocabulary and
 //! its standalone XML grammar.  This module binds that vocabulary to the

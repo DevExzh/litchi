@@ -1,7 +1,9 @@
 //! FIB and Table-stream integration for field PLCFs.
 
-use super::model::*;
 use super::model::{CP_SIZE, FLD_SIZE, MAX_FIELD_MARKERS, MAX_PLCFLD_BYTES, corrupted};
+use super::model::{
+    Field, FieldDescriptor, FieldMarker, FieldMarkerValue, FieldStory, FieldText, FieldType,
+};
 use crate::package::Result;
 use crate::parts::fib::FileInformationBlock;
 
@@ -15,7 +17,7 @@ pub struct FieldStoryTable {
 }
 
 impl FieldStoryTable {
-    /// Strictly parse one complete PLCF, validating its FieldList grammar.
+    /// Strictly parse one complete PLCF, validating its `FieldList` grammar.
     pub fn parse_plcf(story: FieldStory, story_length: u32, data: &[u8]) -> Result<Self> {
         if data.len() > MAX_PLCFLD_BYTES {
             return Err(corrupted("Plcfld exceeds the allocation limit"));
@@ -66,18 +68,22 @@ impl FieldStoryTable {
         })
     }
 
+    #[must_use]
     pub fn story(&self) -> FieldStory {
         self.story
     }
 
+    #[must_use]
     pub fn markers(&self) -> &[FieldMarker] {
         &self.markers
     }
 
+    #[must_use]
     pub fn terminal_cp(&self) -> u32 {
         self.terminal_cp
     }
 
+    #[must_use]
     pub fn fields(&self) -> &[Field] {
         &self.fields
     }
@@ -226,10 +232,12 @@ impl FieldsTable {
         Ok(Self { stories })
     }
 
+    #[must_use]
     pub fn story(&self, story: FieldStory) -> Option<&FieldStoryTable> {
         self.stories.iter().find(|table| table.story == story)
     }
 
+    #[must_use]
     pub fn stories(&self) -> &[FieldStoryTable] {
         &self.stories
     }
@@ -239,20 +247,24 @@ impl FieldsTable {
     }
 
     /// Compatibility accessor for existing main-document users.
+    #[must_use]
     pub fn main_document_fields(&self) -> &[Field] {
         self.fields(FieldStory::Main)
     }
 
+    #[must_use]
     pub fn find_field_at_position(&self, cp: u32) -> Option<&Field> {
         self.find_field(FieldStory::Main, cp)
     }
 
+    #[must_use]
     pub fn find_field(&self, story: FieldStory, cp: u32) -> Option<&Field> {
         self.fields(story)
             .iter()
             .find(|field| field.start_cp <= cp && cp <= field.end_cp)
     }
 
+    #[must_use]
     pub fn get_embedded_object_fields(&self) -> Vec<&Field> {
         self.main_document_fields()
             .iter()
@@ -266,7 +278,7 @@ impl FieldsTable {
     {
         self.stories
             .iter()
-            .flat_map(|story| story.fields())
+            .flat_map(FieldStoryTable::fields)
             .map(|field| {
                 FieldText::from_field(field, |start, end| text_at_range(field.story, start, end))
             })

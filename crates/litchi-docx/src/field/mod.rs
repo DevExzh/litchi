@@ -1,4 +1,8 @@
-//! Layered WordprocessingML field models and bounded codecs.
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+//! Layered `WordprocessingML` field models and bounded codecs.
 //!
 //! The public module remains the historical `crate::field` entry point.
 //! Field values and typed instruction metadata live in [`model`], while

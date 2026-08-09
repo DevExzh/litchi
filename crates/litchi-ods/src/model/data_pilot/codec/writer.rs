@@ -3,7 +3,10 @@
 use crate::model::database_range::{write_database_source, write_filter};
 use litchi_core::{Result, xml::escape_xml};
 
-use super::super::{MAX_DATA_PILOT_TABLES, invalid_message, model::*};
+use super::super::{
+    MAX_DATA_PILOT_TABLES, invalid_message,
+    model::{Field, GrandTotal, GroupBoundary, Groups, Level, Source, Table},
+};
 
 pub(crate) fn write_data_pilot_tables(output: &mut String, tables: &[Table]) -> Result<()> {
     if tables.is_empty() {
@@ -253,7 +256,7 @@ fn write_boundary(out: &mut String, suffix: &str, boundary: &GroupBoundary) {
             attr(out, &format!("table:date-{suffix}"), Some("auto"));
         },
         GroupBoundary::Number(value) => {
-            attr(out, &format!("table:{suffix}"), Some(&value.to_string()))
+            attr(out, &format!("table:{suffix}"), Some(&value.to_string()));
         },
         GroupBoundary::Date(value) => attr(out, &format!("table:date-{suffix}"), Some(value)),
     }

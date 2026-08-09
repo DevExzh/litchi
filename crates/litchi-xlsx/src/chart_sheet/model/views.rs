@@ -31,7 +31,7 @@ pub struct View {
 /// One saved chartsheet view from `CT_CustomChartsheetView`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CustomView {
-    /// Braced UUID lexical form required by SpreadsheetML `ST_Guid`.
+    /// Braced UUID lexical form required by `SpreadsheetML` `ST_Guid`.
     pub guid: String,
     pub scale: Option<u32>,
     pub state: Option<State>,

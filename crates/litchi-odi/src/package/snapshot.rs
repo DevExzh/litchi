@@ -1,13 +1,17 @@
 //! Immutable image package ownership and bounded content-part rebuilding.
 
-use crate::{FlatImage, frame::Frame, resource::Resource};
+use crate::{
+    FlatImage,
+    frame::Frame,
+    resource::{Edge, Graph, Node, Resource},
+};
 use litchi_core::{Error, Metadata, Result};
 use litchi_odf_common::{
     compact_xml,
     core::{PackageWriter, family::Package},
     media,
 };
-use std::{path::Path, sync::Arc};
+use std::{collections::HashMap, path::Path, sync::Arc};
 
 pub(crate) const MIMETYPE: &str = "application/vnd.oasis.opendocument.image";
 // The shared package owner only needs a coarse non-empty XML marker here;
@@ -25,6 +29,7 @@ struct State {
     package: Package,
     content: FlatImage,
     resources: Vec<Resource>,
+    resource_graph: Graph,
 }
 
 /// An immutable, validated package snapshot.
@@ -43,10 +48,12 @@ impl Snapshot {
     fn from_package(package: Package) -> Result<Self> {
         let content = FlatImage::from_content_xml(package.content_xml().as_bytes().to_vec())?;
         let resources = scan_resources(&package)?;
+        let resource_graph = build_resource_graph(&package, &resources)?;
         Ok(Self(Arc::new(State {
             package,
             content,
             resources,
+            resource_graph,
         })))
     }
 
@@ -60,6 +67,20 @@ impl Snapshot {
 
     pub(crate) fn metadata(&self) -> Option<&Metadata> {
         self.0.package.metadata()
+    }
+
+    pub(crate) fn meta_xml(&self) -> Result<Option<String>> {
+        let archive = self.0.package.package();
+        archive
+            .has_file("meta.xml")?
+            .then(|| archive.get_file("meta.xml"))
+            .transpose()?
+            .map(|bytes| {
+                String::from_utf8(bytes).map_err(|error| {
+                    Error::InvalidFormat(format!("ODI meta.xml is not UTF-8: {error}"))
+                })
+            })
+            .transpose()
     }
 
     pub(crate) fn as_bytes(&self) -> &[u8] {
@@ -89,6 +110,10 @@ impl Snapshot {
         &self.0.resources
     }
 
+    pub(crate) fn resource_graph(&self) -> &Graph {
+        &self.0.resource_graph
+    }
+
     pub(crate) fn resource_bytes(&self, index: usize) -> Result<Option<Vec<u8>>> {
         let resource =
             self.0.resources.get(index).ok_or_else(|| {
@@ -110,6 +135,7 @@ impl Snapshot {
     pub(crate) fn rebuild(
         &self,
         content: &str,
+        replacement_meta_xml: Option<&str>,
         replacements: &[ResourceReplacement<'_>],
     ) -> Result<Self> {
         let files = self.files()?;
@@ -122,10 +148,16 @@ impl Snapshot {
         let mut writer = PackageWriter::new_bounded(MAX_OUTPUT_BYTES);
         writer.set_mimetype(MIMETYPE)?;
         writer.add_file("content.xml", content.as_bytes())?;
-        for path in ["styles.xml", "meta.xml", "settings.xml"] {
+        for path in ["styles.xml", "settings.xml"] {
             if self.0.package.package().has_file(path)? {
                 writer.add_file(path, &self.0.package.package().get_file(path)?)?;
             }
+        }
+        if let Some(meta_xml) = replacement_meta_xml {
+            compact_xml::validate(meta_xml.as_bytes()).map_err(Error::from)?;
+            writer.add_file("meta.xml", meta_xml.as_bytes())?;
+        } else if self.0.package.package().has_file("meta.xml")? {
+            writer.add_file("meta.xml", &self.0.package.package().get_file("meta.xml")?)?;
         }
         let excluded = replacements
             .iter()
@@ -163,6 +195,50 @@ fn scan_resources(package: &Package) -> Result<Vec<Resource>> {
         }
     }
     Ok(resources)
+}
+
+fn build_resource_graph(package: &Package, resources: &[Resource]) -> Result<Graph> {
+    let archive = package.package().package()?;
+    let mut paths = package.files()?;
+    for resource in resources {
+        if !paths.iter().any(|path| path == resource.path()) {
+            paths.push(resource.path().to_owned());
+        }
+    }
+    paths.sort_unstable();
+    paths.dedup();
+    let referenced = resources
+        .iter()
+        .map(Resource::path)
+        .collect::<std::collections::HashSet<_>>();
+    let nodes = paths
+        .into_iter()
+        .map(|path| {
+            let present = archive.has_file(&path);
+            Node::new(
+                path.clone(),
+                archive.manifest().get_media_type(&path).map(str::to_owned),
+                present,
+                referenced.contains(path.as_str()),
+            )
+        })
+        .collect::<Vec<_>>();
+    let positions = nodes
+        .iter()
+        .enumerate()
+        .map(|(index, node)| (node.path().to_owned(), index))
+        .collect::<HashMap<_, _>>();
+    let edges = resources
+        .iter()
+        .map(|resource| {
+            positions
+                .get(resource.path())
+                .copied()
+                .map(|node| Edge::new(resource.frame(), resource.href().to_owned(), node))
+                .ok_or_else(|| Error::InvalidFormat("ODI resource graph target disappeared".into()))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    Ok(Graph::new(nodes, edges))
 }
 
 fn is_signature_path(path: &str) -> bool {

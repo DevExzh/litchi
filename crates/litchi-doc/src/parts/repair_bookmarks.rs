@@ -13,13 +13,13 @@ use super::fib::FileInformationBlock;
 use std::collections::HashSet;
 
 /// Table-pointer index of `fcSttbfbkmkBPRepairs`/`lcbSttbfbkmkBPRepairs`
-/// (MS-DOC 2.5.8 FibRgFcLcb2002).
+/// (MS-DOC 2.5.8 `FibRgFcLcb2002`).
 const STTBF_BKMK_BP_REPAIRS: usize = 123;
 /// Table-pointer index of `fcPlcfbkfBPRepairs`/`lcbPlcfbkfBPRepairs`
-/// (MS-DOC 2.5.8 FibRgFcLcb2002).
+/// (MS-DOC 2.5.8 `FibRgFcLcb2002`).
 const PLCF_BKF_BP_REPAIRS: usize = 124;
 /// Table-pointer index of `fcPlcfbklBPRepairs`/`lcbPlcfbklBPRepairs`
-/// (MS-DOC 2.5.8 FibRgFcLcb2002).
+/// (MS-DOC 2.5.8 `FibRgFcLcb2002`).
 const PLCF_BKL_BP_REPAIRS: usize = 125;
 
 /// `fExtend` value of an extended STTB (MS-DOC 2.9.271).
@@ -207,6 +207,7 @@ impl DocumentRepairBookmarks {
     }
 
     /// All repair bookmarks in start-CP order.
+    #[must_use]
     pub fn bookmarks(&self) -> &[RepairBookmark] {
         &self.bookmarks
     }

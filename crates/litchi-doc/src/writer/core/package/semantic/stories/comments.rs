@@ -1,12 +1,21 @@
 use crate::writer::comments::CommentEntry;
-use crate::writer::core::{codec, model::*};
+use crate::writer::core::{
+    codec,
+    model::{
+        CharacterFormatting, CommentStoryData, ParagraphFormatting, WriteError, Writer, pack_dttm,
+        utf16_code_unit_len,
+    },
+};
 use crate::writer::fib::FibBuilder;
 use crate::writer::font_table::FontTableBuilder;
 use crate::writer::piece_table::Piece;
 use std::collections::HashMap;
 impl Writer {
     /// Append the comment subdocument and build its owner, reference, and text tables.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "parameters map one-to-one to a fixed DOC record or semantic construction"
+    )]
     pub(in crate::writer::core::package) fn build_comment_story(
         entries: &[CommentEntry],
         actual_ref_cps: &[u32],

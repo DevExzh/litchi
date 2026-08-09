@@ -25,6 +25,9 @@ pub struct OlapSequence {
 
 impl OlapSequence {
     /// Build a complete sequence and derive the count fields in its header.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn from_parts(
         hierarchies: Vec<PivotHierarchy>,
         page_extensions: Vec<PivotPageItemOlapExt>,
@@ -32,12 +35,13 @@ impl OlapSequence {
         future_bytes: Vec<u8>,
     ) -> Result<Self> {
         let header = PivotViewOlapHeader {
-            hierarchy_count: u32::try_from(hierarchies.len())
-                .map_err(|_| Error::InvalidData("SXViewEx hierarchy count exceeds u32".into()))?,
-            page_extension_count: u32::try_from(page_extensions.len()).map_err(|_| {
+            hierarchy_count: u32::try_from(hierarchies.len()).map_err(|_error| {
+                Error::InvalidData("SXViewEx hierarchy count exceeds u32".into())
+            })?,
+            page_extension_count: u32::try_from(page_extensions.len()).map_err(|_error| {
                 Error::InvalidData("SXViewEx page extension count exceeds u32".into())
             })?,
-            field_extension_count: u32::try_from(field_extensions.len()).map_err(|_| {
+            field_extension_count: u32::try_from(field_extensions.len()).map_err(|_error| {
                 Error::InvalidData("SXViewEx field extension count exceeds u32".into())
             })?,
             future_bytes,
@@ -55,6 +59,9 @@ impl OlapSequence {
     }
 
     /// Parse a complete sequence of `(record type, payload)` pairs.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(records: &[(u16, &[u8])]) -> Result<Self> {
         let (header_type, header_payload) = records.first().ok_or_else(|| {
             Error::InvalidData("SXVIEWEX sequence is missing its SXViewEx header".to_string())
@@ -66,12 +73,13 @@ impl OlapSequence {
             });
         }
         let header = PivotViewOlapHeader::parse(header_payload)?;
-        let hierarchy_count = usize::try_from(header.hierarchy_count)
-            .map_err(|_| Error::InvalidData("SXViewEx hierarchy count overflow".to_string()))?;
-        let page_count = usize::try_from(header.page_extension_count).map_err(|_| {
+        let hierarchy_count = usize::try_from(header.hierarchy_count).map_err(|_error| {
+            Error::InvalidData("SXViewEx hierarchy count overflow".to_string())
+        })?;
+        let page_count = usize::try_from(header.page_extension_count).map_err(|_error| {
             Error::InvalidData("SXViewEx page extension count overflow".to_string())
         })?;
-        let field_count = usize::try_from(header.field_extension_count).map_err(|_| {
+        let field_count = usize::try_from(header.field_extension_count).map_err(|_error| {
             Error::InvalidData("SXViewEx field extension count overflow".to_string())
         })?;
         let expected_len = 1usize
@@ -135,13 +143,17 @@ impl OlapSequence {
     }
 
     /// Serialize the complete sequence as `(record type, payload)` pairs.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_records(&self) -> Result<Vec<(u16, Vec<u8>)>> {
-        let hierarchy_count = usize::try_from(self.header.hierarchy_count)
-            .map_err(|_| Error::InvalidData("SXViewEx hierarchy count overflow".to_string()))?;
-        let page_count = usize::try_from(self.header.page_extension_count).map_err(|_| {
+        let hierarchy_count = usize::try_from(self.header.hierarchy_count).map_err(|_error| {
+            Error::InvalidData("SXViewEx hierarchy count overflow".to_string())
+        })?;
+        let page_count = usize::try_from(self.header.page_extension_count).map_err(|_error| {
             Error::InvalidData("SXViewEx page extension count overflow".to_string())
         })?;
-        let field_count = usize::try_from(self.header.field_extension_count).map_err(|_| {
+        let field_count = usize::try_from(self.header.field_extension_count).map_err(|_error| {
             Error::InvalidData("SXViewEx field extension count overflow".to_string())
         })?;
         if hierarchy_count != self.hierarchies.len()

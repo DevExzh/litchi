@@ -1,4 +1,4 @@
-//! Layered SpreadsheetML external data connection owner.
+//! Layered `SpreadsheetML` external data connection owner.
 //!
 //! Typed connection models live in the model module, bounded XML conversion in the codec
 //! module, and workbook relationship integration in the package module. External targets

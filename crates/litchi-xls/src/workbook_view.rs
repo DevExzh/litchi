@@ -30,48 +30,63 @@ pub struct WorkbookWindow {
 }
 
 impl WorkbookWindow {
+    #[must_use]
     pub fn horizontal_position_twips(&self) -> i16 {
         self.horizontal_position_twips
     }
+    #[must_use]
     pub fn vertical_position_twips(&self) -> i16 {
         self.vertical_position_twips
     }
+    #[must_use]
     pub fn width_twips(&self) -> i16 {
         self.width_twips
     }
+    #[must_use]
     pub fn height_twips(&self) -> i16 {
         self.height_twips
     }
+    #[must_use]
     pub fn hidden(&self) -> bool {
         self.hidden
     }
+    #[must_use]
     pub fn minimized(&self) -> bool {
         self.minimized
     }
+    #[must_use]
     pub fn very_hidden(&self) -> bool {
         self.very_hidden
     }
+    #[must_use]
     pub fn shows_horizontal_scrollbar(&self) -> bool {
         self.shows_horizontal_scrollbar
     }
+    #[must_use]
     pub fn shows_vertical_scrollbar(&self) -> bool {
         self.shows_vertical_scrollbar
     }
+    #[must_use]
     pub fn shows_sheet_tabs(&self) -> bool {
         self.shows_sheet_tabs
     }
+    #[must_use]
     pub fn groups_dates_in_autofilter(&self) -> bool {
         self.groups_dates_in_autofilter
     }
+    #[must_use]
     pub fn active_sheet_index(&self) -> u16 {
         self.active_sheet_index
     }
+    #[must_use]
     pub fn first_visible_sheet_index(&self) -> u16 {
         self.first_visible_sheet_index
     }
+    #[must_use]
     pub fn selected_sheet_count(&self) -> u16 {
         self.selected_sheet_count
     }
+    #[must_use]
     pub fn sheet_tab_ratio_per_mille(&self) -> u16 {
         self.sheet_tab_ratio_per_mille
     }
@@ -108,13 +123,16 @@ pub struct WorkbookView {
 
 impl WorkbookView {
     /// Stable sheet identifiers in `BoundSheet8` order.
+    #[must_use]
     pub fn sheet_ids(&self) -> &[u16] {
         &self.sheet_ids
     }
     /// Workbook windows in `Window1` record order.
+    #[must_use]
     pub fn windows(&self) -> &[WorkbookWindow] {
         &self.windows
     }
+    #[must_use]
     pub fn primary_window(&self) -> Option<&WorkbookWindow> {
         self.windows.first()
     }

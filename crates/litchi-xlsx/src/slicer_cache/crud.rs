@@ -133,7 +133,7 @@ pub fn replace_slicer(
         return Err(invalid("replacement slicer name must match"));
     }
     update_slicer(package, worksheet_name, slicer_name, move |slicer| {
-        *slicer = replacement
+        *slicer = replacement;
     })
 }
 
@@ -158,11 +158,7 @@ pub fn remove_slicer(
         .position(|slicer| slicer.name.eq_ignore_ascii_case(slicer_name))
         .expect("located");
     parts[part_index].slicers.slicers.remove(item_index);
-    if !parts[part_index].slicers.slicers.is_empty() {
-        let xml = write_slicers(&parts[part_index].slicers)?;
-        let uri = uri(&parts[part_index].part_name)?;
-        package.get_part_mut(&uri)?.set_blob(xml);
-    } else {
+    if parts[part_index].slicers.slicers.is_empty() {
         let removed = parts.remove(part_index);
         let uri = uri(&removed.part_name)?;
         package
@@ -172,6 +168,10 @@ pub fn remove_slicer(
         if !part_is_referenced(package, &uri) {
             package.remove_part(&uri);
         }
+    } else {
+        let xml = write_slicers(&parts[part_index].slicers)?;
+        let uri = uri(&parts[part_index].part_name)?;
+        package.get_part_mut(&uri)?.set_blob(xml);
     }
     package.unsign();
     Ok(true)
@@ -619,7 +619,7 @@ pub fn replace_timeline(
         return Err(invalid("replacement timeline name must match"));
     }
     update_timeline(package, worksheet, name, move |timeline| {
-        *timeline = replacement
+        *timeline = replacement;
     })
 }
 
@@ -642,12 +642,7 @@ pub fn remove_timeline(package: &mut OpcPackage, worksheet: &PackURI, name: &str
         return Ok(false);
     };
     sheets[sheet_index].timelines.timelines.remove(index);
-    if !sheets[sheet_index].timelines.timelines.is_empty() {
-        validate_timeline_views(&sheets, &caches)?;
-        let xml = write_timelines(&sheets[sheet_index].timelines)?;
-        let uri = uri(&sheets[sheet_index].part_name)?;
-        package.get_part_mut(&uri)?.set_blob(xml);
-    } else {
+    if sheets[sheet_index].timelines.timelines.is_empty() {
         let removed = sheets.remove(sheet_index);
         validate_timeline_views(&sheets, &caches)?;
         let updated = rewrite_integration_refs(
@@ -667,6 +662,11 @@ pub fn remove_timeline(package: &mut OpcPackage, worksheet: &PackURI, name: &str
         if !part_is_referenced(package, &uri) {
             package.remove_part(&uri);
         }
+    } else {
+        validate_timeline_views(&sheets, &caches)?;
+        let xml = write_timelines(&sheets[sheet_index].timelines)?;
+        let uri = uri(&sheets[sheet_index].part_name)?;
+        package.get_part_mut(&uri)?.set_blob(xml);
     }
     package.unsign();
     Ok(true)
@@ -695,7 +695,7 @@ pub fn reorder_timelines(
         |timeline| &timeline.name,
         "timeline",
     )?;
-    sheets[sheet_index].timelines.timelines = ordered.clone();
+    sheets[sheet_index].timelines.timelines.clone_from(&ordered);
     validate_timeline_views(&sheets, &caches)?;
     let xml = write_timelines(&sheets[sheet_index].timelines)?;
     let uri = uri(&sheets[sheet_index].part_name)?;
@@ -1088,14 +1088,16 @@ fn integration_fragment(
     item: &str,
     ids: &[String],
 ) -> Vec<u8> {
+    use std::fmt::Write as _;
+
     let mut output = format!(
-        "<ext xmlns=\"{}\" uri=\"{}\"><f:{} xmlns:f=\"{}\" xmlns:r=\"{}\">",
-        core, uri, list, family_ns, rel
+        "<ext xmlns=\"{core}\" uri=\"{uri}\"><f:{list} xmlns:f=\"{family_ns}\" xmlns:r=\"{rel}\">"
     );
     for id in ids {
-        output.push_str(&format!("<f:{item} r:id=\"{}\"/>", xml_escape(id)));
+        write!(output, "<f:{item} r:id=\"{}\"/>", xml_escape(id))
+            .expect("writing to a String is infallible");
     }
-    output.push_str(&format!("</f:{list}></ext>"));
+    write!(output, "</f:{list}></ext>").expect("writing to a String is infallible");
     output.into_bytes()
 }
 

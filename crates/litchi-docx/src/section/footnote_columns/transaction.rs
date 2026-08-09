@@ -1,3 +1,7 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Failure-atomic snapshots, edits, and reversible footnote-layout patches.
 
 use std::sync::Arc;
@@ -18,6 +22,10 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parse and retain a bounded section-property snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_xml(xml: impl Into<Vec<u8>>) -> Result<Self> {
         Self::from_xml_with_context(xml, Context::default())
     }
@@ -77,6 +85,10 @@ impl Transaction {
     }
 
     /// Set or remove the direct Word 2012 footnote layout.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_layout(&mut self, value: Option<Layout>) -> Result<&mut Self> {
         validation::validate_layout(value)?;
         self.next = value;
@@ -84,6 +96,10 @@ impl Transaction {
     }
 
     /// Alias using the XML property vocabulary.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_footnote_columns(&mut self, value: Option<Layout>) -> Result<&mut Self> {
         self.set_layout(value)
     }
@@ -96,6 +112,10 @@ impl Transaction {
     }
 
     /// Validate and publish the edit without changing the source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn commit(self) -> Result<Commit> {
         if self.next == self.base.value {
             return Ok(Commit {
@@ -220,6 +240,10 @@ impl Patch {
 
     /// Apply the patch only when the target has the exact expected source
     /// bytes, inherited namespace context, and semantic state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.value != self.before
             || source.xml.as_ref() != self.before_xml.as_ref()

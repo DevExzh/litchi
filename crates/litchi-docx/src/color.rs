@@ -1,10 +1,10 @@
-//! Shared strict WordprocessingML color vocabulary.
+//! Shared strict `WordprocessingML` color vocabulary.
 
 use std::str::FromStr;
 
 use crate::{Error, Result};
 
-/// A theme-color slot used by WordprocessingML formatting and web metadata.
+/// A theme-color slot used by `WordprocessingML` formatting and web metadata.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Theme {
     Dark1,
@@ -27,9 +27,9 @@ pub enum Theme {
 }
 
 impl Theme {
-    /// Every value in the WordprocessingML `ST_ThemeColor` domain.
+    /// Every value in the `WordprocessingML` `ST_ThemeColor` domain.
     ///
-    /// The array is ordered according to the checked-in WordprocessingML
+    /// The array is ordered according to the checked-in `WordprocessingML`
     /// vocabulary and is allocation-free to iterate. It deliberately does
     /// not include DrawingML-only `ST_SchemeColorVal` tokens such as `dk1` or
     /// `hlink`.
@@ -59,6 +59,7 @@ impl Theme {
     /// callers should use [`Self::parse_str`] or `str::parse`, which preserve
     /// the distinction between an invalid token and an absent optional
     /// attribute.
+    #[must_use]
     pub fn parse(value: &str) -> Option<Self> {
         match value {
             "dark1" => Some(Self::Dark1),
@@ -84,14 +85,19 @@ impl Theme {
 
     /// Parse an exact `ST_ThemeColor` token with a typed DOCX error.
     ///
-    /// WordprocessingML theme colors are case-sensitive. The parser rejects
-    /// similarly named DrawingML scheme-color tokens instead of silently
+    /// `WordprocessingML` theme colors are case-sensitive. The parser rejects
+    /// similarly named `DrawingML` scheme-color tokens instead of silently
     /// widening this format-specific domain.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn parse_str(value: &str) -> Result<Self> {
         Self::parse(value).ok_or_else(|| Error::Invalid(format!("invalid theme color '{value}'")))
     }
 
     /// Return the exact `ST_ThemeColor` lexical token.
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Dark1 => "dark1",

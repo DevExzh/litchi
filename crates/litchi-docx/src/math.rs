@@ -1,3 +1,19 @@
+#![expect(
+    clippy::expect_used,
+    reason = "the invariant is established immediately before extraction"
+)]
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
+#![expect(
+    clippy::needless_pass_by_value,
+    reason = "the public API shape is retained for compatibility"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Typed, inert Office Math (OMML) fragments for Word documents.
 //!
 //! Office Math is a rich XML vocabulary. This module validates the XML
@@ -28,7 +44,7 @@ const MAX_OFFICE_MATH_FRAGMENT_BYTES: usize = 4 * 1024 * 1024;
 ///
 /// The XML is deliberately retained verbatim (apart from adding a local
 /// transitional binding when its OMML root namespace relied on an ancestor
-/// declaration). WordprocessingML namespaces used inside the math content
+/// declaration). `WordprocessingML` namespaces used inside the math content
 /// continue to resolve from the containing DOCX document.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OfficeMath {
@@ -46,6 +62,10 @@ impl OfficeMath {
     /// transitional OMML namespace; provide an explicit strict binding to
     /// retain strict conformance. Other inherited namespace prefixes must be
     /// locally declared by the fragment or available in its output context.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_xml(xml: impl Into<String>) -> Result<Self> {
         Ok(Self {
             xml: normalize_fragment(xml.into(), OfficeMathRoot::Equation)?,
@@ -68,11 +88,13 @@ impl OfficeMath {
     }
 
     /// Return the validated OMML element.
+    #[must_use]
     pub fn xml(&self) -> &str {
         &self.xml
     }
 
     /// Consume this equation and return its validated OMML element.
+    #[must_use]
     pub fn into_xml(self) -> String {
         self.xml
     }
@@ -91,6 +113,10 @@ pub struct OfficeMathParagraph {
 impl OfficeMathParagraph {
     /// Parse one standalone `<m:oMathPara>` element containing at least one
     /// Office Math equation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_xml(xml: impl Into<String>) -> Result<Self> {
         let xml = normalize_fragment(xml.into(), OfficeMathRoot::Paragraph)?;
         if extract_omml_formulas(xml.as_bytes())?.is_empty() {
@@ -102,6 +128,7 @@ impl OfficeMathParagraph {
     }
 
     /// Wrap a single equation as a display-math paragraph.
+    #[must_use]
     pub fn from_equation(equation: OfficeMath) -> Self {
         let mut xml = String::new();
         write!(
@@ -114,6 +141,10 @@ impl OfficeMathParagraph {
     }
 
     /// Create a display-math paragraph from one or more equations.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_equations(equations: impl IntoIterator<Item = OfficeMath>) -> Result<Self> {
         let mut equations = equations.into_iter();
         let first = equations
@@ -131,11 +162,16 @@ impl OfficeMathParagraph {
     }
 
     /// Return the validated OMML math-paragraph element.
+    #[must_use]
     pub fn xml(&self) -> &str {
         &self.xml
     }
 
     /// Return the display equations in document order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn equations(&self) -> Result<Vec<OfficeMath>> {
         extract_omml_formulas(self.xml.as_bytes())?
             .into_iter()
@@ -144,6 +180,7 @@ impl OfficeMathParagraph {
     }
 
     /// Consume this math paragraph and return its validated OMML element.
+    #[must_use]
     pub fn into_xml(self) -> String {
         self.xml
     }
@@ -232,7 +269,7 @@ fn validate_fragment(xml: &str, expected_root: OfficeMathRoot) -> Result<RootRan
 
     loop {
         let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("Office Math XML offset does not fit usize"))?;
+            .map_err(|_source_error| invalid("Office Math XML offset does not fit usize"))?;
         let event = {
             let decoder = reader.decoder();
             let (namespace, event) = reader
@@ -276,7 +313,7 @@ fn validate_fragment(xml: &str, expected_root: OfficeMathRoot) -> Result<RootRan
             }
         };
         let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("Office Math XML offset does not fit usize"))?;
+            .map_err(|_source_error| invalid("Office Math XML offset does not fit usize"))?;
 
         match event {
             FragmentEvent::Start {
@@ -409,7 +446,7 @@ fn validate_element_attributes(
 ///
 /// An isolated formula such as `<q:oMath>` or `<oMath>` cannot reveal whether
 /// its original namespace was transitional or strict. The mutable DOCX writer
-/// emits transitional WordprocessingML, so inherited bindings are normalized
+/// emits transitional `WordprocessingML`, so inherited bindings are normalized
 /// to the transitional OMML URI. An explicit namespace declaration remains
 /// intact and is checked by `is_omml_name` instead.
 fn classify_root(
@@ -436,7 +473,7 @@ fn classify_root(
                 ));
             }
             let prefix = std::str::from_utf8(prefix)
-                .map_err(|_| invalid("Office Math namespace prefix is not UTF-8"))?;
+                .map_err(|_source_error| invalid("Office Math namespace prefix is not UTF-8"))?;
             if !is_safe_namespace_prefix(prefix) {
                 return Err(invalid("Office Math namespace prefix is invalid"));
             }

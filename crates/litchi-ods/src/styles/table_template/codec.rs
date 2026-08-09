@@ -18,6 +18,9 @@ const TEXT_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 
 impl Template {
     /// Append deterministic ODF XML for this template to an existing buffer.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn write_xml(&self, output: &mut String) -> Result<()> {
         self.validate()?;
         output.push_str("<table:table-template table:name=\"");
@@ -64,6 +67,9 @@ impl Template {
     }
 
     /// Serialize this template as a standalone ODF XML fragment.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn to_xml(&self) -> Result<String> {
         let mut output = String::new();
         self.write_xml(&mut output)?;
@@ -121,11 +127,17 @@ struct Attribute {
 }
 
 /// Parse table-template elements from one ODF styles XML part.
+///
+/// # Errors
+/// Returns an error when the operation cannot be completed.
 pub fn parse(xml: &str) -> Result<Vec<Template>> {
     parse_parts(&[xml])
 }
 
 /// Parse table-template elements from multiple ODF styles XML parts.
+///
+/// # Errors
+/// Returns an error when the operation cannot be completed.
 pub fn parse_parts(parts: &[&str]) -> Result<Vec<Template>> {
     let mut templates = Vec::new();
     let mut names = HashSet::new();
@@ -202,7 +214,14 @@ fn parse_part(
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
 
         if is_start && !consumed {
@@ -627,7 +646,14 @@ fn consume_empty_region(reader: &mut NsReader<&[u8]>, local: &str) -> Result<()>
                     "unterminated table-template region".to_string(),
                 ));
             },
-            _ => {
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::CData(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {
                 return Err(Error::InvalidFormat(
                     "table-template regions must be empty".to_string(),
                 ));
@@ -671,7 +697,12 @@ fn skip_extension(reader: &mut NsReader<&[u8]>) -> Result<()> {
                     "unterminated table-template extension".to_string(),
                 ));
             },
-            _ => {},
+            Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -717,7 +748,7 @@ fn is_known(namespace: Namespace) -> bool {
 fn decode_name(value: &[u8]) -> Result<String> {
     std::str::from_utf8(value)
         .map(str::to_string)
-        .map_err(|_| Error::InvalidFormat("invalid UTF-8 table-template name".to_string()))
+        .map_err(|_error| Error::InvalidFormat("invalid UTF-8 table-template name".to_string()))
 }
 
 fn xml_error(error: quick_xml::Error) -> Error {

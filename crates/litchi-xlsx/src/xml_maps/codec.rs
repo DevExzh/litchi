@@ -7,7 +7,7 @@ use quick_xml::reader::NsReader;
 use super::model::{XmlMapConformance, XmlMapInfo};
 
 impl XmlMapInfo {
-    /// Parse a bounded SpreadsheetML XML Maps part.
+    /// Parse a bounded `SpreadsheetML` XML Maps part.
     pub fn parse(xml: &[u8]) -> Result<Self> {
         match litchi_ooxml_common::spreadsheet_xml_maps::parse_xml_map_info(xml) {
             Ok(value) => Ok(value.into()),
@@ -27,7 +27,7 @@ impl XmlMapInfo {
         }
     }
 
-    /// Serialize this XML Maps catalog for Transitional or Strict SpreadsheetML.
+    /// Serialize this XML Maps catalog for Transitional or Strict `SpreadsheetML`.
     pub fn to_xml(&self, strict: bool) -> Result<Vec<u8>> {
         let conformance = if strict {
             litchi_ooxml_common::spreadsheet_xml_maps::XmlMapConformance::Strict
@@ -226,7 +226,7 @@ fn find_numeric_boolean_attributes(
     }
 }
 
-/// Parse a bounded SpreadsheetML XML Maps part using the historical XLSX
+/// Parse a bounded `SpreadsheetML` XML Maps part using the historical XLSX
 /// boxed-error result surface.
 pub fn parse_xml_map_info(xml: &[u8]) -> Result<XmlMapInfo> {
     XmlMapInfo::parse(xml)

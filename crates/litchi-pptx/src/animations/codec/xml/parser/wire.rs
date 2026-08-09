@@ -209,7 +209,10 @@ pub(super) fn parse_recursive_timing_tree(xml: &str) -> Result<TimingTree> {
                             delay,
                             target: None,
                         };
-                        let start = condition_lists.last().expect("checked above").1;
+                        let start = condition_lists
+                            .last()
+                            .ok_or_else(|| invalid("condition has no containing list"))?
+                            .1;
                         if empty {
                             let common = &mut frames
                                 .last_mut()
@@ -270,7 +273,9 @@ pub(super) fn parse_recursive_timing_tree(xml: &str) -> Result<TimingTree> {
                 if condition.as_ref().is_some_and(|(d, _, _)| *d == depth)
                     && is_presentationml_name(&namespace, name.name(), b"cond")
                 {
-                    let (_, start, value) = condition.take().expect("checked above");
+                    let (_, start, value) = condition
+                        .take()
+                        .ok_or_else(|| invalid("animation condition state is missing"))?;
                     let common = &mut frames
                         .last_mut()
                         .ok_or_else(|| invalid("condition has no common time node"))?
@@ -303,8 +308,10 @@ pub(super) fn parse_recursive_timing_tree(xml: &str) -> Result<TimingTree> {
                 if timing_depth == Some(depth)
                     && is_presentationml_name(&namespace, name.name(), b"timing")
                 {
-                    source_range =
-                        Some(timing_start.expect("timing start set")..reader.buffer_position());
+                    source_range = Some(
+                        timing_start.ok_or_else(|| invalid("animation timing start is missing"))?
+                            ..reader.buffer_position(),
+                    );
                     timing_depth = None;
                 }
                 depth = depth

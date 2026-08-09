@@ -3,6 +3,7 @@
 use crate::model::{
     layer::Layer,
     page::Page,
+    resource::Resource,
     shape::{Properties as ShapeProperties, Shape, ShapeKind},
 };
 use litchi_core::{Error, Metadata, Result};
@@ -10,6 +11,7 @@ use litchi_odf_common::{
     compact_xml,
     core::{PackageWriter, family::Package},
     drawing::Frame,
+    media,
 };
 use quick_xml::{
     XmlVersion,
@@ -45,14 +47,13 @@ enum NamespaceKind {
 type TextSpans = Vec<Vec<Vec<Option<Range<usize>>>>>;
 type NameSpans = Vec<Vec<Option<Range<usize>>>>;
 type LayerSpans = Vec<Vec<Option<Range<usize>>>>;
+type GeometrySpans = Vec<Vec<[Option<Range<usize>>; 4]>>;
 
 struct State {
     package: Package,
     pages: Vec<Page>,
     layers: Vec<Layer>,
-    text_spans: TextSpans,
-    name_spans: NameSpans,
-    layer_spans: LayerSpans,
+    resources: Vec<Resource>,
 }
 
 /// An immutable, source-owning ODG package snapshot.
@@ -92,13 +93,12 @@ impl Snapshot {
         if parsed.layer_count.saturating_add(layers.len()) > MAX_LAYERS {
             return invalid("ODG declared layer count exceeds the limit");
         }
+        let resources = scan_resources(&package)?;
         Ok(Self(Arc::new(State {
             package,
             pages: parsed.pages,
             layers,
-            text_spans: parsed.text_spans,
-            name_spans: parsed.name_spans,
-            layer_spans: parsed.layer_spans,
+            resources,
         })))
     }
 
@@ -175,13 +175,42 @@ impl Snapshot {
         self.0.package.files()
     }
 
+    /// Returns package-local image resources referenced by drawing XML.
+    #[must_use]
+    pub fn resources(&self) -> &[Resource] {
+        &self.0.resources
+    }
+
+    /// Reads one inventoried package-local resource without activating it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid selector or unreadable package member.
+    pub fn resource_bytes(&self, resource: usize) -> Result<Option<Vec<u8>>> {
+        let selected = self.resources().get(resource).ok_or_else(|| {
+            Error::InvalidFormat("ODG resource selector is out of bounds".to_string())
+        })?;
+        if !selected.is_present() {
+            return Ok(None);
+        }
+        self.0.package.package().get_file(selected.path()).map(Some)
+    }
+
     /// Starts a source-bound semantic transaction.
     #[must_use]
     pub fn edit(&self) -> Transaction {
         Transaction {
             source: self.clone(),
-            change: None,
+            content: self.content_xml().to_string(),
+            changes: Vec::new(),
+            resource_edits: Vec::new(),
         }
+    }
+
+    /// Starts explicit bounded undo/redo history at this immutable snapshot.
+    #[must_use]
+    pub fn history(&self, limits: litchi_core::patch::HistoryLimits) -> super::History {
+        super::History::new(self.clone(), limits)
     }
 
     /// Consumes the snapshot and returns its source bytes.
@@ -197,7 +226,9 @@ impl Snapshot {
 /// A staged source-bound package shape edit.
 pub struct Transaction {
     source: Snapshot,
-    change: Option<ShapeChange>,
+    content: String,
+    changes: Vec<Change>,
+    resource_edits: Vec<ResourceEdit>,
 }
 
 impl Transaction {
@@ -220,18 +251,15 @@ impl Transaction {
         if after.len() > MAX_TEXT_BYTES {
             return invalid("ODG replacement shape text exceeds the limit");
         }
-        self.ensure_selector(page, shape)?;
-        let selected = self
-            .source
-            .pages()
+        let parsed = parse_content(&self.content)?;
+        let selected = parsed
+            .pages
             .get(page)
             .and_then(|page_value| page_value.shapes().get(shape))
             .ok_or_else(|| {
                 Error::InvalidFormat("ODG shape selector is out of bounds".to_string())
             })?;
-        let spans = self
-            .source
-            .0
+        let spans = parsed
             .text_spans
             .get(page)
             .and_then(|shapes| shapes.get(shape))
@@ -240,13 +268,17 @@ impl Transaction {
             return invalid("ODG shape text is not one losslessly replaceable XML span");
         }
         if selected.text() == after {
-            self.change = None;
             return Ok(());
         }
-        self.change = Some(ShapeChange::Text(TextChange {
+        let span = spans[0].as_ref().ok_or_else(|| {
+            Error::InvalidFormat("ODG shape text source span is missing".to_string())
+        })?;
+        let before = selected.text().to_string();
+        self.content = replace_xml_value(&self.content, span, &after)?;
+        self.changes.push(Change::Text(TextChange {
             page,
             shape,
-            before: selected.text().to_string(),
+            before,
             after,
         }));
         Ok(())
@@ -273,10 +305,9 @@ impl Transaction {
         if after.len() > MAX_TEXT_BYTES {
             return invalid("ODG replacement shape name exceeds the limit");
         }
-        self.ensure_selector(page, shape)?;
-        let selected = self
-            .source
-            .pages()
+        let parsed = parse_content(&self.content)?;
+        let selected = parsed
+            .pages
             .get(page)
             .and_then(|page_value| page_value.shapes().get(shape))
             .ok_or_else(|| {
@@ -288,25 +319,23 @@ impl Transaction {
                     .to_string(),
             )
         })?;
-        if self
-            .source
-            .0
+        let span = parsed
             .name_spans
             .get(page)
             .and_then(|shapes| shapes.get(shape))
             .and_then(Option::as_ref)
-            .is_none()
-        {
-            return invalid("ODG shape name source span is missing");
-        }
+            .ok_or_else(|| {
+                Error::InvalidFormat("ODG shape name source span is missing".to_string())
+            })?;
         if before == after {
-            self.change = None;
             return Ok(());
         }
-        self.change = Some(ShapeChange::Name(NameChange {
+        let before_owned = before.to_string();
+        self.content = replace_xml_value(&self.content, span, &after)?;
+        self.changes.push(Change::Name(NameChange {
             page,
             shape,
-            before: before.to_string(),
+            before: before_owned,
             after,
         }));
         Ok(())
@@ -332,8 +361,8 @@ impl Transaction {
         if after.len() > MAX_TEXT_BYTES {
             return invalid("ODG replacement layer name exceeds the limit");
         }
-        self.ensure_selector(page, shape)?;
-        let selected_page = self.source.pages().get(page).ok_or_else(|| {
+        let parsed = parse_content(&self.content)?;
+        let selected_page = parsed.pages.get(page).ok_or_else(|| {
             Error::InvalidFormat("ODG page selector is out of bounds".to_string())
         })?;
         let selected = selected_page.shapes().get(shape).ok_or_else(|| {
@@ -356,38 +385,458 @@ impl Transaction {
                     .to_string(),
             )
         })?;
-        if self
-            .source
-            .0
+        let span = parsed
             .layer_spans
             .get(page)
             .and_then(|shapes| shapes.get(shape))
             .and_then(Option::as_ref)
-            .is_none()
-        {
-            return invalid("ODG shape layer source span is missing");
-        }
+            .ok_or_else(|| {
+                Error::InvalidFormat("ODG shape layer source span is missing".to_string())
+            })?;
         if before == after {
-            self.change = None;
             return Ok(());
         }
-        self.change = Some(ShapeChange::Layer(LayerChange {
+        let before_owned = before.to_string();
+        self.content = replace_xml_value(&self.content, span, &after)?;
+        self.changes.push(Change::Layer(LayerChange {
             page,
             shape,
-            before: before.to_string(),
+            before: before_owned,
             after,
         }));
         Ok(())
     }
 
-    fn ensure_selector(&self, page: usize, shape: usize) -> Result<()> {
-        if self
-            .change
-            .as_ref()
-            .is_some_and(|change| change.page() != page || change.shape() != shape)
+    /// Replaces all four existing SVG geometry attributes as one operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the checked selectors fail or the shape does not
+    /// own four losslessly addressable geometry attributes.
+    pub fn set_shape_geometry(
+        &mut self,
+        page: usize,
+        shape: usize,
+        x: impl Into<String>,
+        y: impl Into<String>,
+        width: impl Into<String>,
+        height: impl Into<String>,
+    ) -> Result<()> {
+        let after = [x.into(), y.into(), width.into(), height.into()];
+        validate_geometry(&after)?;
+        let parsed = parse_content(&self.content)?;
+        let selected = parsed
+            .pages
+            .get(page)
+            .and_then(|value| value.shapes().get(shape))
+            .ok_or_else(|| Error::InvalidFormat("ODG shape selector is out of bounds".into()))?;
+        let before = [
+            selected.x(),
+            selected.y(),
+            selected.width(),
+            selected.height(),
+        ]
+        .map(|value| value.map(str::to_owned));
+        let spans = parsed
+            .geometry_spans
+            .get(page)
+            .and_then(|values| values.get(shape))
+            .ok_or_else(|| Error::InvalidFormat("ODG shape geometry spans are missing".into()))?;
+        let ranges = spans
+            .iter()
+            .map(|span| {
+                span.as_ref().ok_or_else(|| {
+                    Error::Unsupported(
+                        "ODG geometry edit requires existing x, y, width, and height attributes"
+                            .into(),
+                    )
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        if before
+            .iter()
+            .zip(&after)
+            .all(|(source_value, target_value)| {
+                source_value.as_deref() == Some(target_value.as_str())
+            })
         {
-            return invalid("an ODG package transaction supports one semantic edit target");
+            return Ok(());
         }
+        self.content = replace_xml_values(&self.content, &ranges, &after)?;
+        self.changes.push(Change::Geometry(GeometryChange {
+            page,
+            shape,
+            before: before.map(Option::unwrap_or_default),
+            after,
+        }));
+        Ok(())
+    }
+
+    /// Changes an existing graphic style reference without normalizing XML.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a checked-selector failure or missing source attribute.
+    pub fn set_shape_style_name(
+        &mut self,
+        page: usize,
+        shape: usize,
+        style_name: impl Into<String>,
+    ) -> Result<()> {
+        let after = style_name.into();
+        validate_bounded_value(&after, "ODG shape style name")?;
+        let parsed = parse_content(&self.content)?;
+        let selected = parsed
+            .pages
+            .get(page)
+            .and_then(|value| value.shapes().get(shape))
+            .ok_or_else(|| Error::InvalidFormat("ODG shape selector is out of bounds".into()))?;
+        let before = selected.style_name().ok_or_else(|| {
+            Error::Unsupported("ODG style edit requires an existing draw:style-name".into())
+        })?;
+        let span = parsed
+            .style_name_spans
+            .get(page)
+            .and_then(|values| values.get(shape))
+            .and_then(Option::as_ref)
+            .ok_or_else(|| Error::InvalidFormat("ODG shape style span is missing".into()))?;
+        if before == after {
+            return Ok(());
+        }
+        let before_owned = before.to_owned();
+        self.content = replace_xml_value(&self.content, span, &after)?;
+        self.changes.push(Change::Style(StyleChange {
+            page,
+            shape,
+            before: before_owned,
+            after,
+        }));
+        Ok(())
+    }
+
+    /// Inserts a detached page at a checked source-order position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid position, duplicate page identity, or limit violation.
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "detached page values transfer ownership into the transaction"
+    )]
+    pub fn insert_page(&mut self, position: usize, page: Page) -> Result<()> {
+        let parsed = parse_content(&self.content)?;
+        if position > parsed.pages.len() {
+            return invalid("ODG page insertion position is out of bounds");
+        }
+        if parsed.pages.len() >= MAX_PAGES {
+            return invalid("ODG page count exceeds the limit");
+        }
+        if let Some(name) = page.name()
+            && parsed.pages.iter().any(|value| value.name() == Some(name))
+        {
+            return invalid("ODG inserted page name is already present");
+        }
+        let at = if position == parsed.pages.len() {
+            parsed.drawing_insert_position
+        } else {
+            parsed.page_spans[position]
+                .as_ref()
+                .ok_or_else(|| Error::InvalidFormat("ODG page span is missing".into()))?
+                .start
+        };
+        let xml = serialize_page(&page)?;
+        self.content = insert_child_xml(&self.content, at, &xml)?;
+        self.changes
+            .push(Change::Structure(StructureChange::PageInserted {
+                position,
+                name: page.name().map(str::to_owned),
+            }));
+        Ok(())
+    }
+
+    /// Appends a detached page.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for duplicate identity or a resource limit.
+    pub fn add_page(&mut self, page: Page) -> Result<()> {
+        let position = parse_content(&self.content)?.pages.len();
+        self.insert_page(position, page)
+    }
+
+    /// Removes one page selected by exact name or checked position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selector is absent, ambiguous, or unaddressable.
+    pub fn remove_page<'selector>(
+        &mut self,
+        selector: impl Into<crate::page::Selector<'selector>>,
+    ) -> Result<Page> {
+        let parsed = parse_content(&self.content)?;
+        let position = resolve_page_position(&parsed.pages, selector.into())?;
+        let page = parsed.pages[position].clone();
+        let span = parsed.page_spans[position]
+            .as_ref()
+            .ok_or_else(|| Error::InvalidFormat("ODG page span is missing".into()))?;
+        self.content = remove_xml(&self.content, span)?;
+        self.changes
+            .push(Change::Structure(StructureChange::PageRemoved {
+                position,
+                name: page.name().map(str::to_owned),
+            }));
+        Ok(page)
+    }
+
+    /// Inserts a detached shape at a checked page shape position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid selectors, undeclared layers, or limits.
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "detached shape values transfer ownership into the transaction"
+    )]
+    pub fn insert_shape(&mut self, page: usize, position: usize, shape: Shape) -> Result<()> {
+        let parsed = parse_content(&self.content)?;
+        let selected_page = parsed
+            .pages
+            .get(page)
+            .ok_or_else(|| Error::InvalidFormat("ODG page selector is out of bounds".into()))?;
+        if position > selected_page.shapes().len() {
+            return invalid("ODG shape insertion position is out of bounds");
+        }
+        validate_shape_layer(selected_page, self.source.layers(), &shape)?;
+        if parsed
+            .pages
+            .iter()
+            .map(|value| value.shapes().len())
+            .sum::<usize>()
+            >= MAX_SHAPES
+        {
+            return invalid("ODG shape count exceeds the limit");
+        }
+        let at = if position == selected_page.shapes().len() {
+            parsed.page_insert_positions[page]
+                .ok_or_else(|| Error::InvalidFormat("ODG page insertion point is missing".into()))?
+        } else {
+            parsed.shape_spans[page][position]
+                .as_ref()
+                .ok_or_else(|| Error::InvalidFormat("ODG shape span is missing".into()))?
+                .start
+        };
+        let xml = serialize_shape(&shape)?;
+        self.content = insert_child_xml(&self.content, at, &xml)?;
+        self.changes
+            .push(Change::Structure(StructureChange::ShapeInserted {
+                page,
+                position,
+                kind: shape.kind(),
+            }));
+        Ok(())
+    }
+
+    /// Appends a detached shape to a page.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid selectors, dependencies, or limits.
+    pub fn add_shape(&mut self, page: usize, shape: Shape) -> Result<()> {
+        let position = parse_content(&self.content)?
+            .pages
+            .get(page)
+            .ok_or_else(|| Error::InvalidFormat("ODG page selector is out of bounds".into()))?
+            .shapes()
+            .len();
+        self.insert_shape(page, position, shape)
+    }
+
+    /// Appends an empty structural group to a page.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid page selector or limit violation.
+    pub fn add_group(&mut self, page: usize, name: impl Into<String>) -> Result<()> {
+        self.add_shape(page, Shape::new(ShapeKind::Group).with_name(name))
+    }
+
+    /// Removes one shape; removing a group owns and removes its complete subtree.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid checked selector or missing source span.
+    pub fn remove_shape(&mut self, page: usize, shape: usize) -> Result<Shape> {
+        let parsed = parse_content(&self.content)?;
+        let selected = parsed
+            .pages
+            .get(page)
+            .and_then(|value| value.shapes().get(shape))
+            .cloned()
+            .ok_or_else(|| Error::InvalidFormat("ODG shape selector is out of bounds".into()))?;
+        let span = parsed.shape_spans[page][shape]
+            .as_ref()
+            .ok_or_else(|| Error::InvalidFormat("ODG shape span is missing".into()))?;
+        self.content = remove_xml(&self.content, span)?;
+        self.changes
+            .push(Change::Structure(StructureChange::ShapeRemoved {
+                page,
+                position: shape,
+                kind: selected.kind(),
+            }));
+        Ok(selected)
+    }
+
+    /// Adds a page-local layer declaration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid selectors, duplicate names, or limits.
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "detached layer values transfer ownership into the transaction"
+    )]
+    pub fn add_layer(&mut self, page: usize, layer: Layer) -> Result<()> {
+        let parsed = parse_content(&self.content)?;
+        let selected = parsed
+            .pages
+            .get(page)
+            .ok_or_else(|| Error::InvalidFormat("ODG page selector is out of bounds".into()))?;
+        if selected
+            .layers()
+            .iter()
+            .any(|value| value.name() == layer.name())
+        {
+            return invalid("ODG page-local layer name is already present");
+        }
+        let layer_xml = serialize_layer(&layer)?;
+        if selected.has_layer_set() {
+            let at = parsed.layer_set_insert_positions[page].ok_or_else(|| {
+                Error::InvalidFormat("ODG page-local layer-set insertion point is missing".into())
+            })?;
+            self.content = insert_child_xml(&self.content, at, &layer_xml)?;
+        } else {
+            let page_span = parsed.page_spans[page]
+                .as_ref()
+                .ok_or_else(|| Error::InvalidFormat("ODG page span is missing".into()))?;
+            let at = start_tag_end(&self.content, page_span.start)?;
+            let xml = format!(
+                "<draw:layer-set xmlns:draw=\"{}\">{layer_xml}</draw:layer-set>",
+                std::str::from_utf8(DRAW).unwrap_or_default()
+            );
+            self.content = insert_xml(&self.content, at, &xml)?;
+        }
+        self.changes
+            .push(Change::Structure(StructureChange::LayerInserted {
+                page,
+                name: layer.name().to_owned(),
+            }));
+        Ok(())
+    }
+
+    /// Removes an unreferenced page-local layer by exact name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an absent/ambiguous name or a live shape dependency.
+    pub fn remove_layer(&mut self, page: usize, name: &str) -> Result<Layer> {
+        let parsed = parse_content(&self.content)?;
+        let selected = parsed
+            .pages
+            .get(page)
+            .ok_or_else(|| Error::InvalidFormat("ODG page selector is out of bounds".into()))?;
+        if selected
+            .shapes()
+            .iter()
+            .any(|shape| shape.layer() == Some(name))
+        {
+            return Err(Error::Unsupported(
+                "ODG layer removal is blocked by a shape assignment".into(),
+            ));
+        }
+        let mut matches = selected
+            .layers()
+            .iter()
+            .enumerate()
+            .filter(|(_, layer)| layer.name() == name);
+        let (position, matched_layer) = matches
+            .next()
+            .ok_or_else(|| Error::InvalidFormat("ODG layer selector did not match".into()))?;
+        if matches.next().is_some() {
+            return invalid("ODG layer name selector is ambiguous");
+        }
+        let removed_layer = matched_layer.clone();
+        let span = parsed.layer_element_spans[page][position]
+            .as_ref()
+            .ok_or_else(|| Error::InvalidFormat("ODG layer span is missing".into()))?;
+        self.content = remove_xml(&self.content, span)?;
+        self.changes
+            .push(Change::Structure(StructureChange::LayerRemoved {
+                page,
+                name: name.to_owned(),
+            }));
+        Ok(removed_layer)
+    }
+
+    /// Adds or replaces one referenced package-local resource and manifest entry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid selector, media type, or size limit.
+    pub fn set_resource(
+        &mut self,
+        resource: usize,
+        media_type: impl Into<String>,
+        bytes: Vec<u8>,
+    ) -> Result<()> {
+        let target_media_type = media_type.into();
+        validate_media_type(&target_media_type)?;
+        if bytes.len() > MAX_OUTPUT_BYTES {
+            return invalid("ODG resource exceeds the output limit");
+        }
+        self.stage_resource(resource, Some(target_media_type), Some(bytes))
+    }
+
+    /// Removes one package-local resource while retaining its inert reference.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid resource selector.
+    pub fn remove_resource(&mut self, resource: usize) -> Result<()> {
+        self.stage_resource(resource, None, None)
+    }
+
+    fn stage_resource(
+        &mut self,
+        resource: usize,
+        after_media_type: Option<String>,
+        after_bytes: Option<Vec<u8>>,
+    ) -> Result<()> {
+        let selected =
+            self.source.resources().get(resource).ok_or_else(|| {
+                Error::InvalidFormat("ODG resource selector is out of bounds".into())
+            })?;
+        let before_bytes = self.source.resource_bytes(resource)?;
+        let before_media_type = selected.media_type().map(str::to_owned);
+        if let Some(edit) = self
+            .resource_edits
+            .iter_mut()
+            .find(|edit| edit.resource == resource)
+        {
+            edit.after_media_type = after_media_type;
+            edit.after_bytes = after_bytes;
+        } else {
+            self.resource_edits.push(ResourceEdit {
+                resource,
+                path: selected.path().to_owned(),
+                before_media_type: before_media_type.clone(),
+                after_media_type,
+                before_bytes: before_bytes.clone(),
+                after_bytes,
+            });
+        }
+        self.resource_edits.retain(|edit| {
+            edit.before_media_type != edit.after_media_type || edit.before_bytes != edit.after_bytes
+        });
         Ok(())
     }
 
@@ -397,88 +846,52 @@ impl Transaction {
     ///
     /// Returns an error when source policy, rebuilding, parsing, or typed readback fails.
     pub fn commit(self) -> Result<Commit> {
-        let Some(staged) = self.change else {
+        if self.content == self.source.content_xml() && self.resource_edits.is_empty() {
             return Ok(Commit::unchanged(self.source));
-        };
-        ensure_compact_rewrite_source(&self.source)?;
-        let content = match &staged {
-            ShapeChange::Text(text_change) => {
-                let span = self
-                    .source
-                    .0
-                    .text_spans
-                    .get(text_change.page)
-                    .and_then(|shapes| shapes.get(text_change.shape))
-                    .and_then(|spans| spans.first())
-                    .and_then(Option::as_ref)
-                    .ok_or_else(|| {
-                        Error::InvalidFormat("ODG shape text source span is missing".to_string())
-                    })?;
-                replace_xml_value(self.source.content_xml(), span, &text_change.after)?
-            },
-            ShapeChange::Name(name_change) => {
-                let span = self
-                    .source
-                    .0
-                    .name_spans
-                    .get(name_change.page)
-                    .and_then(|shapes| shapes.get(name_change.shape))
-                    .and_then(Option::as_ref)
-                    .ok_or_else(|| {
-                        Error::InvalidFormat("ODG shape name source span is missing".to_string())
-                    })?;
-                replace_xml_value(self.source.content_xml(), span, &name_change.after)?
-            },
-            ShapeChange::Layer(layer_change) => {
-                let span = self
-                    .source
-                    .0
-                    .layer_spans
-                    .get(layer_change.page)
-                    .and_then(|shapes| shapes.get(layer_change.shape))
-                    .and_then(Option::as_ref)
-                    .ok_or_else(|| {
-                        Error::InvalidFormat("ODG shape layer source span is missing".to_string())
-                    })?;
-                replace_xml_value(self.source.content_xml(), span, &layer_change.after)?
-            },
-        };
-        compact_xml::validate(content.as_bytes()).map_err(Error::from)?;
-        let snapshot = Snapshot::from_bytes(rebuild(&self.source, &content)?)?;
-        let actual_page = snapshot.pages().get(staged.page()).ok_or_else(|| {
-            Error::InvalidFormat("ODG edited page disappeared during readback".to_string())
-        })?;
-        let actual_shape = actual_page.shapes().get(staged.shape()).ok_or_else(|| {
-            Error::InvalidFormat("ODG edited shape disappeared during readback".to_string())
-        })?;
-        match &staged {
-            ShapeChange::Text(text_change) if actual_shape.text() != text_change.after => {
-                return invalid("ODG package text edit failed typed readback");
-            },
-            ShapeChange::Name(name_change)
-                if actual_shape.name() != Some(name_change.after.as_str()) =>
-            {
-                return invalid("ODG package name edit failed typed readback");
-            },
-            ShapeChange::Layer(layer_change)
-                if actual_shape.layer() != Some(layer_change.after.as_str()) =>
-            {
-                return invalid("ODG package layer edit failed typed readback");
-            },
-            ShapeChange::Text(_) | ShapeChange::Name(_) | ShapeChange::Layer(_) => {},
         }
-        let (text_change, name_change, layer_change) = match staged {
-            ShapeChange::Text(change) => (Some(change), None, None),
-            ShapeChange::Name(change) => (None, Some(change), None),
-            ShapeChange::Layer(change) => (None, None, Some(change)),
-        };
+        ensure_compact_rewrite_source(&self.source)?;
+        compact_xml::validate(self.content.as_bytes()).map_err(Error::from)?;
+        let replacements = self
+            .resource_edits
+            .iter()
+            .map(|edit| ResourceReplacement {
+                path: &edit.path,
+                media_type: edit.after_media_type.as_deref().unwrap_or_default(),
+                bytes: edit.after_bytes.as_deref(),
+            })
+            .collect::<Vec<_>>();
+        let snapshot = Snapshot::from_bytes(rebuild(&self.source, &self.content, &replacements)?)?;
+        if snapshot.content_xml() != self.content {
+            return invalid("ODG package edit failed exact content readback");
+        }
+        for edit in &self.resource_edits {
+            let present = snapshot
+                .resources()
+                .iter()
+                .find(|resource| resource.path() == edit.path);
+            if present.and_then(Resource::media_type) != edit.after_media_type.as_deref() {
+                return invalid("ODG resource edit failed manifest readback");
+            }
+            let actual = if snapshot.0.package.package().has_file(&edit.path)? {
+                Some(snapshot.0.package.package().get_file(&edit.path)?)
+            } else {
+                None
+            };
+            if actual != edit.after_bytes {
+                return invalid("ODG resource edit failed byte readback");
+            }
+        }
+        let resource_changes = self
+            .resource_edits
+            .iter()
+            .map(ResourceEdit::change)
+            .collect::<Vec<_>>();
         Ok(Commit {
             patch: Patch {
                 source: self.source,
                 target: snapshot.clone(),
-                text_change,
-                name_change,
-                layer_change,
+                changes: self.changes,
+                resource_changes,
             },
             snapshot,
             changed: true,
@@ -486,28 +899,16 @@ impl Transaction {
     }
 }
 
-enum ShapeChange {
+/// One semantic operation published by a unified ODG package transaction.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Change {
     Text(TextChange),
     Name(NameChange),
     Layer(LayerChange),
-}
-
-impl ShapeChange {
-    const fn page(&self) -> usize {
-        match self {
-            Self::Text(change) => change.page,
-            Self::Name(change) => change.page,
-            Self::Layer(change) => change.page,
-        }
-    }
-
-    const fn shape(&self) -> usize {
-        match self {
-            Self::Text(change) => change.shape,
-            Self::Name(change) => change.shape,
-            Self::Layer(change) => change.shape,
-        }
-    }
+    Geometry(GeometryChange),
+    Style(StyleChange),
+    Structure(StructureChange),
 }
 
 /// One reversible semantic shape-text operation.
@@ -615,6 +1016,175 @@ impl LayerChange {
     }
 }
 
+/// One reversible four-attribute geometry change.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GeometryChange {
+    page: usize,
+    shape: usize,
+    before: [String; 4],
+    after: [String; 4],
+}
+
+impl GeometryChange {
+    /// Page position at the time of this operation.
+    #[must_use]
+    pub const fn page(&self) -> usize {
+        self.page
+    }
+
+    /// Shape position at the time of this operation.
+    #[must_use]
+    pub const fn shape(&self) -> usize {
+        self.shape
+    }
+
+    /// Source `[x, y, width, height]` lexical values.
+    #[must_use]
+    pub fn before(&self) -> &[String; 4] {
+        &self.before
+    }
+
+    /// Target `[x, y, width, height]` lexical values.
+    #[must_use]
+    pub fn after(&self) -> &[String; 4] {
+        &self.after
+    }
+}
+
+/// One reversible graphic-style reference change.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StyleChange {
+    page: usize,
+    shape: usize,
+    before: String,
+    after: String,
+}
+
+impl StyleChange {
+    #[must_use]
+    pub const fn page(&self) -> usize {
+        self.page
+    }
+
+    #[must_use]
+    pub const fn shape(&self) -> usize {
+        self.shape
+    }
+
+    #[must_use]
+    pub fn before(&self) -> &str {
+        &self.before
+    }
+
+    #[must_use]
+    pub fn after(&self) -> &str {
+        &self.after
+    }
+}
+
+/// A structural page, layer, shape, or group operation.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum StructureChange {
+    PageInserted {
+        position: usize,
+        name: Option<String>,
+    },
+    PageRemoved {
+        position: usize,
+        name: Option<String>,
+    },
+    LayerInserted {
+        page: usize,
+        name: String,
+    },
+    LayerRemoved {
+        page: usize,
+        name: String,
+    },
+    ShapeInserted {
+        page: usize,
+        position: usize,
+        kind: ShapeKind,
+    },
+    ShapeRemoved {
+        page: usize,
+        position: usize,
+        kind: ShapeKind,
+    },
+}
+
+/// One package-local resource replacement or removal.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ResourceChange {
+    resource: usize,
+    path: String,
+    before_media_type: Option<String>,
+    after_media_type: Option<String>,
+    before_size: Option<usize>,
+    after_size: Option<usize>,
+}
+
+impl ResourceChange {
+    #[must_use]
+    pub const fn resource(&self) -> usize {
+        self.resource
+    }
+
+    #[must_use]
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    #[must_use]
+    pub fn before_media_type(&self) -> Option<&str> {
+        self.before_media_type.as_deref()
+    }
+
+    #[must_use]
+    pub fn after_media_type(&self) -> Option<&str> {
+        self.after_media_type.as_deref()
+    }
+
+    #[must_use]
+    pub const fn before_size(&self) -> Option<usize> {
+        self.before_size
+    }
+
+    #[must_use]
+    pub const fn after_size(&self) -> Option<usize> {
+        self.after_size
+    }
+}
+
+struct ResourceEdit {
+    resource: usize,
+    path: String,
+    before_media_type: Option<String>,
+    after_media_type: Option<String>,
+    before_bytes: Option<Vec<u8>>,
+    after_bytes: Option<Vec<u8>>,
+}
+
+impl ResourceEdit {
+    fn change(&self) -> ResourceChange {
+        ResourceChange {
+            resource: self.resource,
+            path: self.path.clone(),
+            before_media_type: self.before_media_type.clone(),
+            after_media_type: self.after_media_type.clone(),
+            before_size: self.before_bytes.as_ref().map(Vec::len),
+            after_size: self.after_bytes.as_ref().map(Vec::len),
+        }
+    }
+}
+
+struct ResourceReplacement<'a> {
+    path: &'a str,
+    media_type: &'a str,
+    bytes: Option<&'a [u8]>,
+}
+
 /// A committed package publication and its exact-source patch.
 pub struct Commit {
     snapshot: Snapshot,
@@ -628,9 +1198,8 @@ impl Commit {
             patch: Patch {
                 source: snapshot.clone(),
                 target: snapshot.clone(),
-                text_change: None,
-                name_change: None,
-                layer_change: None,
+                changes: Vec::new(),
+                resource_changes: Vec::new(),
             },
             snapshot,
             changed: false,
@@ -667,9 +1236,8 @@ impl Commit {
 pub struct Patch {
     source: Snapshot,
     target: Snapshot,
-    text_change: Option<TextChange>,
-    name_change: Option<NameChange>,
-    layer_change: Option<LayerChange>,
+    changes: Vec<Change>,
+    resource_changes: Vec<ResourceChange>,
 }
 
 impl Patch {
@@ -694,19 +1262,73 @@ impl Patch {
     /// The semantic change represented by this patch.
     #[must_use]
     pub fn change(&self) -> Option<&TextChange> {
-        self.text_change.as_ref()
+        self.changes.iter().find_map(|change| match change {
+            Change::Text(value) => Some(value),
+            Change::Name(_)
+            | Change::Layer(_)
+            | Change::Geometry(_)
+            | Change::Style(_)
+            | Change::Structure(_) => None,
+        })
     }
 
     /// The semantic `draw:name` change, when this is a name patch.
     #[must_use]
     pub fn name_change(&self) -> Option<&NameChange> {
-        self.name_change.as_ref()
+        self.changes.iter().find_map(|change| match change {
+            Change::Name(value) => Some(value),
+            Change::Text(_)
+            | Change::Layer(_)
+            | Change::Geometry(_)
+            | Change::Style(_)
+            | Change::Structure(_) => None,
+        })
     }
 
     /// The semantic drawing-layer change, when present.
     #[must_use]
     pub fn layer_change(&self) -> Option<&LayerChange> {
-        self.layer_change.as_ref()
+        self.changes.iter().find_map(|change| match change {
+            Change::Layer(value) => Some(value),
+            Change::Text(_)
+            | Change::Name(_)
+            | Change::Geometry(_)
+            | Change::Style(_)
+            | Change::Structure(_) => None,
+        })
+    }
+
+    /// All semantic operations in transaction order.
+    #[must_use]
+    pub fn changes(&self) -> &[Change] {
+        &self.changes
+    }
+
+    /// Package-local resource changes in source selector order.
+    #[must_use]
+    pub fn resource_changes(&self) -> &[ResourceChange] {
+        &self.resource_changes
+    }
+
+    /// Composes adjacent exact-lineage patches.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless this target is byte-identical to `next`'s source.
+    pub fn then(&self, next: &Self) -> Result<Self> {
+        if self.target.as_bytes() != next.source.as_bytes() {
+            return invalid("ODG patch composition lineage does not match");
+        }
+        let mut changes = self.changes.clone();
+        changes.extend_from_slice(&next.changes);
+        let mut resource_changes = self.resource_changes.clone();
+        resource_changes.extend_from_slice(&next.resource_changes);
+        Ok(Self {
+            source: self.source.clone(),
+            target: next.target.clone(),
+            changes,
+            resource_changes,
+        })
     }
 
     /// An exact-source patch restoring the original package.
@@ -715,24 +1337,13 @@ impl Patch {
         Self {
             source: self.target.clone(),
             target: self.source.clone(),
-            text_change: self.text_change.as_ref().map(|change| TextChange {
-                page: change.page,
-                shape: change.shape,
-                before: change.after.clone(),
-                after: change.before.clone(),
-            }),
-            name_change: self.name_change.as_ref().map(|change| NameChange {
-                page: change.page,
-                shape: change.shape,
-                before: change.after.clone(),
-                after: change.before.clone(),
-            }),
-            layer_change: self.layer_change.as_ref().map(|change| LayerChange {
-                page: change.page,
-                shape: change.shape,
-                before: change.after.clone(),
-                after: change.before.clone(),
-            }),
+            changes: self.changes.iter().rev().map(inverse_change).collect(),
+            resource_changes: self
+                .resource_changes
+                .iter()
+                .rev()
+                .map(inverse_resource_change)
+                .collect(),
         }
     }
 }
@@ -743,12 +1354,21 @@ struct Parsed {
     name_spans: NameSpans,
     layer_spans: LayerSpans,
     layer_count: usize,
+    geometry_spans: GeometrySpans,
+    style_name_spans: Vec<Vec<Option<Range<usize>>>>,
+    page_spans: Vec<Option<Range<usize>>>,
+    page_insert_positions: Vec<Option<usize>>,
+    shape_spans: Vec<Vec<Option<Range<usize>>>>,
+    layer_element_spans: Vec<Vec<Option<Range<usize>>>>,
+    layer_set_insert_positions: Vec<Option<usize>>,
+    drawing_insert_position: usize,
 }
 
 struct ActiveShape {
     depth: usize,
     page: usize,
     shape: usize,
+    start: usize,
 }
 
 #[derive(Clone, Copy)]
@@ -773,6 +1393,7 @@ struct Scanner {
     drawing_depth: Option<usize>,
     pages: Vec<Page>,
     page_depths: Vec<usize>,
+    page_starts: Vec<usize>,
     layer_sets: Vec<(usize, Option<usize>)>,
     active_shapes: Vec<ActiveShape>,
     active_accessibility: Option<ActiveAccessibility>,
@@ -780,9 +1401,19 @@ struct Scanner {
     text_spans: TextSpans,
     name_spans: NameSpans,
     layer_spans: LayerSpans,
+    geometry_spans: GeometrySpans,
+    style_name_spans: Vec<Vec<Option<Range<usize>>>>,
     layer_count: usize,
     shape_count: usize,
     text_bytes: usize,
+    page_spans: Vec<Option<Range<usize>>>,
+    page_insert_positions: Vec<Option<usize>>,
+    shape_spans: Vec<Vec<Option<Range<usize>>>>,
+    layer_element_spans: Vec<Vec<Option<Range<usize>>>>,
+    layer_set_starts: Vec<(usize, usize, usize)>,
+    layer_set_insert_positions: Vec<Option<usize>>,
+    active_layers: Vec<(usize, usize, usize, usize)>,
+    drawing_insert_position: Option<usize>,
 }
 
 impl Scanner {
@@ -796,6 +1427,7 @@ impl Scanner {
             drawing_depth: None,
             pages: Vec::new(),
             page_depths: Vec::new(),
+            page_starts: Vec::new(),
             layer_sets: Vec::new(),
             active_shapes: Vec::new(),
             active_accessibility: None,
@@ -803,9 +1435,19 @@ impl Scanner {
             text_spans: Vec::new(),
             name_spans: Vec::new(),
             layer_spans: Vec::new(),
+            geometry_spans: Vec::new(),
+            style_name_spans: Vec::new(),
             layer_count: 0,
             shape_count: 0,
             text_bytes: 0,
+            page_spans: Vec::new(),
+            page_insert_positions: Vec::new(),
+            shape_spans: Vec::new(),
+            layer_element_spans: Vec::new(),
+            layer_set_starts: Vec::new(),
+            layer_set_insert_positions: Vec::new(),
+            active_layers: Vec::new(),
+            drawing_insert_position: None,
         }
     }
 
@@ -867,7 +1509,9 @@ impl Scanner {
                 return invalid("ODG office:drawing is misplaced or duplicated");
             }
             self.drawing_seen = true;
-            if !empty {
+            if empty {
+                self.drawing_insert_position = Some(tag_start + tag.len() - 2);
+            } else {
                 self.drawing_depth = Some(self.depth);
             }
             return Ok(());
@@ -877,8 +1521,11 @@ impl Scanner {
                 Error::InvalidFormat("ODG layer-set is outside draw:page".to_string())
             })?;
             self.pages[page].mark_layer_set();
-            if !empty {
+            if empty {
+                self.layer_set_insert_positions[page] = Some(tag_start + tag.len() - 2);
+            } else {
                 self.layer_sets.push((self.depth, Some(page)));
+                self.layer_set_starts.push((self.depth, page, tag_start));
             }
             return Ok(());
         }
@@ -890,6 +1537,16 @@ impl Scanner {
                 .is_some_and(|(depth, _)| *depth + 1 == self.depth)
         {
             self.add_layer(reader, element)?;
+            let page = self.current_page().ok_or_else(|| {
+                Error::InvalidFormat("ODG layer is outside draw:page".to_string())
+            })?;
+            let layer = self.pages[page].layers().len() - 1;
+            if empty {
+                self.layer_element_spans[page][layer] = Some(tag_start..tag_start + tag.len());
+            } else {
+                self.active_layers
+                    .push((self.depth, page, layer, tag_start));
+            }
             return Ok(());
         }
         if namespace == NamespaceKind::Draw && local == b"page" {
@@ -908,8 +1565,20 @@ impl Scanner {
             self.text_spans.push(Vec::new());
             self.name_spans.push(Vec::new());
             self.layer_spans.push(Vec::new());
-            if !empty {
+            self.geometry_spans.push(Vec::new());
+            self.style_name_spans.push(Vec::new());
+            self.page_spans.push(None);
+            self.page_insert_positions.push(None);
+            self.shape_spans.push(Vec::new());
+            self.layer_element_spans.push(Vec::new());
+            self.layer_set_insert_positions.push(None);
+            if empty {
+                let page = self.pages.len() - 1;
+                self.page_spans[page] = Some(tag_start..tag_start + tag.len());
+                self.page_insert_positions[page] = Some(tag_start + tag.len() - 2);
+            } else {
                 self.page_depths.push(self.depth);
+                self.page_starts.push(tag_start);
             }
             return Ok(());
         }
@@ -936,7 +1605,7 @@ impl Scanner {
                 attribute(reader, element, SVG, b"height")?,
             ];
             let shape = self.pages[page].shapes().len();
-            self.pages[page].push_shape(Shape::new(
+            self.pages[page].push_shape(Shape::parsed(
                 ShapeProperties {
                     geometry,
                     layer: attribute(reader, element, DRAW, b"layer")?,
@@ -953,11 +1622,27 @@ impl Scanner {
             self.layer_spans[page].push(attribute_source_span(
                 reader, element, tag, tag_start, DRAW, b"layer",
             )?);
+            self.geometry_spans[page].push([
+                attribute_source_span(reader, element, tag, tag_start, SVG, b"x")?,
+                attribute_source_span(reader, element, tag, tag_start, SVG, b"y")?,
+                attribute_source_span(reader, element, tag, tag_start, SVG, b"width")?,
+                attribute_source_span(reader, element, tag, tag_start, SVG, b"height")?,
+            ]);
+            self.style_name_spans[page].push(attribute_source_span(
+                reader,
+                element,
+                tag,
+                tag_start,
+                DRAW,
+                b"style-name",
+            )?);
+            self.shape_spans[page].push(empty.then_some(tag_start..tag_start + tag.len()));
             if !empty {
                 self.active_shapes.push(ActiveShape {
                     depth: self.depth,
                     page,
                     shape,
+                    start: tag_start,
                 });
             }
             return Ok(());
@@ -1004,6 +1689,7 @@ impl Scanner {
         );
         if let Some((_, Some(page))) = self.layer_sets.last() {
             self.pages[*page].push_layer(layer.clone());
+            self.layer_element_spans[*page].push(None);
         }
         Ok(())
     }
@@ -1049,7 +1735,13 @@ impl Scanner {
         Ok(())
     }
 
-    fn end(&mut self, namespace: NamespaceKind, local: &[u8]) -> Result<()> {
+    fn end(
+        &mut self,
+        namespace: NamespaceKind,
+        local: &[u8],
+        tag_start: usize,
+        tag_end: usize,
+    ) -> Result<()> {
         if self
             .active_accessibility
             .as_ref()
@@ -1068,7 +1760,22 @@ impl Scanner {
             .last()
             .is_some_and(|shape| shape.depth == self.depth)
         {
-            self.active_shapes.pop();
+            let active = self
+                .active_shapes
+                .pop()
+                .ok_or_else(|| Error::InvalidFormat("ODG active shape disappeared".to_string()))?;
+            self.shape_spans[active.page][active.shape] = Some(active.start..tag_end);
+        }
+        if self
+            .active_layers
+            .last()
+            .is_some_and(|layer| layer.0 == self.depth)
+        {
+            let (_, page, layer, start) = self
+                .active_layers
+                .pop()
+                .ok_or_else(|| Error::InvalidFormat("ODG active layer disappeared".to_string()))?;
+            self.layer_element_spans[page][layer] = Some(start..tag_end);
         }
         if namespace == NamespaceKind::Draw
             && local == b"layer-set"
@@ -1078,15 +1785,27 @@ impl Scanner {
                 .is_some_and(|set| set.0 == self.depth)
         {
             self.layer_sets.pop();
+            let (_, page, _) = self.layer_set_starts.pop().ok_or_else(|| {
+                Error::InvalidFormat("ODG active layer-set disappeared".to_string())
+            })?;
+            self.layer_set_insert_positions[page] = Some(tag_start);
         }
         if namespace == NamespaceKind::Draw
             && local == b"page"
             && self.page_depths.last() == Some(&self.depth)
         {
             self.page_depths.pop();
+            let start = self
+                .page_starts
+                .pop()
+                .ok_or_else(|| Error::InvalidFormat("ODG active page disappeared".to_string()))?;
+            let page = self.pages.len() - 1;
+            self.page_spans[page] = Some(start..tag_end);
+            self.page_insert_positions[page] = Some(tag_start);
         }
         if self.drawing_depth == Some(self.depth) {
             self.drawing_depth = None;
+            self.drawing_insert_position = Some(tag_start);
         }
         if self.body_depth == Some(self.depth) {
             self.body_depth = None;
@@ -1123,7 +1842,17 @@ impl Scanner {
             text_spans: self.text_spans,
             name_spans: self.name_spans,
             layer_spans: self.layer_spans,
+            geometry_spans: self.geometry_spans,
+            style_name_spans: self.style_name_spans,
             layer_count: self.layer_count,
+            page_spans: self.page_spans,
+            page_insert_positions: self.page_insert_positions,
+            shape_spans: self.shape_spans,
+            layer_element_spans: self.layer_element_spans,
+            layer_set_insert_positions: self.layer_set_insert_positions,
+            drawing_insert_position: self.drawing_insert_position.ok_or_else(|| {
+                Error::InvalidFormat("ODG drawing insertion point is missing".to_string())
+            })?,
         })
     }
 }
@@ -1161,7 +1890,9 @@ fn parse_content(xml: &str) -> Result<Parsed> {
                 start,
                 true,
             )?,
-            Event::End(element) => scanner.end(namespace, element.local_name().as_ref())?,
+            Event::End(element) => {
+                scanner.end(namespace, element.local_name().as_ref(), start, end)?;
+            },
             Event::Text(text) => {
                 let value = text_value(&text)?;
                 scanner.text(Some(start..end), &value)?;
@@ -1246,6 +1977,36 @@ fn parse_declared_layers(xml: &str) -> Result<Vec<Layer>> {
     Ok(layers)
 }
 
+fn scan_resources(package: &Package) -> Result<Vec<Resource>> {
+    let archive = package.package().package()?;
+    let images = media::scan_package(package.content_xml(), package.styles_xml(), &archive)?;
+    let mut resources = Vec::new();
+    for (occurrence, image) in images.into_iter().enumerate() {
+        match image.source {
+            media::Source::PackagePart {
+                href,
+                path,
+                manifest_media_type,
+            } => resources.push(Resource::new(
+                occurrence,
+                href,
+                path,
+                manifest_media_type,
+                true,
+            )),
+            media::Source::MissingPackagePart {
+                href,
+                resolved_path,
+            } => resources.push(Resource::new(occurrence, href, resolved_path, None, false)),
+            media::Source::Inline { .. }
+            | media::Source::Linked { .. }
+            | media::Source::Missing
+            | _ => {},
+        }
+    }
+    Ok(resources)
+}
+
 fn checked_xml_depth(depth: usize) -> Result<usize> {
     let next_depth = depth
         .checked_add(1)
@@ -1300,7 +2061,11 @@ fn reference_value(reference: &quick_xml::events::BytesRef<'_>) -> Result<String
     }
 }
 
-fn rebuild(source: &Snapshot, content: &str) -> Result<Vec<u8>> {
+fn rebuild(
+    source: &Snapshot,
+    content: &str,
+    replacements: &[ResourceReplacement<'_>],
+) -> Result<Vec<u8>> {
     let files = source.files()?;
     if files.iter().any(|path| {
         matches!(
@@ -1319,7 +2084,16 @@ fn rebuild(source: &Snapshot, content: &str) -> Result<Vec<u8>> {
             writer.add_file(path, &archive.get_file(path)?)?;
         }
     }
-    writer.copy_auxiliary_files_from(archive)?;
+    let excluded = replacements
+        .iter()
+        .map(|replacement| replacement.path.to_owned())
+        .collect::<Vec<_>>();
+    writer.copy_auxiliary_files_from_except(archive, &excluded, &[])?;
+    for replacement in replacements {
+        if let Some(bytes) = replacement.bytes {
+            writer.add_file_with_media_type(replacement.path, bytes, replacement.media_type)?;
+        }
+    }
     writer.finish_to_bounded_bytes()
 }
 
@@ -1360,6 +2134,345 @@ fn replace_xml_value(source: &str, span: &Range<usize>, replacement: &str) -> Re
     output.push_str(&escaped_replacement);
     output.push_str(&source[span.end..]);
     Ok(output)
+}
+
+fn replace_xml_values(
+    source: &str,
+    spans: &[&Range<usize>],
+    replacements: &[String; 4],
+) -> Result<String> {
+    let mut edits = spans
+        .iter()
+        .zip(replacements)
+        .map(|(span, value)| ((*span).clone(), value.as_str()))
+        .collect::<Vec<_>>();
+    edits.sort_unstable_by_key(|(span, _)| std::cmp::Reverse(span.start));
+    let mut output = source.to_owned();
+    for (span, replacement) in edits {
+        output = replace_xml_value(&output, &span, replacement)?;
+    }
+    Ok(output)
+}
+
+fn insert_xml(source: &str, at: usize, xml: &str) -> Result<String> {
+    if at > source.len() || !source.is_char_boundary(at) {
+        return invalid("ODG XML insertion point is invalid");
+    }
+    let capacity = source
+        .len()
+        .checked_add(xml.len())
+        .ok_or_else(|| Error::InvalidFormat("ODG edited content size overflow".into()))?;
+    if capacity > MAX_OUTPUT_BYTES {
+        return invalid("ODG edited content exceeds the output limit");
+    }
+    let mut output = String::new();
+    output
+        .try_reserve_exact(capacity)
+        .map_err(|allocation_error| Error::Allocation {
+            resource: "ODG edited content",
+            source: allocation_error,
+        })?;
+    output.push_str(&source[..at]);
+    output.push_str(xml);
+    output.push_str(&source[at..]);
+    Ok(output)
+}
+
+fn insert_child_xml(source: &str, at: usize, child: &str) -> Result<String> {
+    if source.as_bytes().get(at..at.saturating_add(2)) != Some(b"/>") {
+        return insert_xml(source, at, child);
+    }
+    let element_start = source
+        .get(..at)
+        .and_then(|prefix| prefix.rfind('<'))
+        .ok_or_else(|| Error::InvalidFormat("ODG empty owner start is missing".into()))?;
+    let name_start = element_start + 1;
+    let name_end = source
+        .as_bytes()
+        .get(name_start..at)
+        .and_then(|bytes| {
+            bytes
+                .iter()
+                .position(|byte| byte.is_ascii_whitespace() || matches!(byte, b'/' | b'>'))
+                .map(|offset| name_start + offset)
+        })
+        .unwrap_or(at);
+    let name = source
+        .get(name_start..name_end)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| Error::InvalidFormat("ODG empty owner name is missing".into()))?;
+    let replacement = format!(">{child}</{name}>");
+    let mut output = String::with_capacity(
+        source
+            .len()
+            .saturating_sub(2)
+            .saturating_add(replacement.len()),
+    );
+    output.push_str(&source[..at]);
+    output.push_str(&replacement);
+    output.push_str(&source[at + 2..]);
+    if output.len() > MAX_OUTPUT_BYTES {
+        return invalid("ODG edited content exceeds the output limit");
+    }
+    Ok(output)
+}
+
+fn remove_xml(source: &str, span: &Range<usize>) -> Result<String> {
+    if span.start > span.end
+        || span.end > source.len()
+        || !source.is_char_boundary(span.start)
+        || !source.is_char_boundary(span.end)
+    {
+        return invalid("ODG XML removal span is invalid");
+    }
+    let mut output = String::with_capacity(source.len() - (span.end - span.start));
+    output.push_str(&source[..span.start]);
+    output.push_str(&source[span.end..]);
+    Ok(output)
+}
+
+fn start_tag_end(source: &str, start: usize) -> Result<usize> {
+    source
+        .get(start..)
+        .and_then(|tail| tail.find('>').map(|offset| start + offset + 1))
+        .ok_or_else(|| Error::InvalidFormat("ODG element start tag is unterminated".into()))
+}
+
+fn serialize_page(page: &Page) -> Result<String> {
+    let mut xml = format!(
+        "<draw:page xmlns:draw=\"{}\"",
+        std::str::from_utf8(DRAW).unwrap_or_default()
+    );
+    push_attribute(&mut xml, "draw:name", page.name())?;
+    push_attribute(&mut xml, "xml:id", page.xml_id())?;
+    push_attribute(&mut xml, "draw:style-name", page.style_name())?;
+    push_attribute(&mut xml, "draw:master-page-name", page.master_page_name())?;
+    xml.push_str("></draw:page>");
+    Ok(xml)
+}
+
+fn serialize_layer(layer: &Layer) -> Result<String> {
+    validate_bounded_value(layer.name(), "ODG layer name")?;
+    let mut xml = String::from("<draw:layer");
+    push_attribute(&mut xml, "draw:name", Some(layer.name()))?;
+    push_attribute(&mut xml, "draw:display", layer.display())?;
+    if let Some(protected) = layer.protected() {
+        push_attribute(
+            &mut xml,
+            "draw:protected",
+            Some(if protected { "true" } else { "false" }),
+        )?;
+    }
+    xml.push_str("/>");
+    Ok(xml)
+}
+
+fn serialize_shape(shape: &Shape) -> Result<String> {
+    let element = shape.kind().element_name();
+    let mut xml = format!(
+        "<draw:{element} xmlns:draw=\"{}\" xmlns:svg=\"{}\" xmlns:text=\"{}\"",
+        std::str::from_utf8(DRAW).unwrap_or_default(),
+        std::str::from_utf8(SVG).unwrap_or_default(),
+        std::str::from_utf8(TEXT).unwrap_or_default()
+    );
+    push_attribute(&mut xml, "draw:name", shape.name())?;
+    push_attribute(&mut xml, "draw:layer", shape.layer())?;
+    push_attribute(&mut xml, "draw:style-name", shape.style_name())?;
+    push_attribute(&mut xml, "draw:text-style-name", shape.text_style_name())?;
+    if let Some(z_index) = shape.z_index() {
+        push_attribute(&mut xml, "draw:z-index", Some(&z_index.to_string()))?;
+    }
+    push_attribute(&mut xml, "svg:x", shape.x())?;
+    push_attribute(&mut xml, "svg:y", shape.y())?;
+    push_attribute(&mut xml, "svg:width", shape.width())?;
+    push_attribute(&mut xml, "svg:height", shape.height())?;
+    if shape.title().is_none() && shape.description().is_none() && shape.text().is_empty() {
+        xml.push_str("/>");
+        return Ok(xml);
+    }
+    xml.push('>');
+    if let Some(title) = shape.title() {
+        xml.push_str("<svg:title>");
+        xml.push_str(&quick_xml::escape::escape(title));
+        xml.push_str("</svg:title>");
+    }
+    if let Some(description) = shape.description() {
+        xml.push_str("<svg:desc>");
+        xml.push_str(&quick_xml::escape::escape(description));
+        xml.push_str("</svg:desc>");
+    }
+    if !shape.text().is_empty() {
+        xml.push_str("<text:p>");
+        xml.push_str(&quick_xml::escape::escape(shape.text()));
+        xml.push_str("</text:p>");
+    }
+    xml.push_str("</draw:");
+    xml.push_str(element);
+    xml.push('>');
+    Ok(xml)
+}
+
+fn push_attribute(output: &mut String, name: &str, value: Option<&str>) -> Result<()> {
+    let Some(attribute_value) = value else {
+        return Ok(());
+    };
+    validate_bounded_value(attribute_value, "ODG XML attribute value")?;
+    output.push(' ');
+    output.push_str(name);
+    output.push_str("=\"");
+    output.push_str(&quick_xml::escape::escape(attribute_value));
+    output.push('"');
+    Ok(())
+}
+
+fn validate_bounded_value(value: &str, owner: &str) -> Result<()> {
+    if value.is_empty() || value.len() > MAX_TEXT_BYTES || value.contains('\0') {
+        return Err(Error::InvalidFormat(format!("{owner} is invalid")));
+    }
+    Ok(())
+}
+
+fn validate_geometry(values: &[String; 4]) -> Result<()> {
+    for value in values {
+        validate_bounded_value(value, "ODG geometry value")?;
+        if value.bytes().any(|byte| byte.is_ascii_whitespace()) {
+            return invalid("ODG geometry value contains whitespace");
+        }
+    }
+    Ok(())
+}
+
+fn validate_shape_layer(page: &Page, global_layers: &[Layer], shape: &Shape) -> Result<()> {
+    let Some(layer) = shape.layer() else {
+        return Ok(());
+    };
+    let visible = if page.has_layer_set() {
+        page.layers()
+    } else {
+        global_layers
+    };
+    if !visible.iter().any(|value| value.name() == layer) {
+        return invalid("ODG inserted shape references an undeclared layer");
+    }
+    Ok(())
+}
+
+fn resolve_page_position(pages: &[Page], selector: crate::page::Selector<'_>) -> Result<usize> {
+    match selector {
+        crate::page::Selector::Position(position) => pages
+            .get(position.get())
+            .map(|_| position.get())
+            .ok_or_else(|| Error::InvalidFormat("ODG page selector is out of bounds".into())),
+        crate::page::Selector::Name(name) => {
+            let mut matches = pages
+                .iter()
+                .enumerate()
+                .filter(|(_, page)| page.name() == Some(name.as_ref()));
+            let selected = matches
+                .next()
+                .ok_or_else(|| Error::InvalidFormat("ODG page selector did not match".into()))?;
+            if matches.next().is_some() {
+                return invalid("ODG page name selector is ambiguous");
+            }
+            Ok(selected.0)
+        },
+    }
+}
+
+fn validate_media_type(media_type: &str) -> Result<()> {
+    if media_type.is_empty()
+        || media_type.len() > 1_024
+        || !media_type.is_ascii()
+        || !media_type.contains('/')
+        || media_type
+            .bytes()
+            .any(|byte| byte.is_ascii_control() || byte.is_ascii_whitespace())
+    {
+        return invalid("ODG resource media type is invalid");
+    }
+    Ok(())
+}
+
+fn inverse_change(change: &Change) -> Change {
+    match change {
+        Change::Text(value) => Change::Text(TextChange {
+            page: value.page,
+            shape: value.shape,
+            before: value.after.clone(),
+            after: value.before.clone(),
+        }),
+        Change::Name(value) => Change::Name(NameChange {
+            page: value.page,
+            shape: value.shape,
+            before: value.after.clone(),
+            after: value.before.clone(),
+        }),
+        Change::Layer(value) => Change::Layer(LayerChange {
+            page: value.page,
+            shape: value.shape,
+            before: value.after.clone(),
+            after: value.before.clone(),
+        }),
+        Change::Geometry(value) => Change::Geometry(GeometryChange {
+            page: value.page,
+            shape: value.shape,
+            before: value.after.clone(),
+            after: value.before.clone(),
+        }),
+        Change::Style(value) => Change::Style(StyleChange {
+            page: value.page,
+            shape: value.shape,
+            before: value.after.clone(),
+            after: value.before.clone(),
+        }),
+        Change::Structure(value) => Change::Structure(match value {
+            StructureChange::PageInserted { position, name } => StructureChange::PageRemoved {
+                position: *position,
+                name: name.clone(),
+            },
+            StructureChange::PageRemoved { position, name } => StructureChange::PageInserted {
+                position: *position,
+                name: name.clone(),
+            },
+            StructureChange::LayerInserted { page, name } => StructureChange::LayerRemoved {
+                page: *page,
+                name: name.clone(),
+            },
+            StructureChange::LayerRemoved { page, name } => StructureChange::LayerInserted {
+                page: *page,
+                name: name.clone(),
+            },
+            StructureChange::ShapeInserted {
+                page,
+                position,
+                kind,
+            } => StructureChange::ShapeRemoved {
+                page: *page,
+                position: *position,
+                kind: *kind,
+            },
+            StructureChange::ShapeRemoved {
+                page,
+                position,
+                kind,
+            } => StructureChange::ShapeInserted {
+                page: *page,
+                position: *position,
+                kind: *kind,
+            },
+        }),
+    }
+}
+
+fn inverse_resource_change(change: &ResourceChange) -> ResourceChange {
+    ResourceChange {
+        resource: change.resource,
+        path: change.path.clone(),
+        before_media_type: change.after_media_type.clone(),
+        after_media_type: change.before_media_type.clone(),
+        before_size: change.after_size,
+        after_size: change.before_size,
+    }
 }
 
 fn frame(

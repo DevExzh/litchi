@@ -1,4 +1,4 @@
-//! Typed PivotTable and PivotCache models.
+//! Typed `PivotTable` and `PivotCache` models.
 //!
 //! This module owns semantic values, validation, and the public object model;
 //! BIFF record framing and parsing live in the sibling codec module.
@@ -6,7 +6,7 @@
 use super::codec::{SXVD_TYPE, cache_invalid};
 use crate::error::{Error, Result};
 
-/// A BIFF8 cell error stored in an `SXERROR` PivotCache item.
+/// A BIFF8 cell error stored in an `SXERROR` `PivotCache` item.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u16)]
 pub enum PivotCacheError {
@@ -20,6 +20,7 @@ pub enum PivotCacheError {
 }
 
 impl PivotCacheError {
+    #[must_use]
     pub const fn code(self) -> u16 {
         self as u16
     }
@@ -134,6 +135,9 @@ impl PivotCacheGrouping {
 }
 
 impl PivotCacheDateTime {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(
         year: u16,
         month: u16,
@@ -188,27 +192,33 @@ impl PivotCacheDateTime {
         Ok(())
     }
 
+    #[must_use]
     pub const fn year(self) -> u16 {
         self.year
     }
+    #[must_use]
     pub const fn month(self) -> u16 {
         self.month
     }
+    #[must_use]
     pub const fn day(self) -> u8 {
         self.day
     }
+    #[must_use]
     pub const fn hour(self) -> u8 {
         self.hour
     }
+    #[must_use]
     pub const fn minute(self) -> u8 {
         self.minute
     }
+    #[must_use]
     pub const fn second(self) -> u8 {
         self.second
     }
 }
 
-/// A typed PivotCache shared or resolved row item.
+/// A typed `PivotCache` shared or resolved row item.
 #[derive(Debug, Clone, PartialEq)]
 pub enum PivotCacheItem {
     String(String),
@@ -268,7 +278,7 @@ pub(crate) fn pivot_cache_data_flags(items: &[PivotCacheItem]) -> u16 {
     for item in items {
         match item {
             PivotCacheItem::String(_) | PivotCacheItem::Boolean(_) | PivotCacheItem::Error(_) => {
-                text = true
+                text = true;
             },
             PivotCacheItem::Number(value) if value.fract() == 0.0 => integer = true,
             PivotCacheItem::Number(_) => double = true,
@@ -302,21 +312,27 @@ pub struct PivotCacheField {
     pub(crate) grouping: Option<PivotCacheGrouping>,
 }
 impl PivotCacheField {
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
+    #[must_use]
     pub const fn flags(&self) -> u16 {
         self.flags
     }
+    #[must_use]
     pub fn items(&self) -> &[PivotCacheItem] {
         &self.items
     }
+    #[must_use]
     pub const fn group_parent(&self) -> Option<u16> {
         self.group_parent
     }
+    #[must_use]
     pub const fn group_base(&self) -> Option<u16> {
         self.group_base
     }
+    #[must_use]
     pub fn grouping(&self) -> Option<&PivotCacheGrouping> {
         self.grouping.as_ref()
     }
@@ -341,18 +357,23 @@ pub struct PivotCache {
     pub(crate) rows: Vec<Vec<PivotCacheItem>>,
 }
 impl PivotCache {
+    #[must_use]
     pub const fn stream_id(&self) -> u16 {
         self.stream_id
     }
+    #[must_use]
     pub const fn flags(&self) -> u16 {
         self.flags
     }
+    #[must_use]
     pub const fn record_count(&self) -> u32 {
         self.record_count
     }
+    #[must_use]
     pub fn fields(&self) -> &[PivotCacheField] {
         &self.fields
     }
+    #[must_use]
     pub fn rows(&self) -> &[Vec<PivotCacheItem>] {
         &self.rows
     }
@@ -390,6 +411,7 @@ impl PivotAxis {
             )),
         }
     }
+    #[must_use]
     pub const fn code(self) -> u16 {
         match self {
             Self::None => 0,
@@ -435,6 +457,7 @@ impl PivotFunction {
             other => Self::Unknown(other),
         }
     }
+    #[must_use]
     pub const fn code(self) -> u16 {
         match self {
             Self::Sum => 0,
@@ -474,7 +497,7 @@ pub struct PivotViewDef {
     pub first_data_row: u16,
     /// First data column (body).
     pub first_data_col: u16,
-    /// Zero-based index into the workbook's global PivotCache list.
+    /// Zero-based index into the workbook's global `PivotCache` list.
     pub cache_index: u16,
     /// Number of row fields.
     pub row_field_count: u16,
@@ -496,7 +519,7 @@ pub struct PivotViewDef {
     pub data_position: u16,
     /// SXVIEW option flags.
     pub flags: u16,
-    /// Built-in PivotTable auto-format index.
+    /// Built-in `PivotTable` auto-format index.
     pub auto_format_index: u16,
     /// Name of the pivot table.
     pub name: String,
@@ -568,6 +591,7 @@ impl PivotItemType {
         }
     }
 
+    #[must_use]
     pub const fn code(self) -> u16 {
         match self {
             Self::Data => 0xFE,
@@ -668,6 +692,7 @@ pub enum PivotPageSelection {
 }
 
 impl PageFieldEntry {
+    #[must_use]
     pub const fn selection(self) -> PivotPageSelection {
         if self.item_index == 0x7FFD {
             PivotPageSelection::All
@@ -705,7 +730,7 @@ pub struct PivotLayoutLine {
     pub item_indices: Vec<u16>,
 }
 
-/// Extended PivotTable view properties from SXEX.
+/// Extended `PivotTable` view properties from SXEX.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PivotViewExtension {
     pub format_count: u16,
@@ -721,7 +746,7 @@ pub struct PivotViewExtension {
     pub vacate_style: Option<String>,
 }
 
-/// Query/Pivot tag metadata from QsiSxTag.
+/// Query/Pivot tag metadata from `QsiSxTag`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PivotQueryTag {
     pub table_type: u16,
@@ -735,7 +760,7 @@ pub struct PivotQueryTag {
     pub trailing_payload: Vec<u8>,
 }
 
-/// Excel 9+ PivotTable layout metadata from SXVIEWEX9.
+/// Excel 9+ `PivotTable` layout metadata from SXVIEWEX9.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PivotViewEx9 {
     pub frt_flags: u16,

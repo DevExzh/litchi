@@ -1,9 +1,20 @@
+#![expect(
+    clippy::assigning_clones,
+    reason = "clone assignment preserves validation-before-replacement behavior"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Package-facing glossary load/store/remove orchestration.
 
-use super::codec::*;
-use super::graph::*;
-use super::model::*;
-use super::*;
+use super::codec::invalid;
+use super::graph::{
+    catalog_relationship_references, load_graph, put_graph, raw, relationship_kind, remove_graph,
+    validate_package_conformance,
+};
+use super::model::{Binding, Catalog, Conformance};
+use super::{Arc, Error, OpcPackage, PackURI, Part, Result, ct};
 pub(in crate::glossary) struct Owner {
     pub(in crate::glossary) main: PackURI,
     pub(in crate::glossary) root: PackURI,
@@ -13,6 +24,10 @@ pub(in crate::glossary) struct Owner {
 }
 
 /// Load the semantic catalog and its namespace dialect, without copying auxiliaries.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn load(package: &OpcPackage) -> Result<Option<(Catalog, Conformance)>> {
     let Some(graph) = load_graph(package)? else {
         return Ok(None);
@@ -35,6 +50,10 @@ pub fn load(package: &OpcPackage) -> Result<Option<(Catalog, Conformance)>> {
 /// Move a semantic catalog into the package while preserving its auxiliary graph.
 ///
 /// An unchanged package-loaded catalog is a byte- and signature-preserving no-op.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn put(
     package: &mut OpcPackage,
     mut catalog: Catalog,
@@ -192,6 +211,10 @@ pub(in crate::glossary) fn free_part_name(
 /// Remove the glossary graph. Absence is a signature-preserving no-op.
 ///
 /// Use [`raw::remove`] to move the complete physical graph elsewhere.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn remove(package: &mut OpcPackage) -> Result<bool> {
     Ok(remove_graph(package)?.is_some())
 }

@@ -169,6 +169,7 @@ pub enum FieldType {
 
 impl FieldType {
     /// Convert the typed value to its `flt` byte.
+    #[must_use]
     pub const fn as_u8(self) -> u8 {
         match self {
             Self::Unparsed => 0x01,
@@ -262,6 +263,7 @@ impl FieldType {
     }
 
     /// Whether this identifier is listed by [MS-DOC] 2.9.90.
+    #[must_use]
     pub const fn is_specified(self) -> bool {
         !matches!(self, Self::Unknown(_))
     }
@@ -271,6 +273,7 @@ impl FieldType {
     /// Keywords are ASCII case-insensitive. The five text-only field kinds
     /// excluded from `Plcfld` (`TC`, `TA`, `XE`, `RD`, and `PRIVATE`) return
     /// `None`, as do unrecognized keywords.
+    #[must_use]
     pub fn from_keyword(keyword: &str) -> Option<Self> {
         const TYPES: &[(&str, FieldType)] = &[
             ("REF", FieldType::Ref),
@@ -542,6 +545,7 @@ impl FieldDescriptor {
     }
 
     /// Serialize the exact two-byte descriptor, retaining ignored bits.
+    #[must_use]
     pub fn to_bytes(self) -> [u8; 2] {
         let (boundary, second) = match self.value {
             FieldMarkerValue::Begin(field_type) => (FieldBoundary::Begin, field_type.as_u8()),
@@ -554,6 +558,7 @@ impl FieldDescriptor {
         ]
     }
 
+    #[must_use]
     pub fn boundary(&self) -> FieldBoundary {
         match self.value {
             FieldMarkerValue::Begin(_) => FieldBoundary::Begin,
@@ -562,14 +567,17 @@ impl FieldDescriptor {
         }
     }
 
+    #[must_use]
     pub fn is_begin(&self) -> bool {
         self.boundary() == FieldBoundary::Begin
     }
 
+    #[must_use]
     pub fn is_separator(&self) -> bool {
         self.boundary() == FieldBoundary::Separator
     }
 
+    #[must_use]
     pub fn is_end(&self) -> bool {
         self.boundary() == FieldBoundary::End
     }
@@ -596,15 +604,18 @@ pub struct Field {
 }
 
 impl Field {
+    #[must_use]
     pub fn code_range(&self) -> (u32, u32) {
         (self.start_cp + 1, self.separator_cp.unwrap_or(self.end_cp))
     }
 
+    #[must_use]
     pub fn result_range(&self) -> Option<(u32, u32)> {
         self.separator_cp
             .map(|separator| (separator + 1, self.end_cp))
     }
 
+    #[must_use]
     pub fn is_embedded_object(&self) -> bool {
         self.field_type == FieldType::EmbeddedObject
     }

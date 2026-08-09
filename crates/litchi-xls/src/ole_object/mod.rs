@@ -38,12 +38,12 @@ const CFB_STREAM: u8 = 0x02;
 
 /// MS-XLS 2.5.141/2.5.145 `fNo3d`: the control is drawn without 3-D effects.
 const NO_3D: u16 = 0x0001;
-/// MS-XLS 2.5.154 FtSbs flag bits.
+/// MS-XLS 2.5.154 `FtSbs` flag bits.
 const SBS_DRAW: u16 = 0x0001;
 const SBS_DRAW_SLIDER_ONLY: u16 = 0x0002;
 const SBS_TRACK_ELEVATOR: u16 = 0x0004;
 const SBS_NO_3D: u16 = 0x0008;
-/// MS-XLS 2.5.147 FtLbsData flag bits.
+/// MS-XLS 2.5.147 `FtLbsData` flag bits.
 const LBS_USE_CB: u16 = 0x0001;
 const LBS_VALID_PLEX: u16 = 0x0002;
 const LBS_VALID_IDS: u16 = 0x0004;
@@ -51,14 +51,14 @@ const LBS_NO_3D: u16 = 0x0008;
 const LBS_SELECTION_TYPE_SHIFT: u16 = 4;
 const LBS_SELECTION_TYPE_MASK: u16 = 0x0003;
 const LBS_BEHAVIOR_CLASS_SHIFT: u16 = 8;
-/// MS-XLS 2.5.171 LbsDropData flag bits.
+/// MS-XLS 2.5.171 `LbsDropData` flag bits.
 const DROP_STYLE_MASK: u16 = 0x0003;
 const DROP_FILTERED: u16 = 0x0004;
-/// MS-XLS 2.5.294 XLUnicodeString option bits.
+/// MS-XLS 2.5.294 `XLUnicodeString` option bits.
 const XL_STRING_HIGH_BYTE: u8 = 0x01;
 const XL_STRING_EXT: u8 = 0x04;
 const XL_STRING_RICH: u8 = 0x08;
-/// Size in bytes of one formatting run in a rich XLUnicodeString.
+/// Size in bytes of one formatting run in a rich `XLUnicodeString`.
 const FORMATTING_RUN_SIZE: usize = 4;
 
 fn invalid(record_type: u16, message: impl Into<String>) -> crate::error::Error {

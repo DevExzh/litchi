@@ -1,4 +1,20 @@
-//! Bounded Strict/Transitional XML codec for the WordprocessingML font table.
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::format_push_string,
+    reason = "serialization preserves the established byte-emission path"
+)]
+#![expect(
+    clippy::many_single_char_names,
+    reason = "short names mirror the compact XML decoder vocabulary"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+//! Bounded Strict/Transitional XML codec for the `WordprocessingML` font table.
 
 use crate::{Error, Result};
 use litchi_ooxml_common::mce::process_ooxml;
@@ -13,6 +29,10 @@ use super::model::{
 };
 
 impl Table {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn xml(&self, conformance: Conformance) -> Result<Vec<u8>> {
         write(self, conformance)
     }
@@ -37,6 +57,10 @@ struct Node {
 }
 
 /// Parse one bounded `fontTable.xml` payload without resolving OPC resources.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn parse(xml: &[u8]) -> Result<Table> {
     if xml.len() > MAX_XML {
         return Err(invalid("font-table part is too large"));
@@ -69,7 +93,7 @@ fn parse_tree(xml: &[u8]) -> Result<Node> {
                     .ok_or_else(|| invalid("font-table namespace scope is missing"))?;
                 let (n, s) = make_node(&e, decoder, parent)?;
                 stack.push(n);
-                scopes.push(s)
+                scopes.push(s);
             },
             Event::Empty(e) => {
                 count += 1;
@@ -80,7 +104,7 @@ fn parse_tree(xml: &[u8]) -> Result<Node> {
                     .last()
                     .ok_or_else(|| invalid("font-table namespace scope is missing"))?;
                 let (n, _) = make_node(&e, decoder, parent)?;
-                attach(n, &mut stack, &mut root)?
+                attach(n, &mut stack, &mut root)?;
             },
             Event::End(_) => {
                 let n = stack
@@ -90,12 +114,12 @@ fn parse_tree(xml: &[u8]) -> Result<Node> {
                     return Err(invalid("font-table namespace scope underflow"));
                 }
                 scopes.pop();
-                attach(n, &mut stack, &mut root)?
+                attach(n, &mut stack, &mut root)?;
             },
             Event::Text(e) => {
                 let d = e.decode().map_err(xml_error)?;
                 let d = quick_xml::escape::unescape(&d).map_err(xml_error)?;
-                append_text(&mut stack, &d)?
+                append_text(&mut stack, &d)?;
             },
             Event::CData(e) => append_text(&mut stack, &e.decode().map_err(xml_error)?)?,
             Event::DocType(_) | Event::PI(_) => {
@@ -104,7 +128,7 @@ fn parse_tree(xml: &[u8]) -> Result<Node> {
             Event::Decl(_) | Event::Comment(_) | Event::GeneralRef(_) => {},
             Event::Eof => break,
         }
-        buf.clear()
+        buf.clear();
     }
     if !stack.is_empty() {
         return Err(invalid("unterminated font-table XML"));
@@ -141,7 +165,7 @@ fn make_node(
         } else if let Some(p) = n.strip_prefix("xmlns:") {
             scope.insert(p.into(), v.clone());
         }
-        raw.push((n, v))
+        raw.push((n, v));
     }
     let ns = resolve(&q, &scope, true)?;
     let mut attrs = Vec::new();
@@ -156,7 +180,7 @@ fn make_node(
             q: n,
             ns: ans,
             value: v,
-        })
+        });
     }
     Ok((
         Node {
@@ -187,7 +211,7 @@ fn local(q: &str) -> &str {
 }
 fn attach(n: Node, stack: &mut [Node], root: &mut Option<Node>) -> Result<()> {
     if let Some(p) = stack.last_mut() {
-        p.children.push(n)
+        p.children.push(n);
     } else if root.replace(n).is_some() {
         return Err(invalid("multiple font-table roots"));
     }
@@ -198,7 +222,7 @@ fn append_text(stack: &mut [Node], v: &str) -> Result<()> {
         if n.text.len().saturating_add(v.len()) > MAX_TEXT {
             return Err(invalid("font-table text limit exceeded"));
         }
-        n.text.push_str(v)
+        n.text.push_str(v);
     } else if !v.trim().is_empty() {
         return Err(invalid("text outside font-table root"));
     }
@@ -223,17 +247,17 @@ impl Attributes {
                 if word.iter().any(|(x, _)| x == &a.local) {
                     return Err(invalid("duplicate semantic Word attribute"));
                 }
-                word.push((a.local.clone(), a.value.clone()))
+                word.push((a.local.clone(), a.value.clone()));
             } else if rel_ns(&a.ns) && r.contains(&a.local.as_str()) {
                 if rels.iter().any(|(x, _)| x == &a.local) {
                     return Err(invalid("duplicate semantic relationship attribute"));
                 }
-                rels.push((a.local.clone(), a.value.clone()))
+                rels.push((a.local.clone(), a.value.clone()));
             } else if !a.ns.is_empty() && !word_ns(&a.ns) && !rel_ns(&a.ns) {
                 extensions.push(raw::Attr {
                     qualified_name: a.q.clone(),
                     value: a.value.clone(),
-                })
+                });
             } else {
                 return Err(invalid(format!(
                     "unexpected attribute '{}' on '{}'",
@@ -254,7 +278,7 @@ impl Attributes {
             .find(|(k, _)| k == n)
             .map(|(_, v)| v.clone());
         if let Some(v) = &v {
-            bounded(v)?
+            bounded(v)?;
         }
         Ok(v)
     }
@@ -281,7 +305,7 @@ fn parse_table_node(root: &Node) -> Result<Table> {
     let mut fonts = Vec::with_capacity(root.children.len());
     for n in &root.children {
         require(n, "font")?;
-        fonts.push(parse_font(n)?)
+        fonts.push(parse_font(n)?);
     }
     let table = Table {
         fonts,
@@ -326,24 +350,24 @@ fn parse_font(n: &Node) -> Result<Font> {
         match c.local.as_str() {
             "altName" => {
                 leaf(c)?;
-                alt = Some(Attributes::new(c, &["val"], &[])?.req("val")?)
+                alt = Some(Attributes::new(c, &["val"], &[])?.req("val")?);
             },
             "panose1" => {
                 leaf(c)?;
                 panose = Some(fixed_hex::<10>(
                     &Attributes::new(c, &["val"], &[])?.req("val")?,
                     "PANOSE",
-                )?)
+                )?);
             },
             "charset" => {
                 leaf(c)?;
-                charset = parse_charset(c)?
+                charset = parse_charset(c)?;
             },
             "family" => {
                 leaf(c)?;
                 family = Some(Family::parse(
                     &Attributes::new(c, &["val"], &[])?.req("val")?,
-                )?)
+                )?);
             },
             "notTrueType" => {
                 leaf(c)?;
@@ -351,17 +375,17 @@ fn parse_font(n: &Node) -> Result<Font> {
                     &Attributes::new(c, &["val"], &[])?
                         .opt("val")?
                         .unwrap_or_else(|| "true".into()),
-                )?)
+                )?);
             },
             "pitch" => {
                 leaf(c)?;
                 pitch = Some(Pitch::parse(
                     &Attributes::new(c, &["val"], &[])?.req("val")?,
-                )?)
+                )?);
             },
             "sig" => {
                 leaf(c)?;
-                sig = Some(parse_sig(c)?)
+                sig = Some(parse_sig(c)?);
             },
             "embedRegular" => embedded.push(parse_embed(c, Style::Regular)?),
             "embedBold" => embedded.push(parse_embed(c, Style::Bold)?),
@@ -437,6 +461,10 @@ fn parse_embed(n: &Node, style: Style) -> Result<Embed> {
 }
 
 /// Serialize one font table using the requested OOXML conformance family.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn write(t: &Table, c: Conformance) -> Result<Vec<u8>> {
     validate_table_value(t, false)?;
     let mut o = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#.to_vec();
@@ -446,7 +474,7 @@ pub fn write(t: &Table, c: Conformance) -> Result<Vec<u8>> {
     esc(&mut o, c.rel());
     o.push(b'\"');
     for a in &t.namespaces {
-        preserved(&mut o, a)?
+        preserved(&mut o, a)?;
     }
     extensions(&mut o, &t.extension_attributes)?;
     if t.fonts.is_empty() {
@@ -455,7 +483,7 @@ pub fn write(t: &Table, c: Conformance) -> Result<Vec<u8>> {
     }
     o.push(b'>');
     for f in &t.fonts {
-        write_font(&mut o, f, c)?
+        write_font(&mut o, f, c)?;
     }
     o.extend_from_slice(b"</w:fonts>");
     Ok(o)
@@ -478,10 +506,10 @@ fn write_font(o: &mut Vec<u8>, f: &Font, c: Conformance) -> Result<()> {
     }
     o.push(b'>');
     if let Some(v) = &f.alternate_name {
-        value_leaf(o, "altName", v)
+        value_leaf(o, "altName", v);
     }
     if let Some(v) = f.panose {
-        value_leaf(o, "panose1", &hex(&v))
+        value_leaf(o, "panose1", &hex(&v));
     }
     if let Some(v) = f.character_set {
         o.extend_from_slice(b"<w:charset");
@@ -494,30 +522,30 @@ fn write_font(o: &mut Vec<u8>, f: &Font, c: Conformance) -> Result<()> {
                     .ok_or_else(|| invalid("legacy charset has no Strict representation"))?,
             ),
         }
-        o.extend_from_slice(b"/>")
+        o.extend_from_slice(b"/>");
     }
     if let Some(v) = f.family {
-        value_leaf(o, "family", v.text())
+        value_leaf(o, "family", v.text());
     }
     if let Some(v) = f.not_true_type {
         o.extend_from_slice(b"<w:notTrueType");
         if !v {
-            wa(o, "val", "0")
+            wa(o, "val", "0");
         }
-        o.extend_from_slice(b"/>")
+        o.extend_from_slice(b"/>");
     }
     if let Some(v) = f.pitch {
-        value_leaf(o, "pitch", v.text())
+        value_leaf(o, "pitch", v.text());
     }
     if let Some(v) = &f.signature {
         o.extend_from_slice(b"<w:sig");
         for (i, x) in v.unicode_subsets.iter().enumerate() {
-            wa(o, &format!("usb{i}"), &format!("{x:08X}"))
+            wa(o, &format!("usb{i}"), &format!("{x:08X}"));
         }
         for (i, x) in v.code_pages.iter().enumerate() {
-            wa(o, &format!("csb{i}"), &format!("{x:08X}"))
+            wa(o, &format!("csb{i}"), &format!("{x:08X}"));
         }
-        o.extend_from_slice(b"/>")
+        o.extend_from_slice(b"/>");
     }
     for e in &f.embedded_fonts {
         o.extend_from_slice(b"<w:");
@@ -525,12 +553,12 @@ fn write_font(o: &mut Vec<u8>, f: &Font, c: Conformance) -> Result<()> {
         extensions(o, &e.extension_attributes)?;
         ra(o, "id", &e.relationship_id);
         if let Some(v) = e.font_key {
-            wa(o, "fontKey", &v.to_string())
+            wa(o, "fontKey", &v.to_string());
         }
         if let Some(v) = e.subsetted {
-            wa(o, "subsetted", if v { "1" } else { "0" })
+            wa(o, "subsetted", if v { "1" } else { "0" });
         }
-        o.extend_from_slice(b"/>")
+        o.extend_from_slice(b"/>");
     }
     o.extend_from_slice(b"</w:font>");
     Ok(())
@@ -539,17 +567,17 @@ fn value_leaf(o: &mut Vec<u8>, n: &str, v: &str) {
     o.extend_from_slice(b"<w:");
     o.extend_from_slice(n.as_bytes());
     wa(o, "val", v);
-    o.extend_from_slice(b"/>")
+    o.extend_from_slice(b"/>");
 }
 fn wa(o: &mut Vec<u8>, n: &str, v: &str) {
-    attr(o, &format!("w:{n}"), v)
+    attr(o, &format!("w:{n}"), v);
 }
 fn ra(o: &mut Vec<u8>, n: &str, v: &str) {
-    attr(o, &format!("r:{n}"), v)
+    attr(o, &format!("r:{n}"), v);
 }
 fn extensions(o: &mut Vec<u8>, v: &[raw::Attr]) -> Result<()> {
     for a in v {
-        preserved(o, a)?
+        preserved(o, a)?;
     }
     Ok(())
 }
@@ -563,7 +591,7 @@ fn attr(o: &mut Vec<u8>, n: &str, v: &str) {
     o.extend_from_slice(n.as_bytes());
     o.extend_from_slice(b"=\"");
     esc(o, v);
-    o.push(b'\"')
+    o.push(b'\"');
 }
 fn esc(o: &mut Vec<u8>, v: &str) {
     for c in v.chars() {
@@ -576,7 +604,7 @@ fn esc(o: &mut Vec<u8>, v: &str) {
             '\r' => o.extend_from_slice(b"&#xD;"),
             _ => {
                 let mut b = [0; 4];
-                o.extend_from_slice(c.encode_utf8(&mut b).as_bytes())
+                o.extend_from_slice(c.encode_utf8(&mut b).as_bytes());
             },
         }
     }
@@ -606,11 +634,11 @@ fn extension_namespaces(root: &Node) -> Result<Vec<raw::Attr>> {
                 out.push(raw::Attr {
                     qualified_name: a.q.clone(),
                     value: a.value.clone(),
-                })
+                });
             }
         }
         for c in &n.children {
-            walk(c, map, out)?
+            walk(c, map, out)?;
         }
         Ok(())
     }
@@ -625,14 +653,14 @@ fn fixed_hex<const N: usize>(v: &str, name: &str) -> Result<[u8; N]> {
     let mut out = [0; N];
     for (x, pair) in out.iter_mut().zip(v.as_bytes().chunks_exact(2)) {
         let pair = std::str::from_utf8(pair).map_err(xml_error)?;
-        *x = u8::from_str_radix(pair, 16).map_err(xml_error)?
+        *x = u8::from_str_radix(pair, 16).map_err(xml_error)?;
     }
     Ok(out)
 }
 fn hex<const N: usize>(v: &[u8; N]) -> String {
     let mut s = String::with_capacity(N * 2);
     for b in v {
-        s.push_str(&format!("{b:02X}"))
+        s.push_str(&format!("{b:02X}"));
     }
     s
 }

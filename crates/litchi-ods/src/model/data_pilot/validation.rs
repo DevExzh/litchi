@@ -13,6 +13,9 @@ use super::{
 };
 
 impl Field {
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn validate(&self) -> Result<()> {
         if self.orientation == super::model::Orientation::Page && self.selected_page.is_none() {
             return Err(Error::InvalidFormat(
@@ -68,6 +71,9 @@ impl Field {
 }
 
 impl Table {
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn validate(&self) -> Result<()> {
         validate_string("data-pilot table name", &self.name, false)?;
         if self.target_range_address.is_empty() {

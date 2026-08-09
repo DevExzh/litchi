@@ -1,3 +1,15 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
 //! DocumentPart - the main document.xml part of a Word document.
 
 use crate::alt::{Chunk, active, scan};
@@ -69,7 +81,7 @@ fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> {
     let mut nodes = 0usize;
 
     loop {
-        let start = usize::try_from(reader.buffer_position()).map_err(|_| {
+        let start = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
             crate::Error::InvalidFormat("document XML offset does not fit usize".into())
         })?;
         let event = reader
@@ -78,7 +90,7 @@ fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> {
             .into_owned();
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
-        let end = usize::try_from(reader.buffer_position()).map_err(|_| {
+        let end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
             crate::Error::InvalidFormat("document XML offset does not fit usize".into())
         })?;
 
@@ -143,13 +155,13 @@ fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> {
                     } else {
                         UNKNOWN
                     };
-                    let range_start = u32::try_from(start).map_err(|_| {
+                    let range_start = u32::try_from(start).map_err(|_source_error| {
                         crate::Error::InvalidFormat("document XML offset does not fit u32".into())
                     })?;
                     let length = u32::try_from(end.checked_sub(start).ok_or_else(|| {
                         crate::Error::InvalidFormat("document XML range underflow".into())
                     })?)
-                    .map_err(|_| {
+                    .map_err(|_source_error| {
                         crate::Error::InvalidFormat("document XML range does not fit u32".into())
                     })?;
                     ranges.push((kind, range_start, length));
@@ -160,13 +172,13 @@ fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> {
                     let (kind, range_start) = pending.take().ok_or_else(|| {
                         crate::Error::InvalidFormat("missing document body block".into())
                     })?;
-                    let start = u32::try_from(range_start).map_err(|_| {
+                    let start = u32::try_from(range_start).map_err(|_source_error| {
                         crate::Error::InvalidFormat("document XML offset does not fit u32".into())
                     })?;
                     let length = u32::try_from(end.checked_sub(range_start).ok_or_else(|| {
                         crate::Error::InvalidFormat("document XML range underflow".into())
                     })?)
-                    .map_err(|_| {
+                    .map_err(|_source_error| {
                         crate::Error::InvalidFormat("document XML range does not fit u32".into())
                     })?;
                     ranges.push((kind, start, length));
@@ -201,15 +213,20 @@ fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> {
 
 impl<'a> DocumentPart<'a> {
     /// Return the original OPC part; semantic reads use the cached MCE view.
+    #[must_use]
     pub fn part(&self) -> &'a dyn Part {
         self.part
     }
 
-    /// Create a DocumentPart from a Part.
+    /// Create a `DocumentPart` from a Part.
     ///
     /// # Arguments
     ///
     /// * `part` - The part containing the document.xml content
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
         let raw = part.blob_arc();
         // Word 2010 paragraph/drawing extensions are declared ignorable by
@@ -240,6 +257,7 @@ impl<'a> DocumentPart<'a> {
 
     /// Get the XML bytes of the document.
     #[inline]
+    #[must_use]
     pub fn xml_bytes(&self) -> &[u8] {
         self.xml.as_slice()
     }
@@ -253,6 +271,10 @@ impl<'a> DocumentPart<'a> {
     ///
     /// Uses `quick-xml` for efficient streaming XML parsing with pre-allocated
     /// buffers and validated text decoding.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn extract_text(&self) -> Result<String> {
         extract_word_text(self.xml_bytes())
     }
@@ -260,6 +282,10 @@ impl<'a> DocumentPart<'a> {
     /// Count the number of paragraphs in the document.
     ///
     /// Counts `<w:p>` elements in the document body.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn paragraph_count(&self) -> Result<usize> {
         let mut count = 0;
         scan_word_element_ranges(self.xml_bytes(), &[b"p".as_slice()], |_, _, _| {
@@ -272,6 +298,10 @@ impl<'a> DocumentPart<'a> {
     /// Count the number of tables in the document.
     ///
     /// Counts `<w:tbl>` elements in the document body.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn table_count(&self) -> Result<usize> {
         let mut count = 0;
         scan_word_element_ranges(self.xml_bytes(), &[b"tbl".as_slice()], |_, _, _| {
@@ -288,6 +318,10 @@ impl<'a> DocumentPart<'a> {
     /// # Performance
     ///
     /// Uses namespace-aware streaming XML parsing and shared byte ranges.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn paragraphs(&self) -> Result<SmallVec<[Paragraph; 32]>> {
         let source = self.get_xml_arc();
         let mut paragraphs = SmallVec::new();
@@ -309,6 +343,10 @@ impl<'a> DocumentPart<'a> {
     /// # Performance
     ///
     /// Uses namespace-aware streaming XML parsing and shared byte ranges.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn tables(&self) -> Result<SmallVec<[Table; 8]>> {
         let source = self.get_xml_arc();
         let mut tables = SmallVec::new();
@@ -338,6 +376,10 @@ impl<'a> DocumentPart<'a> {
     /// # Performance
     ///
     /// Uses one-pass, namespace-aware zero-copy parsing.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn elements(&self) -> Result<Vec<crate::Element>> {
         use crate::Element;
 
@@ -354,6 +396,10 @@ impl<'a> DocumentPart<'a> {
     }
 
     /// Get paragraphs, tables, and alternative-format anchors in document order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn blocks(&self) -> Result<Vec<crate::Block>> {
         use crate::Block;
 
@@ -389,6 +435,10 @@ impl<'a> DocumentPart<'a> {
     }
 
     /// Return all alternative-format anchors in XML order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn alts(&self) -> Result<Vec<Chunk>> {
         Ok(self
             .blocks()?

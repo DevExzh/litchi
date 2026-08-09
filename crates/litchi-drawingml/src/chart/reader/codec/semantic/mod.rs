@@ -1,4 +1,4 @@
-//! Semantic DrawingML chart decoding facade.
+//! Semantic `DrawingML` chart decoding facade.
 //!
 //! The chart-reader implementation is kept under [`chart_reader`] so the
 //! codec boundary exposes only the typed entry points consumed by the XML

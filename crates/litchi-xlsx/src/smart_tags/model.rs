@@ -2,7 +2,7 @@ use litchi_sheet::{At, Cell as Address};
 
 use crate::error::Result;
 
-/// SpreadsheetML namespace form used by canonical serialization.
+/// `SpreadsheetML` namespace form used by canonical serialization.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub enum Conformance {
     #[default]
@@ -37,10 +37,12 @@ impl Property {
         Ok(value)
     }
 
+    #[must_use]
     pub fn key(&self) -> &str {
         &self.key
     }
 
+    #[must_use]
     pub fn value(&self) -> &str {
         &self.value
     }
@@ -67,18 +69,22 @@ impl Tag {
         })
     }
 
+    #[must_use]
     pub const fn type_id(&self) -> u32 {
         self.type_id
     }
 
+    #[must_use]
     pub const fn is_deleted(&self) -> bool {
         self.deleted
     }
 
+    #[must_use]
     pub const fn is_xml_based(&self) -> bool {
         self.xml_based
     }
 
+    #[must_use]
     pub fn properties(&self) -> &[Property] {
         &self.properties
     }
@@ -132,10 +138,12 @@ impl Cell {
         Ok(value)
     }
 
+    #[must_use]
     pub const fn address(&self) -> Address {
         self.address
     }
 
+    #[must_use]
     pub fn tags(&self) -> &[Tag] {
         &self.tags
     }
@@ -165,6 +173,7 @@ impl Collection {
         Ok(value)
     }
 
+    #[must_use]
     pub fn cells(&self) -> &[Cell] {
         &self.cells
     }
@@ -178,10 +187,12 @@ impl Collection {
             .map(|index| &self.cells[index]))
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.cells.is_empty()
     }
 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.cells.len()
     }

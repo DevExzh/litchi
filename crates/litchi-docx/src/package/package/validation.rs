@@ -1,6 +1,6 @@
 //! Focused validation rules shared by the package editing layers.
 
-use super::super::model::*;
+use super::super::model::{Error, Result};
 
 pub(super) fn validate_mail_merge_external_uri(uri: &str) -> Result<()> {
     if uri.is_empty() || uri.len() > 32 * 1024 || uri.chars().any(char::is_control) {

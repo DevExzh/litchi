@@ -70,6 +70,7 @@ pub struct Key {
 
 impl Key {
     /// Create a sort key for a zero-based field number.
+    #[must_use]
     pub fn new(field_number: u64) -> Self {
         Self {
             field_number,

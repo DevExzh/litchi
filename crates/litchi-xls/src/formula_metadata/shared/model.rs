@@ -13,18 +13,22 @@ pub struct Cell {
 
 impl Cell {
     /// Construct a coordinate from already checked BIFF8 fields.
+    #[must_use]
     pub const fn new(row: u16, col: u8) -> Self {
         Self { row, col }
     }
 
     /// Construct a coordinate from the wider indices used by writer APIs.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(row: u32, col: u16) -> Result<Self> {
-        let row = u16::try_from(row).map_err(|_| {
+        let row = u16::try_from(row).map_err(|_error| {
             Error::InvalidCellReference(format!(
                 "shared-formula row {row} is outside the BIFF8 grid"
             ))
         })?;
-        let col = u8::try_from(col).map_err(|_| {
+        let col = u8::try_from(col).map_err(|_error| {
             Error::InvalidCellReference(format!(
                 "shared-formula column {col} is outside the BIFF8 grid"
             ))
@@ -33,11 +37,13 @@ impl Cell {
     }
 
     /// Zero-based row.
+    #[must_use]
     pub const fn row(self) -> u16 {
         self.row
     }
 
     /// Zero-based column, bounded to BIFF8's `A..IV` grid.
+    #[must_use]
     pub const fn col(self) -> u8 {
         self.col
     }
@@ -52,6 +58,9 @@ pub struct Range {
 
 impl Range {
     /// Construct an ordered range from its upper-left and lower-right cells.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(first: Cell, last: Cell) -> Result<Self> {
         if first.row > last.row || first.col > last.col {
             return Err(Error::InvalidCellReference(
@@ -62,6 +71,9 @@ impl Range {
     }
 
     /// Construct an ordered range from zero-based writer indices.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(first_row: u32, first_col: u16, last_row: u32, last_col: u16) -> Result<Self> {
         Self::new(
             Cell::try_new(first_row, first_col)?,
@@ -70,16 +82,19 @@ impl Range {
     }
 
     /// Upper-left endpoint.
+    #[must_use]
     pub const fn first(self) -> Cell {
         self.first
     }
 
     /// Lower-right endpoint.
+    #[must_use]
     pub const fn last(self) -> Cell {
         self.last
     }
 
     /// Whether a coordinate is inside this inclusive range.
+    #[must_use]
     pub fn contains(self, cell: Cell) -> bool {
         self.first.row <= cell.row
             && cell.row <= self.last.row
@@ -104,6 +119,9 @@ pub struct Owner {
 
 impl Owner {
     /// Construct an owner with only its anchor participating.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(range: Range, anchor: Cell, tokens: &[u8]) -> Result<Self> {
         let owner = Self {
             range,
@@ -120,6 +138,9 @@ impl Owner {
     /// A non-empty set must contain the anchor exactly once. Passing an empty
     /// set is rejected so that `cUse` cannot silently disagree with the
     /// Formula records the caller intends to emit.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_participants(mut self, participants: &[Cell]) -> Result<Self> {
         if participants.is_empty() {
             return Err(Error::InvalidData(
@@ -154,38 +175,47 @@ impl Owner {
     }
 
     /// Shared-formula range.
+    #[must_use]
     pub const fn range(&self) -> Range {
         self.range
     }
 
-    /// Cell whose Formula record owns the following ShrFmla record.
+    /// Cell whose Formula record owns the following `ShrFmla` record.
+    #[must_use]
     pub const fn anchor(&self) -> Cell {
         self.anchor
     }
 
     /// The shared parsed formula (`rgce`) without the Formula-cell `PtgExp`.
+    #[must_use]
     pub fn tokens(&self) -> &[u8] {
         &self.tokens
     }
 
     /// Formula cells declared as users of this owner, in row-major order.
+    #[must_use]
     pub fn participants(&self) -> &[Cell] {
         &self.participants
     }
 
     /// Number of Formula records using this shared formula.
+    #[must_use]
     pub fn count(&self) -> u8 {
         u8::try_from(self.participants.len()).unwrap_or(u8::MAX)
     }
 
     /// Number of Formula records using this shared formula as `cUse`.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn c_use(&self) -> Result<u8> {
-        u8::try_from(self.participants.len()).map_err(|_| {
+        u8::try_from(self.participants.len()).map_err(|_error| {
             Error::InvalidData("shared-formula participant count exceeds BIFF8 cUse".to_string())
         })
     }
 
     /// Whether this owner explicitly contains a Formula cell.
+    #[must_use]
     pub fn is_participant(&self, cell: Cell) -> bool {
         self.participants.binary_search(&cell).is_ok()
     }

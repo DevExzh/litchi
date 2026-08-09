@@ -54,6 +54,9 @@ pub struct AnchorPoint {
 
 impl AnchorPoint {
     /// Creates a checked point in the BIFF8 worksheet grid.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(column: u16, row: u16, x: i16, y: i16) -> io::Result<Self> {
         let value = Self { column, row, x, y };
         value.validate()?;
@@ -61,21 +64,25 @@ impl AnchorPoint {
     }
 
     /// Returns the zero-based worksheet column.
+    #[must_use]
     pub const fn column(self) -> u16 {
         self.column
     }
 
     /// Returns the zero-based worksheet row.
+    #[must_use]
     pub const fn row(self) -> u16 {
         self.row
     }
 
     /// Returns the signed horizontal offset in 1/1024ths of a column.
+    #[must_use]
     pub const fn x(self) -> i16 {
         self.x
     }
 
     /// Returns the signed vertical offset in 1/256ths of a row.
+    #[must_use]
     pub const fn y(self) -> i16 {
         self.y
     }
@@ -104,6 +111,9 @@ pub struct SheetAnchor {
 
 impl SheetAnchor {
     /// Creates an anchor whose bounding-rectangle endpoints are ordered.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(
         top_left: AnchorPoint,
         bottom_right: AnchorPoint,
@@ -119,16 +129,19 @@ impl SheetAnchor {
     }
 
     /// Returns the cell-change behavior.
+    #[must_use]
     pub const fn behavior(self) -> AnchorBehavior {
         self.behavior
     }
 
     /// Returns the top-left bounding-rectangle endpoint.
+    #[must_use]
     pub const fn top_left(self) -> AnchorPoint {
         self.top_left
     }
 
     /// Returns the bottom-right bounding-rectangle endpoint.
+    #[must_use]
     pub const fn bottom_right(self) -> AnchorPoint {
         self.bottom_right
     }

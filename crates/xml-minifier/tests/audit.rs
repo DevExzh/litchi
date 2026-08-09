@@ -29,6 +29,45 @@ fn preserves_plain_space_nodes_and_mixed_boundaries() {
 }
 
 #[test]
+fn authored_publication_refuses_ambiguous_spaces_but_preserves_explicit_content() {
+    for xml in [
+        b"<root> <child/></root>".as_slice(),
+        b"<p><b>a</b> <i>b</i></p>".as_slice(),
+        b"<p>   </p>".as_slice(),
+    ] {
+        let error = audit::verify_authored(xml, limits_for(xml)).unwrap_err();
+        assert!(matches!(
+            error,
+            audit::Error::NotCompact(violation)
+                if violation.kind() == Kind::AmbiguousWhitespace
+        ));
+    }
+
+    let explicit = b"<p xml:space=\"preserve\"><b>a</b> <i>b</i></p>";
+    let _report = audit::verify_authored(explicit, limits_for(explicit)).unwrap();
+
+    let entity_split = b"<p>boxed &lt;text&gt; &amp; more</p>";
+    let _report = audit::verify_authored(entity_split, limits_for(entity_split)).unwrap();
+}
+
+#[test]
+fn package_xml_classification_uses_names_and_media_types() {
+    for (name, media_type) in [
+        ("[Content_Types].xml", "application/octet-stream"),
+        ("_rels/.rels", "application/octet-stream"),
+        ("manifest.rdf", "application/octet-stream"),
+        ("custom/data", "application/rdf+xml; charset=UTF-8"),
+        (
+            "signature",
+            "application/vnd.oasis.opendocument.digital-signature+xml",
+        ),
+    ] {
+        assert!(package::is_xml_part(name, media_type));
+    }
+    assert!(!package::is_xml_part("Pictures/image.png", "image/png"));
+}
+
+#[test]
 fn rejects_all_whitespace_outside_the_document_element() {
     for xml in [
         b" <root/>".as_slice(),

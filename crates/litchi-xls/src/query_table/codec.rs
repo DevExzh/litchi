@@ -2,12 +2,15 @@ use litchi_core::binary;
 
 use super::super::records::Encoding;
 use super::super::utils::parse_string_record;
-use super::model::*;
+use super::model::{
+    HtmlFormatting, QueryParameter, QueryParameterType, QuerySource, QueryTable, TextCodePage,
+    TextDelimiter, TextField, TextFieldFormat, TextQuery,
+};
 use super::validation::{ExtContext, QueryTableBuild};
 
 /// `Qsi` record type (MS-XLS 2.4.208).
 pub(crate) const QSI_RECORD_TYPE: u16 = 0x01AD;
-/// `DbOrParamQry` record type: DbQuery or ParamQry (MS-XLS 2.4.79).
+/// `DbOrParamQry` record type: `DbQuery` or `ParamQry` (MS-XLS 2.4.79).
 pub(crate) const DB_OR_PARAM_QRY_RECORD_TYPE: u16 = 0x00DC;
 /// `SXString` record type (MS-XLS 2.4.304).
 pub(crate) const SX_STRING_RECORD_TYPE: u16 = 0x00CD;
@@ -155,10 +158,14 @@ pub(crate) fn parse_db_query(build: &mut QueryTableBuild, data: &[u8]) -> Option
     Some(())
 }
 
-/// A declared SXString chunk count; negative counts are clamped to zero.
+/// A declared `SXString` chunk count; negative counts are clamped to zero.
 pub(crate) fn string_count(data: &[u8], offset: usize, present: bool) -> Option<u16> {
     let count = binary::read_i16_le(data, offset).ok()?;
-    Some(if present { count.max(0) as u16 } else { 0 })
+    Some(if present {
+        crate::utils::reinterpret_i16_as_u16(count.max(0))
+    } else {
+        0
+    })
 }
 
 pub(crate) fn parse_param_qry(build: &mut QueryTableBuild, data: &[u8]) -> Option<()> {
@@ -248,10 +255,11 @@ pub(crate) fn parse_txt_qry(data: &[u8]) -> Option<TextQuery> {
     }
     let delimiters = data[12];
     let field_count = binary::read_i32_le(data, 16).ok()?;
-    if field_count <= 0 || field_count as usize > MAX_TXT_FIELDS {
+    if field_count <= 0 || crate::utils::sign_extend_i32_to_usize(field_count) > MAX_TXT_FIELDS {
         return None;
     }
-    let fields_end = 22usize.checked_add((field_count as usize).checked_mul(8)?)?;
+    let fields_end =
+        22usize.checked_add(crate::utils::sign_extend_i32_to_usize(field_count).checked_mul(8)?)?;
     if data.len() < fields_end {
         return None;
     }

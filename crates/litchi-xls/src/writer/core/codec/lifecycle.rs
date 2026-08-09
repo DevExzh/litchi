@@ -1,5 +1,8 @@
 use super::super::super::formatting::FormattingManager;
-use super::super::*;
+use super::super::{
+    CalculationSettings, FunctionGroupOptions, WorkbookEnvironmentOptions, WorkbookWindowOptions,
+    WritableWorksheet, Writer,
+};
 use crate::encryption::{WriterEncryption, validate_writer_encryption};
 use crate::error::{Error, Result};
 use crate::{EncryptionProfile, WeakEncryptionPolicy};
@@ -8,6 +11,7 @@ use zeroize::Zeroizing;
 
 impl Writer {
     /// Create a new XLS writer
+    #[must_use]
     pub fn new() -> Self {
         Self {
             worksheets: Vec::new(),
@@ -46,7 +50,10 @@ impl Writer {
     /// Configure the inert Office Toolbars (`XCB`) stream for the next write.
     ///
     /// The toolbar graph is serialized as metadata only. Controls, macros,
-    /// ActiveX payloads, and UI commands are never activated.
+    /// `ActiveX` payloads, and UI commands are never activated.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_toolbar(&mut self, toolbar: crate::Wrapper<'_>) -> Result<()> {
         let toolbar = toolbar.into_owned();
         toolbar.validate()?;
@@ -60,6 +67,7 @@ impl Writer {
     }
 
     /// Return the configured inert Office Toolbars metadata, if any.
+    #[must_use]
     pub fn toolbar(&self) -> Option<&crate::Wrapper<'static>> {
         self.toolbar.as_ref()
     }
@@ -68,6 +76,9 @@ impl Writer {
     ///
     /// Validation is atomic: an invalid password or profile leaves the current
     /// encryption configuration unchanged.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_password(
         &mut self,
         password: impl Into<String>,
@@ -85,6 +96,9 @@ impl Writer {
     /// for protecting data. The policy value makes that decision auditable at
     /// each authoring call site. Reading existing XOR-obfuscated files does
     /// not require this policy.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_xor_obfuscation_password(
         &mut self,
         password: impl Into<String>,
@@ -108,6 +122,7 @@ impl Writer {
     }
 
     /// Return the configured password-to-open encryption profile.
+    #[must_use]
     pub fn encryption_profile(&self) -> Option<EncryptionProfile> {
         self.encryption.as_ref().map(|value| value.profile)
     }
@@ -121,6 +136,9 @@ impl Writer {
     /// # Returns
     ///
     /// * `Result<usize, Error>` - Worksheet index or error
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_worksheet(&mut self, name: &str) -> Result<usize> {
         // Validate worksheet name
         if name.is_empty() || name.len() > 31 {
@@ -132,8 +150,7 @@ impl Writer {
         // Check for duplicate names
         if self.worksheets.iter().any(|ws| ws.name == name) {
             return Err(Error::InvalidData(format!(
-                "Worksheet '{}' already exists",
-                name
+                "Worksheet '{name}' already exists"
             )));
         }
 

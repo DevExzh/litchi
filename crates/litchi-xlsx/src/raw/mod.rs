@@ -19,7 +19,7 @@ pub(crate) mod worksheet;
 
 pub use catalog::{parse_catalog, parse_sheet};
 
-/// Parse only the direct worksheet-grid defaults from one WorksheetPart.
+/// Parse only the direct worksheet-grid defaults from one `WorksheetPart`.
 ///
 /// This focused read path shares the canonical [`crate::layout::Defaults`]
 /// model and validation with the full worksheet parser without materializing
@@ -49,7 +49,7 @@ pub struct Sheet {
     pub visibility: Visibility,
 }
 
-/// One inert SpreadsheetML defined-name record.
+/// One inert `SpreadsheetML` defined-name record.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct DefinedName {
     pub name: String,

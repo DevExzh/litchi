@@ -8,7 +8,7 @@ use super::Id;
 pub enum Target<'a> {
     /// A package-local target, represented by the host's canonical target text.
     Internal(&'a str),
-    /// An external target retained inertly and never resolved by DrawingML.
+    /// An external target retained inertly and never resolved by `DrawingML`.
     External(&'a str),
 }
 
@@ -41,7 +41,7 @@ pub struct Relationship<'a> {
 
 /// Read-only relationship lookup implemented by DOCX/PPTX/XLSX/XLSB adapters.
 ///
-/// The shared DrawingML crate intentionally does not depend on OPC.  A host
+/// The shared `DrawingML` crate intentionally does not depend on OPC.  A host
 /// adapter can therefore resolve a relationship ID against its own package
 /// graph and still use the same semantic validation rules.
 pub trait Resolver {

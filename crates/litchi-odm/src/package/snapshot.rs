@@ -16,6 +16,8 @@ const MAX_OUTPUT_BYTES: usize = 256 * 1024 * 1024;
 struct State {
     package: Package,
     semantics: crate::codec::Semantics,
+    styles: Vec<crate::style::Definition>,
+    resources: crate::resource::Graph,
 }
 
 /// An immutable, validated package snapshot.
@@ -38,9 +40,25 @@ impl Snapshot {
         Self::from_package(package)
     }
 
+    pub(crate) fn from_bytes_with_password(
+        bytes: Vec<u8>,
+        password: impl Into<String>,
+    ) -> Result<Self> {
+        let package =
+            Package::from_bytes_with_password(bytes, password, MIMETYPE, BODY_MARKER, "ODM")?;
+        Self::from_package(package)
+    }
+
     fn from_package(package: Package) -> Result<Self> {
         let semantics = crate::codec::parse(package.content_xml())?;
-        Ok(Self(Arc::new(State { package, semantics })))
+        let styles = crate::codec::parse_catalog(package.content_xml(), package.styles_xml())?;
+        let resources = build_resource_graph(&package, semantics.references())?;
+        Ok(Self(Arc::new(State {
+            package,
+            semantics,
+            styles,
+            resources,
+        })))
     }
 
     pub(crate) fn content_xml(&self) -> &str {
@@ -77,6 +95,18 @@ impl Snapshot {
     pub(crate) fn with_content_xml(&self, content_xml: &str) -> Result<Self> {
         compact_xml::validate(content_xml.as_bytes()).map_err(Error::from)?;
         self.rebuild(content_xml, None)
+    }
+
+    pub(crate) fn with_parts(
+        &self,
+        content_xml: &str,
+        replacement_meta_xml: Option<&str>,
+    ) -> Result<Self> {
+        compact_xml::validate(content_xml.as_bytes()).map_err(Error::from)?;
+        if let Some(meta_xml) = replacement_meta_xml {
+            compact_xml::validate(meta_xml.as_bytes()).map_err(Error::from)?;
+        }
+        self.rebuild(content_xml, replacement_meta_xml)
     }
 
     fn rebuild(&self, content_xml: &str, replacement_meta_xml: Option<&str>) -> Result<Self> {
@@ -128,28 +158,113 @@ impl Snapshot {
     pub(crate) fn href_span(&self, reference: usize) -> Option<&std::ops::Range<usize>> {
         self.0.semantics.href_span(reference)
     }
+
+    pub(crate) fn section_tree(&self) -> &crate::section::Tree {
+        self.0.semantics.tree()
+    }
+
+    pub(crate) fn styles(&self) -> &[crate::style::Definition] {
+        &self.0.styles
+    }
+
+    pub(crate) fn resources(&self) -> &crate::resource::Graph {
+        &self.0.resources
+    }
 }
 
 fn ensure_editable_xml(archive: &OwnedPackage, files: &[String]) -> Result<()> {
+    let package = archive.package()?;
+    if package.manifest().has_encrypted_entries() {
+        return Err(Error::Unsupported(
+            "ODM package edits refuse encrypted packages".to_string(),
+        ));
+    }
     if files.iter().any(|path| {
         matches!(
             path.as_str(),
             "META-INF/documentsignatures.xml" | "META-INF/macrosignatures.xml"
         )
     }) {
-        return Err(Error::InvalidFormat(
+        return Err(Error::Unsupported(
             "ODM package edits refuse signed packages".to_string(),
         ));
     }
     for path in files {
+        let xml_media_type = package
+            .manifest()
+            .get_entry(path)
+            .is_some_and(|entry| entry.media_type.contains("xml"));
         if Path::new(path)
             .extension()
             .is_some_and(|extension| extension.eq_ignore_ascii_case("xml"))
+            || path.ends_with(".rdf")
+            || xml_media_type
         {
             compact_xml::validate(&archive.get_file(path)?).map_err(Error::from)?;
         }
     }
     Ok(())
+}
+
+fn build_resource_graph(
+    package: &Package,
+    references: &[crate::subdocument::Reference],
+) -> Result<crate::resource::Graph> {
+    use litchi_core::Position;
+    use std::collections::HashMap;
+
+    let archive = package.package().package()?;
+    let paths = archive.files()?;
+    let mut resources = Vec::new();
+    let mut indexes = HashMap::new();
+    resources
+        .try_reserve(paths.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODM package resource graph",
+            source,
+        })?;
+    indexes
+        .try_reserve(paths.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODM package resource index",
+            source,
+        })?;
+    for path in paths {
+        if path.ends_with('/') || matches!(path.as_str(), "mimetype" | "META-INF/manifest.xml") {
+            continue;
+        }
+        let index = resources.len();
+        indexes.insert(path.clone(), index);
+        resources.push(crate::resource::Resource {
+            media_type: archive.manifest().get_media_type(&path).map(str::to_owned),
+            path,
+            references: Vec::new(),
+        });
+    }
+    let mut missing = Vec::new();
+    for (reference_index, reference) in references.iter().enumerate() {
+        let crate::subdocument::Target::Package(path) = reference.target() else {
+            continue;
+        };
+        let position = Position::new(reference_index);
+        if let Some(resource_index) = indexes.get(path).copied() {
+            resources[resource_index]
+                .references
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "ODM package resource references",
+                    source,
+                })?;
+            resources[resource_index].references.push(position);
+        } else {
+            missing.try_reserve(1).map_err(|source| Error::Allocation {
+                resource: "ODM missing package resources",
+                source,
+            })?;
+            missing.push(position);
+        }
+    }
+    Ok(crate::resource::Graph { resources, missing })
 }
 
 fn add_preserving_media_type<W: std::io::Write>(

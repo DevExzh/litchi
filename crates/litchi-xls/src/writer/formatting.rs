@@ -114,7 +114,7 @@ fn builtin_number_format_index(pattern: &str) -> Option<u16> {
     BUILTIN_NUMBER_FORMATS
         .iter()
         .position(|&p| p == pattern)
-        .map(|idx| idx as u16)
+        .map(crate::utils::truncate_usize_to_u16)
 }
 
 /// Vertical alignment
@@ -294,6 +294,9 @@ impl Default for CellStyle {
 ///
 /// * `writer` - Output writer
 /// * `font` - Font definition
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn write_font<W: Write>(writer: &mut W, font: &Font) -> Result<()> {
     let mut name_end = 0;
     let mut name_len = 0;
@@ -319,7 +322,11 @@ pub fn write_font<W: Write>(writer: &mut W, font: &Font) -> Result<()> {
     // - Escapement (2) + Underline (1) + Family (1) + Charset (1) + Reserved (1)
     // BIFF8 FONT requires an uncompressed UTF-16LE ShortXLUnicodeString.
     let data_len = 14 + 1 + 1 + (name_len * 2);
-    super::biff::write_record_header(writer, 0x0031, data_len as u16)?;
+    super::biff::write_record_header(
+        writer,
+        0x0031,
+        crate::utils::truncate_usize_to_u16(data_len),
+    )?;
 
     // Font height in twips
     writer.write_all(&font.height.to_le_bytes())?;
@@ -353,7 +360,7 @@ pub fn write_font<W: Write>(writer: &mut W, font: &Font) -> Result<()> {
     writer.write_all(&[0])?;
 
     // Font name length
-    writer.write_all(&[name_len as u8])?;
+    writer.write_all(&[crate::utils::truncate_usize_to_u8(name_len)])?;
 
     // FONT narrows ShortXLUnicodeString: fHighByte MUST equal 1.
     writer.write_all(&[0x01])?;
@@ -373,6 +380,9 @@ pub fn write_font<W: Write>(writer: &mut W, font: &Font) -> Result<()> {
 /// * `writer` - Output writer
 /// * `xf` - Extended format definition
 /// * `is_style_xf` - True for style XF, false for cell XF
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn write_xf<W: Write>(writer: &mut W, xf: &ExtendedFormat, is_style_xf: bool) -> Result<()> {
     super::biff::write_record_header(writer, 0x00E0, 20)?;
 
@@ -421,8 +431,8 @@ pub fn write_xf<W: Write>(writer: &mut W, xf: &ExtendedFormat, is_style_xf: bool
     let top_idx = xf.borders.top_color & 0x007F;
     let bottom_idx = xf.borders.bottom_color & 0x007F;
     let mut adtl_palette_options: u32 = 0;
-    adtl_palette_options |= (top_idx as u32) & 0x0000_007F;
-    adtl_palette_options |= ((bottom_idx as u32) & 0x0000_007F) << 7;
+    adtl_palette_options |= u32::from(top_idx) & 0x0000_007F;
+    adtl_palette_options |= (u32::from(bottom_idx) & 0x0000_007F) << 7;
     // Diagonal and diagonal line style are left at 0 (not used).
     let fill_pattern_bits = (xf.fill.pattern as u32) & 0x3F;
     adtl_palette_options |= fill_pattern_bits << 26;
@@ -451,6 +461,7 @@ pub struct FormattingManager {
 
 impl FormattingManager {
     /// Create a new formatting manager with default entries
+    #[must_use]
     pub fn new() -> Self {
         let mut manager = Self {
             fonts: Vec::new(),
@@ -488,14 +499,14 @@ impl FormattingManager {
 
     /// Add a font and return its index
     pub fn add_font(&mut self, font: Font) -> u16 {
-        let index = self.fonts.len() as u16;
+        let index = crate::utils::truncate_usize_to_u16(self.fonts.len());
         self.fonts.push(font);
         index
     }
 
     /// Add a format and return its index
     pub fn add_format(&mut self, format: ExtendedFormat) -> u16 {
-        let index = self.formats.len() as u16;
+        let index = crate::utils::truncate_usize_to_u16(self.formats.len());
         self.formats.push(format);
         index
     }
@@ -558,8 +569,7 @@ impl FormattingManager {
         let font_index = self.add_font(font);
         let format_index = number_format
             .as_deref()
-            .map(|pattern| self.register_number_format(pattern))
-            .unwrap_or(0);
+            .map_or(0, |pattern| self.register_number_format(pattern));
 
         let xf = ExtendedFormat {
             font_index,
@@ -578,6 +588,7 @@ impl FormattingManager {
         self.pivot_xfs_enabled = true;
     }
 
+    #[must_use]
     pub fn pivot_xf_indices(&self) -> PivotXfIndices {
         const TARGET_PIVOT_XF_START_INDEX: u16 = 64;
         let base = TARGET_PIVOT_XF_START_INDEX;
@@ -589,11 +600,13 @@ impl FormattingManager {
     }
 
     /// Get font by index
+    #[must_use]
     pub fn get_font(&self, index: u16) -> Option<&Font> {
         self.fonts.get(index as usize)
     }
 
     /// Get format by index
+    #[must_use]
     pub fn get_format(&self, index: u16) -> Option<&ExtendedFormat> {
         self.formats.get(index as usize)
     }
@@ -606,6 +619,9 @@ impl FormattingManager {
     }
 
     /// Write all FONT records
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn write_fonts<W: Write>(&self, writer: &mut W) -> Result<()> {
         for font in &self.fonts {
             write_font(writer, font)?;
@@ -615,6 +631,9 @@ impl FormattingManager {
 
     /// Write all FORMAT records (0x041E): the eight BIFF8 default records and any
     /// registered user-defined formats.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn write_number_formats<W: Write>(&self, writer: &mut W) -> Result<()> {
         // [MS-XLS] 2.4.126 permits the default locale-sensitive groups 5..=8
         // and 41..=44. Built-ins 0..=4 are referenced directly by XF records
@@ -635,6 +654,9 @@ impl FormattingManager {
     }
 
     /// Write all XF records
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn write_formats<W: Write>(&self, writer: &mut W) -> Result<()> {
         // Base style XF (matches Excel/POI defaults: General format, font 0)
         let base = ExtendedFormat::default();
@@ -697,7 +719,10 @@ impl FormattingManager {
                 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x10, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00, 0x00, 0x02, 0xC0, 0x20,
             ];
-            let emitted_xf_count = 15u16 + 1 + 5 + (self.formats.len() as u16).saturating_sub(1);
+            let emitted_xf_count = 15u16
+                + 1
+                + 5
+                + crate::utils::truncate_usize_to_u16(self.formats.len()).saturating_sub(1);
             let pad_count = TARGET_PIVOT_XF_START_INDEX.saturating_sub(emitted_xf_count);
             let default_payload = if let Some(default_cell_xf) = self.formats.first() {
                 let mut buf = Vec::with_capacity(20);
@@ -736,7 +761,7 @@ impl FormattingManager {
         let base = BUILTIN_STYLE_XF_COUNT
             + 1
             + BUILTIN_STYLE_FORMAT_XF_COUNT
-            + (self.formats.len() as u16).saturating_sub(1);
+            + crate::utils::truncate_usize_to_u16(self.formats.len()).saturating_sub(1);
         if self.pivot_xfs_enabled {
             base.max(PIVOT_XF_START_INDEX) + PIVOT_XF_COUNT
         } else {
@@ -755,8 +780,9 @@ impl FormattingManager {
             .iter()
             .map(|(code, _)| *code)
             .max()
-            .map(|max_code| max_code.saturating_add(1))
-            .unwrap_or(FIRST_USER_DEFINED_NUMBER_FORMAT_INDEX)
+            .map_or(FIRST_USER_DEFINED_NUMBER_FORMAT_INDEX, |max_code| {
+                max_code.saturating_add(1)
+            })
     }
     pub(crate) fn cell_xf_index_for(&self, format_index: u16) -> u16 {
         const STYLE_XF_COUNT: u16 = 15;

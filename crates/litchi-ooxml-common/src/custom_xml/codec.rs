@@ -654,7 +654,7 @@ fn props_start(
             Ok(PropsContext::Schema)
         },
         Some(PropsContext::Opaque) => Ok(PropsContext::Opaque),
-        Some(PropsContext::Item) | Some(PropsContext::Schemas) | Some(PropsContext::Schema) => {
+        Some(PropsContext::Item | PropsContext::Schemas | PropsContext::Schema) => {
             // Future properties markup is retained in the source part and is
             // intentionally not interpreted by this host-neutral layer.
             Ok(PropsContext::Opaque)

@@ -1,4 +1,4 @@
-//! BIFF8 wire codec for DXF and XFProp payloads.
+//! BIFF8 wire codec for DXF and `XFProp` payloads.
 //!
 //! This module owns all byte-level parsing and emission. The parent module
 //! remains the semantic facade exposed to the rest of the XLS crate.
@@ -139,7 +139,7 @@ impl XfGradient {
     }
 
     pub(crate) fn write_to(&self, output: &mut Vec<u8>) {
-        output.extend_from_slice(&(self.rectangular as u32).to_le_bytes());
+        output.extend_from_slice(&u32::from(self.rectangular).to_le_bytes());
         output.extend_from_slice(&self.degree.to_le_bytes());
         output.extend_from_slice(&self.fill_to_left.to_le_bytes());
         output.extend_from_slice(&self.fill_to_right.to_le_bytes());
@@ -455,10 +455,10 @@ impl XfProperty {
                 .to_le_bytes(),
             ),
             Self::FontUnderline(value) => {
-                data.extend_from_slice(&underline_u16(*value).to_le_bytes())
+                data.extend_from_slice(&underline_u16(*value).to_le_bytes());
             },
             Self::FontEscapement(value) => {
-                data.extend_from_slice(&escapement_u16(*value).to_le_bytes())
+                data.extend_from_slice(&escapement_u16(*value).to_le_bytes());
             },
             Self::FontCharset(value) => data.push(charset_byte(*value)),
             Self::FontFamily(value) => data.push(font_family_byte(*value)),
@@ -545,7 +545,7 @@ impl XfProperties {
         let mut data = Vec::new();
         data.extend_from_slice(&0u16.to_le_bytes());
         let property_count = u16::try_from(self.properties.len())
-            .map_err(|_| invalid("XFProps count exceeds BIFF u16"))?;
+            .map_err(|_error| invalid("XFProps count exceeds BIFF u16"))?;
         data.extend_from_slice(&property_count.to_le_bytes());
         for property in &self.properties {
             let blob = property.data_bytes()?;
@@ -553,7 +553,7 @@ impl XfProperties {
                 .checked_add(blob.len())
                 .ok_or_else(|| invalid("XFProp size overflows"))?;
             let size = u16::try_from(property_size)
-                .map_err(|_| invalid("XFProp size exceeds BIFF u16"))?;
+                .map_err(|_error| invalid("XFProp size exceeds BIFF u16"))?;
             data.extend_from_slice(&property.property_type().to_le_bytes());
             data.extend_from_slice(&size.to_le_bytes());
             data.extend_from_slice(&blob);
@@ -563,6 +563,9 @@ impl XfProperties {
 }
 
 impl DifferentialFormat {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse_payload(data: &[u8]) -> Result<Self> {
         if !(FIXED_PAYLOAD_LEN..=MAX_BIFF8_PAYLOAD_LEN).contains(&data.len()) {
             return Err(invalid(format!(
@@ -587,6 +590,9 @@ impl DifferentialFormat {
         Ok(value)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_payload(&self) -> Result<Vec<u8>> {
         super::validation::validate_format(self)?;
         let properties = self.properties.to_bytes()?;
@@ -606,13 +612,16 @@ impl DifferentialFormat {
         Ok(data)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         let payload = self.to_payload()?;
         let record_len = 4usize
             .checked_add(payload.len())
             .ok_or_else(|| invalid("DXF record size overflows"))?;
-        let payload_len =
-            u16::try_from(payload.len()).map_err(|_| invalid("DXF payload exceeds BIFF u16"))?;
+        let payload_len = u16::try_from(payload.len())
+            .map_err(|_error| invalid("DXF payload exceeds BIFF u16"))?;
         let mut data = Vec::with_capacity(record_len);
         data.extend_from_slice(&DXF_RECORD_TYPE.to_le_bytes());
         data.extend_from_slice(&payload_len.to_le_bytes());
@@ -984,8 +993,8 @@ fn write_lp_wide_string(value: &str, data: &mut Vec<u8>) -> Result<()> {
     if units.len() > 32 {
         return Err(invalid("font name exceeds 32 UTF-16 code units"));
     }
-    let count =
-        u16::try_from(units.len()).map_err(|_| invalid("font name length exceeds BIFF u16"))?;
+    let count = u16::try_from(units.len())
+        .map_err(|_error| invalid("font name length exceeds BIFF u16"))?;
     data.extend_from_slice(&count.to_le_bytes());
     data.extend(units.into_iter().flat_map(u16::to_le_bytes));
     Ok(())
@@ -1023,7 +1032,7 @@ pub(crate) fn write_number_format_code(value: &str, data: &mut Vec<u8>) -> Resul
         return Err(invalid("number-format string length must be 1..=255"));
     }
     let count = u16::try_from(units.len())
-        .map_err(|_| invalid("number-format string length exceeds BIFF u16"))?;
+        .map_err(|_error| invalid("number-format string length exceeds BIFF u16"))?;
     data.extend_from_slice(&count.to_le_bytes());
     data.extend(units.into_iter().flat_map(u16::to_le_bytes));
     Ok(())
@@ -1036,10 +1045,10 @@ fn decode_utf16(data: &[u8], field: &str) -> Result<String> {
     let mut units = Vec::with_capacity(data.len() / 2);
     for chunk in data.chunks_exact(2) {
         let bytes = <[u8; 2]>::try_from(chunk)
-            .map_err(|_| invalid(format!("{field} has an invalid UTF-16 unit")))?;
+            .map_err(|_error| invalid(format!("{field} has an invalid UTF-16 unit")))?;
         units.push(u16::from_le_bytes(bytes));
     }
     char::decode_utf16(units)
         .collect::<Result<String, _>>()
-        .map_err(|_| invalid(format!("{field} contains invalid UTF-16")))
+        .map_err(|_error| invalid(format!("{field} contains invalid UTF-16")))
 }

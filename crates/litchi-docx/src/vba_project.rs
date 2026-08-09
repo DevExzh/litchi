@@ -1,3 +1,7 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Inert MS-OFFMACRO2 VBA-project relationship discovery for Word packages.
 //!
 //! Discovery validates OPC relationship and content-type metadata only.
@@ -82,6 +86,10 @@ pub struct VbaMacroDescriptor {
 
 impl VbaMacroDescriptor {
     /// Create a descriptor from its fully qualified macro name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(name: impl Into<String>) -> Result<Self> {
         let value = Self {
             name: name.into(),
@@ -92,6 +100,10 @@ impl VbaMacroDescriptor {
     }
 
     /// Add ignored legacy menu-help text while preserving it in the package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn with_menu_help(mut self, menu_help: impl Into<String>) -> Result<Self> {
         self.menu_help = Some(menu_help.into());
         self.validate()?;
@@ -99,11 +111,13 @@ impl VbaMacroDescriptor {
     }
 
     /// Return the stored, case-preserving macro name.
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Return the optional legacy menu-help text.
+    #[must_use]
     pub fn menu_help(&self) -> Option<&str> {
         self.menu_help.as_deref()
     }
@@ -142,6 +156,7 @@ pub struct VbaSupplementalData {
 
 impl VbaSupplementalData {
     /// Create empty supplemental data.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -155,6 +170,10 @@ impl VbaSupplementalData {
     }
 
     /// Add one macro descriptor in stored order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_macro(&mut self, descriptor: VbaMacroDescriptor) -> Result<&mut Self> {
         descriptor.validate()?;
         if self.macros.len() >= MAX_SUPPLEMENTAL_MACROS {
@@ -167,16 +186,22 @@ impl VbaSupplementalData {
     }
 
     /// Return active document events in insertion order.
+    #[must_use]
     pub fn document_events(&self) -> &[VbaDocumentEvent] {
         &self.document_events
     }
 
     /// Return macro descriptors in stored order.
+    #[must_use]
     pub fn macros(&self) -> &[VbaMacroDescriptor] {
         &self.macros
     }
 
     /// Serialize deterministic, schema-shaped `vbaData.xml`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn to_xml(&self) -> Result<Vec<u8>> {
         let mut xml = String::with_capacity(256 + self.macros.len().saturating_mul(160));
         xml.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
@@ -240,31 +265,40 @@ pub struct VbaProject {
 
 impl VbaProject {
     /// Return the Word main part that owns the VBA-project relationship.
+    #[must_use]
     pub fn source_part_name(&self) -> &PackURI {
         &self.source_part_name
     }
 
     /// Return the relationship ID from the main part to the VBA Project part.
+    #[must_use]
     pub fn project_relationship_id(&self) -> &str {
         &self.project_relationship_id
     }
 
     /// Return the absolute OPC part name of the VBA Project binary part.
+    #[must_use]
     pub fn project_part_name(&self) -> &PackURI {
         &self.project_part_name
     }
 
     /// Return the relationship ID from the VBA Project to Word supplemental data.
+    #[must_use]
     pub fn supplemental_data_relationship_id(&self) -> &str {
         &self.supplemental_data_relationship_id
     }
 
     /// Return the absolute OPC part name of the Word VBA supplemental-data part.
+    #[must_use]
     pub fn supplemental_data_part_name(&self) -> &PackURI {
         &self.supplemental_data_part_name
     }
 
     /// Parse the `vbaProject.bin` payload with default resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn project(&self, package: &OpcPackage) -> Result<Project> {
         self.project_with(package, &Limits::default())
     }
@@ -274,6 +308,10 @@ impl VbaProject {
     /// The relationship graph remains independently inspectable through this
     /// type. Parsing only decompresses and decodes source; it never compiles,
     /// interprets, or executes VBA.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn project_with(&self, package: &OpcPackage, limits: &Limits) -> Result<Project> {
         Ok(read_project_part(package, &self.project_part_name, limits)?)
     }

@@ -1,4 +1,4 @@
-//! Layered SpreadsheetML timeline cache and worksheet timeline owners.
+//! Layered `SpreadsheetML` timeline cache and worksheet timeline owners.
 //!
 //! Semantic values live in [`model`], bounded XML conversion in [`codec`],
 //! and OPC relationship/part ownership in [`package`]. The public contextual

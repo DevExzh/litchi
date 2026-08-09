@@ -1,4 +1,4 @@
-//! Typed SpreadsheetML external-link models.
+//! Typed `SpreadsheetML` external-link models.
 //!
 //! These values describe external-link markup without opening, fetching, or
 //! activating any target. OPC relationship resolution belongs to `package`.
@@ -18,9 +18,9 @@ pub(crate) const TRANSITIONAL_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 pub(crate) const STRICT_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
 pub(crate) const MAX_EXTERNAL_TARGET_BYTES: usize = 32 * 1024;
-/// Highest column index addressable by a SpreadsheetML cell reference (`XFD`).
+/// Highest column index addressable by a `SpreadsheetML` cell reference (`XFD`).
 pub(crate) const MAX_CELL_COLUMN: u32 = 16_384;
-/// Highest row index addressable by a SpreadsheetML cell reference.
+/// Highest row index addressable by a `SpreadsheetML` cell reference.
 pub(crate) const MAX_CELL_ROW: u32 = 1_048_576;
 /// Longest column prefix a valid reference can carry (`XFD` is three letters).
 pub(crate) const MAX_COLUMN_LETTERS: usize = 3;
@@ -48,6 +48,7 @@ impl Conformance {
         }
     }
 
+    #[must_use]
     pub fn external_link_relationship(self) -> &'static str {
         match self {
             Self::Transitional => {

@@ -1,4 +1,4 @@
-//! Layered WordprocessingML header and footer stories.
+//! Layered `WordprocessingML` header and footer stories.
 //!
 //! The owner keeps the semantic story view, the bounded XML/MCE codec, and
 //! package relationship resolution separate. `Story` retains the original

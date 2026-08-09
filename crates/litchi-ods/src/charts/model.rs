@@ -18,6 +18,9 @@ pub struct Limits {
 
 impl Limits {
     /// Create a checked chart resource budget.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn new(
         max_charts: usize,
         max_part_bytes: usize,

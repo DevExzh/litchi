@@ -7,17 +7,28 @@ use litchi_odp::{
     Presentation, constants,
     drawing::resources::{fill_image, gradient, hatch, marker, opacity, stroke_dash},
 };
+use soapberry_zip::office::StreamingArchiveWriter;
 
 const CONTENT: &str =
     include_str!("../../../test-data/odf/odp/drawing-style-resources-content.xml");
 const STYLES: &str = include_str!("../../../test-data/odf/odp/drawing-style-resources-styles.xml");
 
 fn presentation() -> Presentation {
-    let mut writer = litchi_odp::core::PackageWriter::new();
-    writer.set_mimetype(constants::ODF_PRESENTATION).unwrap();
-    writer.add_file("content.xml", CONTENT.as_bytes()).unwrap();
-    writer.add_file("styles.xml", STYLES.as_bytes()).unwrap();
-    Presentation::from_bytes(writer.finish().unwrap()).unwrap()
+    const MANIFEST: &[u8] = br#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.presentation"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/><manifest:file-entry manifest:full-path="styles.xml" manifest:media-type="text/xml"/></manifest:manifest>"#;
+    let mut archive = StreamingArchiveWriter::new();
+    archive
+        .write_stored("mimetype", constants::ODF_PRESENTATION.as_bytes())
+        .unwrap();
+    archive
+        .write_deflated("content.xml", CONTENT.as_bytes())
+        .unwrap();
+    archive
+        .write_deflated("styles.xml", STYLES.as_bytes())
+        .unwrap();
+    archive
+        .write_deflated("META-INF/manifest.xml", MANIFEST)
+        .unwrap();
+    Presentation::from_bytes(archive.finish_to_bytes().unwrap()).unwrap()
 }
 
 #[test]

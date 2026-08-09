@@ -26,6 +26,12 @@ pub struct UsesElfs {
 
 impl UsesElfs {
     /// Parse a `UsesELFs` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// # Panics
+    ///
+    /// Panics only if an internal BIFF invariant has been violated.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
             return Err(Error::InvalidLength {
@@ -46,11 +52,13 @@ impl UsesElfs {
     }
 
     /// Serialize back to a complete `UsesELFs` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         u16::from(self.uses_elfs).to_le_bytes().to_vec()
     }
 
     /// Whether the file supports natural language formulas (`useselfs`).
+    #[must_use]
     pub fn uses_elfs(&self) -> bool {
         self.uses_elfs
     }

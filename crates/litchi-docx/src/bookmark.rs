@@ -39,18 +39,21 @@ impl Bookmark {
     ///
     /// * `id` - The bookmark ID
     /// * `name` - The bookmark name
+    #[must_use]
     pub fn new(id: u32, name: String) -> Self {
         Self { id, name }
     }
 
     /// Get the bookmark ID.
     #[inline]
+    #[must_use]
     pub fn id(&self) -> u32 {
         self.id
     }
 
     /// Get the bookmark name.
     #[inline]
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -72,7 +75,7 @@ impl Bookmark {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Empty(e)) | Ok(Event::Start(e))
+                Ok(Event::Empty(e) | Event::Start(e))
                     if e.local_name().as_ref() == b"bookmarkStart" =>
                 {
                     let mut id: Option<u32> = None;

@@ -13,8 +13,14 @@ use super::chart_area;
 #[cfg(test)]
 use super::codec::serialize_chart;
 use super::codec::{parse_chart, patch_chart_data};
-use super::model::*;
-use super::wire::*;
+use super::model::{CacheKind, Chart, Formula, Limits, Location, Role, Selector, Value};
+#[cfg(test)]
+use super::wire::EOF;
+use super::wire::{
+    BOF, BOUNDSHEET, CHART, EXTERN_SHEET, LBL, OBJ, RR_TAB_ID, SUP_BOOK, WINDOW1,
+    chart_scan_limits, graph_error, invalid, invalid_error, parse_biff8_string, record, u16_at,
+    u32_at, validate_limits,
+};
 use crate::{Error, Result};
 
 /// Chart plus its current workbook host location.
@@ -64,6 +70,9 @@ pub struct Editor {
 
 impl Editor {
     /// Takes ownership of an XLS compound file and validates its chart inventory.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn open(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         validate_limits(limits)?;
         let package = ObjectEditor::open(bytes, Targets::default(), ObjectLimits::default())?;
@@ -88,6 +97,7 @@ impl Editor {
     }
 
     /// Iterates borrowed chart entries in workbook drawing order.
+    #[must_use]
     pub fn charts(&self) -> impl ExactSizeIterator<Item = &Entry> {
         self.charts.iter().map(|value| &value.entry)
     }
@@ -114,8 +124,11 @@ impl Editor {
     ///
     /// The operation patches only the target `BRAI` record and preserves the
     /// original chart stream allocation, including unknown records. Embedded
-    /// chart edits remain refused because their worksheet OfficeArt graph is
+    /// chart edits remain refused because their worksheet `OfficeArt` graph is
     /// not owned by this data-only editor.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_formula(
         &mut self,
         selector: Selector<'_>,
@@ -158,6 +171,9 @@ impl Editor {
 
     /// Updates one existing chart cache cell without changing its section or
     /// coordinate. Embedded chart edits remain refused atomically.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_cache(
         &mut self,
         selector: Selector<'_>,
@@ -203,10 +219,13 @@ impl Editor {
     /// Replaces only the fixed chart-area geometry of one existing chart.
     ///
     /// The BIFF `Chart` record remains the same length and at the same offset;
-    /// unknown records, formulas, caches, and the worksheet OfficeArt object
+    /// unknown records, formulas, caches, and the worksheet `OfficeArt` object
     /// are not reconstructed. For an embedded chart this changes only the
     /// inert chart-substream geometry; it does not resize or move the host
     /// object.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_chart_area(&mut self, selector: Selector<'_>, rect: chart_area::Rect) -> Result<()> {
         let location = self
             .resolve(selector)?
@@ -242,11 +261,15 @@ impl Editor {
     }
 
     /// Consume the editor and return the parsed chart inventory without persisting.
+    #[must_use]
     pub fn into_charts(self) -> Vec<Entry> {
         self.charts.into_iter().map(|value| value.entry).collect()
     }
 
     /// Looks up a chart by worksheet name and semantic position.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn get(&self, selector: Selector<'_>) -> Result<Option<&Chart>> {
         let Some(location) = self.resolve(selector)? else {
             return Ok(None);
@@ -255,6 +278,7 @@ impl Editor {
     }
 
     /// Looks up a chart using a checked low-level host location.
+    #[must_use]
     pub fn at(&self, location: &Location) -> Option<&Chart> {
         self.charts
             .iter()
@@ -266,6 +290,9 @@ impl Editor {
     ///
     /// The editor is unchanged when this returns
     /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`Error::Graph`].
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add(&mut self, _sheet: &str, _chart: Chart) -> Result<Location> {
         unsupported_authoring()
     }
@@ -274,6 +301,9 @@ impl Editor {
     ///
     /// The editor is unchanged when this returns
     /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`Error::Graph`].
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn insert_at(
         &mut self,
         _sheet_index: usize,
@@ -335,6 +365,9 @@ impl Editor {
     ///
     /// The editor is unchanged when this returns
     /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`Error::Graph`].
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_sheet(&mut self, _name: impl Into<String>, _chart: Chart) -> Result<()> {
         unsupported_authoring()
     }
@@ -343,6 +376,9 @@ impl Editor {
     ///
     /// The editor is unchanged when this returns
     /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`Error::Graph`].
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn insert_sheet_at(
         &mut self,
         _index: usize,
@@ -353,6 +389,9 @@ impl Editor {
     }
 
     /// Remove a chart-sheet tab. References to that tab cause atomic failure.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn remove_sheet_at(&mut self, sheet_index: usize) -> Result<Chart> {
         let (_, sheets) = bindings(&self.workbook)?;
         let sheet = sheets
@@ -380,6 +419,9 @@ impl Editor {
     }
 
     /// Reorders workbook tabs by Unicode case-insensitive tab names.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn reorder_sheets(&mut self, order: &[&str]) -> Result<()> {
         let (_, sheets) = bindings(&self.workbook)?;
         if order.len() != sheets.len() {
@@ -388,7 +430,7 @@ impl Editor {
         let mut indexes = Vec::new();
         indexes
             .try_reserve(order.len())
-            .map_err(|_| Error::InvalidData("could not allocate sheet reorder".into()))?;
+            .map_err(|_error| Error::InvalidData("could not allocate sheet reorder".into()))?;
         let mut seen = HashSet::new();
         for name in order {
             let sheet = sheets
@@ -404,6 +446,9 @@ impl Editor {
     }
 
     /// Reorders all workbook tabs by checked previous zero-based indexes.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn reorder_sheets_at(&mut self, order: &[usize]) -> Result<()> {
         let count = bindings(&self.workbook)?.1.len();
         if order.len() != count {
@@ -431,6 +476,9 @@ impl Editor {
     ///
     /// The editor is unchanged when this returns
     /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`Error::Graph`].
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn replace(&mut self, _selector: Selector<'_>, _chart: Chart) -> Result<()> {
         unsupported_authoring()
     }
@@ -439,15 +487,21 @@ impl Editor {
     ///
     /// The editor is unchanged when this returns
     /// [`litchi_ograph::Error::UnsupportedAuthoring`] through [`Error::Graph`].
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn replace_at(&mut self, _location: &Location, _chart: Chart) -> Result<()> {
         unsupported_authoring()
     }
 
     /// Removes a chart sheet transactionally and refuses embedded-chart removal.
     ///
-    /// Embedded charts participate in the worksheet OfficeArt drawing graph;
+    /// Embedded charts participate in the worksheet `OfficeArt` drawing graph;
     /// until that complete ownership is modeled, the editor returns
     /// [`litchi_ograph::Error::UnsupportedMutation`] without mutation.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn remove(&mut self, selector: Selector<'_>) -> Result<Chart> {
         let location = self
             .resolve(selector)?
@@ -458,7 +512,10 @@ impl Editor {
     /// Removes a chart sheet using a checked low-level host location.
     ///
     /// An existing embedded location is validated and then refused atomically
-    /// until its complete OfficeArt drawing ownership can be rewritten.
+    /// until its complete `OfficeArt` drawing ownership can be rewritten.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn remove_at(&mut self, location: &Location) -> Result<Chart> {
         if let Location::ChartSheet { sheet_index } = location {
             return self.remove_sheet_at(*sheet_index);
@@ -476,7 +533,10 @@ impl Editor {
     /// Validates embedded-chart order on a named worksheet.
     ///
     /// The current identity order is a no-op. A structural reorder is refused
-    /// atomically until complete OfficeArt drawing ownership is modeled.
+    /// atomically until complete `OfficeArt` drawing ownership is modeled.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn reorder(&mut self, sheet: &str, order: &[usize]) -> Result<()> {
         let (_, sheets) = bindings(&self.workbook)?;
         let sheet = sheets
@@ -501,7 +561,7 @@ impl Editor {
         let mut object_ids = Vec::new();
         object_ids
             .try_reserve(order.len())
-            .map_err(|_| Error::InvalidData("could not allocate chart reorder".into()))?;
+            .map_err(|_error| Error::InvalidData("could not allocate chart reorder".into()))?;
         for index in order {
             let id = ids
                 .get(*index)
@@ -518,7 +578,10 @@ impl Editor {
     /// Validates embedded-chart order using checked worksheet and Obj identifiers.
     ///
     /// The current identity order is a no-op. A structural reorder is refused
-    /// atomically until complete OfficeArt drawing ownership is modeled.
+    /// atomically until complete `OfficeArt` drawing ownership is modeled.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn reorder_at(&mut self, sheet_index: usize, object_ids: &[u16]) -> Result<()> {
         let (_, sheets) = bindings(&self.workbook)?;
         let sheet = sheets
@@ -549,7 +612,7 @@ impl Editor {
         let mut current = Vec::new();
         current
             .try_reserve_exact(slots.len())
-            .map_err(|_| Error::InvalidData("could not allocate chart reorder".into()))?;
+            .map_err(|_error| Error::InvalidData("could not allocate chart reorder".into()))?;
         for index in &slots {
             let object_id = self
                 .charts
@@ -584,6 +647,9 @@ impl Editor {
     }
 
     /// Consumes the editor and returns the rewritten compound-file allocation.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn finish(self) -> Result<Vec<u8>> {
         self.package.finish().map_err(Into::into)
     }
@@ -670,6 +736,9 @@ const GENERATED_SHEET_NAME: &str = "Sheet1";
 /// This public entry point returns [`litchi_ograph::Error::UnsupportedAuthoring`]
 /// through [`Error::Graph`] until the complete Office-compatible chart
 /// grammar is implemented.
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn build_workbook(_chart: Chart, _limits: Limits) -> Result<Vec<u8>> {
     unsupported_authoring()
 }
@@ -700,7 +769,7 @@ fn minimal_workbook_stream() -> Result<Vec<u8>> {
     )?);
     output.extend(record(EOF, &[])?);
     let sheet_offset = u32::try_from(output.len())
-        .map_err(|_| Error::InvalidData("BoundSheet offset exceeds u32".into()))?;
+        .map_err(|_error| Error::InvalidData("BoundSheet offset exceeds u32".into()))?;
     output[bound_offset_position..bound_offset_position + 4]
         .copy_from_slice(&sheet_offset.to_le_bytes());
     output.extend(record(BOF, &bof_body(BOF_WORKSHEET))?);
@@ -742,7 +811,7 @@ fn rewrite_sheet_directory(
             .ok_or_else(|| invalid_error(BOUNDSHEET, "unexpected empty sheet permutation slot"))?;
         let (_, stream) = logical
             .get(index)
-            .and_then(|value| value.clone())
+            .and_then(Clone::clone)
             .ok_or_else(|| invalid_error(BOUNDSHEET, "sheet permutation target is missing"))?;
         let bound = old_bounds
             .get(index)
@@ -779,7 +848,7 @@ fn rewrite_sheet_directory(
     for (position, offset) in globals.bound_positions.into_iter().zip(offsets) {
         output[position..position + 4].copy_from_slice(
             &u32::try_from(offset)
-                .map_err(|_| Error::InvalidData("BoundSheet offset exceeds u32".into()))?
+                .map_err(|_error| Error::InvalidData("BoundSheet offset exceeds u32".into()))?
                 .to_le_bytes(),
         );
     }
@@ -834,7 +903,7 @@ fn rewrite_chart_globals(
                 let mut value = data.to_vec();
                 value[..2].copy_from_slice(
                     &u16::try_from(tabs.len())
-                        .map_err(|_| Error::InvalidData("sheet count exceeds u16".into()))?
+                        .map_err(|_error| Error::InvalidData("sheet count exceeds u16".into()))?
                         .to_le_bytes(),
                 );
                 value
@@ -931,8 +1000,10 @@ pub(super) fn remap_extern_sheet(
                 "sheet reorder would make a 3-D formula range noncontiguous",
             );
         }
-        output[offset + 2..offset + 4].copy_from_slice(&(minimum as u16).to_le_bytes());
-        output[offset + 4..offset + 6].copy_from_slice(&(maximum as u16).to_le_bytes());
+        output[offset + 2..offset + 4]
+            .copy_from_slice(&crate::utils::truncate_usize_to_u16(minimum).to_le_bytes());
+        output[offset + 4..offset + 6]
+            .copy_from_slice(&crate::utils::truncate_usize_to_u16(maximum).to_le_bytes());
     }
     Ok(output)
 }
@@ -953,7 +1024,7 @@ pub(crate) fn remap_lbl(data: &[u8], old_to_new: &[Option<usize>]) -> Result<Vec
     let mut output = data.to_vec();
     output[8..10].copy_from_slice(
         &u16::try_from(new + 1)
-            .map_err(|_| Error::InvalidData("Lbl sheet scope exceeds u16".into()))?
+            .map_err(|_error| Error::InvalidData("Lbl sheet scope exceeds u16".into()))?
             .to_le_bytes(),
     );
     Ok(output)
@@ -971,10 +1042,11 @@ pub(crate) fn remap_window1(data: &[u8], old_to_new: &[Option<usize>]) -> Result
             .copied()
             .flatten()
             .unwrap_or_else(|| old_to_new.iter().flatten().copied().min().unwrap_or(0));
-        output[offset..offset + 2].copy_from_slice(&(new as u16).to_le_bytes());
+        output[offset..offset + 2]
+            .copy_from_slice(&crate::utils::truncate_usize_to_u16(new).to_le_bytes());
     }
     let selected = usize::from(u16_at(data, 14)?).clamp(1, old_to_new.iter().flatten().count());
-    output[14..16].copy_from_slice(&(selected as u16).to_le_bytes());
+    output[14..16].copy_from_slice(&crate::utils::truncate_usize_to_u16(selected).to_le_bytes());
     Ok(output)
 }
 
@@ -1052,7 +1124,7 @@ pub(crate) fn bound_sheet_name(data: &[u8]) -> Result<String> {
     if data.len() < 8 {
         return invalid(BOUNDSHEET, "BoundSheet is truncated");
     }
-    parse_biff8_string(&data[6..]).map_err(|_| Error::InvalidRecord {
+    parse_biff8_string(&data[6..]).map_err(|_error| Error::InvalidRecord {
         record_type: BOUNDSHEET,
         message: "invalid BoundSheet name".into(),
     })
@@ -1187,9 +1259,9 @@ fn replace_chart_sheet_stream(
         .min()
         .ok_or_else(|| invalid_error(BOUNDSHEET, "workbook has no sheet substreams"))?;
     let old_len = u32::try_from(old_len)
-        .map_err(|_| Error::InvalidData("chart-sheet length exceeds u32".into()))?;
+        .map_err(|_error| Error::InvalidData("chart-sheet length exceeds u32".into()))?;
     let new_len = u32::try_from(replacement.len())
-        .map_err(|_| Error::InvalidData("replacement chart length exceeds u32".into()))?;
+        .map_err(|_error| Error::InvalidData("replacement chart length exceeds u32".into()))?;
     for value in ranges(&input[..global_end])? {
         if value.kind != BOUNDSHEET {
             continue;
@@ -1321,7 +1393,7 @@ fn rewrite_workbook_charts(
             .ok_or_else(|| invalid_error(BOUNDSHEET, "BoundSheet target is missing"))?;
         output[reference..reference + 4].copy_from_slice(
             &u32::try_from(new)
-                .map_err(|_| Error::InvalidData("BoundSheet offset exceeds u32".into()))?
+                .map_err(|_error| Error::InvalidData("BoundSheet offset exceeds u32".into()))?
                 .to_le_bytes(),
         );
     }
@@ -1347,7 +1419,10 @@ struct Sheet {
     kind: u8,
     name: String,
 }
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "type mirrors the decoded BIFF record structure"
+)]
 fn bindings(input: &[u8]) -> Result<(Vec<(usize, usize)>, Vec<Sheet>)> {
     let mut refs = Vec::new();
     for value in ranges(input)? {
@@ -1414,7 +1489,7 @@ pub(super) fn ranges_with(input: &[u8], max_records: usize) -> Result<Vec<Range>
             .checked_add(record.encoded().len())
             .ok_or_else(|| Error::InvalidData("BIFF record length overflow".into()))?;
         out.try_reserve(1)
-            .map_err(|_| Error::InvalidData("could not allocate BIFF ranges".into()))?;
+            .map_err(|_error| Error::InvalidData("could not allocate BIFF ranges".into()))?;
         out.push(Range {
             start,
             end,

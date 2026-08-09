@@ -1,3 +1,11 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::struct_excessive_bools,
+    reason = "the public model preserves independent OOXML flags"
+)]
 //! Legacy external, linked, and referenced-document field models.
 
 use super::{Field, Switch};
@@ -134,41 +142,49 @@ impl Dde {
     }
 
     /// Return the complete stored field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
 
     /// Return the cached field result, if one was stored.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a word processor marked the cached result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
 
     /// Whether a word processor locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.locked
     }
 
     /// Return whether this is a DDE or DDEAUTO field.
+    #[must_use]
     pub fn kind(&self) -> DdeKind {
         self.kind
     }
 
     /// Return the stored DDE application name without launching it.
+    #[must_use]
     pub fn application(&self) -> &str {
         &self.application
     }
 
     /// Return the stored source identifier without opening or resolving it.
+    #[must_use]
     pub fn source(&self) -> &str {
         &self.source
     }
 
     /// Return the optional stored source item, such as a cell range or bookmark.
+    #[must_use]
     pub fn item(&self) -> Option<&str> {
         self.item.as_deref()
     }
@@ -176,6 +192,7 @@ impl Dde {
     /// Whether the stored instruction requests automatic DDE updates.
     ///
     /// This is metadata only. The API never performs an update.
+    #[must_use]
     pub fn requests_automatic_updates(&self) -> bool {
         self.automatic_updates
     }
@@ -183,6 +200,7 @@ impl Dde {
     /// Return the requested stored result representation, if present.
     ///
     /// This is metadata only and never triggers source access or conversion.
+    #[must_use]
     pub fn representation(&self) -> Option<DdeFormat> {
         self.representation
     }
@@ -191,11 +209,13 @@ impl Dde {
     ///
     /// This is stored metadata only. The API never reads the source to obtain
     /// omitted data.
+    #[must_use]
     pub fn omits_graphic_data(&self) -> bool {
         self.omit_graphic_data
     }
 
     /// Return all stored field switches in source order.
+    #[must_use]
     pub fn switches(&self) -> &[Switch] {
         &self.switches
     }
@@ -227,7 +247,7 @@ pub enum IncludeOption {
     NamespaceMapping(String),
     /// An XSLT location from the INCLUDETEXT t switch.
     Xslt(String),
-    /// An XPath expression from the INCLUDETEXT x switch.
+    /// An `XPath` expression from the INCLUDETEXT x switch.
     XPath(String),
 }
 
@@ -319,21 +339,25 @@ impl Include {
     }
 
     /// Return the complete stored field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
 
     /// Return the cached field result, if one was stored.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a word processor marked the cached result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
 
     /// Whether a word processor locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.locked
     }
@@ -342,11 +366,13 @@ impl Include {
     ///
     /// Text includes use `INCLUDETEXT` or historical `INCLUDE`; picture includes use
     /// `INCLUDEPICTURE` or historical `IMPORT`.
+    #[must_use]
     pub fn kind(&self) -> IncludeKind {
         self.kind
     }
 
     /// Return the stored source identifier without opening or resolving it.
+    #[must_use]
     pub fn source(&self) -> &str {
         &self.source
     }
@@ -355,6 +381,7 @@ impl Include {
     ///
     /// `INCLUDEPICTURE` and `IMPORT` fields do not define a bookmark operand, so this
     /// returns None for picture includes.
+    #[must_use]
     pub fn bookmark(&self) -> Option<&str> {
         self.bookmark.as_deref()
     }
@@ -362,6 +389,7 @@ impl Include {
     /// Whether the stored text-include instruction suppresses nested updates.
     ///
     /// This is metadata only. The API never performs an update.
+    #[must_use]
     pub fn suppresses_nested_field_updates(&self) -> bool {
         self.suppress_nested_field_updates
     }
@@ -370,6 +398,7 @@ impl Include {
     ///
     /// This is stored metadata only. The API never reads the source to obtain
     /// omitted picture data.
+    #[must_use]
     pub fn omits_picture_data(&self) -> bool {
         self.omit_picture_data
     }
@@ -377,12 +406,14 @@ impl Include {
     /// Return recognized converter and XML options in stored source order.
     ///
     /// All options are inert metadata. This method never resolves a converter,
-    /// opens a source, runs XSLT, or evaluates XPath.
+    /// opens a source, runs XSLT, or evaluates `XPath`.
+    #[must_use]
     pub fn options(&self) -> &[IncludeOption] {
         &self.options
     }
 
     /// Return all stored field switches in source order.
+    #[must_use]
     pub fn switches(&self) -> &[Switch] {
         &self.switches
     }
@@ -443,26 +474,31 @@ impl SubDocument {
     }
 
     /// Return the complete stored field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
 
     /// Return the cached field result, if one was stored.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a word processor marked the cached result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
 
     /// Whether a word processor locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.locked
     }
 
     /// Return the stored referenced-document path without opening it.
+    #[must_use]
     pub fn source(&self) -> &str {
         &self.source
     }
@@ -471,11 +507,13 @@ impl SubDocument {
     /// document.
     ///
     /// This is metadata only. The API never resolves the path.
+    #[must_use]
     pub fn uses_relative_path(&self) -> bool {
         self.relative_path
     }
 
     /// Return all stored field switches in source order.
+    #[must_use]
     pub fn switches(&self) -> &[Switch] {
         &self.switches
     }
@@ -515,9 +553,9 @@ pub enum LinkFormat {
     Source,
     /// `2`: match formatting in the destination document.
     Destination,
-    /// `4`: preserve source formatting for a SpreadsheetML workbook source.
+    /// `4`: preserve source formatting for a `SpreadsheetML` workbook source.
     SpreadsheetSource,
-    /// `5`: match destination formatting for a SpreadsheetML workbook source.
+    /// `5`: match destination formatting for a `SpreadsheetML` workbook source.
     SpreadsheetDestination,
     /// An ECMA-376-unsupported or otherwise unrecognized integral mode.
     Unsupported(i64),
@@ -571,7 +609,7 @@ impl Link {
                             "LINK \\f switch requires an integral formatting mode".to_string(),
                         )
                     })?;
-                    let value = argument.parse::<i64>().map_err(|_| {
+                    let value = argument.parse::<i64>().map_err(|_source_error| {
                         Error::Invalid("LINK \\f formatting mode must be an integer".to_string())
                     })?;
                     formatting_modes.push(match value {
@@ -620,21 +658,25 @@ impl Link {
     }
 
     /// Return the complete stored field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
 
     /// Return the cached field result, if one was stored.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a word processor marked the cached result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
 
     /// Whether a word processor locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.locked
     }
@@ -643,16 +685,19 @@ impl Link {
     ///
     /// Word commonly stores an OLE Programmatic Identifier here. It is never
     /// looked up or activated by this API.
+    #[must_use]
     pub fn application_type(&self) -> &str {
         &self.application_type
     }
 
     /// Return the stored source identifier without opening or resolving it.
+    #[must_use]
     pub fn source(&self) -> &str {
         &self.source
     }
 
     /// Return the optional stored source item, such as a cell range or bookmark.
+    #[must_use]
     pub fn item(&self) -> Option<&str> {
         self.item.as_deref()
     }
@@ -660,6 +705,7 @@ impl Link {
     /// Whether the stored instruction requests automatic updates.
     ///
     /// This is metadata only. The API never performs an update.
+    #[must_use]
     pub fn requests_automatic_updates(&self) -> bool {
         self.automatic_updates
     }
@@ -669,12 +715,14 @@ impl Link {
     /// When several are present, [`Self::effective_result_option`] reflects
     /// Word's documented last-switch behavior. Neither method contacts the
     /// linked source.
+    #[must_use]
     pub fn result_options(&self) -> &[LinkResult] {
         &self.result_options
     }
 
     /// Return the effective result or storage option under Word's documented
     /// last-switch behavior, if one was stored.
+    #[must_use]
     pub fn effective_result_option(&self) -> Option<LinkResult> {
         self.result_options.last().copied()
     }
@@ -682,11 +730,13 @@ impl Link {
     /// Return integral `\\f` formatting modes in stored source order.
     ///
     /// These are metadata only; this API never formats linked content.
+    #[must_use]
     pub fn formatting_modes(&self) -> &[LinkFormat] {
         &self.formatting_modes
     }
 
     /// Return all stored field switches in source order.
+    #[must_use]
     pub fn switches(&self) -> &[Switch] {
         &self.switches
     }
@@ -697,6 +747,7 @@ impl Field {
     ///
     /// Recognition is limited to the stored field instruction. It never
     /// activates an OLE server, opens a source, or refreshes the field.
+    #[must_use]
     pub fn is_link(&self) -> bool {
         field_instruction_remainder(&self.instruction, "LINK").is_some()
     }
@@ -707,6 +758,10 @@ impl Field {
     /// application, source, item, result, formatting, and cached metadata only;
     /// it never activates, opens, contacts, converts, evaluates, or executes
     /// anything.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn link(&self) -> Result<Option<Link>> {
         Link::from_field(self)
     }
@@ -716,6 +771,7 @@ impl Field {
     /// Recognition is limited to the stored field instruction. It never
     /// launches an application, initiates a DDE conversation, opens a source,
     /// or refreshes the field.
+    #[must_use]
     pub fn is_dde(&self) -> bool {
         field_instruction_remainder(&self.instruction, "DDE").is_some()
     }
@@ -725,6 +781,7 @@ impl Field {
     /// Recognition is limited to the stored field instruction. It never
     /// launches an application, initiates a DDE conversation, opens a source,
     /// or refreshes the field.
+    #[must_use]
     pub fn is_dde_auto(&self) -> bool {
         field_instruction_remainder(&self.instruction, "DDEAUTO").is_some()
     }
@@ -735,6 +792,10 @@ impl Field {
     /// application, source, item, representation, and cached metadata only; it
     /// never launches an application, initiates a DDE conversation, opens,
     /// contacts, refreshes, converts, evaluates, or executes anything.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn dde_link(&self) -> Result<Option<Dde>> {
         Dde::from_field(self)
     }
@@ -743,6 +804,7 @@ impl Field {
     ///
     /// Recognition is limited to the stored field instruction. It never opens,
     /// resolves, imports, fetches, or refreshes the referenced source.
+    #[must_use]
     pub fn is_include_text(&self) -> bool {
         field_instruction_remainder(&self.instruction, "INCLUDETEXT").is_some()
             || field_instruction_remainder(&self.instruction, "INCLUDE").is_some()
@@ -752,6 +814,7 @@ impl Field {
     ///
     /// Recognition is limited to the stored field instruction. It never opens,
     /// resolves, imports, fetches, or refreshes the referenced source.
+    #[must_use]
     pub fn is_include_picture(&self) -> bool {
         field_instruction_remainder(&self.instruction, "INCLUDEPICTURE").is_some()
             || field_instruction_remainder(&self.instruction, "IMPORT").is_some()
@@ -764,6 +827,10 @@ impl Field {
     /// source, bookmark, converter, XML, and cached metadata only; it never
     /// opens, resolves, imports, fetches, refreshes, converts, evaluates, or
     /// executes anything.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn external_include(&self) -> Result<Option<Include>> {
         Include::from_field(self)
     }
@@ -772,6 +839,7 @@ impl Field {
     ///
     /// Recognition is limited to the stored field instruction. It never opens,
     /// resolves, reads, imports, or refreshes the referenced document.
+    #[must_use]
     pub fn is_referenced_document(&self) -> bool {
         field_instruction_remainder(&self.instruction, "RD").is_some()
     }
@@ -782,6 +850,10 @@ impl Field {
     /// path, relative-path request, switches, cached content, and dirty/lock
     /// state; it never opens, resolves, imports, evaluates, or executes
     /// anything.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn referenced_document(&self) -> Result<Option<SubDocument>> {
         SubDocument::from_field(self)
     }

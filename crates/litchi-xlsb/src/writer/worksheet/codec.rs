@@ -458,7 +458,10 @@ impl MutableWorksheet {
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "arguments mirror independent BIFF12 record fields"
+    )]
     pub(super) fn write_formula_cell<W: Write>(
         &self,
         writer: &mut Writer<W>,

@@ -5,6 +5,7 @@
 //! Generate a minimal valid document.xml content.
 
 /// Creates an empty document with a single section definition.
+#[must_use]
 pub fn default_document_xml() -> &'static str {
     include_str!("resources/generated/document.xml")
 }
@@ -12,26 +13,31 @@ pub fn default_document_xml() -> &'static str {
 /// Generate default styles.xml content
 ///
 /// Uses theme references for fonts instead of direct font names to ensure compatibility.
+#[must_use]
 pub fn default_styles_xml() -> &'static str {
     include_str!("resources/generated/styles.xml")
 }
 
 /// Generate default settings.xml content
+#[must_use]
 pub fn default_settings_xml() -> &'static str {
     include_str!("resources/generated/settings.xml")
 }
 
 /// Generate a minimal valid fontTable.xml content.
+#[must_use]
 pub fn default_font_table_xml() -> &'static str {
     include_str!("resources/generated/fontTable.xml")
 }
 
 /// Generate a minimal valid core.xml (core properties) content.
+#[must_use]
 pub fn default_core_props_xml() -> &'static str {
     include_str!("resources/generated/docProps/core.xml")
 }
 
 /// Generate a minimal valid app.xml (extended properties) content.
+#[must_use]
 pub fn default_app_props_xml() -> &'static str {
     include_str!("resources/generated/docProps/app.xml")
 }
@@ -39,6 +45,7 @@ pub fn default_app_props_xml() -> &'static str {
 /// Generate a minimal valid theme1.xml content.
 ///
 /// Defines the Office theme with color scheme and font scheme.
+#[must_use]
 pub fn default_theme_xml() -> &'static str {
     include_str!("resources/generated/theme/theme1.xml")
 }
@@ -46,6 +53,7 @@ pub fn default_theme_xml() -> &'static str {
 /// Generate a default numbering.xml content.
 ///
 /// Defines numbering formats for lists (bullets, decimals, etc.).
+#[must_use]
 pub fn default_numbering_xml() -> &'static str {
     include_str!("resources/generated/numbering.xml")
 }

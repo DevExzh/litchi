@@ -102,6 +102,12 @@ pub struct SerAuxTrend {
 
 impl SerAuxTrend {
     /// Parse a `SerAuxTrend` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// # Panics
+    ///
+    /// Panics only if an internal BIFF invariant has been violated.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
             return Err(Error::InvalidLength {
@@ -131,6 +137,7 @@ impl SerAuxTrend {
     }
 
     /// Serialize back to a complete `SerAuxTrend` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(PAYLOAD_LEN);
         payload.push(self.kind as u8);
@@ -144,12 +151,14 @@ impl SerAuxTrend {
     }
 
     /// The trendline type (`regt`).
+    #[must_use]
     pub fn kind(&self) -> TrendlineKind {
         self.kind
     }
 
     /// Polynomial order or moving average period (`ordUser`); preserved
     /// verbatim when ignored for the trendline type.
+    #[must_use]
     pub fn order(&self) -> u8 {
         self.order
     }
@@ -157,6 +166,7 @@ impl SerAuxTrend {
     /// Where the trendline intersects the value axis (`numIntercept`), or
     /// `None` when the `ChartNumNillable` union holds a `NilChartNum`
     /// non-numeric value (MS-XLS 2.5.40).
+    #[must_use]
     pub fn intercept(&self) -> Option<f64> {
         if self.intercept[6..8] == NIL_CHART_NUM_MARKER {
             None
@@ -167,26 +177,31 @@ impl SerAuxTrend {
 
     /// The raw `numIntercept` bytes (a `ChartNumNillable` union), preserved
     /// verbatim.
+    #[must_use]
     pub fn intercept_bytes(&self) -> [u8; 8] {
         self.intercept
     }
 
     /// Whether the trendline equation is displayed (`fEquation`).
+    #[must_use]
     pub fn show_equation(&self) -> bool {
         self.show_equation
     }
 
     /// Whether the R-squared value is displayed (`fRSquared`).
+    #[must_use]
     pub fn show_r_squared(&self) -> bool {
         self.show_r_squared
     }
 
     /// Number of periods to forecast forward (`numForecast`).
+    #[must_use]
     pub fn forecast(&self) -> f64 {
         self.forecast
     }
 
     /// Number of periods to forecast backward (`numBackcast`).
+    #[must_use]
     pub fn backcast(&self) -> f64 {
         self.backcast
     }

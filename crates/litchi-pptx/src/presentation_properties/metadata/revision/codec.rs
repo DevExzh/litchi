@@ -293,7 +293,10 @@ fn parse_revision_information(xml: &[u8]) -> Result<Info> {
                     root_seen = true;
                     Frame::Root
                 } else {
-                    match stack.last_mut().expect("nonempty stack") {
+                    match stack
+                        .last_mut()
+                        .ok_or_else(|| invalid("Revision Information child has no parent"))?
+                    {
                         Frame::Root => {
                             if namespace_name(&namespace, P1510, local.as_ref(), b"revLst") {
                                 if seen_list || seen_extensions {

@@ -1,4 +1,4 @@
-//! Typed Word shape models projected from OfficeArt.
+//! Typed Word shape models projected from `OfficeArt`.
 
 use litchi_odraw::{Container, Record, RecordKind};
 
@@ -10,7 +10,7 @@ use litchi_odraw::{
 
 use std::io;
 
-/// The stable identity carried by an OfficeArt `FSP` shape atom.
+/// The stable identity carried by an `OfficeArt` `FSP` shape atom.
 ///
 /// The value is deliberately kept separate from property and record
 /// identifiers. It remains lossless for producer-defined identifiers while
@@ -20,14 +20,16 @@ use std::io;
 pub struct ShapeId(u32);
 
 impl ShapeId {
-    /// Wraps the exact `spid` value from an OfficeArt shape atom.
+    /// Wraps the exact `spid` value from an `OfficeArt` shape atom.
     #[inline]
+    #[must_use]
     pub const fn from_raw(raw: u32) -> Self {
         Self(raw)
     }
 
     /// Returns the exact `spid` value.
     #[inline]
+    #[must_use]
     pub const fn raw(self) -> u32 {
         self.0
     }
@@ -45,7 +47,7 @@ impl From<ShapeId> for u32 {
     }
 }
 
-/// The four signed coordinates of an OfficeArt `ChildAnchor` record.
+/// The four signed coordinates of an `OfficeArt` `ChildAnchor` record.
 ///
 /// A child anchor is expressed in the coordinate space supplied by the
 /// containing group's [`Bounds`]. Host-owned `ClientAnchor` bytes are kept in
@@ -63,8 +65,9 @@ pub struct Anchor {
 }
 
 impl Anchor {
-    /// Creates an anchor from its four signed OfficeArt coordinates.
+    /// Creates an anchor from its four signed `OfficeArt` coordinates.
     #[inline]
+    #[must_use]
     pub const fn new(left: i32, top: i32, right: i32, bottom: i32) -> Self {
         Self {
             left,
@@ -76,12 +79,14 @@ impl Anchor {
 
     /// Returns the checked horizontal extent.
     #[inline]
+    #[must_use]
     pub const fn width(&self) -> Option<i32> {
         self.right.checked_sub(self.left)
     }
 
     /// Returns the checked vertical extent.
     #[inline]
+    #[must_use]
     pub const fn height(&self) -> Option<i32> {
         self.bottom.checked_sub(self.top)
     }
@@ -111,12 +116,14 @@ impl ClientAnchor {
         }
     }
 
-    /// Returns the exact OfficeArt record bytes, including its header.
+    /// Returns the exact `OfficeArt` record bytes, including its header.
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
-    /// Returns the host-owned payload without the OfficeArt record header.
+    /// Returns the host-owned payload without the `OfficeArt` record header.
+    #[must_use]
     pub fn payload(&self) -> &[u8] {
         &self.bytes[8..]
     }
@@ -129,12 +136,13 @@ impl ClientAnchor {
     }
 
     /// Returns whether the host record has no payload bytes.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.payload().is_empty()
     }
 }
 
-/// The property-table owner of an unknown OfficeArt property.
+/// The property-table owner of an unknown `OfficeArt` property.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PropertyTable {
     /// The primary `OfficeArtFOPT` table.
@@ -181,49 +189,57 @@ impl UnknownProperty {
     }
 
     /// Returns the property-table owner.
+    #[must_use]
     pub const fn table(&self) -> PropertyTable {
         self.table
     }
 
     /// Returns the unflagged property identifier.
+    #[must_use]
     pub fn raw_id(&self) -> u16 {
         self.raw_opid() & 0x3FFF
     }
 
     /// Returns the exact `opid`, including `fBid` and `fComplex` flags.
+    #[must_use]
     pub fn raw_opid(&self) -> u16 {
         u16::from_le_bytes([self.bytes[0], self.bytes[1]])
     }
 
     /// Returns the exact four-byte `op` value.
+    #[must_use]
     pub fn raw_value(&self) -> i32 {
         i32::from_le_bytes([self.bytes[2], self.bytes[3], self.bytes[4], self.bytes[5]])
     }
 
     /// Returns whether the property is a complex property.
+    #[must_use]
     pub fn is_complex(&self) -> bool {
         self.raw_opid() & 0x8000 != 0
     }
 
     /// Returns whether the property is a BLIP-store reference.
+    #[must_use]
     pub fn is_blip(&self) -> bool {
         self.raw_opid() & 0x4000 != 0
     }
 
     /// Returns the exact descriptor and optional complex payload bytes.
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
     /// Returns the complex payload, or an empty slice for simple properties.
+    #[must_use]
     pub fn data(&self) -> &[u8] {
         &self.bytes[6..]
     }
 }
 
-/// One unknown OfficeArt record retained from a Word shape container.
+/// One unknown `OfficeArt` record retained from a Word shape container.
 ///
-/// OfficeArt is extensible and [MS-ODRAW] allows producers to add records that
+/// `OfficeArt` is extensible and [MS-ODRAW] allows producers to add records that
 /// a particular reader does not understand. The record is stored as its exact
 /// wire representation, including the eight-byte record header, so a later
 /// layer can inspect or replay it without a lossy decode/re-encode cycle.
@@ -239,48 +255,53 @@ impl UnknownRecord {
         }
     }
 
-    /// Returns the exact OfficeArt record bytes, including its header.
+    /// Returns the exact `OfficeArt` record bytes, including its header.
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
     /// Returns the record kind value exactly as it appeared on the wire.
+    #[must_use]
     pub fn raw_kind(&self) -> u16 {
         u16::from_le_bytes([self.bytes[2], self.bytes[3]])
     }
 
     /// Returns the four-bit record version.
+    #[must_use]
     pub fn version(&self) -> u8 {
         (u16::from_le_bytes([self.bytes[0], self.bytes[1]]) & 0x000F) as u8
     }
 
     /// Returns the twelve-bit record instance.
+    #[must_use]
     pub fn instance(&self) -> u16 {
         u16::from_le_bytes([self.bytes[0], self.bytes[1]]) >> 4
     }
 
     /// Returns the record payload without its header.
+    #[must_use]
     pub fn data(&self) -> &[u8] {
         &self.bytes[8..]
     }
 }
 
-/// Shape information extracted from a Word document's OfficeArt drawing.
+/// Shape information extracted from a Word document's `OfficeArt` drawing.
 ///
 /// The model is owned because textbox text is resolved from separate Word
-/// stories after OfficeArt parsing. Shape children and unknown-record payloads
+/// stories after `OfficeArt` parsing. Shape children and unknown-record payloads
 /// are consequently independent of the OLE stream borrowed during decoding.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Shape {
-    /// Format-neutral OfficeArt shape family.
+    /// Format-neutral `OfficeArt` shape family.
     pub shape_type: Kind,
-    /// OfficeArt shape identifier (`spid`).
+    /// `OfficeArt` shape identifier (`spid`).
     pub shape_id: u32,
     /// Text content extracted from the shape's Word textbox story, if any.
     pub text: Option<String>,
     /// Whether this shape is a group shape.
     pub is_group: bool,
-    /// Child shapes, in OfficeArt source order.
+    /// Child shapes, in `OfficeArt` source order.
     pub children: Vec<Shape>,
     /// Fill color as `(R, G, B)`, when an explicit `fillColor` is present.
     pub fill_color: Option<(u8, u8, u8)>,
@@ -294,14 +315,14 @@ pub struct Shape {
     pub anchor: Option<Anchor>,
     /// Host-owned `ClientAnchor` record, retained without reinterpretation.
     pub client_anchor: Option<ClientAnchor>,
-    /// Exact flags from the OfficeArt `FSP` shape atom.
+    /// Exact flags from the `OfficeArt` `FSP` shape atom.
     pub flags: Flags,
-    /// Unknown records directly owned by this shape's OfficeArt container.
+    /// Unknown records directly owned by this shape's `OfficeArt` container.
     pub unknown_records: Vec<UnknownRecord>,
     /// Unknown property entries from the shape's primary, secondary, and
-    /// tertiary OfficeArt property tables.
+    /// tertiary `OfficeArt` property tables.
     pub unknown_properties: Vec<UnknownProperty>,
-    /// Exact wire representation of this shape's OfficeArt container.
+    /// Exact wire representation of this shape's `OfficeArt` container.
     ///
     /// For a regular shape this is an `OfficeArtSpContainer`; for a group it
     /// is the enclosing `OfficeArtSpgrContainer`, including its group header
@@ -323,40 +344,46 @@ pub struct Group<'a> {
 }
 
 impl<'a> Group<'a> {
-    /// Returns the group's stable OfficeArt identity.
+    /// Returns the group's stable `OfficeArt` identity.
+    #[must_use]
     pub const fn identity(self) -> ShapeId {
         ShapeId::from_raw(self.shape.shape_id)
     }
 
     /// Returns the group's `spid` value.
+    #[must_use]
     pub const fn shape_id(self) -> u32 {
         self.shape.shape_id
     }
 
     /// Returns the group's child-coordinate space.
+    #[must_use]
     pub const fn bounds(self) -> Option<&'a Bounds> {
         self.shape.group_bounds.as_ref()
     }
 
-    /// Returns direct children in OfficeArt source order.
+    /// Returns direct children in `OfficeArt` source order.
+    #[must_use]
     pub fn children(self) -> &'a [Shape] {
         &self.shape.children
     }
 
-    /// Returns the exact OfficeArt group container snapshot, including its
+    /// Returns the exact `OfficeArt` group container snapshot, including its
     /// group header and complete child subtree.
+    #[must_use]
     pub fn office_art_bytes(self) -> &'a [u8] {
         self.shape.office_art_bytes()
     }
 
     /// Finds the first descendant with the requested identity in source order.
+    #[must_use]
     pub fn find(self, identity: ShapeId) -> Option<&'a Shape> {
         self.shape.find(identity)
     }
 }
 
 impl Shape {
-    /// Project a host-neutral OfficeArt shape into the Word drawing facade.
+    /// Project a host-neutral `OfficeArt` shape into the Word drawing facade.
     pub(crate) fn from_office_art(shape: &OfficeArtShape<'_>) -> io::Result<Self> {
         // In Word, OfficeArtClientTextbox contains only a TXID into the Word
         // textbox story. Text itself is resolved by `Document::text_boxes` and
@@ -397,59 +424,68 @@ impl Shape {
         })
     }
 
-    /// Returns the shape's stable OfficeArt identity.
+    /// Returns the shape's stable `OfficeArt` identity.
     #[inline]
+    #[must_use]
     pub const fn identity(&self) -> ShapeId {
         ShapeId::from_raw(self.shape_id)
     }
 
     /// Returns the exact `spid` value.
     #[inline]
+    #[must_use]
     pub const fn id(&self) -> u32 {
         self.shape_id
     }
 
-    /// Returns the typed OfficeArt flags from `FSP`.
+    /// Returns the typed `OfficeArt` flags from `FSP`.
     #[inline]
+    #[must_use]
     pub const fn shape_flags(&self) -> Flags {
         self.flags
     }
 
-    /// Returns whether the shape is a group according to its OfficeArt flag.
+    /// Returns whether the shape is a group according to its `OfficeArt` flag.
     #[inline]
+    #[must_use]
     pub const fn is_group_shape(&self) -> bool {
         self.is_group
     }
 
     /// Returns the typed child anchor, if the shape is nested in a group.
     #[inline]
+    #[must_use]
     pub const fn anchor(&self) -> Option<&Anchor> {
         self.anchor.as_ref()
     }
 
     /// Returns the host-owned client anchor without interpreting its payload.
     #[inline]
+    #[must_use]
     pub const fn client_anchor(&self) -> Option<&ClientAnchor> {
         self.client_anchor.as_ref()
     }
 
-    /// Returns the exact OfficeArt container used to project this shape.
+    /// Returns the exact `OfficeArt` container used to project this shape.
     ///
     /// The returned bytes are an owned snapshot and can be replayed without
     /// reconstructing the container from the lossy semantic fields. Group
     /// snapshots include their complete child subtree.
+    #[must_use]
     pub fn office_art_bytes(&self) -> &[u8] {
         &self.office_art
     }
 
     /// Returns a typed group view when this shape is a group.
     #[inline]
+    #[must_use]
     pub fn group(&self) -> Option<Group<'_>> {
         self.is_group.then_some(Group { shape: self })
     }
 
-    /// Returns direct children in OfficeArt source order.
+    /// Returns direct children in `OfficeArt` source order.
     #[inline]
+    #[must_use]
     pub fn children(&self) -> &[Shape] {
         &self.children
     }
@@ -457,6 +493,7 @@ impl Shape {
     /// Finds the first shape with the requested identity in depth-first source
     /// order. A caller that needs to diagnose producer-invalid duplicate IDs
     /// should inspect every node through [`Self::children`].
+    #[must_use]
     pub fn find(&self, identity: ShapeId) -> Option<&Shape> {
         if self.identity() == identity {
             return Some(self);
@@ -466,6 +503,7 @@ impl Shape {
 
     /// Returns unknown property entries in their property-table order.
     #[inline]
+    #[must_use]
     pub fn unknown_properties(&self) -> &[UnknownProperty] {
         &self.unknown_properties
     }

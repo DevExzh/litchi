@@ -1,4 +1,4 @@
-//! Bounded SpreadsheetML named-sheet-view XML codec.
+//! Bounded `SpreadsheetML` named-sheet-view XML codec.
 //!
 //! MCE preprocessing and retained extension fragments stay inert; this layer
 //! owns only XML validation, conversion, and serialization.
@@ -16,7 +16,10 @@ use quick_xml::{Writer, XmlVersion};
 use std::borrow::Cow;
 use std::collections::HashSet;
 
-use super::model::*;
+use super::model::{
+    ColumnFilter, DifferentialFormat, Extension, Filter, Guid, IconSet, Markup, Range,
+    SortCondition, SortConditionKind, SortRule, SortRules, View, Views,
+};
 use super::{
     CORE, FRAGMENT_FILTER_ID, FRAGMENT_VIEW_ID, MAX_COLUMNS, MAX_EXTENSIONS, MAX_FILTERS,
     MAX_FRAGMENT_DEPTH, MAX_FRAGMENT_NODES, MAX_MARKUP_BYTES, MAX_NAMESPACE_DECLARATIONS,
@@ -511,60 +514,60 @@ impl Parser {
         match (self.parent(), nsv, local.as_ref()) {
             (Ctx::Outside, true, b"namedSheetViews") => {
                 self.begin_root(e, d)?;
-                self.stack.push(Ctx::Root)
+                self.stack.push(Ctx::Root);
             },
             (Ctx::Root, true, b"namedSheetView") => {
                 self.begin_view(e, d)?;
-                self.stack.push(Ctx::View)
+                self.stack.push(Ctx::View);
             },
             (Ctx::View, true, b"nsvFilter") => {
                 self.begin_filter(e, d)?;
-                self.stack.push(Ctx::Filter)
+                self.stack.push(Ctx::Filter);
             },
             (Ctx::Filter, true, b"columnFilter") => {
                 self.begin_column(e, d)?;
-                self.stack.push(Ctx::Column)
+                self.stack.push(Ctx::Column);
             },
             (Ctx::Filter, true, b"sortRules") => {
                 self.begin_sort_rules(e, d)?;
-                self.stack.push(Ctx::SortRules)
+                self.stack.push(Ctx::SortRules);
             },
             (Ctx::SortRules, true, b"sortRule") => {
                 self.begin_sort_rule(e, d)?;
-                self.stack.push(Ctx::SortRule)
+                self.stack.push(Ctx::SortRule);
             },
             (Ctx::SortRule, true, b"sortCondition") => {
                 self.add_condition(e, d, SortConditionKind::Standard)?;
-                self.stack.push(Ctx::Leaf)
+                self.stack.push(Ctx::Leaf);
             },
             (Ctx::SortRule, true, b"richSortCondition") => {
                 self.add_condition(e, d, SortConditionKind::RichValue)?;
-                self.stack.push(Ctx::Leaf)
+                self.stack.push(Ctx::Leaf);
             },
             (parent, true, b"extLst") => {
-                let owner = self.ext_owner(parent)?;
+                let owner = Self::ext_owner(parent)?;
                 self.begin_ext(owner)?;
-                self.stack.push(Ctx::ExtList(owner))
+                self.stack.push(Ctx::ExtList(owner));
             },
             (Ctx::Column, true, b"dxf") => {
                 self.prepare_dxf(DxfOwner::Column)?;
 
                 self.begin_capture(Payload::Dxf(DxfOwner::Column), e)?;
-                self.stack.push(Ctx::Captured)
+                self.stack.push(Ctx::Captured);
             },
             (Ctx::SortRule, true, b"dxf") => {
                 self.prepare_dxf(DxfOwner::SortRule)?;
                 self.begin_capture(Payload::Dxf(DxfOwner::SortRule), e)?;
-                self.stack.push(Ctx::Captured)
+                self.stack.push(Ctx::Captured);
             },
             (Ctx::Column, true, b"filter") => {
                 self.begin_capture(Payload::Filter, e)?;
-                self.stack.push(Ctx::Captured)
+                self.stack.push(Ctx::Captured);
             },
             (Ctx::ExtList(owner), _, b"ext") if core(ns) => {
                 let x = parse_extension(e, d)?;
                 self.begin_capture(Payload::Extension(owner, x), e)?;
-                self.stack.push(Ctx::Captured)
+                self.stack.push(Ctx::Captured);
             },
             (Ctx::Leaf, _, _) => {
                 return Err(invalid(
@@ -597,46 +600,46 @@ impl Parser {
             },
             (Ctx::Root, true, b"namedSheetView") => {
                 self.begin_view(e, d)?;
-                self.finish_view()?
+                self.finish_view()?;
             },
             (Ctx::View, true, b"nsvFilter") => {
                 self.begin_filter(e, d)?;
-                self.finish_filter()?
+                self.finish_filter()?;
             },
             (Ctx::Filter, true, b"columnFilter") => {
                 self.begin_column(e, d)?;
-                self.finish_column()?
+                self.finish_column()?;
             },
             (Ctx::Filter, true, b"sortRules") => {
                 self.begin_sort_rules(e, d)?;
-                self.finish_sort_rules()?
+                self.finish_sort_rules()?;
             },
             (Ctx::SortRules, true, b"sortRule") => {
                 self.begin_sort_rule(e, d)?;
-                self.finish_sort_rule()?
+                self.finish_sort_rule()?;
             },
             (Ctx::SortRule, true, b"sortCondition") => {
-                self.add_condition(e, d, SortConditionKind::Standard)?
+                self.add_condition(e, d, SortConditionKind::Standard)?;
             },
             (Ctx::SortRule, true, b"richSortCondition") => {
-                self.add_condition(e, d, SortConditionKind::RichValue)?
+                self.add_condition(e, d, SortConditionKind::RichValue)?;
             },
             (parent, true, b"extLst") => {
-                let owner = self.ext_owner(parent)?;
-                self.begin_ext(owner)?
+                let owner = Self::ext_owner(parent)?;
+                self.begin_ext(owner)?;
             },
             (Ctx::Column, true, b"dxf") => {
                 self.prepare_dxf(DxfOwner::Column)?;
-                self.empty_markup(Payload::Dxf(DxfOwner::Column), e)?
+                self.empty_markup(Payload::Dxf(DxfOwner::Column), e)?;
             },
             (Ctx::SortRule, true, b"dxf") => {
                 self.prepare_dxf(DxfOwner::SortRule)?;
-                self.empty_markup(Payload::Dxf(DxfOwner::SortRule), e)?
+                self.empty_markup(Payload::Dxf(DxfOwner::SortRule), e)?;
             },
             (Ctx::Column, true, b"filter") => self.empty_markup(Payload::Filter, e)?,
             (Ctx::ExtList(owner), _, b"ext") if core(ns) => {
                 let x = parse_extension(e, d)?;
-                self.empty_markup(Payload::Extension(owner, x), e)?
+                self.empty_markup(Payload::Extension(owner, x), e)?;
             },
             (Ctx::Leaf, _, _) => {
                 return Err(invalid(
@@ -906,7 +909,7 @@ impl Parser {
         rule.value.condition = Some(parse_condition(e, d, kind)?);
         Ok(())
     }
-    fn ext_owner(&self, parent: Ctx) -> Result<ExtOwner> {
+    fn ext_owner(parent: Ctx) -> Result<ExtOwner> {
         match parent {
             Ctx::Root => Ok(ExtOwner::Root),
             Ctx::View => Ok(ExtOwner::View),
@@ -922,35 +925,35 @@ impl Parser {
                 if self.root_phase > 0 {
                     return Err(invalid("duplicate root extLst"));
                 }
-                self.root_phase = 1
+                self.root_phase = 1;
             },
             ExtOwner::View => {
                 let v = self.view.as_mut().unwrap();
                 if v.phase > 0 {
                     return Err(invalid("duplicate view extLst"));
                 }
-                v.phase = 1
+                v.phase = 1;
             },
             ExtOwner::Filter => {
                 let v = self.filter.as_mut().unwrap();
                 if v.phase > 1 {
                     return Err(invalid("duplicate filter extLst"));
                 }
-                v.phase = 2
+                v.phase = 2;
             },
             ExtOwner::Column => {
                 let v = self.column.as_mut().unwrap();
                 if v.phase > 1 {
                     return Err(invalid("duplicate columnFilter extLst"));
                 }
-                v.phase = 2
+                v.phase = 2;
             },
             ExtOwner::SortRules => {
                 let v = self.sort_rules.as_mut().unwrap();
                 if v.phase > 0 {
                     return Err(invalid("duplicate sortRules extLst"));
                 }
-                v.phase = 1
+                v.phase = 1;
             },
         }
         Ok(())
@@ -962,14 +965,14 @@ impl Parser {
                 if v.phase > 0 || v.value.differential_format.is_some() {
                     return Err(invalid("duplicate or misplaced columnFilter dxf"));
                 }
-                v.value.differential_format = Some(Markup(Vec::new()))
+                v.value.differential_format = Some(Markup(Vec::new()));
             },
             DxfOwner::SortRule => {
                 let v = self.sort_rule.as_mut().unwrap();
                 if v.phase > 0 || v.value.differential_format.is_some() {
                     return Err(invalid("duplicate or misplaced sortRule dxf"));
                 }
-                v.value.differential_format = Some(Markup(Vec::new()))
+                v.value.differential_format = Some(Markup(Vec::new()));
             },
         }
         Ok(())
@@ -1008,7 +1011,7 @@ impl Parser {
         if capture.depth == 0 {
             let capture = self.capture.take().unwrap();
             self.stack.pop();
-            self.attach(capture.payload, capture.writer.into_inner())?
+            self.attach(capture.payload, capture.writer.into_inner())?;
         }
         Ok(())
     }
@@ -1041,13 +1044,13 @@ impl Parser {
                 if column.value.filters.len() >= MAX_FILTERS {
                     return Err(invalid("too many filter payloads"));
                 }
-                column.value.filters.push(parsed)
+                column.value.filters.push(parsed);
             },
             Payload::Dxf(DxfOwner::Column) => {
-                self.column.as_mut().unwrap().value.differential_format = Some(Markup(markup))
+                self.column.as_mut().unwrap().value.differential_format = Some(Markup(markup));
             },
             Payload::Dxf(DxfOwner::SortRule) => {
-                self.sort_rule.as_mut().unwrap().value.differential_format = Some(Markup(markup))
+                self.sort_rule.as_mut().unwrap().value.differential_format = Some(Markup(markup));
             },
             Payload::Extension(owner, mut x) => {
                 x.markup = Markup(markup);
@@ -1057,7 +1060,7 @@ impl Parser {
                     ExtOwner::Filter => self.filter.as_mut().unwrap().value.extensions.push(x),
                     ExtOwner::Column => self.column.as_mut().unwrap().value.extensions.push(x),
                     ExtOwner::SortRules => {
-                        self.sort_rules.as_mut().unwrap().value.extensions.push(x)
+                        self.sort_rules.as_mut().unwrap().value.extensions.push(x);
                     },
                 }
             },
@@ -1102,7 +1105,7 @@ fn parse_filter_payload(markup: &[u8]) -> Result<Column> {
                 seen = true;
                 depth = 1;
                 let c = adapt_filter_root(&e, decoder)?;
-                writer.write_event(Event::Start(c)).map_err(xml_error)?
+                writer.write_event(Event::Start(c)).map_err(xml_error)?;
             },
             Event::Empty(e) if !seen => {
                 seen = true;
@@ -1112,7 +1115,7 @@ fn parse_filter_payload(markup: &[u8]) -> Result<Column> {
             },
             Event::Start(e) => {
                 depth += 1;
-                writer.write_event(Event::Start(e)).map_err(xml_error)?
+                writer.write_event(Event::Start(e)).map_err(xml_error)?;
             },
             Event::Empty(e) => writer.write_event(Event::Empty(e)).map_err(xml_error)?,
             Event::End(e) => {
@@ -1122,9 +1125,8 @@ fn parse_filter_payload(markup: &[u8]) -> Result<Column> {
                         .write_event(Event::End(BytesEnd::new("x:filterColumn")))
                         .map_err(xml_error)?;
                     break;
-                } else {
-                    writer.write_event(Event::End(e)).map_err(xml_error)?
                 }
+                writer.write_event(Event::End(e)).map_err(xml_error)?;
             },
             Event::Eof => break,
             other => writer.write_event(other).map_err(xml_error)?,
@@ -1152,7 +1154,7 @@ fn adapt_filter_root(e: &BytesStart<'_>, d: Decoder) -> Result<BytesStart<'stati
     let mut c = BytesStart::new("x:filterColumn");
     for name in [b"colId".as_slice(), b"hiddenButton", b"showButton"] {
         if let Some(value) = attr(e, name, d)? {
-            c.push_attribute((std::str::from_utf8(name).unwrap(), Cow::Owned(value)))
+            c.push_attribute((std::str::from_utf8(name).unwrap(), Cow::Owned(value)));
         }
     }
     Ok(c)
@@ -1507,7 +1509,7 @@ fn attr(e: &BytesStart<'_>, name: &[u8], d: Decoder) -> Result<Option<String>> {
             a.decoded_and_normalized_value(XmlVersion::Explicit1_0, d)
                 .map_err(xml_error)?
                 .into_owned(),
-        )
+        );
     }
     Ok(value)
 }

@@ -1,6 +1,6 @@
 /// File Information Block (FIB) parser for DOC files.
 ///
-/// The FIB is located at the beginning of the WordDocument stream and contains
+/// The FIB is located at the beginning of the `WordDocument` stream and contains
 /// critical information about the document structure, including:
 /// - File format version
 /// - Which table stream to use (0Table or 1Table)
@@ -29,7 +29,7 @@ pub const WORD_97_NFIB: u16 = 0x00C1;
 /// File Information Block.
 ///
 /// The FIB is the primary metadata structure in a DOC file.
-/// It's located at offset 0 in the WordDocument stream.
+/// It's located at offset 0 in the `WordDocument` stream.
 ///
 /// # Structure (simplified)
 ///
@@ -54,11 +54,11 @@ pub struct FileInformationBlock {
 }
 
 impl FileInformationBlock {
-    /// Parse a FIB from the WordDocument stream.
+    /// Parse a FIB from the `WordDocument` stream.
     ///
     /// # Arguments
     ///
-    /// * `word_document` - The WordDocument stream data
+    /// * `word_document` - The `WordDocument` stream data
     ///
     /// # Returns
     ///
@@ -67,7 +67,7 @@ impl FileInformationBlock {
         Self::parse_at(word_document, 0)
     }
 
-    /// Parse a FIB at an explicit byte offset in the WordDocument stream.
+    /// Parse a FIB at an explicit byte offset in the `WordDocument` stream.
     ///
     /// Secondary glossary FIBs are addressed by `FibBase.pnNext * 512`.
     /// The returned object owns only the suffix beginning at the requested FIB,
@@ -85,28 +85,17 @@ impl FileInformationBlock {
         }
 
         // Read the base FIB fields (little-endian)
-        let magic = U16::<LE>::read_from_bytes(&data[0..2])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        let nfib = U16::<LE>::read_from_bytes(&data[2..4])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        let lid = U16::<LE>::read_from_bytes(&data[6..8])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        let flags = U16::<LE>::read_from_bytes(&data[10..12])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        let l_key = U32::<LE>::read_from_bytes(&data[14..18])
-            .map(|v| v.get())
-            .unwrap_or(0);
+        let magic = U16::<LE>::read_from_bytes(&data[0..2]).map_or(0, U16::get);
+        let nfib = U16::<LE>::read_from_bytes(&data[2..4]).map_or(0, U16::get);
+        let lid = U16::<LE>::read_from_bytes(&data[6..8]).map_or(0, U16::get);
+        let flags = U16::<LE>::read_from_bytes(&data[10..12]).map_or(0, U16::get);
+        let l_key = U32::<LE>::read_from_bytes(&data[14..18]).map_or(0, U32::get);
 
         // Validate magic number
         if magic != 0xA5EC && magic != 0xA5DC {
             // 0xA5DC for Word 6.0/95, 0xA5EC for Word 97+
             return Err(PackageError::InvalidFormat(format!(
-                "Invalid FIB magic number: 0x{:04X}",
-                magic
+                "Invalid FIB magic number: 0x{magic:04X}"
             )));
         }
 
@@ -139,11 +128,13 @@ impl FileInformationBlock {
     /// Note: All Word versions use 2-byte SPRM opcodes in the binary format,
     /// regardless of the file version. This is consistent with Apache POI's implementation.
     #[inline]
+    #[must_use]
     pub fn version(&self) -> u16 {
         self.nfib
     }
 
     /// Get a human-readable description of the Word version.
+    #[must_use]
     pub fn version_name(&self) -> &'static str {
         match self.nfib {
             0x0021 => "Word 1.0",
@@ -167,6 +158,7 @@ impl FileInformationBlock {
     ///
     /// Returns `true` for "1Table", `false` for "0Table".
     #[inline]
+    #[must_use]
     pub fn which_table_stream(&self) -> bool {
         self.which_table_stream
     }
@@ -177,6 +169,7 @@ impl FileInformationBlock {
     ///
     /// Note: This library currently does not support encrypted documents.
     #[inline]
+    #[must_use]
     pub fn is_encrypted(&self) -> bool {
         // fEncrypted flag is bit 8 at offset 0x0A
         (self.flags & 0x0100) != 0
@@ -184,6 +177,7 @@ impl FileInformationBlock {
 
     /// Whether this FIB describes an AutoText-only glossary document.
     #[inline]
+    #[must_use]
     pub fn is_glossary_document(&self) -> bool {
         // fGlsy is bit 1 of the FibBase flags field.
         (self.flags & 0x0002) != 0
@@ -191,6 +185,7 @@ impl FileInformationBlock {
 
     /// Whether this FIB describes a document template.
     #[inline]
+    #[must_use]
     pub fn is_template(&self) -> bool {
         // fDot is bit 0 of the FibBase flags field.
         (self.flags & 0x0001) != 0
@@ -198,19 +193,19 @@ impl FileInformationBlock {
 
     /// Page number of the attached glossary FIB, or zero when none is attached.
     #[inline]
+    #[must_use]
     pub fn next_fib_page(&self) -> u16 {
-        U16::<LE>::read_from_bytes(&self.data[8..10])
-            .map(|value| value.get())
-            .unwrap_or(0)
+        U16::<LE>::read_from_bytes(&self.data[8..10]).map_or(0, U16::get)
     }
 
     /// `FibRgLw97.cbMac`, shared by a template and its attached glossary FIB.
     #[inline]
+    #[must_use]
     pub fn word_document_size(&self) -> Option<u32> {
         self.data
             .get(64..68)
             .and_then(|bytes| U32::<LE>::read_from_bytes(bytes).ok())
-            .map(|value| value.get())
+            .map(U32::get)
     }
 
     /// Check whether the encrypted document uses legacy XOR obfuscation.
@@ -234,6 +229,7 @@ impl FileInformationBlock {
 
     /// Get the language ID.
     #[inline]
+    #[must_use]
     pub fn language_id(&self) -> u16 {
         self.lid
     }
@@ -245,12 +241,13 @@ impl FileInformationBlock {
     ///
     /// # Arguments
     ///
-    /// * `index` - Index of the field in the FibRgFcLcb array
+    /// * `index` - Index of the field in the `FibRgFcLcb` array
     ///
     /// # Returns
     ///
     /// A tuple of (offset, length) in bytes, or `None` if the requested
     /// entry is outside the FIB-declared array or that array is truncated.
+    #[must_use]
     pub fn get_table_pointer(&self, index: usize) -> Option<(u32, u32)> {
         let (base_offset, count) = self.table_pointer_layout()?;
         if index >= count {
@@ -261,12 +258,8 @@ impl FileInformationBlock {
             .data
             .get(entry_offset..entry_offset.checked_add(TABLE_POINTER_SIZE)?)?;
 
-        let offset = U32::<LE>::read_from_bytes(&entry[..4])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        let length = U32::<LE>::read_from_bytes(&entry[4..])
-            .map(|v| v.get())
-            .unwrap_or(0);
+        let offset = U32::<LE>::read_from_bytes(&entry[..4]).map_or(0, U32::get);
+        let length = U32::<LE>::read_from_bytes(&entry[4..]).map_or(0, U32::get);
 
         Some((offset, length))
     }
@@ -276,6 +269,7 @@ impl FileInformationBlock {
     /// Returns `None` when the declaration itself or its complete array is
     /// truncated. Consumers must not infer additional pairs from subsequent
     /// bytes in the `WordDocument` stream.
+    #[must_use]
     pub fn table_pointer_count(&self) -> Option<usize> {
         self.table_pointer_layout().map(|(_, count)| count)
     }
@@ -287,11 +281,7 @@ impl FileInformationBlock {
             let count_bytes = self
                 .data
                 .get(TABLE_POINTER_COUNT_OFFSET..TABLE_POINTERS_OFFSET)?;
-            let count = usize::from(
-                U16::<LE>::read_from_bytes(count_bytes)
-                    .map(|value| value.get())
-                    .unwrap_or(0),
-            );
+            let count = usize::from(U16::<LE>::read_from_bytes(count_bytes).map_or(0, U16::get));
             (TABLE_POINTERS_OFFSET, count)
         };
         let byte_len = count.checked_mul(TABLE_POINTER_SIZE)?;
@@ -307,15 +297,16 @@ impl FileInformationBlock {
 
     /// Get access to the raw FIB data.
     #[inline]
+    #[must_use]
     pub fn raw_data(&self) -> &[u8] {
         &self.data
     }
 
     /// Get character count for a subdocument.
     ///
-    /// Character counts are stored in the FibRgLw97 structure.
-    /// FibRgLw97 starts at offset 64 (after FibBase=32, csw=2, FibRgW97=28, cslw=2).
-    /// Within FibRgLw97, character counts start at offset 0xC (after cbMac, reserved1, reserved2).
+    /// Character counts are stored in the `FibRgLw97` structure.
+    /// `FibRgLw97` starts at offset 64 (after FibBase=32, csw=2, FibRgW97=28, cslw=2).
+    /// Within `FibRgLw97`, character counts start at offset 0xC (after cbMac, reserved1, reserved2).
     /// Each count is a 4-byte little-endian integer.
     ///
     /// # Arguments
@@ -339,12 +330,11 @@ impl FileInformationBlock {
         if offset + 4 > self.data.len() {
             return 0;
         }
-        U32::<LE>::read_from_bytes(&self.data[offset..offset + 4])
-            .map(|v| v.get())
-            .unwrap_or(0)
+        U32::<LE>::read_from_bytes(&self.data[offset..offset + 4]).map_or(0, U32::get)
     }
 
     /// End CP of the concatenated set of all document parts.
+    #[must_use]
     pub fn get_document_parts_end(&self) -> Option<u32> {
         (0..8).try_fold(0u32, |total, index| {
             total.checked_add(self.get_character_count(index))
@@ -353,7 +343,8 @@ impl FileInformationBlock {
 
     /// Get the main document character position range.
     ///
-    /// Returns (start_cp, end_cp) for the main document text.
+    /// Returns (`start_cp`, `end_cp`) for the main document text.
+    #[must_use]
     pub fn get_main_doc_range(&self) -> (u32, u32) {
         let ccp_text = self.get_character_count(0);
         (0, ccp_text)
@@ -361,7 +352,8 @@ impl FileInformationBlock {
 
     /// Get the footnote subdocument character position range.
     ///
-    /// Returns Some((start_cp, end_cp)) if footnotes exist, None otherwise.
+    /// Returns `Some((start_cp`, `end_cp`)) if footnotes exist, None otherwise.
+    #[must_use]
     pub fn get_footnote_range(&self) -> Option<(u32, u32)> {
         let base = self.get_character_count(0);
         let ccp_ftn = self.get_character_count(1);
@@ -374,7 +366,8 @@ impl FileInformationBlock {
 
     /// Get the header/footer subdocument character position range.
     ///
-    /// Returns Some((start_cp, end_cp)) if headers/footers exist, None otherwise.
+    /// Returns `Some((start_cp`, `end_cp`)) if headers/footers exist, None otherwise.
+    #[must_use]
     pub fn get_header_range(&self) -> Option<(u32, u32)> {
         let base = self.get_character_count(0) + self.get_character_count(1);
         let ccp_hdd = self.get_character_count(2);
@@ -387,7 +380,8 @@ impl FileInformationBlock {
 
     /// Get the annotations/comments subdocument character position range.
     ///
-    /// Returns Some((start_cp, end_cp)) if comments exist, None otherwise.
+    /// Returns `Some((start_cp`, `end_cp`)) if comments exist, None otherwise.
+    #[must_use]
     pub fn get_comment_range(&self) -> Option<(u32, u32)> {
         let base = self.get_character_count(0)
             + self.get_character_count(1)
@@ -403,7 +397,8 @@ impl FileInformationBlock {
 
     /// Get the endnotes subdocument character position range.
     ///
-    /// Returns Some((start_cp, end_cp)) if endnotes exist, None otherwise.
+    /// Returns `Some((start_cp`, `end_cp`)) if endnotes exist, None otherwise.
+    #[must_use]
     pub fn get_endnote_range(&self) -> Option<(u32, u32)> {
         let base = self.get_character_count(0)
             + self.get_character_count(1)
@@ -420,7 +415,8 @@ impl FileInformationBlock {
 
     /// Get the text box subdocument character position range.
     ///
-    /// Returns Some((start_cp, end_cp)) if text boxes exist, None otherwise.
+    /// Returns `Some((start_cp`, `end_cp`)) if text boxes exist, None otherwise.
+    #[must_use]
     pub fn get_textbox_range(&self) -> Option<(u32, u32)> {
         let base = self.get_character_count(0)
             + self.get_character_count(1)
@@ -438,7 +434,8 @@ impl FileInformationBlock {
 
     /// Get the header text box subdocument character position range.
     ///
-    /// Returns Some((start_cp, end_cp)) if header text boxes exist, None otherwise.
+    /// Returns `Some((start_cp`, `end_cp`)) if header text boxes exist, None otherwise.
+    #[must_use]
     pub fn get_header_textbox_range(&self) -> Option<(u32, u32)> {
         let base = self.get_character_count(0)
             + self.get_character_count(1)
@@ -457,7 +454,8 @@ impl FileInformationBlock {
 
     /// Get all subdocument ranges that exist in this document.
     ///
-    /// Returns a vector of (name, start_cp, end_cp) tuples for all non-empty subdocuments.
+    /// Returns a vector of (name, `start_cp`, `end_cp`) tuples for all non-empty subdocuments.
+    #[must_use]
     pub fn get_all_subdoc_ranges(&self) -> Vec<(&'static str, u32, u32)> {
         let mut ranges = Vec::new();
 

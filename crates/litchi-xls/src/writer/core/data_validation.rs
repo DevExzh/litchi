@@ -95,16 +95,19 @@ pub struct DataValidationRange {
 
 impl DataValidationRange {
     /// Create a checked, inclusive BIFF8 cell range from zero-based indices.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(first_row: u32, last_row: u32, first_col: u16, last_col: u16) -> Result<Self> {
         let invalid = || {
             Error::InvalidCellReference(format!(
                 "range ({first_row}, {first_col})..=({last_row}, {last_col}) is outside the BIFF8 grid"
             ))
         };
-        let first_row = u16::try_from(first_row).map_err(|_| invalid())?;
-        let last_row = u16::try_from(last_row).map_err(|_| invalid())?;
-        let first_col = u8::try_from(first_col).map_err(|_| invalid())?;
-        let last_col = u8::try_from(last_col).map_err(|_| invalid())?;
+        let first_row = u16::try_from(first_row).map_err(|_error| invalid())?;
+        let last_row = u16::try_from(last_row).map_err(|_error| invalid())?;
+        let first_col = u8::try_from(first_col).map_err(|_error| invalid())?;
+        let last_col = u8::try_from(last_col).map_err(|_error| invalid())?;
         if first_row > last_row || first_col > last_col {
             return Err(invalid());
         }
@@ -116,18 +119,22 @@ impl DataValidationRange {
         })
     }
 
+    #[must_use]
     pub const fn first_row(self) -> u16 {
         self.first_row
     }
 
+    #[must_use]
     pub const fn last_row(self) -> u16 {
         self.last_row
     }
 
+    #[must_use]
     pub const fn first_col(self) -> u8 {
         self.first_col
     }
 
+    #[must_use]
     pub const fn last_col(self) -> u8 {
         self.last_col
     }
@@ -257,11 +264,11 @@ impl DataValidationType {
                 let op = operator.to_biff_code();
 
                 // Encode numeric bounds as simple PtgNum tokens.
-                let f1_tokens = vec![Ptg::Num(*value1 as f64)];
+                let f1_tokens = vec![Ptg::Num(crate::utils::approximate_i64_as_f64(*value1))];
                 let formula1 = Some(encode_ptg_tokens(&f1_tokens));
 
                 let formula2 = if let Some(v2) = value2 {
-                    let f2_tokens = vec![Ptg::Num(*v2 as f64)];
+                    let f2_tokens = vec![Ptg::Num(crate::utils::approximate_i64_as_f64(*v2))];
                     Some(encode_ptg_tokens(&f2_tokens))
                 } else {
                     // Between / NotBetween require a second bound.
@@ -351,8 +358,8 @@ impl DataValidationType {
             } => numeric_payload(
                 6,
                 *operator,
-                *value1 as f64,
-                value2.map(|value| value as f64),
+                crate::utils::approximate_i64_as_f64(*value1),
+                value2.map(crate::utils::approximate_i64_as_f64),
             ),
             DataValidationType::ListFormula { formula_tokens } => raw_payload(
                 3,
@@ -467,6 +474,7 @@ pub struct DataValidation {
 
 impl DataValidation {
     /// Create a validation rule with messages and alerts disabled by default.
+    #[must_use]
     pub fn new(range: DataValidationRange, validation_type: DataValidationType) -> Self {
         Self {
             range,

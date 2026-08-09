@@ -1,4 +1,4 @@
-//! Bounded SpreadsheetML table XML codec.
+//! Bounded `SpreadsheetML` table XML codec.
 
 use std::collections::HashSet;
 

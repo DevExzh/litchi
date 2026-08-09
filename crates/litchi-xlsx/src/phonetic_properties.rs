@@ -69,12 +69,15 @@ pub struct PhoneticProperties {
 
 impl PhoneticProperties {
     /// Zero-based font index. Out-of-range indices fall back to the Normal-style font.
+    #[must_use]
     pub fn font_id(&self) -> u32 {
         self.font_id
     }
+    #[must_use]
     pub fn phonetic_type(&self) -> PhoneticType {
         self.phonetic_type
     }
+    #[must_use]
     pub fn alignment(&self) -> PhoneticAlignment {
         self.alignment
     }

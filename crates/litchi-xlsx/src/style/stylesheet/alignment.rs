@@ -1,4 +1,4 @@
-//! Typed SpreadsheetML cell alignment values.
+//! Typed `SpreadsheetML` cell alignment values.
 
 use std::error::Error;
 use std::fmt::{Display, Formatter};
@@ -7,7 +7,7 @@ use std::str::FromStr;
 /// Horizontal placement of cell content.
 ///
 /// This is the complete `ST_HorizontalAlignment` value set from
-/// SpreadsheetML. Keeping the wire tokens behind an enum prevents authored
+/// `SpreadsheetML`. Keeping the wire tokens behind an enum prevents authored
 /// workbooks from containing misspelled or unsupported values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
@@ -23,7 +23,7 @@ pub enum Horizontal {
 }
 
 impl Horizontal {
-    /// Return the SpreadsheetML token.
+    /// Return the `SpreadsheetML` token.
     #[inline]
     #[must_use]
     pub const fn as_str(self) -> &'static str {
@@ -71,7 +71,7 @@ impl FromStr for Horizontal {
 /// Vertical placement of cell content.
 ///
 /// This is the complete `ST_VerticalAlignment` value set from
-/// SpreadsheetML.
+/// `SpreadsheetML`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum Vertical {
@@ -83,7 +83,7 @@ pub enum Vertical {
 }
 
 impl Vertical {
-    /// Return the SpreadsheetML token.
+    /// Return the `SpreadsheetML` token.
     #[inline]
     #[must_use]
     pub const fn as_str(self) -> &'static str {
@@ -134,7 +134,7 @@ impl Display for ParseError {
 
 impl Error for ParseError {}
 
-/// A SpreadsheetML text rotation.
+/// A `SpreadsheetML` text rotation.
 ///
 /// Values `0..=180` are rotation degrees, `254` is context-dependent rotation,
 /// and `255` means stacked vertical text. Context-dependent rotation is an
@@ -172,7 +172,7 @@ impl Rotation {
         Self(Self::STACKED)
     }
 
-    /// Return the SpreadsheetML numeric value.
+    /// Return the `SpreadsheetML` numeric value.
     #[inline]
     #[must_use]
     pub const fn get(self) -> u8 {
@@ -207,7 +207,7 @@ impl TryFrom<u32> for Rotation {
     }
 }
 
-/// Error returned when a number is not a SpreadsheetML text rotation.
+/// Error returned when a number is not a `SpreadsheetML` text rotation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InvalidRotation(u32);
 
@@ -234,7 +234,7 @@ impl Error for InvalidRotation {}
 
 /// Direction used to lay out cell text.
 ///
-/// SpreadsheetML's schema exposes an unsigned integer, while Microsoft Excel
+/// `SpreadsheetML`'s schema exposes an unsigned integer, while Microsoft Excel
 /// restricts interoperable values to these three states.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
@@ -245,7 +245,7 @@ pub enum Reading {
 }
 
 impl Reading {
-    /// Return the SpreadsheetML numeric value.
+    /// Return the `SpreadsheetML` numeric value.
     #[inline]
     #[must_use]
     pub const fn get(self) -> u8 {
@@ -289,7 +289,7 @@ impl Error for InvalidReading {}
 
 /// Excel-compatible cell indentation in the inclusive `0..=255` range.
 ///
-/// SpreadsheetML uses an unsigned integer on the wire, but Microsoft Excel's
+/// `SpreadsheetML` uses an unsigned integer on the wire, but Microsoft Excel's
 /// documented interoperability limit is 255. Storing a `u8` makes that bound
 /// a type invariant without runtime overhead.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -304,7 +304,7 @@ impl Indent {
         Self(value)
     }
 
-    /// Return the SpreadsheetML numeric value.
+    /// Return the `SpreadsheetML` numeric value.
     #[inline]
     #[must_use]
     pub const fn get(self) -> u8 {

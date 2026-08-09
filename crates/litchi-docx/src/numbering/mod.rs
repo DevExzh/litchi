@@ -1,4 +1,8 @@
-//! Layered WordprocessingML numbering model and XML codec.
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
+//! Layered `WordprocessingML` numbering model and XML codec.
 
 mod codec;
 mod model;

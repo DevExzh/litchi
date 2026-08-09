@@ -20,7 +20,7 @@ pub(super) struct RecordSpan {
 }
 
 impl RecordSpan {
-    pub(super) fn payload<'a>(self, bytes: &'a [u8]) -> &'a [u8] {
+    pub(super) fn payload(self, bytes: &[u8]) -> &[u8] {
         &bytes[self.payload_start..self.payload_end]
     }
 }
@@ -112,7 +112,7 @@ pub(super) fn replace_range(
     let mut output = Vec::new();
     output
         .try_reserve_exact(output_len)
-        .map_err(|_| Error::Allocation("allocating RealTimeData replacement"))?;
+        .map_err(|_error| Error::Allocation("allocating RealTimeData replacement"))?;
     output.extend_from_slice(&bytes[..start]);
     output.extend_from_slice(replacement);
     output.extend_from_slice(&bytes[end..]);
@@ -149,7 +149,7 @@ pub(super) fn frame_logical_payload(
     let mut output = Vec::new();
     output
         .try_reserve_exact(framed_len)
-        .map_err(|_| Error::Allocation("allocating RealTimeData record framing"))?;
+        .map_err(|_error| Error::Allocation("allocating RealTimeData record framing"))?;
 
     for (index, chunk) in payload.chunks(MAX_RECORD_PAYLOAD).enumerate() {
         let record_type = if index == 0 {
@@ -157,7 +157,7 @@ pub(super) fn frame_logical_payload(
         } else {
             continue_frt_record_type
         };
-        let payload_len = u16::try_from(chunk.len()).map_err(|_| {
+        let payload_len = u16::try_from(chunk.len()).map_err(|_error| {
             Error::UnsafeEdit("RealTimeData record payload length exceeds u16".to_string())
         })?;
         output.extend_from_slice(&record_type.to_le_bytes());

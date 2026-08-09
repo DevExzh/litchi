@@ -1,4 +1,8 @@
-//! Contextual package-bound facade for the main WordprocessingML document.
+#![expect(
+    clippy::module_inception,
+    reason = "the module path preserves the established public facade"
+)]
+//! Contextual package-bound facade for the main `WordprocessingML` document.
 //!
 //! The owner is split by responsibility while keeping every method on the
 //! public [`super::Document`] model: semantic queries live in `model`, OPC

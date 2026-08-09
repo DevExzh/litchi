@@ -24,11 +24,15 @@ impl Transaction {
     }
 
     /// Returns the current transaction snapshot.
+    #[must_use]
     pub const fn snapshot(&self) -> Snapshot {
         self.working
     }
 
     /// Stages a replacement rectangle without changing record topology.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_rect(&mut self, rect: Rect) -> Result<&mut Self> {
         validation::ensure(rect)?;
         self.working = Snapshot::from_wire(rect);
@@ -36,6 +40,9 @@ impl Transaction {
     }
 
     /// Validates and publishes the source-checked change.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn commit(self) -> Result<Commit> {
         validation::ensure_pair(self.base.rect(), self.working.rect())?;
         let change = (self.base != self.working).then(|| Change::new(self.base, self.working));

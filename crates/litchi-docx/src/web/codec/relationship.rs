@@ -1,3 +1,7 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Relationship-aware validation and XML relationship attribute decoding.
 
 use super::super::model::{Child, Conformance, Frameset, Settings};

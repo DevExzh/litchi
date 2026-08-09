@@ -383,10 +383,10 @@ pub fn parse_dictionary(
     }
 }
 
-fn parse_numeric_dictionary<'a>(
-    mut cursor: Cursor<'a>,
+fn parse_numeric_dictionary(
+    mut cursor: Cursor<'_>,
     dictionary_type: DictionaryType,
-) -> NativeResult<DictionaryFile<'a>> {
+) -> NativeResult<DictionaryFile<'_>> {
     let hash = read_hash_header(&mut cursor)?;
     if hash.algorithm != -1 || hash.bin_count != -1 {
         return Err(NativeError::new(
@@ -404,7 +404,7 @@ fn parse_numeric_dictionary<'a>(
     if !valid_size {
         return Err(NativeError::new("invalid numeric dictionary element size"));
     }
-    let values_len = bounded_product(element_count, element_size as u64, "dictionary vector")?;
+    let values_len = bounded_product(element_count, u64::from(element_size), "dictionary vector")?;
     let values = cursor.take(values_len, "dictionary values")?;
     let padding = cursor.rest();
     require_zeroes(padding, "dictionary trailing padding")?;
@@ -420,10 +420,10 @@ fn parse_numeric_dictionary<'a>(
     })
 }
 
-fn parse_string_dictionary<'a>(
-    mut cursor: Cursor<'a>,
+fn parse_string_dictionary(
+    mut cursor: Cursor<'_>,
     has_hash: bool,
-) -> NativeResult<DictionaryFile<'a>> {
+) -> NativeResult<DictionaryFile<'_>> {
     let hash = if has_hash {
         let hash = read_hash_header(&mut cursor)?;
         if !matches!(hash.algorithm, 0..=2) || hash.bin_count != -1 {
@@ -835,7 +835,10 @@ fn read_hash_statistics<'a>(cursor: &mut Cursor<'a>) -> NativeResult<HashStatist
     })
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "arguments mirror the fixed-width native XLDM record layout"
+)]
 fn validate_hash_statistics(
     statistics: &HashStatistics<'_>,
     records: u64,

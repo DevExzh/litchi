@@ -15,7 +15,7 @@ pub struct Marker {
     pub symbol: Option<MarkerStyle>,
     /// Marker size in points (2-72)
     pub size: Option<u32>,
-    /// DrawingML shape properties for the marker
+    /// `DrawingML` shape properties for the marker
     pub shape_properties: Option<ShapeProperties>,
     /// Marker extension list
     pub extension_list: Option<ExtensionList>,
@@ -24,12 +24,14 @@ pub struct Marker {
 impl Marker {
     /// Create an empty marker override.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Set marker symbol and size.
     #[inline]
+    #[must_use]
     pub fn with_symbol_and_size(mut self, symbol: MarkerStyle, size: u32) -> Self {
         self.symbol = Some(symbol);
         self.size = Some(size);
@@ -50,7 +52,7 @@ pub struct DataPoint {
     pub marker_symbol: Option<MarkerStyle>,
     /// Whether an explicit marker element is present, including an empty default marker
     pub marker_present: bool,
-    /// DrawingML shape properties for the marker
+    /// `DrawingML` shape properties for the marker
     pub marker_shape_properties: Option<ShapeProperties>,
     /// Marker extension list
     pub marker_extension_list: Option<ExtensionList>,
@@ -58,7 +60,7 @@ pub struct DataPoint {
     pub invert_if_negative: bool,
     /// Show bubble in 3D
     pub bubble_3d: Option<bool>,
-    /// DrawingML shape properties
+    /// `DrawingML` shape properties
     pub shape_properties: Option<ShapeProperties>,
     /// Picture-fill placement options
     pub picture_options: Option<PictureOptions>,
@@ -69,6 +71,7 @@ pub struct DataPoint {
 impl DataPoint {
     /// Create a new data point.
     #[inline]
+    #[must_use]
     pub fn new(index: u32) -> Self {
         Self {
             index,
@@ -88,6 +91,7 @@ impl DataPoint {
 
     /// Set explosion percentage.
     #[inline]
+    #[must_use]
     pub fn with_explosion(mut self, explosion: u32) -> Self {
         self.explosion = Some(explosion);
         self
@@ -95,6 +99,7 @@ impl DataPoint {
 
     /// Set marker properties.
     #[inline]
+    #[must_use]
     pub fn with_marker(mut self, size: u32, symbol: MarkerStyle) -> Self {
         self.marker_present = true;
         self.marker_size = Some(size);
@@ -110,9 +115,9 @@ pub struct DataLabels {
     pub labels: Vec<DataLabel>,
     /// Number format for label values
     pub number_format: Option<NumberFormat>,
-    /// DrawingML shape properties for all labels
+    /// `DrawingML` shape properties for all labels
     pub shape_properties: Option<ShapeProperties>,
-    /// DrawingML text properties for all labels
+    /// `DrawingML` text properties for all labels
     pub text_properties: Option<crate::chart::model::TextProperties>,
     /// Position of data labels
     pub position: Option<DataLabelPosition>,
@@ -143,6 +148,7 @@ pub struct DataLabels {
 impl DataLabels {
     /// Create a new data labels configuration.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             labels: Vec::new(),
@@ -166,6 +172,7 @@ impl DataLabels {
 
     /// Show values on labels.
     #[inline]
+    #[must_use]
     pub fn with_show_value(mut self, show: bool) -> Self {
         self.show_value = show;
         self
@@ -173,6 +180,7 @@ impl DataLabels {
 
     /// Set label position.
     #[inline]
+    #[must_use]
     pub fn with_position(mut self, position: DataLabelPosition) -> Self {
         self.position = Some(position);
         self
@@ -192,9 +200,9 @@ pub struct DataLabel {
     pub text: Option<TitleText>,
     /// Number format for the label value
     pub number_format: Option<NumberFormat>,
-    /// DrawingML shape properties for this label
+    /// `DrawingML` shape properties for this label
     pub shape_properties: Option<ShapeProperties>,
-    /// DrawingML text properties for this label
+    /// `DrawingML` text properties for this label
     pub text_properties: Option<crate::chart::model::TextProperties>,
     /// Position of the label
     pub position: Option<DataLabelPosition>,
@@ -219,6 +227,7 @@ pub struct DataLabel {
 impl DataLabel {
     /// Create an empty override for one point.
     #[inline]
+    #[must_use]
     pub fn new(index: u32) -> Self {
         Self {
             index,
@@ -265,7 +274,7 @@ pub struct ErrorBar {
     pub minus_values: Option<NumericData>,
     /// No end cap on error bars
     pub no_end_cap: bool,
-    /// DrawingML shape properties for the error bars
+    /// `DrawingML` shape properties for the error bars
     pub shape_properties: Option<ShapeProperties>,
     /// Error-bar extension list
     pub extension_list: Option<ExtensionList>,
@@ -313,7 +322,7 @@ pub struct Trendline {
     pub trendline_type: TrendlineType,
     /// Name of the trendline
     pub name: Option<String>,
-    /// DrawingML shape properties for the trendline
+    /// `DrawingML` shape properties for the trendline
     pub shape_properties: Option<ShapeProperties>,
     /// Polynomial order (for polynomial trendlines, 2-6)
     pub order: Option<u32>,
@@ -337,9 +346,9 @@ pub struct Trendline {
     pub label_layout: Option<Layout>,
     /// Number format for the trendline label
     pub label_number_format: Option<NumberFormat>,
-    /// DrawingML shape properties for the trendline label
+    /// `DrawingML` shape properties for the trendline label
     pub label_shape_properties: Option<ShapeProperties>,
-    /// DrawingML text properties for the trendline label
+    /// `DrawingML` text properties for the trendline label
     pub label_text_properties: Option<crate::chart::model::TextProperties>,
     /// Trendline-label extension list
     pub label_extension_list: Option<ExtensionList>,
@@ -367,6 +376,7 @@ pub enum TrendlineType {
 impl Trendline {
     /// Create a linear trendline.
     #[inline]
+    #[must_use]
     pub fn linear() -> Self {
         Self {
             trendline_type: TrendlineType::Linear,
@@ -420,7 +430,7 @@ pub struct Series {
     pub marker_symbol: Option<MarkerStyle>,
     /// Whether an explicit series marker is present, including an empty default marker
     pub marker_present: bool,
-    /// DrawingML shape properties for the series marker
+    /// `DrawingML` shape properties for the series marker
     pub marker_shape_properties: Option<ShapeProperties>,
     /// Series-marker extension list
     pub marker_extension_list: Option<ExtensionList>,
@@ -436,7 +446,7 @@ pub struct Series {
     pub error_bars: Vec<ErrorBar>,
     /// Trendlines
     pub trendlines: Vec<Trendline>,
-    /// DrawingML shape properties
+    /// `DrawingML` shape properties
     pub shape_properties: Option<ShapeProperties>,
     /// Area- and bar-series picture-fill placement options
     pub picture_options: Option<PictureOptions>,
@@ -449,6 +459,7 @@ pub struct Series {
 impl Series {
     /// Create a new series with index.
     #[inline]
+    #[must_use]
     pub fn new(index: u32) -> Self {
         Self {
             index,
@@ -488,6 +499,7 @@ impl Series {
 
     /// Set category data.
     #[inline]
+    #[must_use]
     pub fn with_categories(mut self, categories: StringData) -> Self {
         self.categories = Some(categories);
         self
@@ -495,6 +507,7 @@ impl Series {
 
     /// Set value data.
     #[inline]
+    #[must_use]
     pub fn with_values(mut self, values: NumericData) -> Self {
         self.values = Some(values);
         self
@@ -502,6 +515,7 @@ impl Series {
 
     /// Set X-Y values for scatter charts.
     #[inline]
+    #[must_use]
     pub fn with_xy_values(mut self, x_values: NumericData, y_values: NumericData) -> Self {
         self.x_values = Some(x_values);
         self.y_values = Some(y_values);
@@ -510,6 +524,7 @@ impl Series {
 
     /// Add a data point.
     #[inline]
+    #[must_use]
     pub fn add_data_point(mut self, point: DataPoint) -> Self {
         self.data_points.push(point);
         self
@@ -517,6 +532,7 @@ impl Series {
 
     /// Set data labels.
     #[inline]
+    #[must_use]
     pub fn with_data_labels(mut self, labels: DataLabels) -> Self {
         self.data_labels = Some(labels);
         self
@@ -524,6 +540,7 @@ impl Series {
 
     /// Add a trendline.
     #[inline]
+    #[must_use]
     pub fn add_trendline(mut self, trendline: Trendline) -> Self {
         self.trendlines.push(trendline);
         self

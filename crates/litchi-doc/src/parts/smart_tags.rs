@@ -236,6 +236,7 @@ impl DocumentSmartTags {
     }
 
     /// Resolve the type declaration associated with a tag.
+    #[must_use]
     pub fn tag_type(&self, tag: &DocumentSmartTag) -> Option<&Type> {
         self.store.as_ref()?.tag_type(tag.property_bag.type_id)
     }

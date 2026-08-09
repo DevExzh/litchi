@@ -28,8 +28,8 @@ animations, and embedded payloads are inert unless a row says otherwise.
 The public ODP path includes package opening, slide parsing, slide/text and
 shape authoring, package-contained image/media access, page-layout models,
 presentation settings, declarations, page metadata, custom shows, metadata,
-RDF graph editing, password opening, and source-checked slide/shape and chart
-transactions. Attached mutable presentation roots are private implementation
+RDF graph editing, password opening, and source-checked slide/shape/RDF and
+chart transactions. Attached mutable presentation roots are private implementation
 details and cannot be obtained through the public API.
 
 The Microsoft `[MS-PPTX]` Front Matter and ToC describe extensions to OOXML
@@ -54,7 +54,7 @@ the existence of a PPTX feature is never treated as ODP support.
 | Hyperlinks and external references | ✅ | ✅ | ✅ | Shape links, XLink targets, show/actuate values, page jumps, and action metadata are typed and serialized; targets are never opened or followed |
 | Forms and controls | ❌ | ❌ | ❌ | No public ODP form/control model or authoring surface is exposed; a control-shaped XML payload is not treated as typed form support |
 | Scripts, events, and macros | 🟡 | 🟡 | 🟡 | Event/action and script-binding metadata can be represented as inert values; no script, macro, or event execution occurs |
-| RDF metadata graphs | ✅ | ✅ | ✅ | Graph and triple inventory plus ordered add/replace/remove/move operations are exposed on `Presentation` |
+| RDF metadata graphs | ✅ | ✅ | ✅ | Graph and triple inventory plus ordered add/replace/remove/move operations are exposed on `Presentation`; the same CRUD can be committed atomically with slide, shape, and media edits through `edit::Transaction` |
 | ODF encryption authoring | ❌ | ✅ | ❌ | Password opening is supported, but the public ODP builder has no encrypt/password-change operation; common encryption code alone is not end-to-end write support |
 | ODF digital signatures | ❌ | ❌ | ❌ | Shared XMLDSig models do not become ODP sign/verify/add/clear APIs in the current public crate |
 | Unknown package-part preservation | 🟡 | ✅ | 🟡 | The owned package can retain unrelated resources around supported edits; preservation is not semantic understanding or guaranteed lossless mutation of every extension |

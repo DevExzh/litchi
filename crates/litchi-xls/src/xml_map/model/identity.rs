@@ -1,4 +1,4 @@
-//! Bounded XML-map identifiers and XPath values.
+//! Bounded XML-map identifiers and `XPath` values.
 
 use crate::{Error, Result};
 use std::fmt;
@@ -11,6 +11,9 @@ const MAX_XPATH: usize = 31_999;
 pub struct MapId(u32);
 
 impl MapId {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(value: u32) -> Result<Self> {
         if (1..=MAX_MAP_ID).contains(&value) {
             Ok(Self(value))
@@ -21,6 +24,7 @@ impl MapId {
         }
     }
 
+    #[must_use]
     pub const fn get(self) -> u32 {
         self.0
     }
@@ -36,6 +40,9 @@ impl fmt::Display for MapId {
 pub struct SchemaId(String);
 
 impl SchemaId {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(value: impl Into<String>) -> Result<Self> {
         Ok(Self(validate_string(
             value.into(),
@@ -45,6 +52,7 @@ impl SchemaId {
         )?))
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -54,6 +62,9 @@ impl SchemaId {
 pub struct XPath(String);
 
 impl XPath {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         if value.encode_utf16().count() > MAX_XPATH {
@@ -65,6 +76,7 @@ impl XPath {
         Ok(Self(value))
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }

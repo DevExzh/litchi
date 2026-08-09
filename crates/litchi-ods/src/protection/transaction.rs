@@ -17,6 +17,9 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parse document/sheet protection and automatic cell-protection styles.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn parse(content_xml: impl Into<String>, styles_xml: Option<&str>) -> Result<Self> {
         let source = content_xml.into();
         let styles_xml = styles_xml.map(str::to_owned);
@@ -37,26 +40,31 @@ impl Snapshot {
     }
 
     /// Document-level protection, including inert password-verifier metadata.
+    #[must_use]
     pub fn document(&self) -> &model::Document {
         &self.document
     }
 
     /// Sheet protection in source table order.
+    #[must_use]
     pub fn sheets(&self) -> &[model::Sheet] {
         &self.sheets
     }
 
     /// Lookup a protected sheet by its exact ODF table name.
+    #[must_use]
     pub fn sheet(&self, name: &str) -> Option<&model::Sheet> {
         self.sheets.iter().find(|sheet| sheet.name == name)
     }
 
     /// Automatic table-cell protection styles and inert conditional rules.
+    #[must_use]
     pub fn styles(&self) -> &model::Styles {
         &self.styles
     }
 
     /// The exact source XML captured by this snapshot.
+    #[must_use]
     pub fn source_xml(&self) -> &str {
         &self.source
     }
@@ -99,6 +107,9 @@ impl Patch {
     }
 
     /// Apply this patch only to the exact snapshot that produced it.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn apply(&self, snapshot: &Snapshot) -> Result<Commit> {
         if snapshot.source_xml() != self.source {
             return Err(litchi_core::Error::InvalidFormat(
@@ -132,11 +143,13 @@ impl Transaction {
     }
 
     /// The current immutable candidate.
+    #[must_use]
     pub fn snapshot(&self) -> &Snapshot {
         &self.draft
     }
 
     /// The source snapshot used for source checks and inverse edits.
+    #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
@@ -178,6 +191,7 @@ impl Transaction {
     }
 
     /// Whether the candidate changes any protected owner.
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.before.document != self.draft.document
             || self.before.sheets != self.draft.sheets
@@ -185,6 +199,9 @@ impl Transaction {
     }
 
     /// Validate and atomically materialize the candidate.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn commit(self) -> Result<Commit> {
         validation::validate_candidate(
             &self.before.location,
@@ -236,31 +253,37 @@ pub struct Commit {
 
 impl Commit {
     /// Whether the candidate changed the source.
+    #[must_use]
     pub fn changed(&self) -> bool {
         self.changed
     }
 
     /// The resulting immutable snapshot.
+    #[must_use]
     pub fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrow the reversible exact-source patch produced by this commit.
+    #[must_use]
     pub fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// The resulting `content.xml`.
+    #[must_use]
     pub fn content_xml(&self) -> &str {
         &self.snapshot.source
     }
 
     /// Consume the publication into the rebuilt snapshot.
+    #[must_use]
     pub fn into_snapshot(self) -> Snapshot {
         self.snapshot
     }
 
     /// Consume the publication into package-owned XML.
+    #[must_use]
     pub fn into_owned_xml(self) -> String {
         self.snapshot.source
     }
@@ -268,6 +291,9 @@ impl Commit {
 
 /// A concise document-protection editor used by callers that do not need to
 /// retain the transaction object.
+///
+/// # Errors
+/// Returns an error when the operation cannot be completed.
 pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit>
 where
     F: FnOnce(&mut Transaction) -> Result<()>,
@@ -278,6 +304,7 @@ where
 }
 
 /// Set the wire-level password-verifier fields without treating them as keys.
+#[must_use]
 pub fn key(value: Option<String>, digest_algorithm: Option<String>) -> wire::Key {
     wire::Key {
         value,

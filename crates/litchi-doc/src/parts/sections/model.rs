@@ -26,11 +26,13 @@ pub struct SectionsTable {
 
 impl SectionsTable {
     /// Sections in main-document character-position order.
+    #[must_use]
     pub fn sections(&self) -> &[Section] {
         &self.sections
     }
 
     /// Find the section containing `cp` using half-open section ranges.
+    #[must_use]
     pub fn section_at_cp(&self, cp: u32) -> Option<&Section> {
         let index = self
             .sections
@@ -41,6 +43,7 @@ impl SectionsTable {
     }
 
     /// Section property revision marks in document order.
+    #[must_use]
     pub fn revisions(&self) -> &[SectionRevisionMark] {
         &self.revisions
     }

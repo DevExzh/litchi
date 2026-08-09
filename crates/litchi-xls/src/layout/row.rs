@@ -22,54 +22,67 @@ pub struct Row {
 }
 
 impl Row {
+    #[must_use]
     pub fn row(&self) -> u16 {
         self.row
     }
 
+    #[must_use]
     pub fn first_cell_column(&self) -> u16 {
         self.first_cell_column
     }
 
+    #[must_use]
     pub fn last_cell_column_exclusive(&self) -> u16 {
         self.last_cell_column_exclusive
     }
 
+    #[must_use]
     pub fn height_twips(&self) -> u16 {
         self.height_twips
     }
 
+    #[must_use]
     pub fn outline_level(&self) -> u8 {
         self.outline_level
     }
 
+    #[must_use]
     pub fn is_collapsed(&self) -> bool {
         self.collapsed
     }
 
+    #[must_use]
     pub fn is_hidden(&self) -> bool {
         self.hidden
     }
 
+    #[must_use]
     pub fn has_custom_height(&self) -> bool {
         self.custom_height
     }
 
+    #[must_use]
     pub fn is_formatted(&self) -> bool {
         self.formatted
     }
 
+    #[must_use]
     pub fn format_index(&self) -> Option<u16> {
         self.format_index
     }
 
+    #[must_use]
     pub fn has_thick_top_border(&self) -> bool {
         self.thick_top_border
     }
 
+    #[must_use]
     pub fn has_thick_bottom_border(&self) -> bool {
         self.thick_bottom_border
     }
 
+    #[must_use]
     pub fn has_phonetic_guide(&self) -> bool {
         self.phonetic
     }

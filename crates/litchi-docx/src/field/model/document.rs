@@ -1,3 +1,15 @@
+#![expect(
+    clippy::expect_used,
+    reason = "the invariant is established immediately before extraction"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::struct_field_names,
+    reason = "the public model retains established field names"
+)]
 //! Document-variable, document-property, and document-context field models.
 
 use super::{Field, Switch};
@@ -56,11 +68,13 @@ impl Variable {
     }
 
     /// Return the complete stored field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
 
     /// Return the stored document-variable name without resolving it.
+    #[must_use]
     pub fn variable_name(&self) -> &str {
         &self.variable_name
     }
@@ -68,16 +82,19 @@ impl Variable {
     /// Return the cached visible field result, if present.
     ///
     /// This is stored text only and is never regenerated from a variable.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a word processor has marked the cached result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
 
     /// Whether a word processor has locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.locked
     }
@@ -86,11 +103,13 @@ impl Variable {
     ///
     /// DOCVARIABLE has no field-specific switches. Preserved switches are
     /// inert source metadata and are never interpreted.
+    #[must_use]
     pub fn switches(&self) -> &[Switch] {
         &self.switches
     }
 
     /// Check whether a case-insensitive ASCII switch appears in this field.
+    #[must_use]
     pub fn has_switch(&self, name: char) -> bool {
         has_field_switch(&self.switches, name)
     }
@@ -147,11 +166,13 @@ impl Property {
     }
 
     /// Return the complete stored field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
 
     /// Return the stored document-property name without resolving it.
+    #[must_use]
     pub fn property_name(&self) -> &str {
         &self.property_name
     }
@@ -159,16 +180,19 @@ impl Property {
     /// Return the cached visible field result, if present.
     ///
     /// This is stored text only and is never regenerated from a property.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a word processor has marked the cached result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
 
     /// Whether a word processor has locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.locked
     }
@@ -176,11 +200,13 @@ impl Property {
     /// Return the field switches in source order.
     ///
     /// Preserved switches are inert source metadata and are never interpreted.
+    #[must_use]
     pub fn switches(&self) -> &[Switch] {
         &self.switches
     }
 
     /// Check whether a case-insensitive ASCII switch appears in this field.
+    #[must_use]
     pub fn has_switch(&self, name: char) -> bool {
         has_field_switch(&self.switches, name)
     }
@@ -225,6 +251,7 @@ impl Info {
     }
 
     /// Return the complete stored field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
@@ -232,6 +259,7 @@ impl Info {
     /// Return the stored document or template property selector.
     ///
     /// The selector is preserved as metadata and is never looked up.
+    #[must_use]
     pub fn information_type(&self) -> &str {
         &self.information_type
     }
@@ -239,16 +267,19 @@ impl Info {
     /// Return the stored optional replacement value.
     ///
     /// This value is never applied to a document or template property.
+    #[must_use]
     pub fn new_value(&self) -> Option<&str> {
         self.new_value.as_deref()
     }
 
     /// Return preserved switches in source order without interpreting them.
+    #[must_use]
     pub fn switches(&self) -> &[Switch] {
         &self.switches
     }
 
     /// Check whether a case-insensitive ASCII switch appears in this field.
+    #[must_use]
     pub fn has_switch(&self, name: char) -> bool {
         has_field_switch(&self.switches, name)
     }
@@ -256,16 +287,19 @@ impl Info {
     /// Return the cached visible field result, if present.
     ///
     /// This is stored text only and is never regenerated from a property.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a word processor has marked the cached result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
 
     /// Whether a word processor has locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.locked
     }
@@ -296,6 +330,7 @@ pub enum InformationKind {
 
 impl InformationKind {
     /// The uppercase field keyword stored in a Word field instruction.
+    #[must_use]
     pub const fn field_keyword(self) -> &'static str {
         match self {
             Self::Title => "TITLE",
@@ -378,11 +413,13 @@ impl Information {
     }
 
     /// Return the complete stored field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
 
     /// Return the recognized built-in document-information category.
+    #[must_use]
     pub const fn kind(&self) -> InformationKind {
         self.kind
     }
@@ -391,16 +428,19 @@ impl Information {
     ///
     /// This is stored text only and is never regenerated from package metadata
     /// or a host user profile.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a word processor has marked the cached result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
 
     /// Whether a word processor has locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.locked
     }
@@ -408,11 +448,13 @@ impl Information {
     /// Return the field switches in source order.
     ///
     /// Preserved switches are inert source metadata and are never interpreted.
+    #[must_use]
     pub fn switches(&self) -> &[Switch] {
         &self.switches
     }
 
     /// Check whether a case-insensitive ASCII switch appears in this field.
+    #[must_use]
     pub fn has_switch(&self, name: char) -> bool {
         has_field_switch(&self.switches, name)
     }
@@ -439,6 +481,7 @@ pub enum ContextKind {
 
 impl ContextKind {
     /// The uppercase field keyword stored in a Word field instruction.
+    #[must_use]
     pub const fn field_keyword(self) -> &'static str {
         match self {
             Self::FileName => "FILENAME",
@@ -509,11 +552,13 @@ impl Context {
     }
 
     /// Return the complete stored field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
 
     /// Return the recognized built-in document-context or runtime category.
+    #[must_use]
     pub const fn kind(&self) -> ContextKind {
         self.kind
     }
@@ -523,16 +568,19 @@ impl Context {
     /// This is stored text only and is never regenerated from a document path,
     /// attached template, host filesystem state or file size, current clock,
     /// or page and section layout.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a word processor has marked the cached result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
 
     /// Whether a word processor has locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.locked
     }
@@ -540,11 +588,13 @@ impl Context {
     /// Return the field switches in source order.
     ///
     /// Preserved switches are inert source metadata and are never interpreted.
+    #[must_use]
     pub fn switches(&self) -> &[Switch] {
         &self.switches
     }
 
     /// Check whether a case-insensitive ASCII switch appears in this field.
+    #[must_use]
     pub fn has_switch(&self, name: char) -> bool {
         has_field_switch(&self.switches, name)
     }
@@ -555,6 +605,7 @@ impl Field {
     ///
     /// Recognition is limited to the stored field instruction. It never reads
     /// settings XML, resolves a variable value, or refreshes the field.
+    #[must_use]
     pub fn is_document_variable(&self) -> bool {
         field_instruction_remainder(&self.instruction, "DOCVARIABLE").is_some()
     }
@@ -565,6 +616,10 @@ impl Field {
     /// stored variable name, switches, cached content, and dirty/lock state
     /// only; it never reads settings XML, resolves a value, or refreshes a
     /// field.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn document_variable(&self) -> Result<Option<Variable>> {
         Variable::from_field(self)
     }
@@ -573,6 +628,7 @@ impl Field {
     ///
     /// Recognition is limited to the stored field instruction. It never reads
     /// a package property, resolves a value, or refreshes the field.
+    #[must_use]
     pub fn is_document_property(&self) -> bool {
         field_instruction_remainder(&self.instruction, "DOCPROPERTY").is_some()
     }
@@ -583,6 +639,10 @@ impl Field {
     /// stored property name, switches, cached content, and dirty/lock state
     /// only; it never reads core, extended, or custom package properties,
     /// resolves a value, or refreshes a field.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn document_property(&self) -> Result<Option<Property>> {
         Property::from_field(self)
     }
@@ -592,6 +652,7 @@ impl Field {
     /// Recognition is limited to the stored field instruction. It never reads,
     /// resolves, modifies, or writes document or template properties, or
     /// refreshes the field.
+    #[must_use]
     pub fn is_info_field(&self) -> bool {
         field_instruction_remainder(&self.instruction, "INFO").is_some()
     }
@@ -603,6 +664,10 @@ impl Field {
     /// switches, cached content, and dirty/lock state only; it never reads,
     /// resolves, modifies, or writes document or template properties, or
     /// refreshes a field.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn info_field(&self) -> Result<Option<Info>> {
         Info::from_field(self)
     }
@@ -612,6 +677,7 @@ impl Field {
     /// Recognition is limited to the stored field instruction. It never reads
     /// package metadata or host identity data, resolves a value, or refreshes
     /// the field.
+    #[must_use]
     pub fn is_document_information(&self) -> bool {
         InformationKind::from_instruction(&self.instruction).is_some()
     }
@@ -623,6 +689,10 @@ impl Field {
     /// content, and dirty/lock state; it never reads core or extended package
     /// properties, reads or modifies host identity data, calculates dates,
     /// revisions, or statistics, resolves a value, or refreshes a field.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn document_information(&self) -> Result<Option<Information>> {
         Information::from_field(self)
     }
@@ -633,6 +703,7 @@ impl Field {
     /// a document path, attached template, host filesystem state or file size,
     /// current clock, or page and section layout, resolves a value, or refreshes
     /// the field.
+    #[must_use]
     pub fn is_document_context(&self) -> bool {
         ContextKind::from_instruction(&self.instruction).is_some()
     }
@@ -645,6 +716,10 @@ impl Field {
     /// dirty/lock state; it never reads a document path, attached template,
     /// host filesystem state or file size, current clock, or page and section
     /// layout, resolves a value, or refreshes a field.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn document_context(&self) -> Result<Option<Context>> {
         Context::from_field(self)
     }

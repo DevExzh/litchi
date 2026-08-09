@@ -1,3 +1,7 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Lexical, namespace, and resource validation for `footnoteColumns`.
 
 use crate::error::{Error, Result};
@@ -6,7 +10,7 @@ use quick_xml::name::{Namespace, ResolveResult};
 
 use super::model::Layout;
 
-/// Word 2012 WordprocessingML namespace used by this extension.
+/// Word 2012 `WordprocessingML` namespace used by this extension.
 pub(crate) const WORD_2012_NAMESPACE: &[u8] =
     b"http://schemas.microsoft.com/office/word/2012/wordml";
 /// Markup-compatibility namespace used by `mc:Ignorable`.
@@ -41,7 +45,7 @@ pub(crate) fn parse_columns(value: &str) -> Result<Layout> {
             "footnoteColumns requires a decimal column count".into(),
         ));
     }
-    let columns = value.parse::<i32>().map_err(|_| {
+    let columns = value.parse::<i32>().map_err(|_source_error| {
         Error::InvalidFormat(format!(
             "invalid footnoteColumns decimal column count '{value}'"
         ))

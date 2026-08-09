@@ -121,8 +121,10 @@ pub fn read_pivot_tables(package: &OpcPackage) -> SheetResult<Vec<PivotTable>> {
                 )
                 .into());
             }
-            table.source_sheet = cache.definition.source_worksheet.clone();
-            table.source_ref = cache.definition.source_ref.clone();
+            table
+                .source_sheet
+                .clone_from(&cache.definition.source_worksheet);
+            table.source_ref.clone_from(&cache.definition.source_ref);
             tables.push(table);
         }
     }

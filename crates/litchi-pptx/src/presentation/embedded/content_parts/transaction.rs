@@ -243,7 +243,7 @@ impl Transaction {
         }
         candidate.anchor.xml =
             codec::rewrite_anchor_relationship_id(candidate.anchor.xml(), &value)?;
-        candidate.anchor.relationship_id = value.clone();
+        candidate.anchor.relationship_id.clone_from(&value);
         candidate.relationship.id = value;
         self.validate_candidate(&candidate, Some(index))?;
         self.working[index] = candidate;
@@ -338,7 +338,7 @@ impl Transaction {
             },
             Target::External { target_ref } => {
                 candidate.relationship.target_mode = TargetMode::External;
-                candidate.relationship.target_ref = target_ref.clone();
+                candidate.relationship.target_ref.clone_from(target_ref);
             },
         }
         if candidate.target() == &target {
@@ -754,7 +754,8 @@ fn build_source(
                 replacements.push((location.range.clone(), Vec::new()));
                 continue;
             }
-            let replacement = replacement.unwrap();
+            let replacement =
+                replacement.ok_or_else(|| invalid("content-part replacement state is missing"))?;
             if replacement.anchor.xml == original.anchor.xml {
                 continue;
             }

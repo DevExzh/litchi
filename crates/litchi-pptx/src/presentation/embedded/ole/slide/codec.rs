@@ -460,11 +460,6 @@ pub(crate) fn attribute_edit(
                 .open_end
                 .checked_sub(1)
                 .ok_or_else(|| invalid("OLE XML opening tag is truncated"))?;
-            let insert = if source.get(insert) == Some(&b'/') {
-                insert
-            } else {
-                insert
-            };
             let name = if relationship {
                 format!("r:{}", String::from_utf8_lossy(local))
             } else {

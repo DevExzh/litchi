@@ -43,31 +43,37 @@ impl<'a> Transaction<'a> {
     }
 
     /// Immutable source snapshot used for conflict checks and inverse patches.
+    #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Borrow the currently staged Custom XML Maps value.
+    #[must_use]
     pub fn info(&self) -> Option<&XmlMapInfo> {
         self.draft.as_ref()
     }
 
     /// Contextual alias for [`Self::info`].
+    #[must_use]
     pub fn xml_maps(&self) -> Option<&XmlMapInfo> {
         self.info()
     }
 
     /// Contextual catalog alias for [`Self::info`].
+    #[must_use]
     pub fn catalog(&self) -> Option<&XmlMapInfo> {
         self.info()
     }
 
     /// Explicit alias for the typed `MapInfo` value.
+    #[must_use]
     pub fn map_info(&self) -> Option<&XmlMapInfo> {
         self.info()
     }
 
     /// The conformance that will be used at publication.
+    #[must_use]
     pub fn conformance(&self) -> XmlMapConformance {
         self.conformance
     }
@@ -206,6 +212,7 @@ impl<'a> Transaction<'a> {
     }
 
     /// Whether staged semantics or publication conformance differ from source.
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.before.info() != self.draft.as_ref()
             || (self.draft.is_some() && self.before.conformance() != self.conformance)

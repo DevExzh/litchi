@@ -1,4 +1,4 @@
-//! XLSX-owned compatibility model for SpreadsheetML Custom XML Maps.
+//! XLSX-owned compatibility model for `SpreadsheetML` Custom XML Maps.
 
 use litchi_core::sheet::Result;
 
@@ -33,6 +33,7 @@ impl XmlMapConformance {
     }
 
     /// Whether this conformance uses ISO/IEC 29500 Strict namespace URIs.
+    #[must_use]
     pub const fn is_strict(self) -> bool {
         matches!(self, Self::Strict)
     }

@@ -149,7 +149,7 @@ pub fn read(xml: &[u8]) -> Result<Transform> {
     Ok(transform)
 }
 
-/// Serialize a transform with the canonical DrawingML `a:` prefix.
+/// Serialize a transform with the canonical `DrawingML` `a:` prefix.
 pub fn write(transform: &Transform) -> Result<Vec<u8>> {
     validation::validate(transform)?;
 
@@ -349,7 +349,7 @@ fn validate_attributes(
         if raw == b"xmlns" || raw.starts_with(b"xmlns:") {
             continue;
         }
-        if !allowed.iter().any(|name| *name == raw) {
+        if !allowed.contains(&raw) {
             return Err(invalid(format!(
                 "unsupported {description} attribute '{}'",
                 String::from_utf8_lossy(raw)

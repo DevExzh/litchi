@@ -631,7 +631,10 @@ pub struct Colors {
 
 impl Colors {
     /// Construct all eight ordered color slots.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "arguments mirror independent BIFF12 record fields"
+    )]
     #[must_use]
     pub const fn new(
         series: Color,

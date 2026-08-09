@@ -1,6 +1,18 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
 //! XML syntax, bounded DOM, and canonical opaque-content emission for glossaries.
 
-use super::super::*;
+use super::super::{Arc, BytesStart, Decoder, Error, Event, HashMap, Reader, Result, XmlVersion};
 use super::super::{
     MAX, MAX_DEPTH, MAX_DOM_ATTRIBUTES, MAX_DOM_BYTES, MAX_DOM_CONTENT, MAX_DOM_TOKENS, MAX_NODES,
     MAX_VALUES, R, RS, W, WS,
@@ -259,7 +271,7 @@ pub(in crate::glossary) fn parse_dom(xml: &[u8]) -> Result<Node> {
                 let v = t.decode().map_err(xml_error)?.into_owned();
                 validate_xml_value(&v, "text")?;
                 if let Some(n) = stack.last_mut() {
-                    push_content(n, Content::Text(v), &mut budget)?
+                    push_content(n, Content::Text(v), &mut budget)?;
                 } else if !v.trim().is_empty() {
                     return Err(invalid("text outside glossary root"));
                 }
@@ -268,7 +280,7 @@ pub(in crate::glossary) fn parse_dom(xml: &[u8]) -> Result<Node> {
                 let value = t.decode().map_err(xml_error)?.into_owned();
                 validate_xml_value(&value, "CDATA")?;
                 if let Some(n) = stack.last_mut() {
-                    push_content(n, Content::CData(value), &mut budget)?
+                    push_content(n, Content::CData(value), &mut budget)?;
                 } else {
                     return Err(invalid("CDATA outside glossary root"));
                 }
@@ -280,7 +292,7 @@ pub(in crate::glossary) fn parse_dom(xml: &[u8]) -> Result<Node> {
                     return Err(invalid("glossary XML comment has an invalid lexical form"));
                 }
                 if let Some(n) = stack.last_mut() {
-                    push_content(n, Content::Comment(value), &mut budget)?
+                    push_content(n, Content::Comment(value), &mut budget)?;
                 }
             },
             Event::GeneralRef(t) => {
@@ -288,7 +300,7 @@ pub(in crate::glossary) fn parse_dom(xml: &[u8]) -> Result<Node> {
                     litchi_ooxml_common::xml::decode_xml_reference(&t).map_err(xml_error)?;
                 validate_xml_value(&value, "character reference")?;
                 if let Some(n) = stack.last_mut() {
-                    push_content(n, Content::Text(value), &mut budget)?
+                    push_content(n, Content::Text(value), &mut budget)?;
                 } else {
                     return Err(invalid("entity outside glossary root"));
                 }
@@ -412,7 +424,7 @@ pub(in crate::glossary) fn attach(
     budget: &mut DomBudget,
 ) -> Result<()> {
     if let Some(p) = stack.last_mut() {
-        push_content(p, Content::Node(n), budget)?
+        push_content(p, Content::Node(n), budget)?;
     } else if root.replace(n).is_some() {
         return Err(invalid("multiple XML roots"));
     }
@@ -604,11 +616,11 @@ pub(in crate::glossary) fn write_namespace_binding<X: XmlSink>(
     strict: bool,
 ) -> Result<()> {
     if prefix.is_empty() {
-        x.push_str(" xmlns=\"")?
+        x.push_str(" xmlns=\"")?;
     } else {
         x.push_str(" xmlns:")?;
         x.push_str(prefix)?;
-        x.push_str("=\"")?
+        x.push_str("=\"")?;
     }
     esc(x, mapns(namespace, strict))?;
     x.push_char('"')

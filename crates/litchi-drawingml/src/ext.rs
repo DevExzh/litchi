@@ -1,4 +1,4 @@
-//! DrawingML extension-list primitives.
+//! `DrawingML` extension-list primitives.
 
 use std::{fmt, fmt::Write as _};
 

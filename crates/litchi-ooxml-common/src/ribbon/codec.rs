@@ -288,10 +288,10 @@ fn normalized_namespace<'a>(
     }
 }
 
-fn normalize_namespace_value<'a>(
-    value: &'a [u8],
+fn normalize_namespace_value(
+    value: &[u8],
     decoder: quick_xml::encoding::Decoder,
-) -> Result<Cow<'a, str>> {
+) -> Result<Cow<'_, str>> {
     let decoded = decoder
         .decode(value)
         .map_err(|error| Error::Xml(format!("invalid Ribbon namespace URI: {error}")))?;

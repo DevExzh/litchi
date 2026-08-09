@@ -12,26 +12,35 @@ const BODY_MARKER: &str = "<office:spreadsheet";
 pub struct Package(family::Package);
 
 impl Package {
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let package = family::Package::open(path, MIMETYPE, BODY_MARKER, "ODS")?;
         crate::authoring::validate_content_xml(package.content_xml())?;
         Ok(Self(package))
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         let package = family::Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODS")?;
         crate::authoring::validate_content_xml(package.content_xml())?;
         Ok(Self(package))
     }
 
+    #[must_use]
     pub fn content_xml(&self) -> &str {
         self.0.content_xml()
     }
 
+    #[must_use]
     pub fn styles_xml(&self) -> Option<&str> {
         self.0.styles_xml()
     }
 
+    #[must_use]
     pub fn package(&self) -> &OwnedPackage {
         self.0.package()
     }
@@ -39,15 +48,14 @@ impl Package {
     /// Decode the complete ODS metadata snapshot, retaining the bounded
     /// source part for unknown-XML-preserving transactions.
     pub(crate) fn metadata_snapshot(&self) -> Result<crate::metadata::Snapshot> {
-        let source =
-            if self.package().has_file("meta.xml")? {
-                let bytes = self.package().get_file("meta.xml")?;
-                Some(String::from_utf8(bytes).map_err(|_| {
-                    Error::InvalidFormat("ODS meta.xml is not valid UTF-8".to_string())
-                })?)
-            } else {
-                None
-            };
+        let source = if self.package().has_file("meta.xml")? {
+            let bytes = self.package().get_file("meta.xml")?;
+            Some(String::from_utf8(bytes).map_err(|_error| {
+                Error::InvalidFormat("ODS meta.xml is not valid UTF-8".to_string())
+            })?)
+        } else {
+            None
+        };
         crate::metadata::Snapshot::from_source(source)
     }
 
@@ -58,6 +66,9 @@ impl Package {
     }
 
     /// Read the ordered named-definition catalog from `content.xml`.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn definitions(&self) -> Result<Vec<Definition>> {
         crate::codec::names::parse(self.content_xml())
     }
@@ -149,6 +160,7 @@ impl Package {
         self.replace_content_xml(&content_xml)
     }
 
+    #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
         self.0.into_bytes()
     }

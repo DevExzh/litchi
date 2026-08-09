@@ -15,6 +15,7 @@ pub struct Bookmark {
 
 impl Bookmark {
     /// Whether this is a hidden bookmark.
+    #[must_use]
     pub fn is_hidden(&self) -> bool {
         self.name.starts_with('_')
     }

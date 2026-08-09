@@ -297,10 +297,11 @@ fn inspect_source(xml: &str, limits: &Limits) -> Result<SourceMap> {
                         reject_spoofed_name(namespace, &local)?;
                     }
                 }
-                if parent == Some(HostKind::Owner) && is_foreign(namespace) {
-                    if let Some(open) = stack.last_mut() {
-                        open.unsupported = true;
-                    }
+                if parent == Some(HostKind::Owner)
+                    && is_foreign(namespace)
+                    && let Some(open) = stack.last_mut()
+                {
+                    open.unsupported = true;
                 }
                 if parent == Some(HostKind::Spreadsheet) {
                     if kind == HostKind::Owner {
@@ -487,15 +488,14 @@ fn inspect_source(xml: &str, limits: &Limits) -> Result<SourceMap> {
                 } else if stack
                     .last()
                     .is_some_and(|open| open.kind == HostKind::Owner)
+                    && let Some(open) = stack.last_mut()
                 {
-                    if let Some(open) = stack.last_mut() {
-                        open.unsupported = true;
-                    }
+                    open.unsupported = true;
                 }
             },
             Event::GeneralRef(reference) => {
                 let name = std::str::from_utf8(reference.as_ref())
-                    .map_err(|_| invalid_error("invalid XML entity reference"))?;
+                    .map_err(|_error| invalid_error("invalid XML entity reference"))?;
                 resolve_reference(name)?;
                 if stack.is_empty() {
                     return invalid("entity reference outside the ODS root element");
@@ -523,10 +523,9 @@ fn inspect_source(xml: &str, limits: &Limits) -> Result<SourceMap> {
                 } else if stack
                     .last()
                     .is_some_and(|open| open.kind == HostKind::Owner)
+                    && let Some(open) = stack.last_mut()
                 {
-                    if let Some(open) = stack.last_mut() {
-                        open.unsupported = true;
-                    }
+                    open.unsupported = true;
                 }
             },
             Event::DocType(_) => {
@@ -694,7 +693,7 @@ fn complete_source_element(
                 },
             });
         },
-        _ => {},
+        HostKind::Document | HostKind::Paragraph | HostKind::Other => {},
     }
     Ok(())
 }
@@ -907,7 +906,7 @@ fn table_attribute_insertion(
 
 fn reader_position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid_error("XML source position does not fit usize"))
+        .map_err(|_error| invalid_error("XML source position does not fit usize"))
 }
 
 fn allocation_error(error: std::collections::TryReserveError) -> Error {
@@ -998,7 +997,14 @@ fn parse_tracked_changes_semantic(xml: &str, limits: &Limits) -> Result<Option<C
             },
             Event::PI(_) => {},
             Event::Eof => break,
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
 
         if is_start {
@@ -1127,7 +1133,7 @@ fn build_subtree(
                 )?;
             },
             Event::GeneralRef(reference) => {
-                let name = std::str::from_utf8(reference.as_ref()).map_err(|_| {
+                let name = std::str::from_utf8(reference.as_ref()).map_err(|_error| {
                     Error::InvalidFormat("invalid tracked-change entity reference".to_string())
                 })?;
                 append_text(
@@ -1509,7 +1515,7 @@ fn parse_change_info(node: &Node) -> Result<Info> {
     for child in children(node) {
         if !matches!(
             (child.namespace, child.local.as_str()),
-            (Namespace::Dc, "creator") | (Namespace::Dc, "date") | (Namespace::Text, "p")
+            (Namespace::Dc, "creator" | "date") | (Namespace::Text, "p")
         ) {
             reject_known_child(child, "office:change-info")?;
         }
@@ -1899,6 +1905,9 @@ fn reject_incompatible_value_attributes(node: &Node, value_type: Option<&str>) -
 
 impl Changes {
     /// Return canonical ODF XML for this `table:tracked-changes` fragment.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn to_xml_fragment(&self) -> Result<String> {
         write_tracked_changes_owner(self, Some(self.enabled), &Limits::default())
     }
@@ -1947,7 +1956,7 @@ pub(crate) fn write_tracked_changes_owner(
         })?;
     match tracking {
         Some(value) => {
-            output.replace_range(value_start..value_end, if value { "true" } else { "false" })
+            output.replace_range(value_start..value_end, if value { "true" } else { "false" });
         },
         None => {
             let start = value_start
@@ -2410,7 +2419,11 @@ fn estimate_cell_output(size: &mut usize, cell: &Cell) -> Result<()> {
         CellValue::Error(Some(value)) => {
             checked_output_add(size, escaped_size(value, true)?)?;
         },
-        _ => {},
+        CellValue::Empty
+        | CellValue::Boolean(_)
+        | CellValue::Number(_)
+        | CellValue::Percentage(_)
+        | CellValue::Error(_) => {},
     }
     if let Some(value) = &cell.matrix_columns {
         estimate_positive_integer_output(size, value)?;
@@ -2623,7 +2636,9 @@ fn write_tracked_cut_offs(output: &mut String, cut_offs: &[CutOff]) {
     for value in cut_offs {
         output.push_str(match value {
             CutOff::Insertion { .. } => "<table:insertion-cut-off",
-            _ => "<table:movement-cut-off",
+            CutOff::MovementPoint { .. } | CutOff::MovementRange { .. } => {
+                "<table:movement-cut-off"
+            },
         });
         match value {
             CutOff::Insertion {
@@ -2715,7 +2730,7 @@ fn write_tracked_cell(output: &mut String, cell: &Cell) {
         CellValue::Date(value) => write_tracked_value(output, "date", "office:date-value", value),
         CellValue::Time(value) => write_tracked_value(output, "time", "office:time-value", value),
         CellValue::Text(value) => {
-            write_tracked_value(output, "string", "office:string-value", value)
+            write_tracked_value(output, "string", "office:string-value", value);
         },
         CellValue::Error(value) => {
             push_tracked_attr(output, "office:value-type", "error");
@@ -3054,13 +3069,13 @@ fn parse_bool(value: &str, name: &str) -> Result<bool> {
 
 fn parse_integer(node: &Node, value: &str, name: &str) -> Result<Integer> {
     Integer::parse_with_limits(value, &node.limits)
-        .map_err(|_| Error::InvalidFormat(format!("invalid {name} integer '{value}'")))
+        .map_err(|_error| Error::InvalidFormat(format!("invalid {name} integer '{value}'")))
 }
 
 fn parse_positive(value: &str, name: &str) -> Result<usize> {
-    let value = collapse_atomic(value)
-        .parse::<usize>()
-        .map_err(|_| Error::InvalidFormat(format!("invalid {name} positive integer '{value}'")))?;
+    let value = collapse_atomic(value).parse::<usize>().map_err(|_error| {
+        Error::InvalidFormat(format!("invalid {name} positive integer '{value}'"))
+    })?;
     if value == 0 {
         return Err(Error::InvalidFormat(format!("{name} must be positive")));
     }
@@ -3077,7 +3092,7 @@ fn parse_f64(value: &str, name: &str) -> Result<f64> {
     }
     let parsed = value
         .parse::<f64>()
-        .map_err(|_| Error::InvalidFormat(format!("invalid {name} number '{value}'")))?;
+        .map_err(|_error| Error::InvalidFormat(format!("invalid {name} number '{value}'")))?;
     if !parsed.is_finite() {
         return invalid(format!("invalid {name} xsd:double lexical value '{value}'"));
     }
@@ -3291,7 +3306,7 @@ fn reject_spoofed_attribute(namespace: Namespace, local: &str) -> Result<()> {
 fn decode_name(value: &[u8], kind: &str) -> Result<String> {
     std::str::from_utf8(value)
         .map(str::to_string)
-        .map_err(|_| Error::InvalidFormat(format!("invalid UTF-8 tracked-change {kind} name")))
+        .map_err(|_error| Error::InvalidFormat(format!("invalid UTF-8 tracked-change {kind} name")))
 }
 
 fn resolve_reference(name: &str) -> Result<String> {

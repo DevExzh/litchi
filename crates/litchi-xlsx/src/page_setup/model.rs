@@ -1,4 +1,4 @@
-//! Typed SpreadsheetML worksheet page-setup models.
+//! Typed `SpreadsheetML` worksheet page-setup models.
 
 use std::borrow::Cow;
 use std::error::Error as StdError;
@@ -24,7 +24,7 @@ pub enum Orientation {
 }
 
 impl Orientation {
-    /// Return the exact SpreadsheetML token.
+    /// Return the exact `SpreadsheetML` token.
     #[inline]
     #[must_use]
     pub const fn as_str(self) -> &'static str {
@@ -126,7 +126,7 @@ impl StdError for RangeError {}
 
 /// Checked printer paper-size code.
 ///
-/// SpreadsheetML defines this as `unsignedInt`: named values occupy `1..=118`
+/// `SpreadsheetML` defines this as `unsignedInt`: named values occupy `1..=118`
 /// except reserved values `48` and `49`, `119..=255` is reserved, and custom
 /// printer codes occupy `256..=u32::MAX`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -138,7 +138,7 @@ impl Paper {
     pub const LETTER: Self = Self(1);
     /// ISO A4 (`210 × 297` millimeters).
     pub const A4: Self = Self(9);
-    /// Largest value permitted by SpreadsheetML's `unsignedInt` domain.
+    /// Largest value permitted by `SpreadsheetML`'s `unsignedInt` domain.
     pub const MAX: u32 = u32::MAX;
 
     /// Construct a checked paper-size code.
@@ -150,7 +150,7 @@ impl Paper {
         }
     }
 
-    /// Return the numeric SpreadsheetML paper-size code.
+    /// Return the numeric `SpreadsheetML` paper-size code.
     #[inline]
     #[must_use]
     pub const fn get(self) -> u32 {
@@ -220,7 +220,7 @@ impl Scale {
         }
     }
 
-    /// Return the numeric SpreadsheetML scale.
+    /// Return the numeric `SpreadsheetML` scale.
     #[inline]
     #[must_use]
     pub const fn get(self) -> u16 {
@@ -248,7 +248,7 @@ impl TryFrom<u32> for Scale {
         if value == 0 || (10..=400).contains(&value) {
             Ok(Self(value as u16))
         } else {
-            Err(RangeError::new(RangeKind::Scale, value as i64))
+            Err(RangeError::new(RangeKind::Scale, i64::from(value)))
         }
     }
 }
@@ -289,7 +289,7 @@ impl Fit {
         }
     }
 
-    /// Return the numeric SpreadsheetML page-fit count.
+    /// Return the numeric `SpreadsheetML` page-fit count.
     #[inline]
     #[must_use]
     pub const fn get(self) -> u16 {
@@ -317,7 +317,7 @@ impl TryFrom<u32> for Fit {
         if value <= u32::from(Self::MAX) {
             Ok(Self(value as u16))
         } else {
-            Err(RangeError::new(RangeKind::Fit, value as i64))
+            Err(RangeError::new(RangeKind::Fit, i64::from(value)))
         }
     }
 }
@@ -346,7 +346,7 @@ pub enum Order {
 }
 
 impl Order {
-    /// Return the exact SpreadsheetML token.
+    /// Return the exact `SpreadsheetML` token.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -388,7 +388,7 @@ pub enum Comments {
 }
 
 impl Comments {
-    /// Return the exact SpreadsheetML token.
+    /// Return the exact `SpreadsheetML` token.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -434,7 +434,7 @@ pub enum ErrorMode {
 }
 
 impl ErrorMode {
-    /// Return the exact SpreadsheetML token.
+    /// Return the exact `SpreadsheetML` token.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -622,7 +622,7 @@ impl FirstPage {
         }
     }
 
-    /// Decode SpreadsheetML's unsigned two's-complement representation.
+    /// Decode `SpreadsheetML`'s unsigned two's-complement representation.
     pub const fn from_wire(value: u32) -> Result<Self, RangeError> {
         if value <= Self::MAX as u32 {
             Self::new(value as i32)
@@ -642,7 +642,7 @@ impl FirstPage {
         self.0
     }
 
-    /// Return the SpreadsheetML `unsignedInt` representation.
+    /// Return the `SpreadsheetML` `unsignedInt` representation.
     #[must_use]
     pub const fn wire(self) -> u32 {
         (self.0 as i32) as u32
@@ -693,7 +693,7 @@ impl TryFrom<u32> for Copies {
         if value >= 1 && value <= u32::from(Self::MAX) {
             Ok(Self(value as u16))
         } else {
-            Err(RangeError::new(RangeKind::Copies, value as i64))
+            Err(RangeError::new(RangeKind::Copies, i64::from(value)))
         }
     }
 }
@@ -767,6 +767,7 @@ impl RelId {
     }
 
     /// Move the identifier into a string for the focused relationship layer.
+    #[must_use]
     pub fn into_string(self) -> String {
         self.0.into()
     }

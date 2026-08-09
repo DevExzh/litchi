@@ -40,16 +40,19 @@ impl Name {
     }
 
     /// Borrow the case-preserving spelling.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.value
     }
 
     /// Move the case-preserving spelling out of this checked value.
+    #[must_use]
     pub fn into_string(self) -> String {
         self.value.into_string()
     }
 
     /// Whether a borrowed spelling denotes the same Office sheet identity.
+    #[must_use]
     pub fn matches(&self, other: &str) -> bool {
         folded(other).eq(self.key.chars())
     }
@@ -148,7 +151,7 @@ impl<'a> From<&'a Name> for litchi_core::Selector<'a, Infallible> {
     }
 }
 
-impl<'a> From<Name> for litchi_core::Selector<'a, Infallible> {
+impl From<Name> for litchi_core::Selector<'_, Infallible> {
     fn from(value: Name) -> Self {
         Self::Name(Cow::Owned(value.into_string()))
     }

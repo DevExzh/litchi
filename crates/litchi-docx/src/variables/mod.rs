@@ -1,4 +1,8 @@
-//! Bounded WordprocessingML document-variable model and XML codec.
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
+//! Bounded `WordprocessingML` document-variable model and XML codec.
 //!
 //! The checked-in `[MS-OE376]` conformance material identifies `docVar` as
 //! Part 4 Section 2.15.1.30 and records Word's limits for its `name` and

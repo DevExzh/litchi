@@ -24,6 +24,9 @@ pub struct Snapshot {
 impl Snapshot {
     /// Opens a bounded XLS CFB artifact and captures its typed OLE-object and
     /// form-control views.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn open(bytes: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
         let bytes = bytes.into();
         let editor = Editor::new(bytes.clone(), limits)?;
@@ -48,11 +51,17 @@ impl Snapshot {
     }
 
     /// Returns typed embedded-OLE `Obj` records for one worksheet.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn objects(&self, worksheet: usize) -> Result<&[OleObjectRecord]> {
         self.editor.objects(worksheet)
     }
 
     /// Returns typed form-control `Obj` records for one worksheet.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn form_controls(&self, worksheet: usize) -> Result<&[FormControl]> {
         self.editor.form_controls(worksheet)
     }
@@ -68,6 +77,7 @@ impl Snapshot {
     /// Because a snapshot always owns an already-validated artifact, this
     /// returns the exact source bytes, including producer-specific padding
     /// and unknown records.
+    #[must_use]
     pub fn finish(&self) -> Vec<u8> {
         self.source.as_ref().to_vec()
     }
@@ -140,6 +150,9 @@ impl Patch {
     ///
     /// The returned snapshot is built before it is published to the caller,
     /// so source mismatches and malformed patch output cannot partially apply.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.source.as_ref() != self.before.as_ref() {
             return Err(Error::UnsafeEdit(

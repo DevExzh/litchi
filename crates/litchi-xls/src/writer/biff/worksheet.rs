@@ -10,11 +10,11 @@ use super::{write_record, write_record_header};
 fn write_unicode_string<W: Write>(writer: &mut W, value: &str) -> Result<()> {
     let units = value.encode_utf16().collect::<Vec<_>>();
     let compressed = units.iter().all(|unit| *unit <= 0xff);
-    writer.write_all(&(units.len() as u16).to_le_bytes())?;
+    writer.write_all(&crate::utils::truncate_usize_to_u16(units.len()).to_le_bytes())?;
     writer.write_all(&[u8::from(!compressed)])?;
     for unit in units {
         if compressed {
-            writer.write_all(&[unit as u8])?;
+            writer.write_all(&[crate::utils::truncate_u16_to_u8(unit)])?;
         } else {
             writer.write_all(&unit.to_le_bytes())?;
         }
@@ -25,11 +25,11 @@ fn write_unicode_string<W: Write>(writer: &mut W, value: &str) -> Result<()> {
 fn write_dcon_file<W: Write>(writer: &mut W, file: &crate::ConsolidationFile) -> Result<()> {
     let units = file.encoded_path().encode_utf16().collect::<Vec<_>>();
     let compressed = units.iter().all(|unit| *unit <= 0xff);
-    writer.write_all(&(units.len() as u16).to_le_bytes())?;
+    writer.write_all(&crate::utils::truncate_usize_to_u16(units.len()).to_le_bytes())?;
     writer.write_all(&[u8::from(!compressed)])?;
     for unit in units {
         if compressed {
-            writer.write_all(&[unit as u8])?;
+            writer.write_all(&[crate::utils::truncate_u16_to_u8(unit)])?;
         } else {
             writer.write_all(&unit.to_le_bytes())?;
         }
@@ -103,11 +103,11 @@ fn write_header_footer<W: Write>(writer: &mut W, record_type: u16, text: &str) -
     }
     let compressed = units.iter().all(|unit| *unit <= 0x00ff);
     let mut payload = Vec::with_capacity(3 + units.len() * if compressed { 1 } else { 2 });
-    payload.extend_from_slice(&(units.len() as u16).to_le_bytes());
+    payload.extend_from_slice(&crate::utils::truncate_usize_to_u16(units.len()).to_le_bytes());
     payload.push(u8::from(!compressed));
     for unit in units {
         if compressed {
-            payload.push(unit as u8);
+            payload.push(crate::utils::truncate_u16_to_u8(unit));
         } else {
             payload.extend_from_slice(&unit.to_le_bytes());
         }
@@ -147,8 +147,12 @@ fn write_page_breaks<W: Write>(
             }
         }
     }
-    write_record_header(writer, record_type, 2 + ordered.len() as u16 * 6)?;
-    writer.write_all(&(ordered.len() as u16).to_le_bytes())?;
+    write_record_header(
+        writer,
+        record_type,
+        2 + crate::utils::truncate_usize_to_u16(ordered.len()) * 6,
+    )?;
+    writer.write_all(&crate::utils::truncate_usize_to_u16(ordered.len()).to_le_bytes())?;
     for (position, range_start, range_end) in ordered {
         writer.write_all(&position.to_le_bytes())?;
         writer.write_all(&range_start.to_le_bytes())?;
@@ -160,11 +164,19 @@ fn write_page_breaks<W: Write>(
 fn write_pls<W: Write>(writer: &mut W, driver_data: &[u8]) -> Result<()> {
     const MAX_PAYLOAD: usize = 8224;
     let first_len = driver_data.len().min(MAX_PAYLOAD - 2);
-    write_record_header(writer, 0x004d, (first_len + 2) as u16)?;
+    write_record_header(
+        writer,
+        0x004d,
+        crate::utils::truncate_usize_to_u16(first_len + 2),
+    )?;
     writer.write_all(&0u16.to_le_bytes())?;
     writer.write_all(&driver_data[..first_len])?;
     for chunk in driver_data[first_len..].chunks(MAX_PAYLOAD) {
-        write_record_header(writer, 0x003c, chunk.len() as u16)?;
+        write_record_header(
+            writer,
+            0x003c,
+            crate::utils::truncate_usize_to_u16(chunk.len()),
+        )?;
         writer.write_all(chunk)?;
     }
     Ok(())
@@ -233,7 +245,10 @@ pub(super) fn write_page_settings<W: Write>(
     write_record_header(writer, 0x00a1, 34)?;
     writer.write_all(&options.paper_size.to_le_bytes())?;
     writer.write_all(&options.scale_percent.to_le_bytes())?;
-    writer.write_all(&(options.starting_page_number.unwrap_or(1) as u16).to_le_bytes())?;
+    writer.write_all(
+        &crate::utils::reinterpret_i16_as_u16(options.starting_page_number.unwrap_or(1))
+            .to_le_bytes(),
+    )?;
     writer.write_all(&options.fit_width_pages.to_le_bytes())?;
     writer.write_all(&options.fit_height_pages.to_le_bytes())?;
     writer.write_all(&flags.to_le_bytes())?;
@@ -268,7 +283,7 @@ pub(super) fn write_def_col_width<W: Write>(writer: &mut W, width_chars: u16) ->
 /// Write INDEX record.
 ///
 /// Record type: 0x020B, Length: 16 + 4 * cDbCell
-#[allow(dead_code)]
+#[allow(dead_code, reason = "retained as a BIFF compatibility building block")]
 pub(super) fn write_index<W: Write>(
     writer: &mut W,
     first_row: u32,
@@ -277,7 +292,7 @@ pub(super) fn write_index<W: Write>(
     dbcell_positions: &[u32],
 ) -> Result<()> {
     let data_len = 16u16
-        + u16::try_from(dbcell_positions.len() * 4).map_err(|_| {
+        + u16::try_from(dbcell_positions.len() * 4).map_err(|_error| {
             Error::InvalidData(
                 "INDEX record DBCell pointer list exceeds BIFF8 size limit".to_string(),
             )
@@ -296,14 +311,14 @@ pub(super) fn write_index<W: Write>(
 /// Write DBCELL record.
 ///
 /// Record type: 0x00D7, Length: 4 + 2 * cOffsets
-#[allow(dead_code)]
+#[allow(dead_code, reason = "retained as a BIFF compatibility building block")]
 pub(super) fn write_dbcell<W: Write>(
     writer: &mut W,
     row_offset: u32,
     cell_offsets: &[u16],
 ) -> Result<()> {
     let data_len = 4u16
-        + u16::try_from(cell_offsets.len() * 2).map_err(|_| {
+        + u16::try_from(cell_offsets.len() * 2).map_err(|_error| {
             Error::InvalidData("DBCELL row offset list exceeds BIFF8 size limit".to_string())
         })?;
     write_record_header(writer, 0x00D7, data_len)?;
@@ -511,7 +526,7 @@ pub(super) fn write_colinfo<W: Write>(
 /// - `x` and `y` are the split positions in terms of columns/rows.
 /// - `topRow` and `leftColumn` are set to the same values.
 /// - `activePane` is derived from which sides are frozen.
-#[allow(dead_code)]
+#[allow(dead_code, reason = "retained as a BIFF compatibility building block")]
 pub(super) fn write_pane<W: Write>(
     writer: &mut W,
     freeze_rows: u32,
@@ -521,7 +536,7 @@ pub(super) fn write_pane<W: Write>(
         return Ok(());
     }
 
-    let y = u16::try_from(freeze_rows).map_err(|_| {
+    let y = u16::try_from(freeze_rows).map_err(|_error| {
         Error::InvalidData(
             "freeze_panes: freeze_rows exceeds BIFF8 limit 65535 for PANE record".to_string(),
         )
@@ -578,7 +593,10 @@ pub(super) fn write_autofilterinfo<W: Write>(writer: &mut W, c_entries: u16) -> 
 /// 24      var   rgch1      — string for condition 1 (if applicable)
 ///         var   rgch2      — string for condition 2 (if applicable)
 /// ```
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "arguments map positionally to BIFF fields"
+)]
 pub(super) fn write_autofilter<W: Write>(
     writer: &mut W,
     column_index: u16,
@@ -609,7 +627,9 @@ pub(super) fn write_autofilter<W: Write>(
     let str1_bytes = encode_autofilter_string(str1);
     let str2_bytes = encode_autofilter_string(str2);
 
-    let data_len = 24u16 + str1_bytes.len() as u16 + str2_bytes.len() as u16;
+    let data_len = 24u16
+        + crate::utils::truncate_usize_to_u16(str1_bytes.len())
+        + crate::utils::truncate_usize_to_u16(str2_bytes.len());
     write_record_header(writer, 0x009E, data_len)?;
 
     writer.write_all(&column_index.to_le_bytes())?;
@@ -655,14 +675,14 @@ impl AutoFilterConditionWrite {
                 doper[0] = 0x06; // vt = string
                 doper[1] = *operator;
                 // doper[2] = unused, doper[3] = byte length of string
-                let byte_len = value.len().min(255) as u8;
+                let byte_len = crate::utils::truncate_usize_to_u8(value.len().min(255));
                 doper[3] = byte_len;
                 (doper, Some(value.as_str()))
             },
             Self::Bool { operator, value } => {
                 doper[0] = 0x08; // vt = boolean/error
                 doper[1] = *operator;
-                doper[2] = if *value { 1 } else { 0 };
+                doper[2] = u8::from(*value);
                 doper[3] = 0; // is_error = false
                 (doper, None)
             },
@@ -675,7 +695,7 @@ impl AutoFilterConditionWrite {
     }
 }
 
-/// Encode a DOPER string operand as XLUnicodeStringNoCch for the trailing bytes.
+/// Encode a DOPER string operand as `XLUnicodeStringNoCch` for the trailing bytes.
 fn encode_autofilter_string(s: Option<&str>) -> Vec<u8> {
     match s {
         None => Vec::new(),
@@ -825,8 +845,9 @@ fn write_hyperlink_web<W: Write>(
     ];
 
     let url_bytes = encode_web_url_bytes(url);
-    let url_len = u32::try_from(url_bytes.len())
-        .map_err(|_| Error::InvalidData("Hyperlink URL exceeds BIFF8 length limit".to_string()))?;
+    let url_len = u32::try_from(url_bytes.len()).map_err(|_error| {
+        Error::InvalidData("Hyperlink URL exceeds BIFF8 length limit".to_string())
+    })?;
 
     // Base size (0x34) matches POI's HyperlinkRecord.getDataSize():
     //  - 8 bytes Ref8U (rwFirst, rwLast, colFirst, colLast)
@@ -836,13 +857,13 @@ fn write_hyperlink_web<W: Write>(
     //  - 16 bytes URL moniker CLSID
     //  - 4 bytes address length (byte count)
     let data_len = 0x34u32.saturating_add(url_len);
-    if data_len > u16::MAX as u32 {
+    if data_len > u32::from(u16::MAX) {
         return Err(Error::InvalidData(
             "Hyperlink record exceeds BIFF8 length limit".to_string(),
         ));
     }
 
-    write_record_header(writer, 0x01B8, data_len as u16)?;
+    write_record_header(writer, 0x01B8, crate::utils::truncate_u32_to_u16(data_len))?;
 
     writer.write_all(&row1.to_le_bytes())?;
     writer.write_all(&row2.to_le_bytes())?;
@@ -892,17 +913,19 @@ fn write_hyperlink_internal<W: Write>(
         wide.extend_from_slice(&unit.to_le_bytes());
     }
 
-    let url_len = u32::try_from(char_count)
-        .map_err(|_| Error::InvalidData("Internal hyperlink target is too long".to_string()))?;
+    let url_len = u32::try_from(char_count).map_err(|_error| {
+        Error::InvalidData("Internal hyperlink target is too long".to_string())
+    })?;
 
-    let data_len = 0x24u32.saturating_add(u32::from(wide.len() as u16));
-    if data_len > u16::MAX as u32 {
+    let data_len =
+        0x24u32.saturating_add(u32::from(crate::utils::truncate_usize_to_u16(wide.len())));
+    if data_len > u32::from(u16::MAX) {
         return Err(Error::InvalidData(
             "Internal hyperlink record exceeds BIFF8 length limit".to_string(),
         ));
     }
 
-    write_record_header(writer, 0x01B8, data_len as u16)?;
+    write_record_header(writer, 0x01B8, crate::utils::truncate_u32_to_u16(data_len))?;
 
     writer.write_all(&row1.to_le_bytes())?;
     writer.write_all(&row2.to_le_bytes())?;
@@ -933,7 +956,7 @@ pub(super) fn write_hyperlink<W: Write>(
     col2: u16,
     url: &str,
 ) -> Result<()> {
-    if row1 > u16::MAX as u32 || row2 > u16::MAX as u32 {
+    if row1 > u32::from(u16::MAX) || row2 > u32::from(u16::MAX) {
         return Err(Error::InvalidData(
             "Hyperlink row index must be <= 65535 for BIFF8".to_string(),
         ));
@@ -953,14 +976,14 @@ pub(super) fn write_hyperlink<W: Write>(
             "Hyperlink column range must be ordered".to_string(),
         ));
     }
-    if col2 > u8::MAX as u16 {
+    if col2 > u16::from(u8::MAX) {
         return Err(Error::InvalidCellReference(
             "Hyperlink column index must be <= 255 for BIFF8".to_string(),
         ));
     }
 
-    let r1 = row1 as u16;
-    let r2 = row2 as u16;
+    let r1 = crate::utils::truncate_u32_to_u16(row1);
+    let r2 = crate::utils::truncate_u32_to_u16(row2);
 
     let trimmed = url.trim();
     if trimmed.is_empty() {
@@ -986,10 +1009,10 @@ pub(super) fn write_hyperlink<W: Write>(
 ///
 /// Record type: 0x023E, Length: 18 (worksheet and macro sheet)
 ///
-/// When `has_freeze_panes` is true, the FREEZE_PANES (0x0008) and
-/// FREEZE_PANES_NO_SPLIT (0x0100) bits are set in the options field,
+/// When `has_freeze_panes` is true, the `FREEZE_PANES` (0x0008) and
+/// `FREEZE_PANES_NO_SPLIT` (0x0100) bits are set in the options field,
 /// mirroring Apache POI's behaviour after `createFreezePane`.
-#[allow(dead_code)]
+#[allow(dead_code, reason = "retained as a BIFF compatibility building block")]
 pub(super) fn write_window2<W: Write>(writer: &mut W, has_freeze_panes: bool) -> Result<()> {
     write_record_header(writer, 0x023E, 18)?;
 
@@ -1111,14 +1134,16 @@ pub(super) fn write_selection_options<W: Write>(
     write_record_header(
         writer,
         0x001d,
-        u16::try_from(payload_len)
-            .map_err(|_| Error::InvalidData("SELECTION payload exceeds BIFF8 limit".to_string()))?,
+        u16::try_from(payload_len).map_err(|_error| {
+            Error::InvalidData("SELECTION payload exceeds BIFF8 limit".to_string())
+        })?,
     )?;
     writer.write_all(&[selection.pane().code()])?;
     writer.write_all(&selection.row().to_le_bytes())?;
     writer.write_all(&u16::from(selection.column()).to_le_bytes())?;
     writer.write_all(&selection.active().to_le_bytes())?;
-    writer.write_all(&(selection.ranges().len() as u16).to_le_bytes())?;
+    writer
+        .write_all(&crate::utils::truncate_usize_to_u16(selection.ranges().len()).to_le_bytes())?;
     for range in selection.ranges() {
         writer.write_all(&range.first_row().to_le_bytes())?;
         writer.write_all(&range.last_row().to_le_bytes())?;
@@ -1128,7 +1153,7 @@ pub(super) fn write_selection_options<W: Write>(
 }
 
 /// Write the primary selection for a regular worksheet window.
-#[allow(dead_code)]
+#[allow(dead_code, reason = "retained as a BIFF compatibility building block")]
 pub(super) fn write_default_selection<W: Write>(
     writer: &mut W,
     freeze_rows: u16,
@@ -1153,7 +1178,10 @@ pub(super) fn write_default_selection<W: Write>(
     writer.write_all(&1u16.to_le_bytes())?;
     writer.write_all(&freeze_rows.to_le_bytes())?;
     writer.write_all(&freeze_rows.to_le_bytes())?;
-    writer.write_all(&[freeze_cols as u8, freeze_cols as u8])?;
+    writer.write_all(&[
+        crate::utils::truncate_u16_to_u8(freeze_cols),
+        crate::utils::truncate_u16_to_u8(freeze_cols),
+    ])?;
     Ok(())
 }
 
@@ -1175,7 +1203,11 @@ pub(super) fn write_plv<W: Write>(writer: &mut W) -> Result<()> {
         0x8B, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x12,
         0x00,
     ];
-    write_record_header(writer, 0x088B, DATA.len() as u16)?;
+    write_record_header(
+        writer,
+        0x088B,
+        crate::utils::truncate_usize_to_u16(DATA.len()),
+    )?;
     writer.write_all(DATA)?;
     Ok(())
 }
@@ -1184,14 +1216,22 @@ pub(super) fn write_selection<W: Write>(writer: &mut W) -> Result<()> {
     static DATA: &[u8] = &[
         0x03, 0x0F, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x0F, 0x00, 0x0F, 0x00, 0x03, 0x03,
     ];
-    write_record_header(writer, 0x001D, DATA.len() as u16)?;
+    write_record_header(
+        writer,
+        0x001D,
+        crate::utils::truncate_usize_to_u16(DATA.len()),
+    )?;
     writer.write_all(DATA)?;
     Ok(())
 }
 
 pub(super) fn write_phonetic_pr<W: Write>(writer: &mut W) -> Result<()> {
     static DATA: &[u8] = &[0x17, 0x00, 0x37, 0x00, 0x00, 0x00];
-    write_record_header(writer, 0x00EF, DATA.len() as u16)?;
+    write_record_header(
+        writer,
+        0x00EF,
+        crate::utils::truncate_usize_to_u16(DATA.len()),
+    )?;
     writer.write_all(DATA)?;
     Ok(())
 }
@@ -1201,7 +1241,11 @@ pub(super) fn write_sheet_ext<W: Write>(writer: &mut W) -> Result<()> {
         0x67, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01,
         0xFF, 0xFF, 0xFF, 0xFF, 0x03, 0x44, 0x00, 0x00,
     ];
-    write_record_header(writer, 0x0867, DATA.len() as u16)?;
+    write_record_header(
+        writer,
+        0x0867,
+        crate::utils::truncate_usize_to_u16(DATA.len()),
+    )?;
     writer.write_all(DATA)?;
     Ok(())
 }
@@ -1221,11 +1265,15 @@ pub(super) fn write_phonetic_info<W: Write>(
     write_record_header(
         writer,
         crate::phonetic_info::PHONETIC_INFO_RECORD_TYPE,
-        first_chunk as u16,
+        crate::utils::truncate_usize_to_u16(first_chunk),
     )?;
     writer.write_all(&payload[..first_chunk])?;
     for chunk in payload[first_chunk..].chunks(MAX_RECORD_PAYLOAD) {
-        write_record_header(writer, CONTINUE_RECORD_TYPE, chunk.len() as u16)?;
+        write_record_header(
+            writer,
+            CONTINUE_RECORD_TYPE,
+            crate::utils::truncate_usize_to_u16(chunk.len()),
+        )?;
         writer.write_all(chunk)?;
     }
     Ok(())
@@ -1239,7 +1287,7 @@ pub(super) fn write_sheet_ext_tab_color<W: Write>(writer: &mut W, tab_color: u8)
     write_record_header(
         writer,
         crate::sheet_ext::SHEET_EXT_RECORD_TYPE,
-        payload.len() as u16,
+        crate::utils::truncate_usize_to_u16(payload.len()),
     )?;
     writer.write_all(&payload)?;
     Ok(())
@@ -1290,10 +1338,9 @@ pub(super) fn write_row<W: Write>(
     height: u16,
     hidden: bool,
 ) -> Result<()> {
-    let row_u16 = u16::try_from(row_index).map_err(|_| {
+    let row_u16 = u16::try_from(row_index).map_err(|_error| {
         Error::InvalidData(format!(
-            "Row index {} exceeds BIFF8 limit 65535 for ROW record",
-            row_index
+            "Row index {row_index} exceeds BIFF8 limit 65535 for ROW record"
         ))
     })?;
 
@@ -1371,7 +1418,7 @@ fn write_mergedcells_chunk<W: Write>(writer: &mut W, ranges: &[(u16, u16, u8, u8
     debug_assert!(ranges.len() <= 1027);
 
     let count = u16::try_from(ranges.len())
-        .map_err(|_| Error::InvalidData("MERGEDCELLS range count exceeds u16".to_string()))?;
+        .map_err(|_error| Error::InvalidData("MERGEDCELLS range count exceeds u16".to_string()))?;
     let data_len: u16 = 2u16 + count.saturating_mul(8);
 
     write_record_header(writer, 0x00E5, data_len)?;

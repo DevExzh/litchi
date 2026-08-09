@@ -26,7 +26,7 @@ const MAX_DEPTH: usize = 256;
 const MAX_BINARY_BYTES: usize = 1024 * 1024;
 const MAX_ENCODED_BINARY_BYTES: usize = MAX_BINARY_BYTES * 2;
 
-/// Passive metadata from one SpreadsheetML `workbookProtection` element.
+/// Passive metadata from one `SpreadsheetML` `workbookProtection` element.
 ///
 /// Password verifier values are opaque metadata only. They do not make a
 /// workbook encrypted, and this crate neither validates passwords nor enforces
@@ -42,11 +42,13 @@ pub struct Metadata {
 
 impl Metadata {
     /// Create empty workbook-protection metadata.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Return the optional workbook password verifier metadata.
+    #[must_use]
     pub fn workbook_verifier(&self) -> Option<&ProtectionPasswordVerifier> {
         self.workbook_verifier.as_ref()
     }
@@ -57,6 +59,7 @@ impl Metadata {
     }
 
     /// Return the optional revision password verifier metadata.
+    #[must_use]
     pub fn revisions_verifier(&self) -> Option<&ProtectionPasswordVerifier> {
         self.revisions_verifier.as_ref()
     }
@@ -67,6 +70,7 @@ impl Metadata {
     }
 
     /// Whether workbook structure changes are requested to be locked.
+    #[must_use]
     pub fn structure_locked(&self) -> bool {
         self.lock_structure
     }
@@ -77,6 +81,7 @@ impl Metadata {
     }
 
     /// Whether workbook-window changes are requested to be locked.
+    #[must_use]
     pub fn windows_locked(&self) -> bool {
         self.lock_windows
     }
@@ -87,6 +92,7 @@ impl Metadata {
     }
 
     /// Whether workbook revision changes are requested to be locked.
+    #[must_use]
     pub fn revision_locked(&self) -> bool {
         self.lock_revision
     }
@@ -115,7 +121,7 @@ pub fn parse_workbook_protection(xml: &[u8]) -> Result<Option<Metadata>> {
     parse_selected(selected.as_ref())
 }
 
-/// Serialize one typed SpreadsheetML `workbookProtection` element.
+/// Serialize one typed `SpreadsheetML` `workbookProtection` element.
 ///
 /// The returned element uses canonical uppercase hexadecimal legacy verifiers
 /// and canonical base64 for strong verifier byte strings. Passwords are never
@@ -179,7 +185,7 @@ fn write_true(xml: &mut String, name: &str, value: bool) -> Result<()> {
 fn write_xml_attribute(xml: &mut String, name: &str, value: &str) -> Result<()> {
     if value.chars().any(|character| {
         let code = character as u32;
-        !matches!(code, 0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF)
+        !matches!(code, 0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x0010_FFFF)
     }) {
         return Err(invalid(format!(
             "workbook protection {name} contains an invalid XML character"
@@ -417,7 +423,6 @@ fn finish_credential(
     StrongProtectionPasswordVerifier::new(algorithm_name, hash_value, salt_value, spin_count)
         .map(ProtectionPasswordVerifier::Strong)
         .map(Some)
-        .map_err(Error::from)
 }
 
 fn decode_base64(value: &str, field: &str) -> Result<Vec<u8>> {

@@ -23,6 +23,7 @@ impl Outline {
     }
 
     /// Return the checked numeric level.
+    #[must_use]
     pub const fn get(self) -> u8 {
         self.0
     }
@@ -37,6 +38,7 @@ pub struct OutlineError {
 
 impl OutlineError {
     /// Rejected numeric value.
+    #[must_use]
     pub const fn value(self) -> i64 {
         self.value
     }

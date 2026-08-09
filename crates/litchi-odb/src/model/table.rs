@@ -98,6 +98,61 @@ pub struct Column {
 }
 
 impl Column {
+    /// Creates a named column declaration.
+    #[must_use]
+    pub fn new(name: impl Into<String>) -> Self {
+        Self::parsed(name.into(), ColumnSchema::default())
+    }
+
+    /// Sets the standard ODF database type.
+    #[must_use]
+    pub const fn with_data_type(mut self, value: Option<DataType>) -> Self {
+        self.data_type = value;
+        self
+    }
+
+    /// Sets the producer-specific type name.
+    #[must_use]
+    pub fn with_type_name(mut self, value: impl Into<String>) -> Self {
+        self.type_name = Some(value.into());
+        self
+    }
+
+    /// Sets the positive precision.
+    #[must_use]
+    pub const fn with_precision(mut self, value: Option<u64>) -> Self {
+        self.precision = value;
+        self
+    }
+
+    /// Sets the positive scale.
+    #[must_use]
+    pub const fn with_scale(mut self, value: Option<u64>) -> Self {
+        self.scale = value;
+        self
+    }
+
+    /// Sets schema nullability.
+    #[must_use]
+    pub const fn with_nullable(mut self, value: Option<bool>) -> Self {
+        self.nullable = value;
+        self
+    }
+
+    /// Sets whether empty values are accepted.
+    #[must_use]
+    pub const fn with_empty_allowed(mut self, value: Option<bool>) -> Self {
+        self.empty_allowed = value;
+        self
+    }
+
+    /// Sets the auto-increment declaration.
+    #[must_use]
+    pub const fn with_autoincrement(mut self, value: Option<bool>) -> Self {
+        self.autoincrement = value;
+        self
+    }
+
     pub(crate) fn parsed(name: String, schema: ColumnSchema) -> Self {
         Self {
             name,
@@ -200,6 +255,22 @@ pub struct KeyColumn {
 }
 
 impl KeyColumn {
+    /// Creates a key column mapping.
+    #[must_use]
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: Some(name.into()),
+            related_column: None,
+        }
+    }
+
+    /// Sets the referenced column for a foreign-key mapping.
+    #[must_use]
+    pub fn with_related_column(mut self, value: impl Into<String>) -> Self {
+        self.related_column = Some(value.into());
+        self
+    }
+
     pub(crate) const fn parsed(name: Option<String>, related_column: Option<String>) -> Self {
         Self {
             name,
@@ -229,7 +300,109 @@ pub struct Key {
     columns: Vec<KeyColumn>,
 }
 
+/// A foreign-key relation projected from an ODF `db:key` declaration.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Relation {
+    table: String,
+    key: Option<String>,
+    referenced_table: String,
+    update_rule: Option<ReferentialAction>,
+    delete_rule: Option<ReferentialAction>,
+    columns: Vec<KeyColumn>,
+}
+
+impl Relation {
+    pub(crate) fn from_key(table: &str, key: &Key) -> Option<Self> {
+        let referenced_table = key.referenced_table()?.to_owned();
+        Some(Self {
+            table: table.to_owned(),
+            key: key.name.clone(),
+            referenced_table,
+            update_rule: key.update_rule,
+            delete_rule: key.delete_rule,
+            columns: key.columns.clone(),
+        })
+    }
+
+    /// Returns the table that owns the foreign key.
+    #[must_use]
+    pub fn table(&self) -> &str {
+        &self.table
+    }
+
+    /// Returns the foreign-key name, when declared.
+    #[must_use]
+    pub fn key(&self) -> Option<&str> {
+        self.key.as_deref()
+    }
+
+    /// Returns the related table name.
+    #[must_use]
+    pub fn referenced_table(&self) -> &str {
+        &self.referenced_table
+    }
+
+    /// Returns the update rule.
+    #[must_use]
+    pub const fn update_rule(&self) -> Option<ReferentialAction> {
+        self.update_rule
+    }
+
+    /// Returns the delete rule.
+    #[must_use]
+    pub const fn delete_rule(&self) -> Option<ReferentialAction> {
+        self.delete_rule
+    }
+
+    /// Returns the local-to-related column mappings.
+    #[must_use]
+    pub fn columns(&self) -> &[KeyColumn] {
+        &self.columns
+    }
+}
+
 impl Key {
+    /// Creates a named key declaration.
+    #[must_use]
+    pub fn new(name: impl Into<String>, kind: KeyKind) -> Self {
+        Self {
+            name: Some(name.into()),
+            kind,
+            referenced_table: None,
+            update_rule: None,
+            delete_rule: None,
+            columns: Vec::new(),
+        }
+    }
+
+    /// Sets the referenced table for a foreign key.
+    #[must_use]
+    pub fn with_referenced_table(mut self, value: impl Into<String>) -> Self {
+        self.referenced_table = Some(value.into());
+        self
+    }
+
+    /// Sets the update rule.
+    #[must_use]
+    pub const fn with_update_rule(mut self, value: Option<ReferentialAction>) -> Self {
+        self.update_rule = value;
+        self
+    }
+
+    /// Sets the delete rule.
+    #[must_use]
+    pub const fn with_delete_rule(mut self, value: Option<ReferentialAction>) -> Self {
+        self.delete_rule = value;
+        self
+    }
+
+    /// Appends a key-column mapping.
+    #[must_use]
+    pub fn with_column(mut self, value: KeyColumn) -> Self {
+        self.columns.push(value);
+        self
+    }
+
     pub(crate) const fn parsed(
         name: Option<String>,
         kind: KeyKind,
@@ -297,6 +470,22 @@ pub struct IndexColumn {
 }
 
 impl IndexColumn {
+    /// Creates a named index-column declaration.
+    #[must_use]
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            ascending: None,
+        }
+    }
+
+    /// Sets the optional ascending-order declaration.
+    #[must_use]
+    pub const fn with_ascending(mut self, value: Option<bool>) -> Self {
+        self.ascending = value;
+        self
+    }
+
     pub(crate) const fn parsed(name: String, ascending: Option<bool>) -> Self {
         Self { name, ascending }
     }
@@ -322,6 +511,38 @@ pub struct Index {
 }
 
 impl Index {
+    /// Creates a named index declaration.
+    #[must_use]
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            unique: None,
+            clustered: None,
+            columns: Vec::new(),
+        }
+    }
+
+    /// Sets the optional uniqueness declaration.
+    #[must_use]
+    pub const fn with_unique(mut self, value: Option<bool>) -> Self {
+        self.unique = value;
+        self
+    }
+
+    /// Sets the optional clustered declaration.
+    #[must_use]
+    pub const fn with_clustered(mut self, value: Option<bool>) -> Self {
+        self.clustered = value;
+        self
+    }
+
+    /// Appends an index-column declaration.
+    #[must_use]
+    pub fn with_column(mut self, value: IndexColumn) -> Self {
+        self.columns.push(value);
+        self
+    }
+
     pub(crate) const fn parsed(
         name: String,
         unique: Option<bool>,
@@ -378,6 +599,33 @@ pub struct Table {
 }
 
 impl Table {
+    /// Creates a named presentation or schema table declaration.
+    #[must_use]
+    pub fn new(name: impl Into<String>, kind: TableKind) -> Self {
+        Self::parsed(name.into(), kind)
+    }
+
+    /// Appends a column declaration.
+    #[must_use]
+    pub fn with_column(mut self, value: Column) -> Self {
+        self.columns.push(value);
+        self
+    }
+
+    /// Appends a key declaration.
+    #[must_use]
+    pub fn with_key(mut self, value: Key) -> Self {
+        self.keys.push(value);
+        self
+    }
+
+    /// Appends an index declaration.
+    #[must_use]
+    pub fn with_index(mut self, value: Index) -> Self {
+        self.indices.push(value);
+        self
+    }
+
     pub(crate) fn parsed(name: String, kind: TableKind) -> Self {
         Self {
             name,

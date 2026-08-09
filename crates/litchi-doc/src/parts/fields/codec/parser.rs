@@ -20,12 +20,18 @@ pub(in crate::parts::fields) use buttons::*;
 pub(in crate::parts::fields) use external::*;
 pub(in crate::parts::fields) use formatting::*;
 pub(in crate::parts::fields) use indexing::*;
-#[allow(unused_imports)]
+#[allow(
+    unused_imports,
+    reason = "parser re-exports are consumed only by feature-dependent grammar paths"
+)]
 pub(in crate::parts::fields) use limits::*;
 pub(in crate::parts::fields) use mail_merge::*;
 pub(in crate::parts::fields) use merge::*;
 pub(in crate::parts::fields) use metadata::*;
 pub(in crate::parts::fields) use numbering::*;
-#[allow(unused_imports)]
+#[allow(
+    unused_imports,
+    reason = "parser re-exports are consumed only by feature-dependent grammar paths"
+)]
 pub(in crate::parts::fields) use parts::*;
 pub(in crate::parts::fields) use references::*;

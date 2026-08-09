@@ -1,4 +1,4 @@
-//! Typed, inert Word OLE-control and ObjectPool metadata.
+//! Typed, inert Word OLE-control and `ObjectPool` metadata.
 
 use crate::package::{Error as PackageError, Result};
 
@@ -6,9 +6,9 @@ use crate::package::{Error as PackageError, Result};
 pub const OBJECT_POOL_STORAGE: &str = "ObjectPool";
 /// The stream containing one object's [`Metadata`] (`ODT`).
 pub const OBJ_INFO_STREAM: &str = "\u{3}ObjInfo";
-/// The optional stream used by streamed ActiveX controls.
+/// The optional stream used by streamed `ActiveX` controls.
 pub const OCX_DATA_STREAM: &str = "\u{3}OCXDATA";
-/// The optional screen/print presentation stream for an ObjectPool entry.
+/// The optional screen/print presentation stream for an `ObjectPool` entry.
 pub const PRINT_STREAM: &str = "\u{3}PRINT";
 /// The optional Enhanced Metafile print-presentation stream.
 pub const EPRINT_STREAM: &str = "\u{3}EPRINT";
@@ -50,6 +50,7 @@ impl Story {
     }
 
     /// The exact on-disk `idoc` value.
+    #[must_use]
     pub const fn raw(self) -> u16 {
         self as u16
     }
@@ -69,7 +70,11 @@ pub struct FieldCounts {
 
 impl FieldCounts {
     /// Construct counts in the story order used by the MS-DOC FIB.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "parameters map one-to-one to a fixed DOC record or semantic construction"
+    )]
+    #[must_use]
     pub const fn new(
         main: u32,
         header: u32,
@@ -91,6 +96,7 @@ impl FieldCounts {
     }
 
     /// Return the field count for one `OcxInfo.idoc` story.
+    #[must_use]
     pub const fn for_story(self, story: Story) -> u32 {
         match story {
             Story::Main => self.main,
@@ -114,7 +120,11 @@ impl Flags {
     const FIFLD: u16 = 1 << 0;
 
     /// Construct the flag word from its individual semantic bits.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "parameters map one-to-one to a fixed DOC record or semantic construction"
+    )]
+    #[must_use]
     pub const fn new(
         eats_return: bool,
         eats_escape: bool,
@@ -159,51 +169,61 @@ impl Flags {
     }
 
     /// The exact serialized flag word.
+    #[must_use]
     pub const fn raw(self) -> u16 {
         self.raw
     }
 
     /// Whether the record is associated with a field (`fifld`).
+    #[must_use]
     pub const fn field_present(self) -> bool {
         self.raw & Self::FIFLD != 0
     }
 
     /// Whether the control consumes ENTER.
+    #[must_use]
     pub const fn eats_return(self) -> bool {
         self.raw & (1 << 1) != 0
     }
 
     /// Whether the control consumes ESC.
+    #[must_use]
     pub const fn eats_escape(self) -> bool {
         self.raw & (1 << 2) != 0
     }
 
     /// Whether the control is the default button.
+    #[must_use]
     pub const fn default_button(self) -> bool {
         self.raw & (1 << 3) != 0
     }
 
     /// Whether the control is the default CANCEL button.
+    #[must_use]
     pub const fn cancel_button(self) -> bool {
         self.raw & (1 << 4) != 0
     }
 
     /// Whether loading the control failed.
+    #[must_use]
     pub const fn failed_load(self) -> bool {
         self.raw & (1 << 5) != 0
     }
 
     /// Whether the control uses right-to-left display handling.
+    #[must_use]
     pub const fn right_to_left(self) -> bool {
         self.raw & (1 << 6) != 0
     }
 
     /// Whether the control is marked corrupt.
+    #[must_use]
     pub const fn corrupt(self) -> bool {
         self.raw & (1 << 7) != 0
     }
 
     /// The ignored high-byte bits, retained losslessly.
+    #[must_use]
     pub const fn reserved_bits(self) -> u8 {
         (self.raw >> 8) as u8
     }
@@ -224,6 +244,7 @@ pub struct OcxInfo {
 impl OcxInfo {
     /// Construct a record. The ignored/reserved values are retained exactly
     /// when the record is serialized.
+    #[must_use]
     pub const fn new(
         cookie: u32,
         field_index: u32,
@@ -250,36 +271,43 @@ impl OcxInfo {
     }
 
     /// Unique `dwCookie` index in the containing table.
+    #[must_use]
     pub const fn cookie(self) -> u32 {
         self.cookie
     }
 
     /// `ifld`, the field index in the story selected by [`Self::story`].
+    #[must_use]
     pub const fn field_index(self) -> u32 {
         self.field_index
     }
 
     /// Undefined `hAccel`, retained without interpretation.
+    #[must_use]
     pub const fn accelerator_handle(self) -> u32 {
         self.accelerator_handle
     }
 
     /// Number of accelerator entries (`cAccel`).
+    #[must_use]
     pub const fn accelerator_count(self) -> u16 {
         self.accelerator_count
     }
 
     /// Semantic and retained bits from the record flag word.
+    #[must_use]
     pub const fn flags(self) -> Flags {
         self.flags
     }
 
     /// Story containing the field referenced by `ifld`.
+    #[must_use]
     pub const fn story(self) -> Story {
         self.story
     }
 
     /// Undefined `reserved2`, retained without interpretation.
+    #[must_use]
     pub const fn reserved(self) -> u16 {
         self.reserved
     }
@@ -303,16 +331,19 @@ impl RgxOcxInfo {
     }
 
     /// Records in their original table order.
+    #[must_use]
     pub fn infos(&self) -> &[OcxInfo] {
         &self.infos
     }
 
     /// Number of records.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.infos.len()
     }
 
     /// Whether no records are present.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.infos.is_empty()
     }
@@ -327,7 +358,7 @@ impl RgxOcxInfo {
     }
 }
 
-/// The format identifier (`cf`) in an ObjectPool `ODT` record.
+/// The format identifier (`cf`) in an `ObjectPool` `ODT` record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u16)]
 pub enum Format {
@@ -362,12 +393,13 @@ impl Format {
     }
 
     /// The exact on-disk `cf` value.
+    #[must_use]
     pub const fn raw(self) -> u16 {
         self as u16
     }
 }
 
-/// The `ODTPersist1` bitfield in an ObjectPool `ODT` record.
+/// The `ODTPersist1` bitfield in an `ObjectPool` `ODT` record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Persist1 {
     raw: u16,
@@ -375,7 +407,10 @@ pub struct Persist1 {
 
 impl Persist1 {
     /// Construct a validated bitfield while retaining undefined bits.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "parameters map one-to-one to a fixed DOC record or semantic construction"
+    )]
     pub fn try_new(
         default_handler: bool,
         linked: bool,
@@ -407,62 +442,73 @@ impl Persist1 {
     }
 
     /// The exact serialized bitfield.
+    #[must_use]
     pub const fn raw(self) -> u16 {
         self.raw
     }
 
     /// Whether Word should assume its default document handler CLSID.
+    #[must_use]
     pub const fn default_handler(self) -> bool {
         self.raw & (1 << 1) != 0
     }
 
     /// Whether the OLE object is a link.
+    #[must_use]
     pub const fn linked(self) -> bool {
         self.raw & (1 << 4) != 0
     }
 
     /// Whether the object is represented by an icon.
+    #[must_use]
     pub const fn display_as_icon(self) -> bool {
         self.raw & (1 << 6) != 0
     }
 
     /// Whether the object is OLE 1-only.
+    #[must_use]
     pub const fn ole1(self) -> bool {
         self.raw & (1 << 7) != 0
     }
 
     /// Whether a link updates only on user action.
+    #[must_use]
     pub const fn manual_update(self) -> bool {
         self.raw & (1 << 8) != 0
     }
 
     /// Whether the object requests resize notifications.
+    #[must_use]
     pub const fn recompose_on_resize(self) -> bool {
         self.raw & (1 << 9) != 0
     }
 
     /// Whether the object is an OLE control.
+    #[must_use]
     pub const fn activex(self) -> bool {
         self.raw & (1 << 12) != 0
     }
 
-    /// Whether an ActiveX control stores its data in `OCXDATA`.
+    /// Whether an `ActiveX` control stores its data in `OCXDATA`.
+    #[must_use]
     pub const fn stream_data(self) -> bool {
         self.raw & (1 << 13) != 0
     }
 
     /// Whether the object supports `IViewObject`.
+    #[must_use]
     pub const fn view_object(self) -> bool {
         self.raw & (1 << 15) != 0
     }
 
     /// Undefined bits retained from `ODTPersist1`.
+    #[must_use]
     pub const fn reserved_bits(self) -> u16 {
         self.raw & super::validation::PERSIST1_UNDEFINED
     }
 }
 
-/// The `ODTPersist2` bitfield in an ObjectPool `ODT` record.
+/// The `ODTPersist2` bitfield in an `ObjectPool` `ODT` record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Persist2 {
     raw: u16,
@@ -489,32 +535,37 @@ impl Persist2 {
     }
 
     /// The exact serialized bitfield.
+    #[must_use]
     pub const fn raw(self) -> u16 {
         self.raw
     }
 
     /// Whether the document presentation is Enhanced Metafile.
+    #[must_use]
     pub const fn enhanced_metafile(self) -> bool {
         self.raw & (1 << 0) != 0
     }
 
     /// Whether the producer queried Enhanced Metafile support.
+    #[must_use]
     pub const fn queried_enhanced_metafile(self) -> bool {
         self.raw & (1 << 2) != 0
     }
 
     /// Whether the object supports Enhanced Metafile data.
+    #[must_use]
     pub const fn stored_as_enhanced_metafile(self) -> bool {
         self.raw & (1 << 3) != 0
     }
 
     /// Undefined bits retained from `ODTPersist2`.
+    #[must_use]
     pub const fn reserved_bits(self) -> u16 {
         self.raw & super::validation::PERSIST2_UNDEFINED
     }
 }
 
-/// Typed `ODT` metadata from one ObjectPool storage.
+/// Typed `ODT` metadata from one `ObjectPool` storage.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Metadata {
     persist1: Persist1,
@@ -523,7 +574,7 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    /// Construct and validate one ObjectPool metadata record.
+    /// Construct and validate one `ObjectPool` metadata record.
     pub fn try_new(persist1: Persist1, format: Format, persist2: Option<Persist2>) -> Result<Self> {
         let value = Self {
             persist1,
@@ -540,33 +591,38 @@ impl Metadata {
     }
 
     /// The required `ODTPersist1` bitfield.
+    #[must_use]
     pub const fn persist1(self) -> Persist1 {
         self.persist1
     }
 
     /// The `cf` presentation format.
+    #[must_use]
     pub const fn format(self) -> Format {
         self.format
     }
 
     /// The optional `ODTPersist2` bitfield, preserving presence separately
     /// from an all-zero value.
+    #[must_use]
     pub const fn persist2(self) -> Option<Persist2> {
         self.persist2
     }
 
-    /// Whether this ObjectPool entry identifies an ActiveX/OLE control.
+    /// Whether this `ObjectPool` entry identifies an ActiveX/OLE control.
+    #[must_use]
     pub const fn is_activex(self) -> bool {
         self.persist1.activex()
     }
 
-    /// Whether the ActiveX data is expected in `OCXDATA`.
+    /// Whether the `ActiveX` data is expected in `OCXDATA`.
+    #[must_use]
     pub const fn stores_control_data_in_stream(self) -> bool {
         self.persist1.stream_data()
     }
 }
 
-/// A validated ObjectPool storage name, such as `_42` or `_-1`.
+/// A validated `ObjectPool` storage name, such as `_42` or `_-1`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct StorageName(String);
 
@@ -579,17 +635,19 @@ impl StorageName {
     }
 
     /// Borrow the exact storage name.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
     /// Consume the name and return its exact spelling.
+    #[must_use]
     pub fn into_string(self) -> String {
         self.0
     }
 }
 
-/// Passive ActiveX state derived from an ObjectPool entry.
+/// Passive `ActiveX` state derived from an `ObjectPool` entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ActiveX {
     stream_data: bool,
@@ -605,17 +663,19 @@ impl ActiveX {
     }
 
     /// Whether the control stores its data in `OCXDATA`.
+    #[must_use]
     pub const fn stream_data(self) -> bool {
         self.stream_data
     }
 
-    /// Whether the selected ObjectPool storage contains `OCXDATA`.
+    /// Whether the selected `ObjectPool` storage contains `OCXDATA`.
+    #[must_use]
     pub const fn data_present(self) -> bool {
         self.data_present
     }
 }
 
-/// One inert ObjectPool storage entry and its recognized metadata.
+/// One inert `ObjectPool` storage entry and its recognized metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Entry {
     name: StorageName,
@@ -627,7 +687,7 @@ pub struct Entry {
 }
 
 impl Entry {
-    /// Construct and validate one passive ObjectPool entry.
+    /// Construct and validate one passive `ObjectPool` entry.
     pub fn try_new(
         name: StorageName,
         class_id: Option<String>,
@@ -659,32 +719,37 @@ impl Entry {
         Ok(value)
     }
 
-    /// Validate the storage-name, `ODT`, and ActiveX stream relationship.
+    /// Validate the storage-name, `ODT`, and `ActiveX` stream relationship.
     pub fn validate(&self) -> Result<()> {
         super::validation::entry(self)
     }
 
-    /// The exact ObjectPool storage name.
+    /// The exact `ObjectPool` storage name.
+    #[must_use]
     pub fn name(&self) -> &StorageName {
         &self.name
     }
 
     /// The CFB storage CLSID, when present in the captured directory entry.
+    #[must_use]
     pub fn class_id(&self) -> Option<&str> {
         self.class_id.as_deref()
     }
 
     /// The typed `\x03ObjInfo` metadata, when the stream was present.
+    #[must_use]
     pub const fn metadata(&self) -> Option<&Metadata> {
         self.metadata.as_ref()
     }
 
     /// Whether the entry is marked as an ActiveX/OLE control.
+    #[must_use]
     pub fn is_activex(&self) -> bool {
-        self.metadata.is_some_and(|value| value.is_activex())
+        self.metadata.is_some_and(Metadata::is_activex)
     }
 
-    /// Passive ActiveX metadata, without opening or executing its payload.
+    /// Passive `ActiveX` metadata, without opening or executing its payload.
+    #[must_use]
     pub fn active_x(&self) -> Option<ActiveX> {
         self.metadata
             .filter(|value| value.is_activex())
@@ -697,50 +762,57 @@ impl Entry {
     }
 
     /// Whether the `\x03OCXDATA` stream was present.
+    #[must_use]
     pub const fn control_data_present(&self) -> bool {
         self.control_data_present
     }
 
     /// Whether the `\x03PRINT` presentation stream was present.
+    #[must_use]
     pub const fn print_present(&self) -> bool {
         self.print_present
     }
 
     /// Whether the `\x03EPRINT` presentation stream was present.
+    #[must_use]
     pub const fn enhanced_print_present(&self) -> bool {
         self.enhanced_print_present
     }
 }
 
-/// An immutable, ordered inventory of selected ObjectPool storages.
+/// An immutable, ordered inventory of selected `ObjectPool` storages.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ObjectPool {
     entries: Vec<Entry>,
 }
 
 impl ObjectPool {
-    /// Construct and validate an ObjectPool inventory.
+    /// Construct and validate an `ObjectPool` inventory.
     pub fn try_new(entries: Vec<Entry>) -> Result<Self> {
         super::validation::pool(&entries)?;
         Ok(Self { entries })
     }
 
     /// Entries in their original CFB discovery order.
+    #[must_use]
     pub fn entries(&self) -> &[Entry] {
         &self.entries
     }
 
-    /// Number of selected ObjectPool storages.
+    /// Number of selected `ObjectPool` storages.
+    #[must_use]
     pub const fn len(&self) -> usize {
         self.entries.len()
     }
 
     /// Whether the inventory is empty.
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
 
     /// Find an entry by its exact storage name.
+    #[must_use]
     pub fn get(&self, name: &str) -> Option<&Entry> {
         self.entries
             .iter()

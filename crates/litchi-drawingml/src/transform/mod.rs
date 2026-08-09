@@ -1,7 +1,7 @@
-//! Typed DrawingML two-dimensional transforms.
+//! Typed `DrawingML` two-dimensional transforms.
 //!
 //! [`Transform`] owns the format-neutral `a:CT_Transform2D` vocabulary from
-//! `[MS-ODRAWXML]` and the DrawingML core schema: offsets, extents, group
+//! `[MS-ODRAWXML]` and the `DrawingML` core schema: offsets, extents, group
 //! child coordinate spaces, flips, and rotation. DOCX, PPTX, XLSX, and XLSB
 //! retain their shape, anchor, and package semantics and consume this owner
 //! for the shared `a:xfrm` subtree.

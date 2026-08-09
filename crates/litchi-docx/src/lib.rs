@@ -1,4 +1,4 @@
-//! Canonical WordprocessingML (`.docx`) APIs.
+//! Canonical `WordprocessingML` (`.docx`) APIs.
 //!
 //! The concise modules own format semantics while [`litchi_opc`] remains the
 //! explicit low-level package graph.

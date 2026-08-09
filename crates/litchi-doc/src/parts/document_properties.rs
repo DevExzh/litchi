@@ -75,6 +75,7 @@ pub enum DocumentPropertyVersion {
 }
 
 impl DocumentPropertyVersion {
+    #[must_use]
     pub const fn byte_len(self) -> usize {
         match self {
             Self::Base => 84,
@@ -268,27 +269,35 @@ impl DocumentTimestamp {
         Ok(Self(raw))
     }
 
+    #[must_use]
     pub const fn raw(self) -> u32 {
         self.0
     }
+    #[must_use]
     pub const fn is_omitted(self) -> bool {
         self.0 == 0
     }
+    #[must_use]
     pub fn minute(self) -> Option<u8> {
         (!self.is_omitted()).then_some((self.0 & 0x3F) as u8)
     }
+    #[must_use]
     pub fn hour(self) -> Option<u8> {
         (!self.is_omitted()).then_some(((self.0 >> 6) & 0x1F) as u8)
     }
+    #[must_use]
     pub fn day(self) -> Option<u8> {
         (!self.is_omitted()).then_some(((self.0 >> 11) & 0x1F) as u8)
     }
+    #[must_use]
     pub fn month(self) -> Option<u8> {
         (!self.is_omitted()).then_some(((self.0 >> 16) & 0x0F) as u8)
     }
+    #[must_use]
     pub fn year(self) -> Option<u16> {
         (!self.is_omitted()).then_some((((self.0 >> 20) & 0x1FF) as u16) + 1900)
     }
+    #[must_use]
     pub fn weekday(self) -> Option<u8> {
         (!self.is_omitted()).then_some(((self.0 >> 29) & 0x07) as u8)
     }
@@ -299,45 +308,59 @@ impl DocumentTimestamp {
 pub struct CompatibilityOptions60(u16);
 
 impl CompatibilityOptions60 {
+    #[must_use]
     pub const fn from_raw(raw: u16) -> Self {
         Self(raw)
     }
+    #[must_use]
     pub const fn raw(self) -> u16 {
         self.0
     }
+    #[must_use]
     pub const fn no_tab_for_indent(self) -> bool {
         self.0 & 0x0001 != 0
     }
+    #[must_use]
     pub const fn no_space_raise_lower(self) -> bool {
         self.0 & 0x0002 != 0
     }
+    #[must_use]
     pub const fn suppress_spacing_after_page_break(self) -> bool {
         self.0 & 0x0004 != 0
     }
+    #[must_use]
     pub const fn wrap_trailing_spaces(self) -> bool {
         self.0 & 0x0008 != 0
     }
+    #[must_use]
     pub const fn map_print_text_color(self) -> bool {
         self.0 & 0x0010 != 0
     }
+    #[must_use]
     pub const fn no_column_balance(self) -> bool {
         self.0 & 0x0020 != 0
     }
+    #[must_use]
     pub const fn convert_mail_merge_escapes(self) -> bool {
         self.0 & 0x0040 != 0
     }
+    #[must_use]
     pub const fn suppress_top_spacing(self) -> bool {
         self.0 & 0x0080 != 0
     }
+    #[must_use]
     pub const fn original_word_table_rules(self) -> bool {
         self.0 & 0x0100 != 0
     }
+    #[must_use]
     pub const fn transparent_metafiles(self) -> bool {
         self.0 & 0x0200 != 0
     }
+    #[must_use]
     pub const fn show_breaks_in_frames(self) -> bool {
         self.0 & 0x0400 != 0
     }
+    #[must_use]
     pub const fn swap_borders_on_facing_pages(self) -> bool {
         self.0 & 0x0800 != 0
     }
@@ -392,68 +415,89 @@ impl DocumentPropertiesBase {
         Ok(value)
     }
 
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8; BASE_SIZE] {
         &self.raw
     }
 
+    #[must_use]
     pub fn facing_pages(&self) -> bool {
         self.raw[0] & 0x01 != 0
     }
+    #[must_use]
     pub fn mail_merge_main_document(&self) -> bool {
         self.raw[0] & 0x04 != 0
     }
+    #[must_use]
     pub fn footnote_placement(&self) -> FootnotePlacement {
         FootnotePlacement::from_bits((self.raw[0] >> 5) & 0x03).expect("validated DopBase fpc")
     }
+    #[must_use]
     pub fn footnote_numbering_restart(&self) -> NoteNumberingRestart {
         NoteNumberingRestart::from_bits(u16_at(&self.raw, 2) & 0x03, "DopBase.rncFtn")
             .expect("validated DopBase rncFtn")
     }
+    #[must_use]
     pub fn footnote_start(&self) -> u16 {
         u16_at(&self.raw, 2) >> 2
     }
+    #[must_use]
     pub fn spelling_complete(&self) -> bool {
         self.raw[4] & 0x40 != 0
     }
+    #[must_use]
     pub fn spelling_clean(&self) -> bool {
         self.raw[4] & 0x80 != 0
     }
+    #[must_use]
     pub fn hide_spelling_errors(&self) -> bool {
         self.raw[5] & 0x01 != 0
     }
+    #[must_use]
     pub fn hide_grammar_errors(&self) -> bool {
         self.raw[5] & 0x02 != 0
     }
+    #[must_use]
     pub fn labels_document(&self) -> bool {
         self.raw[5] & 0x04 != 0
     }
+    #[must_use]
     pub fn hyphenate_capitals(&self) -> bool {
         self.raw[5] & 0x08 != 0
     }
+    #[must_use]
     pub fn auto_hyphenation(&self) -> bool {
         self.raw[5] & 0x10 != 0
     }
+    #[must_use]
     pub fn update_styles_from_template(&self) -> bool {
         self.raw[5] & 0x40 != 0
     }
+    #[must_use]
     pub fn exact_statistics(&self) -> bool {
         self.raw[6] & 0x02 != 0
     }
+    #[must_use]
     pub fn mirror_margins(&self) -> bool {
         self.raw[6] & 0x20 != 0
     }
+    #[must_use]
     pub fn word97_compatibility_mode(&self) -> bool {
         self.raw[6] & 0x40 != 0
     }
+    #[must_use]
     pub fn show_revision_markup(&self) -> bool {
         self.raw[7] & 0x08 != 0
     }
+    #[must_use]
     pub fn print_revision_markup(&self) -> bool {
         self.raw[7] & 0x10 != 0
     }
+    #[must_use]
     pub fn embed_true_type_fonts(&self) -> bool {
         self.raw[7] & 0x80 != 0
     }
+    #[must_use]
     pub fn protection(&self) -> ProtectionSettings {
         ProtectionSettings {
             comments_or_read_only: self.raw[6] & 0x10 != 0,
@@ -463,36 +507,47 @@ impl DocumentPropertiesBase {
             vba_project_locked: self.raw[7] & 0x20 != 0,
         }
     }
+    #[must_use]
     pub fn compatibility_options(&self) -> CompatibilityOptions60 {
         CompatibilityOptions60::from_raw(u16_at(&self.raw, 8))
     }
+    #[must_use]
     pub fn default_tab_stop_twips(&self) -> u16 {
         u16_at(&self.raw, 10)
     }
+    #[must_use]
     pub fn web_code_page(&self) -> u16 {
         u16_at(&self.raw, 12)
     }
+    #[must_use]
     pub fn hyphenation_zone_twips(&self) -> u16 {
         u16_at(&self.raw, 14)
     }
+    #[must_use]
     pub fn consecutive_hyphen_limit(&self) -> u16 {
         u16_at(&self.raw, 16)
     }
+    #[must_use]
     pub fn created_at(&self) -> DocumentTimestamp {
         DocumentTimestamp(u32_at(&self.raw, 20))
     }
+    #[must_use]
     pub fn revised_at(&self) -> DocumentTimestamp {
         DocumentTimestamp(u32_at(&self.raw, 24))
     }
+    #[must_use]
     pub fn last_printed_at(&self) -> DocumentTimestamp {
         DocumentTimestamp(u32_at(&self.raw, 28))
     }
+    #[must_use]
     pub fn revision_count(&self) -> u16 {
         u16_at(&self.raw, 32)
     }
+    #[must_use]
     pub fn editing_minutes(&self) -> i32 {
         i32_at(&self.raw, 34)
     }
+    #[must_use]
     pub fn statistics(&self) -> DocumentStatistics {
         DocumentStatistics {
             words: i32_at(&self.raw, 38),
@@ -507,34 +562,44 @@ impl DocumentPropertiesBase {
             lines_with_subdocuments: i32_at(&self.raw, 74),
         }
     }
+    #[must_use]
     pub fn endnote_numbering_restart(&self) -> NoteNumberingRestart {
         NoteNumberingRestart::from_bits(u16_at(&self.raw, 52) & 0x03, "DopBase.rncEdn")
             .expect("validated DopBase rncEdn")
     }
+    #[must_use]
     pub fn endnote_start(&self) -> u16 {
         u16_at(&self.raw, 52) >> 2
     }
+    #[must_use]
     pub fn endnote_placement(&self) -> EndnotePlacement {
         EndnotePlacement::from_bits(u16_at(&self.raw, 54) & 0x03).expect("validated DopBase epc")
     }
+    #[must_use]
     pub fn print_form_data_only(&self) -> bool {
         u16_at(&self.raw, 54) & 0x0400 != 0
     }
+    #[must_use]
     pub fn save_form_data_only(&self) -> bool {
         u16_at(&self.raw, 54) & 0x0800 != 0
     }
+    #[must_use]
     pub fn shade_form_fields(&self) -> bool {
         u16_at(&self.raw, 54) & 0x1000 != 0
     }
+    #[must_use]
     pub fn shade_merge_fields(&self) -> bool {
         u16_at(&self.raw, 54) & 0x2000 != 0
     }
+    #[must_use]
     pub fn include_subdocuments_in_statistics(&self) -> bool {
         u16_at(&self.raw, 54) & 0x8000 != 0
     }
+    #[must_use]
     pub fn protection_key(&self) -> i32 {
         i32_at(&self.raw, 78)
     }
+    #[must_use]
     pub fn saved_view(&self) -> SavedView {
         let raw = u16_at(&self.raw, 82);
         let percent = (raw >> 3) & 0x01FF;
@@ -704,15 +769,18 @@ impl DocumentProperties {
         })
     }
 
+    #[must_use]
     pub fn version(&self) -> DocumentPropertyVersion {
         self.version
     }
+    #[must_use]
     pub fn base(&self) -> &DocumentPropertiesBase {
         &self.base
     }
     pub fn base_mut(&mut self) -> &mut DocumentPropertiesBase {
         &mut self.base
     }
+    #[must_use]
     pub fn extension_bytes(&self) -> &[u8] {
         &self.extension
     }
@@ -741,15 +809,18 @@ impl DocumentProperties {
             DocumentPropertyVersion::Word2013 => Dop2013::parse(&data).map(Versioned::Word2013),
         }
     }
+    #[must_use]
     pub fn includes_headers(&self) -> Option<bool> {
         self.absolute_u16(DOCINFO5_OFFSET)
             .map(|value| value & INCLUDE_HEADER_MASK != 0)
     }
+    #[must_use]
     pub fn includes_footers(&self) -> Option<bool> {
         self.absolute_u16(DOCINFO5_OFFSET)
             .map(|value| value & INCLUDE_FOOTER_MASK != 0)
     }
     /// Whether Word should preserve embedded smart-tag/factoid metadata.
+    #[must_use]
     pub fn embeds_factoids(&self) -> Option<bool> {
         self.absolute_u16(FACTOID_FLAGS_OFFSET)
             .map(|value| value & EMBED_FACTOIDS_MASK != 0)

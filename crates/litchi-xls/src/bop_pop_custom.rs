@@ -54,7 +54,7 @@ impl<'a> BopPopCustomReader<'a> {
                 expected: end,
                 found: self.data.len(),
             })?;
-        let value: [u8; N] = bytes.try_into().map_err(|_| Error::InvalidLength {
+        let value: [u8; N] = bytes.try_into().map_err(|_error| Error::InvalidLength {
             expected: N,
             found: bytes.len(),
         })?;
@@ -96,6 +96,9 @@ pub struct BopPopCustom {
 
 impl BopPopCustom {
     /// Parse a `BopPopCustom` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         let mut reader = BopPopCustomReader::new(data);
         let cxi = reader.read_u16()?;
@@ -140,6 +143,7 @@ impl BopPopCustom {
     }
 
     /// Serialize back to a complete `BopPopCustom` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(2 + self.bits.len());
         payload.extend_from_slice(&self.data_point_count_plus_one.to_le_bytes());
@@ -148,11 +152,13 @@ impl BopPopCustom {
     }
 
     /// Data point count plus one (`cxi`).
+    #[must_use]
     pub fn data_point_count_plus_one(&self) -> u16 {
         self.data_point_count_plus_one
     }
 
     /// The raw `rggrbit` bytes, preserved verbatim.
+    #[must_use]
     pub fn bits(&self) -> &[u8] {
         &self.bits
     }
@@ -162,6 +168,7 @@ impl BopPopCustom {
     ///
     /// Returns `None` when `index` is out of range (the series has
     /// `cxi - 1` data points).
+    #[must_use]
     pub fn is_secondary(&self, index: u16) -> Option<bool> {
         if index >= self.data_point_count_plus_one.saturating_sub(1) {
             return None;
@@ -178,6 +185,7 @@ impl BopPopCustom {
 
     /// Whether the final least significant bit is set, marking that the
     /// secondary bar/pie does not contain data points.
+    #[must_use]
     pub fn secondary_is_empty(&self) -> bool {
         self.bits.last().is_some_and(|last| last & 0x01 != 0)
     }

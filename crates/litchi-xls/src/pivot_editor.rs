@@ -1,4 +1,4 @@
-//! Transactional rewrite of existing BIFF8 worksheet PivotTable views.
+//! Transactional rewrite of existing BIFF8 worksheet `PivotTable` views.
 
 use std::collections::{HashMap, HashSet};
 use std::io::Cursor;
@@ -7,7 +7,13 @@ use litchi_cfb::{OleFile, OleWriter};
 
 use super::Workbook;
 use super::error::{Error, Result};
-use super::pivot_table::*;
+use super::pivot_table::{
+    PivotAdditionalExtension, PivotAxisField, PivotCache, PivotCacheGrouping, PivotCacheItem,
+    PivotLayoutLine, PivotQueryTag, PivotTable, PivotViewEx9, PivotViewExtension,
+    PivotViewFieldExtension, QSI_SX_TAG_TYPE, SXADDL_TYPE, SXDI_TYPE, SXEX_TYPE, SXIVD_TYPE,
+    SXLI_TYPE, SXPI_TYPE, SXVD_TYPE, SXVDEX_TYPE, SXVIEW_TYPE, SXVIEWEX9_TYPE,
+    is_worksheet_view_record, parse_qsi_sx_tag,
+};
 use super::writer::biff;
 
 const BOUNDSHEET: u16 = 0x0085;
@@ -15,7 +21,7 @@ const BOF: u16 = 0x0809;
 const EOF: u16 = 0x000A;
 const MAX_RECORD: usize = 8_224;
 
-/// An owned, transactional editor for PivotTable worksheet views in an XLS file.
+/// An owned, transactional editor for `PivotTable` worksheet views in an XLS file.
 pub struct PivotViewEditor {
     original: Vec<u8>,
     original_tables: Vec<Vec<PivotTable>>,
@@ -27,12 +33,15 @@ pub struct PivotViewEditor {
 
 impl PivotViewEditor {
     /// Parses an owned XLS file. Calling [`finish`](Self::finish) without edits returns these bytes unchanged.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(bytes: Vec<u8>) -> Result<Self> {
         let workbook = Workbook::new(Cursor::new(bytes.clone()))?;
         let worksheet_count = workbook
             .sheets()
             .iter()
-            .filter_map(|sheet| sheet.parsed_worksheet_index())
+            .filter_map(super::sheet_metadata::SheetMetadata::parsed_worksheet_index)
             .max()
             .map_or(0, |value| value + 1);
         let mut tables = vec![Vec::new(); worksheet_count];
@@ -53,9 +62,13 @@ impl PivotViewEditor {
         })
     }
 
+    #[must_use]
     pub fn worksheet_count(&self) -> usize {
         self.tables.len()
     }
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn pivot_tables(&self, worksheet: usize) -> Result<&[PivotTable]> {
         self.tables
             .get(worksheet)
@@ -63,6 +76,9 @@ impl PivotViewEditor {
             .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet index {worksheet}")))
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add(&mut self, worksheet: usize, table: PivotTable) -> Result<()> {
         self.transaction(|tables, _| {
             let target = tables
@@ -82,6 +98,12 @@ impl PivotViewEditor {
         })
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// # Panics
+    ///
+    /// Panics only if an internal BIFF invariant has been violated.
     pub fn replace_by_index(
         &mut self,
         worksheet: usize,
@@ -97,6 +119,9 @@ impl PivotViewEditor {
         Ok(removed.expect("transaction ran"))
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn replace_by_name(
         &mut self,
         worksheet: usize,
@@ -107,6 +132,9 @@ impl PivotViewEditor {
         self.replace_by_index(worksheet, index, table)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn update_by_index<F>(&mut self, worksheet: usize, index: usize, update: F) -> Result<()>
     where
         F: FnOnce(&mut PivotTable),
@@ -117,6 +145,9 @@ impl PivotViewEditor {
         })
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn update_by_name<F>(&mut self, worksheet: usize, name: &str, update: F) -> Result<()>
     where
         F: FnOnce(&mut PivotTable),
@@ -125,6 +156,12 @@ impl PivotViewEditor {
         self.update_by_index(worksheet, index, update)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// # Panics
+    ///
+    /// Panics only if an internal BIFF invariant has been violated.
     pub fn remove_by_index(&mut self, worksheet: usize, index: usize) -> Result<PivotTable> {
         let mut removed = None;
         self.transaction(|tables, _| {
@@ -140,11 +177,17 @@ impl PivotViewEditor {
         Ok(removed.expect("transaction ran"))
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn remove_by_name(&mut self, worksheet: usize, name: &str) -> Result<PivotTable> {
         let index = self.index_by_name(worksheet, name)?;
         self.remove_by_index(worksheet, index)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn move_by_index(
         &mut self,
         from_sheet: usize,
@@ -175,6 +218,9 @@ impl PivotViewEditor {
         })
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn move_by_name(
         &mut self,
         from_sheet: usize,
@@ -186,6 +232,9 @@ impl PivotViewEditor {
         self.move_by_index(from_sheet, index, to_sheet, to_index)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn reassign_cache_by_index(
         &mut self,
         worksheet: usize,
@@ -193,10 +242,13 @@ impl PivotViewEditor {
         cache_index: u16,
     ) -> Result<()> {
         self.update_by_index(worksheet, index, |table| {
-            table.view.cache_index = cache_index
+            table.view.cache_index = cache_index;
         })
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn reassign_cache_by_name(
         &mut self,
         worksheet: usize,
@@ -208,6 +260,9 @@ impl PivotViewEditor {
     }
 
     /// Replaces grouping on a cache field and repairs the base-field child link atomically.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn update_cache_grouping(
         &mut self,
         cache_index: u16,
@@ -247,6 +302,9 @@ impl PivotViewEditor {
     }
 
     /// Serializes all staged edits. Validation and serialization complete before any output is returned.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn finish(self) -> Result<Vec<u8>> {
         if self.tables == self.original_tables && self.caches == self.original_caches {
             return Ok(self.original);
@@ -342,10 +400,10 @@ fn normalize_tables(sheets: &mut [Vec<PivotTable>]) -> Result<()> {
     for tables in sheets {
         for table in tables {
             table.view.field_count = u16::try_from(table.fields.len())
-                .map_err(|_| invalid(SXVIEW_TYPE, "field count overflow"))?;
+                .map_err(|_error| invalid(SXVIEW_TYPE, "field count overflow"))?;
             for field in &mut table.fields {
                 field.item_count = u16::try_from(field.items.len())
-                    .map_err(|_| invalid(SXVD_TYPE, "item count overflow"))?;
+                    .map_err(|_error| invalid(SXVD_TYPE, "item count overflow"))?;
             }
             table.items = table
                 .fields
@@ -353,17 +411,17 @@ fn normalize_tables(sheets: &mut [Vec<PivotTable>]) -> Result<()> {
                 .flat_map(|field| field.items.iter().cloned())
                 .collect();
             table.view.row_field_count = u16::try_from(table.row_fields.len())
-                .map_err(|_| invalid(SXIVD_TYPE, "row axis count overflow"))?;
+                .map_err(|_error| invalid(SXIVD_TYPE, "row axis count overflow"))?;
             table.view.col_field_count = u16::try_from(table.column_fields.len())
-                .map_err(|_| invalid(SXIVD_TYPE, "column axis count overflow"))?;
+                .map_err(|_error| invalid(SXIVD_TYPE, "column axis count overflow"))?;
             table.view.page_field_count = u16::try_from(table.page_entries.len())
-                .map_err(|_| invalid(SXPI_TYPE, "page count overflow"))?;
+                .map_err(|_error| invalid(SXPI_TYPE, "page count overflow"))?;
             table.view.data_field_count = u16::try_from(table.data_items.len())
-                .map_err(|_| invalid(SXDI_TYPE, "data count overflow"))?;
+                .map_err(|_error| invalid(SXDI_TYPE, "data count overflow"))?;
             table.view.data_row_count = u16::try_from(table.row_lines.len())
-                .map_err(|_| invalid(SXLI_TYPE, "row line count overflow"))?;
+                .map_err(|_error| invalid(SXLI_TYPE, "row line count overflow"))?;
             table.view.data_col_count = u16::try_from(table.column_lines.len())
-                .map_err(|_| invalid(SXLI_TYPE, "column line count overflow"))?;
+                .map_err(|_error| invalid(SXLI_TYPE, "column line count overflow"))?;
             if let Some(tag) = &mut table.query_tag {
                 tag.table_name.clone_from(&table.view.name);
             }
@@ -451,7 +509,7 @@ fn rewrite_workbook_stream(
             let position = usize::try_from(u32::from_le_bytes(
                 body[..4].try_into().expect("length checked"),
             ))
-            .map_err(|_| invalid(BOUNDSHEET, "offset overflow"))?;
+            .map_err(|_error| invalid(BOUNDSHEET, "offset overflow"))?;
             let sheet_type = body[5];
             let parsed = (sheet_type == 0).then(|| {
                 let current = worksheet_index;
@@ -529,7 +587,7 @@ fn rewrite_workbook_stream(
             .ok_or_else(|| invalid(BOUNDSHEET, "BoundSheet payload is outside globals"))?;
         payload.copy_from_slice(
             &u32::try_from(new_position)
-                .map_err(|_| invalid(BOUNDSHEET, "new sheet offset overflow"))?
+                .map_err(|_error| invalid(BOUNDSHEET, "new sheet offset overflow"))?
                 .to_le_bytes(),
         );
     }
@@ -697,7 +755,9 @@ fn write_lines(out: &mut Vec<u8>, lines: &[PivotLayoutLine]) -> Result<()> {
     for line in lines {
         body.extend_from_slice(&line.repeated_item_count.to_le_bytes());
         body.extend_from_slice(&line.item_type.to_le_bytes());
-        body.extend_from_slice(&(line.item_indices.len() as u16).to_le_bytes());
+        body.extend_from_slice(
+            &crate::utils::truncate_usize_to_u16(line.item_indices.len()).to_le_bytes(),
+        );
         body.extend_from_slice(&line.custom_name_flags.to_le_bytes());
         for value in &line.item_indices {
             body.extend_from_slice(&value.to_le_bytes());
@@ -715,7 +775,9 @@ fn write_field_extension(out: &mut Vec<u8>, value: &PivotViewFieldExtension) -> 
         &value
             .subtotal_name
             .as_ref()
-            .map_or(u16::MAX, |s| s.chars().count() as u16)
+            .map_or(u16::MAX, |s| {
+                crate::utils::truncate_usize_to_u16(s.chars().count())
+            })
             .to_le_bytes(),
     );
     body.extend_from_slice(&value.reserved);
@@ -738,7 +800,9 @@ fn write_view_extension(out: &mut Vec<u8>, v: &PivotViewExtension) -> Result<()>
     for s in &strings[..3] {
         body.extend_from_slice(
             &s.as_ref()
-                .map_or(u16::MAX, |x| x.chars().count() as u16)
+                .map_or(u16::MAX, |x| {
+                    crate::utils::truncate_usize_to_u16(x.chars().count())
+                })
                 .to_le_bytes(),
         );
     }
@@ -749,7 +813,9 @@ fn write_view_extension(out: &mut Vec<u8>, v: &PivotViewExtension) -> Result<()>
     for s in &strings[3..] {
         body.extend_from_slice(
             &s.as_ref()
-                .map_or(u16::MAX, |x| x.chars().count() as u16)
+                .map_or(u16::MAX, |x| {
+                    crate::utils::truncate_usize_to_u16(x.chars().count())
+                })
                 .to_le_bytes(),
         );
     }
@@ -796,7 +862,7 @@ fn no_cch(value: &str) -> Vec<u8> {
     if value.chars().any(|c| c as u32 > 0xff) {
         let mut out = vec![1];
         for unit in value.encode_utf16() {
-            out.extend_from_slice(&unit.to_le_bytes())
+            out.extend_from_slice(&unit.to_le_bytes());
         }
         out
     } else {
@@ -806,7 +872,9 @@ fn no_cch(value: &str) -> Vec<u8> {
     }
 }
 fn full_string(value: &str) -> Vec<u8> {
-    let mut out = (value.chars().count() as u16).to_le_bytes().to_vec();
+    let mut out = crate::utils::truncate_usize_to_u16(value.chars().count())
+        .to_le_bytes()
+        .to_vec();
     out.extend_from_slice(&no_cch(value));
     out
 }
@@ -815,7 +883,7 @@ fn record(out: &mut Vec<u8>, kind: u16, body: &[u8]) -> Result<()> {
         return Err(invalid(kind, "record exceeds BIFF8 size"));
     }
     out.extend_from_slice(&kind.to_le_bytes());
-    out.extend_from_slice(&(body.len() as u16).to_le_bytes());
+    out.extend_from_slice(&crate::utils::truncate_usize_to_u16(body.len()).to_le_bytes());
     out.extend_from_slice(body);
     Ok(())
 }
@@ -856,7 +924,7 @@ fn regenerate_caches(caches: &[PivotCache], dirty: &HashSet<u16>) -> Result<Hash
                     .ok_or_else(|| invalid(0x00C8, "cache row is short"))?;
                 if numeric[i] && field.items().is_empty() {
                     if let PivotCacheItem::Number(n) = value {
-                        nums.push(*n)
+                        nums.push(*n);
                     } else {
                         return Err(invalid(0x00C8, "unsupported inline typed cache rewrite"));
                     }
@@ -869,14 +937,14 @@ fn regenerate_caches(caches: &[PivotCache], dirty: &HashSet<u16>) -> Result<Hash
                                 .position(|item| item == value)
                                 .ok_or_else(|| invalid(0x00C8, "cache row item is not shared"))?,
                         )
-                        .map_err(|_| invalid(0x00C8, "cache item ordinal overflow"))?,
-                    )
+                        .map_err(|_error| invalid(0x00C8, "cache item ordinal overflow"))?,
+                    );
                 } else {
                     return Err(invalid(0x00C8, "unsupported inline typed cache rewrite"));
                 }
             }
             indices.push(ix);
-            numbers.push(nums)
+            numbers.push(nums);
         }
         let infos = cache
             .fields()
@@ -886,7 +954,7 @@ fn regenerate_caches(caches: &[PivotCache], dirty: &HashSet<u16>) -> Result<Hash
                 name: f.name(),
                 items: f.items(),
                 is_numeric: numeric[i],
-                unique_numeric_count: f.items().len() as u16,
+                unique_numeric_count: crate::utils::truncate_usize_to_u16(f.items().len()),
                 grouping: f.grouping(),
                 group_child: f.group_parent(),
                 is_source_field: source[i],
@@ -911,7 +979,10 @@ fn regenerate_caches(caches: &[PivotCache], dirty: &HashSet<u16>) -> Result<Hash
     Ok(result)
 }
 
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "type mirrors the decoded BIFF record structure"
+)]
 fn record_ranges(data: &[u8]) -> Result<Vec<(usize, usize, u16, usize, usize)>> {
     let mut out = Vec::new();
     let mut offset = 0usize;

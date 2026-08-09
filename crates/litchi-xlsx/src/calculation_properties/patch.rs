@@ -18,21 +18,25 @@ impl Patch {
     }
 
     /// Source state required before application.
+    #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Exact state produced by application.
+    #[must_use]
     pub fn after(&self) -> &Snapshot {
         &self.after
     }
 
     /// Whether this patch preserves the source byte-for-byte.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
     /// Return the exact source-bound inverse.
+    #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
@@ -97,21 +101,25 @@ impl Commit {
     }
 
     /// Whether exact authored calculation metadata changed.
+    #[must_use]
     pub fn changed(&self) -> bool {
         self.changed
     }
 
     /// Resulting immutable source-bound state.
+    #[must_use]
     pub fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Exact reversible patch produced by the transaction.
+    #[must_use]
     pub fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Consume this result into its snapshot and patch.
+    #[must_use]
     pub fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }

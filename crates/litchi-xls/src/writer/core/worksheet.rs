@@ -37,8 +37,8 @@ impl CellPos {
                 "row {row}, column {col} is outside the BIFF8 grid"
             ))
         };
-        let row = u16::try_from(row).map_err(|_| invalid())?;
-        let col = u8::try_from(col).map_err(|_| invalid())?;
+        let row = u16::try_from(row).map_err(|_error| invalid())?;
+        let col = u8::try_from(col).map_err(|_error| invalid())?;
         Ok(Self { row, col })
     }
 
@@ -143,7 +143,7 @@ pub(super) struct HorizontalPageBreak {
 
 impl HorizontalPageBreak {
     pub(super) fn try_new(row: u32, col_start: u16, col_end: u16) -> Result<Self> {
-        let row = u16::try_from(row).map_err(|_| {
+        let row = u16::try_from(row).map_err(|_error| {
             Error::InvalidCellReference(format!(
                 "horizontal page-break row {row} is outside the BIFF8 grid"
             ))
@@ -183,9 +183,9 @@ impl VerticalPageBreak {
                 "vertical page-break column {col}, rows {row_start}..={row_end} are outside the BIFF8 grid"
             ))
         };
-        let col = u8::try_from(col).map_err(|_| invalid())?;
-        let row_start = u16::try_from(row_start).map_err(|_| invalid())?;
-        let row_end = u16::try_from(row_end).map_err(|_| invalid())?;
+        let col = u8::try_from(col).map_err(|_error| invalid())?;
+        let row_start = u16::try_from(row_start).map_err(|_error| invalid())?;
+        let row_end = u16::try_from(row_end).map_err(|_error| invalid())?;
         if row_end <= row_start {
             return Err(invalid());
         }
@@ -283,7 +283,7 @@ pub(super) struct WritableWorksheet {
     pub comments: Vec<WritableComment>,
     pub shapes: Vec<ShapeWrite>,
     pub shape_groups: Vec<ShapeGroupWrite>,
-    /// Per-column AutoFilter conditions.
+    /// Per-column `AutoFilter` conditions.
     pub auto_filter_columns: Vec<AutoFilterColumnDef>,
     /// Sort configuration.
     pub sort_config: Option<SortConfig>,
@@ -306,7 +306,7 @@ pub(super) struct WritableWorksheet {
     pub web_publications: Vec<crate::WebPub>,
 }
 
-/// A column-level AutoFilter condition for the writer.
+/// A column-level `AutoFilter` condition for the writer.
 #[derive(Debug, Clone)]
 pub(super) struct AutoFilterColumnDef {
     /// Column index within the filter range (0-based relative to filter start).
@@ -325,7 +325,7 @@ pub(super) struct SortConfig {
     pub case_sensitive: bool,
     /// true = sort by columns (left-to-right), false = by rows (top-to-bottom)
     pub sort_by_columns: bool,
-    /// Up to 3 sort keys: (column_index, descending).
+    /// Up to 3 sort keys: (`column_index`, descending).
     pub keys: Vec<(u16, bool)>,
 }
 
@@ -442,7 +442,7 @@ impl WritableWorksheet {
         });
     }
     pub(super) fn add_conditional_format_group(&mut self, group: ConditionalFormatGroup) {
-        self.conditional_formats.push(group)
+        self.conditional_formats.push(group);
     }
     pub(super) fn add_conditional_format12_group(&mut self, group: ConditionalFormat12Group) {
         self.conditional_formats12.push(group);
@@ -479,7 +479,7 @@ impl WritableWorksheet {
     pub(super) fn add_comment(&mut self, comment: WritableComment) -> Result<()> {
         self.comments
             .try_reserve(1)
-            .map_err(|_| Error::Allocation("reserving worksheet comment storage"))?;
+            .map_err(|_error| Error::Allocation("reserving worksheet comment storage"))?;
         self.comments.push(comment);
         Ok(())
     }
@@ -524,8 +524,8 @@ impl WritableWorksheet {
         // range.  Excel validates that the DIMENSIONS record covers the
         // SXVIEW output area; a mismatch causes a "corrupt file" repair
         // dialog.
-        let pt_first_row = pt.first_row as u32;
-        let pt_last_row_excl = pt.last_row as u32 + 1; // DIMENSIONS uses exclusive end
+        let pt_first_row = u32::from(pt.first_row);
+        let pt_last_row_excl = u32::from(pt.last_row) + 1; // DIMENSIONS uses exclusive end
         let pt_first_col = pt.first_col;
         let pt_last_col_excl = pt.last_col + 1;
 
@@ -548,12 +548,15 @@ impl WritableWorksheet {
 impl Writer {
     /// Write one inert BIFF8 shared formula and its participating cells.
     ///
-    /// `range` becomes the ShrFmla `RefU`. `participants` is the complete
+    /// `range` becomes the `ShrFmla` `RefU`. `participants` is the complete
     /// participating-cell set when non-empty and therefore must include
     /// `anchor`; an empty slice means that only the anchor participates. The
     /// anchor must not follow any participating cell in worksheet row-major
     /// order because the CELLTABLE grammar requires the anchor Formula and its
-    /// ShrFmla to precede the other Formula records.
+    /// `ShrFmla` to precede the other Formula records.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn write_shared_formula(
         &mut self,
         sheet: usize,
@@ -566,6 +569,9 @@ impl Writer {
     }
 
     /// Write a formatted BIFF8 shared formula.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn write_shared_formula_with_format(
         &mut self,
         sheet: usize,
@@ -647,6 +653,9 @@ impl Writer {
     /// is compiled by the bounded, non-executing array compiler and cached
     /// results remain the canonical BIFF8 Empty value. Authored Array records
     /// request recalculation by default, but this crate never evaluates them.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn write_array_formula(
         &mut self,
         sheet: usize,
@@ -663,6 +672,9 @@ impl Writer {
     }
 
     /// Write an inert BIFF8 array formula with explicit resource limits.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn write_array_formula_with_limits(
         &mut self,
         sheet: usize,
@@ -674,6 +686,9 @@ impl Writer {
     }
 
     /// Write a formatted, inert BIFF8 array formula over a complete rectangle.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn write_array_formula_with_format(
         &mut self,
         sheet: usize,
@@ -691,6 +706,9 @@ impl Writer {
     }
 
     /// Write a formatted, inert BIFF8 array formula with explicit limits.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn write_array_formula_with_format_and_limits(
         &mut self,
         sheet: usize,
@@ -764,7 +782,7 @@ impl Writer {
         let mut candidates = Vec::new();
         candidates
             .try_reserve_exact(cell_count)
-            .map_err(|_| Error::Allocation("reserving array-formula cells"))?;
+            .map_err(|_error| Error::Allocation("reserving array-formula cells"))?;
         for row in first.row()..=last.row() {
             for col in first.col()..=last.col() {
                 candidates.push(
@@ -786,7 +804,7 @@ impl Writer {
         worksheet
             .cells
             .try_reserve(cell_count)
-            .map_err(|_| Error::Allocation("reserving array-formula worksheet cells"))?;
+            .map_err(|_error| Error::Allocation("reserving array-formula worksheet cells"))?;
         for cell in candidates {
             worksheet.add_cell(cell);
         }
@@ -832,7 +850,7 @@ pub(super) struct WritablePivotTable {
     pub fields: Vec<WritablePivotField>,
     /// Data item definitions.
     pub data_items: Vec<WritablePivotDataItem>,
-    /// Page field entries: (item_index, field_index, object_id).
+    /// Page field entries: (`item_index`, `field_index`, `object_id`).
     pub page_entries: Vec<(u16, u16, u16)>,
     /// Source data rows for the pivot cache.
     pub source_data: Vec<Vec<super::PivotCacheValue>>,

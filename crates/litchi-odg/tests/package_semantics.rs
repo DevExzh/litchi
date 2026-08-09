@@ -5,6 +5,7 @@ use litchi_odf_common::{
     core::{OwnedPackage, PackageWriter},
 };
 use litchi_odg::{Drawing, shape::ShapeKind};
+use soapberry_zip::office::StreamingArchiveWriter;
 
 const CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xml="http://www.w3.org/XML/1998/namespace" office:version="1.3"><office:body><office:drawing><draw:page draw:name="Page 1" draw:style-name="dp1" draw:master-page-name="Default" xml:id="page1"><draw:layer-set><draw:layer draw:name="Foreground" draw:display="always" draw:protected="false"/><draw:layer draw:name="Background"/></draw:layer-set><draw:rect draw:name="Label" draw:layer="Foreground" draw:style-name="gr1" draw:text-style-name="P1" draw:z-index="7" svg:x="1cm" svg:y="2cm" svg:width="3cm" svg:height="4cm"><svg:title>Label title</svg:title><svg:desc>Label description</svg:desc><text:p>Old label</text:p></draw:rect><draw:frame draw:name="Photo" draw:layer="Background" svg:width="2cm" svg:height="1cm"><svg:title>Photo title</svg:title><svg:desc>Photo description</svg:desc></draw:frame></draw:page></office:drawing></office:body></office:document-content>"#;
 
@@ -15,6 +16,20 @@ fn package(content: &str) -> Vec<u8> {
         .unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     writer.finish_to_bytes().unwrap()
+}
+
+fn raw_negative_fixture_package(content: &str) -> Vec<u8> {
+    const MIMETYPE: &[u8] = b"application/vnd.oasis.opendocument.graphics";
+    const MANIFEST: &[u8] = br#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.graphics"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#;
+    let mut archive = StreamingArchiveWriter::new();
+    archive.write_stored("mimetype", MIMETYPE).unwrap();
+    archive
+        .write_deflated("content.xml", content.as_bytes())
+        .unwrap();
+    archive
+        .write_deflated("META-INF/manifest.xml", MANIFEST)
+        .unwrap();
+    archive.finish_to_bytes().unwrap()
 }
 
 #[test]
@@ -193,10 +208,10 @@ fn ended_page_scope_does_not_capture_shapes_outside_a_page() {
 #[test]
 fn dtd_and_noncompact_rewrite_are_refused_without_execution() {
     let dtd = CONTENT.replacen("<office:body>", "<!DOCTYPE drawing><office:body>", 1);
-    assert!(Drawing::from_bytes(package(&dtd)).is_err());
+    assert!(Drawing::from_bytes(raw_negative_fixture_package(&dtd)).is_err());
 
     let noncompact = CONTENT.replacen("<office:body>", "\n<office:body>", 1);
-    let drawing = Drawing::from_bytes(package(&noncompact)).unwrap();
+    let drawing = Drawing::from_bytes(raw_negative_fixture_package(&noncompact)).unwrap();
     let mut transaction = drawing.edit();
     transaction.set_shape_text(0, 0, "New label").unwrap();
     assert!(transaction.commit().is_err());

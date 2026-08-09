@@ -41,13 +41,13 @@ impl WritableComment {
         let mut owned_author = String::new();
         owned_author
             .try_reserve_exact(author.len())
-            .map_err(|_| Error::Allocation("reserving comment-author storage"))?;
+            .map_err(|_error| Error::Allocation("reserving comment-author storage"))?;
         owned_author.push_str(author);
 
         let mut owned_text = String::new();
         owned_text
             .try_reserve_exact(text.len())
-            .map_err(|_| Error::Allocation("reserving comment-text storage"))?;
+            .map_err(|_error| Error::Allocation("reserving comment-text storage"))?;
         owned_text.push_str(text);
 
         Ok(Self {
@@ -73,10 +73,10 @@ pub(crate) fn validate_comment(
     text: &str,
     options: &CommentWriteOptions,
 ) -> Result<(u16, u8)> {
-    let row = u16::try_from(row).map_err(|_| {
+    let row = u16::try_from(row).map_err(|_error| {
         Error::InvalidData("comment row exceeds the BIFF8 limit of 65535".to_string())
     })?;
-    let column = u8::try_from(column).map_err(|_| {
+    let column = u8::try_from(column).map_err(|_error| {
         Error::InvalidData("comment column exceeds the BIFF8 limit of 255".to_string())
     })?;
     let author_len = author.encode_utf16().count();
@@ -139,7 +139,7 @@ pub(crate) fn deterministic_comment_guid(
 ) -> [u8; 16] {
     let mut guid = [0u8; 16];
     guid[0..4].copy_from_slice(b"LTCM");
-    guid[4..8].copy_from_slice(&(sheet_index as u32).to_le_bytes());
+    guid[4..8].copy_from_slice(&crate::utils::truncate_usize_to_u32(sheet_index).to_le_bytes());
     guid[8..10].copy_from_slice(&row.to_le_bytes());
     guid[10] = column;
     guid[11] = 0x40;

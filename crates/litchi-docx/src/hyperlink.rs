@@ -1,3 +1,11 @@
+#![expect(
+    clippy::match_same_arms,
+    reason = "separate arms document distinct OOXML grammar cases"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Hyperlink support for reading hyperlinks from Word documents.
 //!
 //! This module provides types and methods for accessing hyperlinks in Word documents.
@@ -71,45 +79,52 @@ impl Hyperlink {
 
     /// Get the display text of the hyperlink.
     #[inline]
+    #[must_use]
     pub fn text(&self) -> &str {
         &self.text
     }
 
     /// Get the target URL of the hyperlink (if external).
     #[inline]
+    #[must_use]
     pub fn url(&self) -> Option<&str> {
         self.url.as_deref()
     }
 
     /// Get the bookmark anchor of the hyperlink (if internal).
     #[inline]
+    #[must_use]
     pub fn anchor(&self) -> Option<&str> {
         self.anchor.as_deref()
     }
 
     /// Get the tooltip text of the hyperlink.
     #[inline]
+    #[must_use]
     pub fn tooltip(&self) -> Option<&str> {
         self.tooltip.as_deref()
     }
 
     /// Return the display text of the hyperlink.
     ///
-    /// This is an alias for [`Self::text`], matching the WordprocessingML
+    /// This is an alias for [`Self::text`], matching the `WordprocessingML`
     /// terminology for the text rendered inside the hyperlink element.
     #[inline]
+    #[must_use]
     pub fn display(&self) -> &str {
         self.text()
     }
 
     /// Check if this is an external hyperlink (has a URL).
     #[inline]
+    #[must_use]
     pub fn is_external(&self) -> bool {
         self.url.is_some()
     }
 
     /// Check if this is an internal hyperlink (has an anchor).
     #[inline]
+    #[must_use]
     pub fn is_internal(&self) -> bool {
         self.anchor.is_some()
     }
@@ -124,6 +139,10 @@ impl Hyperlink {
     /// # Returns
     ///
     /// A vector of hyperlinks found in the paragraph
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn extract_from_paragraph(para_xml: &[u8], rels: &Relationships) -> Result<Vec<Hyperlink>> {
         Self::extract_from_xml(para_xml, rels)
     }
@@ -138,6 +157,10 @@ impl Hyperlink {
     /// # Returns
     ///
     /// A vector of all hyperlinks found in the document
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn extract_from_document(doc_xml: &[u8], rels: &Relationships) -> Result<Vec<Hyperlink>> {
         Self::extract_from_xml(doc_xml, rels)
     }

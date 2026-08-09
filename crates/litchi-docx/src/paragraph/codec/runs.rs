@@ -1,3 +1,7 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Zero-copy paragraph child traversal.
 
 use crate::error::{Error, Result};
@@ -20,6 +24,10 @@ impl Paragraph {
     /// # Performance
     ///
     /// Uses namespace-aware streaming boundary detection and shared XML slices.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn runs(&self) -> Result<SmallVec<[Run; 8]>> {
         enum RunEvent {
             Start,
@@ -39,9 +47,10 @@ impl Paragraph {
         let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
 
         loop {
-            let event_start = usize::try_from(reader.buffer_position()).map_err(|_| {
-                Error::InvalidFormat("Word paragraph offset does not fit usize".to_string())
-            })?;
+            let event_start =
+                usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+                    Error::InvalidFormat("Word paragraph offset does not fit usize".to_string())
+                })?;
             let event = {
                 let (namespace, event) = reader
                     .read_resolved_event()
@@ -84,10 +93,19 @@ impl Paragraph {
                     },
                     Event::End(_) if run_start.is_some() => RunEvent::End,
                     Event::Eof => RunEvent::Eof,
-                    _ => RunEvent::Other,
+                    Event::Start(_)
+                    | Event::End(_)
+                    | Event::Empty(_)
+                    | Event::Text(_)
+                    | Event::CData(_)
+                    | Event::Comment(_)
+                    | Event::Decl(_)
+                    | Event::PI(_)
+                    | Event::DocType(_)
+                    | Event::GeneralRef(_) => RunEvent::Other,
                 }
             };
-            let event_end = usize::try_from(reader.buffer_position()).map_err(|_| {
+            let event_end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
                 Error::InvalidFormat("Word paragraph offset does not fit usize".to_string())
             })?;
 
@@ -133,7 +151,7 @@ impl Paragraph {
                     return Err(Error::InvalidFormat("unterminated Word run".to_string()));
                 },
                 RunEvent::Eof => break,
-                _ => {},
+                RunEvent::Other => {},
             }
         }
 
@@ -141,6 +159,10 @@ impl Paragraph {
     }
 
     /// Return all run-level smart tags in document order, including nested tags.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn smart_tags(&self) -> Result<Vec<SmartTag>> {
         enum SmartTagEvent {
             Start(bool),
@@ -159,9 +181,10 @@ impl Paragraph {
         let mut ranges = Vec::new();
 
         loop {
-            let event_start = usize::try_from(reader.buffer_position()).map_err(|_| {
-                Error::InvalidFormat("Word smart-tag offset does not fit usize".into())
-            })?;
+            let event_start =
+                usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+                    Error::InvalidFormat("Word smart-tag offset does not fit usize".into())
+                })?;
             let event = {
                 let (namespace, event) = reader
                     .read_resolved_event()
@@ -200,10 +223,16 @@ impl Paragraph {
                         &fragment_prefix,
                     )),
                     Event::Eof => SmartTagEvent::Eof,
-                    _ => SmartTagEvent::Other,
+                    Event::Text(_)
+                    | Event::CData(_)
+                    | Event::Comment(_)
+                    | Event::Decl(_)
+                    | Event::PI(_)
+                    | Event::DocType(_)
+                    | Event::GeneralRef(_) => SmartTagEvent::Other,
                 }
             };
-            let event_end = usize::try_from(reader.buffer_position()).map_err(|_| {
+            let event_end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
                 Error::InvalidFormat("Word smart-tag offset does not fit usize".into())
             })?;
 
@@ -243,7 +272,7 @@ impl Paragraph {
                     ));
                 },
                 SmartTagEvent::Eof => break,
-                _ => {},
+                SmartTagEvent::Empty(_) | SmartTagEvent::Other => {},
             }
         }
 
@@ -251,13 +280,15 @@ impl Paragraph {
         ranges
             .into_iter()
             .map(|(start, end)| {
-                let start = u32::try_from(start).map_err(|_| {
+                let start = u32::try_from(start).map_err(|_source_error| {
                     Error::InvalidFormat("Word smart-tag offset exceeds u32".into())
                 })?;
                 let length = u32::try_from(end.checked_sub(start as usize).ok_or_else(|| {
                     Error::InvalidFormat("invalid Word smart-tag byte range".into())
                 })?)
-                .map_err(|_| Error::InvalidFormat("Word smart-tag length exceeds u32".into()))?;
+                .map_err(|_source_error| {
+                    Error::InvalidFormat("Word smart-tag length exceeds u32".into())
+                })?;
                 let absolute_start = base_offset.checked_add(start).ok_or_else(|| {
                     Error::InvalidFormat("Word smart-tag absolute offset exceeds u32".into())
                 })?;
@@ -277,13 +308,14 @@ impl Paragraph {
         start: usize,
         end: usize,
     ) -> Result<()> {
-        let start = u32::try_from(start)
-            .map_err(|_| Error::InvalidFormat("Word run offset exceeds u32".to_string()))?;
+        let start = u32::try_from(start).map_err(|_source_error| {
+            Error::InvalidFormat("Word run offset exceeds u32".to_string())
+        })?;
         let length = u32::try_from(
             end.checked_sub(start as usize)
                 .ok_or_else(|| Error::InvalidFormat("invalid Word run byte range".to_string()))?,
         )
-        .map_err(|_| Error::InvalidFormat("Word run length exceeds u32".to_string()))?;
+        .map_err(|_source_error| Error::InvalidFormat("Word run length exceeds u32".to_string()))?;
         let absolute_start = base_offset.checked_add(start).ok_or_else(|| {
             Error::InvalidFormat("Word run absolute offset exceeds u32".to_string())
         })?;

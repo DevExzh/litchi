@@ -2,7 +2,7 @@
 //!
 //! [`Package`] is the physical-package boundary for the standalone XLSX
 //! crate. It owns the OPC graph, delegates archive I/O to `litchi-opc`, and
-//! validates the SpreadsheetML workbook graph before exposing a package
+//! validates the `SpreadsheetML` workbook graph before exposing a package
 //! handle. Semantic reads and transactional edits live in [`crate::workbook`]
 //! and [`crate::edit`].
 
@@ -383,6 +383,7 @@ impl Package {
     /// Encryption profile retained from source ingress or the latest
     /// successful encrypted save. In-memory byte generation is side-effect-free.
     #[cfg(feature = "encryption")]
+    #[must_use]
     pub const fn encryption(&self) -> Option<crate::encryption::Mode> {
         self.1.mode()
     }
@@ -449,7 +450,7 @@ impl Package {
     /// Start a clone-staged transaction for the package-level task-pane graph.
     ///
     /// Existing XML conformance is retained automatically. New graphs use
-    /// Transitional SpreadsheetML relationships unless the explicit
+    /// Transitional `SpreadsheetML` relationships unless the explicit
     /// [`Self::edit_task_panes_with`] entry point is selected.
     pub fn edit_task_panes(&mut self) -> Result<crate::task_panes::Transaction<'_>> {
         self.ensure_mutation_allowed("edit_task_panes")?;
@@ -563,14 +564,13 @@ impl Package {
         Ok(value)
     }
 
-    fn ensure_ordinary_output(&self, _operation: &'static str) -> Result<()> {
+    fn ensure_ordinary_output(&self, operation: &'static str) -> Result<()> {
         #[cfg(feature = "encryption")]
         self.1
             .ordinary_output()
-            .map_err(|source| crate::Error::EncryptionPolicy {
-                operation: _operation,
-                source,
-            })?;
+            .map_err(|source| crate::Error::EncryptionPolicy { operation, source })?;
+        #[cfg(not(feature = "encryption"))]
+        let _ = operation;
         Ok(())
     }
 

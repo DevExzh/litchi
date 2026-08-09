@@ -308,6 +308,7 @@ impl Props {
     }
 
     /// Returns name/value pairs in lexical name order.
+    #[must_use]
     pub fn iter(&self) -> impl ExactSizeIterator<Item = (&str, &Value)> {
         self.properties
             .iter()

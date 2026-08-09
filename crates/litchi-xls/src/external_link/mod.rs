@@ -28,7 +28,11 @@ pub(super) const MAX_EXTERNAL_NAMES: usize = 4096;
 pub(super) const MAX_EXTERNAL_NAME_BYTES: usize = 1_048_576;
 pub(super) const MAX_DDE_OLE_VALUES: usize = 65_536;
 
-#[allow(unused_imports, unreachable_pub)]
+#[allow(
+    unused_imports,
+    unreachable_pub,
+    reason = "re-exports stage this feature module API"
+)]
 pub use edit::{Commit, Patch, Snapshot, Transaction};
 pub use model::{
     CacheRow, CachedValue, ClipboardFormat, ErrorValue, Links, Name, NameBody, Sheet,

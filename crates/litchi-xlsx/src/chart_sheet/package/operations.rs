@@ -718,7 +718,7 @@ pub fn store_chartsheet(
 ///
 /// This is the in-memory counterpart to [`store_chartsheet`]. It checks the
 /// `CT_Chartsheet` shape and the relationship/part closure required by the
-/// SpreadsheetML chartsheet profile (ISO/IEC 29500-1, §18.3.1 and §12.3),
+/// `SpreadsheetML` chartsheet profile (ISO/IEC 29500-1, §18.3.1 and §12.3),
 /// including the drawing, chart, media, VML, Printer Settings, and extension
 /// resources represented by [`Package`].
 ///
@@ -978,7 +978,7 @@ pub(super) fn store_chartsheet_inner(
                             uri,
                             embedded.content_type.as_str().into(),
                             embedded.data.clone(),
-                        )))?
+                        )))?;
                     },
                 }
             }
@@ -1956,7 +1956,7 @@ pub(super) fn validate_extension_relationships(
                 }
             },
             ExtensionRelationshipTarget::External { target } => {
-                validate_extension_relationship_string(target, "target")?
+                validate_extension_relationship_string(target, "target")?;
             },
         }
     }

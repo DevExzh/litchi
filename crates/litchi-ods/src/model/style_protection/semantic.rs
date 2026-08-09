@@ -284,7 +284,15 @@ impl CellStyleRegistry {
                 },
                 Event::End(_) if current.is_some() && depth > 0 => depth -= 1,
                 Event::Eof => break,
-                _ => {},
+                Event::Start(_)
+                | Event::End(_)
+                | Event::Empty(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::GeneralRef(_) => {},
             }
             buffer.clear();
         }
@@ -520,7 +528,7 @@ fn condition_formula_namespace(
             "conditional style condition uses unbound namespace prefix '{prefix}'"
         )));
     };
-    let uri = String::from_utf8(uri.to_vec()).map_err(|_| {
+    let uri = String::from_utf8(uri.to_vec()).map_err(|_error| {
         Error::InvalidFormat("conditional style namespace URI is not valid UTF-8".to_string())
     })?;
     Ok(Some(formula::Namespace {
@@ -550,7 +558,7 @@ pub(super) fn optional_attribute(
             found = Some(
                 attribute
                     .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
-                    .map(|value| value.into_owned())
+                    .map(std::borrow::Cow::into_owned)
                     .map_err(|error| {
                         Error::InvalidFormat(format!("invalid XML attribute: {error}"))
                     })?,

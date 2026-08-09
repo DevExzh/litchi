@@ -1,4 +1,4 @@
-//! Private bounded SpreadsheetML slicer grammar core.
+//! Private bounded `SpreadsheetML` slicer grammar core.
 ///
 /// This module owns the inert XML grammar rooted at `x14:slicerCacheDefinition`
 /// from the checked-in [MS-XLSX] anchors §§2.1.4, 2.2.4.8, 2.3.2.1, 2.4.38,
@@ -78,9 +78,11 @@ impl Data {
             .data
             .ok_or_else(|| invalid("expected one Slicer Cache data fragment"))
     }
+    #[must_use]
     pub fn kind(&self) -> DataKind {
         self.kind
     }
+    #[must_use]
     pub fn xml(&self) -> &[u8] {
         &self.xml
     }
@@ -99,6 +101,7 @@ impl ExtensionList {
             .extension_list
             .ok_or_else(|| invalid("expected one Slicer Cache extLst fragment"))
     }
+    #[must_use]
     pub fn xml(&self) -> &[u8] {
         &self.0
     }
@@ -405,7 +408,7 @@ pub fn parse(xml: &[u8]) -> Result<Definition> {
                                 target.data = Some(Data { kind, xml: bytes });
                             },
                             CaptureKind::Extension => {
-                                target.extension_list = Some(ExtensionList(bytes))
+                                target.extension_list = Some(ExtensionList(bytes));
                             },
                         }
                         capture = None;
@@ -724,10 +727,10 @@ fn validate_name(value: &str) -> Result<()> {
 }
 
 fn validate_guid(value: &str) -> Result<()> {
-    if !valid_guid(value) {
-        Err(invalid(format!("invalid Slicer Cache uid '{value}'")))
-    } else {
+    if valid_guid(value) {
         Ok(())
+    } else {
+        Err(invalid(format!("invalid Slicer Cache uid '{value}'")))
     }
 }
 
@@ -1030,7 +1033,7 @@ fn validate_element_attributes(
     Ok(())
 }
 fn is_xml_character(character: char) -> bool {
-    matches!(character as u32, 0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF)
+    matches!(character as u32, 0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x0010_FFFF)
 }
 fn xml_error(error: impl std::fmt::Display) -> Error {
     Error::Xml(litchi_ooxml_common::XmlError::Malformed(error.to_string()))

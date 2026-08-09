@@ -42,11 +42,13 @@ impl MacroButton {
     }
 
     /// Return the complete stored field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
 
     /// Return the stored macro or command name without resolving or invoking it.
+    #[must_use]
     pub fn macro_name(&self) -> &str {
         &self.macro_name
     }
@@ -54,6 +56,7 @@ impl MacroButton {
     /// Return the stored button text.
     ///
     /// This is source metadata, not a generated result.
+    #[must_use]
     pub fn display_text(&self) -> &str {
         &self.display_text
     }
@@ -61,16 +64,19 @@ impl MacroButton {
     /// Return the cached visible field result, if present.
     ///
     /// This is stored text only and is never regenerated from the named target.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a word processor has marked the cached result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
 
     /// Whether a word processor has locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.locked
     }
@@ -109,6 +115,7 @@ impl GoToButton {
     }
 
     /// Return the complete stored field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
@@ -117,6 +124,7 @@ impl GoToButton {
     ///
     /// A destination can be a bookmark, page reference, annotation, footnote,
     /// line, page, or section expression.
+    #[must_use]
     pub fn target(&self) -> &str {
         &self.target
     }
@@ -124,6 +132,7 @@ impl GoToButton {
     /// Return the stored text or graphic-label expression for the button.
     ///
     /// This is source metadata, not an activated control.
+    #[must_use]
     pub fn button_text(&self) -> &str {
         &self.button_text
     }
@@ -131,16 +140,19 @@ impl GoToButton {
     /// Return the cached visible field result, if present.
     ///
     /// This is stored text only and is never regenerated from the destination.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a word processor has marked the cached result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
 
     /// Whether a word processor has locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.locked
     }
@@ -151,6 +163,7 @@ impl Field {
     ///
     /// Recognition is limited to the stored field instruction. It never
     /// resolves, loads, invokes, or otherwise executes a macro or command.
+    #[must_use]
     pub fn is_macro_button(&self) -> bool {
         field_instruction_remainder(&self.instruction, "MACROBUTTON").is_some()
     }
@@ -161,6 +174,10 @@ impl Field {
     /// only the stored macro or command name, button text, cached content, and
     /// dirty/lock state; it never resolves, loads, invokes, or executes the
     /// named target.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn macro_button(&self) -> Result<Option<MacroButton>> {
         MacroButton::from_field(self)
     }
@@ -170,6 +187,7 @@ impl Field {
     /// Recognition is limited to the stored field instruction. It never
     /// resolves a destination, changes the insertion point, or refreshes the
     /// cached result.
+    #[must_use]
     pub fn is_go_to_button(&self) -> bool {
         field_instruction_remainder(&self.instruction, "GOTOBUTTON").is_some()
     }
@@ -180,6 +198,10 @@ impl Field {
     /// only the stored target, button text, cached content, and dirty/lock
     /// state; it never resolves a bookmark, page, annotation, footnote, or
     /// other target, changes the insertion point, or refreshes a field.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn go_to_button(&self) -> Result<Option<GoToButton>> {
         GoToButton::from_field(self)
     }

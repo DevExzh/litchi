@@ -87,7 +87,7 @@ pub fn write_arrays(value: &ArrayData) -> Result<Vec<u8>> {
     finish(output)
 }
 
-/// Write a FeaturePropertyBags part.
+/// Write a `FeaturePropertyBags` part.
 pub fn write_feature_property_bags(value: &Bags) -> Result<Vec<u8>> {
     validate_bags(value)?;
     let mut output = Vec::new();
@@ -156,7 +156,7 @@ pub fn write_xf_complement(value: &XfComplement) -> Result<Vec<u8>> {
     finish(output)
 }
 
-/// Write one DXFComplement extension element.
+/// Write one `DXFComplement` extension element.
 pub fn write_dxf_complement(value: &DxfComplement) -> Result<Vec<u8>> {
     let mut output = Vec::new();
     output.extend_from_slice(b"<fpb:DXFComplement xmlns:fpb=\"");
@@ -298,7 +298,7 @@ fn write_property(output: &mut Vec<u8>, value: &Property) -> Result<()> {
         Property::Integer { key, value } => write_scalar(output, "i", key, value),
         Property::Text { key, value } => write_scalar(output, "s", key, value),
         Property::Boolean { key, value } => {
-            write_scalar(output, "b", key, if *value { "1" } else { "0" })
+            write_scalar(output, "b", key, if *value { "1" } else { "0" });
         },
         Property::Decimal { key, value } => write_scalar(output, "d", key, value),
         Property::Relationship { key, id } => write_scalar(output, "rel", key, id),

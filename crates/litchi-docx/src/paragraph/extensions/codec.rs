@@ -1,3 +1,7 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Namespace-aware XML codec for paragraph and table-row extensions.
 
 use crate::error::{Error, Result};
@@ -129,7 +133,11 @@ fn parse_root(
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 
@@ -234,7 +242,7 @@ pub(crate) fn append_paragraph_attributes(
         write!(xml, " w14:textId=\"{id}\"")?;
     }
     if let Some(value) = value.no_spell_err() {
-        write!(xml, " w14:noSpellErr=\"{}\"", if value { 1 } else { 0 })?;
+        write!(xml, " w14:noSpellErr=\"{}\"", i32::from(value))?;
     }
     Ok(())
 }

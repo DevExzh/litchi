@@ -1,4 +1,4 @@
-//! Semantic SpreadsheetML named-sheet-view model.
+//! Semantic `SpreadsheetML` named-sheet-view model.
 //!
 //! The owner module supplies the contextual namespace, so its semantic types
 //! use concise names without repeating the module prefix.
@@ -24,10 +24,12 @@ impl Guid {
     }
 
     /// Generate a fresh RFC 4122 v4 GUID in the braced OOXML representation.
+    #[must_use]
     pub fn generate() -> Self {
         Self(litchi_core::id::generate_guid_braced())
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -41,6 +43,7 @@ impl Range {
         parse_range(&value)
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -48,6 +51,7 @@ impl Range {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Markup(pub(crate) Vec<u8>);
 impl Markup {
+    #[must_use]
     pub fn xml(&self) -> &[u8] {
         &self.0
     }
@@ -66,6 +70,7 @@ impl DifferentialFormat {
     }
 
     /// Construct an empty differential-format element.
+    #[must_use]
     pub fn empty() -> Self {
         Self {
             markup: Markup(
@@ -78,6 +83,7 @@ impl DifferentialFormat {
         }
     }
 
+    #[must_use]
     pub fn xml(&self) -> &[u8] {
         self.markup.xml()
     }
@@ -90,15 +96,17 @@ pub struct Extension {
 impl Extension {
     /// Construct one extension from its URI and bounded XML content.
     ///
-    /// `content_xml` is inserted below a SpreadsheetML `ext` element and the
+    /// `content_xml` is inserted below a `SpreadsheetML` `ext` element and the
     /// complete result is validated before it can enter the model.
     pub fn new(uri: impl Into<String>, content_xml: impl AsRef<[u8]>) -> Result<Self> {
         parse_authored_extension(uri.into(), content_xml.as_ref())
     }
 
+    #[must_use]
     pub fn uri(&self) -> &str {
         &self.uri
     }
+    #[must_use]
     pub fn markup(&self) -> &Markup {
         &self.markup
     }
@@ -135,7 +143,12 @@ pub enum IconSet {
 }
 impl IconSet {
     pub(crate) fn parse(v: &str) -> Result<Self> {
-        use IconSet::*;
+        use IconSet::{
+            FiveArrows, FiveArrowsGray, FiveBoxes, FiveQuarters, FiveRating, FourArrows,
+            FourArrowsGray, FourRating, FourRedToBlack, FourTrafficLights, NoIcons, ThreeArrows,
+            ThreeArrowsGray, ThreeFlags, ThreeSigns, ThreeStars, ThreeSymbols, ThreeSymbols2,
+            ThreeTrafficLights1, ThreeTrafficLights2, ThreeTriangles,
+        };
         match v {
             "3Arrows" => Ok(ThreeArrows),
             "3ArrowsGray" => Ok(ThreeArrowsGray),
@@ -162,7 +175,12 @@ impl IconSet {
         }
     }
     pub(crate) fn cardinality(self) -> Option<u32> {
-        use IconSet::*;
+        use IconSet::{
+            FiveArrows, FiveArrowsGray, FiveBoxes, FiveQuarters, FiveRating, FourArrows,
+            FourArrowsGray, FourRating, FourRedToBlack, FourTrafficLights, NoIcons, ThreeArrows,
+            ThreeArrowsGray, ThreeFlags, ThreeSigns, ThreeStars, ThreeSymbols, ThreeSymbols2,
+            ThreeTrafficLights1, ThreeTrafficLights2, ThreeTriangles,
+        };
         Some(match self {
             ThreeArrows | ThreeArrowsGray | ThreeFlags | ThreeTrafficLights1
             | ThreeTrafficLights2 | ThreeSigns | ThreeSymbols | ThreeSymbols2 | ThreeStars
@@ -174,7 +192,12 @@ impl IconSet {
     }
 
     pub(crate) fn as_str(self) -> &'static str {
-        use IconSet::*;
+        use IconSet::{
+            FiveArrows, FiveArrowsGray, FiveBoxes, FiveQuarters, FiveRating, FourArrows,
+            FourArrowsGray, FourRating, FourRedToBlack, FourTrafficLights, NoIcons, ThreeArrows,
+            ThreeArrowsGray, ThreeFlags, ThreeSigns, ThreeStars, ThreeSymbols, ThreeSymbols2,
+            ThreeTrafficLights1, ThreeTrafficLights2, ThreeTriangles,
+        };
         match self {
             ThreeArrows => "3Arrows",
             ThreeArrowsGray => "3ArrowsGray",
@@ -215,6 +238,7 @@ pub struct SortCondition {
 }
 impl SortCondition {
     /// Create a value-based sort condition for a worksheet range.
+    #[must_use]
     pub fn new(kind: SortConditionKind, reference: Range) -> Self {
         Self {
             kind,
@@ -291,30 +315,39 @@ impl SortCondition {
         Ok(self)
     }
 
+    #[must_use]
     pub fn kind(&self) -> SortConditionKind {
         self.kind
     }
+    #[must_use]
     pub fn reference(&self) -> &Range {
         &self.reference
     }
+    #[must_use]
     pub fn descending(&self) -> bool {
         self.descending
     }
+    #[must_use]
     pub fn sort_by(&self) -> SortBy {
         self.sort_by
     }
+    #[must_use]
     pub fn custom_list(&self) -> Option<&str> {
         self.custom_list.as_deref()
     }
+    #[must_use]
     pub fn differential_format_id(&self) -> Option<u32> {
         self.differential_format_id
     }
+    #[must_use]
     pub fn icon_set(&self) -> Option<IconSet> {
         self.icon_set
     }
+    #[must_use]
     pub fn icon_id(&self) -> Option<u32> {
         self.icon_id
     }
+    #[must_use]
     pub fn rich_sort_key(&self) -> Option<&str> {
         self.rich_sort_key.as_deref()
     }
@@ -371,15 +404,19 @@ impl SortRule {
         Ok(self)
     }
 
+    #[must_use]
     pub fn column_id(&self) -> u32 {
         self.column_id
     }
+    #[must_use]
     pub fn id(&self) -> Option<&Guid> {
         self.id.as_ref()
     }
+    #[must_use]
     pub fn differential_format(&self) -> Option<&Markup> {
         self.differential_format.as_ref()
     }
+    #[must_use]
     pub fn condition(&self) -> Option<&SortCondition> {
         self.condition.as_ref()
     }
@@ -392,6 +429,7 @@ pub struct SortRules {
     pub(crate) extensions: Vec<Extension>,
 }
 impl SortRules {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             sort_method: SortMethod::None,
@@ -435,15 +473,19 @@ impl SortRules {
         remove_extension(&mut self.extensions, uri)
     }
 
+    #[must_use]
     pub fn sort_method(&self) -> SortMethod {
         self.sort_method
     }
+    #[must_use]
     pub fn case_sensitive(&self) -> bool {
         self.case_sensitive
     }
+    #[must_use]
     pub fn rules(&self) -> &[SortRule] {
         &self.rules
     }
+    #[must_use]
     pub fn extensions(&self) -> &[Extension] {
         &self.extensions
     }
@@ -480,7 +522,7 @@ impl ColumnFilter {
 
     /// Add a filter payload for this column.
     ///
-    /// The shared SpreadsheetML auto-filter serializer validates the payload
+    /// The shared `SpreadsheetML` auto-filter serializer validates the payload
     /// before this model is mutated.
     pub fn add_filter(&mut self, filter: Column) -> Result<&mut Self> {
         if self.filters.len() >= MAX_FILTERS {
@@ -514,18 +556,23 @@ impl ColumnFilter {
         remove_extension(&mut self.extensions, uri)
     }
 
+    #[must_use]
     pub fn column_id(&self) -> u32 {
         self.column_id
     }
+    #[must_use]
     pub fn id(&self) -> Option<&Guid> {
         self.id.as_ref()
     }
+    #[must_use]
     pub fn differential_format(&self) -> Option<&Markup> {
         self.differential_format.as_ref()
     }
+    #[must_use]
     pub fn filters(&self) -> &[Column] {
         &self.filters
     }
+    #[must_use]
     pub fn extensions(&self) -> &[Extension] {
         &self.extensions
     }
@@ -540,6 +587,7 @@ pub struct Filter {
     pub(crate) extensions: Vec<Extension>,
 }
 impl Filter {
+    #[must_use]
     pub fn new(filter_id: Guid) -> Self {
         Self {
             filter_id,
@@ -590,21 +638,27 @@ impl Filter {
         remove_extension(&mut self.extensions, uri)
     }
 
+    #[must_use]
     pub fn filter_id(&self) -> &Guid {
         &self.filter_id
     }
+    #[must_use]
     pub fn reference(&self) -> Option<&Range> {
         self.reference.as_ref()
     }
+    #[must_use]
     pub fn table_id(&self) -> Option<u32> {
         self.table_id
     }
+    #[must_use]
     pub fn column_filters(&self) -> &[ColumnFilter] {
         &self.column_filters
     }
+    #[must_use]
     pub fn sort_rules(&self) -> Option<&SortRules> {
         self.sort_rules.as_ref()
     }
+    #[must_use]
     pub fn extensions(&self) -> &[Extension] {
         &self.extensions
     }
@@ -638,15 +692,19 @@ impl View {
         })
     }
 
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
+    #[must_use]
     pub fn id(&self) -> &Guid {
         &self.id
     }
+    #[must_use]
     pub fn filters(&self) -> &[Filter] {
         &self.filters
     }
+    #[must_use]
     pub fn extensions(&self) -> &[Extension] {
         &self.extensions
     }
@@ -686,6 +744,7 @@ impl Views {
     ///
     /// A Named Sheet Views part requires at least one `namedSheetView`, so an
     /// empty collection is deliberately not constructible through this API.
+    #[must_use]
     pub fn new(view: View) -> Self {
         let mut namespace_declarations =
             vec![("xmlns".into(), std::str::from_utf8(NSV).unwrap().into())];
@@ -744,9 +803,11 @@ impl Views {
         Ok(Some(self.views.remove(index)))
     }
 
+    #[must_use]
     pub fn views(&self) -> &[View] {
         &self.views
     }
+    #[must_use]
     pub fn extensions(&self) -> &[Extension] {
         &self.extensions
     }

@@ -1,6 +1,12 @@
-use super::super::codec::*;
-use super::super::*;
-use super::*;
+use super::super::codec::{
+    Node, XmlDocument, canonical_node_xml, invalid, is_drawingml_namespace, parse_xml,
+    reject_unknown_attributes,
+};
+use super::super::{
+    DRAWINGML_NAMESPACE, Result, STRICT_DRAWINGML_NAMESPACE, TASK_PANES_NAMESPACE,
+    WEB_EXTENSION_NAMESPACE,
+};
+use super::MAX_WEB_EXTENSION_XML_BYTES;
 /// Namespace dialect of an MS-OWEXML extension-list element.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExtKind {
@@ -11,6 +17,7 @@ pub enum ExtKind {
 }
 
 impl ExtKind {
+    #[must_use]
     pub fn namespace(self) -> &'static str {
         match self {
             Self::AddIn => WEB_EXTENSION_NAMESPACE,
@@ -55,14 +62,17 @@ impl ExtList {
         Self::from_node(document.root()?, &document)
     }
 
+    #[must_use]
     pub fn kind(&self) -> ExtKind {
         self.kind
     }
 
+    #[must_use]
     pub fn as_xml(&self) -> &[u8] {
         self.xml.as_bytes()
     }
 
+    #[must_use]
     pub fn xml(&self) -> &str {
         &self.xml
     }
@@ -83,7 +93,7 @@ impl ExtList {
     }
 }
 
-/// Compression state of a DrawingML `CT_Blip`.
+/// Compression state of a `DrawingML` `CT_Blip`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Compression {
     Email,
@@ -94,6 +104,7 @@ pub enum Compression {
 }
 
 impl Compression {
+    #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Email => "email",
@@ -116,7 +127,7 @@ impl Compression {
     }
 }
 
-/// Closed effect-element choice allowed by DrawingML `CT_Blip`.
+/// Closed effect-element choice allowed by `DrawingML` `CT_Blip`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EffectKind {
     AlphaBiLevel,
@@ -139,6 +150,7 @@ pub enum EffectKind {
 }
 
 impl EffectKind {
+    #[must_use]
     pub fn local_name(self) -> &'static str {
         match self {
             Self::AlphaBiLevel => "alphaBiLevel",
@@ -185,7 +197,7 @@ impl EffectKind {
     }
 }
 
-/// A validated, inert DrawingML effect subtree.
+/// A validated, inert `DrawingML` effect subtree.
 ///
 /// The subtree is retained as canonical XML. It is never interpreted as
 /// executable content, and construction rejects text, CDATA, DTDs, excessive
@@ -207,10 +219,12 @@ impl Effect {
         Self::from_node(document.root()?)
     }
 
+    #[must_use]
     pub fn kind(&self) -> EffectKind {
         self.kind
     }
 
+    #[must_use]
     pub fn xml(&self) -> &str {
         &self.xml
     }

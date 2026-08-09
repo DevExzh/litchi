@@ -1,12 +1,25 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Mail-merge settings, sources, recipients, and relationship publication.
 
-use super::super::model::*;
+use super::super::model::{
+    BlobPart, DocumentSettings, Error, MAX_MAIL_MERGE_RELATIONSHIPS, MailMergeSettings, PackURI,
+    Package, Part, Recipients, RelationshipId, Result, SettingsPartSnapshot, Source,
+    StoredRelationship, Target, is_mail_merge_relationship_type, mail_merge, map_docx_error,
+    patch_mail_merge,
+};
 
 use super::parts::settings_part_from_snapshot;
 use super::validation::{validate_mail_merge_external_uri, validate_mail_merge_internal_source};
 
 impl Package {
     /// Return the validated inert mail-merge settings, if configured.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn mail_merge_settings(&self) -> Result<Option<MailMergeSettings>> {
         let snapshot = self.settings_part_snapshot()?;
         let part = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
@@ -20,6 +33,10 @@ impl Package {
     /// The typed [`RelationshipId`] is validated and opaque: raw OPC
     /// relationship IDs are package plumbing (ADR-0004) and never appear on
     /// this semantic facade.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn mail_merge_target(&self, relationship_id: &RelationshipId) -> Result<Target> {
         self.mail_merge_target_str(relationship_id.as_str())
     }
@@ -50,6 +67,10 @@ impl Package {
     }
 
     /// Set or replace the complete mail-merge graph atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_mail_merge(
         &mut self,
         mut settings: MailMergeSettings,
@@ -177,6 +198,10 @@ impl Package {
     }
 
     /// Update settings and sources using the same atomic replacement semantics.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn update_mail_merge(
         &mut self,
         settings: MailMergeSettings,
@@ -195,6 +220,10 @@ impl Package {
     }
 
     /// Replace recipient inclusion flags while retaining inert source targets and settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn update_mail_merge_recipients(
         &mut self,
         recipients: Recipients,
@@ -227,6 +256,10 @@ impl Package {
     }
 
     /// Clear mail-merge XML, relationships, and unreachable owned targets.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn clear_mail_merge(&mut self) -> Result<bool> {
         let snapshot = self.settings_part_snapshot()?;
         let original = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);

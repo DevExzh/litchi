@@ -5,8 +5,10 @@ use crate::link::Link;
 /// A projected `text:h` block.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Heading {
+    fields: Vec<crate::field::Field>,
     level: u8,
     links: Vec<Link>,
+    runs: Vec<crate::formatting::Run>,
     style_name: Option<String>,
     text: String,
 }
@@ -20,8 +22,10 @@ impl Heading {
     pub fn new(level: u8, text: impl Into<String>) -> litchi_core::Result<Self> {
         validate_level(level)?;
         Ok(Self {
+            fields: Vec::new(),
             level,
             links: Vec::new(),
+            runs: Vec::new(),
             style_name: None,
             text: text.into(),
         })
@@ -39,8 +43,10 @@ impl Heading {
     ) -> litchi_core::Result<Self> {
         validate_level(level)?;
         Ok(Self {
+            fields: Vec::new(),
             level,
             links: Vec::new(),
+            runs: Vec::new(),
             style_name: Some(style_name.into()),
             text: text.into(),
         })
@@ -49,12 +55,16 @@ impl Heading {
     pub(crate) const fn projected(
         level: u8,
         links: Vec<Link>,
+        runs: Vec<crate::formatting::Run>,
+        fields: Vec<crate::field::Field>,
         style_name: Option<String>,
         text: String,
     ) -> Self {
         Self {
+            fields,
             level,
             links,
+            runs,
             style_name,
             text,
         }
@@ -70,6 +80,18 @@ impl Heading {
     #[must_use]
     pub fn links(&self) -> &[Link] {
         &self.links
+    }
+
+    /// Returns character formatting ranges in source-close order.
+    #[must_use]
+    pub fn formatting_runs(&self) -> &[crate::formatting::Run] {
+        &self.runs
+    }
+
+    /// Returns inert fields in source-close order.
+    #[must_use]
+    pub fn fields(&self) -> &[crate::field::Field] {
+        &self.fields
     }
 
     /// Returns the referenced paragraph style name, if present.

@@ -39,7 +39,10 @@ pub struct Table {
 
 impl Table {
     /// Create a new Table.
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "reserved DOC structure retained for format completeness or future round-trip support"
+    )]
     pub(crate) fn new(rows: Vec<Row>) -> Self {
         Self {
             rows: Arc::new(rows),
@@ -48,7 +51,10 @@ impl Table {
     }
 
     /// Create a new Table with properties.
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "reserved DOC structure retained for format completeness or future round-trip support"
+    )]
     pub(crate) fn with_properties(rows: Vec<Row>, properties: TableProperties) -> Self {
         Self {
             rows: Arc::new(rows),
@@ -95,16 +101,19 @@ impl Table {
     /// Get the table properties.
     ///
     /// Returns the table-level formatting properties if available.
+    #[must_use]
     pub fn properties(&self) -> Option<&TableProperties> {
         self.properties.as_ref()
     }
 
     /// Get table justification (alignment).
+    #[must_use]
     pub fn justification(&self) -> Option<TableJustification> {
         self.properties.as_ref().map(|p| p.justification)
     }
 
     /// Check if the first row is a header row.
+    #[must_use]
     pub fn has_header_row(&self) -> bool {
         self.properties.as_ref().is_some_and(|p| p.is_header_row)
     }
@@ -132,7 +141,10 @@ pub struct Row {
 
 impl Row {
     /// Create a new Row.
-    #[allow(unused)]
+    #[allow(
+        unused,
+        reason = "parsed DOC metadata is retained for format completeness and future round-trip support"
+    )]
     pub(crate) fn new(cells: Vec<Cell>) -> Self {
         Self {
             cells: Arc::new(cells),
@@ -143,7 +155,10 @@ impl Row {
     }
 
     /// Create a new Row with properties.
-    #[allow(unused)]
+    #[allow(
+        unused,
+        reason = "parsed DOC metadata is retained for format completeness and future round-trip support"
+    )]
     pub(crate) fn with_properties(cells: Vec<Cell>, properties: TableProperties) -> Self {
         Self {
             cells: Arc::new(cells),
@@ -181,16 +196,19 @@ impl Row {
     }
 
     /// Get the row properties.
+    #[must_use]
     pub fn properties(&self) -> Option<&TableProperties> {
         self.row_properties.as_ref()
     }
 
     /// Get the row height in twips (1/1440 inch).
+    #[must_use]
     pub fn height(&self) -> Option<i16> {
         self.row_properties.as_ref().and_then(|p| p.row_height)
     }
 
     /// Check if this is a header row.
+    #[must_use]
     pub fn is_header(&self) -> bool {
         self.row_properties
             .as_ref()
@@ -198,11 +216,13 @@ impl Row {
     }
 
     /// Tracked table-row property revision metadata.
+    #[must_use]
     pub fn formatting_revision(&self) -> Option<&RevisionMark> {
         self.formatting_revision.as_ref()
     }
 
     /// Whether table properties preceding the revision wall are preserved.
+    #[must_use]
     pub fn properties_preserved_for_revision(&self) -> bool {
         self.properties_preserved_for_revision
     }
@@ -228,7 +248,10 @@ pub struct Cell {
 
 impl Cell {
     /// Create a new Cell.
-    #[allow(unused)]
+    #[allow(
+        unused,
+        reason = "parsed DOC metadata is retained for format completeness and future round-trip support"
+    )]
     pub(crate) fn new(text: String) -> Self {
         let para = Paragraph::new(text.clone());
         Self {
@@ -239,7 +262,10 @@ impl Cell {
     }
 
     /// Create a new Cell with paragraphs and properties.
-    #[allow(unused)]
+    #[allow(
+        unused,
+        reason = "parsed DOC metadata is retained for format completeness and future round-trip support"
+    )]
     pub(crate) fn with_properties(
         paragraphs: Vec<Paragraph>,
         properties: Option<CellProperties>,
@@ -271,46 +297,55 @@ impl Cell {
     }
 
     /// Get the cell properties.
+    #[must_use]
     pub fn properties(&self) -> Option<&CellProperties> {
         self.properties.as_ref()
     }
 
     /// Get the cell's vertical alignment.
+    #[must_use]
     pub fn vertical_alignment(&self) -> Option<super::parts::tap::VerticalAlignment> {
         self.properties.as_ref().map(|p| p.vertical_alignment)
     }
 
     /// Get the cell's vertical merge state.
+    #[must_use]
     pub fn vertical_merge_status(&self) -> Option<super::parts::tap::VerticalMergeStatus> {
         self.properties.as_ref().map(|p| p.vertical_merge_status)
     }
 
     /// Whether the cell stretches its contents to use the full width.
+    #[must_use]
     pub fn fit_text(&self) -> Option<bool> {
         self.properties.as_ref().map(|p| p.fit_text)
     }
 
     /// Whether the cell prefers a single unwrapped line.
+    #[must_use]
     pub fn no_wrap(&self) -> Option<bool> {
         self.properties.as_ref().map(|p| p.no_wrap)
     }
 
     /// Whether an otherwise empty row can hide this cell's mark.
+    #[must_use]
     pub fn hide_mark(&self) -> Option<bool> {
         self.properties.as_ref().map(|p| p.hide_mark)
     }
 
     /// Get the cell's background color as RGB tuple.
+    #[must_use]
     pub fn background_color(&self) -> Option<(u8, u8, u8)> {
         self.properties.as_ref().and_then(|p| p.background_color)
     }
 
     /// Get the cell's complete legacy shading descriptor.
+    #[must_use]
     pub fn shading(&self) -> Option<super::parts::tap::CellShading> {
         self.properties.as_ref().and_then(|p| p.shading)
     }
 
     /// Whether the cell's raw `ShdNil` value defers shading to its table style.
+    #[must_use]
     pub fn shading_inherits_from_style(&self) -> Option<bool> {
         self.properties
             .as_ref()
@@ -318,21 +353,25 @@ impl Cell {
     }
 
     /// Get the cell's top padding in twips.
+    #[must_use]
     pub fn padding_top(&self) -> Option<i16> {
         self.properties.as_ref().and_then(|p| p.padding_top)
     }
 
     /// Get the cell's left padding in twips.
+    #[must_use]
     pub fn padding_left(&self) -> Option<i16> {
         self.properties.as_ref().and_then(|p| p.padding_left)
     }
 
     /// Get the cell's bottom padding in twips.
+    #[must_use]
     pub fn padding_bottom(&self) -> Option<i16> {
         self.properties.as_ref().and_then(|p| p.padding_bottom)
     }
 
     /// Get the cell's right padding in twips.
+    #[must_use]
     pub fn padding_right(&self) -> Option<i16> {
         self.properties.as_ref().and_then(|p| p.padding_right)
     }

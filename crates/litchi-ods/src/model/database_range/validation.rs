@@ -11,6 +11,9 @@ const MAX_DATABASE_ITEMS: usize = 262_144;
 
 impl Range {
     /// Validate required values and recursive schema constraints.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn validate(&self) -> Result<()> {
         if self.target_range_address.is_empty() {
             return Err(Error::InvalidFormat(

@@ -1,4 +1,4 @@
-//! Typed semantic models for SpreadsheetML Custom XML Maps.
+//! Typed semantic models for `SpreadsheetML` Custom XML Maps.
 
 pub const NS: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 pub const STRICT_NS: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -24,6 +24,7 @@ pub enum XmlMapConformance {
 }
 
 impl XmlMapConformance {
+    #[must_use]
     pub const fn relationship_type(self) -> &'static str {
         match self {
             Self::Transitional => REL,
@@ -32,6 +33,7 @@ impl XmlMapConformance {
     }
 
     /// Whether this conformance uses ISO/IEC 29500 Strict namespace URIs.
+    #[must_use]
     pub const fn is_strict(self) -> bool {
         matches!(self, Self::Strict)
     }
@@ -78,16 +80,16 @@ pub struct XmlMapInfo {
     pub maps: Vec<XmlMap>,
 }
 
-/// A parsed MapInfo value together with the namespace family observed at its root.
+/// A parsed `MapInfo` value together with the namespace family observed at its root.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ParsedXmlMapInfo {
     pub info: XmlMapInfo,
     pub conformance: XmlMapConformance,
 }
 
-/// Backward-compatible SpreadsheetML name for [`XmlSchema`].
+/// Backward-compatible `SpreadsheetML` name for [`XmlSchema`].
 pub type XmlMapSchema = XmlSchema;
-/// Backward-compatible SpreadsheetML name for [`DataBinding`].
+/// Backward-compatible `SpreadsheetML` name for [`DataBinding`].
 pub type XmlMapDataBinding = DataBinding;
 
 /// Fixed resource ceilings enforced by the bounded XML Maps codec.
@@ -197,7 +199,7 @@ impl<'a> From<&'a XmlMap> for XmlMapRef<'a> {
     }
 }
 
-/// Borrowed MapInfo projection with small owned descriptor vectors only.
+/// Borrowed `MapInfo` projection with small owned descriptor vectors only.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct XmlMapInfoRef<'a> {
     pub selection_namespaces: &'a str,

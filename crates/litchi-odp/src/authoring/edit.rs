@@ -1,4 +1,4 @@
-//! Source-checked, failure-atomic ODP slide and shape edits.
+//! Source-checked, failure-atomic ODP slide, shape, media, and RDF edits.
 
 use super::mutable::MutablePresentation;
 use crate::core::OwnedPackage;
@@ -103,10 +103,12 @@ impl Snapshot {
     /// Returns an error when the exact source package cannot be reparsed for staging.
     pub fn transaction(&self) -> Result<Transaction> {
         let presentation = Presentation::from_shared_bytes(Arc::clone(&self.bytes))?;
+        ensure_editable_source(presentation.owned_package())?;
         Ok(Transaction {
             source: self.clone(),
             draft: MutablePresentation::from_presentation(&presentation)?,
             changed: false,
+            rdf: None,
             media_bytes: 0,
             resource_bytes: self.resource_bytes,
             source_resource_bytes: self.resource_bytes,
@@ -149,9 +151,50 @@ pub struct Transaction {
     source: Snapshot,
     draft: MutablePresentation,
     changed: bool,
+    rdf: Option<RdfDraft>,
     media_bytes: usize,
     resource_bytes: usize,
     source_resource_bytes: usize,
+}
+
+#[derive(Clone)]
+enum RdfOperation {
+    AddGraph {
+        path: String,
+        triples: Vec<crate::rdf::Triple>,
+    },
+    ReplaceGraph {
+        path: String,
+        triples: Vec<crate::rdf::Triple>,
+    },
+    RemoveGraph {
+        path: String,
+    },
+    AddTriple {
+        path: String,
+        triple: crate::rdf::Triple,
+    },
+    ReplaceTriple {
+        path: String,
+        index: usize,
+        triple: crate::rdf::Triple,
+    },
+    RemoveTriple {
+        path: String,
+        index: usize,
+    },
+    MoveTriple {
+        path: String,
+        from: usize,
+        to: usize,
+    },
+}
+
+struct RdfDraft {
+    bytes: Arc<Vec<u8>>,
+    original_graphs: Vec<crate::rdf::Graph>,
+    graphs: Vec<crate::rdf::Graph>,
+    operations: Vec<RdfOperation>,
 }
 
 impl Transaction {
@@ -363,6 +406,157 @@ impl Transaction {
         Ok(reference)
     }
 
+    /// Inspect the RDF metadata graphs in the current transaction draft.
+    ///
+    /// The inventory is loaded lazily so slide-only transactions do not reject
+    /// unrelated malformed metadata that they never touch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a declared RDF part is malformed, dangling, or over budget.
+    pub fn rdf_graphs(&mut self) -> Result<&[crate::rdf::Graph]> {
+        self.ensure_rdf()?;
+        self.rdf
+            .as_ref()
+            .map(|draft| draft.graphs.as_slice())
+            .ok_or_else(|| invalid_error("ODP RDF draft initialization failed"))
+    }
+
+    /// Add one RDF metadata graph to this package transaction.
+    ///
+    /// A missing preferred path is resolved immediately to a collision-free,
+    /// deterministic package path which is retained by the transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an unsafe or colliding path, invalid triples, or a package limit.
+    pub fn add_rdf_graph(
+        &mut self,
+        preferred_path: Option<&str>,
+        triples: &[crate::rdf::Triple],
+    ) -> Result<String> {
+        let package = self.rdf_package()?;
+        let (bytes, path) = crate::rdf::add_graph(&package, preferred_path, triples)?;
+        self.stage_rdf(
+            bytes,
+            RdfOperation::AddGraph {
+                path: path.clone(),
+                triples: triples.to_vec(),
+            },
+        )?;
+        Ok(path)
+    }
+
+    /// Replace all triples in one RDF metadata graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing graph, invalid triples, or a package limit.
+    pub fn replace_rdf_graph(&mut self, path: &str, triples: &[crate::rdf::Triple]) -> Result<()> {
+        let package = self.rdf_package()?;
+        let bytes = crate::rdf::replace_graph(&package, path, triples)?;
+        self.stage_rdf(
+            bytes,
+            RdfOperation::ReplaceGraph {
+                path: path.to_string(),
+                triples: triples.to_vec(),
+            },
+        )
+    }
+
+    /// Remove one RDF metadata graph after dependency validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing graph or an incoming graph reference.
+    pub fn remove_rdf_graph(&mut self, path: &str) -> Result<()> {
+        let package = self.rdf_package()?;
+        let bytes = crate::rdf::remove_graph(&package, path)?;
+        self.stage_rdf(
+            bytes,
+            RdfOperation::RemoveGraph {
+                path: path.to_string(),
+            },
+        )
+    }
+
+    /// Append one RDF triple and return its checked projected index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing graph, invalid triple, or graph limit.
+    pub fn add_rdf_triple(&mut self, path: &str, triple: &crate::rdf::Triple) -> Result<usize> {
+        let package = self.rdf_package()?;
+        let (bytes, index) = crate::rdf::add_triple(&package, path, triple)?;
+        self.stage_rdf(
+            bytes,
+            RdfOperation::AddTriple {
+                path: path.to_string(),
+                triple: triple.clone(),
+            },
+        )?;
+        Ok(index)
+    }
+
+    /// Replace one RDF triple selected by checked zero-based position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing graph, out-of-range position, changed subject, or invalid
+    /// triple.
+    pub fn replace_rdf_triple(
+        &mut self,
+        path: &str,
+        index: usize,
+        triple: &crate::rdf::Triple,
+    ) -> Result<()> {
+        let package = self.rdf_package()?;
+        let bytes = crate::rdf::replace_triple(&package, path, index, triple)?;
+        self.stage_rdf(
+            bytes,
+            RdfOperation::ReplaceTriple {
+                path: path.to_string(),
+                index,
+                triple: triple.clone(),
+            },
+        )
+    }
+
+    /// Remove one RDF triple selected by checked zero-based position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing graph or out-of-range position.
+    pub fn remove_rdf_triple(&mut self, path: &str, index: usize) -> Result<()> {
+        let package = self.rdf_package()?;
+        let bytes = crate::rdf::remove_triple(&package, path, index)?;
+        self.stage_rdf(
+            bytes,
+            RdfOperation::RemoveTriple {
+                path: path.to_string(),
+                index,
+            },
+        )
+    }
+
+    /// Move one RDF triple to another checked zero-based position within its subject.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing graph, out-of-range position, or subject mismatch.
+    pub fn move_rdf_triple(&mut self, path: &str, from: usize, to: usize) -> Result<()> {
+        let package = self.rdf_package()?;
+        let bytes = crate::rdf::move_triple(&package, path, from, to)?;
+        self.stage_rdf(
+            bytes,
+            RdfOperation::MoveTriple {
+                path: path.to_string(),
+                from,
+                to,
+            },
+        )
+    }
+
     /// Validate, serialize, reparse, and atomically publish the staged draft.
     ///
     /// # Errors
@@ -370,13 +564,41 @@ impl Transaction {
     /// Returns an error if validation, bounded serialization, package parsing, or semantic
     /// readback fails. The source snapshot is never changed.
     pub fn commit(self) -> Result<Commit> {
-        if !self.changed {
+        let rdf_changed = self
+            .rdf
+            .as_ref()
+            .is_some_and(|draft| !draft.operations.is_empty());
+        if !self.changed && !rdf_changed {
             return Ok(Commit::unchanged(self.source));
         }
-        let bytes = Arc::new(self.draft.to_bytes_bounded(MAX_PACKAGE_BYTES)?);
+        let mut bytes = if self.changed {
+            Arc::new(self.draft.to_bytes_bounded(MAX_PACKAGE_BYTES)?)
+        } else {
+            Arc::clone(&self.source.bytes)
+        };
+        if let Some(rdf) = &self.rdf
+            && !rdf.operations.is_empty()
+        {
+            if self.changed {
+                for operation in &rdf.operations {
+                    let package = OwnedPackage::from_shared_bytes(Arc::clone(&bytes))?;
+                    bytes = Arc::new(apply_rdf_operation(&package, operation)?);
+                    if bytes.len() > MAX_PACKAGE_BYTES {
+                        return invalid("ODP RDF transaction exceeds the 128 MiB package limit");
+                    }
+                }
+            } else {
+                bytes = Arc::clone(&rdf.bytes);
+            }
+        }
         let reopened = OwnedPackage::from_shared_bytes(Arc::clone(&bytes))?;
         validate_compact_xml_parts(&reopened)?;
         self.draft.verify_embedded_media(&reopened)?;
+        if let Some(rdf) = &self.rdf
+            && crate::rdf::graphs(&reopened)? != rdf.graphs
+        {
+            return invalid("ODP transaction RDF readback differs from the staged graph model");
+        }
         let snapshot = Snapshot::from_owned_package(bytes, reopened)?;
         if snapshot.slides() != self.draft.slides() {
             return invalid("ODP transaction readback differs from the staged slide model");
@@ -390,6 +612,57 @@ impl Transaction {
             patch,
             changed: true,
         })
+    }
+
+    fn ensure_rdf(&mut self) -> Result<()> {
+        if self.rdf.is_none() {
+            let package = OwnedPackage::from_shared_bytes(Arc::clone(&self.source.bytes))?;
+            let graphs = crate::rdf::graphs(&package)?;
+            self.rdf = Some(RdfDraft {
+                bytes: Arc::clone(&self.source.bytes),
+                original_graphs: graphs.clone(),
+                graphs,
+                operations: Vec::new(),
+            });
+        }
+        Ok(())
+    }
+
+    fn rdf_package(&mut self) -> Result<OwnedPackage> {
+        self.ensure_rdf()?;
+        let bytes = self
+            .rdf
+            .as_ref()
+            .map(|draft| Arc::clone(&draft.bytes))
+            .ok_or_else(|| invalid_error("ODP RDF draft initialization failed"))?;
+        OwnedPackage::from_shared_bytes(bytes)
+    }
+
+    fn stage_rdf(&mut self, bytes: Vec<u8>, operation: RdfOperation) -> Result<()> {
+        if bytes.len() > MAX_PACKAGE_BYTES {
+            return invalid("ODP RDF transaction exceeds the 128 MiB package limit");
+        }
+        let candidate = Arc::new(bytes);
+        let presentation = Presentation::from_shared_bytes(Arc::clone(&candidate))?;
+        let graphs = crate::rdf::graphs(presentation.owned_package())?;
+        let source_bytes = Arc::clone(&self.source.bytes);
+        let draft = self
+            .rdf
+            .as_mut()
+            .ok_or_else(|| invalid_error("ODP RDF draft initialization failed"))?;
+        if graphs == draft.graphs {
+            return Ok(());
+        }
+        if graphs == draft.original_graphs {
+            draft.bytes = source_bytes;
+            draft.graphs = graphs;
+            draft.operations.clear();
+            return Ok(());
+        }
+        draft.bytes = candidate;
+        draft.graphs = graphs;
+        draft.operations.push(operation);
+        Ok(())
     }
 
     fn check_text(title: &str, text: &str) -> Result<()> {
@@ -556,6 +829,53 @@ fn same_source(left: &Snapshot, right: &Snapshot) -> bool {
     Arc::ptr_eq(&left.bytes, &right.bytes) || left.bytes == right.bytes
 }
 
+fn ensure_editable_source(package: &OwnedPackage) -> Result<()> {
+    let archive = package.package()?;
+    if archive.manifest().has_encrypted_entries() {
+        return unsupported(
+            "ODP package transactions refuse encrypted package entries; decrypt to a new unsigned package first",
+        );
+    }
+    if archive.has_file("META-INF/documentsignatures.xml")
+        || archive.has_file("META-INF/macrosignatures.xml")
+    {
+        return unsupported(
+            "ODP package transactions refuse signed packages because mutation would invalidate their signatures",
+        );
+    }
+    Ok(())
+}
+
+fn apply_rdf_operation(package: &OwnedPackage, operation: &RdfOperation) -> Result<Vec<u8>> {
+    match operation {
+        RdfOperation::AddGraph { path, triples } => {
+            let (bytes, actual_path) = crate::rdf::add_graph(package, Some(path), triples)?;
+            if actual_path != *path {
+                return invalid("ODP RDF replay resolved a different graph path");
+            }
+            Ok(bytes)
+        },
+        RdfOperation::ReplaceGraph { path, triples } => {
+            crate::rdf::replace_graph(package, path, triples)
+        },
+        RdfOperation::RemoveGraph { path } => crate::rdf::remove_graph(package, path),
+        RdfOperation::AddTriple { path, triple } => {
+            crate::rdf::add_triple(package, path, triple).map(|(bytes, _)| bytes)
+        },
+        RdfOperation::ReplaceTriple {
+            path,
+            index,
+            triple,
+        } => crate::rdf::replace_triple(package, path, *index, triple),
+        RdfOperation::RemoveTriple { path, index } => {
+            crate::rdf::remove_triple(package, path, *index)
+        },
+        RdfOperation::MoveTriple { path, from, to } => {
+            crate::rdf::move_triple(package, path, *from, *to)
+        },
+    }
+}
+
 fn bounded_candidate(current: usize, removed: usize, added: usize, limit: usize) -> Result<usize> {
     let candidate = current
         .checked_sub(removed)
@@ -717,10 +1037,9 @@ fn validate_compact_xml_parts(package: &OwnedPackage) -> Result<()> {
     let mut part_count = 0usize;
     let mut aggregate_bytes = 0usize;
     for path in package.files()? {
-        if !path
-            .rsplit_once('.')
-            .is_some_and(|(_, extension)| extension.eq_ignore_ascii_case("xml"))
-        {
+        if !path.rsplit_once('.').is_some_and(|(_, extension)| {
+            extension.eq_ignore_ascii_case("xml") || extension.eq_ignore_ascii_case("rdf")
+        }) {
             continue;
         }
         let payload = package.get_file(&path)?;

@@ -87,7 +87,7 @@ pub(super) fn write_obj<W: Write>(writer: &mut W, config: &CommentConfig<'_>) ->
 
 fn write_continue<W: Write>(writer: &mut W, data: &[u8]) -> Result<()> {
     let length = u16::try_from(data.len())
-        .map_err(|_| Error::InvalidData("comment CONTINUE record is too large".to_string()))?;
+        .map_err(|_error| Error::InvalidData("comment CONTINUE record is too large".to_string()))?;
     if length > 8224 {
         return Err(Error::InvalidData(
             "comment CONTINUE exceeds 8224 bytes".to_string(),
@@ -119,8 +119,8 @@ pub(super) fn write_txo<W: Write>(writer: &mut W, config: &CommentConfig<'_>) ->
     writer.write_all(&0x0212u16.to_le_bytes())?;
     writer.write_all(&0u16.to_le_bytes())?;
     writer.write_all(&[0; 6])?;
-    writer.write_all(&(units.len() as u16).to_le_bytes())?;
-    writer.write_all(&(run_bytes as u16).to_le_bytes())?;
+    writer.write_all(&crate::utils::truncate_usize_to_u16(units.len()).to_le_bytes())?;
+    writer.write_all(&crate::utils::truncate_usize_to_u16(run_bytes).to_le_bytes())?;
     writer.write_all(&config.font_when_empty.to_le_bytes())?;
     writer.write_all(&0u16.to_le_bytes())?;
 
@@ -146,7 +146,7 @@ pub(super) fn write_txo<W: Write>(writer: &mut W, config: &CommentConfig<'_>) ->
             bytes.extend_from_slice(&run.font_index.to_le_bytes());
             bytes.extend_from_slice(&[0; 4]);
         }
-        bytes.extend_from_slice(&(units.len() as u16).to_le_bytes());
+        bytes.extend_from_slice(&crate::utils::truncate_usize_to_u16(units.len()).to_le_bytes());
         bytes.extend_from_slice(&[0; 6]);
         for chunk in bytes.chunks(8224) {
             write_continue(writer, chunk)?;
@@ -159,16 +159,20 @@ pub(super) fn write_note<W: Write>(writer: &mut W, config: &CommentConfig<'_>) -
     let author: Vec<u16> = config.author.encode_utf16().collect();
     let compressed = author.iter().all(|unit| *unit <= 0x00FF);
     let byte_count = author.len() * if compressed { 1 } else { 2 };
-    write_record_header(writer, NOTE, (12 + byte_count) as u16)?;
+    write_record_header(
+        writer,
+        NOTE,
+        crate::utils::truncate_usize_to_u16(12 + byte_count),
+    )?;
     writer.write_all(&config.row.to_le_bytes())?;
     writer.write_all(&u16::from(config.column).to_le_bytes())?;
     writer.write_all(&(if config.visible { 2u16 } else { 0 }).to_le_bytes())?;
     writer.write_all(&config.object_id.to_le_bytes())?;
-    writer.write_all(&(author.len() as u16).to_le_bytes())?;
+    writer.write_all(&crate::utils::truncate_usize_to_u16(author.len()).to_le_bytes())?;
     writer.write_all(&[u8::from(!compressed)])?;
     if compressed {
         for unit in author {
-            writer.write_all(&[unit as u8])?;
+            writer.write_all(&[crate::utils::truncate_u16_to_u8(unit)])?;
         }
     } else {
         for unit in author {

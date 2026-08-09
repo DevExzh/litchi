@@ -1,4 +1,28 @@
-//! Exact-source snapshots for active WordprocessingML content controls.
+#![expect(
+    clippy::len_without_is_empty,
+    reason = "the span abstraction permits zero length without collection semantics"
+)]
+#![expect(
+    clippy::match_same_arms,
+    reason = "separate arms document distinct OOXML grammar cases"
+)]
+#![expect(
+    clippy::needless_pass_by_value,
+    reason = "the public API shape is retained for compatibility"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
+#![expect(
+    clippy::similar_names,
+    reason = "domain names mirror distinct OOXML roles"
+)]
+//! Exact-source snapshots for active `WordprocessingML` content controls.
 
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -223,11 +247,19 @@ pub struct Snapshot(Arc<Inner>);
 
 impl Snapshot {
     /// Parse owned XML with production resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_xml(source: impl Into<Vec<u8>>) -> Result<Self> {
         Self::from_xml_with_limits(source, Limits::default())
     }
 
     /// Parse owned XML with explicit resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_xml_with_limits(source: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
         limits.validate()?;
         let source = source.into();
@@ -505,13 +537,22 @@ fn scan(source: &[u8], limits: &Limits) -> Result<Vec<SourceOccurrence>> {
                 }
                 break;
             },
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     Ok(occurrences)
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "signature mirrors the corresponding OOXML record"
+)]
 fn inspect_child(
     source: &[u8],
     begin: usize,
@@ -934,7 +975,13 @@ fn active_offsets(source: &[u8], limits: &Limits) -> Result<HashSet<usize>> {
                     .ok_or_else(|| invalid("content-control MCE depth underflow"))?;
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if offsets.is_empty() {
@@ -993,7 +1040,7 @@ fn push_offset(offsets: &mut Vec<u32>, offset: usize, limit: usize) -> Result<()
         .map_err(alloc("content-control MCE offsets"))?;
     offsets.push(
         u32::try_from(offset)
-            .map_err(|_| invalid("content-control source offset does not fit u32"))?,
+            .map_err(|_source_error| invalid("content-control source offset does not fit u32"))?,
     );
     Ok(())
 }
@@ -1058,7 +1105,7 @@ fn find_attr(source: &[u8], start: usize, end: usize, wanted: &[u8]) -> Result<A
 
 fn pos(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("content-control XML offset does not fit usize"))
+        .map_err(|_source_error| invalid("content-control XML offset does not fit usize"))
 }
 
 fn checked_add(left: usize, right: usize, resource: &str) -> Result<usize> {

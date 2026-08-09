@@ -59,56 +59,67 @@ impl CrtLayout12 {
     /// The automatic layout type of the legend (`autolayouttype`, 4 bits).
     /// MUST be ignored when the record is in an ATTACHEDLABEL rule sequence
     /// (MS-XLS 2.4.66); defined values are 0x0 through 0x4.
+    #[must_use]
     pub fn auto_layout_type(&self) -> u8 {
         ((self.flags & AUTO_LAYOUT_TYPE_MASK) >> 1) as u8
     }
 
     /// Raw flags word, including the unused and `reserved1` bits.
+    #[must_use]
     pub fn flags(&self) -> u16 {
         self.flags
     }
 
     /// Raw `dwCheckSum` value, preserved verbatim.
+    #[must_use]
     pub fn checksum(&self) -> u32 {
         self.checksum
     }
 
     /// Layout mode of `x` (`wXMode`).
+    #[must_use]
     pub fn x_mode(&self) -> CrtLayout12Mode {
         self.modes.x_mode
     }
 
     /// Layout mode of `y` (`wYMode`).
+    #[must_use]
     pub fn y_mode(&self) -> CrtLayout12Mode {
         self.modes.y_mode
     }
 
     /// Layout mode of `dx` (`wWidthMode`).
+    #[must_use]
     pub fn width_mode(&self) -> CrtLayout12Mode {
         self.modes.width_mode
     }
 
     /// Layout mode of `dy` (`wHeightMode`).
+    #[must_use]
     pub fn height_mode(&self) -> CrtLayout12Mode {
         self.modes.height_mode
     }
 
     /// Horizontal offset (`x`), interpreted per [`Self::x_mode`].
+    #[must_use]
     pub fn x(&self) -> f64 {
         self.modes.x
     }
 
     /// Vertical offset (`y`), interpreted per [`Self::y_mode`].
+    #[must_use]
     pub fn y(&self) -> f64 {
         self.modes.y
     }
 
     /// Width or horizontal offset (`dx`), interpreted per [`Self::width_mode`].
+    #[must_use]
     pub fn dx(&self) -> f64 {
         self.modes.dx
     }
 
     /// Height or vertical offset (`dy`), interpreted per [`Self::height_mode`].
+    #[must_use]
     pub fn dy(&self) -> f64 {
         self.modes.dy
     }
@@ -146,76 +157,91 @@ impl CrtLayout12A {
     /// The `dwCheckSum` value: 0x00000001 when the plot area layout is manual
     /// and not always automatically computed, 0x00000000 otherwise (derived
     /// from the `ShtProps` flags, MS-XLS 2.4.67).
+    #[must_use]
     pub fn checksum(&self) -> u32 {
         self.checksum
     }
 
     /// Whether the layout target is the inner plot area (`fLayoutTargetInner`).
+    #[must_use]
     pub fn is_layout_target_inner(&self) -> bool {
         self.flags & LAYOUT_TARGET_INNER != 0
     }
 
     /// Raw flags word, including the 15 `reserved1` bits.
+    #[must_use]
     pub fn flags(&self) -> u16 {
         self.flags
     }
 
     /// Horizontal offset of the plot area's upper-left corner (`xTL`), in SPRC.
+    #[must_use]
     pub fn x_top_left(&self) -> i16 {
         self.x_top_left
     }
 
     /// Vertical offset of the plot area's upper-left corner (`yTL`), in SPRC.
+    #[must_use]
     pub fn y_top_left(&self) -> i16 {
         self.y_top_left
     }
 
     /// Width of the plot area (`xBR`), in SPRC.
+    #[must_use]
     pub fn x_bottom_right(&self) -> i16 {
         self.x_bottom_right
     }
 
     /// Height of the plot area (`yBR`), in SPRC.
+    #[must_use]
     pub fn y_bottom_right(&self) -> i16 {
         self.y_bottom_right
     }
 
     /// Layout mode of `x` (`wXMode`).
+    #[must_use]
     pub fn x_mode(&self) -> CrtLayout12Mode {
         self.modes.x_mode
     }
 
     /// Layout mode of `y` (`wYMode`).
+    #[must_use]
     pub fn y_mode(&self) -> CrtLayout12Mode {
         self.modes.y_mode
     }
 
     /// Layout mode of `dx` (`wWidthMode`).
+    #[must_use]
     pub fn width_mode(&self) -> CrtLayout12Mode {
         self.modes.width_mode
     }
 
     /// Layout mode of `dy` (`wHeightMode`).
+    #[must_use]
     pub fn height_mode(&self) -> CrtLayout12Mode {
         self.modes.height_mode
     }
 
     /// Horizontal offset (`x`), interpreted per [`Self::x_mode`].
+    #[must_use]
     pub fn x(&self) -> f64 {
         self.modes.x
     }
 
     /// Vertical offset (`y`), interpreted per [`Self::y_mode`].
+    #[must_use]
     pub fn y(&self) -> f64 {
         self.modes.y
     }
 
     /// Width or horizontal offset (`dx`), interpreted per [`Self::width_mode`].
+    #[must_use]
     pub fn dx(&self) -> f64 {
         self.modes.dx
     }
 
     /// Height or vertical offset (`dy`), interpreted per [`Self::height_mode`].
+    #[must_use]
     pub fn dy(&self) -> f64 {
         self.modes.dy
     }

@@ -1,11 +1,15 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Glossary package planning and failure-bounded XML assembly.
 
 use super::super::MAX;
-use super::super::model::*;
-use super::super::*;
-use super::semantic::*;
-use super::validation::*;
-use super::xml::*;
+use super::super::model::{Catalog, Conformance};
+use super::super::{Arc, Error, Result};
+use super::semantic::{prepare_opaque_for, write_entry};
+use super::validation::{invalid, validate_catalog_fields};
+use super::xml::{Node, XmlSink, XmlSize, node_write};
 
 pub(in crate::glossary) struct WritePlan {
     pub(in crate::glossary) background: Option<Node>,

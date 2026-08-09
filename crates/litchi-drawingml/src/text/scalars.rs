@@ -1,4 +1,4 @@
-//! Checked numeric and coordinate domains used by DrawingML text.
+//! Checked numeric and coordinate domains used by `DrawingML` text.
 
 use std::fmt;
 use std::str::FromStr;

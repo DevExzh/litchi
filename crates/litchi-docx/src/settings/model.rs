@@ -1,3 +1,7 @@
+#![expect(
+    clippy::struct_field_names,
+    reason = "the public model retains established field names"
+)]
 use super::colors::ColorSchemeMapping;
 use super::compatibility::{
     COMPATIBILITY_MODE_SETTING_NAME, COMPATIBILITY_SETTING_URI, CompatibilityOption,
@@ -51,6 +55,7 @@ impl<F> Default for Settings<F> {
 
 impl<F> Settings<F> {
     /// Create empty settings values.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -259,6 +264,10 @@ impl<F: Copy> Settings<F> {
 
 impl Settings<NoteNumberFormat> {
     /// Map the owner-local note format to a host format without reparsing XML.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn try_map_note_format<G, E>(
         self,
         mut map: impl FnMut(NoteNumberFormat) -> Result<G, E>,

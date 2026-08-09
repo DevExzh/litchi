@@ -290,7 +290,7 @@ fn choice_requires<R: BufRead>(
         if attribute.key.as_ref() == b"Requires" {
             return attribute
                 .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
-                .map(|value| value.into_owned())
+                .map(std::borrow::Cow::into_owned)
                 .map_err(|error| Error::Xml(error.to_string()));
         }
     }

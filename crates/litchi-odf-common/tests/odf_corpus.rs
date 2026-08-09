@@ -26,14 +26,6 @@ fn package(content: &str) -> Result<Vec<u8>, Error> {
     writer.finish_to_bytes()
 }
 
-fn assert_invalid<T>(result: Result<T, Error>, case: &str) {
-    match result {
-        Err(Error::InvalidFormat(_)) => {},
-        Err(error) => panic!("{case} produced a non-format error: {error:?}"),
-        Ok(_) => panic!("{case} unexpectedly parsed"),
-    }
-}
-
 #[test]
 fn compact_odt_exercises_shared_package_and_xml_parsers() -> Result<(), Error> {
     let package = Package::from_bytes(
@@ -65,22 +57,11 @@ fn compact_odt_exercises_shared_package_and_xml_parsers() -> Result<(), Error> {
 }
 
 #[test]
-fn compact_xxe_probe_is_rejected_by_shared_scanners() -> Result<(), Error> {
+fn compact_xxe_probe_is_rejected_before_publication() {
     let hostile = r#"<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE office [<!ENTITY nasty SYSTEM "externalcontent.txt">]><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text><text:p>&nasty;</text:p></office:text></office:body></office:document-content>"#;
-    let package = Package::from_bytes(
-        package(hostile)?,
-        "application/vnd.oasis.opendocument.text",
-        "<office:text",
-        "ODT",
-    )?;
-    let archive = package.package().package()?;
-    assert_invalid(
-        media::scan_package(package.content_xml(), package.styles_xml(), &archive),
-        "XXE image scan",
-    );
-    assert_invalid(
-        embedded::scan_package(package.content_xml(), package.styles_xml(), &archive),
-        "XXE object scan",
-    );
-    Ok(())
+    let error = package(hostile).unwrap_err();
+    assert!(matches!(
+        error,
+        Error::InvalidFormat(message) if message.contains("XML publication rejected")
+    ));
 }

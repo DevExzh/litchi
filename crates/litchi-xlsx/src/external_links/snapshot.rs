@@ -49,21 +49,25 @@ impl Snapshot {
 
     /// Borrow the workbook's external-link entries in stable relationship-ID
     /// order.
+    #[must_use]
     pub fn entries(&self) -> &[Entry] {
         &self.entries
     }
 
     /// Contextual alias for [`Self::entries`].
+    #[must_use]
     pub fn links(&self) -> &[Entry] {
         self.entries()
     }
 
     /// The workbook part that owns the external-link relationships.
+    #[must_use]
     pub fn workbook_part_name(&self) -> &str {
         &self.source.workbook_part_name
     }
 
     /// Namespace conformance used for newly authored external-link parts.
+    #[must_use]
     pub fn conformance(&self) -> Conformance {
         self.conformance
     }
@@ -78,6 +82,7 @@ impl Snapshot {
     }
 
     /// Whether this workbook owns no external links.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
@@ -116,10 +121,10 @@ impl SourceState {
         }
         parts.sort_by(|left, right| left.part_uri.as_str().cmp(right.part_uri.as_str()));
 
-        let conformance = entries
-            .first()
-            .map(|entry| detect_conformance(&parts, &entry.part_uri))
-            .unwrap_or_else(|| detect_workbook_conformance(workbook.blob()));
+        let conformance = entries.first().map_or_else(
+            || detect_workbook_conformance(workbook.blob()),
+            |entry| detect_conformance(&parts, &entry.part_uri),
+        );
         Ok(Self {
             workbook_part_name: workbook.partname().to_string(),
             workbook_content_type: workbook.content_type().to_owned(),

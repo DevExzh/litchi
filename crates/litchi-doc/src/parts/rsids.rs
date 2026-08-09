@@ -32,11 +32,13 @@ pub struct DocumentRsids {
 
 impl DocumentRsids {
     /// The identifiers in table order.
+    #[must_use]
     pub fn ids(&self) -> &[u32] {
         &self.ids
     }
 
     /// Whether an identifier is present in the table.
+    #[must_use]
     pub fn contains(&self, id: u32) -> bool {
         self.ids.contains(&id)
     }

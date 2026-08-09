@@ -21,6 +21,7 @@ pub struct Limits {
 
 impl Limits {
     /// Returns the checked default resource limits.
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             max_raw_bytes: DEFAULT_BYTES,
@@ -36,33 +37,43 @@ impl Limits {
         }
     }
 
+    #[must_use]
     pub const fn max_raw_bytes(self) -> usize {
         self.max_raw_bytes
     }
+    #[must_use]
     pub const fn max_mce_bytes(self) -> usize {
         self.max_mce_bytes
     }
+    #[must_use]
     pub const fn max_output_bytes(self) -> usize {
         self.max_output_bytes
     }
+    #[must_use]
     pub const fn max_depth(self) -> usize {
         self.max_depth
     }
+    #[must_use]
     pub const fn max_events(self) -> usize {
         self.max_events
     }
+    #[must_use]
     pub const fn max_attributes(self) -> usize {
         self.max_attributes
     }
+    #[must_use]
     pub const fn max_features(self) -> usize {
         self.max_features
     }
+    #[must_use]
     pub const fn max_feature_name_bytes(self) -> usize {
         self.max_feature_name_bytes
     }
+    #[must_use]
     pub const fn max_feature_names_bytes(self) -> usize {
         self.max_feature_names_bytes
     }
+    #[must_use]
     pub const fn max_opaque_bytes(self) -> usize {
         self.max_opaque_bytes
     }

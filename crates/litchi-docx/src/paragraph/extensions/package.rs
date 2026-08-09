@@ -14,6 +14,10 @@ impl Paragraph {
     /// The returned value is a detached snapshot; all paragraph content,
     /// unknown markup, and relationship references remain in the source-backed
     /// paragraph and are not rewritten by this query.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn extensions(&self) -> Result<Extensions> {
         parse_paragraph(self.xml_bytes())
     }
@@ -22,6 +26,10 @@ impl Paragraph {
 impl Row {
     /// Read the typed Word 2010 `paraId`/`textId` pair attached directly to this
     /// `w:tr`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn extension_ids(&self) -> Result<Ids> {
         parse_row(self.xml_bytes())
     }
@@ -35,6 +43,10 @@ impl MutableParagraph {
     }
 
     /// Replace the paragraph extension state after validating dependencies.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_extensions(&mut self, value: Extensions) -> Result<&mut Self> {
         value.validate()?;
         self.extension_values = value;
@@ -48,12 +60,20 @@ impl MutableParagraph {
     }
 
     /// Set or remove `paraId`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_para_id(&mut self, value: Option<Id>) -> Result<&mut Self> {
         self.extension_values.set_para_id(value)?;
         Ok(self)
     }
 
     /// Set or remove `textId`; a present value requires `paraId`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_text_id(&mut self, value: Option<Id>) -> Result<&mut Self> {
         self.extension_values.set_text_id(value)?;
         Ok(self)
@@ -80,6 +100,10 @@ impl MutableRow {
     }
 
     /// Replace the row identifier pair after validating dependencies.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_extension_ids(&mut self, value: Ids) -> Result<&mut Self> {
         value.validate()?;
         self.extension_ids = value;
@@ -87,12 +111,20 @@ impl MutableRow {
     }
 
     /// Set or remove the row's `paraId`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_para_id(&mut self, value: Option<Id>) -> Result<&mut Self> {
         self.extension_ids.set_para_id(value)?;
         Ok(self)
     }
 
     /// Set or remove the row's `textId`; a present value requires `paraId`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_text_id(&mut self, value: Option<Id>) -> Result<&mut Self> {
         self.extension_ids.set_text_id(value)?;
         Ok(self)

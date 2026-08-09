@@ -90,7 +90,9 @@ impl DateTime {
             .map_err(|_err| invalid("slide synchronization month is out of range"))?;
         let day = u8::try_from(day)
             .map_err(|_err| invalid("slide synchronization day is out of range"))?;
-        if NaiveDate::from_ymd_opt(year as i32, month.into(), day.into()).is_none() {
+        let calendar_year = i32::try_from(year)
+            .map_err(|_err| invalid("slide synchronization year is out of range"))?;
+        if NaiveDate::from_ymd_opt(calendar_year, month.into(), day.into()).is_none() {
             return Err(invalid("slide synchronization date is not a calendar day"));
         }
 

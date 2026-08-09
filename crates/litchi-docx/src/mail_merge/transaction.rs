@@ -1,3 +1,19 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::match_same_arms,
+    reason = "separate arms document distinct OOXML grammar cases"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
 //! Source-checked typed mail-merge edits.
 
 use std::sync::Arc;
@@ -26,11 +42,19 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parse a complete settings XML source containing `w:mailMerge`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_xml(xml: impl Into<Vec<u8>>) -> Result<Self> {
         Self::from_parts(xml.into(), None)
     }
 
     /// Parse settings and an optional inert recipient-data XML source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_parts(xml: impl Into<Vec<u8>>, recipients_xml: Option<Vec<u8>>) -> Result<Self> {
         let xml = xml.into();
         let settings = super::parse_settings_mail_merge(&xml)?
@@ -138,6 +162,10 @@ impl Transaction {
     }
 
     /// Apply an atomic mutation to the typed settings model.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn edit_settings(
         &mut self,
         edit: impl FnOnce(&mut Settings) -> Result<()>,
@@ -150,6 +178,10 @@ impl Transaction {
     }
 
     /// Replace the typed settings model after bounded validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn replace_settings(&mut self, value: Settings) -> Result<&mut Self> {
         value.to_xml(self.original.conformance)?;
         self.settings = value;
@@ -157,6 +189,10 @@ impl Transaction {
     }
 
     /// Replace the inert recipient inclusion metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_recipients(&mut self, value: Option<Recipients>) -> Result<&mut Self> {
         if let Some(value) = &value {
             value.to_xml(self.original.conformance)?;
@@ -166,6 +202,10 @@ impl Transaction {
     }
 
     /// Set one recipient inclusion flag without opening any data source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_recipient_active(&mut self, index: usize, active: bool) -> Result<&mut Self> {
         let mut recipients = self
             .recipients
@@ -177,6 +217,10 @@ impl Transaction {
     }
 
     /// Replace one ODSO field-map entry, preserving the surrounding model.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_field_map(&mut self, index: usize, value: Option<FieldMap>) -> Result<&mut Self> {
         let mut settings = self.settings.clone();
         let odso = settings.odso.get_or_insert_with(DataSourceObject::default);
@@ -195,6 +239,10 @@ impl Transaction {
     }
 
     /// Validate and consume this edit into a reversible commit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn commit(self) -> Result<Commit> {
         self.settings.to_xml(self.original.conformance)?;
         let semantic_changed =
@@ -331,6 +379,10 @@ impl Patch {
     }
 
     /// Apply only to the exact captured source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if !source.same_source(&self.before) {
             return Err(invalid("mail-merge patch source is stale"));
@@ -432,13 +484,13 @@ fn scan(xml: &[u8]) -> Result<Layout> {
     let mut stack = Vec::new();
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("mail-merge XML offset is too large"))?;
+            .map_err(|_source_error| invalid("mail-merge XML offset is too large"))?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
         let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("mail-merge XML offset is too large"))?;
+            .map_err(|_source_error| invalid("mail-merge XML offset is too large"))?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
@@ -479,7 +531,13 @@ fn scan(xml: &[u8]) -> Result<Layout> {
                 layout.spans[index].end = end;
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if !stack.is_empty() {
@@ -536,11 +594,11 @@ fn detect_conformance(xml: &[u8]) -> Result<Conformance> {
 }
 
 fn fingerprint(xml: &[u8], recipients_xml: Option<&[u8]>) -> Revision {
-    let mut hash = 0xcbf29ce484222325u64;
+    let mut hash = 0xcbf2_9ce4_8422_2325_u64;
     for bytes in [Some(xml), recipients_xml].into_iter().flatten() {
         for byte in bytes {
             hash ^= u64::from(*byte);
-            hash = hash.wrapping_mul(0x100000001b3);
+            hash = hash.wrapping_mul(0x0100_0000_01b3);
         }
     }
     hash

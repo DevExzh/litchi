@@ -382,7 +382,7 @@ impl Replacement {
 }
 
 fn apply_replacements(source: &[u8], mut replacements: Vec<Replacement>) -> Result<Vec<u8>> {
-    replacements.sort_by(|left, right| right.range.start.cmp(&left.range.start));
+    replacements.sort_by_key(|replacement| std::cmp::Reverse(replacement.range.start));
     let mut output = source.to_vec();
     let mut upper = source.len();
     for replacement in replacements {

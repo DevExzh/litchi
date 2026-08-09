@@ -24,21 +24,25 @@ impl CommandId {
     }
 
     /// Return the exact four-byte command identifier.
+    #[must_use]
     pub const fn raw(self) -> u32 {
         self.raw
     }
 
     /// Return the low three-bit Cmt value.
+    #[must_use]
     pub const fn command_type(self) -> u8 {
         (self.raw & 0x07) as u8
     }
 
     /// Whether this identifies a built-in FCI command.
+    #[must_use]
     pub const fn is_fci(self) -> bool {
         self.command_type() == 0x01
     }
 
     /// Whether this identifies an allocated command.
+    #[must_use]
     pub const fn is_allocated(self) -> bool {
         self.command_type() == 0x03
     }
@@ -46,9 +50,9 @@ impl CommandId {
 
 /// One DOC toolbar control (TBC).
 ///
-/// The fixed header and shared TBCGeneralInfo are typed by
+/// The fixed header and shared `TBCGeneralInfo` are typed by
 /// litchi-ole-common; the format-specific tail remains bounded and
-/// lossless in Data::specific.
+/// lossless in `Data::specific`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Control<'a> {
     pub(in crate::parts::command_bars) header: ControlHeader,
@@ -73,21 +77,25 @@ impl<'a> Control<'a> {
     }
 
     /// Return the shared toolbar-control header.
+    #[must_use]
     pub const fn header(&self) -> &ControlHeader {
         &self.header
     }
 
     /// Return the optional DOC command identifier.
+    #[must_use]
     pub const fn command(&self) -> Option<CommandId> {
         self.command
     }
 
     /// Return typed common metadata and its retained specific tail.
+    #[must_use]
     pub const fn data(&self) -> Option<&Data<'a>> {
         self.data.as_ref()
     }
 
     /// Return the control type from its shared header.
+    #[must_use]
     pub const fn control_type(&self) -> ControlType {
         self.header.control_type()
     }

@@ -1,4 +1,4 @@
-//! Validation for bounded SpreadsheetML Custom XML Maps.
+//! Validation for bounded `SpreadsheetML` Custom XML Maps.
 
 use std::collections::HashSet;
 
@@ -6,30 +6,30 @@ use quick_xml::Reader;
 use quick_xml::events::Event;
 
 use super::invalid;
-use super::model::*;
+use super::model::{XmlMapInfo, XmlMapInfoRef, XmlMapLimits};
 use crate::Result;
 
 pub fn validate_xml_map_info(info: &XmlMapInfo) -> Result<()> {
     validate_xml_map_info_with_limits(info, &XmlMapLimits::DEFAULT)
 }
 
-/// Validate a MapInfo value using caller-selected resource ceilings.
+/// Validate a `MapInfo` value using caller-selected resource ceilings.
 pub fn validate_xml_map_info_with_limits(info: &XmlMapInfo, limits: &XmlMapLimits) -> Result<()> {
     let info = XmlMapInfoRef::from_owned_with_limits(info, limits)?;
     validate_xml_map_info_ref_with_limits(&info, limits)
 }
 
-/// Validate a borrowed MapInfo projection using default resource ceilings.
+/// Validate a borrowed `MapInfo` projection using default resource ceilings.
 pub fn validate_xml_map_info_ref(info: &XmlMapInfoRef<'_>) -> Result<()> {
     validate_xml_map_info_ref_with_limits(info, &XmlMapLimits::DEFAULT)
 }
 
-/// Validate a borrowed MapInfo projection using caller-selected ceilings.
+/// Validate a borrowed `MapInfo` projection using caller-selected ceilings.
 pub fn validate_xml_map_info_ref_with_limits(
     info: &XmlMapInfoRef<'_>,
     limits: &XmlMapLimits,
 ) -> Result<()> {
-    bounded(&info.selection_namespaces, limits)?;
+    bounded(info.selection_namespaces, limits)?;
     if info.schemas.is_empty() || info.schemas.len() > limits.max_schemas {
         return Err(invalid("MapInfo requires 1..4096 Schema children"));
     }
@@ -38,12 +38,12 @@ pub fn validate_xml_map_info_ref_with_limits(
     }
     let mut schema_ids = HashSet::new();
     for schema in &info.schemas {
-        bounded_office_string(&schema.id, limits)?;
+        bounded_office_string(schema.id, limits)?;
         if !schema_ids.insert(schema.id) {
             return Err(invalid("duplicate Schema ID"));
         }
-        optional_bounded_office_string(schema.schema_reference.as_deref(), limits)?;
-        optional_bounded_office_string(schema.namespace.as_deref(), limits)?;
+        optional_bounded_office_string(schema.schema_reference, limits)?;
+        optional_bounded_office_string(schema.namespace, limits)?;
         if let Some(payload) = &schema.payload_xml {
             validate_opaque(payload, limits)?;
         }
@@ -63,29 +63,26 @@ pub fn validate_xml_map_info_ref_with_limits(
             return Err(invalid("Map references an unknown SchemaID"));
         }
         if let Some(binding) = &map.data_binding {
-            optional_bounded_office_string(binding.data_binding_name.as_deref(), limits)?;
-            optional_bounded_office_string(binding.file_binding_name.as_deref(), limits)?;
-            match binding.file_binding {
-                Some(true) => {
-                    let connection_id = binding.connection_id.ok_or_else(|| {
-                        invalid("ConnectionID is required when FileBinding is true")
-                    })?;
-                    if connection_id > i32::MAX as u32 {
-                        return Err(invalid("ConnectionID must be at most 2147483647"));
-                    }
-                },
-                Some(false) | None => {
-                    if binding.connection_id.is_some() {
-                        return Err(invalid(
-                            "ConnectionID is only permitted when FileBinding is true",
-                        ));
-                    }
-                    if binding.file_binding_name.is_some() {
-                        return Err(invalid(
-                            "FileBindingName is absent when FileBinding is false",
-                        ));
-                    }
-                },
+            optional_bounded_office_string(binding.data_binding_name, limits)?;
+            optional_bounded_office_string(binding.file_binding_name, limits)?;
+            if let Some(true) = binding.file_binding {
+                let connection_id = binding
+                    .connection_id
+                    .ok_or_else(|| invalid("ConnectionID is required when FileBinding is true"))?;
+                if connection_id > i32::MAX as u32 {
+                    return Err(invalid("ConnectionID must be at most 2147483647"));
+                }
+            } else {
+                if binding.connection_id.is_some() {
+                    return Err(invalid(
+                        "ConnectionID is only permitted when FileBinding is true",
+                    ));
+                }
+                if binding.file_binding_name.is_some() {
+                    return Err(invalid(
+                        "FileBindingName is absent when FileBinding is false",
+                    ));
+                }
             }
             if let Some(payload) = &binding.payload_xml {
                 validate_opaque(payload, limits)?;

@@ -148,7 +148,7 @@ pub(crate) fn validate_text(value: &str, max_bytes: usize, field: &str) -> Resul
 fn validate_xml_chars(value: &str, field: &str) -> Result<()> {
     if value.chars().any(|ch| {
         let code = ch as u32;
-        !matches!(code, 0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF)
+        !matches!(code, 0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x0010_FFFF)
     }) {
         return Err(invalid(format!(
             "{field} contains an invalid XML character"

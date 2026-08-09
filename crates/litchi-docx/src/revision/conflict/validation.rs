@@ -1,3 +1,7 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Shared bounded validation for inert conflict markup.
 
 use crate::{Error, Result};
@@ -14,7 +18,7 @@ const MAX_ATTRIBUTES: usize = 256;
 const MAX_EVENTS: usize = 4_000_000;
 const MAX_METADATA_BYTES: usize = 32 * 1024 * 1024;
 const MAX_OPEN_RANGES: usize = 1_000_000;
-const MAX_ATTRIBUTE_BYTES: usize = 1 * 1024 * 1024;
+const MAX_ATTRIBUTE_BYTES: usize = 1024 * 1024;
 const MAX_OUTPUT_BYTES: usize = 64 * 1024 * 1024;
 const MAX_STORIES: usize = 4_096;
 const MAX_TOTAL_STORY_BYTES: usize = 512 * 1024 * 1024;
@@ -321,7 +325,11 @@ fn days_in_month(year_mod_400: u32, month: u32) -> u32 {
     match month {
         1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
         4 | 6 | 9 | 11 => 30,
-        2 if year_mod_400 % 400 == 0 || (year_mod_400 % 4 == 0 && year_mod_400 % 100 != 0) => 29,
+        2 if year_mod_400.is_multiple_of(400)
+            || (year_mod_400.is_multiple_of(4) && !year_mod_400.is_multiple_of(100)) =>
+        {
+            29
+        },
         2 => 28,
         _ => 0,
     }

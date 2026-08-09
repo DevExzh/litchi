@@ -190,6 +190,7 @@ pub struct HeaderFooter {
 impl HeaderFooter {
     /// Create an empty header/footer using schema defaults.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             odd_header: None,
@@ -232,6 +233,7 @@ pub struct PageMargins {
 impl PageMargins {
     /// Create a complete page-margin set.
     #[inline]
+    #[must_use]
     pub fn new(left: f64, right: f64, top: f64, bottom: f64, header: f64, footer: f64) -> Self {
         Self {
             left,
@@ -292,6 +294,7 @@ pub struct PageSetup {
 impl PageSetup {
     /// Create page setup using schema defaults.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             paper_size: 1,
@@ -328,6 +331,7 @@ pub struct PrintSettings {
 impl PrintSettings {
     /// Create an explicitly empty print-settings container.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -388,7 +392,7 @@ pub struct Protection {
     pub user_interface: Option<bool>,
 }
 
-/// A DrawingML theme color that can be selected by a color mapping.
+/// A `DrawingML` theme color that can be selected by a color mapping.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColorSchemeIndex {
     /// Dark theme color 1
@@ -436,7 +440,7 @@ impl ColorSchemeIndex {
     }
 }
 
-/// Complete DrawingML theme color mapping used by a chart override.
+/// Complete `DrawingML` theme color mapping used by a chart override.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ColorMapping {
     /// Background color 1 mapping
@@ -518,6 +522,7 @@ impl UserShapes {
     }
 
     /// Create metadata whose relationship will be allocated by a package writer.
+    #[must_use]
     pub fn pending() -> Self {
         Self {
             relationship_id: None,
@@ -535,6 +540,7 @@ impl ExternalData {
     }
 
     /// Create metadata whose relationship will be allocated by a package writer.
+    #[must_use]
     pub fn pending() -> Self {
         Self {
             relationship_id: None,
@@ -546,6 +552,7 @@ impl ExternalData {
 impl PivotFormat {
     /// Create a pivot-format entry for one data point.
     #[inline]
+    #[must_use]
     pub fn new(index: u32) -> Self {
         Self {
             index,
@@ -578,6 +585,7 @@ pub struct View3D {
 impl View3D {
     /// Create a new 3D view with default settings.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             rot_x: None,
@@ -591,6 +599,7 @@ impl View3D {
 
     /// Set rotation angles.
     #[inline]
+    #[must_use]
     pub fn with_rotation(mut self, rot_x: u32, rot_y: u32) -> Self {
         self.rot_x = Some(rot_x);
         self.rot_y = Some(rot_y);
@@ -599,6 +608,7 @@ impl View3D {
 
     /// Set perspective.
     #[inline]
+    #[must_use]
     pub fn with_perspective(mut self, perspective: u32) -> Self {
         self.perspective = Some(perspective);
         self
@@ -653,7 +663,7 @@ pub struct PictureOptions {
 pub struct WallFloor {
     /// Thickness (0-4096 points)
     pub thickness: Option<u32>,
-    /// DrawingML shape properties for the surface
+    /// `DrawingML` shape properties for the surface
     pub shape_properties: Option<ShapeProperties>,
     /// Picture-fill placement options
     pub picture_options: Option<PictureOptions>,
@@ -664,6 +674,7 @@ pub struct WallFloor {
 impl WallFloor {
     /// Create a new wall/floor with default settings.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             thickness: None,
@@ -675,6 +686,7 @@ impl WallFloor {
 
     /// Set thickness.
     #[inline]
+    #[must_use]
     pub fn with_thickness(mut self, thickness: u32) -> Self {
         self.thickness = Some(thickness);
         self
@@ -697,9 +709,9 @@ pub struct Chart {
     pub title_layout: Option<Layout>,
     /// Whether the chart title overlays the plot area
     pub title_overlay: bool,
-    /// DrawingML shape properties for the chart title
+    /// `DrawingML` shape properties for the chart title
     pub title_shape_properties: Option<ShapeProperties>,
-    /// DrawingML text properties for the chart title
+    /// `DrawingML` text properties for the chart title
     pub title_text_properties: Option<TextProperties>,
     /// Chart-title extension list
     pub title_extension_list: Option<ExtensionList>,
@@ -729,7 +741,7 @@ pub struct Chart {
     pub chart_extension_list: Option<ExtensionList>,
     /// Chart style index
     pub style: Option<u32>,
-    /// Optional DrawingML theme color-map override
+    /// Optional `DrawingML` theme color-map override
     pub color_map_override: Option<ColorMapOverride>,
     /// Chart content language
     pub language: Option<String>,
@@ -745,9 +757,9 @@ pub struct Chart {
     pub external_data: Option<ExternalData>,
     /// Optional chart user-shapes drawing relationship metadata
     pub user_shapes: Option<UserShapes>,
-    /// Optional chart-space DrawingML shape properties
+    /// Optional chart-space `DrawingML` shape properties
     pub shape_properties: Option<ShapeProperties>,
-    /// Optional chart-space DrawingML text properties
+    /// Optional chart-space `DrawingML` text properties
     pub text_properties: Option<TextProperties>,
     /// Optional chart printing configuration
     pub print_settings: Option<PrintSettings>,
@@ -758,6 +770,7 @@ pub struct Chart {
 impl Chart {
     /// Create a new chart with default settings.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             title: None,
@@ -803,6 +816,7 @@ impl Chart {
 
     /// Set the plot area.
     #[inline]
+    #[must_use]
     pub fn with_plot_area(mut self, plot_area: PlotArea) -> Self {
         self.plot_area = plot_area;
         self
@@ -810,6 +824,7 @@ impl Chart {
 
     /// Set the legend.
     #[inline]
+    #[must_use]
     pub fn with_legend(mut self, legend: Legend) -> Self {
         self.legend = Some(legend);
         self
@@ -817,6 +832,7 @@ impl Chart {
 
     /// Enable 3D view.
     #[inline]
+    #[must_use]
     pub fn with_3d_view(mut self, view: View3D) -> Self {
         self.view_3d = Some(view);
         self
@@ -824,6 +840,7 @@ impl Chart {
 
     /// Check if this is a 3D chart.
     #[inline]
+    #[must_use]
     pub fn is_3d(&self) -> bool {
         self.view_3d.is_some()
             || self.plot_area.type_groups.iter().any(|tg| {

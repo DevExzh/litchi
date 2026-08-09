@@ -39,6 +39,7 @@ pub struct Ref {
 
 impl Ref {
     /// Construct an absolute reference from zero-based BIFF8 coordinates.
+    #[must_use]
     pub const fn new(row: u16, col: u8) -> Self {
         Self {
             row,
@@ -49,8 +50,11 @@ impl Ref {
     }
 
     /// Convert a wider zero-based column after checking the BIFF8 limit.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn checked(row: u16, col: u16) -> Result<Self, Error> {
-        let col = u8::try_from(col).map_err(|_| {
+        let col = u8::try_from(col).map_err(|_error| {
             Error::InvalidCellReference(format!(
                 "zero-based column {col} exceeds IV ({MAX_BIFF8_COLUMN})"
             ))
@@ -59,23 +63,29 @@ impl Ref {
     }
 
     /// Parse an A1-style BIFF8 reference.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(value: &str) -> Result<Self, Error> {
         parse_ref(value)
     }
 
     /// Set whether the row is relative.
+    #[must_use]
     pub const fn rel_row(mut self, relative: bool) -> Self {
         self.row_rel = relative;
         self
     }
 
     /// Set whether the column is relative.
+    #[must_use]
     pub const fn rel_col(mut self, relative: bool) -> Self {
         self.col_rel = relative;
         self
     }
 
     /// Return an absolute form of this reference.
+    #[must_use]
     pub const fn abs(mut self) -> Self {
         self.row_rel = false;
         self.col_rel = false;
@@ -83,21 +93,25 @@ impl Ref {
     }
 
     /// Zero-based row.
+    #[must_use]
     pub const fn row(self) -> u16 {
         self.row
     }
 
     /// Zero-based column, bounded to 0..=255.
+    #[must_use]
     pub const fn col(self) -> u8 {
         self.col
     }
 
     /// Whether the row is relative to the formula cell.
+    #[must_use]
     pub const fn is_row_rel(self) -> bool {
         self.row_rel
     }
 
     /// Whether the column is relative to the formula cell.
+    #[must_use]
     pub const fn is_col_rel(self) -> bool {
         self.col_rel
     }
@@ -126,6 +140,9 @@ pub struct Area {
 
 impl Area {
     /// Construct an ordered area from its upper-left and lower-right cells.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(first: Ref, last: Ref) -> Result<Self, Error> {
         if first.row > last.row || first.col > last.col {
             return Err(Error::InvalidCellReference(
@@ -136,11 +153,13 @@ impl Area {
     }
 
     /// Upper-left cell.
+    #[must_use]
     pub const fn first(self) -> Ref {
         self.first
     }
 
     /// Lower-right cell.
+    #[must_use]
     pub const fn last(self) -> Ref {
         self.last
     }
@@ -164,8 +183,8 @@ pub enum Ptg {
     /// 3D area reference (external-sheet index and checked area).
     ///
     /// Used by defined names and other structures that require
-    /// NameParsedFormula, which MUST use 3D references instead of
-    /// plain 2D PtgArea in BIFF8.
+    /// `NameParsedFormula`, which MUST use 3D references instead of
+    /// plain 2D `PtgArea` in BIFF8.
     Area3d(u16, Area),
     /// Addition operator
     Add,
@@ -289,8 +308,8 @@ fn parse_ref(value: &str) -> Result<Ref, Error> {
         return Err(invalid());
     }
 
-    let column = u8::try_from(column - 1).map_err(|_| invalid())?;
-    Ok(Ref::new((row - 1) as u16, column)
+    let column = u8::try_from(column - 1).map_err(|_error| invalid())?;
+    Ok(Ref::new(crate::utils::truncate_u32_to_u16(row - 1), column)
         .rel_row(row_relative)
         .rel_col(column_relative))
 }
@@ -303,6 +322,7 @@ pub struct FormulaTokenizer {
 
 impl FormulaTokenizer {
     /// Create a new formula tokenizer
+    #[must_use]
     pub fn new() -> Self {
         let mut functions = HashMap::new();
 
@@ -334,6 +354,9 @@ impl FormulaTokenizer {
     /// # Returns
     ///
     /// Vector of Ptg tokens in RPN order
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn tokenize(&self, formula: &str) -> Result<Vec<Ptg>, Error> {
         let formula = formula.trim();
         if formula.is_empty() {
@@ -364,14 +387,14 @@ impl FormulaTokenizer {
                 }
                 let num_str: String = chars[start..i].iter().collect();
                 if num_str.contains('.') {
-                    let num = num_str
-                        .parse::<f64>()
-                        .map_err(|_| Error::InvalidData(format!("Invalid number: {}", num_str)))?;
+                    let num = num_str.parse::<f64>().map_err(|_error| {
+                        Error::InvalidData(format!("Invalid number: {num_str}"))
+                    })?;
                     output.push(Ptg::Num(num));
                 } else {
-                    let num = num_str
-                        .parse::<u16>()
-                        .map_err(|_| Error::InvalidData(format!("Invalid integer: {}", num_str)))?;
+                    let num = num_str.parse::<u16>().map_err(|_error| {
+                        Error::InvalidData(format!("Invalid integer: {num_str}"))
+                    })?;
                     output.push(Ptg::Int(num));
                 }
                 expect_operand = false;
@@ -567,7 +590,7 @@ impl FormulaTokenizer {
                     expect_operand = true;
                 },
                 _ => {
-                    return Err(Error::InvalidData(format!("Unknown operator: {}", op_str)));
+                    return Err(Error::InvalidData(format!("Unknown operator: {op_str}")));
                 },
             }
 
@@ -613,7 +636,7 @@ impl FormulaTokenizer {
             ":" => Ptg::Range,
             "u+" => Ptg::UnaryPlus,
             "u-" => Ptg::UnaryMinus,
-            _ => return Err(Error::InvalidData(format!("Unknown operator: {}", op))),
+            _ => return Err(Error::InvalidData(format!("Unknown operator: {op}"))),
         };
         output.push(ptg);
         Ok(())
@@ -642,7 +665,7 @@ impl FormulaTokenizer {
             ":" => ":",
             "u+" => "u+",
             "u-" => "u-",
-            _ => return Err(Error::InvalidData(format!("Unknown operator: {}", op))),
+            _ => return Err(Error::InvalidData(format!("Unknown operator: {op}"))),
         };
 
         let prec = get_precedence(op);
@@ -808,7 +831,7 @@ pub(crate) fn compile_array_formula(
     let mut normalized = Vec::new();
     normalized
         .try_reserve_exact(tokens.len())
-        .map_err(|_| Error::Allocation("normalizing array-formula tokens"))?;
+        .map_err(|_error| Error::Allocation("normalizing array-formula tokens"))?;
     for token in tokens {
         if matches!(token, Ptg::Range) {
             let Some(Ptg::Ref(last)) = normalized.pop() else {
@@ -843,12 +866,12 @@ fn array_operand_classes(
     let mut classes = Vec::new();
     classes
         .try_reserve_exact(tokens.len())
-        .map_err(|_| Error::Allocation("classifying array-formula operands"))?;
+        .map_err(|_error| Error::Allocation("classifying array-formula operands"))?;
     classes.resize(tokens.len(), None);
     let mut stack: Vec<Option<usize>> = Vec::new();
     stack
         .try_reserve_exact(tokens.len())
-        .map_err(|_| Error::Allocation("classifying array-formula expression depth"))?;
+        .map_err(|_error| Error::Allocation("classifying array-formula expression depth"))?;
     let mut operand_count = 0usize;
 
     for (index, token) in tokens.iter().enumerate() {
@@ -1046,7 +1069,7 @@ fn try_encode_array_tokens(
     let mut bytes = Vec::new();
     bytes
         .try_reserve_exact(length)
-        .map_err(|_| Error::Allocation("encoding array-formula tokens"))?;
+        .map_err(|_error| Error::Allocation("encoding array-formula tokens"))?;
     for (index, token) in tokens.iter().enumerate() {
         match token {
             Ptg::Int(value) => {
@@ -1061,10 +1084,10 @@ fn try_encode_array_tokens(
                 let units = value.encode_utf16().count();
                 let compressed = value.encode_utf16().all(|unit| unit <= 0xff);
                 bytes.push(0x17);
-                bytes.push(units as u8);
+                bytes.push(crate::utils::truncate_usize_to_u8(units));
                 if compressed {
                     bytes.push(0);
-                    bytes.extend(value.encode_utf16().map(|unit| unit as u8));
+                    bytes.extend(value.encode_utf16().map(crate::utils::truncate_u16_to_u8));
                 } else {
                     bytes.push(1);
                     for unit in value.encode_utf16() {
@@ -1127,6 +1150,7 @@ fn try_encode_array_tokens(
 }
 
 /// Encode Ptg tokens to binary format for BIFF8
+#[must_use]
 pub fn encode_ptg_tokens(tokens: &[Ptg]) -> Vec<u8> {
     let mut bytes = Vec::new();
 
@@ -1149,10 +1173,14 @@ pub fn encode_ptg_tokens(tokens: &[Ptg]) -> Vec<u8> {
                 {
                     utf16.pop();
                 }
-                bytes.push(utf16.len() as u8);
+                bytes.push(crate::utils::truncate_usize_to_u8(utf16.len()));
                 if utf16.iter().all(|unit| *unit <= 0xff) {
                     bytes.push(0); // Compressed Unicode
-                    bytes.extend(utf16.iter().map(|unit| *unit as u8));
+                    bytes.extend(
+                        utf16
+                            .iter()
+                            .map(|unit| crate::utils::truncate_u16_to_u8(*unit)),
+                    );
                 } else {
                     bytes.push(1); // UTF-16LE
                     for unit in utf16 {

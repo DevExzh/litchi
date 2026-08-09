@@ -9,7 +9,7 @@ const CONTENT_SUFFIX: &str = "</office:text></office:body></office:document-cont
 /// Detached builder; publication validates through the package facade.
 #[derive(Clone, Debug)]
 pub struct Builder {
-    blocks: Vec<AuthoredBlock>,
+    blocks: Vec<crate::ContentBlock>,
     content_xml: Option<String>,
     meta_xml: Option<String>,
     settings_xml: Option<String>,
@@ -32,7 +32,14 @@ impl Builder {
     /// Adds a typed heading to freshly authored content.
     #[must_use]
     pub fn heading(mut self, heading: crate::heading::Heading) -> Self {
-        self.blocks.push(AuthoredBlock::Heading(heading));
+        self.blocks.push(crate::ContentBlock::Heading(heading));
+        self
+    }
+
+    /// Adds a typed flat list to freshly authored content.
+    #[must_use]
+    pub fn list(mut self, list: crate::list::List) -> Self {
+        self.blocks.push(crate::ContentBlock::List(list));
         self
     }
 
@@ -46,7 +53,7 @@ impl Builder {
     /// Adds a typed paragraph to freshly authored content.
     #[must_use]
     pub fn paragraph(mut self, paragraph: crate::paragraph::Paragraph) -> Self {
-        self.blocks.push(AuthoredBlock::Paragraph(paragraph));
+        self.blocks.push(crate::ContentBlock::Paragraph(paragraph));
         self
     }
 
@@ -114,24 +121,28 @@ impl Default for Builder {
     }
 }
 
-#[derive(Clone, Debug)]
-enum AuthoredBlock {
-    Heading(crate::heading::Heading),
-    Paragraph(crate::paragraph::Paragraph),
-}
-
-fn render_blocks(blocks: &[AuthoredBlock]) -> Result<String> {
+fn render_blocks(blocks: &[crate::ContentBlock]) -> Result<String> {
     let mut capacity = CONTENT_PREFIX.len() + CONTENT_SUFFIX.len();
     for block in blocks {
         let (markup_bytes, text_bytes) = match block {
-            AuthoredBlock::Heading(heading) => (
+            crate::ContentBlock::Heading(heading) => (
                 48_usize.saturating_add(heading.style_name().map_or(0, str::len)),
                 heading.text().len(),
             ),
-            AuthoredBlock::Paragraph(paragraph) => (
+            crate::ContentBlock::Paragraph(paragraph) => (
                 32_usize.saturating_add(paragraph.style_name().map_or(0, str::len)),
                 paragraph.text().len(),
             ),
+            crate::ContentBlock::List(list) => {
+                let text_bytes = list
+                    .items()
+                    .iter()
+                    .flat_map(crate::list::Item::paragraphs)
+                    .map(crate::paragraph::Paragraph::text)
+                    .map(str::len)
+                    .fold(0_usize, usize::saturating_add);
+                (128_usize.saturating_mul(list.items().len()), text_bytes)
+            },
         };
         capacity = capacity
             .checked_add(markup_bytes)
@@ -155,7 +166,7 @@ fn render_blocks(blocks: &[AuthoredBlock]) -> Result<String> {
     output.push_str(CONTENT_PREFIX);
     for block in blocks {
         match block {
-            AuthoredBlock::Heading(heading) => {
+            crate::ContentBlock::Heading(heading) => {
                 output.push_str("<text:h text:outline-level=\"");
                 output.push_str(&heading.level().to_string());
                 output.push('"');
@@ -164,17 +175,53 @@ fn render_blocks(blocks: &[AuthoredBlock]) -> Result<String> {
                 output.push_str(&quick_xml::escape::escape(heading.text()));
                 output.push_str("</text:h>");
             },
-            AuthoredBlock::Paragraph(paragraph) => {
+            crate::ContentBlock::Paragraph(paragraph) => {
                 output.push_str("<text:p");
                 push_style(&mut output, paragraph.style_name());
                 output.push('>');
                 output.push_str(&quick_xml::escape::escape(paragraph.text()));
                 output.push_str("</text:p>");
             },
+            crate::ContentBlock::List(list) => render_list(&mut output, list),
         }
     }
     output.push_str(CONTENT_SUFFIX);
     Ok(output)
+}
+
+pub(crate) fn render_fragment(blocks: &[crate::ContentBlock]) -> Result<String> {
+    let document = render_blocks(blocks)?;
+    document
+        .strip_prefix(CONTENT_PREFIX)
+        .and_then(|value| value.strip_suffix(CONTENT_SUFFIX))
+        .map(str::to_owned)
+        .ok_or_else(|| {
+            Error::InvalidFormat("OTH rendered fragment envelope is invalid".to_string())
+        })
+}
+
+fn render_list(output: &mut String, list: &crate::list::List) {
+    output.push_str("<text:list");
+    push_style(output, list.style_name());
+    output.push('>');
+    for item in list.items() {
+        output.push_str("<text:list-item");
+        if let Some(start_value) = item.start_value() {
+            output.push_str(" text:start-value=\"");
+            output.push_str(&start_value.to_string());
+            output.push('"');
+        }
+        output.push('>');
+        for paragraph in item.paragraphs() {
+            output.push_str("<text:p");
+            push_style(output, paragraph.style_name());
+            output.push('>');
+            output.push_str(&quick_xml::escape::escape(paragraph.text()));
+            output.push_str("</text:p>");
+        }
+        output.push_str("</text:list-item>");
+    }
+    output.push_str("</text:list>");
 }
 
 fn push_style(output: &mut String, optional_style_name: Option<&str>) {

@@ -22,21 +22,27 @@ pub struct VbaMetadata {
 }
 
 impl VbaMetadata {
+    #[must_use]
     pub fn has_project_marker(&self) -> bool {
         self.project_marker
     }
+    #[must_use]
     pub fn has_no_macros_marker(&self) -> bool {
         self.no_macros_marker
     }
+    #[must_use]
     pub fn has_project_storage(&self) -> bool {
         self.project_storage_present
     }
+    #[must_use]
     pub fn workbook_code_name(&self) -> Option<&str> {
         self.workbook_code_name.as_deref()
     }
+    #[must_use]
     pub fn may_contain_executable_code(&self) -> bool {
         self.project_marker && self.project_storage_present && !self.no_macros_marker
     }
+    #[must_use]
     pub fn markers_are_consistent(&self) -> bool {
         !self.no_macros_marker || self.project_marker
     }
@@ -66,6 +72,7 @@ pub struct VbaProjectStorage {
 
 impl VbaProjectStorage {
     /// Return the CFB path of the `_VBA_PROJECT_CUR` root storage.
+    #[must_use]
     pub fn root_storage_path(&self) -> &[String] {
         &self.root_storage_path
     }
@@ -74,36 +81,43 @@ impl VbaProjectStorage {
     ///
     /// CFB directory enumeration exposes stream paths, so an entirely empty
     /// nested storage has no observable path and is reported as absent.
+    #[must_use]
     pub fn vba_storage_path(&self) -> Option<&[String]> {
         self.vba_storage_path.as_deref()
     }
 
     /// Whether directory metadata shows a nested `VBA` storage.
+    #[must_use]
     pub fn has_vba_storage(&self) -> bool {
         self.vba_storage_path.is_some()
     }
 
     /// Whether the root has the required MS-OVBA `PROJECT` stream.
+    #[must_use]
     pub fn has_project_stream(&self) -> bool {
         self.has_project_stream
     }
 
     /// Whether the root has the optional MS-OVBA `PROJECTwm` stream.
+    #[must_use]
     pub fn has_project_wm_stream(&self) -> bool {
         self.has_project_wm_stream
     }
 
     /// Whether the root has the optional MS-OVBA `PROJECTlk` stream.
+    #[must_use]
     pub fn has_project_lk_stream(&self) -> bool {
         self.has_project_lk_stream
     }
 
     /// Whether the nested `VBA` storage has the required `_VBA_PROJECT` stream.
+    #[must_use]
     pub fn has_vba_project_stream(&self) -> bool {
         self.has_vba_project_stream
     }
 
     /// Whether the nested `VBA` storage has the required compressed `dir` stream.
+    #[must_use]
     pub fn has_dir_stream(&self) -> bool {
         self.has_dir_stream
     }
@@ -113,6 +127,7 @@ impl VbaProjectStorage {
     /// `_VBA_PROJECT`, `dir`, and optional `__SRP_*` streams are excluded.
     /// Names are directory metadata only; no source bytes are read or
     /// interpreted.
+    #[must_use]
     pub fn candidate_module_stream_names(&self) -> &[String] {
         &self.candidate_module_stream_names
     }
@@ -121,11 +136,13 @@ impl VbaProjectStorage {
     ///
     /// MS-OVBA requires these streams to be ignored. This accessor returns
     /// names only and never reads their contents.
+    #[must_use]
     pub fn srp_stream_names(&self) -> &[String] {
         &self.srp_stream_names
     }
 
     /// Whether both streams required inside the nested `VBA` storage exist.
+    #[must_use]
     pub fn has_required_vba_streams(&self) -> bool {
         self.has_vba_project_stream && self.has_dir_stream
     }
@@ -135,6 +152,7 @@ impl VbaProjectStorage {
     ///
     /// This is directory validation only. It does not validate stream bytes or
     /// parse any VBA source code.
+    #[must_use]
     pub fn is_structurally_complete(&self) -> bool {
         self.has_vba_storage() && self.has_project_stream && self.has_required_vba_streams()
     }
@@ -144,6 +162,7 @@ impl VbaProjectStorage {
     /// This is not code analysis and does not override BIFF's `ObNoMacros`
     /// marker. Candidate module stream contents are never opened,
     /// decompressed, parsed, or executed.
+    #[must_use]
     pub fn may_contain_macro_code(&self) -> bool {
         self.is_structurally_complete() && !self.candidate_module_stream_names.is_empty()
     }
@@ -425,7 +444,7 @@ pub(crate) fn parse_code_name(data: &[u8]) -> Result<String> {
             .chunks_exact(2)
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect();
-        String::from_utf16(&units).map_err(|_| Error::InvalidRecord {
+        String::from_utf16(&units).map_err(|_error| Error::InvalidRecord {
             record_type: CODE_NAME_RECORD_TYPE,
             message: "CodeName contains invalid UTF-16".to_string(),
         })?

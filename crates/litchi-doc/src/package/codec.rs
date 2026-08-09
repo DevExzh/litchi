@@ -165,14 +165,14 @@ impl<R: Read + Seek> Package<R> {
         self.limits
     }
 
-    /// Inspect the package's typed MS-OFFCRYPTO DataSpaces graph.
+    /// Inspect the package's typed MS-OFFCRYPTO `DataSpaces` graph.
     ///
     /// This is a structural, inert view of encryption and Information Rights
     /// Management metadata. It validates the CFB graph, transform headers,
     /// licenses, integrity sidecars, and custom-XML promotion markers, but it
     /// never decrypts content, evaluates a license, contacts a rights server,
     /// or activates protected content. `None` means the package has no
-    /// DataSpaces graph.
+    /// `DataSpaces` graph.
     pub fn data_spaces(
         &mut self,
     ) -> std::result::Result<Option<litchi_crypto::spaces::Graph>, litchi_crypto::spaces::Error>
@@ -180,9 +180,9 @@ impl<R: Read + Seek> Package<R> {
         litchi_crypto::spaces::inspect(&mut self.ole)
     }
 
-    /// Capture a source-preserving, validated DataSpaces edit owner.
+    /// Capture a source-preserving, validated `DataSpaces` edit owner.
     ///
-    /// The returned snapshot retains only DataSpaces stream bytes. Its patch
+    /// The returned snapshot retains only `DataSpaces` stream bytes. Its patch
     /// can later be written to a fresh destination with
     /// [`Self::write_data_spaces_patch`]; the current package is never
     /// mutated in place and no protected payload is decrypted or evaluated.
@@ -193,10 +193,10 @@ impl<R: Read + Seek> Package<R> {
         litchi_crypto::spaces::Snapshot::from_ole(&mut self.ole)
     }
 
-    /// Rebuild the package after source-checking a DataSpaces patch.
+    /// Rebuild the package after source-checking a `DataSpaces` patch.
     ///
     /// All logical OLE streams and storages are copied, while only the patch's
-    /// DataSpaces stream replacements are applied. The output must be a fresh
+    /// `DataSpaces` stream replacements are applied. The output must be a fresh
     /// seekable destination; the generic `Package<R>` reader remains intact.
     pub fn write_data_spaces_patch<W: Write + Seek>(
         &mut self,

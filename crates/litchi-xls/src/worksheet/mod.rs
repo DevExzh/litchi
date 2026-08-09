@@ -49,7 +49,7 @@ pub struct Worksheet {
     hyperlinks: Vec<Hyperlink>,
     /// Comments/notes (NOTE records)
     comments: Vec<Comment>,
-    /// AutoFilter configuration (AUTOFILTERINFO + AUTOFILTER records)
+    /// `AutoFilter` configuration (AUTOFILTERINFO + AUTOFILTER records)
     autofilter: Option<AutoFilterInfo>,
     /// Sort configuration (SORT record)
     sort_info: Option<SortInfo>,
@@ -96,6 +96,7 @@ pub struct Worksheet {
 
 impl Worksheet {
     /// Create a new worksheet
+    #[must_use]
     pub fn new(name: String) -> Self {
         Worksheet {
             name,
@@ -144,6 +145,7 @@ impl Worksheet {
     }
 
     /// Create a new worksheet with shared strings (Arc for zero-copy sharing)
+    #[must_use]
     pub fn with_shared_strings(name: String, shared_strings: Arc<Vec<String>>) -> Self {
         Worksheet {
             name,
@@ -195,6 +197,9 @@ impl Worksheet {
     ///
     /// Decoded worksheets are source-bound and reject this create-only edit
     /// because this crate has no whole-sheet BIFF8 save path for them.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_cell(&mut self, cell: Cell) -> Result<()> {
         self.ensure_authored("add_cell")?;
         let pos = (cell.row(), cell.column());
@@ -205,6 +210,9 @@ impl Worksheet {
     }
 
     /// Set worksheet dimensions
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_dimensions(
         &mut self,
         _first_row: u32,
@@ -220,6 +228,7 @@ impl Worksheet {
     }
 
     /// Get shared strings reference
+    #[must_use]
     pub fn shared_strings(&self) -> Option<&[String]> {
         self.shared_strings.as_ref().map(|arc| arc.as_slice())
     }
@@ -235,6 +244,7 @@ impl Worksheet {
     }
 
     /// Whether this worksheet was decoded from an existing workbook.
+    #[must_use]
     pub fn is_source_bound(&self) -> bool {
         self.source_bound
     }
@@ -252,6 +262,7 @@ impl Worksheet {
     }
 
     /// Rich-text and phonetic metadata for a zero-based shared-string index.
+    #[must_use]
     pub fn shared_string_properties(
         &self,
         index: u32,
@@ -263,6 +274,7 @@ impl Worksheet {
     }
 
     /// Rich-text and phonetic metadata for a `LabelSst` cell.
+    #[must_use]
     pub fn shared_string_properties_for_cell(
         &self,
         cell: &Cell,
@@ -271,6 +283,7 @@ impl Worksheet {
     }
 
     /// Get cell at position
+    #[must_use]
     pub fn get_cell(&self, row: u32, col: u32) -> Option<&Cell> {
         self.cells.get(&(row, col))
     }
@@ -285,6 +298,7 @@ impl Worksheet {
     }
 
     /// Return the Array owner covering a zero-based worksheet coordinate.
+    #[must_use]
     pub fn array_formula_at(&self, row: u32, col: u32) -> Option<&ArrayFormula> {
         self.get_cell(row, col)?.array_formula()
     }
@@ -296,6 +310,9 @@ impl Worksheet {
     // -- Merged cells --
 
     /// Add merged cell ranges parsed from a MERGECELLS record.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_merged_cells(&mut self, ranges: &[MergedCellRange]) -> Result<()> {
         self.ensure_authored("add_merged_cells")?;
         self.merged_cells.extend_from_slice(ranges);
@@ -303,6 +320,7 @@ impl Worksheet {
     }
 
     /// All merged cell ranges in this worksheet.
+    #[must_use]
     pub fn merged_cells(&self) -> &[MergedCellRange] {
         &self.merged_cells
     }
@@ -310,6 +328,7 @@ impl Worksheet {
     // -- Hyperlinks --
 
     /// All hyperlinks in this worksheet.
+    #[must_use]
     pub fn hyperlinks(&self) -> &[Hyperlink] {
         &self.hyperlinks
     }
@@ -321,6 +340,7 @@ impl Worksheet {
     // -- Comments --
 
     /// All comments/notes in this worksheet.
+    #[must_use]
     pub fn comments(&self) -> &[Comment] {
         &self.comments
     }
@@ -331,7 +351,10 @@ impl Worksheet {
 
     // -- AutoFilter --
 
-    /// Initialize AutoFilter with the given column count (from AUTOFILTERINFO).
+    /// Initialize `AutoFilter` with the given column count (from AUTOFILTERINFO).
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_autofilter_info(&mut self, column_count: u16) -> Result<()> {
         self.ensure_authored("set_autofilter_info")?;
         self.autofilter = Some(AutoFilterInfo {
@@ -341,7 +364,10 @@ impl Worksheet {
         Ok(())
     }
 
-    /// Add an AutoFilter column definition (from AUTOFILTER record).
+    /// Add an `AutoFilter` column definition (from AUTOFILTER record).
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_autofilter_column(&mut self, col: AutoFilterColumn) -> Result<()> {
         self.ensure_authored("add_autofilter_column")?;
         if let Some(ref mut af) = self.autofilter {
@@ -350,7 +376,8 @@ impl Worksheet {
         Ok(())
     }
 
-    /// AutoFilter configuration, if any.
+    /// `AutoFilter` configuration, if any.
+    #[must_use]
     pub fn autofilter(&self) -> Option<&AutoFilterInfo> {
         self.autofilter.as_ref()
     }
@@ -358,6 +385,9 @@ impl Worksheet {
     // -- Sort --
 
     /// Set the sort configuration (from SORT record).
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_sort_info(&mut self, info: SortInfo) -> Result<()> {
         self.ensure_authored("set_sort_info")?;
         self.sort_info = Some(info);
@@ -365,11 +395,13 @@ impl Worksheet {
     }
 
     /// Sort configuration, if any.
+    #[must_use]
     pub fn sort_info(&self) -> Option<&SortInfo> {
         self.sort_info.as_ref()
     }
 
     /// Extended range sort metadata, including color, icon, and custom-list keys.
+    #[must_use]
     pub fn sort(&self) -> Option<&Config> {
         self.sort_data.as_ref()
     }
@@ -381,6 +413,7 @@ impl Worksheet {
     // -- Sheet extensions --
 
     /// Sheet tab color and publish state from the SHEETEXT record, when present.
+    #[must_use]
     pub fn sheet_ext(&self) -> Option<&crate::sheet_ext::SheetExt> {
         self.sheet_ext.as_ref()
     }
@@ -390,6 +423,7 @@ impl Worksheet {
     }
 
     /// What-if data tables declared in this worksheet, in record order.
+    #[must_use]
     pub fn data_tables(&self) -> &[crate::data_table::DataTable] {
         &self.data_tables
     }
@@ -399,6 +433,7 @@ impl Worksheet {
     }
 
     /// Default phonetic format and visible phonetic ranges, when present.
+    #[must_use]
     pub fn phonetic_info(&self) -> Option<&crate::phonetic_info::PhoneticInfo> {
         self.phonetic_info.as_ref()
     }
@@ -412,6 +447,7 @@ impl Worksheet {
     /// All connection strings, command text, URLs, and file paths are inert:
     /// stored verbatim and never opened, resolved, contacted, refreshed, or
     /// executed.
+    #[must_use]
     pub fn query_tables(&self) -> &[crate::query_table::QueryTable] {
         &self.query_tables
     }
@@ -423,6 +459,7 @@ impl Worksheet {
     /// Custom views of this worksheet (UserSViewBegin…UserSViewEnd
     /// brackets), in record order. The records are inert: applying a view is
     /// a UI operation this reader never performs.
+    #[must_use]
     pub fn custom_views(&self) -> &[crate::custom_view::SheetCustomView] {
         &self.custom_views
     }
@@ -434,6 +471,7 @@ impl Worksheet {
     /// Web pages published from this worksheet (`WebPub` records), in record
     /// order. The records are inert: destination URLs and paths are never
     /// opened, resolved, or fetched.
+    #[must_use]
     pub fn web_publications(&self) -> &[crate::web_pub::WebPub] {
         &self.web_publications
     }
@@ -446,7 +484,8 @@ impl Worksheet {
 
     /// Whether the sheet data was filtered (FILTERMODE 0x009B present).
     ///
-    /// When `true`, at least one AutoFilter drop-down has active criteria.
+    /// When `true`, at least one `AutoFilter` drop-down has active criteria.
+    #[must_use]
     pub fn is_filter_mode(&self) -> bool {
         self.filter_mode
     }
@@ -458,6 +497,9 @@ impl Worksheet {
     // -- Pivot tables --
 
     /// Add a fully assembled pivot table.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_pivot_table(&mut self, pt: PivotTable) -> Result<()> {
         self.ensure_authored("add_pivot_table")?;
         self.pivot_tables.push(pt);
@@ -465,11 +507,13 @@ impl Worksheet {
     }
 
     /// All pivot tables in this worksheet.
+    #[must_use]
     pub fn pivot_tables(&self) -> &[PivotTable] {
         &self.pivot_tables
     }
 
-    /// Finds a PivotTable by its SXVIEW table name.
+    /// Finds a `PivotTable` by its SXVIEW table name.
+    #[must_use]
     pub fn pivot_table(&self, name: &str) -> Option<&PivotTable> {
         self.pivot_tables
             .iter()
@@ -477,6 +521,7 @@ impl Worksheet {
     }
 
     /// Formula error-checking shared features declared for this worksheet.
+    #[must_use]
     pub fn formula_error_features(&self) -> &[crate::formula_errors::FormulaErrorFeature] {
         &self.formula_error_features
     }
@@ -490,6 +535,7 @@ impl Worksheet {
 
     /// Nonconforming Formula metadata preserved without evaluating or
     /// normalizing the source token stream.
+    #[must_use]
     pub fn formula_metadata_defects(&self) -> &[crate::formula_metadata::Defect] {
         &self.formula_metadata_defects
     }
@@ -502,6 +548,7 @@ impl Worksheet {
     }
 
     /// Legacy BIFF8 worksheet tables in feature-record order.
+    #[must_use]
     pub fn list_objects(&self) -> &[crate::list_object::ListObject] {
         &self.list_objects
     }
@@ -513,6 +560,9 @@ impl Worksheet {
     /// Optional worksheet `INDEX`/`DBCELL` accelerator.
     ///
     /// Corrupt optional metadata is reported here without preventing cell parsing.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn row_block_index(&self) -> Result<Option<&crate::row_block_index::RowBlockIndex>, &str> {
         match &self.row_block_index {
             Ok(value) => Ok(value.as_ref()),
@@ -530,6 +580,7 @@ impl Worksheet {
     // -- Sheet Protection --
 
     /// Get the sheet protection state.
+    #[must_use]
     pub fn protection(&self) -> &SheetProtection {
         &self.protection
     }
@@ -538,6 +589,9 @@ impl Worksheet {
     ///
     /// Parsed protection metadata is source-bound because ordinary worksheet
     /// serialization is not available.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn protection_mut(&mut self) -> Result<&mut SheetProtection> {
         self.ensure_authored("protection_mut")?;
         Ok(&mut self.protection)
@@ -547,16 +601,19 @@ impl Worksheet {
         self.formatting = formatting;
     }
 
+    #[must_use]
     pub fn formatting(&self) -> &Formatting {
         &self.formatting
     }
 
     /// Worksheet-level BIFF8 data-validation settings, when present.
+    #[must_use]
     pub fn data_validation_settings(&self) -> Option<&DataValidationSettings> {
         self.data_validation_settings.as_ref()
     }
 
     /// Data-validation rules in worksheet record order.
+    #[must_use]
     pub fn data_validations(&self) -> &[DataValidationRule] {
         &self.data_validations
     }
@@ -570,21 +627,25 @@ impl Worksheet {
     }
 
     /// Layout metadata for a zero-based row index.
+    #[must_use]
     pub fn row_layout(&self, row: u16) -> Option<&Row> {
         self.row_layouts.get(&row)
     }
 
     /// Row layout metadata in ascending row order.
+    #[must_use]
     pub fn row_layouts(&self) -> impl ExactSizeIterator<Item = &Row> {
         self.row_layouts.values()
     }
 
     /// Column layout ranges in BIFF record order.
+    #[must_use]
     pub fn column_layouts(&self) -> &[Column] {
         &self.column_layouts
     }
 
     /// The first layout range containing a zero-based column index.
+    #[must_use]
     pub fn column_layout(&self, column: u8) -> Option<&Column> {
         let column = u16::from(column);
         self.column_layouts
@@ -598,6 +659,7 @@ impl Worksheet {
     }
 
     /// Default dimensions and outline workspace state for this worksheet.
+    #[must_use]
     pub fn layout(&self) -> &layout::Layout {
         &self.layout
     }
@@ -607,11 +669,13 @@ impl Worksheet {
     }
 
     /// The first display window associated with this worksheet.
+    #[must_use]
     pub fn worksheet_view(&self) -> Option<&View> {
         self.worksheet_views.first()
     }
 
     /// All display windows associated with this worksheet in record order.
+    #[must_use]
     pub fn worksheet_views(&self) -> &[View] {
         &self.worksheet_views
     }
@@ -621,6 +685,7 @@ impl Worksheet {
     ///
     /// Returns `None` when the window has no panes or when the panes are
     /// split (unfrozen); use [`View::pane`] for split geometry.
+    #[must_use]
     pub fn frozen_panes(&self) -> Option<(u16, u16)> {
         let view = self.worksheet_views.first()?;
         if !view.has_frozen_panes() {
@@ -635,6 +700,7 @@ impl Worksheet {
     }
 
     /// Print and page setup for this worksheet.
+    #[must_use]
     pub fn page_setup(&self) -> Option<&PageSetup> {
         self.page_setup.as_ref()
     }
@@ -643,6 +709,7 @@ impl Worksheet {
         self.page_setup = page_setup;
     }
 
+    #[must_use]
     pub fn calculation(&self) -> &crate::calculation::WorksheetCalculation {
         &self.calculation
     }
@@ -654,6 +721,7 @@ impl Worksheet {
         self.calculation = calculation;
     }
 
+    #[must_use]
     pub fn scenario_manager(&self) -> Option<&crate::scenario::ScenarioManager> {
         self.scenario_manager.as_ref()
     }
@@ -665,6 +733,7 @@ impl Worksheet {
         self.scenario_manager = scenario_manager;
     }
 
+    #[must_use]
     pub fn vba_code_name(&self) -> Option<&str> {
         self.vba_code_name.as_deref()
     }
@@ -673,6 +742,7 @@ impl Worksheet {
     }
 
     /// Legacy conditional formatting groups in worksheet record order.
+    #[must_use]
     pub fn conditional_formattings(&self) -> &[ConditionalFormatting] {
         &self.conditional_formattings
     }
@@ -683,11 +753,13 @@ impl Worksheet {
     ) {
         self.conditional_formattings = conditional_formattings;
     }
+    #[must_use]
     pub fn conditional_formattings12(
         &self,
     ) -> &[crate::conditional_format::ConditionalFormatting12] {
         &self.conditional_formattings12
     }
+    #[must_use]
     pub fn conditional_format_extensions(
         &self,
     ) -> &[crate::conditional_format::ConditionalExtension] {
@@ -697,16 +769,17 @@ impl Worksheet {
         &mut self,
         value: Vec<crate::conditional_format::ConditionalFormatting12>,
     ) {
-        self.conditional_formattings12 = value
+        self.conditional_formattings12 = value;
     }
     pub(crate) fn set_conditional_format_extensions(
         &mut self,
         value: Vec<crate::conditional_format::ConditionalExtension>,
     ) {
-        self.conditional_format_extensions = value
+        self.conditional_format_extensions = value;
     }
 
     /// Data-consolidation settings and inert source directory for this worksheet.
+    #[must_use]
     pub fn consolidation(&self) -> Option<&crate::consolidation::Consolidation> {
         self.consolidation.as_ref()
     }
@@ -718,23 +791,24 @@ impl Worksheet {
         self.consolidation = consolidation;
     }
 
+    #[must_use]
     pub fn format_for_cell(&self, row: u32, col: u32) -> Option<&ExtendedFormat> {
         let cell = self.get_cell(row, col)?;
         self.formatting.cell_format(cell.xf_index())
     }
 
+    #[must_use]
     pub fn number_format_for_cell(&self, row: u32, col: u32) -> Option<&NumberFormat> {
         let format = self.format_for_cell(row, col)?;
         self.formatting.number_format(format.number_format_id())
     }
 
+    #[must_use]
     pub fn is_date_time_formatted(&self, row: u32, col: u32) -> bool {
-        self.format_for_cell(row, col)
-            .map(|format| {
-                self.formatting
-                    .is_date_time_format(format.number_format_id())
-            })
-            .unwrap_or(false)
+        self.format_for_cell(row, col).is_some_and(|format| {
+            self.formatting
+                .is_date_time_format(format.number_format_id())
+        })
     }
 }
 
@@ -795,7 +869,7 @@ impl WorksheetTrait for Worksheet {
     }
 
     fn row(&self, row_idx: usize) -> SheetResult<Cow<'_, [CellValue]>> {
-        let row_idx = row_idx as u32;
+        let row_idx = crate::utils::truncate_usize_to_u32(row_idx);
         let mut row_data = Vec::new();
 
         for col in 0..=self.max_col {

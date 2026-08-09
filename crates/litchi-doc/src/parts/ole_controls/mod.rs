@@ -1,4 +1,4 @@
-//! Inert Word OLE-control and ObjectPool metadata.
+//! Inert Word OLE-control and `ObjectPool` metadata.
 //!
 //! This context owns the table records described by [MS-DOC] sections
 //! 2.1.4, 2.9.161, 2.9.165-2.9.167, and 2.9.229. It does not resolve,

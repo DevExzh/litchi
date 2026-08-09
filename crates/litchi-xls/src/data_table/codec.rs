@@ -25,8 +25,8 @@ impl DataTableInputCell {
             }
             return Ok(Self::Deleted);
         }
-        let col =
-            u8::try_from(col).map_err(|_| invalid("input cell column exceeds the BIFF8 grid"))?;
+        let col = u8::try_from(col)
+            .map_err(|_error| invalid("input cell column exceeds the BIFF8 grid"))?;
         Ok(Self::Present { row, col })
     }
 

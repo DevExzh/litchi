@@ -1,4 +1,4 @@
-//! Typed semantic models for SpreadsheetML volatile dependencies.
+//! Typed semantic models for `SpreadsheetML` volatile dependencies.
 
 pub(super) const NS: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 pub(super) const STRICT_NS: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -35,6 +35,7 @@ impl VolatileDependenciesConformance {
     }
 
     /// Whether this conformance uses ISO/IEC 29500 Strict namespace URIs.
+    #[must_use]
     pub const fn is_strict(self) -> bool {
         matches!(self, Self::Strict)
     }

@@ -1,4 +1,4 @@
-//! Bounded SpreadsheetML XML wire helpers for data validation.
+//! Bounded `SpreadsheetML` XML wire helpers for data validation.
 
 use super::super::model::{Range, Source, Sqref};
 use super::super::{
@@ -484,7 +484,13 @@ pub(super) fn sqref_flags(
     ))
 }
 pub(super) fn encode_flags(v: (bool, bool, bool, bool)) -> String {
-    format!("{}{}{}{}|", v.0 as u8, v.1 as u8, v.2 as u8, v.3 as u8)
+    format!(
+        "{}{}{}{}|",
+        u8::from(v.0),
+        u8::from(v.1),
+        u8::from(v.2),
+        u8::from(v.3)
+    )
 }
 pub(super) fn decode_flags(value: &str) -> Result<((bool, bool, bool, bool), String)> {
     let bytes = value.as_bytes();

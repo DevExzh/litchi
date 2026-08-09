@@ -20,7 +20,10 @@ fn qsi(name: &str, flags: u16) -> Vec<u8> {
     out
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "arguments map positionally to BIFF fields"
+)]
 fn db_query(
     flags: u16,
     cparams: i16,
@@ -55,7 +58,10 @@ fn qsi_sx_tag(name: &str, f_sx: u16, flags: u16, future: u32) -> Vec<u8> {
     out
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "arguments map positionally to BIFF fields"
+)]
 fn db_query_ext(
     dbt: u16,
     flags: u16,

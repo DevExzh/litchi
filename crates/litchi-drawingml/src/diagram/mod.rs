@@ -1,10 +1,10 @@
-//! DrawingML diagram (SmartArt) support shared across OOXML formats.
+//! `DrawingML` diagram (`SmartArt`) support shared across OOXML formats.
 //!
-//! A SmartArt graphic is stored as a set of diagram parts — the data model
+//! A `SmartArt` graphic is stored as a set of diagram parts — the data model
 //! (`dataN.xml`), layout (`layoutN.xml`), quick style (`quickStyleN.xml`),
 //! colors (`colorsN.xml`), and an optional pre-rendered drawing
 //! (`drawingN.xml`) — anchored from the host document through a
-//! `dgm:relIds` (Word) or graphic-frame (PowerPoint) reference.
+//! `dgm:relIds` (Word) or graphic-frame (`PowerPoint`) reference.
 //!
 //! This module holds the format-agnostic pieces:
 //!
@@ -37,9 +37,9 @@ pub use model::{
     generate_smartart_quickstyle_xml,
 };
 
-/// DrawingML diagram namespace (transitional).
+/// `DrawingML` diagram namespace (transitional).
 pub const DGM_NAMESPACE: &str = "http://schemas.openxmlformats.org/drawingml/2006/diagram";
-/// DrawingML diagram namespace (ISO/IEC 29500 Strict).
+/// `DrawingML` diagram namespace (ISO/IEC 29500 Strict).
 pub const DGM_NAMESPACE_STRICT: &str = "http://purl.oclc.org/ooxml/drawingml/diagram";
 
 /// Diagram data relationship type (transitional).

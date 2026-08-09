@@ -1,6 +1,6 @@
-//! Checked, format-neutral DrawingML text primitives.
+//! Checked, format-neutral `DrawingML` text primitives.
 //!
-//! The semantic model is shared by every DrawingML host. Numeric scalars,
+//! The semantic model is shared by every `DrawingML` host. Numeric scalars,
 //! lexical codecs, and the neutral text-body owner stay layered beneath this
 //! facade so host crates consume one compact, prefix-free vocabulary.
 

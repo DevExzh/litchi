@@ -31,7 +31,7 @@ fn read_u32(data: &[u8], offset: usize, record_type: u16, field: &str) -> Result
 
 fn with_record_header(record_type: u16, payload: Vec<u8>) -> Result<Vec<u8>> {
     let length = u16::try_from(payload.len())
-        .map_err(|_| invalid(record_type, "payload length exceeds BIFF u16"))?;
+        .map_err(|_error| invalid(record_type, "payload length exceeds BIFF u16"))?;
     let mut record = Vec::with_capacity(4 + payload.len());
     record.extend_from_slice(&record_type.to_le_bytes());
     record.extend_from_slice(&length.to_le_bytes());
@@ -40,6 +40,9 @@ fn with_record_header(record_type: u16, payload: Vec<u8>) -> Result<Vec<u8>> {
 }
 
 impl WorksheetIndexRecord {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse_payload(data: &[u8], workbook_stream_len: u64) -> Result<Self> {
         if !(INDEX_FIXED_LEN..=MAX_INDEX_PAYLOAD_LEN).contains(&data.len()) {
             return Err(invalid(
@@ -144,6 +147,9 @@ impl WorksheetIndexRecord {
 }
 
 impl DbCellRecord {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse_payload(
         record_position: u32,
         workbook_stream_len: u64,
@@ -193,6 +199,9 @@ impl DbCellRecord {
     }
 
     /// Resolve the chained `rgdb` offsets from the end of the first ROW record.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn resolve_cell_positions(&self, first_row_end_position: u32) -> Result<Vec<u32>> {
         if !self.cell_offsets.is_empty() && self.first_row_position.is_none() {
             return Err(invalid(
@@ -221,8 +230,7 @@ impl DbCellRecord {
     fn to_payload(&self) -> Vec<u8> {
         let row_offset = self
             .first_row_position
-            .map(|position| self.record_position - position)
-            .unwrap_or(0);
+            .map_or(0, |position| self.record_position - position);
         let mut data = Vec::with_capacity(4 + self.cell_offsets.len() * 2);
         data.extend_from_slice(&row_offset.to_le_bytes());
         for offset in &self.cell_offsets {
@@ -234,6 +242,9 @@ impl DbCellRecord {
 
 impl RowBlock {
     /// Reproduce this cross-validated `DBCELL` record at its original position.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         with_record_header(DBCELL_RECORD_TYPE, self.dbcell.to_payload())
     }
@@ -241,6 +252,9 @@ impl RowBlock {
 
 impl RowBlockIndex {
     /// Reproduce this cross-validated `INDEX` record at its original position.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_index_record_bytes(&self) -> Result<Vec<u8>> {
         with_record_header(INDEX_RECORD_TYPE, self.index.to_payload())
     }
@@ -301,7 +315,7 @@ impl RowBlockIndexCollector {
         record_type: u16,
         data: &[u8],
     ) -> Result<()> {
-        let position = u32::try_from(record_position).map_err(|_| {
+        let position = u32::try_from(record_position).map_err(|_error| {
             invalid(
                 record_type,
                 "record position exceeds BIFF FilePointer range",
@@ -311,7 +325,7 @@ impl RowBlockIndexCollector {
             BOF_RECORD_TYPE => self.sheet_start = Some(position),
             EOF_RECORD_TYPE => {
                 let size = u32::try_from(4usize + data.len())
-                    .map_err(|_| invalid(record_type, "EOF size overflows"))?;
+                    .map_err(|_error| invalid(record_type, "EOF size overflows"))?;
                 self.sheet_end = position.checked_add(size);
             },
             INDEX_RECORD_TYPE => {
@@ -388,14 +402,16 @@ impl RowBlockIndexCollector {
             })?;
             let block_offset = u32::try_from(self.blocks.len())
                 .ok()
-                .and_then(|value| value.checked_mul(MAX_ROWS_PER_BLOCK as u32))
+                .and_then(|value| {
+                    value.checked_mul(crate::utils::truncate_usize_to_u32(MAX_ROWS_PER_BLOCK))
+                })
                 .ok_or_else(|| invalid(DBCELL_RECORD_TYPE, "empty DBCELL block range overflow"))?;
             let first_row = index
                 .first_data_row()
                 .checked_add(block_offset)
                 .ok_or_else(|| invalid(DBCELL_RECORD_TYPE, "empty DBCELL block range overflow"))?;
             let last_row_exclusive = first_row
-                .checked_add(MAX_ROWS_PER_BLOCK as u32)
+                .checked_add(crate::utils::truncate_usize_to_u32(MAX_ROWS_PER_BLOCK))
                 .map(|value| value.min(index.last_data_row_exclusive()))
                 .ok_or_else(|| invalid(DBCELL_RECORD_TYPE, "empty DBCELL block range overflow"))?;
             if first_row >= last_row_exclusive {
@@ -405,13 +421,13 @@ impl RowBlockIndexCollector {
                 ));
             }
             self.blocks.push(RowBlock {
-                first_row: u16::try_from(first_row).map_err(|_| {
+                first_row: u16::try_from(first_row).map_err(|_error| {
                     invalid(
                         DBCELL_RECORD_TYPE,
                         "empty DBCELL first row exceeds BIFF8 limit",
                     )
                 })?,
-                last_row: u16::try_from(last_row_exclusive - 1).map_err(|_| {
+                last_row: u16::try_from(last_row_exclusive - 1).map_err(|_error| {
                     invalid(
                         DBCELL_RECORD_TYPE,
                         "empty DBCELL last row exceeds BIFF8 limit",

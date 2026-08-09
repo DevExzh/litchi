@@ -1,7 +1,7 @@
 use super::validation;
 /// Numbering and list structures parser for Word binary format.
 ///
-/// Based on Apache POI's ListTables and LibreOffice's implementation.
+/// Based on Apache POI's `ListTables` and `LibreOffice`'s implementation.
 /// Lists in DOC files are defined by:
 /// - List Format Override (LFO) structures
 /// - List Format (LF) structures
@@ -88,7 +88,10 @@ pub enum NumberFormat {
 
 impl NumberFormat {
     /// Writer-compatible name for decimal numbering.
-    #[allow(non_upper_case_globals)]
+    #[allow(
+        non_upper_case_globals,
+        reason = "name follows the corresponding MS-DOC specification symbol"
+    )]
     pub const Decimal: Self = Self::Arabic;
 }
 
@@ -218,10 +221,12 @@ impl TryFrom<u8> for ListFollowCharacter {
 pub struct HtmlCompatibilityFlags(u8);
 
 impl HtmlCompatibilityFlags {
+    #[must_use]
     pub const fn from_raw(raw: u8) -> Self {
         Self(raw)
     }
 
+    #[must_use]
     pub const fn raw(self) -> u8 {
         self.0
     }
@@ -240,6 +245,7 @@ impl ListStyleIndex {
         }
     }
 
+    #[must_use]
     pub const fn get(self) -> u16 {
         self.0
     }
@@ -316,7 +322,7 @@ pub struct ListLevelOverrideMetadata {
     pub formatting: Option<ListLevelMetadata>,
 }
 
-/// Lossless LFO and corresponding LFOData metadata.
+/// Lossless LFO and corresponding `LFOData` metadata.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ListFormatOverrideMetadata {
     pub unused1: u32,
@@ -337,14 +343,17 @@ pub struct ListTablesMetadata {
 }
 
 impl ListTablesMetadata {
+    #[must_use]
     pub fn definition(&self, index: usize) -> Option<&ListStructureMetadata> {
         self.definitions.get(index)
     }
 
+    #[must_use]
     pub fn level(&self, definition: usize, level: u8) -> Option<&ListLevelMetadata> {
         self.levels.get(definition)?.get(usize::from(level))
     }
 
+    #[must_use]
     pub fn format_override(&self, index: usize) -> Option<&ListFormatOverrideMetadata> {
         self.overrides.get(index)
     }
@@ -384,15 +393,14 @@ impl ListLevel {
         validation::level(level)?;
 
         let start_at = binary::read_u32_le(data, 0)
-            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read start_at: {}", e)))?;
+            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read start_at: {e}")))?;
         let number_format = validation::number_format(data[4])?;
         validation::start_at(number_format, start_at)?;
         let alignment = validation::alignment(data[5] & 0x03)?;
         let follow_char = data[15];
         validation::follow_character(follow_char)?;
-        let indent_left = binary::read_i32_le(data, 16).map_err(|e| {
-            PackageError::InvalidFormat(format!("Failed to read indent_left: {}", e))
-        })?;
+        let indent_left = binary::read_i32_le(data, 16)
+            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read indent_left: {e}")))?;
         let cb_chpx = data[24] as usize;
         let cb_papx = data[25] as usize;
         let text_offset = 28usize
@@ -454,11 +462,13 @@ impl ListLevel {
     }
 
     /// Check if this is a bullet list
+    #[must_use]
     pub fn is_bullet(&self) -> bool {
         self.number_format == NumberFormat::Bullet
     }
 
     /// Check if this is a numbered list
+    #[must_use]
     pub fn is_numbered(&self) -> bool {
         !self.is_bullet() && self.number_format != NumberFormat::None
     }
@@ -485,10 +495,9 @@ impl ListStructure {
         }
 
         let list_id = binary::read_u32_le(data, 0)
-            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read list_id: {}", e)))?;
-        let template_id = binary::read_u32_le(data, 4).map_err(|e| {
-            PackageError::InvalidFormat(format!("Failed to read template_id: {}", e))
-        })?;
+            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read list_id: {e}")))?;
+        let template_id = binary::read_u32_le(data, 4)
+            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read template_id: {e}")))?;
 
         // Flags byte at offset 26
         let flags = data[26];
@@ -503,6 +512,7 @@ impl ListStructure {
     }
 
     /// Get a specific level
+    #[must_use]
     pub fn level(&self, level: u8) -> Option<&ListLevel> {
         self.levels.get(level as usize)
     }
@@ -545,7 +555,7 @@ impl ListFormatOverride {
         }
 
         let list_id = binary::read_u32_le(data, 0)
-            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read list_id: {}", e)))?;
+            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read list_id: {e}")))?;
         let override_count = data[12];
         validation::override_count(override_count)?;
 
@@ -558,6 +568,7 @@ impl ListFormatOverride {
     }
 
     /// Get the `LFOLVL` override for a zero-based list level, if any.
+    #[must_use]
     pub fn level_override(&self, level: u8) -> Option<&ListLevelOverride> {
         self.level_overrides
             .iter()
@@ -604,6 +615,7 @@ impl<'a> ParagraphListBinding<'a> {
     ///
     /// A formatting override replaces the complete base `LVL`; a start-at-only
     /// override leaves this reference pointing at the base level.
+    #[must_use]
     pub fn effective_level(&self) -> &'a ListLevel {
         self.level_override
             .and_then(|level| level.format.as_ref())
@@ -611,6 +623,7 @@ impl<'a> ParagraphListBinding<'a> {
     }
 
     /// Effective starting number after applying a start-at-only override.
+    #[must_use]
     pub fn effective_start_at(&self) -> u32 {
         self.level_override
             .and_then(|level| level.start_at)
@@ -618,12 +631,14 @@ impl<'a> ParagraphListBinding<'a> {
     }
 
     /// Whether this binding replaces the complete base `LVL` formatting.
+    #[must_use]
     pub fn has_formatting_override(&self) -> bool {
         self.level_override
             .is_some_and(|level| level.format.is_some())
     }
 
     /// Whether this binding overrides only the starting number.
+    #[must_use]
     pub fn has_start_at_override(&self) -> bool {
         self.level_override
             .is_some_and(|level| level.start_at.is_some())

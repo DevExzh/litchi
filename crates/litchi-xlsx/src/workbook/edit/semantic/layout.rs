@@ -296,7 +296,7 @@ impl ColumnEdit<'_> {
         self
     }
 
-    /// Set a checked SpreadsheetML width and mark it as explicitly customized.
+    /// Set a checked `SpreadsheetML` width and mark it as explicitly customized.
     ///
     /// Raw finite values in `0..=255` and reusable [`crate::column::Width`]
     /// values are both accepted.

@@ -84,6 +84,9 @@ pub struct Chart3d {
 
 impl Chart3d {
     /// Parse a `Chart3d` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
             return Err(Error::InvalidLength {
@@ -135,6 +138,7 @@ impl Chart3d {
     }
 
     /// Serialize back to a complete `Chart3d` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(PAYLOAD_LEN);
         payload.extend_from_slice(&self.rotation.to_le_bytes());
@@ -150,64 +154,76 @@ impl Chart3d {
     /// Clockwise rotation around the vertical center line, in degrees
     /// (`anRot`). MUST be at most 44 for transposed bar chart groups
     /// (MS-XLS 2.4.46; cross-record constraint).
+    #[must_use]
     pub fn rotation(&self) -> i16 {
         self.rotation
     }
 
     /// Rotation around the horizontal center line, in degrees (`anElev`).
+    #[must_use]
     pub fn elevation(&self) -> i16 {
         self.elevation
     }
 
     /// Field of view angle (`pcDist`).
+    #[must_use]
     pub fn distance(&self) -> i16 {
         self.distance
     }
 
     /// Pie thickness or 3-D plot area height percentage (`pcHeight`), as the
     /// raw 16-bit value; its interpretation depends on `fNotPieChart`.
+    #[must_use]
     pub fn height(&self) -> u16 {
         self.height
     }
 
     /// Depth of the 3-D plot area as a percentage of its width (`pcDepth`).
+    #[must_use]
     pub fn depth(&self) -> i16 {
         self.depth
     }
 
     /// Gap width between series and the plot area edges (`pcGap`).
+    #[must_use]
     pub fn gap(&self) -> u16 {
         self.gap
     }
 
     /// Whether the plot area is rendered with a vanishing point
     /// (`fPerspective`). MUST be 0 for pie chart groups (MS-XLS 2.4.46).
+    #[must_use]
     pub fn perspective(&self) -> bool {
         self.flags & FLAG_PERSPECTIVE != 0
     }
 
     /// Whether data points are clustered in a bar chart group (`fCluster`).
+    #[must_use]
     pub fn cluster(&self) -> bool {
         self.flags & FLAG_CLUSTER != 0
     }
 
     /// Whether the plot area height is automatically determined
     /// (`f3DScaling`).
+    #[must_use]
     pub fn auto_scaling(&self) -> bool {
         self.flags & FLAG_3D_SCALING != 0
     }
 
     /// Whether the chart group type is not pie (`fNotPieChart`).
+    #[must_use]
     pub fn not_pie_chart(&self) -> bool {
         self.flags & FLAG_NOT_PIE_CHART != 0
     }
 
     /// Whether the walls are rendered in 2-D (`fWalls2D`).
+    #[must_use]
     pub fn walls_2d(&self) -> bool {
         self.flags & FLAG_WALLS_2D != 0
     }
 
     /// Raw flags word, including the 11 reserved bits.
+    #[must_use]
     pub fn flags(&self) -> u16 {
         self.flags
     }

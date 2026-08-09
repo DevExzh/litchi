@@ -1,4 +1,12 @@
-//! Layered WordprocessingML document-settings vocabulary and XML codec.
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
+//! Layered `WordprocessingML` document-settings vocabulary and XML codec.
 //
 //! The package host owns relationship validation and settings-part orchestration;
 //! this owner contains only the package-neutral settings model and bounded
@@ -18,10 +26,10 @@ mod support;
 #[cfg(test)]
 mod tests;
 
-/// Transitional WordprocessingML namespace.
+/// Transitional `WordprocessingML` namespace.
 pub const TRANSITIONAL_WORD_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-/// Strict WordprocessingML namespace.
+/// Strict `WordprocessingML` namespace.
 pub const STRICT_WORD_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/wordprocessingml/main";
 
 /// Maximum input accepted by the standalone settings codec.

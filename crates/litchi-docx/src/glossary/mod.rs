@@ -1,4 +1,8 @@
-//! Layered WordprocessingML glossary / AutoText catalog owner.
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+//! Layered `WordprocessingML` glossary / `AutoText` catalog owner.
 
 mod codec;
 mod graph;

@@ -1,9 +1,9 @@
-//! OfficeArt SpgrContainer payloads for writable BIFF8 shape groups.
+//! `OfficeArt` `SpgrContainer` payloads for writable BIFF8 shape groups.
 //!
-//! A shape group serializes as one SpgrContainer whose first SpContainer is the
-//! group header (Spgr + Sp + OPT + ClientAnchor + ClientData) followed by one
-//! SpContainer per child anchored with an OfficeArtChildAnchor (MS-ODRAW 2.2.16).
-//! Each OBJ-bearing SpContainer becomes its own MsoDrawing fragment so the BIFF
+//! A shape group serializes as one `SpgrContainer` whose first `SpContainer` is the
+//! group header (Spgr + Sp + OPT + `ClientAnchor` + `ClientData`) followed by one
+//! `SpContainer` per child anchored with an `OfficeArtChildAnchor` (MS-ODRAW 2.2.16).
+//! Each OBJ-bearing `SpContainer` becomes its own `MsoDrawing` fragment so the BIFF
 //! stream can interleave the matching OBJ records.
 
 use crate::Result;
@@ -21,9 +21,9 @@ use litchi_odraw::{
 
 use super::drawing::{split_client_textbox, style_properties, write_xls_anchor};
 
-/// OfficeArtFOPT "Protection Boolean Properties" property ID (MS-ODRAW 2.3.1.5).
+/// `OfficeArtFOPT` "Protection Boolean Properties" property ID (MS-ODRAW 2.3.1.5).
 const PROTECTION_BOOLEAN_PROPERTIES: Id = Id::LockAgainstGrouping;
-/// OfficeArtFOPT "Group Shape Boolean Properties" property ID (MS-ODRAW 2.3.4.44).
+/// `OfficeArtFOPT` "Group Shape Boolean Properties" property ID (MS-ODRAW 2.3.4.44).
 const GROUP_SHAPE_BOOLEAN_PROPERTIES_RAW: u16 = 0x03BF;
 /// `fLockAgainstGrouping` asserted together with its use bit.
 const LOCK_AGAINST_GROUPING_ON: i32 = 0x0004_0004;
@@ -41,14 +41,14 @@ pub(crate) struct GroupShapeConfig<'a> {
     pub child_object_ids: Vec<u16>,
 }
 
-/// One MsoDrawing fragment of a group plus the OBJ payload that must follow it.
+/// One `MsoDrawing` fragment of a group plus the OBJ payload that must follow it.
 pub(crate) struct GroupFragment<'a> {
     pub escher: Vec<u8>,
     pub has_textbox: bool,
     pub obj: GroupFragmentObj<'a>,
 }
 
-/// The OBJ record kind owed after a group fragment's MsoDrawing record.
+/// The OBJ record kind owed after a group fragment's `MsoDrawing` record.
 pub(crate) enum GroupFragmentObj<'a> {
     Header {
         object_id: u16,
@@ -61,16 +61,16 @@ pub(crate) enum GroupFragmentObj<'a> {
     },
 }
 
-/// Whether a grouped child carries an OfficeArt ClientTextbox and a TXO record.
+/// Whether a grouped child carries an `OfficeArt` `ClientTextbox` and a TXO record.
 pub(crate) fn child_has_textbox(child: &ShapeGroupChild) -> bool {
     child.kind == ShapeKind::TextBox || child.text.is_some()
 }
 
-/// Split one group into ordered MsoDrawing fragments with sequential shape IDs.
+/// Split one group into ordered `MsoDrawing` fragments with sequential shape IDs.
 ///
-/// The first fragment carries the SpgrContainer header (whose declared length
-/// spans every fragment) plus the group-header SpContainer; each remaining
-/// fragment is one child SpContainer.
+/// The first fragment carries the `SpgrContainer` header (whose declared length
+/// spans every fragment) plus the group-header `SpContainer`; each remaining
+/// fragment is one child `SpContainer`.
 pub(crate) fn group_fragments<'a>(
     config: &'a GroupShapeConfig<'a>,
     first_shape_id: u32,
@@ -81,7 +81,7 @@ pub(crate) fn group_fragments<'a>(
     for (index, child) in group.children.iter().enumerate() {
         child_shapes.push(grouped_child_shape(
             child,
-            first_shape_id + 1 + index as u32,
+            first_shape_id + 1 + crate::utils::truncate_usize_to_u32(index),
         )?);
     }
     let total = header.len()
@@ -90,7 +90,12 @@ pub(crate) fn group_fragments<'a>(
             .map(|(escher, has_textbox)| escher.len() + usize::from(*has_textbox) * 8)
             .sum::<usize>();
     let mut first = Vec::with_capacity(8 + header.len());
-    write_container_header(&mut first, 0, WriteContainer::Spgr, total as u32)?;
+    write_container_header(
+        &mut first,
+        0,
+        WriteContainer::Spgr,
+        crate::utils::truncate_usize_to_u32(total),
+    )?;
     first.extend_from_slice(&header);
 
     let mut fragments = Vec::with_capacity(1 + child_shapes.len());
@@ -118,7 +123,7 @@ pub(crate) fn group_fragments<'a>(
     Ok(fragments)
 }
 
-/// Build the group-header SpContainer (Spgr + Sp + OPT + ClientAnchor + ClientData).
+/// Build the group-header `SpContainer` (Spgr + Sp + OPT + `ClientAnchor` + `ClientData`).
 fn group_header_shape(group: &ShapeGroupWrite, shape_id: u32) -> Result<Vec<u8>> {
     let mut children = Vec::with_capacity(104);
     let [left, top, right, bottom] = group.coordinates.fields();
@@ -151,7 +156,7 @@ fn group_header_shape(group: &ShapeGroupWrite, shape_id: u32) -> Result<Vec<u8>>
     Ok(out)
 }
 
-/// Build one child SpContainer anchored with an OfficeArtChildAnchor.
+/// Build one child `SpContainer` anchored with an `OfficeArtChildAnchor`.
 fn grouped_child_shape(child: &ShapeGroupChild, shape_id: u32) -> Result<(Vec<u8>, bool)> {
     let mut children = Vec::with_capacity(112);
     ShapeBuilder::new(Native::from_raw(child.kind.officeart_type()), shape_id)

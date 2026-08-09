@@ -1,4 +1,4 @@
-//! Typed SpreadsheetML table models and semantic validation.
+//! Typed `SpreadsheetML` table models and semantic validation.
 
 use std::collections::HashSet;
 
@@ -12,7 +12,7 @@ use super::{
 /// Table style information for visual formatting.
 #[derive(Debug, Clone)]
 pub struct TableStyleInfo {
-    /// Style name (e.g., "TableStyleMedium2")
+    /// Style name (e.g., "`TableStyleMedium2`")
     pub name: Option<String>,
     /// Show first column with special formatting
     pub show_first_column: Option<bool>,
@@ -25,6 +25,7 @@ pub struct TableStyleInfo {
 }
 
 impl TableStyleInfo {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             name: None,
@@ -36,6 +37,7 @@ impl TableStyleInfo {
     }
 
     /// Parse table style info from XML tag.
+    #[must_use]
     pub fn parse(tag: &str) -> Option<Self> {
         let name = Self::extract_attribute(tag, "name");
         let show_first_column = Self::extract_attribute(tag, "showFirstColumn")
@@ -57,7 +59,7 @@ impl TableStyleInfo {
     }
 
     fn extract_attribute(tag: &str, attr: &str) -> Option<String> {
-        let search_str = format!("{}=\"", attr);
+        let search_str = format!("{attr}=\"");
         let start = tag.find(&search_str)? + search_str.len();
         let end = tag[start..].find('"')? + start;
         Some(tag[start..end].to_string())
@@ -85,6 +87,7 @@ pub enum TotalsRowFunction {
 }
 
 impl TotalsRowFunction {
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Sum => "sum",
@@ -99,6 +102,7 @@ impl TotalsRowFunction {
         }
     }
 
+    #[must_use]
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "sum" => Some(Self::Sum),
@@ -167,6 +171,7 @@ pub enum TableType {
 }
 
 impl TableType {
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Worksheet => "worksheet",
@@ -175,6 +180,7 @@ impl TableType {
         }
     }
 
+    #[must_use]
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "worksheet" => Some(Self::Worksheet),
@@ -262,7 +268,7 @@ impl Table {
                     return;
                 };
                 self.columns
-                    .push(TableColumn::new(col_id, format!("Column{}", col_id)));
+                    .push(TableColumn::new(col_id, format!("Column{col_id}")));
             }
         }
 
@@ -273,12 +279,13 @@ impl Table {
     }
 
     /// Get column names.
+    #[must_use]
     pub fn column_names(&self) -> Vec<&str> {
         self.columns.iter().map(|c| c.name.as_str()).collect()
     }
 }
 
-/// Validate a table before it is authored as SpreadsheetML.
+/// Validate a table before it is authored as `SpreadsheetML`.
 pub fn validate_table(table: &Table) -> Result<()> {
     if table.id == 0 {
         return Err(invalid("table ID must be positive"));
@@ -465,7 +472,7 @@ fn checked_cell_ref(reference: &str, description: &str) -> Result<(u32, u32)> {
     })
 }
 
-/// Parse a cell range like "A1:D10" into (min_col, min_row, max_col, max_row).
+/// Parse a cell range like "A1:D10" into (`min_col`, `min_row`, `max_col`, `max_row`).
 /// Returns 1-based indices.
 pub(super) fn parse_range(range: &str) -> Option<(u32, u32, u32, u32)> {
     let normalized = range.replace('$', "");

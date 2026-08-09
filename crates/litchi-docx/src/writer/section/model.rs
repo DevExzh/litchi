@@ -1,3 +1,19 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::cast_possible_truncation,
+    reason = "OOXML numeric values are bounded before conversion"
+)]
+#![expect(
+    clippy::cast_sign_loss,
+    reason = "the value is validated as nonnegative before conversion"
+)]
+#![expect(
+    clippy::struct_excessive_bools,
+    reason = "the public model preserves independent OOXML flags"
+)]
 use crate::error::{Error, Result};
 use crate::header_footer::Kind;
 use crate::section::Start;
@@ -105,6 +121,7 @@ impl SectionHeaderFooterReference {
         }
     }
 
+    #[must_use]
     pub fn managed_default(kind: Kind) -> Self {
         Self {
             kind,
@@ -840,11 +857,13 @@ pub enum Color {
 
 impl Color {
     /// Creates an explicit red-green-blue color.
+    #[must_use]
     pub const fn rgb(red: u8, green: u8, blue: u8) -> Self {
         Self::Rgb([red, green, blue])
     }
 
     /// Returns the RGB components, or `None` for automatic color selection.
+    #[must_use]
     pub const fn components(self) -> Option<[u8; 3]> {
         match self {
             Self::Auto => None,
@@ -862,8 +881,9 @@ impl Color {
             )));
         }
         let component = |range| {
-            u8::from_str_radix(&value[range], 16)
-                .map_err(|_| Error::InvalidFormat(format!("invalid page border color '{value}'")))
+            u8::from_str_radix(&value[range], 16).map_err(|_source_error| {
+                Error::InvalidFormat(format!("invalid page border color '{value}'"))
+            })
         };
         Ok(Self::rgb(
             component(0..2)?,
@@ -956,7 +976,7 @@ impl SectionVerticalAlignment {
     }
 }
 
-/// Typed WordprocessingML `sectPr` properties.
+/// Typed `WordprocessingML` `sectPr` properties.
 #[derive(Debug, Clone)]
 pub struct SectionProperties {
     pub page_width: u32,
@@ -1031,6 +1051,7 @@ impl Default for SectionProperties {
 }
 
 impl SectionProperties {
+    #[must_use]
     pub fn a4() -> Self {
         Self {
             page_width: 11906,
@@ -1039,10 +1060,12 @@ impl SectionProperties {
         }
     }
 
+    #[must_use]
     pub fn letter() -> Self {
         Self::default()
     }
 
+    #[must_use]
     pub fn legal() -> Self {
         Self {
             page_height: 20160,
@@ -1050,12 +1073,14 @@ impl SectionProperties {
         }
     }
 
+    #[must_use]
     pub fn landscape(mut self) -> Self {
         self.orientation = PageOrientation::Landscape;
         std::mem::swap(&mut self.page_width, &mut self.page_height);
         self
     }
 
+    #[must_use]
     pub fn margins(mut self, top: f64, bottom: f64, left: f64, right: f64) -> Self {
         self.margin_top = inches_to_twips(top);
         self.margin_bottom = inches_to_twips(bottom);
@@ -1064,12 +1089,17 @@ impl SectionProperties {
         self
     }
 
+    #[must_use]
     pub fn with_start_type(mut self, start_type: Start) -> Self {
         self.start_type = Some(start_type);
         self
     }
 
     /// Create or replace a section-owned header part of the selected kind.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_header_part(
         &mut self,
         kind: Kind,
@@ -1080,6 +1110,10 @@ impl SectionProperties {
     }
 
     /// Create or replace a section-owned footer part of the selected kind.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_footer_part(
         &mut self,
         kind: Kind,

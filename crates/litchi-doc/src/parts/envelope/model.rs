@@ -50,16 +50,19 @@ impl Envelope {
     }
 
     /// The exact serialized GUID bytes from `MsoEnvelopeCLSID.CLSID`.
+    #[must_use]
     pub const fn class_id(&self) -> &[u8; 16] {
         &self.class_id
     }
 
     /// The class-selected envelope payload.
+    #[must_use]
     pub fn payload(&self) -> &Payload {
         &self.payload
     }
 
     /// The typed Office envelope body, when the documented CLSID is present.
+    #[must_use]
     pub fn message(&self) -> Option<&Message> {
         match &self.payload {
             Payload::Message(message) => Some(message),
@@ -113,14 +116,17 @@ pub enum Text {
 }
 
 impl Text {
+    #[must_use]
     pub fn ansi(value: Vec<u8>) -> Self {
         Self::Ansi(value.into_boxed_slice())
     }
 
+    #[must_use]
     pub fn unicode(value: Vec<u16>) -> Self {
         Self::Unicode(value.into_boxed_slice())
     }
 
+    #[must_use]
     pub fn as_ansi(&self) -> Option<&[u8]> {
         match self {
             Self::Ansi(value) => Some(value),
@@ -128,6 +134,7 @@ impl Text {
         }
     }
 
+    #[must_use]
     pub fn as_unicode(&self) -> Option<&[u16]> {
         match self {
             Self::Ansi(_) => None,
@@ -138,6 +145,7 @@ impl Text {
     /// Render for diagnostics without treating ANSI bytes as a claimed code
     /// page. Unicode replacement is limited to display and never used for
     /// serialization.
+    #[must_use]
     pub fn to_string_lossy(&self) -> String {
         match self {
             Self::Ansi(value) => value.iter().map(|byte| char::from(*byte)).collect(),

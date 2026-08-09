@@ -1,3 +1,15 @@
+#![expect(
+    clippy::cast_possible_truncation,
+    reason = "OOXML numeric values are bounded before conversion"
+)]
+#![expect(
+    clippy::cast_precision_loss,
+    reason = "OOXML unit conversion intentionally uses floating-point output"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Text-box authoring for DOCX documents.
 //!
 //! A text box is serialized as a `<w:drawing>` inline wordprocessing shape
@@ -6,7 +18,7 @@
 //! authored here reappear in the [`crate::Document::text_boxes`]
 //! inventory with identical semantics after save and reopen.
 //!
-//! WordArt authoring (text warps and run-level text fill/outline/effect
+//! `WordArt` authoring (text warps and run-level text fill/outline/effect
 //! styling) is deliberately not supported; those remain read-only metadata.
 
 use crate::error::{Error, Result};
@@ -40,7 +52,7 @@ pub(crate) const MAX_TEXT_BYTES: usize = 1024 * 1024;
 /// use litchi_docx::writer::MutableTextBox;
 ///
 /// let mut package = Package::new()?;
-/// let mut text_box = MutableTextBox::new("Greeting", 1828800, 914400)?;
+/// let mut text_box = MutableTextBox::new("Greeting", 1828800, 914_400)?;
 /// text_box.add_run("Hello ")?.bold = Some(true);
 /// text_box.add_run("world")?;
 /// text_box.body_properties_mut().autofit = TextBoxAutofit::Shape;
@@ -56,7 +68,7 @@ pub struct MutableTextBox {
     pub(crate) name: String,
     /// Preset geometry of the shape.
     pub(crate) preset: Preset,
-    /// Shape width in EMUs (English Metric Units, 1 inch = 914400 EMUs).
+    /// Shape width in EMUs (English Metric Units, 1 inch = `914_400` EMUs).
     pub(crate) width_emu: i64,
     /// Shape height in EMUs.
     pub(crate) height_emu: i64,
@@ -87,6 +99,10 @@ impl MutableTextBox {
     }
 
     /// Create a text box with a preset shape geometry, name, and EMU extents.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn with_shape(
         name: impl Into<String>,
         preset: Preset,
@@ -127,16 +143,19 @@ impl MutableTextBox {
     }
 
     /// Get the shape name.
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Get the preset shape geometry.
+    #[must_use]
     pub fn preset(&self) -> Preset {
         self.preset
     }
 
     /// Get the text-body properties.
+    #[must_use]
     pub fn body_properties(&self) -> &TextBoxBodyProperties {
         &self.body
     }
@@ -194,6 +213,7 @@ impl MutableTextBox {
     }
 
     /// Get the story paragraphs.
+    #[must_use]
     pub fn paragraphs(&self) -> &[TextBoxParagraph] {
         &self.paragraphs
     }
@@ -226,6 +246,7 @@ impl MutableTextBox {
     }
 
     /// Convert extents from inches to EMUs.
+    #[must_use]
     pub fn inches_to_emu(inches: f64) -> i64 {
         (inches * EMUS_PER_INCH as f64) as i64
     }
@@ -272,7 +293,7 @@ fn story_limit(kind: &str) -> Error {
 }
 
 /// Serialize story paragraphs (`w:p` with runs and basic run properties),
-/// validating the bounded story limits. Shared by the DrawingML text-box and
+/// validating the bounded story limits. Shared by the `DrawingML` text-box and
 /// VML shape writers.
 pub(crate) fn write_story_xml(xml: &mut String, paragraphs: &[TextBoxParagraph]) -> Result<()> {
     if paragraphs.len() > MAX_PARAGRAPHS {
@@ -400,7 +421,7 @@ mod tests {
 
     #[test]
     fn serializes_inline_text_box_with_body_properties() {
-        let mut text_box = MutableTextBox::new("My Box", 1828800, 914400).unwrap();
+        let mut text_box = MutableTextBox::new("My Box", 1828800, 914_400).unwrap();
         text_box.set_id(42);
         text_box.add_run("rich text").unwrap();
         {
@@ -434,7 +455,7 @@ mod tests {
     #[test]
     fn serializes_preset_shape_and_formatted_runs() {
         let mut text_box =
-            MutableTextBox::with_shape("Round", Preset::RoundRect, 914400, 457200).unwrap();
+            MutableTextBox::with_shape("Round", Preset::RoundRect, 914_400, 457200).unwrap();
         text_box.add_run("bold").unwrap().bold = Some(true);
         text_box.add_run("italic-off").unwrap().italic = Some(false);
         text_box.add_run("under").unwrap().underline = Some(TextUnderline::WavyDouble);
@@ -458,7 +479,7 @@ mod tests {
 
     #[test]
     fn defaults_match_read_model_defaults() {
-        let text_box = MutableTextBox::new("Plain", 914400, 914400).unwrap();
+        let text_box = MutableTextBox::new("Plain", 914_400, 914_400).unwrap();
         text_box.to_xml(&mut String::new()).unwrap();
         let inventory = load_text_boxes(authored_xml(&text_box).as_bytes()).unwrap();
         let parsed = &inventory[0];
@@ -469,13 +490,13 @@ mod tests {
 
     #[test]
     fn rejects_invalid_extents() {
-        assert!(MutableTextBox::new("Bad", 0, 914400).is_err());
-        assert!(MutableTextBox::new("Bad", 914400, -1).is_err());
+        assert!(MutableTextBox::new("Bad", 0, 914_400).is_err());
+        assert!(MutableTextBox::new("Bad", 914_400, -1).is_err());
     }
 
     #[test]
     fn escapes_markup_in_text_and_name() {
-        let mut text_box = MutableTextBox::new("A & <B>", 914400, 914400).unwrap();
+        let mut text_box = MutableTextBox::new("A & <B>", 914_400, 914_400).unwrap();
         text_box.add_run("x < y & \"z\"").unwrap();
         let document_xml = authored_xml(&text_box);
         assert!(document_xml.contains("name=\"A &amp; &lt;B&gt;\""));
@@ -494,7 +515,7 @@ mod tests {
         {
             let document = package.document_mut().unwrap();
             document.add_paragraph_with_text("before the box");
-            let mut text_box = MutableTextBox::new("Round Trip Box", 1828800, 914400).unwrap();
+            let mut text_box = MutableTextBox::new("Round Trip Box", 1828800, 914_400).unwrap();
             text_box.set_id(11);
             text_box.add_run("Hello ").unwrap().bold = Some(true);
             text_box.add_run("world").unwrap().italic = Some(true);
@@ -549,14 +570,14 @@ mod tests {
         let mut package = Package::new().unwrap();
         {
             let document = package.document_mut().unwrap();
-            let mut first = MutableTextBox::new("First Box", 914400, 457200).unwrap();
+            let mut first = MutableTextBox::new("First Box", 914_400, 457200).unwrap();
             first.set_id(21);
             first.add_run("first story").unwrap();
             document.add_text_box(first);
 
             document
                 .add_paragraph()
-                .add_picture_from_bytes(PNG_HEADER.to_vec(), Some(914400), Some(914400))
+                .add_picture_from_bytes(PNG_HEADER.to_vec(), Some(914_400), Some(914_400))
                 .unwrap();
 
             let mut second =
@@ -609,7 +630,7 @@ mod tests {
 
     #[test]
     fn append_limits_leave_the_story_unchanged() {
-        let mut text_box = MutableTextBox::new("Bounded", 914400, 914400).unwrap();
+        let mut text_box = MutableTextBox::new("Bounded", 914_400, 914_400).unwrap();
         let too_much_text = "x".repeat(MAX_TEXT_BYTES + 1);
 
         assert!(text_box.add_run(&too_much_text).is_err());

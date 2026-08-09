@@ -37,36 +37,43 @@ pub struct SourceStore {
 
 impl SourceStore {
     /// Return the part that owns the Custom XML relationship.
+    #[must_use]
     pub fn source_part_name(&self) -> &PackURI {
         &self.source_part_name
     }
 
     /// Return the owning Custom XML relationship ID.
+    #[must_use]
     pub fn relationship_id(&self) -> &str {
         &self.relationship_id
     }
 
     /// Return the Custom XML data-part name.
+    #[must_use]
     pub fn data_part_name(&self) -> &PackURI {
         &self.data_part_name
     }
 
     /// Return the stored Custom XML content type.
+    #[must_use]
     pub fn content_type(&self) -> &str {
         &self.content_type
     }
 
     /// Return the optional Custom XML properties-part name.
+    #[must_use]
     pub fn properties_part_name(&self) -> Option<&PackURI> {
         self.properties_part_name.as_ref()
     }
 
     /// Return the optional Custom XML data-store GUID.
+    #[must_use]
     pub fn data_store_item_id(&self) -> Option<&str> {
         self.data_store_item_id.as_deref()
     }
 
     /// Return declared schema-reference URIs without resolving them.
+    #[must_use]
     pub fn schema_references(&self) -> &[String] {
         &self.schema_references
     }
@@ -75,21 +82,25 @@ impl SourceStore {
     ///
     /// This is opaque metadata. The library never opens, loads, or executes
     /// the referenced style.
+    #[must_use]
     pub fn selected_style(&self) -> Option<&str> {
         self.payload.selected_style()
     }
 
     /// Return the stored bibliography style name, if any.
+    #[must_use]
     pub fn style_name(&self) -> Option<&str> {
         self.payload.style_name()
     }
 
     /// Return sources in their persisted XML order.
+    #[must_use]
     pub fn sources(&self) -> &[BibliographySource] {
         self.payload.sources()
     }
 
     /// Return the number of persisted bibliography sources.
+    #[must_use]
     pub fn source_count(&self) -> usize {
         self.payload.source_count()
     }

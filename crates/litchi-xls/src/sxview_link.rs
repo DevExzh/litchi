@@ -35,7 +35,7 @@ fn read_u16(data: &[u8], offset: usize) -> u16 {
 }
 
 /// Typed `SXViewLink` record content (MS-XLS 2.4.316): the name of the
-/// source PivotTable view associated with a Pivot Chart.
+/// source `PivotTable` view associated with a Pivot Chart.
 ///
 /// The `unused` and `reserved` fields MUST be ignored; they are preserved
 /// verbatim so the record round-trips unchanged.
@@ -46,12 +46,15 @@ pub struct SXViewLink {
     /// Reserved two-byte field (`reserved`), preserved verbatim; MUST be
     /// zero (MS-XLS 2.4.316).
     reserved: u16,
-    /// Name of the PivotTable view (`stPivotTable`).
+    /// Name of the `PivotTable` view (`stPivotTable`).
     pivot_table_name: String,
 }
 
 impl SXViewLink {
     /// Parse an `SXViewLink` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < HEADER_LEN {
             return Err(Error::InvalidLength {
@@ -110,36 +113,40 @@ impl SXViewLink {
     }
 
     /// Serialize back to a complete `SXViewLink` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(HEADER_LEN + 1);
         payload.extend_from_slice(&SX_VIEW_LINK_RECORD_TYPE.to_le_bytes());
         payload.extend_from_slice(&self.unused.to_le_bytes());
         payload.extend_from_slice(&self.reserved.to_le_bytes());
         let units: Vec<u16> = self.pivot_table_name.encode_utf16().collect();
-        payload.extend_from_slice(&(units.len() as u8).to_le_bytes());
+        payload.extend_from_slice(&crate::utils::truncate_usize_to_u8(units.len()).to_le_bytes());
         let wide = units.iter().any(|&unit| unit > 0x00FF);
         payload.push(if wide { STRING_HIGH_BYTE } else { 0 });
         for unit in units {
             if wide {
                 payload.extend_from_slice(&unit.to_le_bytes());
             } else {
-                payload.push(unit as u8);
+                payload.push(crate::utils::truncate_u16_to_u8(unit));
             }
         }
         payload
     }
 
     /// Undefined field, preserved verbatim.
+    #[must_use]
     pub fn unused(&self) -> u16 {
         self.unused
     }
 
     /// Reserved field, preserved verbatim; MUST be zero (MS-XLS 2.4.316).
+    #[must_use]
     pub fn reserved(&self) -> u16 {
         self.reserved
     }
 
-    /// Name of the source PivotTable view associated with the Pivot Chart.
+    /// Name of the source `PivotTable` view associated with the Pivot Chart.
+    #[must_use]
     pub fn pivot_table_name(&self) -> &str {
         &self.pivot_table_name
     }

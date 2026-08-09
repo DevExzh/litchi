@@ -36,16 +36,18 @@ impl<'a> Transaction<'a> {
     }
 
     /// Immutable source snapshot used for conflict checks and inverse patches.
+    #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Borrow the currently staged typed graph.
+    #[must_use]
     pub fn objects(&self) -> Option<&OleObjects> {
         self.draft.as_ref()
     }
 
-    /// Edit one object by its stable DrawingML shape ID.
+    /// Edit one object by its stable `DrawingML` shape ID.
     ///
     /// The closure is applied to a private clone and validated before it
     /// becomes staged state. An error leaves the transaction unchanged.
@@ -90,6 +92,7 @@ impl<'a> Transaction<'a> {
     }
 
     /// Whether staged typed metadata differs from the captured source model.
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.before.objects() != self.draft.as_ref()
     }

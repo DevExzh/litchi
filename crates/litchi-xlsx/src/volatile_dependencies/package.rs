@@ -1,6 +1,6 @@
 //! Workbook relationship services for volatile-dependencies metadata.
 //!
-//! This layer owns only the inert OPC graph around the SpreadsheetML part.
+//! This layer owns only the inert OPC graph around the `SpreadsheetML` part.
 //! It never contacts RTD servers, opens OLAP connections, or evaluates
 //! formulas.
 
@@ -8,7 +8,10 @@ use litchi_core::sheet::Result;
 use litchi_opc::{OpcPackage, PackURI};
 
 use super::invalid;
-use super::model::*;
+use super::model::{
+    CONTENT_TYPE, MAX_PART_BYTES, REL, STRICT_REL, VolatileDependencies,
+    VolatileDependenciesConformance,
+};
 
 /// Loads the single volatile-dependencies part related to the package workbook.
 pub fn load_from_package(package: &OpcPackage) -> Result<Option<VolatileDependencies>> {
@@ -26,7 +29,7 @@ pub fn load_from_package_with_conformance(
     load_for_workbook(package, &workbook_uri)
 }
 
-/// Store caller-authored inert volatile-dependencies metadata in a SpreadsheetML package.
+/// Store caller-authored inert volatile-dependencies metadata in a `SpreadsheetML` package.
 ///
 /// Existing invalid package graphs are rejected before mutation. The writer only
 /// persists the supplied dependency records and never performs RTD, cube, or

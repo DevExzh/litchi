@@ -1,3 +1,7 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Generated-list, table, authority, and index field models.
 
 use super::{Field, Switch};
@@ -14,7 +18,7 @@ use super::super::MAX_TABLE_OF_CONTENTS_ENTRY_FIELD_INSTRUCTION_BYTES;
 
 /// An inclusive heading-level range selected by a `TOC \o` switch.
 ///
-/// WordprocessingML heading levels are bounded to one through nine.
+/// `WordprocessingML` heading levels are bounded to one through nine.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TocLevelRange {
     start: u8,
@@ -23,6 +27,10 @@ pub struct TocLevelRange {
 
 impl TocLevelRange {
     /// Create a valid inclusive heading-level range.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(start: u8, end: u8) -> Result<Self> {
         if !(1..=9).contains(&start) || !(1..=9).contains(&end) || start > end {
             return Err(Error::Invalid(
@@ -33,11 +41,13 @@ impl TocLevelRange {
     }
 
     /// Return the first included heading level.
+    #[must_use]
     pub fn start(&self) -> u8 {
         self.start
     }
 
     /// Return the final included heading level.
+    #[must_use]
     pub fn end(&self) -> u8 {
         self.end
     }
@@ -73,31 +83,37 @@ impl Toc {
     }
 
     /// Return the complete field instruction exactly as parsed.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
 
     /// Return the cached visible result, if one is stored in the document.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a word processor has marked the cached result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
 
     /// Whether a word processor has locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.locked
     }
 
     /// Return the field switches in source order.
+    #[must_use]
     pub fn switches(&self) -> &[Switch] {
         &self.switches
     }
 
     /// Check whether a case-insensitive ASCII switch appears in this field.
+    #[must_use]
     pub fn has_switch(&self, name: char) -> bool {
         has_field_switch(&self.switches, name)
     }
@@ -107,6 +123,10 @@ impl Toc {
     /// The OOXML TOC definition associates `\o` with the heading styles to
     /// include. Multiple occurrences are retained in source order rather than
     /// guessed at or collapsed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn heading_style_levels(&self) -> Result<Vec<TocLevelRange>> {
         self.switches
             .iter()
@@ -121,16 +141,19 @@ impl Toc {
     }
 
     /// Whether the field asks Word to use applied paragraph outline levels.
+    #[must_use]
     pub fn uses_outline_levels(&self) -> bool {
         self.has_switch('u')
     }
 
     /// Whether the field asks Word to emit hyperlinks for its entries.
+    #[must_use]
     pub fn includes_hyperlinks(&self) -> bool {
         self.has_switch('h')
     }
 
     /// Whether the field hides page numbers in Web Layout view.
+    #[must_use]
     pub fn hides_page_numbers_in_web_layout(&self) -> bool {
         self.has_switch('z')
     }
@@ -199,6 +222,7 @@ impl TocEntry {
     }
 
     /// Return the complete stored field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
@@ -206,6 +230,7 @@ impl TocEntry {
     /// Return the stored text marked for a table of contents.
     ///
     /// This is metadata only and is never inserted into generated content.
+    #[must_use]
     pub fn entry(&self) -> &str {
         &self.entry
     }
@@ -213,26 +238,31 @@ impl TocEntry {
     /// Return the cached visible result, if a producer stored one.
     ///
     /// TC fields normally display no result, and this API never generates one.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a word processor has marked the cached result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
 
     /// Whether a word processor has locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.locked
     }
 
     /// Return the field switches in source order.
+    #[must_use]
     pub fn switches(&self) -> &[Switch] {
         &self.switches
     }
 
     /// Check whether a case-insensitive ASCII switch appears in this field.
+    #[must_use]
     pub fn has_switch(&self, name: char) -> bool {
         has_field_switch(&self.switches, name)
     }
@@ -241,11 +271,19 @@ impl TocEntry {
     ///
     /// The identifier is preserved as stored metadata and is never used to
     /// select or generate a contents list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn list_identifier(&self) -> Result<Option<&str>> {
         optional_field_switch_argument(&self.switches, 'f', "TC")
     }
 
     /// Return the optional `\\l` entry level without calculating its style.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn level(&self) -> Result<Option<&str>> {
         optional_field_switch_argument(&self.switches, 'l', "TC")
     }
@@ -254,6 +292,7 @@ impl TocEntry {
     ///
     /// This records producer intent only; no page number is calculated or
     /// changed.
+    #[must_use]
     pub fn omits_page_number(&self) -> bool {
         self.has_switch('n')
     }
@@ -289,31 +328,37 @@ impl Toa {
     }
 
     /// Return the complete stored field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
 
     /// Return the cached visible result, if present.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a word processor has marked the cached result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
 
     /// Whether a word processor has locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.locked
     }
 
     /// Return the field switches in source order.
+    #[must_use]
     pub fn switches(&self) -> &[Switch] {
         &self.switches
     }
 
     /// Check whether a case-insensitive ASCII switch appears in this field.
+    #[must_use]
     pub fn has_switch(&self, name: char) -> bool {
         has_field_switch(&self.switches, name)
     }
@@ -321,6 +366,10 @@ impl Toa {
     /// Return the selected authority category, where zero means all categories.
     ///
     /// The Word TOA model bounds category values to zero through sixteen.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn category(&self) -> Result<Option<u8>> {
         optional_field_switch_argument(&self.switches, 'c', "TOA")?
             .map(|value| parse_authority_category(value, 0, "TOA"))
@@ -328,46 +377,73 @@ impl Toa {
     }
 
     /// Return the bookmark limiting where authority entries are collected.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn bookmark(&self) -> Result<Option<&str>> {
         optional_field_switch_argument(&self.switches, 'b', "TOA")
     }
 
     /// Whether five or more page references may be rendered as "Passim".
+    #[must_use]
     pub fn uses_passim(&self) -> bool {
         self.has_switch('p')
     }
 
     /// Whether formatting stored with `TA` entries is retained in the result.
+    #[must_use]
     pub fn keeps_entry_formatting(&self) -> bool {
         self.has_switch('f')
     }
 
     /// Return the separator between a sequence number and its page number.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn sequence_page_separator(&self) -> Result<Option<&str>> {
         optional_field_switch_argument(&self.switches, 'd', "TOA")
     }
 
     /// Return the `SEQ` field identifier used to number authority entries.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn sequence_name(&self) -> Result<Option<&str>> {
         optional_field_switch_argument(&self.switches, 's', "TOA")
     }
 
     /// Return the separator between an authority entry and its page number.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn entry_page_separator(&self) -> Result<Option<&str>> {
         optional_field_switch_argument(&self.switches, 'e', "TOA")
     }
 
     /// Return the separator between the endpoints of a page range.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn page_range_separator(&self) -> Result<Option<&str>> {
         optional_field_switch_argument(&self.switches, 'g', "TOA")
     }
 
     /// Whether category headers are included in the stored TOA configuration.
+    #[must_use]
     pub fn includes_category_headers(&self) -> bool {
         self.has_switch('h')
     }
 
     /// Return the separator between individual page references.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn page_number_separator(&self) -> Result<Option<&str>> {
         optional_field_switch_argument(&self.switches, 'l', "TOA")
     }
@@ -402,41 +478,55 @@ impl ToaEntry {
     }
 
     /// Return the complete stored field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
 
     /// Return the cached visible result, if present.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a word processor has marked the cached result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
 
     /// Whether a word processor has locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.locked
     }
 
     /// Return the field switches in source order.
+    #[must_use]
     pub fn switches(&self) -> &[Switch] {
         &self.switches
     }
 
     /// Check whether a case-insensitive ASCII switch appears in this field.
+    #[must_use]
     pub fn has_switch(&self, name: char) -> bool {
         has_field_switch(&self.switches, name)
     }
 
     /// Return the long citation text used in a generated table of authorities.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn long_citation(&self) -> Result<Option<&str>> {
         optional_field_switch_argument(&self.switches, 'l', "TA")
     }
 
     /// Return the short citation stored for matching/entry selection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn short_citation(&self) -> Result<Option<&str>> {
         optional_field_switch_argument(&self.switches, 's', "TA")
     }
@@ -444,6 +534,10 @@ impl ToaEntry {
     /// Return the authority category, if explicitly stored.
     ///
     /// Citation-marker categories are numbered one through sixteen.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn category(&self) -> Result<Option<u8>> {
         optional_field_switch_argument(&self.switches, 'c', "TA")?
             .map(|value| parse_authority_category(value, 1, "TA"))
@@ -451,11 +545,13 @@ impl ToaEntry {
     }
 
     /// Whether the generated authority entry asks for bold formatting.
+    #[must_use]
     pub fn is_bold(&self) -> bool {
         self.has_switch('b')
     }
 
     /// Whether the generated authority entry asks for italic formatting.
+    #[must_use]
     pub fn is_italic(&self) -> bool {
         self.has_switch('i')
     }
@@ -499,36 +595,46 @@ impl Index {
     }
 
     /// Return the complete stored field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
 
     /// Return the cached visible result, if present.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a word processor has marked the cached result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
 
     /// Whether a word processor has locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.locked
     }
 
     /// Return the field switches in source order.
+    #[must_use]
     pub fn switches(&self) -> &[Switch] {
         &self.switches
     }
 
     /// Check whether a case-insensitive ASCII switch appears in this field.
+    #[must_use]
     pub fn has_switch(&self, name: char) -> bool {
         has_field_switch(&self.switches, name)
     }
 
     /// Return the bookmark limiting which portion of the document is indexed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn bookmark(&self) -> Result<Option<&str>> {
         optional_field_switch_argument(&self.switches, 'b', "INDEX")
     }
@@ -536,6 +642,10 @@ impl Index {
     /// Return the requested number of index columns.
     ///
     /// Word bounds the `\c` switch to one through four columns.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn columns(&self) -> Result<Option<u8>> {
         optional_field_switch_argument(&self.switches, 'c', "INDEX")?
             .map(parse_index_columns)
@@ -543,36 +653,64 @@ impl Index {
     }
 
     /// Return the separator between a sequence number and a page number.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn sequence_page_separator(&self) -> Result<Option<&str>> {
         optional_field_switch_argument(&self.switches, 'd', "INDEX")
     }
 
     /// Return the separator between an index entry and its page number.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn entry_page_separator(&self) -> Result<Option<&str>> {
         optional_field_switch_argument(&self.switches, 'e', "INDEX")
     }
 
     /// Return the entry identifier used to select matching `XE` fields.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn entry_identifier(&self) -> Result<Option<&str>> {
         optional_field_switch_argument(&self.switches, 'f', "INDEX")
     }
 
     /// Return the separator between the endpoints of a page range.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn page_range_separator(&self) -> Result<Option<&str>> {
         optional_field_switch_argument(&self.switches, 'g', "INDEX")
     }
 
     /// Return the text inserted between alphabetic groups in the index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn alphabetic_group_heading(&self) -> Result<Option<&str>> {
         optional_field_switch_argument(&self.switches, 'h', "INDEX")
     }
 
     /// Return the separator between an entry and its cross-reference text.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn cross_reference_separator(&self) -> Result<Option<&str>> {
         optional_field_switch_argument(&self.switches, 'k', "INDEX")
     }
 
     /// Return the separator between multiple page references.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn page_reference_separator(&self) -> Result<Option<&str>> {
         optional_field_switch_argument(&self.switches, 'l', "INDEX")
     }
@@ -581,6 +719,10 @@ impl Index {
     ///
     /// `\o` is a documented Word extension rather than a core ECMA-376 INDEX
     /// switch, so unknown values are reported as invalid instead of guessed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn sort_order(&self) -> Result<Option<IndexOrder>> {
         optional_field_switch_argument(&self.switches, 'o', "INDEX")?
             .map(parse_index_sort_order)
@@ -588,21 +730,31 @@ impl Index {
     }
 
     /// Return the alphabetic range used to restrict generated entries.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn letter_range(&self) -> Result<Option<&str>> {
         optional_field_switch_argument(&self.switches, 'p', "INDEX")
     }
 
     /// Whether subentries are configured to run into their main-entry line.
+    #[must_use]
     pub fn runs_subentries_inline(&self) -> bool {
         self.has_switch('r')
     }
 
     /// Return the `SEQ` field identifier included with page numbers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn sequence_name(&self) -> Result<Option<&str>> {
         optional_field_switch_argument(&self.switches, 's', "INDEX")
     }
 
     /// Whether the field enables yomi text for index entries.
+    #[must_use]
     pub fn uses_yomi(&self) -> bool {
         self.has_switch('y')
     }
@@ -611,6 +763,10 @@ impl Index {
     ///
     /// This preserves the lexical field value rather than resolving it to a
     /// locale or changing sorting behavior.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn language_id(&self) -> Result<Option<&str>> {
         optional_field_switch_argument(&self.switches, 'z', "INDEX")
     }
@@ -656,66 +812,91 @@ impl IndexEntry {
     }
 
     /// Return the complete stored field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
 
     /// Return the cached visible result, if present.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a word processor has marked the cached result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
 
     /// Whether a word processor has locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.locked
     }
 
     /// Return the text that is marked for inclusion in an index.
+    #[must_use]
     pub fn entry(&self) -> &str {
         &self.entry
     }
 
     /// Return the field switches in source order.
+    #[must_use]
     pub fn switches(&self) -> &[Switch] {
         &self.switches
     }
 
     /// Check whether a case-insensitive ASCII switch appears in this field.
+    #[must_use]
     pub fn has_switch(&self, name: char) -> bool {
         has_field_switch(&self.switches, name)
     }
 
     /// Whether the marked page number is formatted in bold.
+    #[must_use]
     pub fn is_bold(&self) -> bool {
         self.has_switch('b')
     }
 
     /// Return the entry identifier used to select an `INDEX` field.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn entry_identifier(&self) -> Result<Option<&str>> {
         optional_field_switch_argument(&self.switches, 'f', "XE")
     }
 
     /// Whether the marked page number is formatted in italics.
+    #[must_use]
     pub fn is_italic(&self) -> bool {
         self.has_switch('i')
     }
 
     /// Return the bookmark marking the stored page range.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn page_range_bookmark(&self) -> Result<Option<&str>> {
         optional_field_switch_argument(&self.switches, 'r', "XE")
     }
 
     /// Return text substituted for a page number, such as a cross-reference.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn cross_reference(&self) -> Result<Option<&str>> {
         optional_field_switch_argument(&self.switches, 't', "XE")
     }
 
     /// Return yomi sort text, if the entry stores it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn yomi(&self) -> Result<Option<&str>> {
         optional_field_switch_argument(&self.switches, 'y', "XE")
     }
@@ -726,6 +907,7 @@ impl Field {
     ///
     /// The field's cached result remains data only; calling this method never
     /// recalculates the table of contents or follows any hyperlinks in it.
+    #[must_use]
     pub fn is_table_of_contents(&self) -> bool {
         field_instruction_remainder(&self.instruction, "TOC").is_some()
     }
@@ -735,6 +917,10 @@ impl Field {
     /// Returns `Ok(None)` for non-`TOC` fields. The returned model preserves
     /// the instruction, cached result, dirty/lock state, and field switches;
     /// it never evaluates the field or refreshes its cached content.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn table_of_contents(&self) -> Result<Option<Toc>> {
         Toc::from_field(self)
     }
@@ -744,6 +930,7 @@ impl Field {
     /// TC markers remain stored data only. Recognizing one never changes
     /// hidden-text state, calculates a page number, or generates a table of
     /// contents.
+    #[must_use]
     pub fn is_table_of_contents_entry(&self) -> bool {
         field_instruction_remainder(&self.instruction, "TC").is_some()
     }
@@ -754,6 +941,10 @@ impl Field {
     /// the stored entry text, switches, cached result, and dirty/lock state
     /// only; it never changes hidden text, calculates page numbers, generates
     /// a table of contents, or refreshes a field.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn table_of_contents_entry(&self) -> Result<Option<TocEntry>> {
         TocEntry::from_field(self)
     }
@@ -762,6 +953,7 @@ impl Field {
     ///
     /// This only recognizes the stored field code. It never generates the
     /// table, resolves its cited authorities, or recalculates page references.
+    #[must_use]
     pub fn is_table_of_authorities(&self) -> bool {
         field_instruction_remainder(&self.instruction, "TOA").is_some()
     }
@@ -770,6 +962,10 @@ impl Field {
     ///
     /// Returns `Ok(None)` for non-`TOA` fields. Stored switches and cached
     /// visible content are exposed as data only; no authority table is built.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn table_of_authorities(&self) -> Result<Option<Toa>> {
         Toa::from_field(self)
     }
@@ -778,6 +974,7 @@ impl Field {
     ///
     /// Such fields mark stored citations for a `TOA` field. They remain inert
     /// data and are never interpreted as executable content.
+    #[must_use]
     pub fn is_table_of_authorities_entry(&self) -> bool {
         field_instruction_remainder(&self.instruction, "TA").is_some()
     }
@@ -786,6 +983,10 @@ impl Field {
     ///
     /// Returns `Ok(None)` for non-`TA` fields. The result does not search for
     /// matching citations, generate a `TOA`, or refresh any cached content.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn table_of_authorities_entry(&self) -> Result<Option<ToaEntry>> {
         ToaEntry::from_field(self)
     }
@@ -794,6 +995,7 @@ impl Field {
     ///
     /// This recognizes only the stored configuration and does not sort entries,
     /// calculate page references, or generate the index result.
+    #[must_use]
     pub fn is_index(&self) -> bool {
         field_instruction_remainder(&self.instruction, "INDEX").is_some()
     }
@@ -802,6 +1004,10 @@ impl Field {
     ///
     /// Returns `Ok(None)` for non-`INDEX` fields. The model exposes the stored
     /// switches and cached result without regenerating or paginating an index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn index(&self) -> Result<Option<Index>> {
         Index::from_field(self)
     }
@@ -810,6 +1016,7 @@ impl Field {
     ///
     /// XE fields mark stored index entries. They are inspected as data only and
     /// never affect hidden text, sorting, or generated index content.
+    #[must_use]
     pub fn is_index_entry(&self) -> bool {
         field_instruction_remainder(&self.instruction, "XE").is_some()
     }
@@ -818,6 +1025,10 @@ impl Field {
     ///
     /// Returns `Ok(None)` for non-`XE` fields. It never searches document text
     /// for entries, follows bookmarks, or updates an `INDEX` field.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn index_entry(&self) -> Result<Option<IndexEntry>> {
         IndexEntry::from_field(self)
     }

@@ -33,6 +33,9 @@ pub struct WriteAccess {
 
 impl WriteAccess {
     /// Construct a canonical record, using compressed Unicode when possible.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(user_name: impl Into<String>) -> Result<Self> {
         let user_name = user_name.into();
         let units = user_name.encode_utf16().collect::<Vec<_>>();
@@ -47,6 +50,9 @@ impl WriteAccess {
     }
 
     /// Construct a record with explicit encoding and ignored bytes.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new_with_parts(
         user_name: impl Into<String>,
         encoding: WriteAccessEncoding,
@@ -62,6 +68,9 @@ impl WriteAccess {
     }
 
     /// Parse the fixed 112-byte BIFF8 record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse_payload(data: &[u8]) -> Result<Self> {
         if data.len() != WRITE_ACCESS_PAYLOAD_LEN {
             return Err(invalid(format!(
@@ -108,25 +117,31 @@ impl WriteAccess {
                 .collect::<Vec<_>>(),
         };
         let user_name = String::from_utf16(&units)
-            .map_err(|_| invalid("WriteAccess userName contains invalid UTF-16"))?;
+            .map_err(|_error| invalid("WriteAccess userName contains invalid UTF-16"))?;
         Self::try_new_with_parts(user_name, encoding, data[end..].to_vec())
     }
 
+    #[must_use]
     pub fn user_name(&self) -> &str {
         &self.user_name
     }
+    #[must_use]
     pub fn encoding(&self) -> WriteAccessEncoding {
         self.encoding
     }
+    #[must_use]
     pub fn unused_bytes(&self) -> &[u8] {
         &self.unused
     }
 
     /// Serialize the fixed-size BIFF8 payload, preserving ignored bytes.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_payload(&self) -> Result<[u8; WRITE_ACCESS_PAYLOAD_LEN]> {
         let units = self.validate()?;
         let character_count = u16::try_from(units.len())
-            .map_err(|_| invalid("WriteAccess character count exceeds u16"))?;
+            .map_err(|_error| invalid("WriteAccess character count exceeds u16"))?;
         let mut data = [0u8; WRITE_ACCESS_PAYLOAD_LEN];
         data[..2].copy_from_slice(&character_count.to_le_bytes());
         data[2] = match self.encoding {
@@ -137,7 +152,7 @@ impl WriteAccess {
         match self.encoding {
             WriteAccessEncoding::CompressedUnicode => {
                 for unit in units {
-                    data[offset] = unit as u8;
+                    data[offset] = crate::utils::truncate_u16_to_u8(unit);
                     offset += 1;
                 }
             },
@@ -154,10 +169,15 @@ impl WriteAccess {
     }
 
     /// Serialize the complete BIFF record including its four-byte record header.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         let mut data = Vec::with_capacity(4 + WRITE_ACCESS_PAYLOAD_LEN);
         data.extend_from_slice(&WRITE_ACCESS_RECORD_TYPE.to_le_bytes());
-        data.extend_from_slice(&(WRITE_ACCESS_PAYLOAD_LEN as u16).to_le_bytes());
+        data.extend_from_slice(
+            &crate::utils::truncate_usize_to_u16(WRITE_ACCESS_PAYLOAD_LEN).to_le_bytes(),
+        );
         data.extend_from_slice(&self.to_payload()?);
         Ok(data)
     }

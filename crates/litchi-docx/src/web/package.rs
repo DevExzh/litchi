@@ -1,3 +1,11 @@
+#![expect(
+    clippy::needless_pass_by_value,
+    reason = "the public API shape is retained for compatibility"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! OPC ownership and failure-atomic package service for web settings.
 
 use super::codec::{read, write};
@@ -18,6 +26,10 @@ struct Owner {
 }
 
 /// Load the document-owned web-settings model, if present.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn load(package: &OpcPackage) -> Result<Option<(Settings, Conformance)>> {
     let Some(owner) = locate(package)? else {
         return Ok(None);
@@ -36,6 +48,10 @@ pub fn load(package: &OpcPackage) -> Result<Option<(Settings, Conformance)>> {
 ///
 /// The relationship owner, content type, conformance family, and every
 /// frame-source relationship are checked before the snapshot is returned.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn load_snapshot(package: &OpcPackage) -> Result<Option<Snapshot>> {
     let Some(owner) = locate(package)? else {
         return Ok(None);
@@ -50,6 +66,10 @@ pub fn load_snapshot(package: &OpcPackage) -> Result<Option<Snapshot>> {
 /// The candidate is published only after a cloned package passes ownership,
 /// content-type, conformance, relationship, and semantic validation. A
 /// failure leaves the caller's package and signatures untouched.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
     let owner = locate(package)?.ok_or_else(|| Error::PartNotFound("web-settings part".into()))?;
     let part = package.get_part(&owner.target)?;
@@ -73,6 +93,10 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
 }
 
 /// Apply a committed web-settings edit to its owning OPC part.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
     apply_patch(package, &commit.into_patch())
 }
@@ -85,6 +109,10 @@ pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot
 /// A different requested conformance is rejected before mutation. A real
 /// semantic edit writes canonical modeled XML; ignored or unknown extension
 /// markup is not retained source-surgically.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn put(package: &mut OpcPackage, value: Settings, conformance: Conformance) -> Result<bool> {
     let xml = write(&value, conformance)?;
     let package_conformance = package_conformance(package)?;
@@ -150,6 +178,10 @@ pub fn put(package: &mut OpcPackage, value: Settings, conformance: Conformance) 
 ///
 /// A part shared by another relationship is rejected rather than silently
 /// detached or deleted. Absence is an exact, signature-preserving no-op.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn remove(package: &mut OpcPackage) -> Result<bool> {
     let Some(owner) = locate(package)? else {
         return Ok(false);
@@ -229,7 +261,7 @@ fn locate(package: &OpcPackage) -> Result<Option<Owner>> {
     let mut parts = package
         .iter_parts()
         .filter(|part| part.content_type() == CONTENT_TYPE);
-    let part_name = parts.next().map(|part| part.partname());
+    let part_name = parts.next().map(Part::partname);
     if parts.next().is_some() {
         return Err(invalid("package has multiple web-settings parts"));
     }

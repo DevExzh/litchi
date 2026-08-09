@@ -25,11 +25,13 @@ impl FileNameKey {
     }
 
     /// The file-name kind encoded in `FNPI.fnpt`.
+    #[must_use]
     pub const fn kind(self) -> Kind {
         self.kind
     }
 
     /// The identifier encoded in `FNPI.fnpd`.
+    #[must_use]
     pub const fn identifier(self) -> u16 {
         self.identifier
     }
@@ -134,37 +136,44 @@ pub struct Name {
 
 impl Name {
     /// The type and identifier of this file name (`FNPI`, MS-DOC 2.9.93).
+    #[must_use]
     pub fn fnpi(&self) -> Fnpi {
         self.fnpi
     }
 
     /// The typed key used by `SttbFnm` and `PlcfWKB` references.
+    #[must_use]
     pub fn key(&self) -> FileNameKey {
         FileNameKey::from_fnpi(self.fnpi)
     }
 
     /// The full file path exactly as stored in `SttbFnm`.
+    #[must_use]
     pub fn path(&self) -> &str {
         &self.path
     }
 
     /// The `FNIF.ichRelative` UTF-16 code-unit offset, when present.
+    #[must_use]
     pub fn relative_path_offset(&self) -> Option<usize> {
         self.relative_path_offset
     }
 
     /// The raw `FNIF.fnfb` byte, including undefined bits retained from the
     /// source. The typed booleans are available through the other accessors.
+    #[must_use]
     pub fn file_system_flags(&self) -> u8 {
         self.raw_fnfb
     }
 
     /// The four undefined `FNIF.unused` bytes retained verbatim.
+    #[must_use]
     pub fn fnif_unused(&self) -> [u8; 4] {
         self.fnif_unused
     }
 
     /// The kind of the referenced file.
+    #[must_use]
     pub fn kind(&self) -> Kind {
         match self.fnpi.file_type() {
             0x5 => Kind::Subdocument,
@@ -174,6 +183,7 @@ impl Name {
 
     /// The path segment relative to the folder containing the document, when
     /// the file name carries one. Never resolved against the file system.
+    #[must_use]
     pub fn relative_path(&self) -> Option<&str> {
         self.relative_path_offset
             .and_then(|offset| utf16_suffix(&self.path, offset))
@@ -222,21 +232,25 @@ pub struct Reference {
 
 impl Reference {
     /// The main-document character position at which the subdocument starts.
+    #[must_use]
     pub const fn start(&self) -> u32 {
         self.start
     }
 
     /// The mandated WKB outline level.
+    #[must_use]
     pub const fn outline_level(&self) -> u16 {
         self.outline_level
     }
 
     /// The typed key of the referenced `SttbFnm` entry.
+    #[must_use]
     pub fn file_name_key(&self) -> FileNameKey {
         FileNameKey::from_fnpi(self.file_name)
     }
 
     /// The `FNPI` stored in this reference.
+    #[must_use]
     pub const fn file_name(&self) -> Fnpi {
         self.file_name
     }
@@ -262,23 +276,27 @@ impl Collection {
     }
 
     /// All externally referenced files in `SttbFnm` table order.
+    #[must_use]
     pub fn referenced_files(&self) -> &[Name] {
         &self.referenced_files
     }
 
     /// The subdocuments in start-CP order (empty unless this is a master
     /// document).
+    #[must_use]
     pub fn subdocuments(&self) -> &[Reference] {
         &self.subdocuments
     }
 
     /// Resolve an `FNPI` reference to its `SttbFnm` entry.
+    #[must_use]
     pub fn file_name(&self, fnpi: Fnpi) -> Option<&Name> {
         self.referenced_files.iter().find(|file| file.fnpi == fnpi)
     }
 
     /// The referenced file of a subdocument. Always resolves: entries are
     /// validated against the `SttbFnm` during parsing.
+    #[must_use]
     pub fn file_name_of(&self, reference: &Reference) -> &Name {
         &self.referenced_files[reference.file_name_index]
     }

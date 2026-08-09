@@ -1,8 +1,28 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_same,
+    reason = "the validated binding intentionally replaces its fallible precursor"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
 //! Typed semantic glossary catalog and failure-atomic in-memory CRUD.
 
-use super::codec::*;
-use super::graph::*;
-use super::*;
+use super::codec::{
+    GALLERIES, add_sizes, authored_analysis, background_analysis, bounded, canonical_id,
+    entry_analysis, invalid, name_key, replace_sizes, validate_authored_name,
+    validate_catalog_sizes, validate_name,
+};
+use super::graph::raw;
+use super::{Arc, Error, HashMap, MAX_PARTS, R, REL, RS, Result, STRICT_REL, W, WS};
 /// Namespace and relationship family used by a glossary part.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Conformance {
@@ -75,6 +95,10 @@ bitflags::bitflags! {
 pub struct Gallery(String);
 impl Gallery {
     /// Validate a schema-defined building-block gallery token.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         if GALLERIES.contains(&value.as_str()) {
@@ -84,6 +108,7 @@ impl Gallery {
         }
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -95,6 +120,10 @@ pub struct Name {
     pub(in crate::glossary) decorated: Option<bool>,
 }
 impl Name {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         validate_name(&value)?;
@@ -106,10 +135,12 @@ impl Name {
         })
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.value
     }
 
+    #[must_use]
     pub fn decorated(&self) -> Option<bool> {
         self.decorated
     }
@@ -118,6 +149,7 @@ impl Name {
         &self.key
     }
 
+    #[must_use]
     pub fn with_decorated(mut self, decorated: bool) -> Self {
         self.decorated = Some(decorated);
         self
@@ -129,6 +161,10 @@ pub struct Category {
     pub(in crate::glossary) gallery: Gallery,
 }
 impl Category {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(name: impl Into<String>, gallery: Gallery) -> Result<Self> {
         let name = name.into();
         bounded(&name)?;
@@ -138,10 +174,12 @@ impl Category {
         Ok(Self { name, gallery })
     }
 
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    #[must_use]
     pub fn gallery(&self) -> &Gallery {
         &self.gallery
     }
@@ -152,6 +190,10 @@ impl Category {
 pub struct Id(String);
 
 impl Id {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         if canonical_id(&value) {
@@ -163,6 +205,7 @@ impl Id {
         }
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -180,6 +223,7 @@ pub struct Props {
     pub id: Option<Id>,
 }
 impl Props {
+    #[must_use]
     pub fn new(name: Name) -> Self {
         Self {
             name: Some(name),
@@ -193,10 +237,12 @@ impl Props {
         }
     }
 
+    #[must_use]
     pub fn name(&self) -> Option<&Name> {
         self.name.as_ref()
     }
 
+    #[must_use]
     pub fn with_name(mut self, name: Name) -> Self {
         self.name = Some(name);
         self
@@ -505,6 +551,7 @@ impl Catalog {
         Ok(())
     }
 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             background: None,
@@ -516,6 +563,7 @@ impl Catalog {
         }
     }
 
+    #[must_use]
     pub fn background(&self) -> Option<&[u8]> {
         self.background.as_deref()
     }
@@ -557,6 +605,10 @@ impl Catalog {
         Ok(())
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_background(&mut self, xml: Vec<u8>) -> Result<Option<Vec<u8>>> {
         if self.background.as_ref() == Some(&xml) {
             return Ok(self.background.replace(xml));
@@ -582,23 +634,31 @@ impl Catalog {
         self.background.take()
     }
 
+    #[must_use]
     pub fn entries(&self) -> &[Entry] {
         &self.entries
     }
 
+    #[must_use]
     pub fn iter(&self) -> impl ExactSizeIterator<Item = &Entry> {
         self.entries.iter()
     }
 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.entries.len()
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
 
     /// Find a uniquely named entry using Unicode default case folding.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn get(&self, name: &str) -> Result<Option<&Entry>> {
         Ok(self
             .state
@@ -607,6 +667,10 @@ impl Catalog {
     }
 
     /// Checked numeric fallback for import and inspection workflows.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn at(&self, index: usize) -> Result<&Entry> {
         self.entries.get(index).ok_or(Error::OutOfBounds {
             object: "glossary entry",
@@ -616,6 +680,10 @@ impl Catalog {
     }
 
     /// Add a fresh, uniquely named entry by moving it into the catalog.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add(&mut self, entry: Entry) -> Result<usize> {
         validate_authored_name(&entry)?;
         self.validate_entry_lineage(&entry)?;
@@ -669,6 +737,10 @@ impl Catalog {
     }
 
     /// Insert or replace an entry selected by the replacement's semantic name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn put(&mut self, entry: Entry) -> Result<Option<Entry>> {
         let name = entry
             .name()
@@ -688,6 +760,10 @@ impl Catalog {
     }
 
     /// Replace a uniquely named entry while selecting independently of its new name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn replace(&mut self, name: &str, entry: Entry) -> Result<Option<Entry>> {
         let Some(index) = self.state.offset(name)? else {
             return Ok(None);
@@ -696,6 +772,10 @@ impl Catalog {
     }
 
     /// Checked numeric fallback for replacement and ambiguous-name repair.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn replace_at(&mut self, index: usize, entry: Entry) -> Result<Entry> {
         validate_authored_name(&entry)?;
         self.validate_entry_lineage(&entry)?;
@@ -746,6 +826,10 @@ impl Catalog {
     }
 
     /// Rename a uniquely named entry without copying its body.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn rename(&mut self, name: &str, replacement: Name) -> Result<bool> {
         let Some(index) = self.state.offset(name)? else {
             return Ok(false);
@@ -754,6 +838,10 @@ impl Catalog {
     }
 
     /// Checked numeric fallback for renaming an ambiguous producer entry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn rename_at(&mut self, index: usize, replacement: Name) -> Result<bool> {
         let entry = self.entries.get(index).ok_or(Error::OutOfBounds {
             object: "glossary entry",
@@ -844,6 +932,10 @@ impl Catalog {
         Ok(true)
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove(&mut self, name: &str) -> Result<Option<Entry>> {
         let Some(offset) = self.state.offset(name)? else {
             return Ok(None);
@@ -852,6 +944,10 @@ impl Catalog {
     }
 
     /// Checked numeric fallback for removal.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove_at(&mut self, index: usize) -> Result<Entry> {
         if index >= self.entries.len() {
             return Err(Error::OutOfBounds {
@@ -881,6 +977,10 @@ impl Catalog {
         Ok(removed)
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn move_to(&mut self, name: &str, to: usize) -> Result<bool> {
         let Some(from) = self.state.offset(name)? else {
             return Ok(false);
@@ -890,6 +990,10 @@ impl Catalog {
     }
 
     /// Checked numeric fallback for reordering.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn move_at(&mut self, from: usize, to: usize) -> Result<bool> {
         if from >= self.entries.len() || to >= self.entries.len() {
             let index = if from >= self.entries.len() { from } else { to };
@@ -957,6 +1061,10 @@ impl Entry {
                 .is_some_and(|producer| !producer.refs.is_empty())
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(name: impl Into<String>, body_xml: Vec<u8>) -> Result<Self> {
         let name = Name::new(name)?;
         let entry = Self {
@@ -981,14 +1089,20 @@ impl Entry {
             .map(Name::as_str)
     }
 
+    #[must_use]
     pub fn props(&self) -> Option<&Props> {
         self.props.as_ref()
     }
 
+    #[must_use]
     pub fn body(&self) -> Option<&[u8]> {
         self.body.as_deref()
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn with_props(mut self, props: Props) -> Result<Self> {
         if self.props.as_ref() != Some(&props) {
             self.producer = None;
@@ -1000,6 +1114,10 @@ impl Entry {
         Ok(self)
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn with_body(mut self, body: Vec<u8>) -> Result<Self> {
         if self.body.as_ref() != Some(&body) {
             self.producer = None;
@@ -1012,6 +1130,7 @@ impl Entry {
         Ok(self)
     }
 
+    #[must_use]
     pub fn into_body(self) -> Option<Vec<u8>> {
         self.body
     }

@@ -39,12 +39,14 @@ pub struct CellStyle {
 impl CellStyle {
     /// Create a new empty cell style.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Check if this style has any formatting applied.
     #[inline]
+    #[must_use]
     pub fn has_formatting(&self) -> bool {
         self.num_fmt_id.is_some()
             || self.font_id.is_some()

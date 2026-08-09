@@ -27,11 +27,13 @@ pub struct Patch {
 
 impl Patch {
     /// The ordered changes made by the editor.
+    #[must_use]
     pub fn changes(&self) -> &[Change] {
         &self.changes
     }
 
     /// Whether the edit made no semantic changes.
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.changes.is_empty()
     }
@@ -46,16 +48,19 @@ pub struct Commit {
 
 impl Commit {
     /// The edited immutable snapshot.
+    #[must_use]
     pub const fn snapshot(&self) -> &RgxOcxInfo {
         &self.snapshot
     }
 
     /// The compact patch from the source snapshot.
+    #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Consume the commit and return its snapshot and patch.
+    #[must_use]
     pub fn into_parts(self) -> (RgxOcxInfo, Patch) {
         (self.snapshot, self.patch)
     }
@@ -70,6 +75,7 @@ pub struct Editor {
 
 impl Editor {
     /// Begin an edit from an immutable snapshot.
+    #[must_use]
     pub fn new(source: &RgxOcxInfo) -> Self {
         Self {
             infos: source.infos().to_vec(),
@@ -78,6 +84,7 @@ impl Editor {
     }
 
     /// The current working records.
+    #[must_use]
     pub fn infos(&self) -> &[OcxInfo] {
         &self.infos
     }
@@ -157,6 +164,7 @@ impl Editor {
 
 impl RgxOcxInfo {
     /// Begin a transactional edit from this immutable snapshot.
+    #[must_use]
     pub fn edit(&self) -> Editor {
         Editor::new(self)
     }

@@ -1,3 +1,7 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Typed, source-coordinate conflict markup values.
 
 use std::sync::Arc;
@@ -24,7 +28,7 @@ pub enum Scope {
     Property,
 }
 
-/// A WordprocessingML markup identifier.
+/// A `WordprocessingML` markup identifier.
 ///
 /// Word accepts the complete signed `i32` lexical domain except its reserved
 /// sentinel `-1`; the type preserves that domain without narrowing it.
@@ -33,6 +37,10 @@ pub struct Id(i32);
 
 impl Id {
     /// Validate and construct an identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(value: i32) -> Result<Self> {
         validation::validate_id(value)?;
         Ok(Self(value))
@@ -58,6 +66,10 @@ pub struct Metadata {
 
 impl Metadata {
     /// Construct validated metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(id: Id, author: String, date: Option<String>) -> Result<Self> {
         validation::validate_metadata(id, &author, date.as_deref())?;
         Ok(Self { id, author, date })
@@ -75,6 +87,10 @@ pub struct Span {
 
 impl Span {
     /// Construct a checked half-open source span.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(start: usize, end: usize) -> Result<Self> {
         if start > end {
             return Err(Error::Invalid("conflict span starts after its end".into()));
@@ -223,7 +239,7 @@ pub struct Limits {
     pub max_attribute_bytes: usize,
     /// Maximum bytes produced by an edited source.
     pub max_output_bytes: usize,
-    /// Maximum WordprocessingML stories inspected in one package operation.
+    /// Maximum `WordprocessingML` stories inspected in one package operation.
     pub max_stories: usize,
     /// Maximum aggregate source bytes across inspected stories.
     pub max_total_story_bytes: usize,
@@ -273,6 +289,10 @@ impl Default for Limits {
 
 impl Limits {
     /// Validate finite, hard-capped resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn validate(self) -> Result<Self> {
         validation::validate_limits(self)?;
         Ok(self)
@@ -351,11 +371,19 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parse a conflict-markup XML source using default bounded limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_xml(source: impl Into<Vec<u8>>) -> Result<Self> {
         Self::from_xml_with_limits(source, Limits::default())
     }
 
     /// Parse a conflict-markup XML source using explicit bounded limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_xml_with_limits(source: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
         Self::from_arc_with_limits(Arc::from(source.into().into_boxed_slice()), limits)
     }
@@ -366,7 +394,10 @@ impl Snapshot {
     }
 
     /// Parse an OPC-native part blob without copying it.
-    #[allow(dead_code)] // Package integration consumes this without copying an OPC part blob.
+    #[allow(
+        dead_code,
+        reason = "writer helper is retained for package integration"
+    )] // Package integration consumes this without copying an OPC part blob.
     pub(crate) fn from_blob_with_limits(source: Arc<Vec<u8>>, limits: Limits) -> Result<Self> {
         Self::from_source_with_limits(Source::Blob(source), limits)
     }

@@ -2,7 +2,7 @@
 
 use crate::Result;
 use crate::list_object::codec::binary::{append_frt, append_range, append_string, record};
-use crate::list_object::model::*;
+use crate::list_object::model::{ExternalTableMetadata, ListObject};
 use crate::list_object::{
     CONTINUE_FRT11_RECORD_TYPE, FEATURE12_RECORD_TYPE, ISF_LIST, MAX_CONTINUE_RGB,
     MAX_FEATURE_BYTES, MAX_PAYLOAD, invalid,
@@ -42,14 +42,18 @@ impl ListObject {
         feature.extend_from_slice(&0u32.to_le_bytes());
         feature.extend_from_slice(&[0; 16]);
         append_string(&mut feature, &self.name);
-        feature.extend_from_slice(&(self.columns.len() as u16).to_le_bytes());
+        feature.extend_from_slice(
+            &crate::utils::truncate_usize_to_u16(self.columns.len()).to_le_bytes(),
+        );
         append_string(&mut feature, &self.id.value().to_string());
         for (column, field) in self.columns.iter().zip(&metadata.fields) {
             feature.extend_from_slice(&column.id.value().to_le_bytes());
             feature.extend_from_slice(&0u32.to_le_bytes());
             feature.extend_from_slice(&0u32.to_le_bytes());
             feature.extend_from_slice(&column.aggregation.code().to_le_bytes());
-            feature.extend_from_slice(&(field.aggregate_format.len() as u32).to_le_bytes());
+            feature.extend_from_slice(
+                &crate::utils::truncate_usize_to_u32(field.aggregate_format.len()).to_le_bytes(),
+            );
             feature.extend_from_slice(&field.aggregate_style.to_le_bytes());
             let mut field_flags = u32::from(self.autofilter)
                 | (u32::from(field.filter_hidden) << 1)
@@ -61,7 +65,9 @@ impl ListObject {
                 field_flags |= 0x200;
             }
             feature.extend_from_slice(&field_flags.to_le_bytes());
-            feature.extend_from_slice(&(field.insert_row_format.len() as u32).to_le_bytes());
+            feature.extend_from_slice(
+                &crate::utils::truncate_usize_to_u32(field.insert_row_format.len()).to_le_bytes(),
+            );
             feature.extend_from_slice(&field.insert_row_style.to_le_bytes());
             append_string(&mut feature, &field.source_name);
             append_string(&mut feature, &column.name);
@@ -71,7 +77,9 @@ impl ListObject {
                 feature.extend_from_slice(&field.auto_filter);
             }
             if let Some(tokens) = &column.total_formula {
-                feature.extend_from_slice(&(tokens.len() as u16).to_le_bytes());
+                feature.extend_from_slice(
+                    &crate::utils::truncate_usize_to_u16(tokens.len()).to_le_bytes(),
+                );
                 feature.extend_from_slice(tokens);
                 feature.extend_from_slice(&field.formula_extra);
             }
@@ -89,7 +97,8 @@ impl ListObject {
         payload.push(0);
         payload.extend_from_slice(&0u32.to_le_bytes());
         payload.extend_from_slice(&1u16.to_le_bytes());
-        payload.extend_from_slice(&(feature.len() as u32).to_le_bytes());
+        payload
+            .extend_from_slice(&crate::utils::truncate_usize_to_u32(feature.len()).to_le_bytes());
         payload.extend_from_slice(&0u16.to_le_bytes());
         append_range(&mut payload, self.range);
         payload.extend_from_slice(&feature);

@@ -1,4 +1,4 @@
-//! Bounded SpreadsheetML custom-data properties XML codec.
+//! Bounded `SpreadsheetML` custom-data properties XML codec.
 
 use super::model::{ExtensionList, Properties};
 use crate::error::{Error, Result};
@@ -68,7 +68,7 @@ pub fn write_properties(value: &Properties) -> Result<Vec<u8>> {
     Ok(output)
 }
 
-/// Validate that XML belongs to a SpreadsheetML workbook part.
+/// Validate that XML belongs to a `SpreadsheetML` workbook part.
 //
 // The host calls this while retaining ownership of package graph traversal.
 // Keeping the bounded XML root check beside the shared parser avoids a second

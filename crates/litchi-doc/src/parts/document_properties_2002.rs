@@ -76,14 +76,17 @@ impl DocumentFeatureSet {
     pub const PRE_WORD_2007: u16 = 0x0800;
     pub const PLAIN_TEXT: u16 = 0x1000;
 
+    #[must_use]
     pub const fn from_raw(raw: u16) -> Self {
         Self(raw)
     }
 
+    #[must_use]
     pub const fn raw(self) -> u16 {
         self.0
     }
 
+    #[must_use]
     pub const fn contains(self, feature: u16) -> bool {
         self.0 & feature != 0
     }
@@ -96,10 +99,12 @@ pub struct StylePaneFormatFilter(u16);
 impl StylePaneFormatFilter {
     pub const DEFAULT: Self = Self(0x5024);
 
+    #[must_use]
     pub const fn from_raw(raw: u16) -> Self {
         Self(raw)
     }
 
+    #[must_use]
     pub const fn raw(self) -> u16 {
         self.0
     }
@@ -110,10 +115,12 @@ impl StylePaneFormatFilter {
 pub struct TextCodePage(u32);
 
 impl TextCodePage {
+    #[must_use]
     pub const fn from_raw(raw: u32) -> Self {
         Self(raw)
     }
 
+    #[must_use]
     pub const fn raw(self) -> u32 {
         self.0
     }

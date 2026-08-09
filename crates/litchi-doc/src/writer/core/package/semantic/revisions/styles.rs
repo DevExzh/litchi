@@ -1,4 +1,7 @@
-use crate::writer::core::{Writer, model::*};
+use crate::writer::core::{
+    Writer,
+    model::{CharacterFormatting, ParagraphFormatting, WriteError},
+};
 impl Writer {
     pub(in crate::writer::core::package) fn validate_style_reference(
         &self,

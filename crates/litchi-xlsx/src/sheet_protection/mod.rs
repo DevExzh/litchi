@@ -1,4 +1,4 @@
-//! Immutable worksheet-protection metadata for SpreadsheetML worksheets.
+//! Immutable worksheet-protection metadata for `SpreadsheetML` worksheets.
 //!
 //! The owner is layered by semantic responsibility: typed protection models,
 //! bounded XML codecs, and focused regression coverage.

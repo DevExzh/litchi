@@ -1,3 +1,11 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::format_push_string,
+    reason = "serialization preserves the established byte-emission path"
+)]
 use crate::Result;
 
 use super::support::{escape_attribute, invalid};
@@ -17,6 +25,7 @@ pub enum ProtectionType {
 
 impl ProtectionType {
     /// Parse the optional `w:edit` token.
+    #[must_use]
     pub fn from_xml(value: &str) -> Option<Self> {
         match value {
             "readOnly" => Some(Self::ReadOnly),
@@ -28,6 +37,7 @@ impl ProtectionType {
     }
 
     /// Get the XML value for this protection type.
+    #[must_use]
     pub const fn to_xml(self) -> &'static str {
         match self {
             Self::ReadOnly => "readOnly",
@@ -57,6 +67,10 @@ pub enum View {
 
 impl View {
     /// Parse the schema token.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_xml(value: &str) -> Result<Self> {
         match value {
             "none" => Ok(Self::None),
@@ -70,6 +84,7 @@ impl View {
     }
 
     /// Get the XML value for this view mode.
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::None => "none",
@@ -93,6 +108,10 @@ pub enum ProofState {
 
 impl ProofState {
     /// Parse the schema token.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_xml(value: &str) -> Result<Self> {
         match value {
             "clean" => Ok(Self::Clean),
@@ -102,6 +121,7 @@ impl ProofState {
     }
 
     /// Get the XML value for this proof state.
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Clean => "clean",
@@ -119,6 +139,7 @@ pub struct ProofingState {
 
 impl ProofingState {
     /// Create a proofing state with no markers.
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             spelling: None,
@@ -140,17 +161,20 @@ impl ProofingState {
 
     /// Return the spelling proofing marker, when specified.
     #[inline]
+    #[must_use]
     pub const fn spelling(&self) -> Option<ProofState> {
         self.spelling
     }
 
     /// Return the grammar proofing marker, when specified.
     #[inline]
+    #[must_use]
     pub const fn grammar(&self) -> Option<ProofState> {
         self.grammar
     }
 
     /// Serialize a standalone `w:proofState` fragment.
+    #[must_use]
     pub fn to_xml(&self, prefix: &str) -> String {
         let mut xml = format!("<{prefix}:proofState");
         if let Some(spelling) = self.spelling {
@@ -189,6 +213,7 @@ pub struct ThemeFontLanguages {
 
 impl ThemeFontLanguages {
     /// Create theme font language defaults with no languages set.
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             latin: None,
@@ -198,6 +223,10 @@ impl ThemeFontLanguages {
     }
 
     /// Set the Latin (`w:val`) theme language.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_latin(&mut self, value: Option<String>) -> Result<&mut Self> {
         if let Some(tag) = value.as_deref() {
             validate_language_tag(tag, "Latin theme font")?;
@@ -207,6 +236,10 @@ impl ThemeFontLanguages {
     }
 
     /// Set the East Asian (`w:eastAsia`) theme language.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_east_asia(&mut self, value: Option<String>) -> Result<&mut Self> {
         if let Some(tag) = value.as_deref() {
             validate_language_tag(tag, "East Asian theme font")?;
@@ -216,6 +249,10 @@ impl ThemeFontLanguages {
     }
 
     /// Set the complex-script (`w:bidi`) theme language.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_bidi(&mut self, value: Option<String>) -> Result<&mut Self> {
         if let Some(tag) = value.as_deref() {
             validate_language_tag(tag, "complex-script theme font")?;
@@ -226,23 +263,27 @@ impl ThemeFontLanguages {
 
     /// Return the Latin theme language, when specified.
     #[inline]
+    #[must_use]
     pub fn latin(&self) -> Option<&str> {
         self.latin.as_deref()
     }
 
     /// Return the East Asian theme language, when specified.
     #[inline]
+    #[must_use]
     pub fn east_asia(&self) -> Option<&str> {
         self.east_asia.as_deref()
     }
 
     /// Return the complex-script theme language, when specified.
     #[inline]
+    #[must_use]
     pub fn bidi(&self) -> Option<&str> {
         self.bidi.as_deref()
     }
 
     /// Serialize a standalone `w:themeFontLang` fragment.
+    #[must_use]
     pub fn to_xml(&self, prefix: &str) -> String {
         let mut xml = format!("<{prefix}:themeFontLang");
         for (name, value) in [

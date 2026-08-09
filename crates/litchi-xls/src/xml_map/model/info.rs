@@ -14,6 +14,9 @@ pub struct MapInfo {
 }
 
 impl MapInfo {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(
         selection_namespaces: impl Into<String>,
         schemas: Vec<Schema>,
@@ -44,21 +47,27 @@ impl MapInfo {
         })
     }
 
+    #[must_use]
     pub fn selection_namespaces(&self) -> &str {
         &self.selection_namespaces
     }
+    #[must_use]
     pub fn namespaces(&self) -> &[NamespaceDeclaration] {
         &self.namespaces
     }
+    #[must_use]
     pub fn schemas(&self) -> &[Schema] {
         &self.schemas
     }
+    #[must_use]
     pub fn maps(&self) -> &[Map] {
         &self.maps
     }
+    #[must_use]
     pub fn schema(&self, id: &super::identity::SchemaId) -> Option<&Schema> {
         self.schemas.iter().find(|schema| schema.id() == id)
     }
+    #[must_use]
     pub fn map(&self, id: super::identity::MapId) -> Option<&Map> {
         self.maps.iter().find(|map| map.id() == id)
     }

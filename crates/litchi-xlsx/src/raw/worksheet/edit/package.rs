@@ -97,17 +97,14 @@ pub(crate) fn rewrite(content: &[u8], sheet: &str, plan: impl Into<Plan>) -> Res
         }
     }
     if !columns.is_empty() {
-        match layout.columns.as_ref() {
-            Some(stored) => {
-                output.extend_from_slice(&content[cursor..stored.span.start]);
-                write_columns(&mut output, content, stored, columns, sheet)?;
-                cursor = stored.span.end;
-            },
-            None => {
-                output.extend_from_slice(&content[cursor..layout.sheet_data.span.start]);
-                write_new_columns(&mut output, &layout.sheet_data.tag.name, columns);
-                cursor = layout.sheet_data.span.start;
-            },
+        if let Some(stored) = layout.columns.as_ref() {
+            output.extend_from_slice(&content[cursor..stored.span.start]);
+            write_columns(&mut output, content, stored, columns, sheet)?;
+            cursor = stored.span.end;
+        } else {
+            output.extend_from_slice(&content[cursor..layout.sheet_data.span.start]);
+            write_new_columns(&mut output, &layout.sheet_data.tag.name, columns);
+            cursor = layout.sheet_data.span.start;
         }
     }
     output.extend_from_slice(&content[cursor..layout.sheet_data.span.start]);

@@ -5,7 +5,10 @@ use litchi_ograph::chart::group;
 use litchi_ograph::record::{line, pie};
 
 use super::codec::validate_link;
-use super::wire::*;
+use super::wire::{
+    AXIS_LINE, BAR, BRAI, CHART, CHART_FORMAT, CRT_LINE, DROP_BAR, LABEL, NUMBER, PIE, SCATTER,
+    SER_TO_CRT, VALUE_RANGE, invalid, u16_at, validate_limits, validate_sheet_properties,
+};
 use crate::{Error, Result};
 
 /// Hard resource bounds for chart discovery and safe mutation.
@@ -66,6 +69,7 @@ pub enum Location {
 
 impl Location {
     /// Returns the zero-based host tab index.
+    #[must_use]
     pub fn sheet_index(&self) -> usize {
         match self {
             Self::ChartSheet { sheet_index } | Self::Embedded { sheet_index, .. } => *sheet_index,
@@ -126,7 +130,7 @@ pub struct CellRef {
 /// A bounded, inert chart formula.
 ///
 /// The XLS owner intentionally exposes only the canonical single-cell and
-/// rectangular `PtgRef3d`/`PtgArea3d` forms here. Other ChartParsedFormula
+/// rectangular `PtgRef3d`/`PtgArea3d` forms here. Other `ChartParsedFormula`
 /// operands remain readable as raw link bytes, but are not accepted by this
 /// mutation facade because their graph effects cannot yet be proven.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -137,6 +141,9 @@ pub struct Formula {
 
 impl Formula {
     /// Constructs an absolute single-cell reference.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn cell(reference: CellRef) -> Result<Self> {
         if reference.first_row != reference.last_row
             || reference.first_column != reference.last_column
@@ -150,6 +157,9 @@ impl Formula {
     }
 
     /// Constructs an absolute rectangular cell-range reference.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn range(reference: CellRef) -> Result<Self> {
         Self::from_reference(reference, true)
     }
@@ -158,6 +168,9 @@ impl Formula {
     ///
     /// Empty formulas are retained for inspection, but a data-link mutation
     /// requires a non-empty supported cell reference.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(tokens: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
         let tokens = tokens.into();
         if tokens.len() > limits.max_formula_bytes {
@@ -200,6 +213,9 @@ impl Formula {
     }
 
     /// Number of cells covered by the represented references.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn cell_count(&self) -> Result<usize> {
         self.references.iter().try_fold(0usize, |count, reference| {
             let rows = usize::from(
@@ -300,6 +316,7 @@ pub enum CacheKind {
 
 impl CacheKind {
     /// Decodes the only three legal BIFF `SIIndex` values.
+    #[must_use]
     pub const fn from_wire(value: u16) -> Option<Self> {
         match value {
             1 => Some(Self::Values),
@@ -310,11 +327,13 @@ impl CacheKind {
     }
 
     /// Wire value written to `SIIndex`.
+    #[must_use]
     pub const fn wire(self) -> u16 {
         self as u16
     }
 
     /// Series role represented by this cache section.
+    #[must_use]
     pub const fn role(self) -> Role {
         match self {
             Self::Values => Role::Values,
@@ -355,6 +374,7 @@ pub struct DataLink {
 
 impl DataLink {
     /// Creates an automatically generated link with no formula payload.
+    #[must_use]
     pub const fn automatic(role: Role) -> Self {
         Self {
             role,
@@ -367,6 +387,7 @@ impl DataLink {
     }
 
     /// Creates a worksheet-cell link from a checked inert formula.
+    #[must_use]
     pub fn cells(role: Role, formula: Formula) -> Self {
         let (formula_tokens, references) = formula.into_parts();
         Self {
@@ -380,6 +401,9 @@ impl DataLink {
     }
 
     /// Returns the formula as a checked typed view.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn formula(&self, limits: Limits) -> Result<Formula> {
         Formula::parse(self.formula_tokens.clone(), limits)
     }
@@ -413,6 +437,9 @@ pub struct Cache {
 
 impl Cache {
     /// Creates one typed cached chart value.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(kind: CacheKind, series: u8, point: u16, format: u16, value: Value) -> Result<Self> {
         validate_cache_value(&value)?;
         Ok(Self {
@@ -487,6 +514,9 @@ impl Series {
     /// The link role, source kind, series shape, and declared cell count stay
     /// fixed. Adding, removing, duplicating, or retargeting a link is outside
     /// this narrow safe mutation boundary.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_formula(&mut self, role: Role, formula: Formula) -> Result<()> {
         let mut link_index = None;
         for (index, link) in self.links.iter().enumerate() {
@@ -506,8 +536,9 @@ impl Series {
                 Role::Bubbles => self.bubble_count,
                 Role::Name => 0,
             };
-            let actual = u16::try_from(formula.cell_count()?)
-                .map_err(|_| Error::InvalidData("chart formula cell count exceeds u16".into()))?;
+            let actual = u16::try_from(formula.cell_count()?).map_err(|_error| {
+                Error::InvalidData("chart formula cell count exceeds u16".into())
+            })?;
             if actual != expected {
                 return invalid(
                     BRAI,
@@ -885,6 +916,7 @@ impl Chart {
     /// checks are applied when [`Snapshot::edit`](crate::chart::chart_area::Snapshot::edit)
     /// is opened, so a malformed producer record remains readable but cannot
     /// be mutated through this owner.
+    #[must_use]
     pub fn chart_area(&self) -> super::chart_area::Snapshot {
         super::chart_area::Snapshot::from_wire(super::chart_area::Rect {
             x: self.x,
@@ -895,11 +927,17 @@ impl Chart {
     }
 
     /// Opens a source-checked transaction over the fixed chart-area record.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn edit_chart_area(&self) -> Result<super::chart_area::Transaction> {
         self.chart_area().edit()
     }
 
     /// Replaces one existing series formula without changing chart topology.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_formula(&mut self, series: usize, role: Role, formula: Formula) -> Result<()> {
         self.set_formula_with(series, role, formula, Limits::default())
     }
@@ -929,6 +967,9 @@ impl Chart {
 
     /// Replaces one existing cached cell while preserving its section and
     /// coordinate. Cache insertion, removal, and reclassification are refused.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_cache(
         &mut self,
         kind: CacheKind,
@@ -971,6 +1012,7 @@ impl Chart {
     }
 
     /// Derives the concise chart family from the configured groups.
+    #[must_use]
     pub fn kind(&self) -> Kind {
         match self.groups.as_slice() {
             [] => Kind::Empty,
@@ -997,6 +1039,9 @@ impl Chart {
     }
 
     /// Checks resource bounds, invariants, flags, and inert cell references.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn validate(&self, limits: Limits) -> Result<()> {
         validate_limits(limits)?;
         validate_sheet_properties(self.sheet_properties)?;

@@ -3,7 +3,10 @@
 //! The semantic validator and bounded Brt* binary codec are kept in
 //! contextual owners while this module preserves the public facade.
 
-#![allow(clippy::too_many_arguments)]
+#![allow(
+    clippy::too_many_arguments,
+    reason = "arguments mirror independent BIFF12 conditional-formatting fields"
+)]
 
 mod binary;
 mod semantic;

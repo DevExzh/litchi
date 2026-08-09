@@ -84,7 +84,7 @@ pub enum TableHorizontalPosition {
     Right,
     Inside,
     Outside,
-    /// Physical offset in twips after decoding XAS_plusOne.
+    /// Physical offset in twips after decoding `XAS_plusOne`.
     Offset(i16),
 }
 
@@ -98,14 +98,14 @@ pub enum TableVerticalPosition {
     Bottom,
     Inside,
     Outside,
-    /// Downward offset in twips after decoding YAS_plusOne.
+    /// Downward offset in twips after decoding `YAS_plusOne`.
     Offset(i16),
 }
 
 /// Table Properties structure.
 ///
 /// Contains formatting and structural information for a table.
-/// Based on Apache POI's TableProperties class.
+/// Based on Apache POI's `TableProperties` class.
 #[derive(Debug, Clone)]
 pub struct TableProperties {
     /// Number of cells in the row
@@ -197,7 +197,7 @@ pub struct TableProperties {
 /// Cell Properties structure.
 ///
 /// Contains formatting for an individual table cell.
-/// Based on Apache POI's TableCellDescriptor class.
+/// Based on Apache POI's `TableCellDescriptor` class.
 #[derive(Debug, Clone, Default)]
 pub struct CellProperties {
     /// Horizontal merge status
@@ -780,14 +780,16 @@ impl Default for TableProperties {
 }
 
 impl TableProperties {
-    /// Create new TableProperties with default values.
+    /// Create new `TableProperties` with default values.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Create TableProperties with specified cell count.
+    /// Create `TableProperties` with specified cell count.
     ///
     /// Initializes cell boundaries and properties arrays.
+    #[must_use]
     pub fn with_cell_count(cell_count: usize) -> Self {
         Self {
             cell_count,
@@ -808,6 +810,7 @@ impl TableProperties {
     }
 
     /// Get cell width in twips for a given cell index.
+    #[must_use]
     pub fn get_cell_width(&self, cell_index: usize) -> Option<i16> {
         if cell_index < self.cell_boundaries.len().saturating_sub(1) {
             Some(self.cell_boundaries[cell_index + 1] - self.cell_boundaries[cell_index])

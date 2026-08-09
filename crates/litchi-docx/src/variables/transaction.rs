@@ -1,3 +1,7 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Source-checked snapshots, edits, commits, and patches for document variables.
 
 use std::sync::Arc;
@@ -16,6 +20,10 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parse and retain a bounded complete Word settings XML snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_xml(xml: impl Into<Vec<u8>>) -> Result<Self> {
         let xml = xml.into();
         let variables = Variables::from_xml(&xml)?;
@@ -90,12 +98,20 @@ impl Transaction {
     }
 
     /// Insert or replace one document variable atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set(&mut self, name: impl Into<String>, value: impl Into<String>) -> Result<&mut Self> {
         self.next.insert(name, value)?;
         Ok(self)
     }
 
     /// Alias for [`Self::set`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn insert(
         &mut self,
         name: impl Into<String>,
@@ -105,6 +121,10 @@ impl Transaction {
     }
 
     /// Alias for [`Self::set`] with an owner-specific verb.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_variable(
         &mut self,
         name: impl Into<String>,
@@ -135,6 +155,10 @@ impl Transaction {
     }
 
     /// Replace the complete collection after validating all Word limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn replace(&mut self, value: Variables) -> Result<&mut Self> {
         value.validate()?;
         self.next = value;
@@ -142,6 +166,10 @@ impl Transaction {
     }
 
     /// Apply a clone-staged collection mutation atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn edit_variables(
         &mut self,
         edit: impl FnOnce(&mut Variables) -> Result<()>,
@@ -154,11 +182,19 @@ impl Transaction {
     }
 
     /// Alias for [`Self::edit_variables`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn edit(&mut self, edit: impl FnOnce(&mut Variables) -> Result<()>) -> Result<&mut Self> {
         self.edit_variables(edit)
     }
 
     /// Validate and publish this edit without mutating its source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn commit(self) -> Result<Commit> {
         self.next.validate()?;
         if self.next == self.base.variables {
@@ -294,6 +330,10 @@ impl Patch {
     }
 
     /// Apply only to a snapshot matching both source preconditions.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if !source.same_source(&self.before) {
             return Err(Error::InvalidFormat(

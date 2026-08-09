@@ -1,4 +1,4 @@
-//! XML/wire codec façade for DrawingML charts.
+//! XML/wire codec façade for `DrawingML` charts.
 //!
 //! Record-family serialization lives under [`super::semantic`]. This module
 //! keeps the public writer contract small and stable while package owners can
@@ -8,7 +8,7 @@ use super::semantic::write_chart_space;
 use crate::chart::model::Chart;
 use std::io::Write;
 
-/// Write a chart to canonical DrawingML chart XML.
+/// Write a chart to canonical `DrawingML` chart XML.
 pub fn write<W: Write>(writer: &mut W, chart: &Chart) -> std::io::Result<()> {
     write_with_rels(writer, chart, None, None)
 }

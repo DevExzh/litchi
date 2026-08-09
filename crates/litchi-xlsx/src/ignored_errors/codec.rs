@@ -1,6 +1,9 @@
-//! Bounded SpreadsheetML ignored-error parsing.
+//! Bounded `SpreadsheetML` ignored-error parsing.
 
-use super::model::*;
+use super::model::{
+    IgnoredError, IgnoredErrorRangeReference, IgnoredErrorType, IgnoredErrors,
+    IgnoredErrorsExtension,
+};
 use crate::error::{Error, Result};
 use crate::raw::namespace::is_spreadsheetml_name;
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
@@ -390,7 +393,7 @@ impl Parser {
                 capture.depth = capture
                     .depth
                     .checked_sub(1)
-                    .ok_or_else(|| invalid("extension capture depth underflow"))?
+                    .ok_or_else(|| invalid("extension capture depth underflow"))?;
             },
             Event::Eof => return Err(invalid("unterminated ignoredErrors extension")),
             _ => {},

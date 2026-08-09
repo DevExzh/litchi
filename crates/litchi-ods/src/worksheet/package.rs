@@ -222,7 +222,7 @@ fn apply_edits_bounded(
     let mut output = String::new();
     output
         .try_reserve_exact(output_len)
-        .map_err(|_| invalid("flat ODS output allocation failed"))?;
+        .map_err(|_error| invalid("flat ODS output allocation failed"))?;
     cursor = 0;
     for (start, end, replacement) in edits {
         output.push_str(&xml[cursor..start]);
@@ -471,7 +471,7 @@ fn tag_start(xml: &str, tag_end: usize) -> Result<usize> {
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| Error::InvalidFormat("ODS XML position overflows usize".to_string()))
+        .map_err(|_error| Error::InvalidFormat("ODS XML position overflows usize".to_string()))
 }
 
 fn resolve_namespace(namespace: &ResolveResult<'_>) -> Result<Option<String>> {
@@ -487,7 +487,7 @@ fn resolve_namespace(namespace: &ResolveResult<'_>) -> Result<Option<String>> {
 
 fn decode(bytes: &[u8], label: &str) -> Result<String> {
     String::from_utf8(bytes.to_vec())
-        .map_err(|_| Error::InvalidFormat(format!("ODS {label} is not valid UTF-8")))
+        .map_err(|_error| Error::InvalidFormat(format!("ODS {label} is not valid UTF-8")))
 }
 
 fn one_spreadsheet(spans: &[Span]) -> Result<usize> {

@@ -1,6 +1,26 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::format_push_string,
+    reason = "serialization preserves the established byte-emission path"
+)]
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::unnecessary_wraps,
+    reason = "the Result signature preserves a uniform fallible codec API"
+)]
 //! Watermark support for DOCX documents.
 //!
-//! Based on Apache POI's XWPFHeaderFooterPolicy watermark implementation.
+//! Based on Apache POI's `XWPFHeaderFooterPolicy` watermark implementation.
 use crate::error::{Error, Result};
 use litchi_core::xml::escape_xml;
 use quick_xml::XmlVersion;
@@ -15,7 +35,7 @@ const DIAGONAL_ROTATION: &str = "315";
 /// Fill opacity applied to semitransparent text watermarks.
 const SEMITRANSPARENT_FILL_OPACITY: &str = ".5";
 /// Z-index of image watermark shapes (behind document content).
-const IMAGE_WATERMARK_Z_INDEX: i64 = -251654144;
+const IMAGE_WATERMARK_Z_INDEX: i64 = -251_654_144;
 
 /// Layout orientation of a text watermark.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -89,6 +109,10 @@ impl Watermark {
     }
 
     /// Set a potentially fractional VML text-path font size in points.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_font_size_points(&mut self, size: f64) -> Result<()> {
         if !size.is_finite() || size < 0.0 {
             return Err(Error::InvalidFormat(
@@ -116,36 +140,42 @@ impl Watermark {
 
     /// Get the watermark text.
     #[inline]
+    #[must_use]
     pub fn get_text(&self) -> &str {
         &self.text
     }
 
     /// Get the watermark font family.
     #[inline]
+    #[must_use]
     pub fn font(&self) -> &str {
         &self.font
     }
 
     /// Get the VML text-path font size in points.
     #[inline]
+    #[must_use]
     pub fn font_size(&self) -> f64 {
         self.font_size
     }
 
     /// Get the VML fill color.
     #[inline]
+    #[must_use]
     pub fn color(&self) -> &str {
         &self.color
     }
 
     /// Get the layout orientation.
     #[inline]
+    #[must_use]
     pub fn layout(&self) -> WatermarkLayout {
         self.layout
     }
 
     /// Get whether the watermark fill is semitransparent.
     #[inline]
+    #[must_use]
     pub fn semitransparent(&self) -> bool {
         self.semitransparent
     }
@@ -227,7 +257,14 @@ impl Watermark {
                     return Err(Error::InvalidFormat("unterminated Word header XML".into()));
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Empty(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {},
             }
         }
 
@@ -249,13 +286,13 @@ impl Watermark {
         xml.push_str(r#"<w:p><w:pPr><w:pStyle w:val="Header"/></w:pPr>"#);
 
         // Start run with picture
-        xml.push_str(r#"<w:r><w:rPr><w:noProof/></w:rPr><w:pict>"#);
+        xml.push_str(r"<w:r><w:rPr><w:noProof/></w:rPr><w:pict>");
 
         // Shapetype for diagonal text (NO v:group wrapper for watermarks!)
         xml.push_str(r#"<v:shapetype id="_x0000_t136" coordsize="21600,21600" o:spt="136" adj="10800" path="m@7,l@8,m@5,21600l@6,21600e">"#);
 
         // Formulas for shape
-        xml.push_str(r#"<v:formulas>"#);
+        xml.push_str(r"<v:formulas>");
         xml.push_str(r#"<v:f eqn="sum #0 0 10800"/>"#);
         xml.push_str(r#"<v:f eqn="prod #0 2 1"/>"#);
         xml.push_str(r#"<v:f eqn="sum 21600 0 @1"/>"#);
@@ -270,7 +307,7 @@ impl Watermark {
         xml.push_str(r#"<v:f eqn="mid @7 @8"/>"#);
         xml.push_str(r#"<v:f eqn="mid @6 @7"/>"#);
         xml.push_str(r#"<v:f eqn="sum @6 0 @5"/>"#);
-        xml.push_str(r#"</v:formulas>"#);
+        xml.push_str(r"</v:formulas>");
 
         xml.push_str(r#"<v:path textpathok="t" o:connecttype="custom" "#);
         xml.push_str(r#"o:connectlocs="@9,0;@10,10800;@11,21600;@12,10800" "#);
@@ -278,20 +315,17 @@ impl Watermark {
 
         xml.push_str(r#"<v:textpath on="t" fitshape="t"/>"#);
 
-        xml.push_str(r#"<v:handles>"#);
+        xml.push_str(r"<v:handles>");
         xml.push_str(r##"<v:h position="#0,bottomRight" xrange="6629,14971"/>"##);
-        xml.push_str(r#"</v:handles>"#);
+        xml.push_str(r"</v:handles>");
 
         xml.push_str(r#"<o:lock v:ext="edit" text="t" shapetype="t"/>"#);
 
-        xml.push_str(r#"</v:shapetype>"#);
+        xml.push_str(r"</v:shapetype>");
 
         // Main shape
-        xml.push_str(&format!(
-            r#"<v:shape id="PowerPlusWaterMarkObject{}" "#,
-            idx
-        ));
-        xml.push_str(&format!(r##"o:spid="_x0000_s102{}" "##, 4 + idx));
+        xml.push_str(&format!(r#"<v:shape id="PowerPlusWaterMarkObject{idx}" "#));
+        xml.push_str(&format!(r#"o:spid="_x0000_s102{}" "#, 4 + idx));
         xml.push_str(r##"type="#_x0000_t136" "##);
         xml.push_str(
             r#"style="position:absolute;margin-left:0;margin-top:0;width:439.9pt;height:219.95pt;"#,
@@ -302,7 +336,7 @@ impl Watermark {
             xml.push(';');
         }
         xml.push_str("z-index:-251655168;");
-        xml.push_str(r#"mso-position-horizontal:center;mso-position-horizontal-relative:margin;"#);
+        xml.push_str(r"mso-position-horizontal:center;mso-position-horizontal-relative:margin;");
         xml.push_str(r#"mso-position-vertical:center;mso-position-vertical-relative:margin" "#);
         xml.push_str(r#"o:allowincell="f" "#);
         // Add # prefix to color if not already present
@@ -313,7 +347,7 @@ impl Watermark {
         } else {
             format!("#{}", self.color)
         };
-        xml.push_str(&format!(r#"fillcolor="{}" "#, color_with_hash));
+        xml.push_str(&format!(r#"fillcolor="{color_with_hash}" "#));
         xml.push_str(r#"stroked="f">"#);
 
         // Fill with opacity (separate element, not attribute!)
@@ -332,10 +366,10 @@ impl Watermark {
         ));
         xml.push_str(&format!(r#"string="{}"/>"#, escape_xml(&self.text)));
 
-        xml.push_str(r#"</v:shape>"#);
+        xml.push_str(r"</v:shape>");
 
         // End picture and run
-        xml.push_str(r#"</w:pict></w:r></w:p>"#);
+        xml.push_str(r"</w:pict></w:r></w:p>");
 
         Ok(xml)
     }
@@ -533,6 +567,10 @@ impl ImageWatermark {
     /// [`crate::format::ImageFormat`]) and pixel dimensions are sniffed
     /// from the bytes; when dimensions cannot be determined the shape
     /// defaults to one square inch before scaling.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(data: Vec<u8>) -> Result<Self> {
         if data.len() > MAX_WATERMARK_IMAGE_BYTES {
             return Err(Error::InvalidFormat(format!(
@@ -552,6 +590,10 @@ impl ImageWatermark {
     }
 
     /// Scale the watermark shape relative to its natural size.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_scale(&mut self, scale: f64) -> Result<&mut Self> {
         if !scale.is_finite() || scale <= 0.0 || scale > MAX_WATERMARK_SCALE {
             return Err(Error::InvalidFormat(format!(
@@ -564,16 +606,19 @@ impl ImageWatermark {
     }
 
     /// Get the image bytes.
+    #[must_use]
     pub fn data(&self) -> &[u8] {
         &self.data
     }
 
     /// Get the sniffed image format.
+    #[must_use]
     pub fn format(&self) -> crate::format::ImageFormat {
         self.format
     }
 
     /// Get the watermark shape dimensions in points.
+    #[must_use]
     pub fn dimensions_pt(&self) -> (f64, f64) {
         (self.width_pt, self.height_pt)
     }
@@ -585,10 +630,10 @@ impl ImageWatermark {
     pub(crate) fn to_header_xml(&self, idx: u32, rel_id: &str) -> Result<String> {
         let mut xml = String::with_capacity(1024);
         xml.push_str(r#"<w:p><w:pPr><w:pStyle w:val="Header"/></w:pPr>"#);
-        xml.push_str(r#"<w:r><w:rPr><w:noProof/></w:rPr><w:pict>"#);
+        xml.push_str(r"<w:r><w:rPr><w:noProof/></w:rPr><w:pict>");
         xml.push_str(r#"<v:shapetype id="_x0000_t75" coordsize="21600,21600" o:spt="75" o:preferrelative="t" path="m@4@5l@4@11@9@11@9@5xe" filled="f" stroked="f">"#);
         xml.push_str(r#"<v:stroke joinstyle="miter"/>"#);
-        xml.push_str(r#"<v:formulas>"#);
+        xml.push_str(r"<v:formulas>");
         xml.push_str(r#"<v:f eqn="if lineDrawn pixelLineWidth 0"/>"#);
         xml.push_str(r#"<v:f eqn="sum @0 1 0"/>"#);
         xml.push_str(r#"<v:f eqn="sum 0 0 @1"/>"#);
@@ -601,10 +646,10 @@ impl ImageWatermark {
         xml.push_str(r#"<v:f eqn="sum @8 21600 0"/>"#);
         xml.push_str(r#"<v:f eqn="prod @7 21600 pixelHeight"/>"#);
         xml.push_str(r#"<v:f eqn="sum @10 21600 0"/>"#);
-        xml.push_str(r#"</v:formulas>"#);
+        xml.push_str(r"</v:formulas>");
         xml.push_str(r#"<v:path o:extrusionok="f" gradientshapeok="t" o:connecttype="rect"/>"#);
         xml.push_str(r#"<o:lock v:ext="edit" aspectratio="t"/>"#);
-        xml.push_str(r#"</v:shapetype>"#);
+        xml.push_str(r"</v:shapetype>");
         xml.push_str(&format!(
             r##"<v:shape id="PowerPlusWaterMarkObject{idx}" o:spid="_x0000_s102{}" type="#_x0000_t75" "##,
             4 + idx
@@ -614,9 +659,9 @@ impl ImageWatermark {
             self.width_pt, self.height_pt
         ));
         xml.push_str(r#"o:allowincell="f" stroked="f">"#);
-        xml.push_str(&format!(r#"<v:imagedata r:id="{}" o:title=""/>"#, rel_id));
-        xml.push_str(r#"</v:shape>"#);
-        xml.push_str(r#"</w:pict></w:r></w:p>"#);
+        xml.push_str(&format!(r#"<v:imagedata r:id="{rel_id}" o:title=""/>"#));
+        xml.push_str(r"</v:shape>");
+        xml.push_str(r"</w:pict></w:r></w:p>");
         Ok(xml)
     }
 }
@@ -626,7 +671,11 @@ fn sniff_dimensions_pt(data: &[u8], format: crate::format::ImageFormat) -> Optio
     let (width_px, height_px) = match format {
         crate::format::ImageFormat::Png => png_dimensions(data)?,
         crate::format::ImageFormat::Jpeg => jpeg_dimensions(data)?,
-        _ => return None,
+        crate::format::ImageFormat::Gif
+        | crate::format::ImageFormat::Bmp
+        | crate::format::ImageFormat::Tiff
+        | crate::format::ImageFormat::Emf
+        | crate::format::ImageFormat::Wmf => return None,
     };
     if width_px == 0 || height_px == 0 {
         return None;
@@ -713,11 +762,13 @@ pub struct ImageWatermarkAnchor {
 
 impl ImageWatermarkAnchor {
     /// Get the relationship ID of the image reference.
+    #[must_use]
     pub fn relationship_id(&self) -> &str {
         &self.relationship_id
     }
 
     /// Get the shape dimensions in points.
+    #[must_use]
     pub fn dimensions_pt(&self) -> (f64, f64) {
         (self.width_pt, self.height_pt)
     }
@@ -792,7 +843,14 @@ impl ImageWatermarkAnchor {
                     return Err(Error::InvalidFormat("unterminated Word header XML".into()));
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Empty(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {},
             }
         }
 

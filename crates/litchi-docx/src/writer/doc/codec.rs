@@ -1,3 +1,11 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 use crate::error::{Error, Result};
 use std::fmt::Write as FmtWrite;
 
@@ -78,7 +86,7 @@ pub(super) fn patch_document_protection(
 ) -> Result<Vec<u8>> {
     use crate::namespace::scan_word_element_ranges;
 
-    let existing = std::str::from_utf8(existing).map_err(|_| {
+    let existing = std::str::from_utf8(existing).map_err(|_source_error| {
         Error::InvalidFormat("settings.xml must be UTF-8 to modify document protection".into())
     })?;
     let mut ranges = Vec::new();
@@ -86,10 +94,10 @@ pub(super) fn patch_document_protection(
         existing.as_bytes(),
         &[b"documentProtection"],
         |_, start, len| {
-            let start = usize::try_from(start).map_err(|_| {
+            let start = usize::try_from(start).map_err(|_source_error| {
                 Error::InvalidFormat("settings protection offset does not fit usize".into())
             })?;
-            let len = usize::try_from(len).map_err(|_| {
+            let len = usize::try_from(len).map_err(|_source_error| {
                 Error::InvalidFormat("settings protection length does not fit usize".into())
             })?;
             let end = start.checked_add(len).ok_or_else(|| {
@@ -202,8 +210,9 @@ fn locate_settings_root(xml: &[u8]) -> Result<SettingsRoot> {
     let mut saw_root = false;
     let mut root_info = None;
     loop {
-        let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::InvalidFormat("settings root offset does not fit usize".into()))?;
+        let event_start = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+            Error::InvalidFormat("settings root offset does not fit usize".into())
+        })?;
         let event = {
             let (namespace, event) = reader
                 .read_resolved_event()
@@ -224,11 +233,18 @@ fn locate_settings_root(xml: &[u8]) -> Result<SettingsRoot> {
                         && element.local_name().as_ref() == b"settings",
                 ),
                 Event::Eof => RootEvent::Eof,
-                _ => RootEvent::Other,
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => RootEvent::Other,
             }
         };
-        let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::InvalidFormat("settings root offset does not fit usize".into()))?;
+        let event_end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+            Error::InvalidFormat("settings root offset does not fit usize".into())
+        })?;
 
         match event {
             RootEvent::Start(info) if depth == 0 => {
@@ -286,7 +302,7 @@ fn locate_settings_root(xml: &[u8]) -> Result<SettingsRoot> {
                     "settings.xml has no complete settings root".into(),
                 ));
             },
-            _ => {},
+            RootEvent::Empty(_) | RootEvent::Other => {},
         }
     }
 }

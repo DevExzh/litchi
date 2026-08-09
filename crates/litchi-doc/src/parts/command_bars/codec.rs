@@ -2,7 +2,12 @@
 
 mod control;
 
-use super::model::*;
+use super::model::{
+    Action, AllocatedCommand, AllocatedCommands, CommandBars, CommandString, CommandStrings,
+    Control, Customization, CustomizationData, Entry, KeyMap, KeyMapKind, KeyMaps, MacroCommand,
+    MacroCommands, MacroName, MacroNames, Operation, Toolbar, ToolbarDelta, ToolbarWrapper,
+    XString,
+};
 use super::validation::validate_count;
 use crate::package::{Error as PackageError, Result};
 use litchi_ole_common::toolbar::Header;
@@ -23,7 +28,7 @@ const CTB_DATA_OVERHEAD: usize = 112;
 const MAX_BITMAP_SIZE: i32 = 65_576;
 
 /// Parse exactly one complete `Tcg` payload.
-pub fn parse_bytes<'a>(data: &'a [u8]) -> Result<CommandBars<'a>> {
+pub fn parse_bytes(data: &[u8]) -> Result<CommandBars<'_>> {
     let mut reader = Reader::new(data);
     let version = reader.u8("Tcg nTcgVer")?;
     if version != TCG_VERSION {
@@ -125,6 +130,7 @@ impl<'a> XString<'a> {
     }
 
     /// Serialize the `Xstz` form used by `MacroName`.
+    #[must_use]
     pub fn to_terminated_bytes(&self) -> Vec<u8> {
         let mut output = self.to_bytes();
         output.extend_from_slice(&[0, 0]);
@@ -132,6 +138,7 @@ impl<'a> XString<'a> {
     }
 
     /// Serialize the two-byte length and the exact UTF-16 payload.
+    #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut output = Vec::with_capacity(2 + self.encoded.len());
         output.extend_from_slice(&(self.len() as u16).to_le_bytes());
@@ -324,7 +331,7 @@ fn parse_customization<'a>(
     Ok(value)
 }
 
-fn parse_toolbar<'a>(data: &'a [u8], customization_count: usize) -> Result<(Toolbar<'a>, usize)> {
+fn parse_toolbar(data: &[u8], customization_count: usize) -> Result<(Toolbar<'_>, usize)> {
     let (name, name_size) = XString::parse_prefix(data)?;
     let mut reader = Reader::new(&data[name_size..]);
     let cb_tbd = nonnegative_i32(reader.i32("CTB cbTBData")?, "cbTBData")?;
@@ -543,7 +550,7 @@ pub fn to_control_bytes(value: &Control<'_>) -> Result<Vec<u8>> {
     Ok(output)
 }
 
-impl<'a> Control<'a> {
+impl Control<'_> {
     /// Serialize one complete DOC toolbar-control record.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         to_control_bytes(self)

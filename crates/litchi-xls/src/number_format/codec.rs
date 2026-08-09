@@ -78,7 +78,7 @@ impl Formatting {
                     if number_formats.len() == MAX_FORMAT_RECORDS {
                         return Err(invalid(FORMAT_RECORD, "more than 218 Format records"));
                     }
-                    let ordinal = u32::try_from(number_formats.len()).map_err(|_| {
+                    let ordinal = u32::try_from(number_formats.len()).map_err(|_error| {
                         invalid(FORMAT_RECORD, "Format record ordinal does not fit in u32")
                     })?;
                     let format = parse_number_format(record.payload(), ordinal, tolerance)?;
@@ -95,7 +95,7 @@ impl Formatting {
                     if extended_formats.len() == MAX_XF_RECORDS {
                         return Err(invalid(XF_RECORD, "more than 65,536 XF records"));
                     }
-                    let index = u16::try_from(extended_formats.len()).map_err(|_| {
+                    let index = u16::try_from(extended_formats.len()).map_err(|_error| {
                         invalid(XF_RECORD, "XF index does not fit in the BIFF index field")
                     })?;
                     extended_formats.push(parse_xf(record.payload(), index, tolerance)?);
@@ -282,9 +282,9 @@ const MIN_FORMAT_CODE_UNITS: usize = 1;
 /// Largest number of UTF-16 code units MS-XLS 2.4.126 permits in a format code.
 const MAX_FORMAT_CODE_UNITS: usize = 255;
 
-/// `cch` plus the option byte that precede an XLUnicodeString's characters.
+/// `cch` plus the option byte that precede an `XLUnicodeString`'s characters.
 const XL_UNICODE_STRING_HEADER_LEN: usize = 3;
-/// Offset of the option byte within an XLUnicodeString.
+/// Offset of the option byte within an `XLUnicodeString`.
 const XL_UNICODE_STRING_FLAGS_OFFSET: usize = 2;
 
 pub(super) fn parse_number_format(
@@ -384,7 +384,7 @@ fn parse_xl_unicode_string(
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]));
         char::decode_utf16(units)
             .collect::<Result<String, _>>()
-            .map_err(|_| invalid(FORMAT_RECORD, "format string contains invalid UTF-16"))?
+            .map_err(|_error| invalid(FORMAT_RECORD, "format string contains invalid UTF-16"))?
     };
     Ok((code, truncated))
 }

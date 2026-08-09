@@ -1,4 +1,4 @@
-//! Typed worksheet-view models for SpreadsheetML.
+//! Typed worksheet-view models for `SpreadsheetML`.
 
 use crate::error::Result;
 use litchi_sheet::Rect;
@@ -58,10 +58,12 @@ pub struct Extension {
     pub(super) markup: Vec<u8>,
 }
 impl Extension {
+    #[must_use]
     pub fn uri(&self) -> &str {
         &self.uri
     }
     /// MCE-processed extension markup. It is retained, not interpreted or executed.
+    #[must_use]
     pub fn markup(&self) -> &[u8] {
         &self.markup
     }
@@ -84,43 +86,56 @@ pub struct PivotArea {
     pub(super) markup: Vec<u8>,
 }
 impl PivotArea {
+    #[must_use]
     pub fn field(&self) -> Option<i32> {
         self.field
     }
+    #[must_use]
     pub fn area_type(&self) -> PivotAreaType {
         self.area_type
     }
+    #[must_use]
     pub fn data_only(&self) -> bool {
         self.data_only
     }
+    #[must_use]
     pub fn label_only(&self) -> bool {
         self.label_only
     }
+    #[must_use]
     pub fn grand_row(&self) -> bool {
         self.grand_row
     }
+    #[must_use]
     pub fn grand_column(&self) -> bool {
         self.grand_column
     }
+    #[must_use]
     pub fn cache_index(&self) -> bool {
         self.cache_index
     }
+    #[must_use]
     pub fn outline(&self) -> bool {
         self.outline
     }
+    #[must_use]
     pub fn offset(&self) -> Option<Rect> {
         self.offset
     }
+    #[must_use]
     pub fn collapsed_levels_are_subtotals(&self) -> bool {
         self.collapsed_levels_are_subtotals
     }
+    #[must_use]
     pub fn axis(&self) -> Option<PivotSelectionAxis> {
         self.axis
     }
+    #[must_use]
     pub fn field_position(&self) -> Option<u32> {
         self.field_position
     }
     /// Complete, bounded, MCE-processed `pivotArea` markup, including references and extensions.
+    #[must_use]
     pub fn markup(&self) -> &[u8] {
         &self.markup
     }
@@ -148,57 +163,75 @@ pub struct PivotSelection {
     pub(super) area: PivotArea,
 }
 impl PivotSelection {
+    #[must_use]
     pub fn pane(&self) -> Position {
         self.pane
     }
+    #[must_use]
     pub fn show_header(&self) -> bool {
         self.show_header
     }
+    #[must_use]
     pub fn label(&self) -> bool {
         self.label
     }
+    #[must_use]
     pub fn data(&self) -> bool {
         self.data
     }
+    #[must_use]
     pub fn extendable(&self) -> bool {
         self.extendable
     }
+    #[must_use]
     pub fn count(&self) -> u32 {
         self.count
     }
+    #[must_use]
     pub fn axis(&self) -> Option<PivotSelectionAxis> {
         self.axis
     }
+    #[must_use]
     pub fn dimension(&self) -> u32 {
         self.dimension
     }
+    #[must_use]
     pub fn start(&self) -> u32 {
         self.start
     }
+    #[must_use]
     pub fn min(&self) -> u32 {
         self.min
     }
+    #[must_use]
     pub fn max(&self) -> u32 {
         self.max
     }
+    #[must_use]
     pub fn active_row(&self) -> u32 {
         self.active_row
     }
+    #[must_use]
     pub fn active_column(&self) -> u32 {
         self.active_column
     }
+    #[must_use]
     pub fn previous_row(&self) -> u32 {
         self.previous_row
     }
+    #[must_use]
     pub fn previous_column(&self) -> u32 {
         self.previous_column
     }
+    #[must_use]
     pub fn click(&self) -> u32 {
         self.click
     }
+    #[must_use]
     pub fn relationship_id(&self) -> Option<&str> {
         self.relationship_id.as_deref()
     }
+    #[must_use]
     pub fn area(&self) -> &PivotArea {
         &self.area
     }
@@ -215,13 +248,16 @@ impl Entry {
     pub fn view(&self) -> &View {
         &self.view
     }
+    #[must_use]
     pub fn pivot_selections(&self) -> &[PivotSelection] {
         &self.pivot_selections
     }
+    #[must_use]
     pub fn extensions(&self) -> &[Extension] {
         &self.extensions
     }
     /// Complete MCE-processed `sheetView` markup retained for source fidelity.
+    #[must_use]
     pub fn retained_xml(&self) -> &[u8] {
         &self.retained_xml
     }
@@ -233,9 +269,11 @@ pub struct Collection {
     pub(super) extensions: Vec<Extension>,
 }
 impl Collection {
+    #[must_use]
     pub fn entries(&self) -> &[Entry] {
         &self.entries
     }
+    #[must_use]
     pub fn extensions(&self) -> &[Extension] {
         &self.extensions
     }

@@ -543,11 +543,8 @@ fn parse_alternate(raw: &[u8], inherited: &HashMap<String, String>) -> Result<Zo
             ));
         }
     }
-    let (kind, _position, payload) = match known {
-        Some(value) => value,
-        None => {
-            return Ok(Zoom::Unknown(Unknown { xml: raw.to_vec() }));
-        },
+    let Some((kind, _position, payload)) = known else {
+        return Ok(Zoom::Unknown(Unknown { xml: raw.to_vec() }));
     };
     let fallback_children = fallback.elements();
     if fallback_children.len() != 1 {

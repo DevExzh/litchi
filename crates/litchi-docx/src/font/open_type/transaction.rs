@@ -1,3 +1,7 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Source-preserving OpenType snapshots, transactions, and patches.
 
 use std::sync::Arc;
@@ -17,6 +21,10 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parse and retain a bounded source fragment.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_xml(xml: impl Into<Vec<u8>>) -> Result<Self> {
         let xml = xml.into();
         let value = codec::parse(&xml)?;
@@ -83,6 +91,10 @@ impl Transaction {
         self
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_style_set(&mut self, value: StyleSet) -> Result<&mut Self> {
         self.next.set_style_set(value)?;
         Ok(self)
@@ -94,6 +106,10 @@ impl Transaction {
     }
 
     /// Validate and publish without changing the source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn commit(self) -> Result<Commit> {
         self.next.validate()?;
         let xml = codec::rewrite(self.base.xml_bytes(), &self.next)?;
@@ -170,6 +186,10 @@ impl Patch {
     }
 
     /// Apply only to the exact source snapshot captured by the transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.fingerprint != self.before_fingerprint || source.value != self.before {
             return Err(Error::InvalidFormat(
@@ -185,10 +205,10 @@ fn fingerprint(bytes: &[u8]) -> u64 {
     // Stable bounded FNV-1a source identity; the full source comparison is
     // still performed by `Patch::apply` through the snapshot fingerprint and
     // semantic precondition.
-    let mut hash = 0xcbf29ce484222325u64;
+    let mut hash = 0xcbf2_9ce4_8422_2325_u64;
     for byte in bytes {
         hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(0x100000001b3);
+        hash = hash.wrapping_mul(0x0100_0000_01b3);
     }
     hash
 }

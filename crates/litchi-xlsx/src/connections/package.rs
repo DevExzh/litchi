@@ -1,7 +1,10 @@
-//! Workbook package integration for the SpreadsheetML connections owner.
+//! Workbook package integration for the `SpreadsheetML` connections owner.
 
 use super::codec::patch_connections_source;
-use super::model::*;
+use super::model::{
+    CONNECTIONS_CONTENT_TYPE, CONNECTIONS_RELATIONSHIP, Conformance, Connection, Connections,
+    QUERY_TABLE_CONTENT_TYPE, STRICT_CONNECTIONS_RELATIONSHIP, STRICT_NAMESPACE,
+};
 use super::{codec, invalid};
 use litchi_core::sheet::Result;
 use std::collections::HashSet;
@@ -410,10 +413,12 @@ impl Snapshot {
         Self::load(package)
     }
 
+    #[must_use]
     pub fn connections(&self) -> Option<&Connections> {
         self.connections.as_ref()
     }
 
+    #[must_use]
     pub fn catalog(&self) -> Option<&Connections> {
         self.connections()
     }
@@ -434,14 +439,17 @@ impl Snapshot {
         self.source.query_tables.iter().map(|part| &part.part_uri)
     }
 
+    #[must_use]
     pub fn workbook_part_name(&self) -> &str {
         &self.source.workbook_part_name
     }
 
+    #[must_use]
     pub fn conformance(&self) -> Conformance {
         self.conformance
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.connections.is_none()
     }
@@ -481,7 +489,7 @@ impl SourceState {
             .rels()
             .iter()
             .find(|relationship| is_connections_relationship(relationship.reltype()))
-            .map(|relationship| relationship.target_partname())
+            .map(litchi_opc::Relationship::target_partname)
             .transpose()?;
         let connection = connection_uri
             .as_ref()
@@ -590,10 +598,12 @@ impl<'a> Transaction<'a> {
         })
     }
 
+    #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
+    #[must_use]
     pub fn connections(&self) -> Option<&Connections> {
         self.draft.as_ref()
     }
@@ -677,6 +687,7 @@ impl<'a> Transaction<'a> {
         Ok(Some(removed))
     }
 
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.before.connections.as_ref() != self.draft.as_ref()
     }
@@ -719,18 +730,22 @@ impl Patch {
         Self { before, after }
     }
 
+    #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
+    #[must_use]
     pub fn after(&self) -> &Snapshot {
         &self.after
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
+    #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
@@ -773,18 +788,22 @@ impl Commit {
         }
     }
 
+    #[must_use]
     pub fn changed(&self) -> bool {
         self.changed
     }
 
+    #[must_use]
     pub fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
+    #[must_use]
     pub fn patch(&self) -> &Patch {
         &self.patch
     }
 
+    #[must_use]
     pub fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }

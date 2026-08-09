@@ -18,6 +18,7 @@ pub enum IgnoredErrorType {
 pub struct IgnoredErrorRangeReference(pub(crate) String);
 
 impl IgnoredErrorRangeReference {
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -31,10 +32,12 @@ pub struct IgnoredErrorsExtension {
 }
 
 impl IgnoredErrorsExtension {
+    #[must_use]
     pub fn uri(&self) -> &str {
         &self.uri
     }
     /// MCE-processed extension markup. It is retained but never executed.
+    #[must_use]
     pub fn markup(&self) -> &[u8] {
         &self.markup
     }
@@ -48,9 +51,11 @@ pub struct IgnoredError {
 }
 
 impl IgnoredError {
+    #[must_use]
     pub fn ranges(&self) -> &[IgnoredErrorRangeReference] {
         &self.ranges
     }
+    #[must_use]
     pub fn ignores(&self, error_type: IgnoredErrorType) -> bool {
         self.flags[error_type as usize]
     }
@@ -64,9 +69,11 @@ pub struct IgnoredErrors {
 }
 
 impl IgnoredErrors {
+    #[must_use]
     pub fn entries(&self) -> &[IgnoredError] {
         &self.entries
     }
+    #[must_use]
     pub fn extensions(&self) -> &[IgnoredErrorsExtension] {
         &self.extensions
     }

@@ -26,8 +26,7 @@ impl ExtensionNames {
         let root = &layout.root;
         let x14_prefix = x14_prefix(layout)?;
         let mce_prefix = namespace_prefix(&root.tag, MCE)
-            .map(str::to_owned)
-            .unwrap_or_else(|| available_prefix(&root.tag, "mc"));
+            .map_or_else(|| available_prefix(&root.tag, "mc"), str::to_owned);
         let mut appended = Vec::new();
         if namespace_uri(&root.tag, &x14_prefix) != Some(x14ac::NAMESPACE) {
             appended.push((

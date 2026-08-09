@@ -9,7 +9,7 @@ pub(crate) const MAX_COLUMNS: usize = 16_384;
 pub(crate) const MAX_ITEMS: usize = 10_000;
 pub(crate) const MAX_SORT_CONDITIONS: usize = 64;
 pub(crate) const MAX_FRAGMENT_BYTES: usize = 8 * 1024 * 1024;
-/// SpreadsheetML `ST_Xstring` values used by the filter family are limited to
+/// `SpreadsheetML` `ST_Xstring` values used by the filter family are limited to
 /// fewer than 65,536 Unicode characters.  This is deliberately a character
 /// limit; the codec still applies a separate byte budget to the XML owner.
 pub(crate) const MAX_TEXT_CHARS: usize = 65_535;
@@ -25,10 +25,12 @@ pub struct UnknownAttribute {
 }
 
 impl UnknownAttribute {
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    #[must_use]
     pub fn value(&self) -> &str {
         &self.value
     }
@@ -62,6 +64,7 @@ impl UnknownElement {
         })
     }
 
+    #[must_use]
     pub fn as_xml(&self) -> &[u8] {
         &self.xml
     }
@@ -148,6 +151,7 @@ impl Range {
         super::codec::parse_range(&value)?;
         Ok(Self(value))
     }
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -223,7 +227,10 @@ pub struct DateGroup {
     pub(crate) opaque: Option<Box<OpaqueFields>>,
 }
 impl DateGroup {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "arguments map one-to-one to the immutable auto-filter schema fields"
+    )]
     pub fn new(
         year: u16,
         month: Option<u8>,
@@ -269,32 +276,41 @@ impl DateGroup {
         })
     }
 
+    #[must_use]
     pub fn year(&self) -> u16 {
         self.year
     }
+    #[must_use]
     pub fn month(&self) -> Option<u8> {
         self.month
     }
+    #[must_use]
     pub fn day(&self) -> Option<u8> {
         self.day
     }
+    #[must_use]
     pub fn hour(&self) -> Option<u8> {
         self.hour
     }
+    #[must_use]
     pub fn minute(&self) -> Option<u8> {
         self.minute
     }
+    #[must_use]
     pub fn second(&self) -> Option<u8> {
         self.second
     }
+    #[must_use]
     pub fn grouping(&self) -> Grouping {
         self.grouping
     }
 
+    #[must_use]
     pub fn unknown_attributes(&self) -> &[UnknownAttribute] {
         unknown_attributes(self.opaque.as_deref())
     }
 
+    #[must_use]
     pub fn unknown_elements(&self) -> &[UnknownElement] {
         unknown_elements(self.opaque.as_deref())
     }
@@ -331,20 +347,25 @@ impl Values {
         })
     }
 
+    #[must_use]
     pub fn blank(&self) -> bool {
         self.blank
     }
+    #[must_use]
     pub fn calendar_type(&self) -> Calendar {
         self.calendar_type
     }
+    #[must_use]
     pub fn items(&self) -> &[Item] {
         &self.items
     }
 
+    #[must_use]
     pub fn unknown_attributes(&self) -> &[UnknownAttribute] {
         unknown_attributes(self.opaque.as_deref())
     }
 
+    #[must_use]
     pub fn unknown_elements(&self) -> &[UnknownElement] {
         unknown_elements(self.opaque.as_deref())
     }
@@ -390,17 +411,21 @@ impl Custom {
         })
     }
 
+    #[must_use]
     pub fn operator(&self) -> Operator {
         self.operator
     }
+    #[must_use]
     pub fn value(&self) -> &str {
         &self.value
     }
 
+    #[must_use]
     pub fn unknown_attributes(&self) -> &[UnknownAttribute] {
         unknown_attributes(self.opaque.as_deref())
     }
 
+    #[must_use]
     pub fn unknown_elements(&self) -> &[UnknownElement] {
         unknown_elements(self.opaque.as_deref())
     }
@@ -426,17 +451,21 @@ impl Customs {
         })
     }
 
+    #[must_use]
     pub fn and(&self) -> bool {
         self.and
     }
+    #[must_use]
     pub fn filters(&self) -> &[Custom] {
         &self.filters
     }
 
+    #[must_use]
     pub fn unknown_attributes(&self) -> &[UnknownAttribute] {
         unknown_attributes(self.opaque.as_deref())
     }
 
+    #[must_use]
     pub fn unknown_elements(&self) -> &[UnknownElement] {
         unknown_elements(self.opaque.as_deref())
     }
@@ -482,7 +511,12 @@ pub enum DynamicType {
 }
 impl DynamicType {
     pub(crate) fn parse(v: &str) -> Result<Self> {
-        use DynamicType::*;
+        use DynamicType::{
+            AboveAverage, BelowAverage, LastMonth, LastQuarter, LastWeek, LastYear, M1, M2, M3, M4,
+            M5, M6, M7, M8, M9, M10, M11, M12, NextMonth, NextQuarter, NextWeek, NextYear, Null,
+            Q1, Q2, Q3, Q4, ThisMonth, ThisQuarter, ThisWeek, ThisYear, Today, Tomorrow,
+            YearToDate, Yesterday,
+        };
         match v {
             "aboveAverage" => Ok(AboveAverage),
             "belowAverage" => Ok(BelowAverage),
@@ -545,10 +579,10 @@ impl Dynamic {
         if max_value.is_some() && value.is_none() {
             return Err(invalid("dynamicFilter maxVal requires val"));
         }
-        if let (Some(value), Some(max_value)) = (value, max_value) {
-            if value >= max_value {
-                return Err(invalid("dynamicFilter val must be less than maxVal"));
-            }
+        if let (Some(value), Some(max_value)) = (value, max_value)
+            && value >= max_value
+        {
+            return Err(invalid("dynamicFilter val must be less than maxVal"));
         }
         Ok(Self {
             filter_type,
@@ -558,20 +592,25 @@ impl Dynamic {
         })
     }
 
+    #[must_use]
     pub fn filter_type(&self) -> DynamicType {
         self.filter_type
     }
+    #[must_use]
     pub fn value(&self) -> Option<f64> {
         self.value
     }
+    #[must_use]
     pub fn max_value(&self) -> Option<f64> {
         self.max_value
     }
 
+    #[must_use]
     pub fn unknown_attributes(&self) -> &[UnknownAttribute] {
         unknown_attributes(self.opaque.as_deref())
     }
 
+    #[must_use]
     pub fn unknown_elements(&self) -> &[UnknownElement] {
         unknown_elements(self.opaque.as_deref())
     }
@@ -584,6 +623,7 @@ pub struct Color {
     pub(crate) opaque: Option<Box<OpaqueFields>>,
 }
 impl Color {
+    #[must_use]
     pub fn new(differential_format_id: u32, cell_color: bool) -> Self {
         Self {
             differential_format_id,
@@ -592,17 +632,21 @@ impl Color {
         }
     }
 
+    #[must_use]
     pub fn differential_format_id(&self) -> u32 {
         self.differential_format_id
     }
+    #[must_use]
     pub fn cell_color(&self) -> bool {
         self.cell_color
     }
 
+    #[must_use]
     pub fn unknown_attributes(&self) -> &[UnknownAttribute] {
         unknown_attributes(self.opaque.as_deref())
     }
 
+    #[must_use]
     pub fn unknown_elements(&self) -> &[UnknownElement] {
         unknown_elements(self.opaque.as_deref())
     }
@@ -634,7 +678,12 @@ pub enum IconSet {
 }
 impl IconSet {
     pub(crate) fn parse(v: &str) -> Result<Self> {
-        use IconSet::*;
+        use IconSet::{
+            FiveArrows, FiveArrowsGray, FiveBoxes, FiveQuarters, FiveRating, FourArrows,
+            FourArrowsGray, FourRating, FourRedToBlack, FourTrafficLights, NoIcons, ThreeArrows,
+            ThreeArrowsGray, ThreeFlags, ThreeSigns, ThreeStars, ThreeSymbols, ThreeSymbols2,
+            ThreeTrafficLights1, ThreeTrafficLights2, ThreeTriangles,
+        };
         match v {
             "3Arrows" => Ok(ThreeArrows),
             "3ArrowsGray" => Ok(ThreeArrowsGray),
@@ -703,17 +752,21 @@ impl Icon {
         })
     }
 
+    #[must_use]
     pub fn icon_set(&self) -> IconSet {
         self.icon_set
     }
+    #[must_use]
     pub fn icon_id(&self) -> u32 {
         self.icon_id
     }
 
+    #[must_use]
     pub fn unknown_attributes(&self) -> &[UnknownAttribute] {
         unknown_attributes(self.opaque.as_deref())
     }
 
+    #[must_use]
     pub fn unknown_elements(&self) -> &[UnknownElement] {
         unknown_elements(self.opaque.as_deref())
     }
@@ -745,23 +798,29 @@ impl Top10 {
         })
     }
 
+    #[must_use]
     pub fn top(&self) -> bool {
         self.top
     }
+    #[must_use]
     pub fn percent(&self) -> bool {
         self.percent
     }
+    #[must_use]
     pub fn value(&self) -> f64 {
         self.value
     }
+    #[must_use]
     pub fn filter_value(&self) -> Option<f64> {
         self.filter_value
     }
 
+    #[must_use]
     pub fn unknown_attributes(&self) -> &[UnknownAttribute] {
         unknown_attributes(self.opaque.as_deref())
     }
 
+    #[must_use]
     pub fn unknown_elements(&self) -> &[UnknownElement] {
         unknown_elements(self.opaque.as_deref())
     }
@@ -822,23 +881,29 @@ impl Column {
         self
     }
 
+    #[must_use]
     pub fn column_id(&self) -> u32 {
         self.column_id
     }
+    #[must_use]
     pub fn hidden_button(&self) -> bool {
         self.hidden_button
     }
+    #[must_use]
     pub fn show_button(&self) -> bool {
         self.show_button
     }
+    #[must_use]
     pub fn payload(&self) -> Option<&Payload> {
         self.payload.as_ref()
     }
 
+    #[must_use]
     pub fn unknown_attributes(&self) -> &[UnknownAttribute] {
         unknown_attributes(self.opaque.as_deref())
     }
 
+    #[must_use]
     pub fn unknown_elements(&self) -> &[UnknownElement] {
         unknown_elements(self.opaque.as_deref())
     }
@@ -856,32 +921,41 @@ pub struct Condition {
     pub(crate) opaque: Option<Box<OpaqueFields>>,
 }
 impl Condition {
+    #[must_use]
     pub fn reference(&self) -> &Range {
         &self.reference
     }
+    #[must_use]
     pub fn descending(&self) -> bool {
         self.descending
     }
+    #[must_use]
     pub fn sort_by(&self) -> SortBy {
         self.sort_by
     }
+    #[must_use]
     pub fn custom_list(&self) -> Option<&str> {
         self.custom_list.as_deref()
     }
+    #[must_use]
     pub fn differential_format_id(&self) -> Option<u32> {
         self.differential_format_id
     }
+    #[must_use]
     pub fn icon_set(&self) -> Option<IconSet> {
         self.icon_set
     }
+    #[must_use]
     pub fn icon_id(&self) -> Option<u32> {
         self.icon_id
     }
 
+    #[must_use]
     pub fn unknown_attributes(&self) -> &[UnknownAttribute] {
         unknown_attributes(self.opaque.as_deref())
     }
 
+    #[must_use]
     pub fn unknown_elements(&self) -> &[UnknownElement] {
         unknown_elements(self.opaque.as_deref())
     }
@@ -897,26 +971,33 @@ pub struct State {
     pub(crate) opaque: Option<Box<OpaqueFields>>,
 }
 impl State {
+    #[must_use]
     pub fn reference(&self) -> &Range {
         &self.reference
     }
+    #[must_use]
     pub fn column_sort(&self) -> bool {
         self.column_sort
     }
+    #[must_use]
     pub fn case_sensitive(&self) -> bool {
         self.case_sensitive
     }
+    #[must_use]
     pub fn sort_method(&self) -> Option<SortMethod> {
         self.sort_method
     }
+    #[must_use]
     pub fn conditions(&self) -> &[Condition] {
         &self.conditions
     }
 
+    #[must_use]
     pub fn unknown_attributes(&self) -> &[UnknownAttribute] {
         unknown_attributes(self.opaque.as_deref())
     }
 
+    #[must_use]
     pub fn unknown_elements(&self) -> &[UnknownElement] {
         unknown_elements(self.opaque.as_deref())
     }
@@ -930,6 +1011,7 @@ pub struct Definition {
     pub(crate) opaque: Option<Box<OpaqueFields>>,
 }
 impl Definition {
+    #[must_use]
     pub fn new(reference: Option<Range>) -> Self {
         Self {
             reference,
@@ -938,20 +1020,25 @@ impl Definition {
             opaque: None,
         }
     }
+    #[must_use]
     pub fn reference(&self) -> Option<&Range> {
         self.reference.as_ref()
     }
+    #[must_use]
     pub fn columns(&self) -> &[Column] {
         &self.columns
     }
+    #[must_use]
     pub fn sort_state(&self) -> Option<&State> {
         self.sort_state.as_ref()
     }
 
+    #[must_use]
     pub fn unknown_attributes(&self) -> &[UnknownAttribute] {
         unknown_attributes(self.opaque.as_deref())
     }
 
+    #[must_use]
     pub fn unknown_elements(&self) -> &[UnknownElement] {
         unknown_elements(self.opaque.as_deref())
     }

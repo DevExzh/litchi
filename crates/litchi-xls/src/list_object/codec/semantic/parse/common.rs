@@ -4,7 +4,9 @@ use crate::Result;
 use crate::list_object::codec::binary::{
     PendingFeature, parse_range, parse_string, u16_at, u32_at, validate_frt,
 };
-use crate::list_object::model::*;
+use crate::list_object::model::{
+    ListObject, ListObjectFeatureVersion, ListObjectId, OpaqueListObjectFeature,
+};
 use crate::list_object::{FEATURE12_RECORD_TYPE, ISF_LIST, invalid};
 
 impl ListObject {

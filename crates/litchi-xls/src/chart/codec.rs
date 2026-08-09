@@ -5,9 +5,28 @@ use litchi_biff::Encoder as GraphEncoder;
 use litchi_ograph::chart::{format, group};
 use litchi_ograph::record::{chart3d, frame, line, marker, pie, series};
 
-use super::model::*;
+use super::model::{
+    Axis, AxisKind, AxisLine, AxisLineKind, Cache, CacheKind, CellRef, Chart, DataKind, DataLink,
+    Format, Formula, Group, GroupKind, Label, Legend, Limits, Raw, Role, Scale, Series, Source,
+    Tick, Value,
+};
 use super::package::{is_chart_bof, ranges_with};
-use super::wire::*;
+use super::wire::{
+    AREA, AREA_FORMAT, AXES_USED, AXIS, AXIS_LINE, AXIS_PARENT, BAR, BAR_SHAPE, BEGIN, BLANK, BOF,
+    BRAI, CAT_SER_RANGE, CHART, CHART_FORMAT, CONTINUE, CRT_LINE, CRT_LINK, DATA_FORMAT,
+    DATA_LAB_EXT, DATA_LAB_EXT_CONTENTS, DEFAULT_TEXT, DROP_BAR, END, EOF, FONT_X, FRAME, LABEL,
+    LEGEND, LINE, LINE_FORMAT, MARKER_FORMAT, NUMBER, OBJECT_LINK, PIE, PIE_FORMAT, PLOT_AREA,
+    PLOT_GROWTH, RADAR, RADAR_AREA, SCATTER, SER_TO_CRT, SERIES, SERIES_FORMAT, SERIES_LIST,
+    SERIES_PARENT, SERIES_TEXT, SHT_PROPS, SI_INDEX, SURFACE, TEXT, TICK, VALUE_RANGE, array_at,
+    bounded_count, exact, f64_at, graph_error, i16_at, i32_at, invalid, invalid_error,
+    parse_area_format, parse_line_format, parse_short_text, parse_xl_unicode_string, record,
+    shared_area, shared_line, u16_at, u32_at, validate_sheet_properties, xl_unicode_string,
+};
+#[cfg(test)]
+use super::wire::{
+    chart_encoder, known_record, push_record, shared_area_bytes, shared_line_bytes, short_text,
+    write_area, write_line,
+};
 use crate::{Error, Result};
 
 #[cfg(test)]
@@ -546,7 +565,7 @@ fn parse_cache(kind: CacheKind, record_type: u16, data: &[u8]) -> Result<Cache> 
             (
                 u16_at(data, 0)?,
                 u8::try_from(u16_at(data, 2)?)
-                    .map_err(|_| invalid_error(BLANK, "cached column exceeds BIFF8 grid"))?,
+                    .map_err(|_error| invalid_error(BLANK, "cached column exceeds BIFF8 grid"))?,
                 u16_at(data, 4)?,
                 Value::Blank,
             )
@@ -556,7 +575,7 @@ fn parse_cache(kind: CacheKind, record_type: u16, data: &[u8]) -> Result<Cache> 
             (
                 u16_at(data, 0)?,
                 u8::try_from(u16_at(data, 2)?)
-                    .map_err(|_| invalid_error(NUMBER, "cached column exceeds BIFF8 grid"))?,
+                    .map_err(|_error| invalid_error(NUMBER, "cached column exceeds BIFF8 grid"))?,
                 u16_at(data, 4)?,
                 Value::Number(f64_at(data, 6)?),
             )
@@ -568,7 +587,7 @@ fn parse_cache(kind: CacheKind, record_type: u16, data: &[u8]) -> Result<Cache> 
             (
                 u16_at(data, 0)?,
                 u8::try_from(u16_at(data, 2)?)
-                    .map_err(|_| invalid_error(LABEL, "cached column exceeds BIFF8 grid"))?,
+                    .map_err(|_error| invalid_error(LABEL, "cached column exceeds BIFF8 grid"))?,
                 u16_at(data, 4)?,
                 Value::Text(parse_xl_unicode_string(&data[6..])?),
             )
@@ -607,7 +626,7 @@ fn write_link(link: &DataLink, limits: Limits) -> Result<Vec<u8>> {
     data.extend(link.number_format.to_le_bytes());
     data.extend(
         u16::try_from(link.formula_tokens.len())
-            .map_err(|_| Error::InvalidData("chart formula exceeds u16".into()))?
+            .map_err(|_error| Error::InvalidData("chart formula exceeds u16".into()))?
             .to_le_bytes(),
     );
     data.extend(&link.formula_tokens);

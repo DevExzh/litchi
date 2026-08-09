@@ -28,6 +28,7 @@ impl<'xml> Transaction<'xml> {
 
     /// Read the current draft without exposing mutable fields outside the
     /// editor boundary.
+    #[must_use]
     pub fn calculation(&self) -> Option<&Settings> {
         self.draft.as_ref()
     }
@@ -38,6 +39,9 @@ impl<'xml> Transaction<'xml> {
     }
 
     /// Replace the complete typed calculation-settings value.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn replace(&mut self, settings: Settings) -> Result<()> {
         settings.validate()?;
         self.draft = Some(settings);
@@ -51,6 +55,9 @@ impl<'xml> Transaction<'xml> {
 
     /// Atomically publish the draft.  A semantically unchanged transaction
     /// borrows the original XML, retaining unknown or vendor XML exactly.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn commit(self) -> Result<Commit<'xml>> {
         if self.draft == self.original {
             return Ok(Commit {
@@ -76,19 +83,26 @@ pub struct Editor<'transaction, 'xml> {
     transaction: &'transaction mut Transaction<'xml>,
 }
 
-impl<'transaction, 'xml> Editor<'transaction, 'xml> {
+impl Editor<'_, '_> {
     /// Return the current typed draft, if present.
+    #[must_use]
     pub fn calculation(&self) -> Option<&Settings> {
         self.transaction.calculation()
     }
 
     /// Replace the complete typed value after common validation.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn replace(&mut self, settings: Settings) -> Result<()> {
         self.transaction.replace(settings)
     }
 
     /// Apply a checked in-place update to the current value.  If no value is
     /// present, the editor starts from the common default settings value.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn update<F>(&mut self, update: F) -> Result<()>
     where
         F: FnOnce(&mut Settings) -> Result<()>,
@@ -114,16 +128,19 @@ pub struct Commit<'xml> {
 impl Commit<'_> {
     /// Borrow the resulting content XML.  This is the original source for a
     /// no-op commit and the rebuilt XML for a changed commit.
+    #[must_use]
     pub fn content_xml(&self) -> &str {
         &self.xml
     }
 
     /// Return the typed value that is now represented by the result.
+    #[must_use]
     pub fn calculation(&self) -> Option<&Settings> {
         self.calculation.as_ref()
     }
 
     /// Whether the transaction required an XML rebuild.
+    #[must_use]
     pub fn changed(&self) -> bool {
         self.changed
     }
@@ -131,11 +148,13 @@ impl Commit<'_> {
 
 impl<'xml> Commit<'xml> {
     /// Consume the result while retaining a borrow for no-op commits.
+    #[must_use]
     pub fn into_xml(self) -> Cow<'xml, str> {
         self.xml
     }
 
     /// Consume the result into package-owned UTF-8 XML.
+    #[must_use]
     pub fn into_owned(self) -> String {
         self.xml.into_owned()
     }

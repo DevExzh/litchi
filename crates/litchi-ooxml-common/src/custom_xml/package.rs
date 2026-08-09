@@ -397,7 +397,7 @@ pub(crate) fn apply_items(
             .items()
             .iter()
             .filter(|item| item.source() == source_name)
-            .map(|item| item.rel_id())
+            .map(Item::rel_id)
             .collect::<Vec<_>>();
         state
             .relationships

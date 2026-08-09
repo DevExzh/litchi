@@ -1,8 +1,8 @@
-//! Typed DrawingML color choices and transforms.
+//! Typed `DrawingML` color choices and transforms.
 //!
 //! The `color` owner models the ECMA-376 `EG_ColorChoice` and
-//! `EG_ColorTransform` groups shared by the WordprocessingML, PresentationML,
-//! SpreadsheetML, and SpreadsheetML binary drawing projections. Unsupported
+//! `EG_ColorTransform` groups shared by the `WordprocessingML`, `PresentationML`,
+//! `SpreadsheetML`, and `SpreadsheetML` binary drawing projections. Unsupported
 //! choices and extensions remain bounded [`Unknown`] values instead of being
 //! silently discarded.
 //!

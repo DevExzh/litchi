@@ -15,17 +15,24 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Creates a semantically valid snapshot for a new edit.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(rect: Rect) -> Result<Self> {
         validation::ensure(rect)?;
         Ok(Self { rect })
     }
 
     /// Returns the decoded fixed-point rectangle.
+    #[must_use]
     pub const fn rect(self) -> Rect {
         self.rect
     }
 
     /// Opens a source-checked transaction over this snapshot.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn edit(self) -> Result<super::Transaction> {
         super::Transaction::new(self)
     }
@@ -54,11 +61,13 @@ impl Change {
     }
 
     /// Rectangle required in the source snapshot.
+    #[must_use]
     pub const fn before(self) -> Rect {
         self.before.rect
     }
 
     /// Rectangle produced by the change.
+    #[must_use]
     pub const fn after(self) -> Rect {
         self.after.rect
     }
@@ -91,16 +100,19 @@ impl Patch {
     }
 
     /// Returns the effective change, or `None` for a semantic no-op.
+    #[must_use]
     pub const fn change(self) -> Option<Change> {
         self.change
     }
 
     /// Whether this patch changes no chart-area bytes.
+    #[must_use]
     pub const fn is_empty(self) -> bool {
         self.change.is_none()
     }
 
     /// Returns the exact inverse change.
+    #[must_use]
     pub const fn inverse(self) -> Self {
         let change = match self.change {
             Some(change) => Some(change.inverse()),
@@ -110,6 +122,9 @@ impl Patch {
     }
 
     /// Applies the patch only to its matching source snapshot.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn apply(self, source: Snapshot) -> Result<Commit> {
         let Some(change) = self.change else {
             return Ok(Commit::new(source, self));
@@ -136,11 +151,13 @@ impl Commit {
     }
 
     /// Returns the post-edit snapshot.
+    #[must_use]
     pub const fn snapshot(self) -> Snapshot {
         self.snapshot
     }
 
     /// Returns the reversible semantic patch.
+    #[must_use]
     pub const fn patch(self) -> Patch {
         self.patch
     }

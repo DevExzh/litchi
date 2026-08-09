@@ -1,11 +1,15 @@
 //! Strict low-level codecs for paragraph-property SPRM operands.
 
-use super::model::*;
+use super::model::{
+    AutoNumberAlignment, Border, BorderStyle, LegacyAutoNumbering, NumberingRevisionProperties,
+    ParagraphConditionalFormatting, ParagraphProperties, Shading, ShadingPattern, TabAlignment,
+    TabLeader, TabStop,
+};
 use crate::package::{Error as PackageError, Result};
 use crate::parts::numbering::NumberFormat;
 use crate::parts::tap::TableStyleCondition;
 use crate::sprm::{Sprm, parse_sprms};
-use crate::sprm_operations::*;
+use crate::sprm_operations::{SPRM_P_CNF, get_sprm_type};
 use litchi_core::binary::{read_i16_le, read_u16_le};
 
 impl ParagraphProperties {
@@ -670,7 +674,7 @@ impl ParagraphProperties {
         }))
     }
 
-    /// Parse shading from ShadingDescriptor (10 bytes).
+    /// Parse shading from `ShadingDescriptor` (10 bytes).
     pub(super) fn parse_shading_descriptor(sprm: &Sprm) -> Result<Option<Shading>> {
         let data = sprm.operand_bytes();
         if data.len() != 10 {

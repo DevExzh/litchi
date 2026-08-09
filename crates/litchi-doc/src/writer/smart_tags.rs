@@ -52,21 +52,25 @@ impl SmartTagEntry {
         self
     }
 
+    #[must_use]
     pub fn with_origin(mut self, value: SmartTagOrigin) -> Self {
         self.origin = value;
         self
     }
 
+    #[must_use]
     pub fn with_sub_entity(mut self, value: bool) -> Self {
         self.is_sub_entity = value;
         self
     }
 
+    #[must_use]
     pub fn with_native_export(mut self, value: bool) -> Self {
         self.is_native = value;
         self
     }
 
+    #[must_use]
     pub fn with_column_range(mut self, first: u8, limit: u8) -> Self {
         self.column_range = Some((first, limit));
         self

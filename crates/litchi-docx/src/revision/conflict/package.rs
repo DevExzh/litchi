@@ -1,3 +1,11 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Story discovery and failure-atomic package publication.
 
 use super::model::{Binding, Source};
@@ -10,7 +18,7 @@ use crate::{Error, Package, Result};
 use litchi_opc::{OpcPackage, PackURI};
 use std::sync::Arc;
 
-/// One reachable WordprocessingML story and its conflict snapshot.
+/// One reachable `WordprocessingML` story and its conflict snapshot.
 #[derive(Clone, Debug)]
 pub struct Story {
     part: PackURI,
@@ -46,11 +54,19 @@ impl Story {
 
 impl Package {
     /// Read the conflict revisions in the resolved main-document story.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn conflicts(&self) -> Result<Snapshot> {
         self.conflicts_with_limits(Limits::default())
     }
 
     /// Read the main-story conflicts with explicit semantic resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn conflicts_with_limits(&self, limits: Limits) -> Result<Snapshot> {
         let limits = limits.validate()?;
         self.ensure_conflict_opc_current("conflicts_with_limits")?;
@@ -63,16 +79,24 @@ impl Package {
         snapshot_single(story, Arc::clone(&captured.topology), limits)
     }
 
-    /// Read every reachable WordprocessingML story independently.
+    /// Read every reachable `WordprocessingML` story independently.
     ///
     /// Stories are returned with the main document first and remaining parts
     /// ordered by canonical part name. Conflict ranges never pair across two
     /// entries in this inventory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn conflict_stories(&self) -> Result<Vec<Story>> {
         self.conflict_stories_with_limits(Limits::default())
     }
 
     /// Read every reachable story with explicit semantic resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn conflict_stories_with_limits(&self, limits: Limits) -> Result<Vec<Story>> {
         let limits = limits.validate()?;
         self.ensure_conflict_opc_current("conflict_stories_with_limits")?;
@@ -105,6 +129,10 @@ impl Package {
     /// Publish a prepared story-bound conflict transaction.
     ///
     /// The commit remains reusable when publication fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn apply_conflicts(&mut self, commit: &Commit) -> Result<Snapshot> {
         self.apply_conflict_patch(commit.patch())
     }
@@ -116,6 +144,10 @@ impl Package {
     /// graph through an internal semantic publication path, replace only the
     /// bound story blob,
     /// and reparse it before the candidate is published.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn apply_conflict_patch(&mut self, patch: &Patch) -> Result<Snapshot> {
         let claim = patch.claim_publication()?;
         self.ensure_conflict_opc_current("apply_conflict_patch")?;
@@ -465,7 +497,7 @@ fn checked_total(
 }
 
 fn bound_story<'a>(captured: &'a Capture, binding: &Binding) -> Result<&'a Located> {
-    if captured.topology.as_ref() != binding.topology().as_ref() {
+    if captured.topology.as_ref() != binding.topology() {
         return Err(invalid("conflict story topology is stale"));
     }
     let story = captured

@@ -143,7 +143,7 @@ pub(in crate::list_object) fn parse_list_formula_extra_end(
 
 pub(in crate::list_object) fn append_formula(out: &mut Vec<u8>, tokens: &[u8]) -> Result<()> {
     let len = u16::try_from(tokens.len())
-        .map_err(|_| invalid(FEATURE11_RECORD_TYPE, "formula token length exceeds 65535"))?;
+        .map_err(|_error| invalid(FEATURE11_RECORD_TYPE, "formula token length exceeds 65535"))?;
     out.extend_from_slice(&len.to_le_bytes());
     out.extend_from_slice(tokens);
     Ok(())

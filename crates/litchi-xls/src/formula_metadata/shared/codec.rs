@@ -5,7 +5,7 @@ use crate::{Error, Result};
 use super::model::{Cell, Range};
 use super::validation::{FIXED_PAYLOAD_SIZE, MAX_RECORD_PAYLOAD, invalid};
 
-/// Parsed fields of a ShrFmla record before worksheet Formula cells supply
+/// Parsed fields of a `ShrFmla` record before worksheet Formula cells supply
 /// the anchor and participating-cell consistency context.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Record {
@@ -15,7 +15,10 @@ pub struct Record {
     pub tokens: Vec<u8>,
 }
 
-/// Parse one complete ShrFmla payload.
+/// Parse one complete `ShrFmla` payload.
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn parse(data: &[u8]) -> Result<Record> {
     if data.len() < FIXED_PAYLOAD_SIZE {
         return Err(Error::InvalidLength {

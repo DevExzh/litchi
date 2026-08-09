@@ -1,6 +1,11 @@
 //! Binary codecs for DOC list tables and their FIB routing.
 
-use super::model::*;
+use super::model::{
+    AutomaticNumberingField, HtmlCompatibilityFlags, ListFollowCharacter, ListFormatOverride,
+    ListFormatOverrideMetadata, ListLevel, ListLevelMetadata, ListLevelOverride,
+    ListLevelOverrideMetadata, ListStructure, ListStructureMetadata, ListStyleIndex, ListTables,
+    ListTablesMetadata, NumberFormat, ParagraphListBinding,
+};
 use super::validation;
 use crate::package::{Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
@@ -301,7 +306,7 @@ impl ListTables {
         ))
     }
 
-    /// Parse PlfLst (List Table)
+    /// Parse `PlfLst` (List Table)
     pub(super) fn parse_plflst(
         header_data: &[u8],
         level_data: &[u8],
@@ -313,7 +318,7 @@ impl ListTables {
         }
 
         let count = binary::read_u16_le(header_data, 0)
-            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read count: {}", e)))?
+            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read count: {e}")))?
             as usize;
         validation::count(count, "PlfLst structure count")?;
         let expected_header_len = 2usize
@@ -357,14 +362,14 @@ impl ListTables {
         Ok(structures)
     }
 
-    /// Parse PlfLfo (List Format Override Table)
+    /// Parse `PlfLfo` (List Format Override Table)
     pub(super) fn parse_plflfo(data: &[u8]) -> Result<Vec<ListFormatOverride>> {
         if data.len() < 4 {
             return Ok(Vec::new());
         }
 
         let count = binary::read_u32_le(data, 0)
-            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read count: {}", e)))?
+            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read count: {e}")))?
             as usize;
         validation::count(count, "PlfLfo count")?;
         let mut overrides = Vec::with_capacity(count);
@@ -468,21 +473,25 @@ impl ListTables {
     }
 
     /// Get all list structures
+    #[must_use]
     pub fn structures(&self) -> &[ListStructure] {
         &self.list_structures
     }
 
     /// Get all list format overrides
+    #[must_use]
     pub fn overrides(&self) -> &[ListFormatOverride] {
         &self.list_overrides
     }
 
     /// Lossless typed metadata for the list tables.
+    #[must_use]
     pub fn metadata(&self) -> &ListTablesMetadata {
         &self.metadata
     }
 
     /// Find a list structure by ID
+    #[must_use]
     pub fn find_structure(&self, list_id: u32) -> Option<&ListStructure> {
         self.list_structures
             .iter()
@@ -490,11 +499,13 @@ impl ListTables {
     }
 
     /// Find a list override by LFO ID
+    #[must_use]
     pub fn find_override(&self, lfo_id: u32) -> Option<&ListFormatOverride> {
         self.list_overrides.iter().find(|lfo| lfo.lfo_id == lfo_id)
     }
 
     /// Get the list structure for a given LFO ID
+    #[must_use]
     pub fn get_list_for_lfo(&self, lfo_id: u32) -> Option<&ListStructure> {
         self.find_override(lfo_id)
             .and_then(|lfo| self.find_structure(lfo.list_id))
@@ -505,6 +516,7 @@ impl ListTables {
     /// `sprmPIlfo` is one-based. Negative values select the same absolute LFO
     /// index while requesting that paragraph indents be preserved. Level 12 is
     /// the specification's "skip numbering" sentinel and does not bind a list.
+    #[must_use]
     pub fn bind_paragraph(&self, signed_lfo: i16, level: u8) -> Option<ParagraphListBinding<'_>> {
         if signed_lfo == 0 || signed_lfo == i16::MIN || level > 8 {
             return None;
@@ -526,6 +538,7 @@ impl ListTables {
 
     /// Resolve the effective level formatting for an LFO ID and zero-based
     /// level, applying any `LFOLVL` start-at or formatting overrides.
+    #[must_use]
     pub fn resolve_level(&self, lfo_id: u32, level: u8) -> Option<ListLevel> {
         let signed_lfo = i16::try_from(lfo_id).ok()?;
         let binding = self.bind_paragraph(signed_lfo, level)?;

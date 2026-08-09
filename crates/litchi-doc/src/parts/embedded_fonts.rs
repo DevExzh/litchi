@@ -52,27 +52,32 @@ pub struct EmbeddedFont {
 impl EmbeddedFont {
     /// Offset into the `WordDocument` stream where the embedded font data
     /// begins. Inert metadata: this library never loads the font data.
+    #[must_use]
     pub fn font_data_offset(&self) -> u32 {
         self.font_data_offset
     }
 
     /// Index into the `SttbfFfn` font-name table of the embedded font.
+    #[must_use]
     pub fn font_table_index(&self) -> u16 {
         self.font_table_index
     }
 
     /// Whether the embedded font is bold.
+    #[must_use]
     pub fn is_bold(&self) -> bool {
         self.bold
     }
 
     /// Whether the embedded font is italic.
+    #[must_use]
     pub fn is_italic(&self) -> bool {
         self.italic
     }
 
     /// The font's first-use order when only the characters used by the
     /// document are embedded, or `None` when the entire font is embedded.
+    #[must_use]
     pub fn subset_order(&self) -> Option<u32> {
         self.subset_order
     }
@@ -86,6 +91,7 @@ pub struct DocumentEmbeddedFonts {
 
 impl DocumentEmbeddedFonts {
     /// The embedded-font descriptions in table order.
+    #[must_use]
     pub fn fonts(&self) -> &[EmbeddedFont] {
         &self.fonts
     }

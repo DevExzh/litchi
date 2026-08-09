@@ -40,11 +40,13 @@ pub struct Properties {
 }
 
 impl Properties {
+    #[must_use]
     pub fn new(full_calc_on_load: bool) -> Self {
         Self { full_calc_on_load }
     }
 
     /// Whether this sheet is fully recalculated the next time the workbook loads.
+    #[must_use]
     pub fn full_calc_on_load(&self) -> bool {
         self.full_calc_on_load
     }
@@ -290,6 +292,7 @@ fn parse_sheet_calc_pr_attributes(
 }
 
 /// Serializes one canonical, namespace-complete `sheetCalcPr` fragment.
+#[must_use]
 pub fn write(value: &Properties, conformance: Conformance) -> String {
     let mut xml = String::with_capacity(64 + conformance.main_namespace().len());
     xml.push_str("<sheetCalcPr xmlns=\"");

@@ -1,3 +1,15 @@
+#![expect(
+    clippy::option_option,
+    reason = "nested options distinguish omitted, present-empty, and present-valued XML"
+)]
+#![expect(
+    clippy::ref_option,
+    reason = "the public API shape is retained for compatibility"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Typed run-property decoding.
 
 use crate::UnderlineStyle;
@@ -185,7 +197,13 @@ pub(super) fn parse_run_underline(xml_bytes: &[u8]) -> Result<Option<RunUnderlin
                 return Err(Error::InvalidFormat("unterminated Word run XML".into()));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 
@@ -288,8 +306,10 @@ fn parse_run_underline_color(value: &str) -> Result<RunUnderlineColor> {
     }
     let mut rgb = [0u8; 3];
     for (index, component) in rgb.iter_mut().enumerate() {
-        *component = u8::from_str_radix(&value[index * 2..index * 2 + 2], 16)
-            .map_err(|_| Error::InvalidFormat(format!("invalid Word underline color '{value}'")))?;
+        *component =
+            u8::from_str_radix(&value[index * 2..index * 2 + 2], 16).map_err(|_source_error| {
+                Error::InvalidFormat(format!("invalid Word underline color '{value}'"))
+            })?;
     }
     Ok(RunUnderlineColor::Rgb(rgb))
 }
@@ -300,7 +320,7 @@ fn parse_run_underline_hex_byte(value: &str, description: &str) -> Result<u8> {
             "invalid Word underline {description} '{value}'"
         )));
     }
-    u8::from_str_radix(value, 16).map_err(|_| {
+    u8::from_str_radix(value, 16).map_err(|_source_error| {
         Error::InvalidFormat(format!("invalid Word underline {description} '{value}'"))
     })
 }

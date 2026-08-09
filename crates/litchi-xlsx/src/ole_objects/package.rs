@@ -9,7 +9,10 @@ use super::codec::{
     crate_conformance, insert_collection, parse_document, parse_ole_objects, write_ole_objects,
 };
 use super::invalid;
-use super::model::*;
+use super::model::{
+    OleObjectConformance, OleObjectRelationshipKind, OleObjectResource, OleObjectTarget,
+    OleObjects, add_payload, is_image_content_type, validate_id, validate_resource, validate_value,
+};
 
 /// Validate every worksheet OLE owner and reject orphan embedded payloads.
 pub(super) fn validate_graph(

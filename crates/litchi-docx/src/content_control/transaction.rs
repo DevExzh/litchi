@@ -1,3 +1,11 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Failure-atomic source-coordinate content-control edits.
 
 use std::collections::HashMap;
@@ -84,6 +92,10 @@ impl Transaction {
     }
 
     /// Apply one typed edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn apply(&mut self, edit: Edit) -> Result<&mut Self> {
         match edit {
             Edit::SetChecksum { occurrence, value } => self.set_checksum(occurrence, value),
@@ -102,6 +114,10 @@ impl Transaction {
     ///
     /// Use [`Self::set_binding_checksum`] when a control owns multiple
     /// bindings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_checksum(
         &mut self,
         occurrence: usize,
@@ -118,6 +134,10 @@ impl Transaction {
     }
 
     /// Set one exact source-order binding checksum.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_binding_checksum(
         &mut self,
         occurrence: usize,
@@ -145,6 +165,10 @@ impl Transaction {
     }
 
     /// Alias emphasizing the stable source-order binding coordinate.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_checksum_at(
         &mut self,
         occurrence: usize,
@@ -168,6 +192,10 @@ impl Transaction {
     }
 
     /// Set or remove the formatting exception on one exact active lock.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_formatting_allowed(
         &mut self,
         occurrence: usize,
@@ -201,6 +229,10 @@ impl Transaction {
     }
 
     /// Materialize and fully reparse a candidate without mutating the source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn commit(&self) -> Result<Commit> {
         let before = self.base.source_owner();
         if self.index.is_empty() {
@@ -358,7 +390,10 @@ fn plan_checksum(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "signature mirrors the corresponding OOXML record"
+)]
 fn replace_extension(
     source: &[u8],
     tag: Span,
@@ -390,7 +425,7 @@ fn replace_extension(
             }
             let extension_prefix = prefixes.prefix(prefix_kind)?;
             let insertion = tag_insertion(source, tag)?;
-            let escaped = String::from_utf8(escape_attribute(value)?).map_err(|_| {
+            let escaped = String::from_utf8(escape_attribute(value)?).map_err(|_source_error| {
                 Error::Invalid("escaped content-control attribute is not UTF-8".into())
             })?;
             let authored = if let Some(ignorable) = ignorable {
@@ -512,8 +547,9 @@ impl PrefixAllocator {
             .map_err(alloc("content-control namespace prefix"))?;
         prefix.push_str(stem);
         if suffix != 0 {
-            write!(&mut prefix, "{suffix}")
-                .map_err(|_| Error::Invalid("namespace prefix formatting failed".into()))?;
+            write!(&mut prefix, "{suffix}").map_err(|_source_error| {
+                Error::Invalid("namespace prefix formatting failed".into())
+            })?;
         }
         Ok(prefix)
     }

@@ -22,6 +22,7 @@ pub enum AxisCrossMode {
 impl AxisCrossMode {
     /// Returns the XML value for this crossing mode.
     #[inline]
+    #[must_use]
     pub const fn xml_value(&self) -> &'static str {
         match self {
             Self::AutoZero => "autoZero",
@@ -43,6 +44,7 @@ pub enum AxisCrossBetween {
 impl AxisCrossBetween {
     /// Returns the XML value for this position.
     #[inline]
+    #[must_use]
     pub const fn xml_value(&self) -> &'static str {
         match self {
             Self::Between => "between",
@@ -65,6 +67,7 @@ pub enum TimeUnit {
 impl TimeUnit {
     /// Returns the XML value for this time unit.
     #[inline]
+    #[must_use]
     pub const fn xml_value(&self) -> &'static str {
         match self {
             Self::Days => "days",
@@ -100,6 +103,7 @@ pub enum BuiltInUnit {
 impl BuiltInUnit {
     /// Returns the XML value for this built-in unit.
     #[inline]
+    #[must_use]
     pub const fn xml_value(&self) -> &'static str {
         match self {
             Self::Hundreds => "hundreds",
@@ -139,6 +143,7 @@ pub struct DisplayUnits {
 impl DisplayUnits {
     /// Create display units with a built-in unit.
     #[inline]
+    #[must_use]
     pub fn built_in(unit: BuiltInUnit) -> Self {
         Self {
             built_in_unit: Some(unit),
@@ -154,6 +159,7 @@ impl DisplayUnits {
 
     /// Create display units with a custom scale.
     #[inline]
+    #[must_use]
     pub fn custom(scale: f64) -> Self {
         Self {
             built_in_unit: None,
@@ -195,7 +201,7 @@ pub struct AxisCommon {
     pub cross_axis_id: u32,
     /// Crossing mode
     pub cross_mode: AxisCrossMode,
-    /// Specific crossing value (overrides cross_mode)
+    /// Specific crossing value (overrides `cross_mode`)
     pub crosses_at: Option<f64>,
     /// Show major gridlines
     pub show_major_gridlines: bool,
@@ -205,9 +211,9 @@ pub struct AxisCommon {
     pub major_gridlines: Option<Lines>,
     /// Optional formatting for minor gridlines; also implies they are visible
     pub minor_gridlines: Option<Lines>,
-    /// DrawingML shape properties for the axis
+    /// `DrawingML` shape properties for the axis
     pub shape_properties: Option<ShapeProperties>,
-    /// DrawingML text properties for axis labels
+    /// `DrawingML` text properties for axis labels
     pub text_properties: Option<TextProperties>,
     /// Extension list inside the axis scaling container
     pub scaling_extension_list: Option<ExtensionList>,
@@ -215,9 +221,9 @@ pub struct AxisCommon {
     pub extension_list: Option<ExtensionList>,
     /// Manual layout for the axis title
     pub layout: Option<Layout>,
-    /// DrawingML shape properties for the axis title
+    /// `DrawingML` shape properties for the axis title
     pub title_shape_properties: Option<ShapeProperties>,
-    /// DrawingML text properties for the axis title
+    /// `DrawingML` text properties for the axis title
     pub title_text_properties: Option<TextProperties>,
     /// Axis-title extension list
     pub title_extension_list: Option<ExtensionList>,
@@ -226,6 +232,7 @@ pub struct AxisCommon {
 impl AxisCommon {
     /// Create a new axis with default settings.
     #[inline]
+    #[must_use]
     pub fn new(axis_id: u32, position: AxisPosition, cross_axis_id: u32) -> Self {
         Self {
             axis_id,
@@ -265,6 +272,7 @@ impl AxisCommon {
 
     /// Show major gridlines.
     #[inline]
+    #[must_use]
     pub fn with_major_gridlines(mut self, show: bool) -> Self {
         self.show_major_gridlines = show;
         self
@@ -310,6 +318,7 @@ pub enum AxisLabelAlign {
 impl AxisLabelAlign {
     /// Returns the XML value for this alignment.
     #[inline]
+    #[must_use]
     pub const fn xml_value(&self) -> &'static str {
         match self {
             Self::Center => "ctr",
@@ -322,6 +331,7 @@ impl AxisLabelAlign {
 impl CategoryAxis {
     /// Create a new category axis.
     #[inline]
+    #[must_use]
     pub fn new(axis_id: u32, position: AxisPosition, cross_axis_id: u32) -> Self {
         Self {
             common: AxisCommon::new(axis_id, position, cross_axis_id),
@@ -362,6 +372,7 @@ pub struct ValueAxis {
 impl ValueAxis {
     /// Create a new value axis.
     #[inline]
+    #[must_use]
     pub fn new(axis_id: u32, position: AxisPosition, cross_axis_id: u32) -> Self {
         Self {
             common: AxisCommon::new(axis_id, position, cross_axis_id),
@@ -377,6 +388,7 @@ impl ValueAxis {
 
     /// Set the axis range.
     #[inline]
+    #[must_use]
     pub fn with_range(mut self, min: f64, max: f64) -> Self {
         self.min = Some(min);
         self.max = Some(max);
@@ -385,6 +397,7 @@ impl ValueAxis {
 
     /// Set the major unit.
     #[inline]
+    #[must_use]
     pub fn with_major_unit(mut self, unit: f64) -> Self {
         self.major_unit = Some(unit);
         self
@@ -392,6 +405,7 @@ impl ValueAxis {
 
     /// Enable logarithmic scale.
     #[inline]
+    #[must_use]
     pub fn with_log_scale(mut self, base: f64) -> Self {
         self.log_base = Some(base);
         self
@@ -428,6 +442,7 @@ pub struct DateAxis {
 impl DateAxis {
     /// Create a new date axis.
     #[inline]
+    #[must_use]
     pub fn new(axis_id: u32, position: AxisPosition, cross_axis_id: u32) -> Self {
         Self {
             common: AxisCommon::new(axis_id, position, cross_axis_id),
@@ -465,6 +480,7 @@ pub struct SeriesAxis {
 impl SeriesAxis {
     /// Create a new series axis.
     #[inline]
+    #[must_use]
     pub fn new(axis_id: u32, position: AxisPosition, cross_axis_id: u32) -> Self {
         Self {
             common: AxisCommon::new(axis_id, position, cross_axis_id),
@@ -493,6 +509,7 @@ pub enum Axis {
 impl Axis {
     /// Get the axis type.
     #[inline]
+    #[must_use]
     pub const fn axis_type(&self) -> AxisType {
         match self {
             Self::Category(_) => AxisType::Category,
@@ -504,6 +521,7 @@ impl Axis {
 
     /// Get the common axis properties.
     #[inline]
+    #[must_use]
     pub fn common(&self) -> &AxisCommon {
         match self {
             Self::Category(ax) => &ax.common,
@@ -526,6 +544,7 @@ impl Axis {
 
     /// Get the axis ID.
     #[inline]
+    #[must_use]
     pub fn axis_id(&self) -> u32 {
         self.common().axis_id
     }

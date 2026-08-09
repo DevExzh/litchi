@@ -201,7 +201,7 @@ fn load_location(
 
     let preview = load_preview(package, source, &scene, &mut origin)?;
     origin.asset = asset.clone();
-    origin.preview = preview.clone();
+    origin.preview.clone_from(&preview);
     let model = Model {
         scene,
         asset,

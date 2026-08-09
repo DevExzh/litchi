@@ -27,12 +27,12 @@ impl Section {
     }
 
     /// Add a presentation slide identifier.
-    #[must_use]
     pub fn add_slide(&mut self, slide_id: u32) {
         self.slide_ids.push(slide_id);
     }
 
     /// Add presentation slide identifiers.
+    #[must_use]
     pub fn with_slides(mut self, slide_ids: impl IntoIterator<Item = u32>) -> Self {
         self.slide_ids.extend(slide_ids);
         self
@@ -110,12 +110,9 @@ impl List {
         }
         self.sections = ordered_ids
             .iter()
-            .map(|id| {
-                self.get_by_id(id)
-                    .expect("permutation was validated")
-                    .clone()
-            })
-            .collect();
+            .map(|id| self.get_by_id(id).cloned())
+            .collect::<Option<Vec<_>>>()
+            .ok_or_else(|| crate::Error::Invalid("section reorder lost a validated GUID".into()))?;
         Ok(())
     }
 

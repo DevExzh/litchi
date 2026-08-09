@@ -1,5 +1,5 @@
 use super::super::super::formatting::{CellStyle, ExtendedFormat};
-use super::super::*;
+use super::super::{CellPos, CellValue, Hyperlink, WritableCell, Writer};
 use crate::error::{Error, Result};
 
 impl Writer {
@@ -11,10 +11,16 @@ impl Writer {
     /// * `row` - Row index (0-based)
     /// * `col` - Column index (0-based)
     /// * `value` - String value
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn write_string(&mut self, sheet: usize, row: u32, col: u16, value: &str) -> Result<()> {
         self.write_string_with_format(sheet, row, col, value, 0)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn write_string_with_format(
         &mut self,
         sheet: usize,
@@ -35,10 +41,16 @@ impl Writer {
     /// * `row` - Row index (0-based)
     /// * `col` - Column index (0-based)
     /// * `value` - Numeric value
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn write_number(&mut self, sheet: usize, row: u32, col: u16, value: f64) -> Result<()> {
         self.write_number_with_format(sheet, row, col, value, 0)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn write_number_with_format(
         &mut self,
         sheet: usize,
@@ -64,10 +76,16 @@ impl Writer {
     /// * `row` - Row index (0-based)
     /// * `col` - Column index (0-based)
     /// * `value` - Boolean value
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn write_boolean(&mut self, sheet: usize, row: u32, col: u16, value: bool) -> Result<()> {
         self.write_boolean_with_format(sheet, row, col, value, 0)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn write_boolean_with_format(
         &mut self,
         sheet: usize,
@@ -92,10 +110,16 @@ impl Writer {
     /// The supported BIFF8 formula subset includes constants, cell/range
     /// references, arithmetic/comparison operators, and built-in functions
     /// recognized by [`FormulaTokenizer`](crate::writer::FormulaTokenizer).
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn write_formula(&mut self, sheet: usize, row: u32, col: u16, formula: &str) -> Result<()> {
         self.write_formula_with_format(sheet, row, col, formula, 0)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn write_formula_with_format(
         &mut self,
         sheet: usize,
@@ -118,6 +142,9 @@ impl Writer {
     /// The shared-formula flag is intentionally rejected until this writer
     /// owns the corresponding `ShrFmla` sequence. All other flags and the
     /// opaque application cache are emitted verbatim.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn write_formula_with_metadata(
         &mut self,
         sheet: usize,
@@ -130,6 +157,9 @@ impl Writer {
     }
 
     /// Write a formatted formula with explicit BIFF8 `Formula` metadata.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn write_formula_with_format_and_metadata(
         &mut self,
         sheet: usize,
@@ -178,8 +208,11 @@ impl Writer {
     /// writer APIs. The hyperlink target can be a standard URL (http, https,
     /// ftp, mailto) or an internal reference such as `Sheet1!A1` or
     /// `internal:Sheet1!A1`.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_hyperlink(&mut self, sheet: usize, row: u32, col: u16, url: &str) -> Result<()> {
-        if row > u16::MAX as u32 {
+        if row > u32::from(u16::MAX) {
             return Err(Error::InvalidData(
                 "set_hyperlink: row index must be <= 65535 for BIFF8".to_string(),
             ));
@@ -194,7 +227,7 @@ impl Writer {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
 
         // Replace any existing hyperlink on this exact cell to match
         // XLSX writer semantics.
@@ -238,7 +271,7 @@ impl Writer {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
 
         if worksheet
             .cells

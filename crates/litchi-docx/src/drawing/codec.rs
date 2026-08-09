@@ -1,4 +1,28 @@
-//! Streaming WordprocessingML drawing inventory decoder.
+#![expect(
+    clippy::match_same_arms,
+    reason = "separate arms document distinct OOXML grammar cases"
+)]
+#![expect(
+    clippy::option_option,
+    reason = "nested options distinguish omitted, present-empty, and present-valued XML"
+)]
+#![expect(
+    clippy::ref_option,
+    reason = "the public API shape is retained for compatibility"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
+#![expect(
+    clippy::unnecessary_wraps,
+    reason = "the Result signature preserves a uniform fallible codec API"
+)]
+//! Streaming `WordprocessingML` drawing inventory decoder.
 
 use super::model::{Anchor, AnchorId, Kind, LegacyAnchor, LegacyAnchorKind, Object};
 use super::validation::{parse_anchor_id_text, parse_word2010_anchor_id};
@@ -38,7 +62,7 @@ pub(crate) fn parse(xml_bytes: &[u8]) -> Result<SmallVec<[Object; 4]>> {
 
     loop {
         match reader.read_event() {
-            Ok(Event::Start(element)) | Ok(Event::Empty(element)) => {
+            Ok(Event::Start(element) | Event::Empty(element)) => {
                 let local = element.local_name();
                 match local.as_ref() {
                     b"drawing" => {
@@ -256,7 +280,13 @@ pub(crate) fn parse_legacy(xml_bytes: &[u8]) -> Result<SmallVec<[LegacyAnchor; 4
                 }
                 break;
             },
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 
@@ -334,23 +364,23 @@ fn number_attribute(element: &BytesStart<'_>, name: &[u8], default: i64) -> Resu
 
 /// Read a numeric or descriptive attribute as inert inventory.
 ///
-/// The inventory historically treats numeric whitespace and DrawingML tokens
+/// The inventory historically treats numeric whitespace and `DrawingML` tokens
 /// as authored: invalid numbers fall back to their element defaults and invalid
 /// UTF-8 in descriptive metadata is ignored. Unknown/inert extension
 /// attributes are never normalized or interpreted.
 fn inert_attribute(element: &BytesStart<'_>, name: &[u8]) -> Option<String> {
     let mut value = None;
     for attribute in element.attributes().flatten() {
-        if attribute.key.as_ref() == name {
-            if let Ok(decoded) = std::str::from_utf8(&attribute.value) {
-                value = Some(decoded.to_owned());
-            }
+        if attribute.key.as_ref() == name
+            && let Ok(decoded) = std::str::from_utf8(&attribute.value)
+        {
+            value = Some(decoded.to_owned());
         }
     }
     value
 }
 
-/// Read the closed DrawingML preset token with the original strict failure
+/// Read the closed `DrawingML` preset token with the original strict failure
 /// behavior for malformed attributes and non-UTF-8 values.
 fn strict_attribute(element: &BytesStart<'_>, name: &[u8]) -> Result<Option<String>> {
     let mut value = None;

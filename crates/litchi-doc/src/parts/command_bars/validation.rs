@@ -1,6 +1,10 @@
 //! Wire and relationship validation for command-bar metadata.
 
-use super::model::*;
+use super::model::{
+    Action, AllocatedCommands, CommandBars, CommandString, CommandStrings, Control, Customization,
+    CustomizationData, Entry, KeyMaps, MacroCommands, MacroNames, Operation, Toolbar, ToolbarDelta,
+    ToolbarWrapper,
+};
 use crate::package::{Error as PackageError, Result};
 use crate::parts::fib::{FileInformationBlock, WORD_97_NFIB};
 
@@ -34,7 +38,7 @@ pub(super) fn package_fib(fib: &FileInformationBlock) -> Result<()> {
     Ok(())
 }
 
-/// Locate the `fcCmds/lcbCmds` pair in the WordDocument stream.
+/// Locate the `fcCmds/lcbCmds` pair in the `WordDocument` stream.
 pub(super) fn pointer_location(fib: &FileInformationBlock) -> Result<usize> {
     package_fib(fib)?;
     let offset = COMMAND_POINTER_BASE
@@ -303,10 +307,11 @@ pub(super) fn validate_control(value: &Control<'_>) -> Result<()> {
             "TBC Cid presence does not match the toolbar control identifier",
         ));
     }
-    if let Some(command) = value.command {
-        if !command.is_fci() && !command.is_allocated() {
-            return Err(corrupted("TBC Cid has an unsupported Cmt value"));
-        }
+    if let Some(command) = value.command
+        && !command.is_fci()
+        && !command.is_allocated()
+    {
+        return Err(corrupted("TBC Cid has an unsupported Cmt value"));
     }
 
     if matches!(

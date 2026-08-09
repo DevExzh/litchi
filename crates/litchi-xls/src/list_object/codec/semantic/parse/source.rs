@@ -5,7 +5,12 @@ use crate::list_object::codec::binary::{
     parse_formula, parse_list_formula_extra_end, parse_range, parse_string, parse_web_info, u16_at,
     u32_at,
 };
-use crate::list_object::model::*;
+use crate::list_object::model::{
+    ExternalTableVersion, ListColumnId, ListObject, ListObjectColumn, ListObjectFeatureVersion,
+    ListObjectId, ListObjectSourceMetadata, ListTotalAggregation, WebColumnType, WebEditMode,
+    WebInvalidCell, WebTableField, WebTableMetadata, XmlColumnMapping, XmlDataType, XmlTableField,
+    XmlTableMetadata, validate_column_name, validate_table_name,
+};
 use crate::list_object::{FEATURE11_RECORD_TYPE, FEATURE12_RECORD_TYPE, invalid};
 
 impl ListObject {
@@ -105,10 +110,10 @@ impl ListObject {
             let aggregation =
                 ListTotalAggregation::from_code(u32_at(data, start + 12, rt, "ilta")?)?;
             let agg_len = usize::try_from(u32_at(data, start + 16, rt, "cbFmtAgg")?)
-                .map_err(|_| invalid(rt, "aggregate format length overflows"))?;
+                .map_err(|_error| invalid(rt, "aggregate format length overflows"))?;
             let field_flags = u32_at(data, start + 24, rt, "field flags")?;
             let insert_len = usize::try_from(u32_at(data, start + 28, rt, "cbFmtInsertRow")?)
-                .map_err(|_| invalid(rt, "insert-row format length overflows"))?;
+                .map_err(|_error| invalid(rt, "insert-row format length overflows"))?;
             if field_flags & 0x0000_0040 != 0
                 || field_flags & 2 != 0 && field_flags & 1 == 0
                 || field_flags & 0x100 != 0 && field_flags & 0x80 == 0
@@ -145,7 +150,7 @@ impl ListObject {
             offset = insert_end;
             let auto_filter = if field_flags & 1 != 0 {
                 let n = usize::try_from(u32_at(data, offset, rt, "cbAutoFilter")?)
-                    .map_err(|_| invalid(rt, "AutoFilter size overflows"))?;
+                    .map_err(|_error| invalid(rt, "AutoFilter size overflows"))?;
                 if n > 2080 {
                     return Err(invalid(rt, "AutoFilter exceeds 2080 bytes"));
                 }
@@ -220,7 +225,7 @@ impl ListObject {
             };
             if header == 0 && !single {
                 let n = usize::try_from(u32_at(data, offset, rt, "cached header format size")?)
-                    .map_err(|_| invalid(rt, "cached header size overflows"))?;
+                    .map_err(|_error| invalid(rt, "cached header size overflows"))?;
                 let end = offset
                     .checked_add(4 + n)
                     .ok_or_else(|| invalid(rt, "cached header size overflows"))?;
@@ -256,7 +261,7 @@ impl ListObject {
                     total_formula_extra: total_extra,
                     header_cache: vec![0; 4],
                     ignored_flags: field_flags & 0xffff_f030,
-                })
+                });
             } else {
                 xml_fields.push(XmlTableField {
                     column_id: cid,
@@ -269,7 +274,7 @@ impl ListObject {
                     total_formula_extra: total_extra,
                     header_cache: vec![0; 4],
                     ignored_flags: field_flags & 0xffff_f030,
-                })
+                });
             }
         }
         let source_metadata = if lt == 1 {
@@ -312,7 +317,7 @@ impl ListObject {
                     let column =
                         ListColumnId::try_new(u32_at(data, offset + 4, rt, "invalid cell field")?)?;
                     offset += 8;
-                    out.push(WebInvalidCell::new(row, column))
+                    out.push(WebInvalidCell::new(row, column));
                 }
                 out
             } else {

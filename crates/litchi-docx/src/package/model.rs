@@ -1,3 +1,15 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
 //! Typed DOCX package state and semantic document-facing operations.
 
 pub(super) use crate::Variables;
@@ -74,7 +86,7 @@ pub(super) fn validate_document_main_content_type(content_type: &str) -> Result<
     })
 }
 
-/// A WordprocessingML (.docx, .docm, or .dotm) package.
+/// A `WordprocessingML` (.docx, .docm, or .dotm) package.
 ///
 /// This is the main entry point for working with Word documents.
 /// It wraps an OPC package and provides Word-specific functionality.
@@ -461,7 +473,7 @@ fn ensure_word_font_settings(
                 relationship.target_partname()?
             },
             None => PackURI::new("/word/settings.xml")
-                .map_err(|error| Error::InvalidUri(error.to_string()))?,
+                .map_err(|error| Error::InvalidUri(error.clone()))?,
         };
         (document_uri, target, relationship.is_some())
     };
@@ -540,11 +552,15 @@ impl Package {
     /// let doc = pkg.document()?;
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn document(&self) -> Result<Document<'_>> {
         let main_part = self
             .opc
             .main_document_part()
-            .map_err(|e| Error::PartNotFound(format!("main document part: {}", e)))?;
+            .map_err(|e| Error::PartNotFound(format!("main document part: {e}")))?;
 
         // Create DocumentPart wrapper
         let doc_part = DocumentPart::from_part(main_part)?;
@@ -559,6 +575,10 @@ impl Package {
     /// types. It does not inspect, parse, decompress, or execute the binary
     /// VBA project or Word supplemental-data bytes.
     #[cfg(feature = "vba-inspection")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn vba(&self) -> Result<Option<VbaProject>> {
         let document = self.opc.main_document_part()?;
         discover_vba_project(&self.opc, document)
@@ -566,6 +586,10 @@ impl Package {
 
     /// Attach a cache-free, inert MS-OVBA project with empty Word supplemental data.
     #[cfg(feature = "vba-inspection")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_vba(&mut self, project: litchi_vba::build::Project) -> Result<VbaProject> {
         let payload = project.finish(&litchi_vba::Limits::default())?;
         self.put_vba_managed("set_vba", payload, &VbaSupplementalData::new())
@@ -573,6 +597,10 @@ impl Package {
 
     /// Attach a cache-free project and typed Word document-event/macro metadata.
     #[cfg(feature = "vba-inspection")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_vba_with(
         &mut self,
         project: litchi_vba::build::Project,
@@ -585,6 +613,10 @@ impl Package {
 
     /// Attach a prevalidated `vbaProject.bin` and typed Word supplemental data.
     #[cfg(feature = "vba-inspection")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn put_vba(
         &mut self,
         payload: litchi_vba::Payload,
@@ -595,6 +627,10 @@ impl Package {
 
     /// Remove the VBA project and supplemental-data graph and restore DOCX/DOTX type.
     #[cfg(feature = "vba-inspection")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn clear_vba(&mut self) -> Result<bool> {
         let source = self.opc.main_document_part()?.partname().clone();
         let source_part = self.opc.get_part(&source)?;
@@ -629,11 +665,19 @@ impl Package {
     }
 
     /// Load inert persisted Office Add-in task panes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn task_panes(&self) -> Result<Option<web::Panes>> {
         Ok(web::load(&self.opc)?)
     }
 
     /// Store a validated task-pane graph by moving it into package ownership.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn put_task_panes(
         &mut self,
         panes: web::Panes,
@@ -644,6 +688,10 @@ impl Package {
     }
 
     /// Remove task panes and graph resources no longer shared elsewhere.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove_task_panes(&mut self) -> Result<bool> {
         Ok(web::remove(&mut self.opc)?)
     }
@@ -652,42 +700,70 @@ impl Package {
     ///
     /// [`ribbon::Set::effective`] applies modern-first precedence. XML remains
     /// inert; callbacks and commands are never invoked.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn ribbon(&self) -> Result<ribbon::Set<'_>> {
         Ok(ribbon::load(&self.opc)?)
     }
 
     /// Store opaque Ribbon XML by moving its `Vec` into package ownership.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn put_ribbon(&mut self, version: ribbon::Version, xml: Vec<u8>) -> Result<&mut Self> {
         ribbon::put(&mut self.opc, version, xml)?;
         Ok(self)
     }
 
     /// Remove one package-level Ribbon relationship family and its orphaned part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove_ribbon(&mut self, family: ribbon::Family) -> Result<bool> {
         Ok(ribbon::remove(&mut self.opc, family)?)
     }
 
     /// Read typed font metadata and inert embedded-font resources.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn fonts(&self) -> Result<Option<font::Table>> {
-        Ok(font::read(&self.opc)?)
+        font::read(&self.opc)
     }
 
     /// Move a complete font table into this package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn put_fonts(
         &mut self,
         table: font::Table,
         conformance: font::Conformance,
     ) -> Result<bool> {
-        Ok(font::put(&mut self.opc, table, conformance)?)
+        font::put(&mut self.opc, table, conformance)
     }
 
     /// Remove the font table and font resources that become unreferenced.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove_fonts(&mut self) -> Result<bool> {
-        Ok(font::remove(&mut self.opc)?)
+        font::remove(&mut self.opc)
     }
 
     /// Select the font publication policy used by managed save operations.
     #[cfg(feature = "automatic-fonts")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_font_embedding(&mut self, mode: litchi_fonts::embedding::Mode) -> Result<&mut Self> {
         if self.mutable_doc.is_none() {
             return Err(Error::UnsafeEdit {
@@ -702,6 +778,10 @@ impl Package {
 
     /// Select the font publication policy and return this package by value.
     #[cfg(feature = "automatic-fonts")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn with_font_embedding(mut self, mode: litchi_fonts::embedding::Mode) -> Result<Self> {
         self.set_font_embedding(mode)?;
         Ok(self)
@@ -727,6 +807,7 @@ impl Package {
     /// let props = pkg.props();
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
+    #[must_use]
     pub fn props(&self) -> Option<&Props> {
         self.properties.get()
     }
@@ -776,6 +857,7 @@ impl Package {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
+    #[must_use]
     pub fn custom_props(&self) -> &CustomProps {
         &self.custom_props
     }

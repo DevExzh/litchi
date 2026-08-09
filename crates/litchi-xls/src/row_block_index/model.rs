@@ -10,18 +10,22 @@ pub struct WorksheetIndexRecord {
 }
 
 impl WorksheetIndexRecord {
+    #[must_use]
     pub fn first_data_row(&self) -> u32 {
         self.first_data_row
     }
 
+    #[must_use]
     pub fn last_data_row_exclusive(&self) -> u32 {
         self.last_data_row_exclusive
     }
 
+    #[must_use]
     pub fn default_column_width_position(&self) -> u32 {
         self.default_column_width_position
     }
 
+    #[must_use]
     pub fn dbcell_positions(&self) -> &[u32] {
         &self.dbcell_positions
     }
@@ -36,14 +40,17 @@ pub struct DbCellRecord {
 }
 
 impl DbCellRecord {
+    #[must_use]
     pub fn record_position(&self) -> u32 {
         self.record_position
     }
 
+    #[must_use]
     pub fn first_row_position(&self) -> Option<u32> {
         self.first_row_position
     }
 
+    #[must_use]
     pub fn cell_offsets(&self) -> &[u16] {
         &self.cell_offsets
     }
@@ -58,14 +65,17 @@ pub struct IndexedRow {
 }
 
 impl IndexedRow {
+    #[must_use]
     pub fn row(self) -> u16 {
         self.row
     }
 
+    #[must_use]
     pub fn row_record_position(self) -> u32 {
         self.row_record_position
     }
 
+    #[must_use]
     pub fn first_cell_position(self) -> u32 {
         self.first_cell_position
     }
@@ -81,18 +91,22 @@ pub struct RowBlock {
 }
 
 impl RowBlock {
+    #[must_use]
     pub fn first_row(&self) -> u16 {
         self.first_row
     }
 
+    #[must_use]
     pub fn last_row(&self) -> u16 {
         self.last_row
     }
 
+    #[must_use]
     pub fn dbcell(&self) -> &DbCellRecord {
         &self.dbcell
     }
 
+    #[must_use]
     pub fn indexed_rows(&self) -> &[IndexedRow] {
         &self.indexed_rows
     }
@@ -107,18 +121,22 @@ pub struct RowBlockIndex {
 }
 
 impl RowBlockIndex {
+    #[must_use]
     pub fn index_record_position(&self) -> u32 {
         self.index_record_position
     }
 
+    #[must_use]
     pub fn index_record(&self) -> &WorksheetIndexRecord {
         &self.index
     }
 
+    #[must_use]
     pub fn blocks(&self) -> &[RowBlock] {
         &self.blocks
     }
 
+    #[must_use]
     pub fn block_for_row(&self, row: u32) -> Option<&RowBlock> {
         let row = u16::try_from(row).ok()?;
         self.blocks
@@ -126,6 +144,7 @@ impl RowBlockIndex {
             .find(|block| block.first_row <= row && row <= block.last_row)
     }
 
+    #[must_use]
     pub fn first_cell_position(&self, row: u32) -> Option<u32> {
         let row = u16::try_from(row).ok()?;
         self.block_for_row(u32::from(row))?

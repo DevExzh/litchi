@@ -19,7 +19,7 @@ pub(in crate::embedded_object) struct FieldMarker {
     pub(in crate::embedded_object) descriptor: [u8; 2],
 }
 
-/// Transactional editor for the DOC field and ObjectPool owner.
+/// Transactional editor for the DOC field and `ObjectPool` owner.
 #[derive(Clone)]
 pub struct Editor {
     pub(in crate::embedded_object) package: ObjectEditor,

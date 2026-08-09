@@ -6,15 +6,15 @@ use std::io::Write;
 use super::{write_record, write_record_header};
 
 fn encode_rk(value: f64) -> Option<u32> {
-    let int_value = value as i32;
+    let int_value = crate::utils::saturating_f64_to_i32(value);
     if f64::from(int_value) == value && (-(1 << 29)..(1 << 29)).contains(&int_value) {
-        return Some(((int_value as u32) << 2) | 0x02);
+        return Some((crate::utils::reinterpret_i32_as_u32(int_value) << 2) | 0x02);
     }
 
     let scaled = value * 100.0;
-    let scaled_int = scaled as i32;
+    let scaled_int = crate::utils::saturating_f64_to_i32(scaled);
     if f64::from(scaled_int) == scaled && (-(1 << 29)..(1 << 29)).contains(&scaled_int) {
-        return Some(((scaled_int as u32) << 2) | 0x03);
+        return Some((crate::utils::reinterpret_i32_as_u32(scaled_int) << 2) | 0x03);
     }
 
     None
@@ -38,10 +38,9 @@ pub(crate) fn write_number<W: Write>(
     value: f64,
 ) -> Result<()> {
     // BIFF8 stores row as a 16-bit index (0..65535)
-    let row_u16 = u16::try_from(row).map_err(|_| {
+    let row_u16 = u16::try_from(row).map_err(|_error| {
         Error::InvalidData(format!(
-            "Row index {} exceeds BIFF8 limit 65535 for NUMBER record",
-            row
+            "Row index {row} exceeds BIFF8 limit 65535 for NUMBER record"
         ))
     })?;
 
@@ -65,10 +64,9 @@ pub(crate) fn write_mulrk<W: Write>(
     first_col: u16,
     values: &[(u16, f64)],
 ) -> Result<()> {
-    let row_u16 = u16::try_from(row).map_err(|_| {
+    let row_u16 = u16::try_from(row).map_err(|_error| {
         Error::InvalidData(format!(
-            "Row index {} exceeds BIFF8 limit 65535 for MULRK record",
-            row
+            "Row index {row} exceeds BIFF8 limit 65535 for MULRK record"
         ))
     })?;
     if values.len() < 2 {
@@ -77,14 +75,12 @@ pub(crate) fn write_mulrk<W: Write>(
         ));
     }
     let last_col = first_col
-        .checked_add(
-            u16::try_from(values.len() - 1).map_err(|_| {
-                Error::InvalidData("MULRK column span exceeds BIFF8 limit".to_string())
-            })?,
-        )
+        .checked_add(u16::try_from(values.len() - 1).map_err(|_error| {
+            Error::InvalidData("MULRK column span exceeds BIFF8 limit".to_string())
+        })?)
         .ok_or_else(|| Error::InvalidData("MULRK last column exceeds BIFF8 limit".to_string()))?;
     let data_len = 6u16
-        .checked_add(u16::try_from(values.len() * 6).map_err(|_| {
+        .checked_add(u16::try_from(values.len() * 6).map_err(|_error| {
             Error::InvalidData("MULRK payload exceeds BIFF8 size limit".to_string())
         })?)
         .ok_or_else(|| Error::InvalidData("MULRK payload exceeds BIFF8 size limit".to_string()))?;
@@ -121,10 +117,9 @@ pub(crate) fn write_labelsst<W: Write>(
     sst_index: u32,
 ) -> Result<()> {
     // BIFF8 stores row as a 16-bit index (0..65535)
-    let row_u16 = u16::try_from(row).map_err(|_| {
+    let row_u16 = u16::try_from(row).map_err(|_error| {
         Error::InvalidData(format!(
-            "Row index {} exceeds BIFF8 limit 65535 for LABELSST record",
-            row
+            "Row index {row} exceeds BIFF8 limit 65535 for LABELSST record"
         ))
     })?;
 
@@ -161,10 +156,9 @@ pub(crate) fn write_boolerr<W: Write>(
     value: bool,
 ) -> Result<()> {
     // BIFF8 stores row as a 16-bit index (0..65535)
-    let row_u16 = u16::try_from(row).map_err(|_| {
+    let row_u16 = u16::try_from(row).map_err(|_error| {
         Error::InvalidData(format!(
-            "Row index {} exceeds BIFF8 limit 65535 for BOOLERR record",
-            row
+            "Row index {row} exceeds BIFF8 limit 65535 for BOOLERR record"
         ))
     })?;
 
@@ -178,7 +172,7 @@ pub(crate) fn write_boolerr<W: Write>(
     writer.write_all(&xf_index.to_le_bytes())?;
 
     // Boolean value (0 = false, 1 = true) + error flag (0 = boolean)
-    writer.write_all(&[if value { 1 } else { 0 }, 0])?;
+    writer.write_all(&[u8::from(value), 0])?;
 
     Ok(())
 }
@@ -211,7 +205,7 @@ pub(crate) fn write_formula_with_metadata<W: Write>(
     tokens: &[u8],
     metadata: crate::FormulaMetadata,
 ) -> Result<()> {
-    let row_u16 = u16::try_from(row).map_err(|_| {
+    let row_u16 = u16::try_from(row).map_err(|_error| {
         Error::InvalidData(format!(
             "Row index {row} exceeds BIFF8 limit 65535 for FORMULA record"
         ))
@@ -229,7 +223,7 @@ pub(crate) fn write_formula_with_metadata<W: Write>(
     };
     let array_tokens = match array_owner {
         Some(owner) => {
-            let col_u8 = u8::try_from(col).map_err(|_| {
+            let col_u8 = u8::try_from(col).map_err(|_error| {
                 Error::InvalidFormula(format!(
                     "array-formula column {col} exceeds the BIFF8 limit"
                 ))
@@ -278,7 +272,7 @@ pub(crate) fn write_formula_with_metadata<W: Write>(
         ));
     }
     let token_len = u16::try_from(formula_tokens.len())
-        .map_err(|_| Error::InvalidFormula("Formula token length exceeds u16".to_string()))?;
+        .map_err(|_error| Error::InvalidFormula("Formula token length exceeds u16".to_string()))?;
     let data_len = 22u16
         .checked_add(token_len)
         .ok_or_else(|| Error::InvalidFormula("Formula record length overflow".to_string()))?;
@@ -306,7 +300,7 @@ pub(crate) fn write_formula_with_metadata<W: Write>(
     Ok(())
 }
 
-/// Write the ShrFmla record owned by an anchor Formula record.
+/// Write the `ShrFmla` record owned by an anchor Formula record.
 fn write_shared_formula<W: Write>(
     writer: &mut W,
     owner: &crate::formula_metadata::Owner,
@@ -333,7 +327,7 @@ fn write_shared_formula<W: Write>(
         .checked_add(tokens.len())
         .ok_or_else(|| Error::InvalidFormula("ShrFmla payload length overflow".to_string()))?;
     let payload_len = u16::try_from(payload_len)
-        .map_err(|_| Error::InvalidFormula("ShrFmla payload exceeds u16".to_string()))?;
+        .map_err(|_error| Error::InvalidFormula("ShrFmla payload exceeds u16".to_string()))?;
     let c_use = owner.c_use()?;
 
     write_record_header(writer, 0x04BC, payload_len)?;
@@ -343,7 +337,7 @@ fn write_shared_formula<W: Write>(
     writer.write_all(&[range.first().col(), range.last().col()])?;
     writer.write_all(&[0, c_use])?;
     let token_len = u16::try_from(tokens.len())
-        .map_err(|_| Error::InvalidFormula("ShrFmla token length exceeds u16".to_string()))?;
+        .map_err(|_error| Error::InvalidFormula("ShrFmla token length exceeds u16".to_string()))?;
     writer.write_all(&token_len.to_le_bytes())?;
     writer.write_all(tokens)?;
     Ok(())

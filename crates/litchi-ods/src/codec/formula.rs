@@ -1,11 +1,11 @@
 //! ODF formula parsing and representation.
 //!
-//! This module provides support for OpenFormula (ODF 1.2) spreadsheet formulas.
+//! This module provides support for `OpenFormula` (ODF 1.2) spreadsheet formulas.
 //! It handles parsing, validation, and representation of formulas in ODS files.
 //!
 //! # Formula Syntax
 //!
-//! ODF uses OpenFormula syntax (similar to Excel but with some differences):
+//! ODF uses `OpenFormula` syntax (similar to Excel but with some differences):
 //! - Cell references: `A1`, `$A$1` (absolute), `Sheet1.A1` (external)
 //! - Functions: `SUM(A1:A10)`, `IF(A1>0, "Positive", "Negative")`
 //! - Operators: `+`, `-`, `*`, `/`, `^`, `&` (concatenation)
@@ -13,7 +13,7 @@
 //!
 //! # References
 //!
-//! - OpenFormula 1.2 Specification
+//! - `OpenFormula` 1.2 Specification
 //! - odfdo: `3rdparty/odfdo/src/odfdo/utils/formula.py`
 use litchi_core::{Error, Result};
 use phf::{Set, phf_set};
@@ -23,9 +23,9 @@ use smallvec::SmallVec;
 // FORMULA FUNCTION CATALOG
 // ============================================================================
 
-/// Standard OpenFormula functions
+/// Standard `OpenFormula` functions
 ///
-/// This is a compile-time set of valid OpenFormula function names.
+/// This is a compile-time set of valid `OpenFormula` function names.
 /// Using phf for O(1) lookup.
 static FORMULA_FUNCTIONS: Set<&'static str> = phf_set! {
     // Mathematical functions
@@ -143,6 +143,7 @@ pub struct FormulaParser<'a> {
 
 impl<'a> FormulaParser<'a> {
     /// Create a new formula parser
+    #[must_use]
     pub fn new(input: &'a str) -> Self {
         Self {
             input: input.as_bytes(),
@@ -151,6 +152,9 @@ impl<'a> FormulaParser<'a> {
     }
 
     /// Parse the formula
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn parse(mut self) -> Result<Formula> {
         let original = String::from_utf8_lossy(self.input).to_string();
         let mut tokens = Vec::new();
@@ -160,7 +164,7 @@ impl<'a> FormulaParser<'a> {
         // but parse the body directly so stripping the prefix does not require
         // a normalized temporary string.
         let input = std::str::from_utf8(self.input)
-            .map_err(|_| Error::InvalidFormat("Invalid UTF-8 in formula".to_string()))?;
+            .map_err(|_error| Error::InvalidFormat("Invalid UTF-8 in formula".to_string()))?;
         let body = input.trim();
         let body = body
             .strip_prefix('=')
@@ -294,10 +298,10 @@ impl<'a> FormulaParser<'a> {
         }
 
         let num_str = std::str::from_utf8(&self.input[start..self.position])
-            .map_err(|_| Error::InvalidFormat("Invalid UTF-8 in number".to_string()))?;
+            .map_err(|_error| Error::InvalidFormat("Invalid UTF-8 in number".to_string()))?;
 
         let num = fast_float2::parse(num_str)
-            .map_err(|_| Error::InvalidFormat(format!("Invalid number: {}", num_str)))?;
+            .map_err(|_error| Error::InvalidFormat(format!("Invalid number: {num_str}")))?;
 
         Ok(Token::Number(num))
     }
@@ -338,7 +342,7 @@ impl<'a> FormulaParser<'a> {
         }
 
         let ident = std::str::from_utf8(&self.input[start..self.position])
-            .map_err(|_| Error::InvalidFormat("Invalid UTF-8 in identifier".to_string()))?
+            .map_err(|_error| Error::InvalidFormat("Invalid UTF-8 in identifier".to_string()))?
             .to_uppercase();
 
         // Check if it's a known function
@@ -351,8 +355,7 @@ impl<'a> FormulaParser<'a> {
         } else {
             // Treat as cell reference or named range
             Err(Error::InvalidFormat(format!(
-                "Unknown identifier or invalid cell reference: {}",
-                ident
+                "Unknown identifier or invalid cell reference: {ident}"
             )))
         }
     }
@@ -383,8 +386,9 @@ impl<'a> FormulaParser<'a> {
         }
         self.advance(); // Skip the closing bracket.
 
-        let reference = std::str::from_utf8(&self.input[start..end])
-            .map_err(|_| Error::InvalidFormat("Invalid UTF-8 in cell reference".to_string()))?;
+        let reference = std::str::from_utf8(&self.input[start..end]).map_err(|_error| {
+            Error::InvalidFormat("Invalid UTF-8 in cell reference".to_string())
+        })?;
         parse_open_formula_reference(reference)
     }
 
@@ -411,7 +415,7 @@ impl<'a> FormulaParser<'a> {
 
             if self.peek() == Some(b'.') {
                 let sheet_name = std::str::from_utf8(&self.input[start..self.position])
-                    .map_err(|_| Error::InvalidFormat("Invalid sheet name".to_string()))?;
+                    .map_err(|_error| Error::InvalidFormat("Invalid sheet name".to_string()))?;
                 sheet = Some(sheet_name.to_string());
                 self.advance(); // Skip dot
             } else {
@@ -444,7 +448,7 @@ impl<'a> FormulaParser<'a> {
         }
 
         let column = std::str::from_utf8(&self.input[col_start..self.position])
-            .map_err(|_| Error::InvalidFormat("Invalid column".to_string()))?
+            .map_err(|_error| Error::InvalidFormat("Invalid column".to_string()))?
             .to_uppercase();
 
         // Parse row (absolute or relative)
@@ -472,11 +476,11 @@ impl<'a> FormulaParser<'a> {
         }
 
         let row_str = std::str::from_utf8(&self.input[row_start..self.position])
-            .map_err(|_| Error::InvalidFormat("Invalid row".to_string()))?;
+            .map_err(|_error| Error::InvalidFormat("Invalid row".to_string()))?;
 
         let row = row_str
             .parse::<u32>()
-            .map_err(|_| Error::InvalidFormat("Invalid row number".to_string()))?;
+            .map_err(|_error| Error::InvalidFormat("Invalid row number".to_string()))?;
 
         Ok(CellRef {
             sheet,
@@ -600,12 +604,10 @@ fn parse_open_formula_sheet_name(value: &str) -> Result<String> {
         let mut sheet = String::with_capacity(value.len());
         let mut characters = value.chars().peekable();
         while let Some(character) = characters.next() {
-            if character == '\'' {
-                if characters.next() != Some('\'') {
-                    return Err(Error::InvalidFormat(
-                        "ODF reference has an invalid escaped sheet name".to_string(),
-                    ));
-                }
+            if character == '\'' && characters.next() != Some('\'') {
+                return Err(Error::InvalidFormat(
+                    "ODF reference has an invalid escaped sheet name".to_string(),
+                ));
             }
             sheet.push(character);
         }
@@ -635,10 +637,7 @@ fn parse_a1_cell_ref(value: &str) -> Result<(String, u32, bool, bool)> {
         false
     };
     let column_start = position;
-    while bytes
-        .get(position)
-        .is_some_and(|character| character.is_ascii_alphabetic())
-    {
+    while bytes.get(position).is_some_and(u8::is_ascii_alphabetic) {
         position += 1;
     }
     if column_start == position {
@@ -647,7 +646,7 @@ fn parse_a1_cell_ref(value: &str) -> Result<(String, u32, bool, bool)> {
         ));
     }
     let column = std::str::from_utf8(&bytes[column_start..position])
-        .map_err(|_| Error::InvalidFormat("Invalid UTF-8 in ODF column".to_string()))?
+        .map_err(|_error| Error::InvalidFormat("Invalid UTF-8 in ODF column".to_string()))?
         .to_ascii_uppercase();
 
     let row_absolute = if bytes.get(position) == Some(&b'$') {
@@ -657,10 +656,7 @@ fn parse_a1_cell_ref(value: &str) -> Result<(String, u32, bool, bool)> {
         false
     };
     let row_start = position;
-    while bytes
-        .get(position)
-        .is_some_and(|character| character.is_ascii_digit())
-    {
+    while bytes.get(position).is_some_and(u8::is_ascii_digit) {
         position += 1;
     }
     if row_start == position || position != bytes.len() {
@@ -669,9 +665,9 @@ fn parse_a1_cell_ref(value: &str) -> Result<(String, u32, bool, bool)> {
         ));
     }
     let row = std::str::from_utf8(&bytes[row_start..position])
-        .map_err(|_| Error::InvalidFormat("Invalid UTF-8 in ODF row".to_string()))?
+        .map_err(|_error| Error::InvalidFormat("Invalid UTF-8 in ODF row".to_string()))?
         .parse::<u32>()
-        .map_err(|_| Error::InvalidFormat("Invalid ODF row number".to_string()))?;
+        .map_err(|_error| Error::InvalidFormat("Invalid ODF row number".to_string()))?;
     if row == 0 {
         return Err(Error::InvalidFormat(
             "ODF references must use 1-based rows".to_string(),
@@ -685,14 +681,16 @@ fn parse_a1_cell_ref(value: &str) -> Result<(String, u32, bool, bool)> {
 // FORMULA UTILITIES
 // ============================================================================
 
-/// Check if a string is a valid OpenFormula function name
+/// Check if a string is a valid `OpenFormula` function name
 #[inline]
 #[allow(dead_code)] // Will be used for future enhancements
+#[must_use]
 pub fn is_valid_function(name: &str) -> bool {
     FORMULA_FUNCTIONS.contains(name.to_uppercase().as_str())
 }
 
 /// Extract all cell references from a formula
+#[must_use]
 pub fn extract_cell_refs(formula: &Formula) -> SmallVec<[&CellRef; 8]> {
     formula
         .tokens
@@ -700,19 +698,37 @@ pub fn extract_cell_refs(formula: &Formula) -> SmallVec<[&CellRef; 8]> {
         .filter_map(|token| match token {
             Token::CellRef(cell_ref) => Some(cell_ref),
             Token::RangeRef(range_ref) => Some(&range_ref.start), // Just start for simplicity
-            _ => None,
+            Token::Function(_)
+            | Token::Number(_)
+            | Token::String(_)
+            | Token::Boolean(_)
+            | Token::Operator(_)
+            | Token::LParen
+            | Token::RParen
+            | Token::Comma
+            | Token::Semicolon => None,
         })
         .collect()
 }
 
 /// Extract all function calls from a formula
+#[must_use]
 pub fn extract_functions(formula: &Formula) -> SmallVec<[&str; 4]> {
     formula
         .tokens
         .iter()
         .filter_map(|token| match token {
             Token::Function(name) => Some(name.as_str()),
-            _ => None,
+            Token::CellRef(_)
+            | Token::RangeRef(_)
+            | Token::Number(_)
+            | Token::String(_)
+            | Token::Boolean(_)
+            | Token::Operator(_)
+            | Token::LParen
+            | Token::RParen
+            | Token::Comma
+            | Token::Semicolon => None,
         })
         .collect()
 }

@@ -67,6 +67,7 @@ impl Function {
         }
     }
 
+    #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Average => "average",
@@ -97,6 +98,7 @@ impl RangeReference {
         Ok(Self(value))
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -141,10 +143,12 @@ impl Reference {
         Ok(self)
     }
 
+    #[must_use]
     pub fn source(&self) -> &ReferenceSource {
         &self.source
     }
 
+    #[must_use]
     pub fn relationship_id(&self) -> Option<&str> {
         self.relationship_id.as_deref()
     }
@@ -173,10 +177,12 @@ impl References {
         })
     }
 
+    #[must_use]
     pub fn references(&self) -> &[Reference] {
         &self.references
     }
 
+    #[must_use]
     pub fn declared_count(&self) -> Option<u32> {
         self.declared_count
     }
@@ -201,6 +207,7 @@ pub struct DataConsolidation {
 }
 
 impl DataConsolidation {
+    #[must_use]
     pub fn new(function: Function, data_references: Option<References>) -> Self {
         Self {
             function,
@@ -212,46 +219,56 @@ impl DataConsolidation {
         }
     }
 
+    #[must_use]
     pub fn with_left_labels(mut self, value: bool) -> Self {
         self.left_labels = value;
         self
     }
 
+    #[must_use]
     pub fn with_start_labels(mut self, value: bool) -> Self {
         self.start_labels = value;
         self
     }
 
+    #[must_use]
     pub fn with_top_labels(mut self, value: bool) -> Self {
         self.top_labels = value;
         self
     }
 
+    #[must_use]
     pub fn with_link(mut self, value: bool) -> Self {
         self.link = value;
         self
     }
 
+    #[must_use]
     pub fn function(&self) -> Function {
         self.function
     }
 
+    #[must_use]
     pub fn left_labels(&self) -> bool {
         self.left_labels
     }
 
+    #[must_use]
     pub fn start_labels(&self) -> bool {
         self.start_labels
     }
 
+    #[must_use]
     pub fn top_labels(&self) -> bool {
         self.top_labels
     }
 
+    #[must_use]
     pub fn link(&self) -> bool {
         self.link
     }
 
+    #[must_use]
     pub fn data_references(&self) -> Option<&References> {
         self.data_references.as_ref()
     }

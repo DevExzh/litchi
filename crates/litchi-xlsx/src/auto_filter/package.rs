@@ -1,4 +1,4 @@
-//! Worksheet-context extraction for SpreadsheetML auto-filters.
+//! Worksheet-context extraction for `SpreadsheetML` auto-filters.
 
 use litchi_ooxml_common::mce::process_ooxml;
 use quick_xml::Writer;
@@ -6,7 +6,7 @@ use quick_xml::events::Event;
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
-use super::model::*;
+use super::model::{CORE, Definition, MAX_FRAGMENT_BYTES, STRICT};
 use crate::error::{Error, Result, invalid};
 
 pub fn parse_auto_filter(xml: &[u8]) -> Result<Option<Definition>> {

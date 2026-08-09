@@ -66,7 +66,10 @@ fn add_cell(
     duplicate_cells: &mut HashSet<(u16, u16)>,
     maximum: usize,
 ) -> Result<()> {
-    let position = (cell.row() as u16, cell.column() as u16);
+    let position = (
+        utils::truncate_u32_to_u16(cell.row()),
+        utils::truncate_u32_to_u16(cell.column()),
+    );
     if worksheet
         .get_cell(u32::from(position.0), u32::from(position.1))
         .is_some()
@@ -79,7 +82,7 @@ fn add_cell(
         }
         duplicate_cells
             .try_reserve(1)
-            .map_err(|_| Error::Allocation("tracking duplicate worksheet cells"))?;
+            .map_err(|_error| Error::Allocation("tracking duplicate worksheet cells"))?;
         duplicate_cells.insert(position);
     }
     worksheet.add_cell(cell)?;
@@ -115,7 +118,7 @@ fn claim_companion(
     }
     claims
         .try_reserve(1)
-        .map_err(|_| Error::Allocation("tracking Formula companion ownership"))?;
+        .map_err(|_error| Error::Allocation("tracking Formula companion ownership"))?;
     claims.insert(anchor, kind);
     Ok(predecessor)
 }
@@ -167,7 +170,7 @@ fn claim_array_range(occupancy: &mut HashMap<u16, [u64; 4]>, owner: &ArrayFormul
     }
     occupancy
         .try_reserve(missing_rows)
-        .map_err(|_| Error::Allocation("indexing Array range occupancy"))?;
+        .map_err(|_error| Error::Allocation("indexing Array range occupancy"))?;
     for row in first_row..=last_row {
         let columns = occupancy.entry(row).or_insert([0; 4]);
         for (occupied, mask) in columns.iter_mut().zip(masks) {
@@ -186,7 +189,7 @@ impl<R: Read + Seek> Workbook<R> {
         encoding: &Encoding,
         compatibility_profile: CompatibilityProfile,
     ) -> Result<Worksheet> {
-        let worksheet_position = usize::try_from(bound_sheet.position).map_err(|_| {
+        let worksheet_position = usize::try_from(bound_sheet.position).map_err(|_error| {
             Error::InvalidData("worksheet position does not fit in usize".to_string())
         })?;
         let worksheet_data = workbook_data.get(worksheet_position..).ok_or_else(|| {
@@ -627,7 +630,7 @@ impl<R: Read + Seek> Workbook<R> {
                         }
                         formula_metadata_defects
                             .try_reserve(1)
-                            .map_err(|_| Error::Allocation("tracking Formula metadata defects"))?;
+                            .map_err(|_error| Error::Allocation("tracking Formula metadata defects"))?;
                         formula_metadata_defects.push(
                             FormulaDefect::SharedFlagWithoutPtgExp {
                                 cell: FormulaCell::try_new(
@@ -651,7 +654,7 @@ impl<R: Read + Seek> Workbook<R> {
                             }
                             ptg_exp_cells
                                 .try_reserve(1)
-                                .map_err(|_| Error::Allocation("tracking PtgExp Formula cells"))?;
+                                .map_err(|_error| Error::Allocation("tracking PtgExp Formula cells"))?;
                             ptg_exp_cells.insert(position, link);
                         }
                         immediately_preceding_formula = Some(link);
@@ -731,7 +734,7 @@ impl<R: Read + Seek> Workbook<R> {
                     }
                     shared_formulas
                         .try_reserve(1)
-                        .map_err(|_| Error::Allocation("tracking ShrFmla owners"))?;
+                        .map_err(|_error| Error::Allocation("tracking ShrFmla owners"))?;
                     let rendered = template.render(formula_context, anchor.0, anchor.1);
                     shared_formulas.insert(anchor, template);
                     if let Some(cell) = worksheet.get_cell_mut(
@@ -787,10 +790,10 @@ impl<R: Read + Seek> Workbook<R> {
                     }
                     array_formulas
                         .try_reserve(1)
-                        .map_err(|_| Error::Allocation("tracking Array owners"))?;
+                        .map_err(|_error| Error::Allocation("tracking Array owners"))?;
                     array_formula_by_anchor
                         .try_reserve(1)
-                        .map_err(|_| Error::Allocation("indexing Array owners"))?;
+                        .map_err(|_error| Error::Allocation("indexing Array owners"))?;
                     claim_array_range(&mut array_occupancy, &owner)?;
                     array_formula_by_anchor.insert(anchor_position, Arc::clone(&owner));
                     array_formulas.push(owner);

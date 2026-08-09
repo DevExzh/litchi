@@ -24,7 +24,7 @@ pub struct Document {
     pub key: Key,
 }
 
-/// LibreOffice's optional sheet edit permissions.
+/// `LibreOffice`'s optional sheet edit permissions.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Permissions {
     pub select_protected_cells: Option<bool>,
@@ -38,6 +38,7 @@ pub struct Permissions {
 }
 
 impl Permissions {
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.select_protected_cells.is_none()
             && self.select_unprotected_cells.is_none()
@@ -60,6 +61,7 @@ pub struct Sheet {
 }
 
 impl Sheet {
+    #[must_use]
     pub fn is_protected(&self) -> Option<bool> {
         self.protected
     }
@@ -98,19 +100,23 @@ pub struct Styles {
 }
 
 impl Styles {
+    #[must_use]
     pub fn automatic(&self) -> &[Style] {
         &self.automatic
     }
 
+    #[must_use]
     pub fn get(&self, name: &str) -> Option<&Style> {
         self.automatic.iter().find(|style| style.name == name)
     }
 
     /// Borrow conditional `style:map` catalogs in source order.
+    #[must_use]
     pub fn conditional(&self) -> &[ConditionalStyle] {
         &self.conditional
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.automatic.is_empty() && self.conditional.is_empty()
     }

@@ -19,11 +19,13 @@ pub enum Change {
 
 impl Change {
     /// Membership before this transition.
+    #[must_use]
     pub const fn before(self) -> bool {
         matches!(self, Self::Remove)
     }
 
     /// Membership after this transition.
+    #[must_use]
     pub const fn after(self) -> bool {
         matches!(self, Self::Add)
     }
@@ -153,12 +155,10 @@ impl Index {
                     return Some(range);
                 }
             }
-            current = if row < node.center {
-                node.lower
-            } else if row > node.center {
-                node.upper
-            } else {
-                NONE
+            current = match row.cmp(&node.center) {
+                std::cmp::Ordering::Less => node.lower,
+                std::cmp::Ordering::Greater => node.upper,
+                std::cmp::Ordering::Equal => NONE,
             };
         }
         None
@@ -320,8 +320,7 @@ fn validate_non_overlapping(ranges: &[Rect]) -> Result<()> {
         }
         if active.insert(start_column, (end_column, index)).is_some() {
             return Err(invalid(format!(
-                "overlapping merged ranges share start column {}",
-                start_column
+                "overlapping merged ranges share start column {start_column}"
             )));
         }
         expiry.push(Reverse((end_row, start_column, index)));

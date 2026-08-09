@@ -1,3 +1,19 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::expect_used,
+    reason = "the invariant is established immediately before extraction"
+)]
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Field writer support for DOCX documents.
 
 use super::revision::RevisionTextMode;
@@ -25,6 +41,10 @@ pub struct CitationSource {
 
 impl CitationSource {
     /// Create a source reference from its case-sensitive bibliography tag.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(tag: impl Into<String>) -> Result<Self> {
         let tag = tag.into();
         validate_typed_field_instruction_text(&tag, "citation source tag", false)?;
@@ -37,11 +57,16 @@ impl CitationSource {
     }
 
     /// Return the case-sensitive bibliography tag stored by this source.
+    #[must_use]
     pub fn tag(&self) -> &str {
         &self.tag
     }
 
     /// Replace the bibliography tag.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_tag(&mut self, tag: impl Into<String>) -> Result<()> {
         let tag = tag.into();
         validate_typed_field_instruction_text(&tag, "citation source tag", false)?;
@@ -50,6 +75,7 @@ impl CitationSource {
     }
 
     /// Return the optional source-local volume number.
+    #[must_use]
     pub fn volume(&self) -> Option<u32> {
         self.volume
     }
@@ -60,11 +86,16 @@ impl CitationSource {
     }
 
     /// Return the optional source-local citation prefix.
+    #[must_use]
     pub fn prefix(&self) -> Option<&str> {
         self.prefix.as_deref()
     }
 
     /// Set or clear the source-local citation prefix.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_prefix(&mut self, prefix: Option<String>) -> Result<()> {
         if let Some(prefix) = &prefix {
             validate_typed_field_instruction_text(prefix, "citation prefix", false)?;
@@ -74,11 +105,16 @@ impl CitationSource {
     }
 
     /// Return the optional source-local citation suffix.
+    #[must_use]
     pub fn suffix(&self) -> Option<&str> {
         self.suffix.as_deref()
     }
 
     /// Set or clear the source-local citation suffix.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_suffix(&mut self, suffix: Option<String>) -> Result<()> {
         if let Some(suffix) = &suffix {
             validate_typed_field_instruction_text(suffix, "citation suffix", false)?;
@@ -135,6 +171,7 @@ pub struct CitationFieldSpec {
 
 impl CitationFieldSpec {
     /// Create a dirty field with one required primary source.
+    #[must_use]
     pub fn new(primary_source: CitationSource) -> Self {
         Self {
             sources: vec![primary_source],
@@ -145,6 +182,7 @@ impl CitationFieldSpec {
     }
 
     /// Return the primary source tag and its source-local switches.
+    #[must_use]
     pub fn primary_source(&self) -> &CitationSource {
         &self.sources[0]
     }
@@ -155,11 +193,13 @@ impl CitationFieldSpec {
     }
 
     /// Return every source in field-code order.
+    #[must_use]
     pub fn sources(&self) -> &[CitationSource] {
         &self.sources
     }
 
     /// Return the optional locale identifier stored with the field.
+    #[must_use]
     pub fn locale(&self) -> Option<u32> {
         self.locale
     }
@@ -170,6 +210,10 @@ impl CitationFieldSpec {
     }
 
     /// Add another source, serialized with a `\\m` switch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_source(&mut self, source: CitationSource) -> Result<()> {
         source.validate()?;
         if self.sources.len() >= MAX_CITATION_SOURCES {
@@ -182,11 +226,16 @@ impl CitationFieldSpec {
     }
 
     /// Return the caller-supplied cached result, if any.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Set or clear a caller-supplied cached result without generating it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_cached_result(&mut self, result: Option<String>) -> Result<()> {
         if let Some(result) = &result {
             validate_typed_field_result_text(result)?;
@@ -196,6 +245,7 @@ impl CitationFieldSpec {
     }
 
     /// Return whether the serialized field is marked stale for a word processor.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
@@ -206,6 +256,10 @@ impl CitationFieldSpec {
     }
 
     /// Build a canonical `CITATION` instruction from the typed metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn to_instruction(&self) -> Result<String> {
         self.validate()?;
         let mut instruction = String::from("CITATION");
@@ -266,6 +320,7 @@ pub struct BibliographyFieldSpec {
 
 impl BibliographyFieldSpec {
     /// Create a dirty bibliography field without an explicit source selection.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             locale: None,
@@ -277,6 +332,7 @@ impl BibliographyFieldSpec {
     }
 
     /// Return the optional display locale identifier stored with the field.
+    #[must_use]
     pub fn locale(&self) -> Option<u32> {
         self.locale
     }
@@ -287,6 +343,7 @@ impl BibliographyFieldSpec {
     }
 
     /// Return the optional source-language filter stored with the field.
+    #[must_use]
     pub fn filter(&self) -> Option<BibliographyFilter> {
         self.filter
     }
@@ -297,11 +354,16 @@ impl BibliographyFieldSpec {
     }
 
     /// Return source tags selected by repeatable `\\m` switches in order.
+    #[must_use]
     pub fn source_tags(&self) -> &[String] {
         &self.source_tags
     }
 
     /// Select one additional source tag with a `\\m` switch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_source_tag(&mut self, tag: impl Into<String>) -> Result<()> {
         if self.source_tags.len() >= MAX_BIBLIOGRAPHY_SOURCES {
             return Err(Error::InvalidFormat(format!(
@@ -315,11 +377,16 @@ impl BibliographyFieldSpec {
     }
 
     /// Return the caller-supplied cached bibliography result, if any.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Set or clear a caller-supplied cached result without generating it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_cached_result(&mut self, result: Option<String>) -> Result<()> {
         if let Some(result) = &result {
             validate_typed_field_result_text(result)?;
@@ -329,6 +396,7 @@ impl BibliographyFieldSpec {
     }
 
     /// Return whether the serialized field is marked stale for a word processor.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
@@ -339,6 +407,10 @@ impl BibliographyFieldSpec {
     }
 
     /// Build a canonical `BIBLIOGRAPHY` instruction from the typed metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn to_instruction(&self) -> Result<String> {
         self.validate()?;
         let mut instruction = String::from("BIBLIOGRAPHY");
@@ -397,7 +469,7 @@ fn validate_typed_field_instruction_text(
 ) -> Result<()> {
     if (!allow_empty && value.trim().is_empty())
         || value.len() > MAX_TYPED_FIELD_TEXT_BYTES
-        || value.chars().any(|character| character.is_control())
+        || value.chars().any(char::is_control)
     {
         return Err(Error::InvalidFormat(format!("invalid {context}")));
     }
@@ -449,7 +521,7 @@ fn append_quoted_field_argument(instruction: &mut String, value: &str) {
 pub enum MutableField {
     /// A complete field with instruction and optional result
     Complete {
-        /// Field instruction (e.g., "PAGE", "DATE", "REF MyBookmark")
+        /// Field instruction (e.g., "PAGE", "DATE", "REF `MyBookmark`")
         instruction: String,
         /// Field result (optional, the displayed value)
         result: Option<String>,
@@ -475,6 +547,7 @@ impl MutableField {
     /// # Arguments
     ///
     /// * `instruction` - The field instruction (e.g., "PAGE", "DATE \\@ \"MMMM d, yyyy\"")
+    #[must_use]
     pub fn new(instruction: String) -> Self {
         Self::Complete {
             instruction,
@@ -489,6 +562,7 @@ impl MutableField {
     ///
     /// * `instruction` - The field instruction
     /// * `result` - The current result value
+    #[must_use]
     pub fn with_result(instruction: String, result: String) -> Self {
         Self::Complete {
             instruction,
@@ -502,6 +576,10 @@ impl MutableField {
     /// This serializes caller-supplied bibliography tags and switches only. It
     /// does not access source stores, format a citation, or refresh the cached
     /// result.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn citation(spec: &CitationFieldSpec) -> Result<Self> {
         Ok(Self::Complete {
             instruction: spec.to_instruction()?,
@@ -515,6 +593,10 @@ impl MutableField {
     /// This serializes caller-supplied locale metadata and source tags only. It
     /// does not read source stores, format a bibliography, filter sources, or
     /// refresh the cached result.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn bibliography(spec: &BibliographyFieldSpec) -> Result<Self> {
         Ok(Self::Complete {
             instruction: spec.to_instruction()?,
@@ -524,36 +606,42 @@ impl MutableField {
     }
 
     /// Create a field begin character.
+    #[must_use]
     pub fn begin() -> Self {
         Self::Begin
     }
 
     /// Create a field instruction character.
+    #[must_use]
     pub fn instruction_char(text: String) -> Self {
         Self::Instruction(text)
     }
 
     /// Create a field separate character.
+    #[must_use]
     pub fn separate() -> Self {
         Self::Separate { dirty: false }
     }
 
     /// Create a field separate character marked as dirty.
+    #[must_use]
     pub fn separate_dirty() -> Self {
         Self::Separate { dirty: true }
     }
 
     /// Create a field end character.
+    #[must_use]
     pub fn end() -> Self {
         Self::End
     }
 
     /// Get the field instruction (for Complete fields only).
+    #[must_use]
     pub fn get_instruction(&self) -> Option<&str> {
         match self {
             Self::Complete { instruction, .. } => Some(instruction),
             Self::Instruction(text) => Some(text),
-            _ => None,
+            Self::Begin | Self::Separate { .. } | Self::End => None,
         }
     }
 
@@ -561,12 +649,14 @@ impl MutableField {
     ///
     /// # Panics
     /// Panics if this is not a Complete or Instruction field variant.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         self.get_instruction()
             .expect("instruction() called on non-instruction field variant")
     }
 
-    /// Get the field result (alias for get_result).
+    /// Get the field result (alias for `get_result`).
+    #[must_use]
     pub fn result(&self) -> Option<&str> {
         self.get_result()
     }
@@ -583,10 +673,11 @@ impl MutableField {
     }
 
     /// Get the field result (for Complete fields only).
+    #[must_use]
     pub fn get_result(&self) -> Option<&str> {
         match self {
             Self::Complete { result, .. } => result.as_deref(),
-            _ => None,
+            Self::Begin | Self::Instruction(_) | Self::Separate { .. } | Self::End => None,
         }
     }
 
@@ -599,10 +690,11 @@ impl MutableField {
     }
 
     /// Check if the field is dirty (needs update).
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         match self {
             Self::Complete { dirty, .. } | Self::Separate { dirty } => *dirty,
-            _ => false,
+            Self::Begin | Self::Instruction(_) | Self::End => false,
         }
     }
 
@@ -610,12 +702,15 @@ impl MutableField {
     pub fn mark_dirty(&mut self) {
         match self {
             Self::Complete { dirty, .. } | Self::Separate { dirty } => *dirty = true,
-            _ => {},
+            Self::Begin | Self::Instruction(_) | Self::End => {},
         }
     }
 
     /// Generate XML for this field.
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "writer helper is retained for package integration"
+    )]
     pub(crate) fn to_xml(&self) -> Result<String> {
         self.to_xml_mode(RevisionTextMode::Normal)
     }
@@ -702,11 +797,13 @@ impl MutableField {
 
     /// Common field factory methods
     /// Create a PAGE field (page number).
+    #[must_use]
     pub fn page() -> Self {
         Self::new("PAGE".to_string())
     }
 
     /// Create a NUMPAGES field (total page count).
+    #[must_use]
     pub fn num_pages() -> Self {
         Self::new("NUMPAGES".to_string())
     }
@@ -716,9 +813,10 @@ impl MutableField {
     /// # Arguments
     ///
     /// * `format` - Optional date format string (e.g., "MMMM d, yyyy")
+    #[must_use]
     pub fn date(format: Option<&str>) -> Self {
         let instruction = if let Some(fmt) = format {
-            format!(r#"DATE \@ "{}""#, fmt)
+            format!(r#"DATE \@ "{fmt}""#)
         } else {
             "DATE".to_string()
         };
@@ -726,9 +824,10 @@ impl MutableField {
     }
 
     /// Create a TIME field with optional format.
+    #[must_use]
     pub fn time(format: Option<&str>) -> Self {
         let instruction = if let Some(fmt) = format {
-            format!(r#"TIME \@ "{}""#, fmt)
+            format!(r#"TIME \@ "{fmt}""#)
         } else {
             "TIME".to_string()
         };
@@ -740,8 +839,9 @@ impl MutableField {
     /// # Arguments
     ///
     /// * `bookmark_name` - Name of the bookmark to reference
+    #[must_use]
     pub fn reference(bookmark_name: &str) -> Self {
-        Self::new(format!("REF {}", bookmark_name))
+        Self::new(format!("REF {bookmark_name}"))
     }
 
     /// Create a HYPERLINK field.
@@ -749,8 +849,9 @@ impl MutableField {
     /// # Arguments
     ///
     /// * `url` - The URL to link to
+    #[must_use]
     pub fn hyperlink(url: &str) -> Self {
-        Self::new(format!(r#"HYPERLINK "{}""#, url))
+        Self::new(format!(r#"HYPERLINK "{url}""#))
     }
 
     /// Create a TOC (Table of Contents) field.
@@ -759,6 +860,7 @@ impl MutableField {
     ///
     /// * `instruction` - The complete TOC field instruction (e.g., `TOC \o "1-3" \h \z`)
     /// * `placeholder_text` - Optional placeholder text to display before field update
+    #[must_use]
     pub fn toc(instruction: String, placeholder_text: Option<String>) -> Self {
         Self::Complete {
             instruction,

@@ -13,6 +13,9 @@ pub struct Scale {
 
 impl Scale {
     /// Create a scale from positive terms no larger than 32767.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(numerator: u16, denominator: u16) -> Result<Self> {
         let value = Self {
             numerator,
@@ -23,11 +26,13 @@ impl Scale {
     }
 
     /// Return the fraction numerator.
+    #[must_use]
     pub const fn numerator(self) -> u16 {
         self.numerator
     }
 
     /// Return the fraction denominator.
+    #[must_use]
     pub const fn denominator(self) -> u16 {
         self.denominator
     }
@@ -71,6 +76,9 @@ pub struct Pane {
 
 impl Pane {
     /// Freeze `rows` rows and `columns` columns from the top-left corner.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn frozen(rows: u16, columns: u8) -> Result<Self> {
         let value = Self {
             mode: Mode::Frozen,
@@ -85,6 +93,9 @@ impl Pane {
     }
 
     /// Create a split pane with BIFF8 twip offsets and scroll origins.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn split(
         horizontal_twips: u16,
         vertical_twips: u16,
@@ -105,31 +116,37 @@ impl Pane {
     }
 
     /// Return whether this pane is frozen or split.
+    #[must_use]
     pub const fn mode(self) -> Mode {
         self.mode
     }
 
     /// Return the horizontal split in columns when frozen, otherwise twips.
+    #[must_use]
     pub const fn horizontal(self) -> u16 {
         self.horizontal_split
     }
 
     /// Return the vertical split in rows when frozen, otherwise twips.
+    #[must_use]
     pub const fn vertical(self) -> u16 {
         self.vertical_split
     }
 
     /// Return the first row shown in the bottom pane.
+    #[must_use]
     pub const fn row(self) -> u16 {
         self.bottom_pane_top_row
     }
 
     /// Return the first column shown in the right pane.
+    #[must_use]
     pub const fn column(self) -> u8 {
         self.right_pane_left_column
     }
 
     /// Return the pane that owns the active selection.
+    #[must_use]
     pub const fn active(self) -> PaneType {
         self.active_pane
     }
@@ -173,6 +190,9 @@ pub struct Selection {
 
 impl Selection {
     /// Create a selection record from ordered, nonempty ranges.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(
         pane: PaneType,
         active_row: u16,
@@ -192,6 +212,7 @@ impl Selection {
     }
 
     /// Select one cell in `pane`.
+    #[must_use]
     pub fn cell(pane: PaneType, row: u16, column: u8) -> Self {
         Self {
             pane,
@@ -203,26 +224,31 @@ impl Selection {
     }
 
     /// Return the pane containing this selection.
+    #[must_use]
     pub const fn pane(&self) -> PaneType {
         self.pane
     }
 
     /// Return the active row.
+    #[must_use]
     pub const fn row(&self) -> u16 {
         self.active_row
     }
 
     /// Return the active column.
+    #[must_use]
     pub const fn column(&self) -> u8 {
         self.active_column
     }
 
     /// Return the zero-based active range index.
+    #[must_use]
     pub const fn active(&self) -> u16 {
         self.active_range_index
     }
 
     /// Borrow the inclusive selected ranges.
+    #[must_use]
     pub fn ranges(&self) -> &[Range] {
         &self.ranges
     }
@@ -281,86 +307,103 @@ impl Default for View {
 
 impl View {
     /// Return whether formulas are shown instead of their results.
+    #[must_use]
     pub const fn shows_formulas(&self) -> bool {
         self.flags.contains(Flags::FORMULAS)
     }
 
     /// Return whether gridlines are shown.
+    #[must_use]
     pub const fn shows_gridlines(&self) -> bool {
         self.flags.contains(Flags::GRIDLINES)
     }
 
     /// Return whether row and column headers are shown.
+    #[must_use]
     pub const fn shows_headers(&self) -> bool {
         self.flags.contains(Flags::HEADERS)
     }
 
     /// Return whether zero-valued cells are shown.
+    #[must_use]
     pub const fn shows_zeros(&self) -> bool {
         self.flags.contains(Flags::ZEROS)
     }
 
     /// Return the custom palette index, or `None` for the default color.
+    #[must_use]
     pub const fn grid_color_index(&self) -> Option<u16> {
         self.gridline_color_index
     }
 
     /// Return whether the worksheet is laid out right-to-left.
+    #[must_use]
     pub const fn right_to_left(&self) -> bool {
         self.flags.contains(Flags::RIGHT_TO_LEFT)
     }
 
     /// Return whether outline symbols are shown.
+    #[must_use]
     pub const fn shows_outlines(&self) -> bool {
         self.flags.contains(Flags::OUTLINES)
     }
 
     /// Return whether this worksheet is selected in the workbook window.
+    #[must_use]
     pub const fn is_selected(&self) -> bool {
         self.flags.contains(Flags::SELECTED)
     }
 
     /// Return whether this worksheet window is displayed.
+    #[must_use]
     pub const fn is_displayed(&self) -> bool {
         self.flags.contains(Flags::DISPLAYED)
     }
 
     /// Return whether page-break preview is active.
+    #[must_use]
     pub const fn is_page_break_preview(&self) -> bool {
         self.flags.contains(Flags::PAGE_BREAKS)
     }
 
     /// Return the first visible row.
+    #[must_use]
     pub const fn row(&self) -> u16 {
         self.first_visible_row
     }
 
     /// Return the first visible column.
+    #[must_use]
     pub const fn column(&self) -> u8 {
         self.first_visible_column
     }
 
     /// Return the page-break preview zoom percentage.
+    #[must_use]
     pub const fn page_zoom_percent(&self) -> Option<u16> {
         self.page_break_zoom_percent
     }
 
     /// Return the normal-view zoom percentage.
+    #[must_use]
     pub const fn normal_zoom_percent(&self) -> Option<u16> {
         self.normal_zoom_percent
     }
 
     /// Return the optional exact zoom fraction.
+    #[must_use]
     pub const fn scale(&self) -> Option<Scale> {
         self.scale
     }
 
     /// Borrow the current pane.
+    #[must_use]
     pub const fn pane(&self) -> Option<&Pane> {
         self.pane.as_ref()
     }
 
     /// Borrow all pane selections.
+    #[must_use]
     pub fn selections(&self) -> &[Selection] {
         &self.selections
     }
@@ -420,6 +463,9 @@ impl View {
     }
 
     /// Set the first visible cell after checking pane-specific sentinels.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn origin(&mut self, row: u16, column: u8) -> Result<&mut Self> {
         validate_origin(row, column, self.pane.as_ref())?;
         self.first_visible_row = row;
@@ -428,6 +474,9 @@ impl View {
     }
 
     /// Set a palette index in `0..=63`, or use the default with `None`.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn grid_color(&mut self, index: Option<u16>) -> Result<&mut Self> {
         if index.is_some_and(|value| value > 63) {
             return Err(Error::InvalidData(
@@ -439,6 +488,9 @@ impl View {
     }
 
     /// Set page-break preview zoom in `10..=400`, or clear it with `None`.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn page_zoom(&mut self, percent: Option<u16>) -> Result<&mut Self> {
         validate_zoom(percent)?;
         self.page_break_zoom_percent = percent;
@@ -446,6 +498,9 @@ impl View {
     }
 
     /// Set normal-view zoom in `10..=400`, or clear it with `None`.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn normal_zoom(&mut self, percent: Option<u16>) -> Result<&mut Self> {
         validate_zoom(percent)?;
         self.normal_zoom_percent = percent;
@@ -458,6 +513,9 @@ impl View {
     }
 
     /// Atomically replace the pane and its selections after preflight checks.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn put_pane(
         &mut self,
         pane: Pane,
@@ -470,6 +528,9 @@ impl View {
     }
 
     /// Atomically replace selections after checking them against the pane.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn put_selections(&mut self, selections: Vec<Selection>) -> Result<Vec<Selection>> {
         self.validate_with(self.pane.as_ref(), &selections)?;
         Ok(std::mem::replace(&mut self.selections, selections))

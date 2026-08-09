@@ -14,18 +14,23 @@ pub struct Settings {
 }
 
 impl Settings {
+    #[must_use]
     pub fn window_closed(&self) -> bool {
         self.window_closed
     }
+    #[must_use]
     pub fn x_left(&self) -> u32 {
         self.x_left
     }
+    #[must_use]
     pub fn y_top(&self) -> u32 {
         self.y_top
     }
+    #[must_use]
     pub fn dropdown_object_id(&self) -> Option<u16> {
         self.dropdown_object_id
     }
+    #[must_use]
     pub fn declared_rule_count(&self) -> u16 {
         self.declared_rule_count
     }
@@ -84,11 +89,13 @@ pub struct Formula {
 }
 
 impl Formula {
+    #[must_use]
     pub fn tokens(&self) -> &[u8] {
         &self.tokens
     }
 
     /// Best-effort inert rendering using the workbook's existing BIFF token renderer.
+    #[must_use]
     pub fn rendered(&self) -> Option<&str> {
         self.rendered.as_deref()
     }
@@ -104,15 +111,19 @@ pub struct Range {
 }
 
 impl Range {
+    #[must_use]
     pub fn first_row(&self) -> u16 {
         self.first_row
     }
+    #[must_use]
     pub fn last_row(&self) -> u16 {
         self.last_row
     }
+    #[must_use]
     pub fn first_column(&self) -> u8 {
         self.first_column
     }
+    #[must_use]
     pub fn last_column(&self) -> u8 {
         self.last_column
     }
@@ -140,51 +151,67 @@ pub struct Rule {
 }
 
 impl Rule {
+    #[must_use]
     pub fn kind(&self) -> Kind {
         self.kind
     }
+    #[must_use]
     pub fn error_style(&self) -> ErrorStyle {
         self.error_style
     }
+    #[must_use]
     pub fn explicit_list(&self) -> bool {
         self.explicit_list
     }
+    #[must_use]
     pub fn allow_blank(&self) -> bool {
         self.allow_blank
     }
+    #[must_use]
     pub fn suppress_dropdown(&self) -> bool {
         self.suppress_dropdown
     }
+    #[must_use]
     pub fn ime_mode(&self) -> ImeMode {
         self.ime_mode
     }
+    #[must_use]
     pub fn show_input_message(&self) -> bool {
         self.show_input_message
     }
+    #[must_use]
     pub fn show_error_message(&self) -> bool {
         self.show_error_message
     }
+    #[must_use]
     pub fn operator(&self) -> Operator {
         self.operator
     }
+    #[must_use]
     pub fn prompt_title(&self) -> Option<&str> {
         self.prompt_title.as_deref()
     }
+    #[must_use]
     pub fn error_title(&self) -> Option<&str> {
         self.error_title.as_deref()
     }
+    #[must_use]
     pub fn prompt(&self) -> Option<&str> {
         self.prompt.as_deref()
     }
+    #[must_use]
     pub fn error(&self) -> Option<&str> {
         self.error.as_deref()
     }
+    #[must_use]
     pub fn formula1(&self) -> Option<&Formula> {
         self.formula1.as_ref()
     }
+    #[must_use]
     pub fn formula2(&self) -> Option<&Formula> {
         self.formula2.as_ref()
     }
+    #[must_use]
     pub fn ranges(&self) -> &[Range] {
         &self.ranges
     }

@@ -31,6 +31,7 @@ impl Field {
     /// * `instruction` - The field instruction
     /// * `result` - The cached field result
     /// * `dirty` - Whether the field needs updating
+    #[must_use]
     pub fn new(instruction: String, result: Option<String>, dirty: bool) -> Self {
         Self {
             instruction,
@@ -64,24 +65,28 @@ impl Field {
     /// - `"DATE \\@ \"MMMM d, yyyy\""` - Formatted date
     /// - `"REF bookmark1"` - Cross-reference to a bookmark
     #[inline]
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
 
     /// Get the field result (cached display value).
     #[inline]
+    #[must_use]
     pub fn result(&self) -> Option<&str> {
         self.result.as_deref()
     }
 
     /// Check if the field is dirty (needs updating).
     #[inline]
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
 
     /// Check if the field is locked against automatic recalculation.
     #[inline]
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.locked
     }
@@ -101,6 +106,7 @@ impl Field {
     /// let field = Field::new("DATE \\@ \"MMMM d, yyyy\"".to_string(), None, false);
     /// assert_eq!(field.field_type(), "DATE");
     /// ```
+    #[must_use]
     pub fn field_type(&self) -> &str {
         self.instruction
             .split_whitespace()

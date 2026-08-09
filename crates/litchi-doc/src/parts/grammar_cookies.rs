@@ -8,11 +8,11 @@
 use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
 
-/// Table-pointer index of `fcPlcfcookie`/`lcbPlcfcookie` (MS-DOC 2.5.8 FibRgFcLcb2002).
+/// Table-pointer index of `fcPlcfcookie`/`lcbPlcfcookie` (MS-DOC 2.5.8 `FibRgFcLcb2002`).
 const COOKIE_FIB_INDEX: usize = 116;
-/// Table-pointer index of `fcPlcfCookieOld`/`lcbPlcfCookieOld` (MS-DOC 2.5.7 FibRgFcLcb2000).
+/// Table-pointer index of `fcPlcfCookieOld`/`lcbPlcfCookieOld` (MS-DOC 2.5.7 `FibRgFcLcb2000`).
 const COOKIE_OLD_FIB_INDEX: usize = 101;
-/// Table-pointer index of `fcCookieData`/`lcbCookieData` (MS-DOC 2.5.6 FibRgFcLcb97).
+/// Table-pointer index of `fcCookieData`/`lcbCookieData` (MS-DOC 2.5.6 `FibRgFcLcb97`).
 const COOKIE_DATA_FIB_INDEX: usize = 62;
 const MAX_COOKIE_ENTRIES: usize = 1_000_000;
 /// CPs are signed 31-bit positions in the set of all document parts (MS-DOC 2.2.1).
@@ -81,7 +81,10 @@ impl GrammarCookie {
     const LID_PRIMARY_MAX: u8 = 0x7F;
 
     /// Create a cookie descriptor, validating the bit-field widths.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "parameters map one-to-one to a fixed DOC record or semantic construction"
+    )]
     pub fn try_new(
         dcp: i16,
         dcp_sent: i16,
@@ -129,6 +132,7 @@ impl GrammarCookie {
     }
 
     /// Serialize exactly as decoded.
+    #[must_use]
     pub fn to_bytes(self) -> [u8; Self::SIZE] {
         let flags = self.error_type as u16
             | u16::from(self.is_error) << 2
@@ -144,33 +148,41 @@ impl GrammarCookie {
     }
 
     /// Characters spanned by the cookie text (ignored for header entries).
+    #[must_use]
     pub fn dcp(&self) -> i16 {
         self.dcp
     }
     /// Characters from the cookie text back to its sentence start.
+    #[must_use]
     pub fn dcp_sent(&self) -> i16 {
         self.dcp_sent
     }
     /// Byte offset of the cookie within the `RgCdb` at `fcCookieData`.
+    #[must_use]
     pub fn icdb(&self) -> u32 {
         self.icdb
     }
+    #[must_use]
     pub fn error_type(&self) -> CookieErrorType {
         self.error_type
     }
     /// Whether the cookie corresponds to an error displayed to the user.
+    #[must_use]
     pub fn is_error(&self) -> bool {
         self.is_error
     }
     /// Bits 9-13 of the creating grammar checker's language ID.
+    #[must_use]
     pub fn lid_sub(&self) -> u8 {
         self.lid_sub
     }
     /// The 7 least significant bits of the checker's language ID.
+    #[must_use]
     pub fn lid_primary(&self) -> u8 {
         self.lid_primary
     }
     /// Whether this is the checker's single implementation-specific header entry.
+    #[must_use]
     pub fn is_header(&self) -> bool {
         self.is_header
     }
@@ -236,6 +248,7 @@ impl LegacyGrammarCookie {
     }
 
     /// Serialize with zeroed padding and spare bits.
+    #[must_use]
     pub fn to_bytes(self) -> [u8; Self::SIZE] {
         let flags = self.error_type as u16 | u16::from(self.is_error) << 15;
         let mut data = [0u8; Self::SIZE];
@@ -248,25 +261,31 @@ impl LegacyGrammarCookie {
     }
 
     /// Language ID of the grammar checker that created the cookie.
+    #[must_use]
     pub fn lid(&self) -> u16 {
         self.lid
     }
     /// Characters spanned by the cookie text.
+    #[must_use]
     pub fn dcp(&self) -> i16 {
         self.dcp
     }
     /// Characters from the cookie text back to its sentence start.
+    #[must_use]
     pub fn dcp_sent(&self) -> i16 {
         self.dcp_sent
     }
+    #[must_use]
     pub fn error_type(&self) -> CookieErrorType {
         self.error_type
     }
     /// Whether the cookie corresponds to an error displayed to the user.
+    #[must_use]
     pub fn is_error(&self) -> bool {
         self.is_error
     }
     /// Byte offset of the cookie within the `RgCdb` at `fcCookieData`.
+    #[must_use]
     pub fn icdb(&self) -> u32 {
         self.icdb
     }
@@ -419,16 +438,20 @@ impl<E: CookieElement> GrammarCookiePlc<E> {
         })
     }
 
+    #[must_use]
     pub fn entries(&self) -> &[CookieEntry<E>] {
         &self.entries
     }
     /// Final PLC CP. The format ignores this value; it carries no range.
+    #[must_use]
     pub fn terminal_cp(&self) -> u32 {
         self.terminal_cp
     }
+    #[must_use]
     pub fn len(&self) -> usize {
         self.entries.len()
     }
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
@@ -556,10 +579,12 @@ impl GrammarCookieTables {
     }
 
     /// Current grammar cookies (`Plcfcookie`, MS-DOC 2.8.14).
+    #[must_use]
     pub fn current(&self) -> Option<&GrammarCookieTable> {
         self.current.as_ref()
     }
     /// Legacy grammar cookies (`PlcfcookieOld`, MS-DOC 2.8.15).
+    #[must_use]
     pub fn legacy(&self) -> Option<&LegacyGrammarCookieTable> {
         self.legacy.as_ref()
     }

@@ -1,4 +1,4 @@
-//! Semantic DrawingML text domains.
+//! Semantic `DrawingML` text domains.
 //!
 //! These compact, host-neutral values describe the closed schema domains
 //! used by text bodies; lexical behavior is implemented by `codec`.
@@ -31,13 +31,13 @@ pub enum Direction {
     Vertical,
     /// Lines rotated 270 degrees (`vert270`).
     Vertical270,
-    /// Upright, stacked WordArt letters (`wordArtVert`).
+    /// Upright, stacked `WordArt` letters (`wordArtVert`).
     WordArtVertical,
     /// East Asian vertical text (`eaVert`).
     EastAsianVertical,
     /// Mongolian vertical text (`mongolianVert`).
     MongolianVertical,
-    /// Right-to-left WordArt vertical text (`wordArtVertRtl`).
+    /// Right-to-left `WordArt` vertical text (`wordArtVertRtl`).
     WordArtVerticalRtl,
 }
 
@@ -65,7 +65,7 @@ pub enum Autofit {
     Normal,
 }
 
-/// Lossless underline style shared by DrawingML and WordprocessingML.
+/// Lossless underline style shared by `DrawingML` and `WordprocessingML`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum Underline {

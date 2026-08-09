@@ -1,3 +1,19 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::unwrap_used,
+    reason = "the invariant is established immediately before extraction"
+)]
 //! Table types and implementation for DOCX documents.
 use crate::error::{Error, Result};
 use crate::namespace::normalize_xml_integer;
@@ -174,6 +190,10 @@ impl MutableTable {
     }
 
     /// Add a new row with specified column count.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal writer invariant is violated.
     pub fn add_row(&mut self, cols: usize) -> &mut MutableRow {
         self.rows.push(MutableRow::new(cols));
         self.rows.last_mut().unwrap()
@@ -200,6 +220,7 @@ impl MutableTable {
     }
 
     /// Get the number of rows.
+    #[must_use]
     pub fn row_count(&self) -> usize {
         self.rows.len()
     }
@@ -210,6 +231,10 @@ impl MutableTable {
     }
 
     /// Mark this whole table as inserted or deleted.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_revision(
         &mut self,
         kind: TableRevisionKind,
@@ -226,6 +251,10 @@ impl MutableTable {
     }
 
     /// Record the table properties which existed before a tracked formatting change.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_property_change(
         &mut self,
         metadata: RevisionMetadata,
@@ -249,6 +278,7 @@ impl MutableTable {
         Ok(self)
     }
 
+    #[must_use]
     pub fn revision_kind(&self) -> Option<TableRevisionKind> {
         self.revision.as_ref().map(|(kind, _)| *kind)
     }
@@ -436,12 +466,17 @@ impl MutableRow {
     }
 
     /// Add a new cell.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal writer invariant is violated.
     pub fn add_cell(&mut self) -> &mut MutableCell {
         self.cells.push(MutableCell::new());
         self.cells.last_mut().unwrap()
     }
 
     /// Get the number of cells.
+    #[must_use]
     pub fn cell_count(&self) -> usize {
         self.cells.len()
     }
@@ -450,6 +485,10 @@ impl MutableRow {
     ///
     /// Division IDs are XML Schema integers and are kept as strings so values
     /// larger than the native integer types can be written without truncation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_division_id(&mut self, id: impl Into<String>) -> Result<&mut Self> {
         self.division_id = Some(normalize_xml_integer(
             id.into(),
@@ -459,6 +498,7 @@ impl MutableRow {
     }
 
     /// Return the HTML division ID referenced by this row, if set.
+    #[must_use]
     pub fn division_id(&self) -> Option<&str> {
         self.division_id.as_deref()
     }
@@ -469,6 +509,10 @@ impl MutableRow {
         self
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_revision(
         &mut self,
         kind: RowRevisionKind,
@@ -484,6 +528,10 @@ impl MutableRow {
         Ok(self)
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_property_change(
         &mut self,
         metadata: RevisionMetadata,
@@ -510,11 +558,16 @@ impl MutableRow {
         Ok(self)
     }
 
+    #[must_use]
     pub fn revision_kind(&self) -> Option<RowRevisionKind> {
         self.revision.as_ref().map(|(kind, _)| *kind)
     }
 
     /// Append an inert Word 2010 conflict marker to this row's properties.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_property_conflict(
         &mut self,
         kind: ConflictKind,
@@ -527,6 +580,7 @@ impl MutableRow {
     }
 
     /// Number of Word 2010 conflict markers on this row's properties.
+    #[must_use]
     pub fn property_conflict_count(&self) -> usize {
         self.property_conflicts.len()
     }
@@ -721,12 +775,17 @@ impl MutableCell {
     }
 
     /// Add a new paragraph to the cell.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal writer invariant is violated.
     pub fn add_paragraph(&mut self) -> &mut MutableParagraph {
         self.paragraphs.push(MutableParagraph::new());
         self.paragraphs.last_mut().unwrap()
     }
 
     /// Get the number of paragraphs.
+    #[must_use]
     pub fn paragraph_count(&self) -> usize {
         self.paragraphs.len()
     }
@@ -761,6 +820,10 @@ impl MutableCell {
         self.properties.vertical_merge = state;
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_revision(
         &mut self,
         kind: CellRevisionKind,
@@ -776,6 +839,10 @@ impl MutableCell {
         Ok(self)
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_merge_revision(
         &mut self,
         metadata: RevisionMetadata,
@@ -801,6 +868,10 @@ impl MutableCell {
         Ok(self)
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_property_change(
         &mut self,
         metadata: RevisionMetadata,
@@ -827,6 +898,7 @@ impl MutableCell {
         Ok(self)
     }
 
+    #[must_use]
     pub fn revision_kind(&self) -> Option<CellRevisionKind> {
         self.revision.as_ref().map(|(kind, _)| *kind)
     }

@@ -18,13 +18,16 @@ impl Writer {
     /// # Implementation Status
     ///
     /// ✅ Basic structure generation (BOF, EOF, workbook globals)
-    /// ✅ Cell record generation (Number, LabelSST, BoolErr)
+    /// ✅ Cell record generation (Number, `LabelSST`, `BoolErr`)
     /// ✅ Shared string table (SST)
     /// ✅ Formula tokenization for the supported BIFF8 writer subset
     /// ❌ Cell formatting (XF records)
     /// ❌ Column widths / row heights
     /// ❌ Merged cells
     /// ❌ Named ranges
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<()> {
         // Build shared string table
         self.build_shared_strings();
@@ -51,6 +54,9 @@ impl Writer {
     /// # Returns
     ///
     /// * `Result<(), Error>` - Success or error
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn write_to<W: std::io::Write + std::io::Seek>(&mut self, writer: &mut W) -> Result<()> {
         // Build shared string table
         self.build_shared_strings();
@@ -86,7 +92,7 @@ impl Writer {
         if !streams.pivot_caches.is_empty() {
             ole_writer.create_storage(&["_SX_DB_CUR"])?;
             for (id, data) in &streams.pivot_caches {
-                let name = format!("{:04X}", id);
+                let name = format!("{id:04X}");
                 ole_writer.create_stream(&["_SX_DB_CUR", &name], data)?;
             }
         }
@@ -114,7 +120,7 @@ impl Writer {
                     self.sst_total = self.sst_total.saturating_add(1);
                     // Insert unique strings
                     if !self.string_map.contains_key(s) {
-                        let index = self.shared_strings.len() as u32;
+                        let index = crate::utils::truncate_usize_to_u32(self.shared_strings.len());
                         self.string_map.insert(s.clone(), index);
                         self.shared_strings.push(s.clone());
                     }
@@ -176,11 +182,13 @@ impl Writer {
     }
 
     /// Get the number of worksheets in this workbook
+    #[must_use]
     pub fn worksheet_count(&self) -> usize {
         self.worksheets.len()
     }
 
     /// Get worksheet name by index
+    #[must_use]
     pub fn get_worksheet_name(&self, index: usize) -> Option<&str> {
         self.worksheets.get(index).map(|w| w.name.as_str())
     }

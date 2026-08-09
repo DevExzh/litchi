@@ -469,12 +469,12 @@ fn scan_layout(xml: &[u8]) -> Result<Layout> {
                         return Err(invalid("custom-show owner is not a presentation root"));
                     }
                     saw_root = true;
-                    p_prefix = prefix(&qualified_name).to_owned();
+                    prefix(&qualified_name).clone_into(&mut p_prefix);
                     if let Some(value) = find_attribute(&attributes, "xmlns:p") {
-                        p_namespace = value.to_owned();
+                        value.clone_into(&mut p_namespace);
                     }
                     if let Some(value) = find_attribute(&attributes, "xmlns:r") {
-                        r_namespace = value.to_owned();
+                        value.clone_into(&mut r_namespace);
                     }
                 }
                 stack.push(frame(
@@ -497,12 +497,12 @@ fn scan_layout(xml: &[u8]) -> Result<Layout> {
                         return Err(invalid("custom-show owner is not a presentation root"));
                     }
                     saw_root = true;
-                    p_prefix = prefix(&qualified_name).to_owned();
+                    prefix(&qualified_name).clone_into(&mut p_prefix);
                     if let Some(value) = find_attribute(&attributes, "xmlns:p") {
-                        p_namespace = value.to_owned();
+                        value.clone_into(&mut p_namespace);
                     }
                     if let Some(value) = find_attribute(&attributes, "xmlns:r") {
-                        r_namespace = value.to_owned();
+                        value.clone_into(&mut r_namespace);
                     }
                 }
                 let mut value = frame(

@@ -1,4 +1,12 @@
-//! XML discovery, validation, and shared DrawingML schema delegation.
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
+//! XML discovery, validation, and shared `DrawingML` schema delegation.
 
 use super::model::{
     COLOR_STYLE_CT, Conformance, Graph, MAX_ATTRIBUTE_BYTES, MAX_ATTRIBUTES, MAX_CHART_XML,
@@ -218,7 +226,7 @@ fn scan_document_xml(xml: &[u8], conformance: Conformance) -> Result<Vec<String>
             },
             Event::CData(_) => return Err(invalid("CDATA is rejected")),
             Event::Eof => break,
-            _ => {},
+            Event::Text(_) | Event::Comment(_) | Event::Decl(_) | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -293,7 +301,7 @@ pub(crate) fn scan_chart_xml(xml: &[u8], conformance: Conformance) -> Result<Cha
             },
             Event::CData(_) => return Err(invalid("CDATA is rejected")),
             Event::Eof => break,
-            _ => {},
+            Event::Text(_) | Event::Comment(_) | Event::Decl(_) | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }

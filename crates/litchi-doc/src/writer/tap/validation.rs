@@ -27,19 +27,19 @@ pub enum TapBuildError {
     InvalidCellSpacing(u16),
     /// `PGPInfo.ipgpSelf` identifiers are nonzero.
     InvalidParagraphGroupId,
-    /// PropRMark stores its revision-author index as a signed 16-bit value.
+    /// `PropRMark` stores its revision-author index as a signed 16-bit value.
     InvalidRevisionAuthorIndex(u16),
-    /// PropRMark contains an invalid packed DTTM.
+    /// `PropRMark` contains an invalid packed DTTM.
     InvalidRevisionTimestamp(u32),
     /// Table-style band sizes are limited to one through three cells.
     InvalidStyleBandSize(&'static str, u8),
-    /// Style border defaults are only legal inside a TCnf property list.
+    /// Style border defaults are only legal inside a `TCnf` property list.
     StyleBorderOutsideConditional,
     /// A conditional nested grpprl is malformed.
     InvalidConditionalProperties(String),
-    /// CNFOperand uses a one-byte total operand length.
+    /// `CNFOperand` uses a one-byte total operand length.
     ConditionalPropertiesTooLong(usize),
-    /// A TCellBrcType prefix requires four explicit types for every included cell.
+    /// A `TCellBrcType` prefix requires four explicit types for every included cell.
     IncompleteCellBorderTypes(usize),
     /// A preferred-width property uses unsupported units or a value outside its context's range.
     InvalidPreferredWidth(&'static str, TableWidth),
@@ -47,7 +47,7 @@ pub enum TapBuildError {
     InvalidTableLookFlags(u16),
     /// A physical table offset cannot be represented by the plus-one operand.
     InvalidTablePosition(&'static str, i16),
-    /// A wrapping distance exceeds the XAS/YAS_nonNeg range.
+    /// A wrapping distance exceeds the `XAS/YAS_nonNeg` range.
     InvalidWrapDistance(&'static str, u16),
     /// A preserved row state cannot itself contain a `sprmTWall` boundary.
     NestedPreservedState,

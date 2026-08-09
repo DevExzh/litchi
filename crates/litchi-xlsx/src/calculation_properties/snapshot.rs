@@ -59,36 +59,43 @@ impl Snapshot {
     }
 
     /// Exact authored `calcPr` state, if present.
+    #[must_use]
     pub fn properties(&self) -> Option<&Properties> {
         self.properties.as_ref()
     }
 
     /// Ordered calculation-feature occurrences, if present.
+    #[must_use]
     pub fn features(&self) -> Option<&Features> {
         self.features.as_ref()
     }
 
     /// Exact source workbook XML.
+    #[must_use]
     pub fn source_xml(&self) -> &[u8] {
         self.source.bytes.as_slice()
     }
 
     /// Shared ownership of the exact source workbook XML.
+    #[must_use]
     pub fn source_arc(&self) -> Arc<Vec<u8>> {
         Arc::clone(&self.source.bytes)
     }
 
     /// Resolved package part containing the workbook root.
+    #[must_use]
     pub fn workbook_part_name(&self) -> &PackURI {
         &self.source.part_name
     }
 
     /// Exact source content type of the workbook part.
+    #[must_use]
     pub fn content_type(&self) -> &str {
         &self.source.content_type
     }
 
     /// Resource policy retained for publication and patch application.
+    #[must_use]
     pub fn limits(&self) -> Limits {
         self.limits
     }

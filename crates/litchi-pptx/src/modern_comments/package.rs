@@ -409,7 +409,7 @@ mod comments {
         if !remaining.is_empty() {
             return Err(invalid("modern comment reorder must contain every comment"));
         }
-        parts[part_index].comments.comments = ordered.clone();
+        parts[part_index].comments.comments.clone_from(&ordered);
         let staged = parts[part_index].clone();
         validate_and_commit_modern_comment_part(package, &staged, &parts)?;
         Ok(ordered)
@@ -1247,7 +1247,7 @@ mod authors {
         if !remaining.is_empty() {
             return Err(invalid("modern author reorder must contain every author"));
         }
-        part.authors.authors = ordered.clone();
+        part.authors.authors.clone_from(&ordered);
         commit_modern_comment_authors(package, &part, &graph.comments)?;
         Ok(ordered)
     }

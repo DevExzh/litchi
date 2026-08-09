@@ -306,10 +306,9 @@ impl FinalOrder {
             .enumerate()
             .all(|(position, actual)| {
                 let expected = if position < base_len {
-                    let Some(identity) = base_order
-                        .map(|order| order.positions.get(position).copied())
-                        .unwrap_or(Some(position))
-                    else {
+                    let Some(identity) = base_order.map_or(Some(position), |order| {
+                        order.positions.get(position).copied()
+                    }) else {
                         return false;
                     };
                     Target::Base(identity)

@@ -216,7 +216,7 @@ pub fn validate_xf_complement(value: &XfComplement, bags: &Bags) -> Result<()> {
     validate_opaque(&value.opaque)
 }
 
-/// Validate a DXFComplement reference against the feature-bag graph.
+/// Validate a `DXFComplement` reference against the feature-bag graph.
 pub fn validate_dxf_complement(value: &DxfComplement, bags: &Bags) -> Result<()> {
     if value.opaque.len() > MAX_ITEMS {
         return Err(limit("DXFComplement extensions"));
@@ -245,12 +245,12 @@ fn validate_bag(owner: &Bags, index: usize, bag: &Bag) -> Result<()> {
     if let Some(value) = &bag.attribute {
         bounded(value, "feature property bag att")?;
     }
-    if let Some(extension) = bag.bag_extension {
-        if extension as usize >= owner.bag_extensions.len() {
-            return Err(invalid(
-                "feature property bag extension index is out of range",
-            ));
-        }
+    if let Some(extension) = bag.bag_extension
+        && extension as usize >= owner.bag_extensions.len()
+    {
+        return Err(invalid(
+            "feature property bag extension index is out of range",
+        ));
     }
     if bag.properties.len() > MAX_ITEMS {
         return Err(limit("feature property bag properties"));

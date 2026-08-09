@@ -103,7 +103,7 @@ fn parse_range_endpoint(
     }
     let row_number = row
         .parse::<usize>()
-        .map_err(|_| invalid_message("invalid data-pilot row"))?;
+        .map_err(|_error| invalid_message("invalid data-pilot row"))?;
     if row_number == 0 {
         return Err(invalid_message("data-pilot rows are one-based"));
     }

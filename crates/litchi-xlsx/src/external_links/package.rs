@@ -11,7 +11,7 @@ use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI, Part};
 
 use super::codec::{parse_external_link, patch_source};
-use super::model::*;
+use super::model::{Conformance, Link, MAX_EXTERNAL_TARGET_BYTES, Target};
 use super::{invalid, limit, validation};
 
 /// One external-link part together with its workbook package relationship.
@@ -344,8 +344,7 @@ pub fn validate_graph(package: &OpcPackage) -> Result<()> {
         let target = relationship.target_partname()?;
         if !target_parts.insert(target.to_string()) {
             return Err(invalid(format!(
-                "external-link part '{}' is targeted more than once",
-                target
+                "external-link part '{target}' is targeted more than once"
             )));
         }
         let part = package.get_part(&target)?;

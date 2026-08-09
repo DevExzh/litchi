@@ -18,7 +18,7 @@ pub(crate) fn write_ob_no_macros<W: Write>(writer: &mut W) -> Result<()> {
 }
 pub(crate) fn write_code_name<W: Write>(writer: &mut W, value: &str) -> Result<()> {
     validate_code_name(value)?;
-    let count = value.encode_utf16().count() as u16;
+    let count = crate::utils::truncate_usize_to_u16(value.encode_utf16().count());
     let wide = !value.chars().all(|character| u32::from(character) <= 0xFF);
     let data_len = CODE_NAME_HEADER_LEN + count * if wide { 2 } else { 1 };
     write_record_header(writer, CODE_NAME_RECORD_TYPE, data_len)?;

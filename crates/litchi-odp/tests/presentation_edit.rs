@@ -6,6 +6,7 @@
 
 use litchi_odp::core::{OwnedPackage, PackageWriter};
 use litchi_odp::{Builder, Presentation, edit};
+use soapberry_zip::office::StreamingArchiveWriter;
 
 #[test]
 fn transaction_publishes_compact_xml_without_mutating_source() {
@@ -154,24 +155,19 @@ fn changed_commit_snapshot_and_patch_output_share_backing_bytes() {
 
 #[test]
 fn changed_publication_refuses_noncompact_referenced_xml() {
-    let mut writer = PackageWriter::new();
-    writer
-        .set_mimetype("application/vnd.oasis.opendocument.presentation")
+    const MIME: &str = "application/vnd.oasis.opendocument.presentation";
+    const CONTENT: &[u8] = br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body><office:presentation/></office:body></office:document-content>"#;
+    const MANIFEST: &[u8] = br#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.presentation"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/><manifest:file-entry manifest:full-path="Object 1/content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#;
+    let mut archive = StreamingArchiveWriter::new();
+    archive.write_stored("mimetype", MIME.as_bytes()).unwrap();
+    archive.write_deflated("content.xml", CONTENT).unwrap();
+    archive
+        .write_deflated("Object 1/content.xml", b"<object>\n  <opaque/>\n</object>")
         .unwrap();
-    writer
-        .add_file(
-            "content.xml",
-            br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body><office:presentation/></office:body></office:document-content>"#,
-        )
+    archive
+        .write_deflated("META-INF/manifest.xml", MANIFEST)
         .unwrap();
-    writer
-        .add_file_with_media_type(
-            "Object 1/content.xml",
-            b"<object>\n  <opaque/>\n</object>",
-            "text/xml",
-        )
-        .unwrap();
-    let source = edit::Snapshot::from_bytes(writer.finish_to_bytes().unwrap()).unwrap();
+    let source = edit::Snapshot::from_bytes(archive.finish_to_bytes().unwrap()).unwrap();
     let mut transaction = source.transaction().unwrap();
     transaction.add("New", "Body").unwrap();
     assert!(transaction.commit().is_err());

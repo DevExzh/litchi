@@ -35,11 +35,13 @@ impl<'a> Transaction<'a> {
     }
 
     /// Immutable source snapshot used for conflict checks and inverse patches.
+    #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Borrow the currently staged revision package.
+    #[must_use]
     pub fn revisions(&self) -> Option<&Revisions> {
         self.draft.as_ref()
     }
@@ -142,7 +144,7 @@ impl<'a> Transaction<'a> {
             _ => return Err(invalid("revision header/log catalog is inconsistent")),
         }
         if let Some(last) = draft.headers.headers.last() {
-            draft.headers.properties.guid = last.guid.clone();
+            draft.headers.properties.guid.clone_from(&last.guid);
         }
         validation::revisions(&draft)?;
         self.draft = Some(draft);
@@ -173,7 +175,7 @@ impl<'a> Transaction<'a> {
         draft.headers.headers.remove(header_index);
         draft.logs.remove(log_index);
         if let Some(last) = draft.headers.headers.last() {
-            draft.headers.properties.guid = last.guid.clone();
+            draft.headers.properties.guid.clone_from(&last.guid);
         }
         validation::revisions(&draft)?;
         self.draft = Some(draft);
@@ -264,6 +266,7 @@ impl<'a> Transaction<'a> {
     }
 
     /// Whether staged semantics differ from the source semantics.
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.before.revisions() != self.draft.as_ref()
     }

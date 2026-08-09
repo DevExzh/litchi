@@ -58,6 +58,12 @@ pub struct CellWatch {
 
 impl CellWatch {
     /// Parse a `CellWatch` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// # Panics
+    ///
+    /// Panics only if an internal BIFF invariant has been violated.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
             return Err(Error::InvalidLength {
@@ -101,6 +107,7 @@ impl CellWatch {
     }
 
     /// Serialize back to a complete `CellWatch` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(PAYLOAD_LEN);
         payload.extend_from_slice(&CELL_WATCH_RECORD_TYPE.to_le_bytes());
@@ -114,31 +121,37 @@ impl CellWatch {
     }
 
     /// Raw `grbitFrt` bitfield (`fFrtRef` set, `fFrtAlert` clear).
+    #[must_use]
     pub fn flags(&self) -> u16 {
         self.flags
     }
 
     /// Zero-based index of the first row of the watched range (`ref8.rwFirst`).
+    #[must_use]
     pub fn row_first(&self) -> u16 {
         self.row_first
     }
 
     /// Zero-based index of the last row of the watched range (`ref8.rwLast`).
+    #[must_use]
     pub fn row_last(&self) -> u16 {
         self.row_last
     }
 
     /// Zero-based index of the first column of the watched range (`ref8.colFirst`).
+    #[must_use]
     pub fn column_first(&self) -> u16 {
         self.column_first
     }
 
     /// Zero-based index of the last column of the watched range (`ref8.colLast`).
+    #[must_use]
     pub fn column_last(&self) -> u16 {
         self.column_last
     }
 
     /// The preserved trailing `reserved` field.
+    #[must_use]
     pub fn reserved(&self) -> [u8; 4] {
         self.reserved
     }

@@ -14,6 +14,9 @@ pub struct DataTableRange {
 impl DataTableRange {
     /// A range; both the first row and the first column are 1-based per the
     /// `Table` record constraints.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(first_row: u16, last_row: u16, first_col: u8, last_col: u8) -> Result<Self> {
         if first_row == 0 || first_col == 0 {
             return Err(invalid("data-table range origin is 1-based"));
@@ -29,15 +32,19 @@ impl DataTableRange {
         })
     }
 
+    #[must_use]
     pub const fn first_row(&self) -> u16 {
         self.first_row
     }
+    #[must_use]
     pub const fn last_row(&self) -> u16 {
         self.last_row
     }
+    #[must_use]
     pub const fn first_col(&self) -> u8 {
         self.first_col
     }
+    #[must_use]
     pub const fn last_col(&self) -> u8 {
         self.last_col
     }
@@ -59,14 +66,17 @@ pub enum DataTableInputCell {
 
 impl DataTableInputCell {
     /// Create a present input-cell reference from zero-based raw indices.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn present(row: u32, col: u16) -> Result<Self> {
         let invalid = || {
             Error::InvalidCellReference(format!(
                 "data-table input row {row}, column {col} is outside the BIFF8 grid"
             ))
         };
-        let row = u16::try_from(row).map_err(|_| invalid())?;
-        let col = u8::try_from(col).map_err(|_| invalid())?;
+        let row = u16::try_from(row).map_err(|_error| invalid())?;
+        let col = u8::try_from(col).map_err(|_error| invalid())?;
         Ok(Self::Present { row, col })
     }
 }
@@ -109,6 +119,7 @@ pub struct DataTable {
 
 impl DataTable {
     /// A one-variable data table.
+    #[must_use]
     pub fn one_variable(
         range: DataTableRange,
         row_orientation: bool,
@@ -127,6 +138,7 @@ impl DataTable {
     }
 
     /// A two-variable data table.
+    #[must_use]
     pub fn two_variable(
         range: DataTableRange,
         row_input: DataTableInputCell,
@@ -143,9 +155,11 @@ impl DataTable {
         }
     }
 
+    #[must_use]
     pub const fn range(&self) -> DataTableRange {
         self.range
     }
+    #[must_use]
     pub const fn always_calc(&self) -> bool {
         self.always_calc
     }
@@ -154,12 +168,15 @@ impl DataTable {
     }
     /// Whether the single input cell of a one-variable table is a row input
     /// cell (`fRw`); preserved verbatim for two-variable tables.
+    #[must_use]
     pub const fn row_orientation(&self) -> bool {
         self.row_orientation
     }
+    #[must_use]
     pub const fn is_two_variable(&self) -> bool {
         matches!(self.kind, DataTableKind::TwoVariable { .. })
     }
+    #[must_use]
     pub const fn kind(&self) -> &DataTableKind {
         &self.kind
     }

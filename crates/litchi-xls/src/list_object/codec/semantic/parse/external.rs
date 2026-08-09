@@ -5,7 +5,12 @@ use crate::list_object::codec::binary::{
     PendingFeature, parse_list_formula_extra_end, parse_range, parse_string, u16_at, u32_at,
     validate_frt,
 };
-use crate::list_object::model::*;
+use crate::list_object::model::{
+    CachedDiskHeader, ExternalTableField, ExternalTableMetadata, ExternalTableVersion,
+    ListColumnId, ListObject, ListObjectColumn, ListObjectFeatureVersion, ListObjectId,
+    ListTotalAggregation, OpaqueListObjectFeature, validate_column_name, validate_name,
+    validate_table_name,
+};
 use crate::list_object::{FEATURE12_RECORD_TYPE, ISF_LIST, MAX_FEATURE_BYTES, invalid};
 
 impl ListObject {
@@ -29,7 +34,7 @@ impl ListObject {
             return Err(invalid(rt, "invalid Feature12 fixed fields"));
         }
         let declared = usize::try_from(u32_at(data, 21, rt, "cbFeatData")?)
-            .map_err(|_| invalid(rt, "cbFeatData overflows"))?;
+            .map_err(|_error| invalid(rt, "cbFeatData overflows"))?;
         if declared != 0 && declared != data.len() - 35 {
             return Err(invalid(
                 rt,
@@ -92,11 +97,11 @@ impl ListObject {
             let aggregation =
                 ListTotalAggregation::from_code(u32_at(data, start + 12, rt, "ilta")?)?;
             let aggregate_len = usize::try_from(u32_at(data, start + 16, rt, "cbFmtAgg")?)
-                .map_err(|_| invalid(rt, "aggregate format length overflows"))?;
+                .map_err(|_error| invalid(rt, "aggregate format length overflows"))?;
             let aggregate_style = u32_at(data, start + 20, rt, "istnAgg")?;
             let field_flags = u32_at(data, start + 24, rt, "field flags")?;
             let insert_len = usize::try_from(u32_at(data, start + 28, rt, "cbFmtInsertRow")?)
-                .map_err(|_| invalid(rt, "insert format length overflows"))?;
+                .map_err(|_error| invalid(rt, "insert format length overflows"))?;
             let insert_row_style = u32_at(data, start + 32, rt, "istnInsertRow")?;
             if field_flags & 0x4C != 0
                 || field_flags & 0x40 != 0
@@ -129,7 +134,7 @@ impl ListObject {
             offset = insert_end;
             let auto_filter = if field_flags & 1 != 0 {
                 let size = usize::try_from(u32_at(data, offset, rt, "cbAutoFilter")?)
-                    .map_err(|_| invalid(rt, "AutoFilter length overflows"))?;
+                    .map_err(|_error| invalid(rt, "AutoFilter length overflows"))?;
                 if size > 2080 {
                     return Err(invalid(rt, "AutoFilter exceeds 2080 bytes"));
                 }
@@ -186,7 +191,7 @@ impl ListObject {
             offset += 4;
             let header_cache = if header == 0 {
                 let size = usize::try_from(u32_at(data, offset, rt, "cbdxfHdrDisk")?)
-                    .map_err(|_| invalid(rt, "header cache length overflows"))?;
+                    .map_err(|_error| invalid(rt, "header cache length overflows"))?;
                 let format_end = offset
                     .checked_add(4 + size)
                     .ok_or_else(|| invalid(rt, "header cache length overflows"))?;

@@ -18,12 +18,15 @@ pub const PROT4REVPASS_TYPE: u16 = 0x01BC;
 pub struct PasswordVerifier(u16);
 
 impl PasswordVerifier {
+    #[must_use]
     pub const fn from_raw(value: u16) -> Self {
         Self(value)
     }
+    #[must_use]
     pub const fn raw(self) -> u16 {
         self.0
     }
+    #[must_use]
     pub const fn is_set(self) -> bool {
         self.0 != 0
     }
@@ -37,12 +40,15 @@ pub struct FileSharing {
 }
 
 impl FileSharing {
+    #[must_use]
     pub const fn read_only_recommended(&self) -> bool {
         self.read_only_recommended
     }
+    #[must_use]
     pub const fn write_password(&self) -> PasswordVerifier {
         self.write_password
     }
+    #[must_use]
     pub fn user_name(&self) -> &str {
         &self.user_name
     }
@@ -60,24 +66,31 @@ pub struct WorkbookProtection {
 }
 
 impl WorkbookProtection {
+    #[must_use]
     pub const fn structure_protected(&self) -> bool {
         self.structure_protected
     }
+    #[must_use]
     pub const fn windows_protected(&self) -> bool {
         self.windows_protected
     }
+    #[must_use]
     pub const fn password(&self) -> PasswordVerifier {
         self.password
     }
+    #[must_use]
     pub const fn revisions_protected(&self) -> bool {
         self.revisions_protected
     }
+    #[must_use]
     pub const fn revision_password(&self) -> PasswordVerifier {
         self.revision_password
     }
+    #[must_use]
     pub const fn write_protected(&self) -> bool {
         self.write_protected
     }
+    #[must_use]
     pub fn file_sharing(&self) -> Option<&FileSharing> {
         self.file_sharing.as_ref()
     }
@@ -92,18 +105,23 @@ pub struct SheetProtection {
 }
 
 impl SheetProtection {
+    #[must_use]
     pub const fn is_protected(&self) -> bool {
         self.sheet_protected
     }
+    #[must_use]
     pub const fn objects_protected(&self) -> bool {
         self.objects_protected
     }
+    #[must_use]
     pub const fn scenarios_protected(&self) -> bool {
         self.scenarios_protected
     }
+    #[must_use]
     pub const fn password(&self) -> Option<PasswordVerifier> {
         self.password
     }
+    #[must_use]
     pub const fn has_password(&self) -> bool {
         self.password.is_some()
     }

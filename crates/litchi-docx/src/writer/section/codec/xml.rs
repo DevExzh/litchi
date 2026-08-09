@@ -1,3 +1,19 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::expect_used,
+    reason = "the invariant is established immediately before extraction"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
 use crate::error::{Error, Result};
 use crate::header_footer::Kind;
 use crate::section::Start;
@@ -6,7 +22,13 @@ use quick_xml::{Reader, XmlVersion};
 use std::fmt::Write;
 
 use super::super::borders;
-use super::super::model::*;
+use super::super::model::{
+    ChapterSep, Color, Display, Endnotes, Footnotes, GridType, LineNumberRestart,
+    NoteNumberRestart, NotePos, OffsetFrom, PageNumberFormat, PageOrientation, SectionColumn,
+    SectionColumns, SectionDocumentGrid, SectionHeaderFooterReference, SectionLineNumbering,
+    SectionPageNumbering, SectionPaperSource, SectionProperties, SectionTextDirection,
+    SectionVerticalAlignment, Style, ZOrder,
+};
 use super::package::write_references;
 impl SectionProperties {
     pub(crate) fn from_xml(xml: &str) -> Result<Self> {
@@ -247,12 +269,12 @@ fn direct_children(xml: &str) -> Result<Vec<(String, String)>> {
     let mut children = Vec::new();
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::InvalidFormat("section XML offset overflow".into()))?;
+            .map_err(|_source_error| Error::InvalidFormat("section XML offset overflow".into()))?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
         let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::InvalidFormat("section XML offset overflow".into()))?;
+            .map_err(|_source_error| Error::InvalidFormat("section XML offset overflow".into()))?;
         match event {
             Event::Start(element) => {
                 if depth == 0 {
@@ -290,7 +312,14 @@ fn direct_children(xml: &str) -> Result<Vec<(String, String)>> {
                     .ok_or_else(|| Error::InvalidFormat("invalid section XML nesting".into()))?;
             },
             Event::Eof => break,
-            _ => {},
+            Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if !root_seen || depth != 0 {
@@ -314,7 +343,14 @@ fn attributes(xml: &str) -> Result<Vec<(String, String)>> {
                     "section property has no element".into(),
                 ));
             },
-            _ => {},
+            Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     };
     let mut result = Vec::new();
@@ -350,9 +386,9 @@ fn required_attr(xml: &str, name: &[u8]) -> Result<String> {
 }
 
 fn parse_u32(value: &str, description: &str) -> Result<u32> {
-    value
-        .parse()
-        .map_err(|_| Error::InvalidFormat(format!("invalid {description} value '{value}'")))
+    value.parse().map_err(|_source_error| {
+        Error::InvalidFormat(format!("invalid {description} value '{value}'"))
+    })
 }
 
 fn assign_u32(attrs: &[(String, String)], name: &str, slot: &mut u32) -> Result<()> {
@@ -386,7 +422,7 @@ fn parse_page_numbering(xml: &str) -> Result<SectionPageNumbering> {
             .map(|value| {
                 value
                     .parse::<u8>()
-                    .map_err(|_| Error::InvalidFormat("invalid chapter style".into()))
+                    .map_err(|_source_error| Error::InvalidFormat("invalid chapter style".into()))
             })
             .transpose()?,
         chapter_separator: attr(&attrs, "chapSep").map(ChapterSep::parse).transpose()?,
@@ -400,9 +436,9 @@ fn parse_columns(xml: &str) -> Result<SectionColumns> {
             .is_none_or(|value| value != "0" && value != "false"),
         count: attr(&attrs, "num")
             .map(|value| {
-                value
-                    .parse::<u16>()
-                    .map_err(|_| Error::InvalidFormat("invalid section column count".into()))
+                value.parse::<u16>().map_err(|_source_error| {
+                    Error::InvalidFormat("invalid section column count".into())
+                })
             })
             .transpose()?
             .unwrap_or(1),
@@ -511,9 +547,9 @@ fn parse_grid(xml: &str) -> Result<SectionDocumentGrid> {
             .transpose()?,
         char_space: attr(&attrs, "charSpace")
             .map(|value| {
-                value
-                    .parse::<i32>()
-                    .map_err(|_| Error::InvalidFormat("invalid grid character space".into()))
+                value.parse::<i32>().map_err(|_source_error| {
+                    Error::InvalidFormat("invalid grid character space".into())
+                })
             })
             .transpose()?,
     })
@@ -674,7 +710,7 @@ fn write_columns(xml: &mut String, columns: &SectionColumns) -> Result<()> {
     write!(
         xml,
         "<w:cols w:equalWidth=\"{}\" w:num=\"{}\"",
-        if columns.equal_width { 1 } else { 0 },
+        i32::from(columns.equal_width),
         columns.count
     )
     .map_err(|error| Error::Xml(error.to_string()))?;

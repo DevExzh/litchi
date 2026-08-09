@@ -1,4 +1,4 @@
-//! Bounded DrawingML diagram data-model facade.
+//! Bounded `DrawingML` diagram data-model facade.
 //!
 //! The semantic model, XML codec, validation, and tests are kept in separate
 //! layers while this module preserves the established public facade.

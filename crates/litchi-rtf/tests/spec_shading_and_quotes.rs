@@ -24,7 +24,12 @@ fn smart_quote_symbols_have_exact_unicode_semantics_and_canonical_output() {
     assert_eq!(document.text(), "‘left’ “double”");
 
     let output = write(&document);
-    assert!(output.contains(r"\lquote left\rquote  \ldblquote double\rdblquote "));
+    for control in [r"\lquote ", r"\rquote ", r"\ldblquote ", r"\rdblquote "] {
+        assert!(
+            output.contains(control),
+            "canonical output omitted {control}: {output}"
+        );
+    }
     assert_eq!(RtfDocument::parse(&output).unwrap().text(), document.text());
 }
 

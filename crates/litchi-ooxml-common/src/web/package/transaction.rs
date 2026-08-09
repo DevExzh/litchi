@@ -1,7 +1,10 @@
 use super::super::codec::{invalid, limit};
-use super::super::model::*;
-use super::super::*;
-use super::*;
+use super::super::model::Limits;
+use super::super::{
+    Arc, BTreeSet, Error, HashMap, HashSet, OpcPackage, PackURI, Part, Result,
+    TASK_PANES_RELATIONSHIP, VecDeque,
+};
+use super::{PlannedPart, PlannedRelationship, fold_part_name, folded_name_conflicts};
 use litchi_opc::{BlobPart, TargetMode};
 /// Opaque, exact, reversible task-pane graph transaction.
 ///

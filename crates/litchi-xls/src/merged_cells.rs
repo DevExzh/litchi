@@ -32,18 +32,21 @@ pub struct MergedCellRange {
 impl MergedCellRange {
     /// Number of rows spanned by this merge.
     #[inline]
+    #[must_use]
     pub fn row_span(&self) -> u16 {
         self.last_row - self.first_row + 1
     }
 
     /// Number of columns spanned by this merge.
     #[inline]
+    #[must_use]
     pub fn col_span(&self) -> u16 {
         self.last_col - self.first_col + 1
     }
 
     /// Whether the given cell `(row, col)` falls within this merged region.
     #[inline]
+    #[must_use]
     pub fn contains(&self, row: u16, col: u16) -> bool {
         row >= self.first_row
             && row <= self.last_row
@@ -56,8 +59,11 @@ impl MergedCellRange {
 ///
 /// # Layout
 ///
-/// - `u16` cmcs: count of CellRangeAddress structs
+/// - `u16` cmcs: count of `CellRangeAddress` structs
 /// - `cmcs * 8` bytes: array of `(rwFirst: u16, rwLast: u16, colFirst: u16, colLast: u16)`
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn parse_mergecells_record(data: &[u8], out: &mut Vec<MergedCellRange>) -> Result<()> {
     if data.len() < 2 {
         return Err(Error::InvalidLength {

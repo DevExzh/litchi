@@ -9,12 +9,21 @@ pub struct Query {
 }
 
 impl Query {
+    /// Creates an inert stored-query declaration.
+    #[must_use]
     pub fn new(name: impl Into<String>, command: impl Into<String>) -> Self {
         Self {
             name: name.into(),
             command: command.into(),
             escape_processing: None,
         }
+    }
+
+    /// Sets the optional ODF escape-processing declaration.
+    #[must_use]
+    pub const fn with_escape_processing(mut self, value: Option<bool>) -> Self {
+        self.escape_processing = value;
+        self
     }
 
     pub(crate) fn parsed(name: String, command: String, escape_processing: Option<bool>) -> Self {

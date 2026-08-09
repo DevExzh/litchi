@@ -106,6 +106,7 @@ pub struct PhoneticFormat {
 
 impl PhoneticFormat {
     /// A phonetic format with no unused flag bits.
+    #[must_use]
     pub fn new(font_index: u16, phonetic_type: PhoneticType, alignment: PhoneticAlignment) -> Self {
         Self {
             font_index,
@@ -115,12 +116,15 @@ impl PhoneticFormat {
         }
     }
 
+    #[must_use]
     pub const fn font_index(&self) -> u16 {
         self.font_index
     }
+    #[must_use]
     pub const fn phonetic_type(&self) -> PhoneticType {
         self.phonetic_type
     }
+    #[must_use]
     pub const fn alignment(&self) -> PhoneticAlignment {
         self.alignment
     }
@@ -137,6 +141,9 @@ pub struct PhoneticRange {
 
 impl PhoneticRange {
     /// A range; the last row and column must not precede the first.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(first_row: u16, last_row: u16, first_col: u8, last_col: u8) -> Result<Self> {
         if last_row < first_row || last_col < first_col {
             return Err(invalid("phonetic range is reversed"));
@@ -149,15 +156,19 @@ impl PhoneticRange {
         })
     }
 
+    #[must_use]
     pub const fn first_row(&self) -> u16 {
         self.first_row
     }
+    #[must_use]
     pub const fn last_row(&self) -> u16 {
         self.last_row
     }
+    #[must_use]
     pub const fn first_col(&self) -> u8 {
         self.first_col
     }
+    #[must_use]
     pub const fn last_col(&self) -> u8 {
         self.last_col
     }
@@ -172,6 +183,9 @@ pub struct PhoneticInfo {
 
 impl PhoneticInfo {
     /// A record with the default format and the visible phonetic ranges.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(format: PhoneticFormat, ranges: Vec<PhoneticRange>) -> Result<Self> {
         if ranges.len() > MAX_RANGES {
             return Err(invalid("phonetic range count exceeds 0x2000"));
@@ -179,9 +193,11 @@ impl PhoneticInfo {
         Ok(Self { format, ranges })
     }
 
+    #[must_use]
     pub const fn format(&self) -> PhoneticFormat {
         self.format
     }
+    #[must_use]
     pub fn ranges(&self) -> &[PhoneticRange] {
         &self.ranges
     }
@@ -241,7 +257,9 @@ impl PhoneticInfo {
         let mut payload = Vec::with_capacity(HEADER_LEN + self.ranges.len() * REF8_LEN);
         payload.extend_from_slice(&self.format.font_index.to_le_bytes());
         payload.extend_from_slice(&flags.to_le_bytes());
-        payload.extend_from_slice(&(self.ranges.len() as u16).to_le_bytes());
+        payload.extend_from_slice(
+            &crate::utils::truncate_usize_to_u16(self.ranges.len()).to_le_bytes(),
+        );
         for range in &self.ranges {
             payload.extend_from_slice(&range.first_row.to_le_bytes());
             payload.extend_from_slice(&range.last_row.to_le_bytes());

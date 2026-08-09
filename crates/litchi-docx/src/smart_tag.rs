@@ -1,4 +1,12 @@
-//! WordprocessingML smart-tag metadata.
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+//! `WordprocessingML` smart-tag metadata.
 
 use crate::error::{Error, Result};
 use crate::paragraph::extract_word_text;
@@ -91,7 +99,14 @@ impl SmartTag {
                     return Err(Error::InvalidFormat("unterminated smart-tag XML".into()));
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Empty(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {},
             }
         }
 
@@ -111,12 +126,17 @@ impl SmartTag {
     }
 
     /// Extract the visible text contained by this smart tag.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn text(&self) -> Result<String> {
         extract_word_text(self.xml.as_bytes())
     }
 
     /// Return the original smart-tag XML fragment.
     #[inline]
+    #[must_use]
     pub fn raw_xml(&self) -> &[u8] {
         self.xml.as_bytes()
     }

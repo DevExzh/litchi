@@ -109,7 +109,7 @@ pub fn store_data_model(
     fragment.extend_from_slice(&descriptor);
     fragment.extend_from_slice(b"</x:ext>");
     let updated = insert_extension(workbook.blob(), core, &fragment)?;
-    let uri = PackURI::new(&value.payload.part_name).map_err(|error| invalid(error.to_string()))?;
+    let uri = PackURI::new(&value.payload.part_name).map_err(|error| invalid(error.clone()))?;
     package.try_add_part(Box::new(BlobPart::new(
         uri,
         DATA_MODEL_CONTENT_TYPE.into(),
@@ -133,7 +133,7 @@ fn validate_payload(value: &Payload) -> Result<()> {
         return Err(limit("payload bytes"));
     }
     inspect(&value.data)?;
-    let _ = PackURI::new(&value.part_name).map_err(|error| invalid(error.to_string()))?;
+    let _ = PackURI::new(&value.part_name).map_err(|error| invalid(error.clone()))?;
     Ok(())
 }
 

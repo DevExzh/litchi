@@ -1,7 +1,18 @@
-//! PivotTable aggregate and workbook/package integration.
+//! `PivotTable` aggregate and workbook/package integration.
 
-use super::codec::*;
-use super::model::*;
+use super::codec::{
+    MAX_PIVOT_EXTENSION_BYTES, MAX_PIVOT_ITEMS, MAX_PIVOT_VIEWS_PER_SHEET, QSI_SX_TAG_TYPE,
+    SXADDL_TYPE, SXDI_TYPE, SXEX_TYPE, SXIVD_TYPE, SXLI_TYPE, SXPI_TYPE, SXVD_TYPE, SXVDEX_TYPE,
+    SXVI_TYPE, SXVIEW_TYPE, SXVIEWEX9_TYPE, cache_invalid, is_worksheet_view_record,
+    parse_qsi_sx_tag, parse_sxaddl, parse_sxdi, parse_sxex, parse_sxivd, parse_sxli, parse_sxpi,
+    parse_sxvd, parse_sxvdex, parse_sxvi, parse_sxview, parse_sxviewex9,
+};
+use super::model::{
+    PageFieldEntry, PivotAdditionalExtension, PivotAxis, PivotAxisField, PivotCache,
+    PivotCacheField, PivotCacheGrouping, PivotDataItem, PivotLayoutLine, PivotPageSelection,
+    PivotQueryTag, PivotSourceType, PivotViewDef, PivotViewEx9, PivotViewExtension, PivotViewField,
+    PivotViewItem,
+};
 use crate::error::Result;
 
 /// Complete pivot table definition aggregated from multiple SX* records.
@@ -39,6 +50,7 @@ pub struct PivotTable {
 
 impl PivotTable {
     /// Create a new pivot table from its view definition.
+    #[must_use]
     pub fn new(view: PivotViewDef) -> Self {
         Self {
             source_type: PivotSourceType::Worksheet,
@@ -58,11 +70,13 @@ impl PivotTable {
         }
     }
 
+    #[must_use]
     pub const fn cache_index(&self) -> u16 {
         self.view.cache_index
     }
 
     /// Returns the cache field addressed by a view-field ordinal.
+    #[must_use]
     pub fn cache_field<'a>(
         &self,
         cache: &'a PivotCache,
@@ -405,7 +419,7 @@ impl PivotTableBuild {
     }
 }
 
-/// Ordered worksheet PivotTable record collector.
+/// Ordered worksheet `PivotTable` record collector.
 pub(crate) struct PivotTableCollector {
     current: Option<PivotTableBuild>,
     completed: Vec<PivotTable>,
@@ -444,7 +458,7 @@ impl PivotTableCollector {
         Ok(())
     }
 
-    /// Returns true when the record belongs to the PivotTable aggregate.
+    /// Returns true when the record belongs to the `PivotTable` aggregate.
     pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> Result<bool> {
         let pivot_record = is_worksheet_view_record(record_type);
         if record_type == SXVIEW_TYPE {
@@ -521,8 +535,7 @@ pub(crate) fn validate_pivot_cache_links(
                 let cache_field = &cache.fields()[index];
                 let visible_items = cache_field
                     .grouping()
-                    .map(PivotCacheGrouping::group_items)
-                    .unwrap_or(cache_field.items());
+                    .map_or(cache_field.items(), PivotCacheGrouping::group_items);
                 for item in &field.items {
                     if item.item_type.code() == 0
                         && usize::from(item.cache_index) >= visible_items.len()

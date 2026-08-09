@@ -61,21 +61,25 @@ impl Snapshot {
     }
 
     /// The main-document `ccpText` captured with this snapshot.
+    #[must_use]
     pub const fn main_document_chars(&self) -> u32 {
         self.main_document_chars
     }
 
     /// The source stream/range context required by the bounded patch.
+    #[must_use]
     pub const fn source_context(&self) -> SourceContext {
         self.wire.context
     }
 
     /// The exact source `SttbFnm` bytes, when present.
+    #[must_use]
     pub fn referenced_files_bytes(&self) -> Option<&[u8]> {
         self.wire.referenced_files.as_deref()
     }
 
     /// The exact source `PlcfWKB` bytes, when present.
+    #[must_use]
     pub fn subdocuments_bytes(&self) -> Option<&[u8]> {
         self.wire.subdocuments.as_deref()
     }
@@ -141,10 +145,12 @@ pub struct ReferenceSelector(pub usize);
 
 impl ReferenceSelector {
     /// Select a zero-based `PlcfWKB` reference index.
+    #[must_use]
     pub const fn index(index: usize) -> Self {
         Self(index)
     }
 
+    #[must_use]
     pub const fn get(self) -> usize {
         self.0
     }
@@ -629,9 +635,9 @@ fn allocate_key(collection: &Collection, kind: Kind) -> Result<FileNameKey, Erro
 }
 
 fn raw_fnfb(metadata: FileNameMetadata) -> u8 {
-    u8::from(metadata.valid_on_fat) * codec::FNFB_FAT
-        | u8::from(metadata.valid_on_ntfs) * codec::FNFB_NTFS
-        | u8::from(metadata.is_non_file_system_path) * codec::FNFB_NON_FILE_SYS
+    (u8::from(metadata.valid_on_fat) * codec::FNFB_FAT)
+        | (u8::from(metadata.valid_on_ntfs) * codec::FNFB_NTFS)
+        | (u8::from(metadata.is_non_file_system_path) * codec::FNFB_NON_FILE_SYS)
 }
 
 fn key_error(error: FileNameKeyError) -> Error {

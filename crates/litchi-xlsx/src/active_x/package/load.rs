@@ -1,7 +1,7 @@
-//! Worksheet-to-package loading for inert ActiveX graphs.
+//! Worksheet-to-package loading for inert `ActiveX` graphs.
 
 use super::super::codec::descriptor_relationship_ids;
-use super::super::model::*;
+use super::super::model::{Binary, Control, Descriptor, LoadedControl, PreviewImage};
 use super::super::{
     BINARY_CONTENT_TYPE, BINARY_REL, CONTROL_REL, CONTROL_REL_STRICT, DESCRIPTOR_CONTENT_TYPE,
     IMAGE_REL, IMAGE_REL_STRICT, MAX_BINARY, MAX_TOTAL_BINARY, Result, content_type, limit, relerr,

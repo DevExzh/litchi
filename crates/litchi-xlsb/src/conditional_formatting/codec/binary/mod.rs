@@ -3,7 +3,10 @@
 //! Wire primitives, typed record codecs, and record-stream writing live in
 //! nested owners so the public conditional-formatting facade remains small.
 
-#![allow(clippy::too_many_arguments)]
+#![allow(
+    clippy::too_many_arguments,
+    reason = "arguments mirror independent BIFF12 conditional-formatting fields"
+)]
 
 mod records;
 mod wire;

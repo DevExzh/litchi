@@ -1,4 +1,4 @@
-//! Writer-side constraints for the typed DrawingML chart model.
+//! Writer-side constraints for the typed `DrawingML` chart model.
 
 /// Construct an invalid-input error without coupling record writers to a
 /// concrete semantic family.

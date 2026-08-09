@@ -125,7 +125,7 @@ pub fn parse_arrays(xml: &[u8]) -> Result<ArrayData> {
     Ok(value)
 }
 
-/// Parse a FeaturePropertyBags part.
+/// Parse a `FeaturePropertyBags` part.
 pub fn parse_feature_property_bags(xml: &[u8]) -> Result<Bags> {
     let root = parse_document(xml)?;
     require(&root, FEATURE_BAG, "FeaturePropertyBags")?;
@@ -233,7 +233,7 @@ pub fn parse_xf_complement(xml: &[u8]) -> Result<XfComplement> {
     Ok(value)
 }
 
-/// Parse one DXFComplement extension element.
+/// Parse one `DXFComplement` extension element.
 pub fn parse_dxf_complement(xml: &[u8]) -> Result<DxfComplement> {
     let root = parse_document(xml)?;
     require(&root, FEATURE_BAG, "DXFComplement")?;
@@ -345,9 +345,7 @@ fn parse_key(node: &Node) -> Result<Key> {
     }
     Ok(Key {
         name: required(node, "", "n")?.to_owned(),
-        value_type: optional(node, "", "t")
-            .map(ValueType::parse)
-            .unwrap_or(ValueType::Number),
+        value_type: optional(node, "", "t").map_or(ValueType::Number, ValueType::parse),
     })
 }
 
@@ -381,9 +379,7 @@ fn parse_array_value(node: &Node) -> Result<ArrayValue> {
         return Err(invalid("rich-array value must be a leaf"));
     }
     Ok(ArrayValue {
-        value_type: optional(node, "", "t")
-            .map(ArrayValueType::parse)
-            .unwrap_or(ArrayValueType::Number),
+        value_type: optional(node, "", "t").map_or(ArrayValueType::Number, ArrayValueType::parse),
         value: node.text.clone(),
     })
 }
@@ -515,7 +511,7 @@ fn parse_u32(value: &str, name: &str) -> Result<u32> {
         .map_err(|_| invalid(format!("{name} must be an unsigned integer")))
 }
 
-fn push_limit<T>(values: &mut Vec<T>, limit_value: usize, name: &str) -> Result<()> {
+fn push_limit<T>(values: &mut [T], limit_value: usize, name: &str) -> Result<()> {
     if values.len() >= limit_value {
         Err(limit(name))
     } else {

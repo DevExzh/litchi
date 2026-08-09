@@ -41,7 +41,7 @@ pub(crate) fn corrupted(message: impl Into<String>) -> PackageError {
     PackageError::Corrupted(message.into())
 }
 
-/// The semantically decoded FFDataBits fields used by the wire codec.
+/// The semantically decoded `FFDataBits` fields used by the wire codec.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct DecodedBits {
     pub(crate) kind: FormFieldDataKind,
@@ -55,7 +55,7 @@ pub(crate) struct DecodedBits {
     pub(crate) has_list_box: bool,
 }
 
-/// Decode and validate the FFDataBits relationships mandated by MS-DOC.
+/// Decode and validate the `FFDataBits` relationships mandated by MS-DOC.
 pub(crate) fn decode_bits(
     bits: u16,
     max_length: u16,

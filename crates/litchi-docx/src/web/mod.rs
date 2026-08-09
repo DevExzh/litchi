@@ -1,4 +1,8 @@
-//! Layered WordprocessingML web-settings models, codec, and OPC owner.
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+//! Layered `WordprocessingML` web-settings models, codec, and OPC owner.
 //!
 //! The historical `crate::web` module remains the public facade.
 
@@ -102,7 +106,7 @@ pub(super) fn word_attribute_value(
         }
         if value.is_some() {
             let name = std::str::from_utf8(name)
-                .map_err(|_| invalid("Word attribute name is not UTF-8"))?;
+                .map_err(|_source_error| invalid("Word attribute name is not UTF-8"))?;
             return Err(invalid(format!("duplicate Word attribute '{name}'")));
         }
         value = Some(

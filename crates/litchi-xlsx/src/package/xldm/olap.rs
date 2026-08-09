@@ -50,6 +50,7 @@ pub struct OlapElement {
 }
 
 impl OlapElement {
+    #[must_use]
     pub fn child(&self, name: &str) -> Option<&OlapElement> {
         self.children.iter().find(|child| child.name == name)
     }
@@ -57,6 +58,7 @@ impl OlapElement {
         let name = name.to_owned();
         self.children.iter().filter(move |child| child.name == name)
     }
+    #[must_use]
     pub fn scalar(&self, name: &str) -> Option<&str> {
         let child = self.child(name)?;
         child.children.is_empty().then_some(child.text.trim())
@@ -197,7 +199,10 @@ pub struct DimensionInformation {
 pub struct CubeInformation;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[allow(clippy::large_enum_variant)] // public API; boxing would break callers
+#[allow(
+    clippy::large_enum_variant,
+    reason = "boxing this public schema enum would break callers"
+)]
 pub enum OlapDocument {
     Definition(OlapDefinition),
     PartitionInformation(PartitionInformation),

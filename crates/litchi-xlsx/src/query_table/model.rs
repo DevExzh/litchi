@@ -1,4 +1,4 @@
-//! Semantic SpreadsheetML query-table model.
+//! Semantic `SpreadsheetML` query-table model.
 //!
 //! The surrounding module supplies the contextual owner name.
 
@@ -198,10 +198,12 @@ pub struct ExtensionAttribute {
 }
 
 impl ExtensionAttribute {
+    #[must_use]
     pub fn qualified_name(&self) -> &str {
         &self.qualified_name
     }
 
+    #[must_use]
     pub fn value(&self) -> &str {
         &self.value
     }
@@ -221,10 +223,12 @@ impl ExtensionList {
             .map(|extension| extension.uri.as_str())
     }
 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.extensions.len()
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.extensions.is_empty()
     }
@@ -267,27 +271,35 @@ pub struct SortCondition {
 }
 
 impl SortCondition {
+    #[must_use]
     pub fn reference(&self) -> &str {
         &self.reference
     }
+    #[must_use]
     pub fn descending(&self) -> Option<bool> {
         self.descending
     }
+    #[must_use]
     pub fn sort_by(&self) -> Option<SortBy> {
         self.sort_by
     }
+    #[must_use]
     pub fn custom_list(&self) -> Option<&str> {
         self.custom_list.as_deref()
     }
+    #[must_use]
     pub fn differential_format_id(&self) -> Option<u32> {
         self.differential_format_id
     }
+    #[must_use]
     pub fn icon_set(&self) -> Option<IconSet> {
         self.icon_set
     }
+    #[must_use]
     pub fn icon_id(&self) -> Option<u32> {
         self.icon_id
     }
+    #[must_use]
     pub fn extension_attributes(&self) -> &[ExtensionAttribute] {
         &self.extension_attributes
     }
@@ -304,21 +316,27 @@ pub struct SortState {
 }
 
 impl SortState {
+    #[must_use]
     pub fn reference(&self) -> &str {
         &self.reference
     }
+    #[must_use]
     pub fn column_sort(&self) -> Option<bool> {
         self.column_sort
     }
+    #[must_use]
     pub fn case_sensitive(&self) -> Option<bool> {
         self.case_sensitive
     }
+    #[must_use]
     pub fn sort_method(&self) -> Option<SortMethod> {
         self.sort_method
     }
+    #[must_use]
     pub fn conditions(&self) -> &[SortCondition] {
         &self.conditions
     }
+    #[must_use]
     pub fn extension_attributes(&self) -> &[ExtensionAttribute] {
         &self.extension_attributes
     }
@@ -338,6 +356,7 @@ pub struct Field {
 }
 
 impl Field {
+    #[must_use]
     pub fn new(id: u32) -> Self {
         Self {
             id,
@@ -369,30 +388,39 @@ impl Field {
     pub fn set_table_column_id(&mut self, value: Option<u32>) {
         self.table_column_id = value;
     }
+    #[must_use]
     pub fn id(&self) -> u32 {
         self.id
     }
+    #[must_use]
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
     }
+    #[must_use]
     pub fn data_bound(&self) -> Option<bool> {
         self.data_bound
     }
+    #[must_use]
     pub fn row_numbers(&self) -> Option<bool> {
         self.row_numbers
     }
+    #[must_use]
     pub fn fill_formulas(&self) -> Option<bool> {
         self.fill_formulas
     }
+    #[must_use]
     pub fn clipped(&self) -> Option<bool> {
         self.clipped
     }
+    #[must_use]
     pub fn table_column_id(&self) -> Option<u32> {
         self.table_column_id
     }
+    #[must_use]
     pub fn extension_list(&self) -> Option<&ExtensionList> {
         self.extension_list.as_ref()
     }
+    #[must_use]
     pub fn extension_attributes(&self) -> &[ExtensionAttribute] {
         &self.extension_attributes
     }
@@ -423,6 +451,7 @@ impl Default for Refresh {
 }
 
 impl Refresh {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             preserve_sort_filter_layout: None,
@@ -474,45 +503,59 @@ impl Refresh {
     pub fn set_unbound_columns_right(&mut self, value: Option<u32>) {
         self.unbound_columns_right = value;
     }
+    #[must_use]
     pub fn preserve_sort_filter_layout(&self) -> Option<bool> {
         self.preserve_sort_filter_layout
     }
+    #[must_use]
     pub fn field_id_wrapped(&self) -> Option<bool> {
         self.field_id_wrapped
     }
+    #[must_use]
     pub fn headers_in_last_refresh(&self) -> Option<bool> {
         self.headers_in_last_refresh
     }
+    #[must_use]
     pub fn minimum_version(&self) -> Option<u8> {
         self.minimum_version
     }
+    #[must_use]
     pub fn next_id(&self) -> Option<u32> {
         self.next_id
     }
+    #[must_use]
     pub fn unbound_columns_left(&self) -> Option<u32> {
         self.unbound_columns_left
     }
+    #[must_use]
     pub fn unbound_columns_right(&self) -> Option<u32> {
         self.unbound_columns_right
     }
+    #[must_use]
     pub fn declared_field_count(&self) -> Option<u32> {
         self.declared_field_count
     }
+    #[must_use]
     pub fn fields(&self) -> &[Field] {
         &self.fields
     }
+    #[must_use]
     pub fn declared_deleted_field_count(&self) -> Option<u32> {
         self.declared_deleted_field_count
     }
+    #[must_use]
     pub fn deleted_fields(&self) -> Option<&[String]> {
         self.deleted_fields.as_deref()
     }
+    #[must_use]
     pub fn sort_state(&self) -> Option<&SortState> {
         self.sort_state.as_ref()
     }
+    #[must_use]
     pub fn extension_list(&self) -> Option<&ExtensionList> {
         self.extension_list.as_ref()
     }
+    #[must_use]
     pub fn extension_attributes(&self) -> &[ExtensionAttribute] {
         &self.extension_attributes
     }
@@ -630,78 +673,103 @@ impl Table {
     pub fn refresh_mut(&mut self) -> Option<&mut Refresh> {
         self.refresh.as_mut()
     }
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
+    #[must_use]
     pub fn headers(&self) -> Option<bool> {
         self.headers
     }
+    #[must_use]
     pub fn row_numbers(&self) -> Option<bool> {
         self.row_numbers
     }
+    #[must_use]
     pub fn disable_refresh(&self) -> Option<bool> {
         self.disable_refresh
     }
+    #[must_use]
     pub fn background_refresh(&self) -> Option<bool> {
         self.background_refresh
     }
+    #[must_use]
     pub fn first_background_refresh(&self) -> Option<bool> {
         self.first_background_refresh
     }
+    #[must_use]
     pub fn refresh_on_load(&self) -> Option<bool> {
         self.refresh_on_load
     }
+    #[must_use]
     pub fn grow_shrink_type(&self) -> Option<GrowShrinkType> {
         self.grow_shrink_type
     }
+    #[must_use]
     pub fn fill_formulas(&self) -> Option<bool> {
         self.fill_formulas
     }
+    #[must_use]
     pub fn remove_data_on_save(&self) -> Option<bool> {
         self.remove_data_on_save
     }
+    #[must_use]
     pub fn disable_edit(&self) -> Option<bool> {
         self.disable_edit
     }
+    #[must_use]
     pub fn preserve_formatting(&self) -> Option<bool> {
         self.preserve_formatting
     }
+    #[must_use]
     pub fn adjust_column_width(&self) -> Option<bool> {
         self.adjust_column_width
     }
+    #[must_use]
     pub fn intermediate(&self) -> Option<bool> {
         self.intermediate
     }
+    #[must_use]
     pub fn connection_id(&self) -> u32 {
         self.connection_id
     }
+    #[must_use]
     pub fn auto_format_id(&self) -> Option<u32> {
         self.auto_format_id
     }
+    #[must_use]
     pub fn apply_number_formats(&self) -> Option<bool> {
         self.apply_number_formats
     }
+    #[must_use]
     pub fn apply_border_formats(&self) -> Option<bool> {
         self.apply_border_formats
     }
+    #[must_use]
     pub fn apply_font_formats(&self) -> Option<bool> {
         self.apply_font_formats
     }
+    #[must_use]
     pub fn apply_pattern_formats(&self) -> Option<bool> {
         self.apply_pattern_formats
     }
+    #[must_use]
     pub fn apply_alignment_formats(&self) -> Option<bool> {
         self.apply_alignment_formats
     }
+    #[must_use]
     pub fn apply_width_height_formats(&self) -> Option<bool> {
         self.apply_width_height_formats
     }
+    #[must_use]
     pub fn refresh(&self) -> Option<&Refresh> {
         self.refresh.as_ref()
     }
+    #[must_use]
     pub fn extension_list(&self) -> Option<&ExtensionList> {
         self.extension_list.as_ref()
     }
+    #[must_use]
     pub fn extension_attributes(&self) -> &[ExtensionAttribute] {
         &self.extension_attributes
     }
@@ -719,6 +787,7 @@ pub struct Part {
 }
 
 impl Part {
+    #[must_use]
     pub fn new(relationship_id: String, part_name: String, query_table: Table) -> Self {
         Self {
             relationship_id,
@@ -727,12 +796,15 @@ impl Part {
         }
     }
 
+    #[must_use]
     pub fn relationship_id(&self) -> &str {
         &self.relationship_id
     }
+    #[must_use]
     pub fn part_name(&self) -> &str {
         &self.part_name
     }
+    #[must_use]
     pub fn query_table(&self) -> &Table {
         &self.query_table
     }

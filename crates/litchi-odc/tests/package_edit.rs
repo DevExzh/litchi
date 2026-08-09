@@ -5,6 +5,7 @@
 
 use litchi_odc::{AxisSpec, AxisUpdate, Chart, ChartClass, Definition, chart::Dimension};
 use litchi_odf_common::core::PackageWriter;
+use soapberry_zip::office::StreamingArchiveWriter;
 
 fn source_definition() -> Definition {
     let mut definition = Definition::new(ChartClass::bar());
@@ -27,6 +28,20 @@ fn package(content: &str, auxiliary: Option<(&str, &[u8])>) -> Vec<u8> {
         writer.add_file(path, bytes).unwrap();
     }
     writer.finish_to_bytes().unwrap()
+}
+
+fn raw_negative_fixture_package(content: &str) -> Vec<u8> {
+    const MIMETYPE: &[u8] = b"application/vnd.oasis.opendocument.chart";
+    const MANIFEST: &[u8] = br#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.chart"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#;
+    let mut archive = StreamingArchiveWriter::new();
+    archive.write_stored("mimetype", MIMETYPE).unwrap();
+    archive
+        .write_deflated("content.xml", content.as_bytes())
+        .unwrap();
+    archive
+        .write_deflated("META-INF/manifest.xml", MANIFEST)
+        .unwrap();
+    archive.finish_to_bytes().unwrap()
 }
 
 #[test]
@@ -89,7 +104,7 @@ fn package_edit_preserves_auxiliary_payloads_and_refuses_signed_or_pretty_xml() 
     assert!(signed_edit.commit().is_err());
 
     let pretty = content.replacen("><", ">\n<", 1);
-    let pretty_chart = Chart::from_bytes(package(&pretty, None)).unwrap();
+    let pretty_chart = Chart::from_bytes(raw_negative_fixture_package(&pretty)).unwrap();
     let mut pretty_edit = pretty_chart.edit();
     pretty_edit
         .update_axis(0, AxisUpdate::named("blocked"))

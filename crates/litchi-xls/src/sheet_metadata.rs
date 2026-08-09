@@ -31,22 +31,28 @@ pub struct SheetMetadata {
 }
 
 impl SheetMetadata {
+    #[must_use]
     pub fn workbook_index(&self) -> usize {
         self.workbook_index
     }
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
+    #[must_use]
     pub fn visibility(&self) -> SheetVisibility {
         self.visibility
     }
+    #[must_use]
     pub fn kind(&self) -> SheetKind {
         self.kind
     }
     /// Index accepted by `Workbook::xls_worksheet`, when this entry was parsed as a worksheet.
+    #[must_use]
     pub fn parsed_worksheet_index(&self) -> Option<usize> {
         self.parsed_worksheet_index
     }
+    #[must_use]
     pub fn is_visible(&self) -> bool {
         self.visibility == SheetVisibility::Visible
     }

@@ -39,6 +39,9 @@ impl PrinterDriverData {
     /// `Continue` payloads carry raw `DEVMODE` sections without any header,
     /// so they are appended verbatim; their record-type identity is
     /// established by the caller's record iteration.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8], continues: &[Vec<u8>]) -> Result<Self> {
         if data.len() < RESERVED_LEN {
             return Err(Error::InvalidLength {
@@ -71,11 +74,13 @@ impl PrinterDriverData {
     }
 
     /// Raw `reserved` field value.
+    #[must_use]
     pub fn reserved(&self) -> u16 {
         self.reserved
     }
 
     /// The opaque `DEVMODE` printer driver data.
+    #[must_use]
     pub fn driver_data(&self) -> &[u8] {
         &self.devmode
     }

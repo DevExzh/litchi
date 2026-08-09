@@ -9,16 +9,22 @@ use super::offsets::Offsets;
 /// story counts, and table references are kept in separate semantic owners so
 /// each codec section can evolve independently.
 #[derive(Debug)]
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "reserved DOC structure retained for format completeness or future round-trip support"
+)]
 pub struct FibBuilder {
     pub(super) header: Header,
     pub(super) stories: Stories,
     pub(super) offsets: Offsets,
 }
 
-/// Fields belonging to FibBase.
+/// Fields belonging to `FibBase`.
 #[derive(Debug)]
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "reserved DOC structure retained for format completeness or future round-trip support"
+)]
 pub(super) struct Header {
     pub(super) text_size: u32,
     pub(super) table_size: u32,
@@ -29,9 +35,12 @@ pub(super) struct Header {
     pub(super) cb_mac: u32,
 }
 
-/// Character counts and story ranges emitted in FibRgLw97.
+/// Character counts and story ranges emitted in `FibRgLw97`.
 #[derive(Debug, Default)]
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "reserved DOC structure retained for format completeness or future round-trip support"
+)]
 pub(super) struct Stories {
     pub(super) main_text_start: u32,
     pub(super) main_text_length: u32,
@@ -50,6 +59,7 @@ pub(super) struct Stories {
 
 impl FibBuilder {
     /// Create a new FIB builder.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             header: Header {

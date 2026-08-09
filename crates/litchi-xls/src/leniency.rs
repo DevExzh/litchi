@@ -49,6 +49,7 @@ pub enum Leniency {
 
 impl Leniency {
     /// Whether formatting defects are repaired rather than rejected.
+    #[must_use]
     pub fn tolerates_formatting_defects(self) -> bool {
         matches!(self, Leniency::TolerateFormattingDefects)
     }
@@ -90,6 +91,7 @@ pub enum FormattingDefect {
 
 impl FormattingDefect {
     /// The BIFF record type whose payload carried the defect.
+    #[must_use]
     pub fn record_type(self) -> u16 {
         match self {
             FormattingDefect::FontFamily | FormattingDefect::FontNameEmpty => {
@@ -102,6 +104,7 @@ impl FormattingDefect {
     }
 
     /// A stable, allocation-free description of the defect class.
+    #[must_use]
     pub fn description(self) -> &'static str {
         match self {
             FormattingDefect::FontFamily => "Font family byte is outside the enumeration",
@@ -129,6 +132,7 @@ pub struct ToleratedDefect {
 
 impl ToleratedDefect {
     /// The class of defect that was repaired.
+    #[must_use]
     pub fn defect(&self) -> FormattingDefect {
         self.defect
     }
@@ -142,6 +146,7 @@ impl ToleratedDefect {
     /// zero-based ordinal of the `Format` record among the `Format` records
     /// parsed so far. For [`FormattingDefect::ExtendedFormatCountMismatch`]
     /// it is the number of `XF` records that were actually parsed.
+    #[must_use]
     pub fn ordinal(&self) -> u32 {
         self.ordinal
     }
@@ -155,11 +160,13 @@ impl ToleratedDefect {
     /// `cxfs`. For [`FormattingDefect::FormatStringOverrun`] it is the
     /// declared `cch`. For [`FormattingDefect::FontNameEmpty`] it is always
     /// zero, since the defect *is* the value.
+    #[must_use]
     pub fn observed(&self) -> u32 {
         self.observed
     }
 
     /// The BIFF record type whose payload carried the defect.
+    #[must_use]
     pub fn record_type(&self) -> u16 {
         self.defect.record_type()
     }
@@ -177,6 +184,7 @@ pub struct ToleranceReport {
 
 impl ToleranceReport {
     /// Whether the workbook parsed without any repair.
+    #[must_use]
     pub fn is_clean(&self) -> bool {
         self.defects.is_empty() && self.unrecorded == 0
     }
@@ -185,6 +193,7 @@ impl ToleranceReport {
     ///
     /// At most [`ToleranceReport::RECORD_LIMIT`] entries; any excess is
     /// reported by [`ToleranceReport::unrecorded`].
+    #[must_use]
     pub fn defects(&self) -> &[ToleratedDefect] {
         &self.defects
     }
@@ -194,11 +203,13 @@ impl ToleranceReport {
     /// Non-zero only for workbooks with more than
     /// [`ToleranceReport::RECORD_LIMIT`] defects, where storing every one
     /// would let the file dictate unbounded memory use.
+    #[must_use]
     pub fn unrecorded(&self) -> u32 {
         self.unrecorded
     }
 
     /// Total number of repairs, including those not individually stored.
+    #[must_use]
     pub fn total(&self) -> u64 {
         self.defects.len() as u64 + u64::from(self.unrecorded)
     }
@@ -207,6 +218,7 @@ impl ToleranceReport {
     ///
     /// Counts only individually recorded entries; compare
     /// [`ToleranceReport::unrecorded`] before treating a zero as absence.
+    #[must_use]
     pub fn count(&self, defect: FormattingDefect) -> usize {
         self.defects
             .iter()

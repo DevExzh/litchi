@@ -28,12 +28,14 @@ impl BookmarkEntry {
     }
 
     /// Set whether non-DOC exports should retain this bookmark.
+    #[must_use]
     pub fn with_native_export(mut self, is_native: bool) -> Self {
         self.is_native = is_native;
         self
     }
 
     /// Restrict this bookmark to a table-column range.
+    #[must_use]
     pub fn with_column_range(mut self, first: u8, exclusive_limit: u8) -> Self {
         self.column_range = Some((first, exclusive_limit));
         self

@@ -152,7 +152,7 @@ struct Edit {
     replacement: String,
 }
 
-fn groups<'a>(definitions: &'a [Definition]) -> HashMap<Scope, Vec<&'a Definition>> {
+fn groups(definitions: &[Definition]) -> HashMap<Scope, Vec<&Definition>> {
     let mut groups = HashMap::new();
     for definition in definitions {
         groups
@@ -218,14 +218,14 @@ fn scan(xml: &str) -> Result<Scan> {
 
     loop {
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid_error("XML position overflow"))?;
+            .map_err(|_error| invalid_error("XML position overflow"))?;
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| invalid_error(format!("invalid ODS content.xml: {error}")))?;
         let is_table = is_namespace(&namespace, TABLE_NAMESPACE);
         let is_office = is_namespace(&namespace, OFFICE_NAMESPACE);
         let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid_error("XML position overflow"))?;
+            .map_err(|_error| invalid_error("XML position overflow"))?;
 
         match event {
             Event::Start(element)
@@ -262,7 +262,7 @@ fn scan(xml: &str) -> Result<Scan> {
                     let index = containers.len();
                     containers.push(Span {
                         start,
-                        end: end,
+                        end,
                         scope: scope.clone(),
                     });
                     active = Some((index, scope));
@@ -323,7 +323,16 @@ fn scan(xml: &str) -> Result<Scan> {
                 _ => {},
             },
             Event::Eof => break,
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -347,7 +356,7 @@ fn host(
     name: Option<String>,
 ) -> Result<Host> {
     let qualified_name = String::from_utf8(element.name().as_ref().to_vec())
-        .map_err(|_| invalid_error("ODS element name is not UTF-8"))?;
+        .map_err(|_error| invalid_error("ODS element name is not UTF-8"))?;
     Ok(Host {
         start,
         end,
@@ -467,7 +476,7 @@ fn formula_namespace_uri(resolver: &NamespaceResolver, expression: &str) -> Resu
         {
             return String::from_utf8(namespace.as_ref().to_vec())
                 .map(Some)
-                .map_err(|_| {
+                .map_err(|_error| {
                     invalid_error(format!(
                         "formula namespace for prefix '{prefix}' is not UTF-8"
                     ))

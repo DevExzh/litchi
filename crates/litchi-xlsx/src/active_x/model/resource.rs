@@ -1,4 +1,4 @@
-//! Opaque ActiveX payloads and the loaded worksheet graph.
+//! Opaque `ActiveX` payloads and the loaded worksheet graph.
 
 use super::{Control, Descriptor};
 use litchi_opc::PackURI;

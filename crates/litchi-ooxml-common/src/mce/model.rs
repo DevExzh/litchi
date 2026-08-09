@@ -25,6 +25,7 @@ pub struct Capabilities {
 
 impl Capabilities {
     /// Create an empty capability set.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             understood: HashSet::new(),
@@ -33,6 +34,7 @@ impl Capabilities {
     }
 
     /// Create the baseline namespaces required by the OOXML profile.
+    #[must_use]
     pub fn ooxml_baseline() -> Self {
         let mut capabilities = Self::new();
         for namespace in [
@@ -72,6 +74,7 @@ impl Capabilities {
     }
 
     /// Test whether a namespace is understood by this profile.
+    #[must_use]
     pub fn understands(&self, namespace: &str) -> bool {
         self.understood.contains(namespace)
     }

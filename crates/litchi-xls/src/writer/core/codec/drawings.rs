@@ -1,10 +1,13 @@
 use super::super::comment;
-use super::super::*;
+use super::super::{CommentWriteOptions, ShapeGroupWrite, ShapeWrite, WritableWorksheet, Writer};
 use crate::error::{Error, Result};
 use std::collections::HashSet;
 
 impl Writer {
     /// Add a canonical, macro-inert BIFF8 comment to a cell.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_comment(
         &mut self,
         sheet: usize,
@@ -24,6 +27,9 @@ impl Writer {
     }
 
     /// Add a canonical BIFF8 comment with explicit visibility, anchor, rich runs, and GUID options.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_comment_with_options(
         &mut self,
         sheet: usize,
@@ -67,6 +73,9 @@ impl Writer {
     }
 
     /// Add a validated, macro-inert primitive shape and return its worksheet OBJ identifier.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_shape(&mut self, sheet: usize, mut shape: ShapeWrite) -> Result<u16> {
         shape.validate()?;
         let worksheet = self
@@ -103,13 +112,16 @@ impl Writer {
         worksheet
             .shapes
             .try_reserve(1)
-            .map_err(|_| Error::Allocation("reserving worksheet shape storage"))?;
+            .map_err(|_error| Error::Allocation("reserving worksheet shape storage"))?;
         shape.object_id = Some(object_id);
         worksheet.shapes.push(shape);
         Ok(object_id)
     }
 
     /// Remove a primitive by its assigned OBJ identifier.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn remove_shape(&mut self, sheet: usize, object_id: u16) -> Result<ShapeWrite> {
         if object_id == 0 || object_id == u16::MAX {
             return Err(Error::InvalidData(
@@ -129,6 +141,9 @@ impl Writer {
     }
 
     /// Remove all writable primitive shapes from a worksheet.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn clear_shapes(&mut self, sheet: usize) -> Result<usize> {
         let worksheet = self
             .worksheets
@@ -143,6 +158,9 @@ impl Writer {
     ///
     /// The group consumes one object ID for itself plus one per child; assigned
     /// child identifiers are stored back into the group before it is retained.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_shape_group(&mut self, sheet: usize, mut group: ShapeGroupWrite) -> Result<u16> {
         group.validate()?;
         let worksheet = self
@@ -176,7 +194,7 @@ impl Writer {
         worksheet
             .shape_groups
             .try_reserve(1)
-            .map_err(|_| Error::Allocation("reserving worksheet shape-group storage"))?;
+            .map_err(|_error| Error::Allocation("reserving worksheet shape-group storage"))?;
         let group_id = assign_object_id(&mut reserved, group.object_id)?;
         group.object_id = Some(group_id);
         for child in &mut group.children {
@@ -187,6 +205,9 @@ impl Writer {
     }
 
     /// Remove a shape group by the group's assigned OBJ identifier.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn remove_shape_group(&mut self, sheet: usize, object_id: u16) -> Result<ShapeGroupWrite> {
         if object_id == 0 || object_id == u16::MAX {
             return Err(Error::InvalidData(
@@ -250,7 +271,7 @@ fn collect_reserved_object_ids(
     let mut reserved = HashSet::new();
     reserved
         .try_reserve(capacity)
-        .map_err(|_| Error::Allocation("reserving worksheet drawing-object ID storage"))?;
+        .map_err(|_error| Error::Allocation("reserving worksheet drawing-object ID storage"))?;
     reserved.extend(
         worksheet
             .pivot_tables

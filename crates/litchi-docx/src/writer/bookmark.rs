@@ -1,3 +1,7 @@
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
 /// Bookmark writer support for DOCX documents.
 use crate::error::Result;
 use litchi_core::xml::escape_xml;
@@ -21,18 +25,21 @@ impl MutableBookmark {
     ///
     /// * `id` - Unique bookmark ID
     /// * `name` - Bookmark name (must not start with underscore for user bookmarks)
+    #[must_use]
     pub fn new(id: u32, name: String) -> Self {
         Self { id, name }
     }
 
     /// Get the bookmark ID.
     #[inline]
+    #[must_use]
     pub fn id(&self) -> u32 {
         self.id
     }
 
     /// Get the bookmark name.
     #[inline]
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -43,7 +50,10 @@ impl MutableBookmark {
     }
 
     /// Generate XML for bookmark start tag.
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "writer helper is retained for package integration"
+    )]
     pub(crate) fn to_xml_start(&self) -> Result<String> {
         let mut xml = String::with_capacity(128);
         write!(
@@ -56,7 +66,10 @@ impl MutableBookmark {
     }
 
     /// Generate XML for bookmark end tag.
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "writer helper is retained for package integration"
+    )]
     pub(crate) fn to_xml_end(&self) -> Result<String> {
         let mut xml = String::with_capacity(64);
         write!(&mut xml, r#"<w:bookmarkEnd w:id="{}"/>"#, self.id)?;

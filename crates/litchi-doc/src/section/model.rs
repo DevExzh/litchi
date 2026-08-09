@@ -265,6 +265,7 @@ pub enum VerticalMargin {
 
 impl VerticalMargin {
     /// Return the lossless signed-twips representation used by the file format.
+    #[must_use]
     pub fn signed_twips(self) -> i16 {
         match self {
             Self::Minimum(value) => value as i16,
@@ -273,6 +274,7 @@ impl VerticalMargin {
     }
 
     /// Return the physical distance in twips, independent of margin behavior.
+    #[must_use]
     pub fn distance_twips(self) -> u16 {
         match self {
             Self::Minimum(value) | Self::Fixed(value) => value,

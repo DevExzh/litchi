@@ -81,7 +81,17 @@ pub(super) fn parse_field(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) 
             Event::Text(ref text) if text_is_whitespace(text)? => {},
             Event::Comment(_) => {},
             Event::Eof => return Err(invalid_message("unterminated table:data-pilot-field")),
-            _ => return Err(invalid_message("invalid child in table:data-pilot-field")),
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {
+                return Err(invalid_message("invalid child in table:data-pilot-field"));
+            },
         }
         buf.clear();
     }

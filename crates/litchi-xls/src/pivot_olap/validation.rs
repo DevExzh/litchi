@@ -1,4 +1,4 @@
-//! Cross-field validation for PivotTable OLAP values.
+//! Cross-field validation for `PivotTable` OLAP values.
 
 use crate::error::{Error, Result};
 

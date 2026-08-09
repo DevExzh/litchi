@@ -1,6 +1,9 @@
 //! Binary STSH/STD/UPX parser.
 
-use super::super::model::*;
+use super::super::model::{
+    StyleDefinition, StyleFlags, StyleKind, StylePost2000, StyleRevisionMark, StyleSheet,
+    StyleSheetHeader,
+};
 use super::{corrupted, read_i16, read_u16, read_u32};
 use crate::leniency::{Leniency, ToleranceReport};
 use crate::package::{Error as PackageError, Result};

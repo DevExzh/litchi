@@ -21,6 +21,7 @@ pub enum BiffVersion {
 }
 
 impl BiffVersion {
+    #[must_use]
     pub fn from_bof_version(version: u16) -> Option<Self> {
         match version {
             0x0200 | 0x0002 | 0x0007 => Some(BiffVersion::Biff2),
@@ -32,7 +33,8 @@ impl BiffVersion {
         }
     }
 
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "retained as a BIFF compatibility building block")]
+    #[must_use]
     pub fn supports_unicode(&self) -> bool {
         matches!(self, BiffVersion::Biff8)
     }
@@ -46,6 +48,9 @@ pub struct BofRecord {
 }
 
 impl BofRecord {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < 4 {
             return Err(Error::InvalidLength {
@@ -83,15 +88,18 @@ pub struct DimensionsRecord {
 }
 
 impl DimensionsRecord {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         match data.len() {
             10 => {
                 // BIFF5-BIFF8
                 Ok(DimensionsRecord {
-                    first_row: binary::read_u16_le_at(data, 0)? as u32,
-                    last_row: binary::read_u16_le_at(data, 2)? as u32,
-                    first_col: binary::read_u16_le_at(data, 4)? as u32,
-                    last_col: binary::read_u16_le_at(data, 6)? as u32,
+                    first_row: u32::from(binary::read_u16_le_at(data, 0)?),
+                    last_row: u32::from(binary::read_u16_le_at(data, 2)?),
+                    first_col: u32::from(binary::read_u16_le_at(data, 4)?),
+                    last_col: u32::from(binary::read_u16_le_at(data, 6)?),
                 })
             },
             14 => {
@@ -99,8 +107,8 @@ impl DimensionsRecord {
                 Ok(DimensionsRecord {
                     first_row: binary::read_u32_le_at(data, 0)?,
                     last_row: binary::read_u32_le_at(data, 4)?,
-                    first_col: binary::read_u16_le_at(data, 8)? as u32,
-                    last_col: binary::read_u16_le_at(data, 10)? as u32,
+                    first_col: u32::from(binary::read_u16_le_at(data, 8)?),
+                    last_col: u32::from(binary::read_u16_le_at(data, 10)?),
                 })
             },
             _ => Err(Error::InvalidLength {
@@ -120,6 +128,9 @@ pub enum SheetVisible {
 }
 
 impl SheetVisible {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn from_u8(value: u8) -> Result<Self> {
         match value & 0x3 {
             0x00 => Ok(SheetVisible::Visible),
@@ -127,7 +138,7 @@ impl SheetVisible {
             0x02 => Ok(SheetVisible::VeryHidden),
             v => Err(Error::InvalidRecord {
                 record_type: 0x0085, // BoundSheet8
-                message: format!("Invalid visibility value: {}", v),
+                message: format!("Invalid visibility value: {v}"),
             }),
         }
     }
@@ -143,6 +154,9 @@ pub enum SheetType {
 }
 
 impl SheetType {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn from_u8(value: u8) -> Result<Self> {
         match value {
             0x00 => Ok(SheetType::WorkSheet),
@@ -151,15 +165,15 @@ impl SheetType {
             0x06 => Ok(SheetType::VBModule),
             v => Err(Error::InvalidRecord {
                 record_type: 0x0085, // BoundSheet8
-                message: format!("Invalid sheet type: {}", v),
+                message: format!("Invalid sheet type: {v}"),
             }),
         }
     }
 }
 
-/// BoundSheet8 record (worksheet metadata)
+/// `BoundSheet8` record (worksheet metadata)
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
+#[allow(dead_code, reason = "retained as a BIFF compatibility building block")]
 pub struct BoundSheetRecord {
     pub position: u32,
     pub visible: SheetVisible,
@@ -168,6 +182,9 @@ pub struct BoundSheetRecord {
 }
 
 impl BoundSheetRecord {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8], encoding: &Encoding) -> Result<Self> {
         if data.len() < 8 {
             return Err(Error::InvalidLength {
@@ -241,6 +258,9 @@ impl Encoding {
     /// # Arguments
     ///
     /// * `codepage` - Windows codepage identifier (e.g., 1252 for Western European, 1200 for UTF-16LE)
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn from_codepage(codepage: u16) -> Result<Self> {
         match codepage {
             1200 => Ok(Encoding::Utf16Le),
@@ -254,6 +274,9 @@ impl Encoding {
     ///
     /// Record terminators are handled here while the shared codec performs
     /// strict conversion without guessing format-specific boundaries.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn decode(&self, data: &[u8]) -> Result<String> {
         match self {
             Encoding::Utf16Le => {
@@ -268,7 +291,7 @@ impl Encoding {
                     .map_or(data.len(), |units| units * 2);
                 Page::UTF_16LE
                     .decode(&data[..end])
-                    .map(|text| text.into_owned())
+                    .map(std::borrow::Cow::into_owned)
                     .map_err(|error| Error::Encoding(error.to_string()))
             },
             Encoding::Codepage(page) => {
@@ -277,7 +300,7 @@ impl Encoding {
                     .position(|byte| *byte == 0)
                     .unwrap_or(data.len());
                 page.decode(&data[..end])
-                    .map(|text| text.into_owned())
+                    .map(std::borrow::Cow::into_owned)
                     .map_err(|error| Error::Encoding(error.to_string()))
             },
         }
@@ -353,6 +376,9 @@ pub struct PhoneticRun {
 
 impl SharedStringTable {
     /// Parse SST from potentially multiple records (SST + CONTINUE)
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse_from_records(records: &[RecordRef<'_>], encoding: &Encoding) -> Result<Self> {
         if records.is_empty() {
             return Ok(SharedStringTable {
@@ -383,6 +409,9 @@ impl SharedStringTable {
         Self::parse_segments(&segments, encoding)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8], encoding: &Encoding) -> Result<Self> {
         Self::parse_segments(&[data], encoding)
     }
@@ -605,7 +634,7 @@ impl<'a> SstCursor<'a> {
                     self.offset += 2;
                     u16::from_le_bytes([low, high])
                 } else {
-                    let character = self.current()[self.offset] as u16;
+                    let character = u16::from(self.current()[self.offset]);
                     self.offset += 1;
                     character
                 };
@@ -1027,14 +1056,17 @@ mod shared_string_tests {
 
 /// XF (Extended Format) record - cell formatting
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
+#[allow(dead_code, reason = "retained as a BIFF compatibility building block")]
 pub struct ExtendedFormat {
     pub font_index: u16,
     pub format_index: u16,
 }
 
-#[allow(dead_code)]
+#[allow(dead_code, reason = "retained as a BIFF compatibility building block")]
 impl ExtendedFormat {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < 4 {
             return Err(Error::InvalidLength {
@@ -1119,6 +1151,7 @@ pub enum FormulaValue {
 }
 
 impl CellRecord {
+    #[must_use]
     pub fn row(&self) -> u16 {
         match self {
             CellRecord::Blank { row, .. } => *row,
@@ -1131,6 +1164,7 @@ impl CellRecord {
         }
     }
 
+    #[must_use]
     pub fn col(&self) -> u16 {
         match self {
             CellRecord::Blank { col, .. } => *col,
@@ -1143,6 +1177,9 @@ impl CellRecord {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(record_type: u16, data: &[u8], encoding: &Encoding) -> Result<Self> {
         match record_type {
             0x0201 => Self::parse_blank(data),           // Blank
@@ -1166,7 +1203,7 @@ impl CellRecord {
             let offset = 4 + index * 6;
             cells.push(Self::Rk {
                 row,
-                col: first_col + index as u16,
+                col: first_col + utils::truncate_usize_to_u16(index),
                 xf_index: binary::read_u16_le_at(data, offset)?,
                 value: utils::rk_to_f64(binary::read_u32_le_at(data, offset + 2)?),
             });
@@ -1180,7 +1217,7 @@ impl CellRecord {
         for index in 0..count {
             cells.push(Self::Blank {
                 row,
-                col: first_col + index as u16,
+                col: first_col + utils::truncate_usize_to_u16(index),
                 xf_index: binary::read_u16_le_at(data, 4 + index * 2)?,
             });
         }
@@ -1214,7 +1251,7 @@ impl CellRecord {
         let first_col = binary::read_u16_le_at(data, 2)?;
         let last_col = binary::read_u16_le_at(data, data.len() - 2)?;
         let expected_last = first_col
-            .checked_add((count - 1) as u16)
+            .checked_add(utils::truncate_usize_to_u16(count - 1))
             .ok_or_else(|| Error::InvalidData(format!("{record_name} column overflow")))?;
         if first_col > 254 || last_col != expected_last || last_col > 255 {
             return Err(Error::InvalidData(format!(

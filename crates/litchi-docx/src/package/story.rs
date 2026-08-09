@@ -1,4 +1,20 @@
-//! Bounded ownership inventory for reachable WordprocessingML stories.
+#![expect(
+    clippy::expect_used,
+    reason = "the invariant is established immediately before extraction"
+)]
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::similar_names,
+    reason = "domain names mirror distinct OOXML roles"
+)]
+//! Bounded ownership inventory for reachable `WordprocessingML` stories.
 //!
 //! Ownership is derived only from OPC relationships. Directory names and XML
 //! references do not create ownership, and no linked or embedded content is
@@ -35,9 +51,9 @@ const HARD_MAX_PROLOG_EVENTS: usize = 1_000_000;
 /// Relationship and XML namespace family used by a Word package.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum StoryDialect {
-    /// ECMA-376 Transitional relationship and WordprocessingML namespaces.
+    /// ECMA-376 Transitional relationship and `WordprocessingML` namespaces.
     Transitional,
-    /// ISO/IEC 29500 Strict relationship and WordprocessingML namespaces.
+    /// ISO/IEC 29500 Strict relationship and `WordprocessingML` namespaces.
     Strict,
 }
 
@@ -57,7 +73,7 @@ impl StoryDialect {
     }
 }
 
-/// Semantic role of one independently parsed WordprocessingML story.
+/// Semantic role of one independently parsed `WordprocessingML` story.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum StoryKind {
     Main,
@@ -149,7 +165,7 @@ impl StoryOwner {
     }
 }
 
-/// One reachable, uniquely owned WordprocessingML story part.
+/// One reachable, uniquely owned `WordprocessingML` story part.
 #[derive(Clone, Debug)]
 pub struct StoryPart {
     pub(crate) part: PackURI,
@@ -283,6 +299,10 @@ impl Default for StoryLimits {
 }
 
 impl StoryLimits {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn validate(self) -> Result<Self> {
         for (name, value, maximum) in [
             (
@@ -334,11 +354,19 @@ impl StoryLimits {
 
 impl Package {
     /// Inventory every uniquely owned reachable Word story.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn story_inventory(&self) -> Result<StoryInventory> {
         self.story_inventory_with_limits(StoryLimits::default())
     }
 
     /// Inventory Word stories under an explicit semantic resource policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn story_inventory_with_limits(&self, limits: StoryLimits) -> Result<StoryInventory> {
         self.ensure_story_opc_current("story_inventory_with_limits")?;
         capture(self.opc_package(), limits)
@@ -472,7 +500,10 @@ pub(crate) fn capture_with_policy(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "signature mirrors the corresponding OOXML record"
+)]
 fn discover_owned(
     package: &OpcPackage,
     owner: &PackURI,
@@ -493,8 +524,7 @@ fn discover_owned(
         };
         if edge_dialect != dialect {
             return Err(invalid(format!(
-                "story '{}' mixes Strict and Transitional relationship dialects",
-                owner
+                "story '{owner}' mixes Strict and Transitional relationship dialects"
             )));
         }
         if kind == StoryKind::Glossary && !allow_glossary {
@@ -531,8 +561,7 @@ fn discover_owned(
             && std::mem::replace(&mut singleton[index], true)
         {
             return Err(invalid(format!(
-                "story '{}' has multiple {:?} relationships",
-                owner, kind
+                "story '{owner}' has multiple {kind:?} relationships"
             )));
         }
         *relationship_count = relationship_count
@@ -546,15 +575,13 @@ fn discover_owned(
         }
         if relationship.is_external() {
             return Err(invalid(format!(
-                "story '{}' has an external {:?} relationship",
-                owner, kind
+                "story '{owner}' has an external {kind:?} relationship"
             )));
         }
         let requested = relationship.target_partname()?;
-        let target_part = package.get_part(&requested).map_err(|_| {
+        let target_part = package.get_part(&requested).map_err(|_source_error| {
             invalid(format!(
-                "story '{}' {:?} relationship targets missing part '{}'",
-                owner, kind, requested
+                "story '{owner}' {kind:?} relationship targets missing part '{requested}'"
             ))
         })?;
         let expected = kind
@@ -571,8 +598,7 @@ fn discover_owned(
         let target = target_part.partname().clone();
         if owned.contains(&target) {
             return Err(invalid(format!(
-                "Word story part '{}' has ambiguous ownership",
-                target
+                "Word story part '{target}' has ambiguous ownership"
             )));
         }
         let incoming = StoryOwner {
@@ -599,7 +625,10 @@ fn discover_owned(
     Ok(glossary)
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "signature mirrors the corresponding OOXML record"
+)]
 fn push_story(
     stories: &mut Vec<StoryPart>,
     owned: &mut HashSet<PackURI>,
@@ -774,8 +803,7 @@ fn validate_root(
                 );
                 if !valid_namespace || element.local_name().as_ref() != kind.root() {
                     return Err(invalid(format!(
-                        "{:?} story has an invalid XML root or namespace",
-                        kind
+                        "{kind:?} story has an invalid XML root or namespace"
                     )));
                 }
                 return Ok(());
@@ -788,7 +816,9 @@ fn validate_root(
                 ));
             },
             Event::Eof => return Err(invalid("Word story XML root is missing")),
-            _ => return Err(invalid("invalid content before Word story XML root")),
+            Event::End(_) | Event::Text(_) | Event::CData(_) => {
+                return Err(invalid("invalid content before Word story XML root"));
+            },
         }
     }
 }

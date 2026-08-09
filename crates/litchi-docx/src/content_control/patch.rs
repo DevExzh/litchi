@@ -1,3 +1,7 @@
+#![expect(
+    clippy::let_underscore_must_use,
+    reason = "the builder return is intentionally ignored after mutation"
+)]
 //! Retry-safe exact-source and package patch gates.
 
 use std::sync::{
@@ -58,6 +62,10 @@ impl Patch {
     }
 
     /// Apply once to the exact detached snapshot. Stale failures remain retryable.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         let claim = self.gate.claim("content-control patch")?;
         if source.source() != self.before.as_slice() || source.limits() != &self.limits {

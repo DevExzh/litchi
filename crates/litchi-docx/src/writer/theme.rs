@@ -1,7 +1,11 @@
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
 //! Theme writer support for DOCX documents.
 //!
 //! Themes define the color scheme, fonts, and effects used in a document.
-//! Based on Apache POI's XWPFTheme implementation.
+//! Based on Apache POI's `XWPFTheme` implementation.
 use crate::error::Result;
 use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
@@ -77,6 +81,7 @@ impl MutableTheme {
     }
 
     /// Create the default Office theme.
+    #[must_use]
     pub fn office_theme() -> Self {
         let mut theme = Self::new("Office Theme");
         theme.major_font = "Calibri Light".to_string();
@@ -87,6 +92,7 @@ impl MutableTheme {
 
     /// Get the theme name.
     #[inline]
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -98,6 +104,7 @@ impl MutableTheme {
 
     /// Get the major font.
     #[inline]
+    #[must_use]
     pub fn major_font(&self) -> &str {
         &self.major_font
     }
@@ -109,6 +116,7 @@ impl MutableTheme {
 
     /// Get the minor font.
     #[inline]
+    #[must_use]
     pub fn minor_font(&self) -> &str {
         &self.minor_font
     }
@@ -223,6 +231,7 @@ impl ColorScheme {
     }
 
     /// Create the default Office color scheme.
+    #[must_use]
     pub fn office() -> Self {
         Self::new("Office")
     }

@@ -19,7 +19,10 @@ pub(super) fn parse_comment_changes(xml: &[u8]) -> Result<Changes> {
         return Err(invalid("comment change root must be pc226:cmChg"));
     }
     only_attributes(&scan.root.attributes, &["chg"], "comment change")?;
-    let changes = parse_comment_bits(attribute(&scan.root.attributes, "chg", true)?.unwrap())?;
+    let changes = parse_comment_bits(
+        attribute(&scan.root.attributes, "chg", true)?
+            .ok_or_else(|| invalid("comment change requires chg"))?,
+    )?;
     let mut metadata = None;
     let mut monikers = None;
     let mut replies = Vec::new();
@@ -74,7 +77,10 @@ pub(super) fn parse_comment_changes(xml: &[u8]) -> Result<Changes> {
 
 fn parse_reply_changes(fragment: &Fragment) -> Result<Replies> {
     only_attributes(&fragment.attributes, &["chg"], "comment reply change")?;
-    let changes = parse_reply_bits(attribute(&fragment.attributes, "chg", true)?.unwrap())?;
+    let changes = parse_reply_bits(
+        attribute(&fragment.attributes, "chg", true)?
+            .ok_or_else(|| invalid("comment reply change requires chg"))?,
+    )?;
     let scan = scan(&fragment.xml, "comment reply change")?;
     let mut metadata = None;
     let mut monikers = None;
@@ -318,14 +324,14 @@ pub(crate) fn replace_change_commands(xml: &[u8], replacements: &[Changes]) -> R
 }
 
 fn locate_commands(xml: &[u8]) -> Result<Vec<(usize, usize, Changes)>> {
-    if xml.len() > super::super::MAX_BYTES {
-        return Err(invalid("comment change descriptor is too large"));
-    }
     #[derive(Debug)]
     struct Open {
         namespace: String,
         local: String,
         start: usize,
+    }
+    if xml.len() > super::super::MAX_BYTES {
+        return Err(invalid("comment change descriptor is too large"));
     }
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);

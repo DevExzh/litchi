@@ -1,3 +1,11 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 use std::borrow::Cow;
 use std::ops::Range;
 
@@ -9,19 +17,27 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
-/// Transitional WordprocessingML namespace.
+/// Transitional `WordprocessingML` namespace.
 const TRANSITIONAL_WORD_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-/// Strict WordprocessingML namespace.
+/// Strict `WordprocessingML` namespace.
 const STRICT_WORD_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/wordprocessingml/main";
 
 impl Variables {
     /// Parse a bounded Word settings XML payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_xml(xml: &[u8]) -> Result<Self> {
         parse_variables(xml)
     }
 
     /// Serialize a standalone transitional `w:docVars` element.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn to_xml(&self) -> Result<String> {
         self.validate()?;
         let mut xml = String::new();
@@ -62,6 +78,10 @@ impl Variables {
 }
 
 /// Parse document variables from a bounded Word settings XML payload.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn parse_variables(xml: &[u8]) -> Result<Variables> {
     if xml.len() > MAX_DOCUMENT_VARIABLE_XML_BYTES {
         return Err(invalid(format!(
@@ -177,7 +197,13 @@ pub fn parse_variables(xml: &[u8]) -> Result<Variables> {
                 return Err(invalid("unterminated document-variable settings XML"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if !saw_root {
@@ -248,13 +274,13 @@ fn scan_settings_layout(xml: &[u8]) -> Result<SettingsLayout> {
 
     loop {
         let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("document-variable XML offset is too large"))?;
+            .map_err(|_source_error| invalid("document-variable XML offset is too large"))?;
         let event = reader
             .read_event()
             .map_err(|error| xml_error(error.to_string()))?
             .into_owned();
         let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("document-variable XML offset is too large"))?;
+            .map_err(|_source_error| invalid("document-variable XML offset is too large"))?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
 
@@ -330,7 +356,13 @@ fn scan_settings_layout(xml: &[u8]) -> Result<SettingsLayout> {
                     .ok_or_else(|| invalid("invalid document-variable XML nesting"))?;
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 
@@ -392,8 +424,7 @@ fn document_variables_element(layout: &SettingsLayout, variables: &Variables) ->
     let prefix = layout
         .word_prefix
         .as_deref()
-        .map(String::from_utf8_lossy)
-        .unwrap_or(Cow::Borrowed("w"));
+        .map_or(Cow::Borrowed("w"), String::from_utf8_lossy);
     let mut output = format!("<{prefix}:docVars");
     if layout.word_prefix.is_none() {
         let namespace = if layout.strict {

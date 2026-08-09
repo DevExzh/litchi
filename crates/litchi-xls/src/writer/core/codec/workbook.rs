@@ -1,4 +1,8 @@
-use super::super::*;
+use super::super::{
+    AddInFunctionOptions, CalculationSettings, DdeOrOleLinkOptions, ExternalDefinedNameOptions,
+    ExternalWorkbookOptions, FunctionGroupOptions, VbaWriteMetadata, WorkbookEnvironmentOptions,
+    WorkbookWindowOptions, Writer,
+};
 use crate::error::{Error, Result};
 
 impl Writer {
@@ -11,6 +15,9 @@ impl Writer {
         self.use_1904_dates = use_1904;
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_workbook_environment(&mut self, options: WorkbookEnvironmentOptions) -> Result<()> {
         if options.refresh_external_data_on_load && !options.template {
             return Err(Error::InvalidData(
@@ -46,6 +53,9 @@ impl Writer {
     /// [`crate::real_time_data::Record::common_prefix_len`] and store only the
     /// trailing sub-strings in `topic_segments`, matching the on-disk prefix
     /// compression.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_real_time_data(&mut self, topic: crate::real_time_data::Record) -> Result<()> {
         if let Some(cell) = topic
             .cells
@@ -63,6 +73,9 @@ impl Writer {
 
     /// Append a Web page published from the workbook globals, emitted as a
     /// `WebPub` record (MS-XLS 2.4.344).
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_web_publication(&mut self, publication: crate::WebPub) -> Result<()> {
         publication.validate_for_write()?;
         self.web_publications.push(publication);
@@ -71,6 +84,9 @@ impl Writer {
 
     /// Append a Web page published from a worksheet, emitted as a `WebPub`
     /// record (MS-XLS 2.4.344) in that sheet's substream.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_sheet_web_publication(
         &mut self,
         sheet: usize,
@@ -80,13 +96,16 @@ impl Writer {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.web_publications.push(publication);
         Ok(())
     }
 
     /// Set a worksheet's default phonetic format and visible phonetic ranges
     /// (PHONETICINFO, MS-XLS 2.4.192); `None` emits no record.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_phonetic_info(
         &mut self,
         sheet: usize,
@@ -95,21 +114,21 @@ impl Writer {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.phonetic_info = phonetic_info;
         Ok(())
     }
 
     /// Set the document theme emitted as a `Theme` record (MS-XLS 2.4.326);
     /// `None` emits no record. Large custom theme contents are chunked into
-    /// ContinueFrt12 records automatically.
+    /// `ContinueFrt12` records automatically.
     pub fn set_theme(&mut self, theme: Option<crate::Theme>) {
         self.theme = theme;
     }
 
     /// Set the MDX (OLAP cube) metadata emitted as the workbook globals
     /// `METADATA` production (MS-XLS 2.1); `None` emits no records. Oversized
-    /// record payloads are chunked into ContinueFrt12 records automatically.
+    /// record payloads are chunked into `ContinueFrt12` records automatically.
     pub fn set_mdx_metadata(&mut self, metadata: Option<crate::MdxMetadata>) {
         self.mdx_metadata = metadata;
     }
@@ -127,6 +146,9 @@ impl Writer {
         self.style_extensions = style_extensions;
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_workbook_window(&mut self, options: WorkbookWindowOptions) -> Result<()> {
         options.validate_intrinsic()?;
         self.workbook_window_options = options;
@@ -148,12 +170,18 @@ impl Writer {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_function_groups(&mut self, options: FunctionGroupOptions) -> Result<()> {
         options.validate()?;
         self.function_group_options = options;
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_external_workbook_link(
         &mut self,
         options: ExternalWorkbookOptions,
@@ -184,6 +212,9 @@ impl Writer {
                 .sum::<usize>()
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_external_defined_name(
         &mut self,
         external_workbook: usize,
@@ -207,6 +238,9 @@ impl Writer {
         Ok(index)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_add_in_function(&mut self, options: AddInFunctionOptions) -> Result<usize> {
         options.validate()?;
         if self.add_in_functions.is_empty()
@@ -226,6 +260,9 @@ impl Writer {
         Ok(index)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_dde_or_ole_link(&mut self, options: DdeOrOleLinkOptions) -> Result<usize> {
         options.validate()?;
         if self.external_workbooks.len()
@@ -251,6 +288,9 @@ impl Writer {
         Ok(index)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_calculation_settings(&mut self, settings: CalculationSettings) -> Result<()> {
         if !(1..=32_767).contains(&settings.maximum_iterations) {
             return Err(Error::InvalidData(
@@ -266,15 +306,21 @@ impl Writer {
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_recalculation_pending(&mut self, sheet: usize, pending: bool) -> Result<()> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.formulas_pending_recalculation = pending;
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_scenario_manager(
         &mut self,
         sheet: usize,
@@ -284,21 +330,27 @@ impl Writer {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.scenario_manager = Some(manager);
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn clear_scenario_manager(&mut self, sheet: usize) -> Result<()> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.scenario_manager = None;
         Ok(())
     }
 
     /// Configure an inert BIFF8 data-consolidation directory for a worksheet.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_consolidation(
         &mut self,
         sheet: usize,
@@ -308,21 +360,27 @@ impl Writer {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.consolidation = Some(consolidation);
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn clear_consolidation(&mut self, sheet: usize) -> Result<()> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.consolidation = None;
         Ok(())
     }
 
     /// Configure a complete inert VBA project with safe default limits.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_vba(
         &mut self,
         workbook_code_name: &str,
@@ -335,6 +393,9 @@ impl Writer {
     ///
     /// Module source is serialized but never compiled, interpreted, or run.
     /// Validation and serialization finish before the writer state is changed.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_vba_with(
         &mut self,
         workbook_code_name: &str,
@@ -349,6 +410,9 @@ impl Writer {
     /// Configure an already validated and serialized inert VBA project.
     ///
     /// Import standalone CFB bytes through [`litchi_vba::Payload::read`] first.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn put_vba(
         &mut self,
         workbook_code_name: &str,
@@ -371,6 +435,7 @@ impl Writer {
     }
 
     /// Whether a complete VBA project is configured for output.
+    #[must_use]
     pub fn has_vba(&self) -> bool {
         self.vba_metadata.is_some()
     }

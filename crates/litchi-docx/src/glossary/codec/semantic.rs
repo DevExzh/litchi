@@ -1,11 +1,22 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Semantic glossary projection and typed document-part encoding.
 
-use super::super::graph::*;
-use super::super::model::*;
-use super::super::*;
+use super::super::graph::relationship_references;
+use super::super::model::{
+    Catalog, Category, Conformance, Entry, EntryAnalysis, Gallery, Id, Insert, Kind, Name,
+    ProducerEntry, Props,
+};
+use super::super::{Arc, Error, HashMap, HashSet, Result};
 use super::super::{MAX, MAX_PARTS, MAX_VALUES, MC, VML};
-use super::validation::*;
-use super::xml::*;
+use super::validation::{
+    INSERT_VALUES, KIND_VALUES, bounded, expect, expect_w, invalid, kids, leaf, name_key, noattrs,
+    only_w, onoff, parse_behavior, parse_type, validate_catalog_fields, validate_entry_fields,
+    validate_name, wattr_get, wval, xml_error,
+};
+use super::xml::{Attr, Content, Node, XmlSink, XmlSize, esc, node_write, node_xml, parse_dom};
 
 pub(in crate::glossary) fn project(n: &Node) -> Result<Catalog> {
     expect(n, "glossaryDocument")?;

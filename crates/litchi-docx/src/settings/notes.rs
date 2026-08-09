@@ -1,3 +1,11 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::format_push_string,
+    reason = "serialization preserves the established byte-emission path"
+)]
 use crate::Result;
 
 use super::support::invalid;
@@ -21,7 +29,7 @@ pub enum NotePosition {
 }
 
 impl NotePosition {
-    /// Return the exact WordprocessingML token.
+    /// Return the exact `WordprocessingML` token.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -33,6 +41,7 @@ impl NotePosition {
     }
 
     /// Whether this placement is valid for an endnote.
+    #[must_use]
     pub const fn valid_for_endnote(self) -> bool {
         matches!(self, Self::SectionEnd | Self::DocumentEnd)
     }
@@ -83,6 +92,10 @@ pub enum NoteNumberingRestart {
 
 impl NoteNumberingRestart {
     /// Parse the schema token.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_xml(value: &str) -> Result<Self> {
         match value {
             "continuous" => Ok(Self::Continuous),
@@ -95,6 +108,7 @@ impl NoteNumberingRestart {
     }
 
     /// Get the XML value for this restart behavior.
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Continuous => "continuous",
@@ -114,7 +128,7 @@ macro_rules! define_note_formats {
         }
 
         impl NoteNumberFormat {
-            /// Return the exact WordprocessingML token.
+            /// Return the exact `WordprocessingML` token.
             pub const fn as_str(self) -> &'static str {
                 match self { $(Self::$variant => $token,)+ }
             }
@@ -236,6 +250,7 @@ impl<F> Default for NoteNumberingProperties<F> {
 
 impl<F> NoteNumberingProperties<F> {
     /// Construct note properties from validated component values.
+    #[must_use]
     pub fn from_parts(
         position: Option<NotePosition>,
         format: Option<F>,

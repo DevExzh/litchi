@@ -125,6 +125,9 @@ impl Cell {
     }
 
     /// Create a compact repeated cell run.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn repeated(value: CellValue, text: impl Into<String>, repeat: usize) -> Result<Self> {
         let repeat = NonZeroUsize::new(repeat).ok_or_else(|| {
             Error::InvalidFormat("ODS cell repetition must be positive".to_string())
@@ -140,16 +143,21 @@ impl Cell {
     }
 
     /// Create an empty physical cell.
+    #[must_use]
     pub fn empty() -> Self {
         Self::new(CellValue::Empty, "")
     }
 
     /// Number of logical cells represented by this run.
+    #[must_use]
     pub fn repeat(&self) -> usize {
         self.repeat.get()
     }
 
     /// Set an inert formula after validating its lexical payload.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_formula(&mut self, formula: impl Into<String>) -> Result<()> {
         let formula = formula.into();
         super::validation::validate_text(&formula, "cell formula")?;
@@ -168,6 +176,9 @@ impl Cell {
     }
 
     /// Set a direct ODF cell style reference.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_style_name(&mut self, style_name: impl Into<String>) -> Result<()> {
         let style_name = style_name.into();
         super::validation::validate_text(&style_name, "cell style name")?;
@@ -186,6 +197,9 @@ impl Cell {
     }
 
     /// Set a rectangular merge span on this cell.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_span(&mut self, rows: usize, columns: usize) -> Result<()> {
         let rows = NonZeroUsize::new(rows).ok_or_else(|| {
             Error::InvalidFormat("ODS merged-cell row span must be positive".to_string())
@@ -207,6 +221,7 @@ impl Cell {
     }
 
     /// Logical column interval covered by this run when it starts at `start`.
+    #[must_use]
     pub fn columns(&self, start: usize) -> Range<usize> {
         start..start.saturating_add(self.repeat())
     }
@@ -244,6 +259,7 @@ pub struct Row {
 
 impl Row {
     /// Create one ordinary row.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             cells: Vec::new(),
@@ -254,6 +270,9 @@ impl Row {
     }
 
     /// Create a compact repeated row run.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn repeated(repeat: usize) -> Result<Self> {
         let repeat = NonZeroUsize::new(repeat).ok_or_else(|| {
             Error::InvalidFormat("ODS row repetition must be positive".to_string())
@@ -265,11 +284,13 @@ impl Row {
     }
 
     /// Number of logical rows represented by this run.
+    #[must_use]
     pub fn repeat(&self) -> usize {
         self.repeat.get()
     }
 
     /// Number of logical cells covered by the physical cell runs.
+    #[must_use]
     pub fn logical_cell_count(&self) -> usize {
         self.cells
             .iter()
@@ -277,11 +298,13 @@ impl Row {
     }
 
     /// Return physical cell runs in logical order.
+    #[must_use]
     pub fn cells(&self) -> &[Cell] {
         &self.cells
     }
 
     /// Return the physical run covering a logical column.
+    #[must_use]
     pub fn cell(&self, column: usize) -> Option<&Cell> {
         let mut start = 0usize;
         for cell in &self.cells {
@@ -295,6 +318,9 @@ impl Row {
     }
 
     /// Append one physical cell run.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn push_cell(&mut self, cell: Cell) -> Result<()> {
         cell.validate()?;
         self.cells.push(cell);
@@ -350,6 +376,9 @@ pub struct Sheet {
 
 impl Sheet {
     /// Create an empty named worksheet.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn new(name: impl Into<String>) -> Result<Self> {
         let sheet = Self {
             name: name.into(),
@@ -361,6 +390,7 @@ impl Sheet {
     }
 
     /// Number of logical rows, including repeated rows.
+    #[must_use]
     pub fn logical_row_count(&self) -> usize {
         self.rows
             .iter()
@@ -377,6 +407,7 @@ impl Sheet {
     }
 
     /// Return the physical row run covering a logical row.
+    #[must_use]
     pub fn row(&self, index: usize) -> Option<&Row> {
         let mut start = 0usize;
         for row in &self.rows {
@@ -390,6 +421,7 @@ impl Sheet {
     }
 
     /// Return the physical cell run covering a logical coordinate.
+    #[must_use]
     pub fn cell(&self, row: usize, column: usize) -> Option<&Cell> {
         self.row(row).and_then(|row| row.cell(column))
     }
@@ -401,6 +433,9 @@ impl Sheet {
     }
 
     /// Set a single logical cell as one atomic model operation.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_cell(&mut self, row: usize, column: usize, cell: Cell) -> Result<()> {
         let mut candidate = self.clone();
         candidate.set_cell_unchecked(row, column, cell)?;
@@ -410,6 +445,9 @@ impl Sheet {
     }
 
     /// Clear one stored logical cell. Missing coordinates are a no-op.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn clear_cell(&mut self, row: usize, column: usize) -> Result<()> {
         let Some(existing) = self.cell(row, column).cloned() else {
             return Ok(());
@@ -424,6 +462,9 @@ impl Sheet {
     }
 
     /// Set a formula while retaining its cached typed value and displayed text.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_formula(
         &mut self,
         row: usize,
@@ -437,6 +478,9 @@ impl Sheet {
     }
 
     /// Set or replace the direct style on one logical cell.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_cell_style(
         &mut self,
         row: usize,
@@ -450,6 +494,9 @@ impl Sheet {
     }
 
     /// Append a physical row run and validate the resulting graph.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn push_row(&mut self, row: Row) -> Result<()> {
         let mut candidate = self.clone();
         candidate.rows.push(row);
@@ -459,6 +506,9 @@ impl Sheet {
     }
 
     /// Set the direct sheet style reference.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_style_name(&mut self, style_name: impl Into<String>) -> Result<()> {
         let style_name = style_name.into();
         super::validation::validate_text(&style_name, "sheet style name")?;

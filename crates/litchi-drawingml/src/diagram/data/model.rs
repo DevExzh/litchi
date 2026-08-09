@@ -26,18 +26,21 @@ pub enum Id {
 impl Id {
     /// Creates a numeric model identifier.
     #[inline]
+    #[must_use]
     pub const fn number(value: i32) -> Self {
         Self::Number(value)
     }
 
     /// Creates a GUID model identifier from its 16 bytes.
     #[inline]
+    #[must_use]
     pub const fn guid(value: [u8; 16]) -> Self {
         Self::Guid(value)
     }
 
     /// Returns the numeric value, if this is a numeric identifier.
     #[inline]
+    #[must_use]
     pub const fn as_number(self) -> Option<i32> {
         match self {
             Self::Number(value) => Some(value),
@@ -47,6 +50,7 @@ impl Id {
 
     /// Returns the GUID bytes, if this is a GUID identifier.
     #[inline]
+    #[must_use]
     pub const fn as_guid(self) -> Option<[u8; 16]> {
         match self {
             Self::Number(_) => None,
@@ -179,6 +183,7 @@ pub enum PointType {
 impl PointType {
     /// Returns the owning connection for a transition point.
     #[inline]
+    #[must_use]
     pub const fn connection(self) -> Option<Id> {
         match self {
             Self::ParentTransition(connection) | Self::SiblingTransition(connection) => {
@@ -218,6 +223,7 @@ impl ConnectionType {
     /// Creates a structural parent relation with both Office-required
     /// transition identifiers.
     #[inline]
+    #[must_use]
     pub const fn parent(parent_transition: Id, sibling_transition: Id) -> Self {
         Self::Parent {
             parent_transition,
@@ -228,6 +234,7 @@ impl ConnectionType {
     /// Returns whether Office treats this relation as a parent edge for its
     /// one-parent-per-destination constraint.
     #[inline]
+    #[must_use]
     pub const fn is_parent(&self) -> bool {
         matches!(self, Self::Parent { .. } | Self::PresentationParent)
     }
@@ -253,6 +260,7 @@ pub struct Point {
 impl Point {
     /// Creates a point with no text or style-definition references.
     #[inline]
+    #[must_use]
     pub fn new(id: Id, kind: PointType) -> Self {
         Self {
             id,
@@ -298,6 +306,7 @@ pub struct Connection {
 impl Connection {
     /// Creates a connection edge.
     #[inline]
+    #[must_use]
     pub const fn new(
         id: Id,
         kind: ConnectionType,
@@ -327,7 +336,7 @@ pub enum Conformance {
     Strict,
 }
 
-/// The modeled semantic subset of a DrawingML diagram data model.
+/// The modeled semantic subset of a `DrawingML` diagram data model.
 ///
 /// This type does not retain unmodeled XML such as rich-text formatting, shape
 /// properties, backgrounds, whole-diagram formatting, or extension lists.
@@ -344,6 +353,7 @@ pub struct DiagramDataModel {
 impl DiagramDataModel {
     /// Creates an empty data model.
     #[inline]
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             points: Vec::new(),
@@ -353,6 +363,7 @@ impl DiagramDataModel {
 
     /// Looks up a point by its typed model identifier.
     #[inline]
+    #[must_use]
     pub fn point(&self, id: Id) -> Option<&Point> {
         self.points.iter().find(|point| point.id == id)
     }
@@ -365,6 +376,7 @@ impl DiagramDataModel {
 
     /// Looks up a connection by its typed model identifier.
     #[inline]
+    #[must_use]
     pub fn connection(&self, id: Id) -> Option<&Connection> {
         self.connections
             .iter()
@@ -498,6 +510,7 @@ impl DiagramDataModel {
         Some(connection)
     }
     /// The document root point (`type="doc"`), if present.
+    #[must_use]
     pub fn document_point(&self) -> Option<&Point> {
         self.points
             .iter()
@@ -514,6 +527,7 @@ impl DiagramDataModel {
     /// Build the content-node hierarchy implied by the `parOf` connection
     /// graph, ordered by `srcOrd`. Cycles and dangling references are
     /// tolerated: nodes not reachable from the document root are omitted.
+    #[must_use]
     pub fn node_tree(&self) -> Vec<DiagramNode> {
         let Some(root) = self.document_point() else {
             return Vec::new();
@@ -537,10 +551,11 @@ impl DiagramDataModel {
     }
 
     /// All text content of the diagram, one line per content node.
+    #[must_use]
     pub fn text(&self) -> String {
         self.node_tree()
             .iter()
-            .map(|node| node.all_text())
+            .map(DiagramNode::all_text)
             .collect::<Vec<_>>()
             .join("\n")
     }

@@ -34,7 +34,7 @@ const fn allocation(context: &'static str) -> Error {
 fn copy_bytes(data: &[u8], context: &'static str) -> Result<Vec<u8>> {
     let mut copy = Vec::new();
     copy.try_reserve_exact(data.len())
-        .map_err(|_| allocation(context))?;
+        .map_err(|_error| allocation(context))?;
     copy.extend_from_slice(data);
     Ok(copy)
 }
@@ -56,7 +56,7 @@ fn read_u32(data: &[u8], offset: usize) -> Result<u32> {
 }
 
 fn read_i32(data: &[u8], offset: usize) -> Result<i32> {
-    Ok(read_u32(data, offset)? as i32)
+    Ok(crate::utils::wrap_u32_to_i32(read_u32(data, offset)?))
 }
 
 /// Checked native value for the signed four-byte `[MS-XLS]` `Rw12` field.
@@ -73,19 +73,19 @@ impl Rw12 {
             return Err(invalid("sort row exceeds the Rw12 maximum"));
         }
         let value = i32::try_from(value)
-            .map_err(|_| invalid("sort row cannot be represented by signed Rw12"))?;
+            .map_err(|_error| invalid("sort row cannot be represented by signed Rw12"))?;
         Ok(Self(value))
     }
 
     const fn index(self) -> u32 {
-        self.0 as u32
+        crate::utils::reinterpret_i32_as_u32(self.0)
     }
 
     fn from_wire(value: i32) -> Result<Self> {
         if value < 0 {
             return Err(invalid("sort Rw12 is negative"));
         }
-        Self::new(value as u32)
+        Self::new(crate::utils::reinterpret_i32_as_u32(value))
     }
 
     const fn wire_value(self) -> i32 {
@@ -114,19 +114,19 @@ impl Col12 {
             return Err(invalid("sort column exceeds the Col12 maximum"));
         }
         let value = i16::try_from(value)
-            .map_err(|_| invalid("sort column cannot be represented by signed Col12"))?;
+            .map_err(|_error| invalid("sort column cannot be represented by signed Col12"))?;
         Ok(Self(value))
     }
 
     const fn index(self) -> u16 {
-        self.0 as u16
+        crate::utils::reinterpret_i16_as_u16(self.0)
     }
 
     fn from_wire(value: i32) -> Result<Self> {
         if value < 0 {
             return Err(invalid("sort Col12 is negative"));
         }
-        Self::new(value as u32)
+        Self::new(crate::utils::reinterpret_i32_as_u32(value))
     }
 
     const fn wire_value(self) -> i32 {
@@ -148,11 +148,15 @@ pub struct Row(Rw12);
 
 impl Row {
     /// Check a zero-based row index without applying the smaller BIFF8 cell grid.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(index: u32) -> Result<Self> {
         Rw12::new(index).map(Self)
     }
 
     /// Return the zero-based row index.
+    #[must_use]
     pub const fn index(self) -> u32 {
         self.0.index()
     }
@@ -164,11 +168,15 @@ pub struct Col(Col12);
 
 impl Col {
     /// Check a zero-based column index without applying the smaller BIFF8 cell grid.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(index: u32) -> Result<Self> {
         Col12::new(index).map(Self)
     }
 
     /// Return the zero-based column index.
+    #[must_use]
     pub const fn index(self) -> u16 {
         self.0.index()
     }
@@ -187,6 +195,9 @@ impl Range {
     /// Create an inclusive range with the complete `Rw12` and `Col12` domains.
     ///
     /// `Range::new(1..=20, 0..=4)` is rows 2 through 21 and columns A through E.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(rows: RangeInclusive<u32>, cols: RangeInclusive<u32>) -> Result<Self> {
         let first_row = Rw12::new(*rows.start())?;
         let last_row = Rw12::new(*rows.end())?;
@@ -207,21 +218,25 @@ impl Range {
     }
 
     /// Return the first row.
+    #[must_use]
     pub const fn first_row(self) -> Row {
         Row(self.first_row)
     }
 
     /// Return the last row.
+    #[must_use]
     pub const fn last_row(self) -> Row {
         Row(self.last_row)
     }
 
     /// Return the first column.
+    #[must_use]
     pub const fn first_col(self) -> Col {
         Col(self.first_col)
     }
 
     /// Return the last column.
+    #[must_use]
     pub const fn last_col(self) -> Col {
         Col(self.last_col)
     }
@@ -299,10 +314,12 @@ pub enum Parent {
 pub struct Dxf(u32);
 
 impl Dxf {
+    #[must_use]
     pub const fn new(index: u32) -> Self {
         Self(index)
     }
 
+    #[must_use]
     pub const fn index(self) -> u32 {
         self.0
     }
@@ -486,6 +503,9 @@ pub struct Key {
 
 impl Key {
     /// Create a column key for a top-to-bottom row sort.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn col(range: Range, descending: bool, on: On) -> Result<Self> {
         if range.first_col != range.last_col {
             return Err(invalid("column sort key must contain exactly one column"));
@@ -502,6 +522,9 @@ impl Key {
     }
 
     /// Create a row key for a left-to-right column sort.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn row(range: Range, descending: bool, on: On) -> Result<Self> {
         if range.first_row != range.last_row {
             return Err(invalid("row sort key must contain exactly one row"));
@@ -527,21 +550,25 @@ impl Key {
     }
 
     /// Return the axis this key can sort.
+    #[must_use]
     pub const fn axis(&self) -> Axis {
         self.range.axis()
     }
 
     /// Return the key's inclusive range.
+    #[must_use]
     pub const fn range(&self) -> Range {
         self.range.range()
     }
 
     /// Return whether this key sorts descending.
+    #[must_use]
     pub const fn descending(&self) -> bool {
         self.descending
     }
 
     /// Borrow the criterion applied by this key.
+    #[must_use]
     pub const fn on(&self) -> &On {
         &self.on
     }
@@ -560,6 +587,7 @@ pub struct Config {
 
 impl Config {
     /// Create an empty top-to-bottom sort for `range`.
+    #[must_use]
     pub fn new(range: Range, parent: Parent) -> Self {
         Self {
             range,
@@ -574,6 +602,9 @@ impl Config {
     /// Replace the reordered axis after validating every retained key.
     ///
     /// On failure, the configuration is unchanged.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn put_axis(&mut self, axis: Axis) -> Result<Axis> {
         if self.keys.iter().any(|key| key.axis() != axis) {
             return Err(invalid(
@@ -596,6 +627,9 @@ impl Config {
     /// Append a checked key.
     ///
     /// The key direction and containment are checked before `self` changes.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add(&mut self, key: Key) -> Result<()> {
         if key.axis() != self.axis {
             return Err(invalid("sort key direction does not match the sort axis"));
@@ -608,40 +642,47 @@ impl Config {
             .len()
             .checked_add(1)
             .ok_or_else(|| allocation("computing the next sort-key count"))?;
-        u32::try_from(next_len).map_err(|_| invalid("SortData has more than u32::MAX keys"))?;
+        u32::try_from(next_len)
+            .map_err(|_error| invalid("SortData has more than u32::MAX keys"))?;
         self.keys
             .try_reserve(1)
-            .map_err(|_| allocation("reserving storage for a sort key"))?;
+            .map_err(|_error| allocation("reserving storage for a sort key"))?;
         self.keys.push(key);
         Ok(())
     }
 
     /// Return the range being sorted.
+    #[must_use]
     pub const fn range(&self) -> Range {
         self.range
     }
 
     /// Return the reordered axis.
+    #[must_use]
     pub const fn axis(&self) -> Axis {
         self.axis
     }
 
     /// Return whether comparison is case-sensitive.
+    #[must_use]
     pub const fn case_sensitive(&self) -> bool {
         self.case_sensitive
     }
 
     /// Return the comparison method.
+    #[must_use]
     pub const fn method(&self) -> Method {
         self.method
     }
 
     /// Return the owning object.
+    #[must_use]
     pub const fn parent(&self) -> Parent {
         self.parent
     }
 
     /// Borrow the keys in priority order.
+    #[must_use]
     pub fn keys(&self) -> &[Key] {
         &self.keys
     }
@@ -649,7 +690,7 @@ impl Config {
     /// Write the `SortData` record followed by one `ContinueFrt12` per key.
     pub(crate) fn write_biff_records<W: Write>(&self, writer: &mut W) -> Result<()> {
         let condition_count = u32::try_from(self.keys.len())
-            .map_err(|_| invalid("SortData has more than u32::MAX keys"))?;
+            .map_err(|_error| invalid("SortData has more than u32::MAX keys"))?;
         let (parent_kind, parent_id) = match self.parent {
             Parent::Sheet => (0u16, 0),
             Parent::Table { id } => (1, id),
@@ -687,7 +728,7 @@ impl Config {
 }
 
 fn write_record_header<W: Write>(writer: &mut W, record_type: u16, len: usize) -> Result<()> {
-    let len = u16::try_from(len).map_err(|_| invalid("BIFF record body exceeds u16::MAX"))?;
+    let len = u16::try_from(len).map_err(|_error| invalid("BIFF record body exceeds u16::MAX"))?;
     writer.write_all(&record_type.to_le_bytes())?;
     writer.write_all(&len.to_le_bytes())?;
     Ok(())
@@ -835,11 +876,11 @@ fn encode_key(key: &Key) -> Result<Vec<u8>> {
         let unit_count = value.encode_utf16().count();
         units
             .try_reserve_exact(unit_count)
-            .map_err(|_| allocation("reserving SortCond12 custom-list storage"))?;
+            .map_err(|_error| allocation("reserving SortCond12 custom-list storage"))?;
         units.extend(value.encode_utf16());
     }
     let char_count = u32::try_from(units.len())
-        .map_err(|_| invalid("SortCond12 custom list exceeds u32::MAX UTF-16 code units"))?;
+        .map_err(|_error| invalid("SortCond12 custom list exceeds u32::MAX UTF-16 code units"))?;
     let compressed = units.iter().all(|unit| *unit <= 0xff);
     let string_bytes = if units.is_empty() {
         0
@@ -858,7 +899,7 @@ fn encode_key(key: &Key) -> Result<Vec<u8>> {
     let mut output = Vec::new();
     output
         .try_reserve_exact(body_len)
-        .map_err(|_| allocation("reserving SortCond12 record storage"))?;
+        .map_err(|_error| allocation("reserving SortCond12 record storage"))?;
     output.extend_from_slice(&((sort_on << 1) | u16::from(key.descending)).to_le_bytes());
     key.range().write_to(&mut output);
     output.extend_from_slice(&cond_data);
@@ -866,7 +907,7 @@ fn encode_key(key: &Key) -> Result<Vec<u8>> {
     if !units.is_empty() {
         output.push(u8::from(!compressed));
         if compressed {
-            output.extend(units.into_iter().map(|unit| unit as u8));
+            output.extend(units.into_iter().map(crate::utils::truncate_u16_to_u8));
         } else {
             for unit in units {
                 output.extend_from_slice(&unit.to_le_bytes());
@@ -892,7 +933,7 @@ pub(crate) fn parse_sort_data(base: &[u8], continuations: &[&[u8]]) -> Result<Co
     let parent_kind = (flags >> 3) & 0x0007;
     let range = Range::parse(base, 14)?;
     let condition_count = usize::try_from(read_u32(base, 30)?)
-        .map_err(|_| invalid("SortData condition count is not addressable"))?;
+        .map_err(|_error| invalid("SortData condition count is not addressable"))?;
     if condition_count != continuations.len() {
         return Err(invalid(format!(
             "SortData declares {condition_count} conditions but {} continuations were supplied",
@@ -914,7 +955,7 @@ pub(crate) fn parse_sort_data(base: &[u8], continuations: &[&[u8]]) -> Result<Co
     };
     let mut keys = Vec::new();
     keys.try_reserve_exact(condition_count)
-        .map_err(|_| allocation("reserving parsed SortData key storage"))?;
+        .map_err(|_error| allocation("reserving parsed SortData key storage"))?;
     let mut config = Config {
         range,
         axis,
@@ -972,7 +1013,7 @@ impl SortDataCollector {
                 let mut continuations = Vec::new();
                 continuations
                     .try_reserve_exact(pending.continuations.len())
-                    .map_err(|_| allocation("reserving SortData continuation references"))?;
+                    .map_err(|_error| allocation("reserving SortData continuation references"))?;
                 continuations.extend(pending.continuations.iter().map(Vec::as_slice));
                 return parse_sort_data(&pending.base, &continuations).map(Some);
             }
@@ -989,7 +1030,7 @@ impl SortDataCollector {
             });
         }
         let expected_conditions = usize::try_from(read_u32(data, 30)?)
-            .map_err(|_| invalid("SortData condition count is not addressable"))?;
+            .map_err(|_error| invalid("SortData condition count is not addressable"))?;
         if expected_conditions == 0 {
             return parse_sort_data(data, &[]).map(Some);
         }
@@ -997,7 +1038,7 @@ impl SortDataCollector {
         let mut continuations = Vec::new();
         continuations
             .try_reserve_exact(expected_conditions)
-            .map_err(|_| allocation("reserving SortData continuation storage"))?;
+            .map_err(|_error| allocation("reserving SortData continuation storage"))?;
         self.pending = Some(PendingSortData {
             base,
             continuations,
@@ -1046,7 +1087,7 @@ fn parse_continuation(data: &[u8], axis: Axis) -> Result<Key> {
     if char_count < 0 {
         return Err(invalid("SortCond12 cchSt is negative"));
     }
-    let char_count = char_count as usize;
+    let char_count = crate::utils::sign_extend_i32_to_usize(char_count);
     let sort_on = match sort_on_code {
         0 => {
             if data_value != 0 || reserved_data != 0 {
@@ -1078,7 +1119,7 @@ fn parse_continuation(data: &[u8], axis: Axis) -> Result<Key> {
             }
             On::Icon {
                 set: IconSet::from_code(data_value)?,
-                icon: Icon::from_code(reserved_data as i32)?,
+                icon: Icon::from_code(crate::utils::wrap_u32_to_i32(reserved_data))?,
             }
         },
         _ => return Err(invalid("SortCond12 sortOn is outside 0 through 3")),
@@ -1123,17 +1164,15 @@ fn parse_custom_list(body: &[u8], char_count: usize) -> Result<Option<String>> {
     let mut value = String::new();
     value
         .try_reserve_exact(reserve)
-        .map_err(|_| allocation("reserving decoded SortCond12 string storage"))?;
+        .map_err(|_error| allocation("reserving decoded SortCond12 string storage"))?;
     if wide {
         let units = encoded
             .chunks_exact(2)
             .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]));
         for character in char::decode_utf16(units) {
-            value.push(
-                character.map_err(|_| {
-                    Error::Encoding("invalid UTF-16 in SortCond12 custom list".into())
-                })?,
-            );
+            value.push(character.map_err(|_error| {
+                Error::Encoding("invalid UTF-16 in SortCond12 custom list".into())
+            })?);
         }
     } else {
         for byte in encoded {

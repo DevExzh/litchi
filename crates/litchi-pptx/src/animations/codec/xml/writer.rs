@@ -232,7 +232,7 @@ fn write_condition_list(xml: &mut String, name: &str, conditions: &[TimeConditio
                 xml.push_str("><p:tgtEl><p14:bmkTgt xmlns:p14=\"http://schemas.microsoft.com/office/powerpoint/2010/main\" spid=\"");
                 xml.push_str(&shape_id.to_string());
                 xml.push_str("\" bmkName=\"");
-                escape_xml(xml, &name);
+                escape_xml(xml, name);
                 xml.push_str("\"/></p:tgtEl></p:cond>");
             },
             Some(ConditionTarget::Slide) => {

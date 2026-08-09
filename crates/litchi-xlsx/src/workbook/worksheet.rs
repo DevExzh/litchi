@@ -25,16 +25,19 @@ pub struct TablePart {
 
 impl TablePart {
     /// Relationship ID as stored by the worksheet part.
+    #[must_use]
     pub fn relationship_id(&self) -> &str {
         &self.relationship_id
     }
 
     /// Absolute OPC part name of the table resource.
+    #[must_use]
     pub fn part_name(&self) -> &str {
         &self.part_name
     }
 
     /// Parsed table declaration.
+    #[must_use]
     pub fn table(&self) -> &crate::table::Table {
         &self.table
     }
@@ -53,7 +56,7 @@ pub struct ArrayFormula {
     pub range: Option<Box<str>>,
 }
 
-fn part<'a>(sheet: &'a Worksheet) -> Result<&'a dyn Part> {
+fn part(sheet: &Worksheet) -> Result<&dyn Part> {
     if sheet.kind() != WorksheetKind::Worksheet {
         return Err(crate::Error::NotWorksheet {
             sheet: sheet.name().to_owned(),
@@ -71,7 +74,7 @@ fn xml(sheet: &Worksheet) -> Result<&[u8]> {
 }
 
 fn relationships(sheet: &Worksheet) -> Result<&Relationships> {
-    Ok(&part(sheet)?.rels())
+    Ok(part(sheet)?.rels())
 }
 
 /// Parse the worksheet's direct auto-filter declaration.
@@ -242,7 +245,7 @@ pub(crate) fn query_tables(sheet: &Worksheet) -> Result<Vec<crate::query_table::
     crate::query_table::load_worksheet_query_tables(&sheet.owner.package, &sheet.data.part_uri)
 }
 
-/// Load the worksheet's inert ActiveX graph.
+/// Load the worksheet's inert `ActiveX` graph.
 pub(crate) fn active_x(sheet: &Worksheet) -> Result<crate::active_x::ControlSet> {
     crate::active_x::load_from_worksheet(&sheet.owner.package, &sheet.data.part_uri)
 }

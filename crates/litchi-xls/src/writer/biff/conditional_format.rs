@@ -48,7 +48,7 @@ pub(crate) fn write_condfmt12<W: Write>(
         u16::from_le_bytes([payload[10], payload[11]]),
     );
     let length = u16::try_from(12 + payload.len())
-        .map_err(|_| Error::InvalidData("CondFmt12 record is too large".to_string()))?;
+        .map_err(|_error| Error::InvalidData("CondFmt12 record is too large".to_string()))?;
     write_record_header(writer, 0x0879, length)?;
     write_frt(writer, 0x0879, true, enclosing)?;
     writer.write_all(payload)?;
@@ -99,15 +99,16 @@ pub(crate) fn write_cf12<W: Write>(writer: &mut W, cfg: &Cf12Config<'_>) -> Resu
             "CF12 record exceeds maximum BIFF8 record size".to_string(),
         ));
     }
-    write_record_header(writer, 0x087a, total as u16)?;
+    write_record_header(writer, 0x087a, crate::utils::truncate_usize_to_u16(total))?;
     write_frt(writer, 0x087a, false, (0, 0, 0, 0))?;
     writer.write_all(&[cfg.condition_type, cfg.comparison])?;
-    writer.write_all(&(cfg.formula1.len() as u16).to_le_bytes())?;
-    writer.write_all(&(cfg.formula2.len() as u16).to_le_bytes())?;
+    writer.write_all(&crate::utils::truncate_usize_to_u16(cfg.formula1.len()).to_le_bytes())?;
+    writer.write_all(&crate::utils::truncate_usize_to_u16(cfg.formula2.len()).to_le_bytes())?;
     writer.write_all(cfg.differential_format)?;
     writer.write_all(cfg.formula1)?;
     writer.write_all(cfg.formula2)?;
-    writer.write_all(&(cfg.active_formula.len() as u16).to_le_bytes())?;
+    writer
+        .write_all(&crate::utils::truncate_usize_to_u16(cfg.active_formula.len()).to_le_bytes())?;
     writer.write_all(cfg.active_formula)?;
     writer.write_all(&[u8::from(cfg.stop_if_true) << 1])?;
     writer.write_all(&cfg.priority.to_le_bytes())?;
@@ -162,8 +163,9 @@ pub(crate) fn write_cfheader_with_identifier<W: Write>(
             "CFHEADER range count or identifier exceeds BIFF8 limits".to_string(),
         ));
     }
-    let range_count_u16 = u16::try_from(ranges.len())
-        .map_err(|_| Error::InvalidData("Too many conditional formatting ranges".to_string()))?;
+    let range_count_u16 = u16::try_from(ranges.len()).map_err(|_error| {
+        Error::InvalidData("Too many conditional formatting ranges".to_string())
+    })?;
 
     // Compute enclosing cell range over all regions
     let mut enc_first_row = u32::MAX;
@@ -183,16 +185,14 @@ pub(crate) fn write_cfheader_with_identifier<W: Write>(
         enc_last_col = enc_last_col.max(*last_col);
     }
 
-    let enc_first_row_u16 = u16::try_from(enc_first_row).map_err(|_| {
+    let enc_first_row_u16 = u16::try_from(enc_first_row).map_err(|_error| {
         Error::InvalidData(format!(
-            "Row index {} exceeds BIFF8 limit 65535 for CFHEADER record",
-            enc_first_row
+            "Row index {enc_first_row} exceeds BIFF8 limit 65535 for CFHEADER record"
         ))
     })?;
-    let enc_last_row_u16 = u16::try_from(enc_last_row).map_err(|_| {
+    let enc_last_row_u16 = u16::try_from(enc_last_row).map_err(|_error| {
         Error::InvalidData(format!(
-            "Row index {} exceeds BIFF8 limit 65535 for CFHEADER record",
-            enc_last_row
+            "Row index {enc_last_row} exceeds BIFF8 limit 65535 for CFHEADER record"
         ))
     })?;
 
@@ -229,16 +229,14 @@ pub(crate) fn write_cfheader_with_identifier<W: Write>(
     writer.write_all(&range_count_u16.to_le_bytes())?;
 
     for (first_row_u32, last_row_u32, first_col, last_col) in ranges {
-        let first_row_u16 = u16::try_from(*first_row_u32).map_err(|_| {
+        let first_row_u16 = u16::try_from(*first_row_u32).map_err(|_error| {
             Error::InvalidData(format!(
-                "Row index {} exceeds BIFF8 limit 65535 for CFHEADER range",
-                first_row_u32
+                "Row index {first_row_u32} exceeds BIFF8 limit 65535 for CFHEADER range"
             ))
         })?;
-        let last_row_u16 = u16::try_from(*last_row_u32).map_err(|_| {
+        let last_row_u16 = u16::try_from(*last_row_u32).map_err(|_error| {
             Error::InvalidData(format!(
-                "Row index {} exceeds BIFF8 limit 65535 for CFHEADER range",
-                last_row_u32
+                "Row index {last_row_u32} exceeds BIFF8 limit 65535 for CFHEADER range"
             ))
         })?;
 
@@ -259,10 +257,10 @@ pub(crate) fn write_cfrule<W: Write>(
     formula2: &[u8],
     pattern: Option<(u16, u16, u16)>,
 ) -> Result<()> {
-    let f1_len = u16::try_from(formula1.len()).map_err(|_| {
+    let f1_len = u16::try_from(formula1.len()).map_err(|_error| {
         Error::InvalidData("Conditional format formula1 exceeds BIFF8 size limit".to_string())
     })?;
-    let f2_len = u16::try_from(formula2.len()).map_err(|_| {
+    let f2_len = u16::try_from(formula2.len()).map_err(|_error| {
         Error::InvalidData("Conditional format formula2 exceeds BIFF8 size limit".to_string())
     })?;
 

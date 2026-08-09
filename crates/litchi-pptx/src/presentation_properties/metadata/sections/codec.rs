@@ -239,7 +239,7 @@ fn make_node(element: &BytesStart<'_>, decoder: Decoder, stack: &[Node]) -> Resu
         if name == "xmlns" || name.starts_with("xmlns:") {
             let prefix = name.strip_prefix("xmlns:").unwrap_or("").to_owned();
             if let Some(binding) = bindings.iter_mut().find(|binding| binding.0 == prefix) {
-                binding.1 = value.clone();
+                binding.1.clone_from(value);
             } else {
                 bindings.push((prefix, value.clone()));
             }

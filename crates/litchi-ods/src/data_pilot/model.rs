@@ -1,4 +1,4 @@
-//! Immutable DataPilot catalogs and semantic selectors.
+//! Immutable `DataPilot` catalogs and semantic selectors.
 
 use crate::model::data_pilot::{self as vocabulary, Table};
 use crate::package::Package;
@@ -8,7 +8,7 @@ use super::codec::{Location, locate};
 use super::transaction::Transaction;
 use super::validation;
 
-/// Immutable DataPilot declarations bound to one ODS package snapshot.
+/// Immutable `DataPilot` declarations bound to one ODS package snapshot.
 pub struct Catalog<'source> {
     pub(crate) source: &'source Package,
     pub(crate) source_xml: &'source str,
@@ -39,6 +39,7 @@ impl<'source> Catalog<'source> {
     }
 
     /// Iterate declarations without copying their nested source metadata.
+    #[must_use]
     pub fn iter(&self) -> impl ExactSizeIterator<Item = &Table> {
         self.tables.iter()
     }
@@ -63,16 +64,25 @@ impl<'source> Catalog<'source> {
     }
 
     /// Select a declaration by checked source position.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn at(&self, index: usize) -> Result<Option<&Table>> {
         Ok(self.tables.get(index))
     }
 
     /// Select one declaration by its exact producer-visible name.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn named(&self, name: &str) -> Result<Option<&Table>> {
         self.get(Selector::Name(name))
     }
 
     /// Select by exact name or checked zero-based source position.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn get<'a, S>(&self, selector: S) -> Result<Option<&Table>>
     where
         S: Into<Selector<'a>>,
@@ -81,17 +91,18 @@ impl<'source> Catalog<'source> {
     }
 
     /// Start an isolated clone-staged transaction over this catalog.
+    #[must_use]
     pub fn transaction(&self) -> Transaction<'source> {
         Transaction::from_catalog(self)
     }
 }
 
-/// Primary semantic selector for DataPilot declarations.
+/// Primary semantic selector for `DataPilot` declarations.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Selector<'a> {
     /// Checked zero-based source order.
     Index(usize),
-    /// Exact producer-visible DataPilot name.
+    /// Exact producer-visible `DataPilot` name.
     Name(&'a str),
 }
 
@@ -107,7 +118,7 @@ impl<'a> From<&'a str> for Selector<'a> {
     }
 }
 
-pub(crate) fn select<'a>(tables: &[Table], selector: Selector<'a>) -> Result<Option<usize>> {
+pub(crate) fn select(tables: &[Table], selector: Selector<'_>) -> Result<Option<usize>> {
     match selector {
         Selector::Index(index) => Ok((index < tables.len()).then_some(index)),
         Selector::Name(name) => {

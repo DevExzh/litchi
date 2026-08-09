@@ -1,7 +1,7 @@
-//! Typed, bounded SpreadsheetML timeline ownership.
+//! Typed, bounded `SpreadsheetML` timeline ownership.
 //!
 //! Timelines are inert package controls. This owner preserves their XML and
-//! graph state but never refreshes a PivotCache, recalculates formulas, or
+//! graph state but never refreshes a `PivotCache`, recalculates formulas, or
 //! renders/applies a host UI.
 
 pub mod codec;

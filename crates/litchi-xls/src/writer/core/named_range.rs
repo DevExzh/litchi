@@ -166,7 +166,7 @@ pub(super) fn validate_future_records(
 /// tailored for BIFF8 `NAME` (Lbl) records.
 #[derive(Debug, Clone)]
 pub struct DefinedName {
-    /// Name of the defined range (e.g. "TaxRate", "SalesData").
+    /// Name of the defined range (e.g. "`TaxRate`", "`SalesData`").
     pub name: String,
     /// Reference text for the name.
     ///
@@ -184,9 +184,9 @@ pub struct DefinedName {
     ///
     /// When `None`, the name is workbook-scoped. When `Some(itab)`,
     /// the value corresponds to the `itab` field of the Lbl record
-    /// and is a one-based index into the BoundSheet8 collection.
+    /// and is a one-based index into the `BoundSheet8` collection.
     pub local_sheet: Option<u16>,
-    /// Zero-based sheet index used when encoding PtgArea3d tokens.
+    /// Zero-based sheet index used when encoding `PtgArea3d` tokens.
     ///
     /// This is the sheet whose cells the range refers to. For
     /// workbook-scoped names that still point to a single sheet
@@ -208,6 +208,9 @@ impl DefinedName {
     ///
     /// This currently supports only simple A1-style references as
     /// documented on [`DefinedName::reference`].
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_biff_formula(&self) -> Result<Vec<u8>> {
         let trimmed = self.reference.trim();
 

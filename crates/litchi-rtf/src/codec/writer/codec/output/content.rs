@@ -1196,7 +1196,6 @@ impl<W: Write> RtfWriter<W> {
 
         let pattern_value = match (shading.amount, shading.pattern) {
             (Some(amount), _) => Some(i32::from(amount)),
-            (None, None) => None,
             (None, Some(ShadingPattern::Clear)) => Some(0),
             (None, Some(ShadingPattern::Solid)) => Some(10_000),
             (None, Some(ShadingPattern::Percent5)) => Some(500),
@@ -1221,7 +1220,7 @@ impl<W: Write> RtfWriter<W> {
             (None, Some(ShadingPattern::Percent87)) => Some(8750),
             (None, Some(ShadingPattern::Percent90)) => Some(9000),
             (None, Some(ShadingPattern::Percent95)) => Some(9500),
-            (None, Some(_)) => None,
+            (None, None | Some(_)) => None,
         };
 
         if let Some(pattern_value) = pattern_value {

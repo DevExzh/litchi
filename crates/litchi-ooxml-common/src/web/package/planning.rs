@@ -1,7 +1,18 @@
-use super::super::codec::*;
-use super::super::model::*;
-use super::super::*;
-use super::*;
+use super::super::codec::{
+    charge_authored_metadata, invalid, limit, validate_panes, write_add_in_with, write_panes_with,
+};
+use super::super::model::{Conformance, Limits, OperationBudget, Panes, SnapshotTarget};
+use super::super::{
+    ADD_IN_CONTENT_TYPE, ADD_IN_RELATIONSHIP, Arc, BTreeSet, Error, HashMap, HashSet, OpcPackage,
+    Result, TASK_PANES_CONTENT_TYPE, TASK_PANES_RELATIONSHIP,
+};
+use super::{
+    PackageGraphIndex, Patch, PatchPlan, PlannedGraph, PlannedPart, PlannedRelationship,
+    RelationshipState, add_or_match_planned_part, existing_web_extension_graph, fold_part_name,
+    folded_name_conflicts, graph_matches_plan, has_task_panes_relationship,
+    next_package_relationship_id, next_task_panes_part_name, next_web_extension_part_name,
+    planned_deletions, preflight_planned_parts, validate_plan_counts,
+};
 /// Create or replace the package-level persisted task-pane graph.
 ///
 /// Add-in references, bindings, properties, and snapshot resources are stored

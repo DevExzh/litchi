@@ -16,6 +16,7 @@ use crate::rel::Relationships;
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Write};
 use std::path::Path;
+use std::sync::Arc;
 
 /// Options for saving an OPC package.
 #[derive(Debug, Clone, Default)]
@@ -55,6 +56,9 @@ pub struct OpcPackage {
     /// `PackURI` keys avoid string allocations compared to String keys
     parts: HashMap<PackURI, Box<dyn Part + Send + Sync>>,
 
+    /// Exact XML payloads materialized from the opened source package.
+    source_xml_parts: HashMap<PackURI, Arc<Vec<u8>>>,
+
     /// ZIP items the reader found but did not model as parts
     non_part_members: Vec<NonPartMember>,
 
@@ -67,6 +71,7 @@ impl std::fmt::Debug for OpcPackage {
         f.debug_struct("OpcPackage")
             .field("rels", &self.rels)
             .field("parts_count", &self.parts.len())
+            .field("source_xml_parts_count", &self.source_xml_parts.len())
             .field("non_part_members", &self.non_part_members)
             .field("save_options", &self.save_options)
             .finish()
@@ -80,6 +85,7 @@ impl OpcPackage {
         Self {
             rels: Relationships::new(PACKAGE_URI.to_string()),
             parts: HashMap::new(),
+            source_xml_parts: HashMap::new(),
             non_part_members: Vec::new(),
             save_options: SaveOptions::default(),
         }
@@ -228,6 +234,7 @@ impl OpcPackage {
         // Pre-allocate with known capacity to avoid reallocations
         let mut parts_map: HashMap<PackURI, Box<dyn Part + Send + Sync>> =
             HashMap::with_capacity(sparts.len());
+        let mut source_xml_parts = HashMap::new();
 
         // Create all parts - move data instead of cloning
         for spart in sparts {
@@ -248,6 +255,16 @@ impl OpcPackage {
                 )?;
             }
 
+            if xml_minifier::audit::package::is_xml_part(partname.as_str(), part.content_type()) {
+                source_xml_parts
+                    .try_reserve(1)
+                    .map_err(|source| OpcError::Allocation {
+                        resource: "OPC source-preserved XML parts",
+                        source,
+                    })?;
+                source_xml_parts.insert(partname.clone(), part.blob_arc());
+            }
+
             parts_map.insert(partname, part);
         }
 
@@ -262,7 +279,14 @@ impl OpcPackage {
         }
 
         package.parts = parts_map;
+        package.source_xml_parts = source_xml_parts;
         Ok(package)
+    }
+
+    pub(crate) fn is_exact_source_xml(&self, part: &dyn Part) -> bool {
+        self.source_xml_parts
+            .get(part.partname())
+            .is_some_and(|source| source.as_slice() == part.blob())
     }
 
     /// Get a reference to the main document part.
@@ -382,6 +406,7 @@ impl OpcPackage {
     /// * `part` - The part to add
     pub fn add_part(&mut self, part: Box<dyn Part + Send + Sync>) {
         let partname = part.partname().clone();
+        self.source_xml_parts.remove(&partname);
         self.parts.insert(partname, part);
     }
 
@@ -413,6 +438,7 @@ impl OpcPackage {
 
     /// Remove a part by name, returning whether it existed.
     pub fn remove_part(&mut self, partname: &PackURI) -> bool {
+        self.source_xml_parts.remove(partname);
         self.parts.remove(partname).is_some()
     }
 

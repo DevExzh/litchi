@@ -18,9 +18,9 @@ pub struct Legend {
     pub layout: Option<Layout>,
     /// Individual legend entries
     pub entries: Vec<LegendEntry>,
-    /// DrawingML shape properties for the legend container
+    /// `DrawingML` shape properties for the legend container
     pub shape_properties: Option<ShapeProperties>,
-    /// DrawingML text properties for the legend container
+    /// `DrawingML` text properties for the legend container
     pub text_properties: Option<TextProperties>,
     /// Legend extension list
     pub extension_list: Option<ExtensionList>,
@@ -29,6 +29,7 @@ pub struct Legend {
 impl Legend {
     /// Create a new legend with default settings.
     #[inline]
+    #[must_use]
     pub fn new(position: LegendPosition) -> Self {
         Self {
             position,
@@ -43,6 +44,7 @@ impl Legend {
 
     /// Set whether to overlay on chart.
     #[inline]
+    #[must_use]
     pub fn with_overlay(mut self, overlay: bool) -> Self {
         self.overlay = overlay;
         self
@@ -50,6 +52,7 @@ impl Legend {
 
     /// Set manual layout.
     #[inline]
+    #[must_use]
     pub fn with_layout(mut self, layout: Layout) -> Self {
         self.layout = Some(layout);
         self
@@ -57,6 +60,7 @@ impl Legend {
 
     /// Create a default right-positioned legend.
     #[inline]
+    #[must_use]
     pub fn default_right() -> Self {
         Self::new(LegendPosition::Right)
     }
@@ -76,7 +80,7 @@ pub struct LegendEntry {
     pub index: u32,
     /// Whether entry is deleted
     pub deleted: bool,
-    /// DrawingML text properties used instead of the delete choice
+    /// `DrawingML` text properties used instead of the delete choice
     pub text_properties: Option<TextProperties>,
     /// Legend-entry extension list
     pub extension_list: Option<ExtensionList>,
@@ -85,6 +89,7 @@ pub struct LegendEntry {
 impl LegendEntry {
     /// Create a new legend entry.
     #[inline]
+    #[must_use]
     pub fn new(index: u32) -> Self {
         Self {
             index,

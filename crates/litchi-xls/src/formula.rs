@@ -25,7 +25,7 @@ impl BoundedText {
     }
 
     fn push_str(&mut self, value: &str) -> Result<(), ()> {
-        self.write_str(value).map_err(|_| ())
+        self.write_str(value).map_err(|_error| ())
     }
 
     fn finish(self) -> String {
@@ -45,7 +45,7 @@ impl fmt::Write for BoundedText {
         }
         self.value
             .try_reserve(value.len())
-            .map_err(|_| fmt::Error)?;
+            .map_err(|_error| fmt::Error)?;
         self.value.push_str(value);
         Ok(())
     }
@@ -53,7 +53,7 @@ impl fmt::Write for BoundedText {
 
 fn render_text(arguments: fmt::Arguments<'_>) -> Result<String, ()> {
     let mut text = BoundedText::new();
-    fmt::write(&mut text, arguments).map_err(|_| ())?;
+    fmt::write(&mut text, arguments).map_err(|_error| ())?;
     Ok(text.finish())
 }
 
@@ -436,7 +436,7 @@ impl<'a> FormulaDecoder<'a> {
         if stack_bytes > MAX_RENDERED_FORMULA_BYTES {
             return Err(());
         }
-        self.stack.try_reserve(1).map_err(|_| ())?;
+        self.stack.try_reserve(1).map_err(|_error| ())?;
         self.stack.push(value);
         self.stack_bytes = stack_bytes;
         Ok(())
@@ -448,15 +448,15 @@ impl<'a> FormulaDecoder<'a> {
 
     fn push_quoted(&mut self, value: &str) -> Result<(), ()> {
         let mut text = BoundedText::new();
-        fmt::Write::write_char(&mut text, '"').map_err(|_| ())?;
+        fmt::Write::write_char(&mut text, '"').map_err(|_error| ())?;
         for character in value.chars() {
             if character == '"' {
                 text.push_str("\"\"")?;
             } else {
-                fmt::Write::write_char(&mut text, character).map_err(|_| ())?;
+                fmt::Write::write_char(&mut text, character).map_err(|_error| ())?;
             }
         }
-        fmt::Write::write_char(&mut text, '"').map_err(|_| ())?;
+        fmt::Write::write_char(&mut text, '"').map_err(|_error| ())?;
         self.push_text(text.finish())
     }
 
@@ -628,7 +628,7 @@ impl<'a> FormulaDecoder<'a> {
                     .context
                     .and_then(|context| context.name_x(extern_sheet, name_index))
                     .ok_or(())?;
-                self.name_x_operands.try_reserve(1).map_err(|_| ())?;
+                self.name_x_operands.try_reserve(1).map_err(|_error| ())?;
                 self.name_x_operands.push(self.stack.len());
                 self.push_text(name)
             },
@@ -773,7 +773,7 @@ impl<'a> FormulaDecoder<'a> {
         if flags & 0x01 == 0 {
             let bytes = self.take(count)?;
             for &byte in bytes {
-                fmt::Write::write_char(&mut output, char::from(byte)).map_err(|_| ())?;
+                fmt::Write::write_char(&mut output, char::from(byte)).map_err(|_error| ())?;
             }
         } else {
             let byte_count = count.checked_mul(2).ok_or(())?;
@@ -783,8 +783,8 @@ impl<'a> FormulaDecoder<'a> {
                     .chunks_exact(2)
                     .map(|pair| u16::from_le_bytes([pair[0], pair[1]])),
             ) {
-                let character = result.map_err(|_| ())?;
-                fmt::Write::write_char(&mut output, character).map_err(|_| ())?;
+                let character = result.map_err(|_error| ())?;
+                fmt::Write::write_char(&mut output, character).map_err(|_error| ())?;
             }
         }
         Ok(output.finish())
@@ -844,13 +844,13 @@ fn resolve_shared_reference(
     let row_relative = column_flags & 0x8000 != 0;
     let column_relative = column_flags & 0x4000 != 0;
     let resolved_row = if row_relative {
-        origin_row.wrapping_add_signed(row as i16)
+        origin_row.wrapping_add_signed(crate::utils::wrap_u16_to_i16(row))
     } else {
         row
     };
     let raw_column = column_flags & 0x00ff;
     let resolved_column = if column_relative {
-        let offset = (raw_column as u8) as i8;
+        let offset = crate::utils::wrap_u8_to_i8(raw_column as u8);
         origin_column.wrapping_add_signed(i16::from(offset)) & 0x00ff
     } else {
         raw_column
@@ -878,7 +878,10 @@ fn cell_reference(row: u16, column_flags: u16) -> Result<String, ()> {
 fn column_name(mut column: usize) -> String {
     let mut result = String::new();
     loop {
-        result.insert(0, char::from(b'A' + (column % 26) as u8));
+        result.insert(
+            0,
+            char::from(b'A' + crate::utils::truncate_usize_to_u8(column % 26)),
+        );
         if column < 26 {
             return result;
         }

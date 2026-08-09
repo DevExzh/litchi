@@ -1,4 +1,4 @@
-//! Bounded SpreadsheetML OLE markup codec.
+//! Bounded `SpreadsheetML` OLE markup codec.
 
 use crate::error::Result;
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
@@ -8,7 +8,11 @@ use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::cmp::Reverse;
 
-use super::model::*;
+use super::model::{
+    Aspect, MAX_DEPTH, MAX_NODES, MAX_OBJECTS, MAX_STRING_BYTES, MAX_XML_BYTES, OleObject,
+    OleObjectAnchor, OleObjectConformance, OleObjectMarker, OleObjectProperties,
+    OleObjectRelationshipKind, OleObjectUpdate, OleObjects, SML, STRICT_SML, X14, validate_value,
+};
 use super::{invalid, limit, xml_error};
 
 #[derive(Clone)]
@@ -628,14 +632,14 @@ fn collect_raw_source(source: &[u8], conformance: OleObjectConformance) -> Resul
                     .map_err(xml_error)?
                     .to_owned();
                 let object = if namespace == conformance.sml() && name == "oleObject" {
-                    Some(raw_object_key(&reader, &element, conformance)?)
+                    Some(raw_object_key(&reader, element, conformance)?)
                 } else {
                     stack.last().and_then(|id| elements[*id].object.clone())
                 };
                 let parent = stack.last().copied();
                 let end = usize::try_from(reader.buffer_position())
                     .map_err(|_| invalid("worksheet XML offset overflow"))?;
-                let attributes = raw_attributes(source, start, end, &reader, &element)?;
+                let attributes = raw_attributes(source, start, end, &reader, element)?;
                 let id = elements.len();
                 elements.push(RawElement {
                     namespace,
@@ -865,17 +869,17 @@ fn patch_anchor_marker(
         .ok_or_else(|| invalid(format!("OLE source anchor is missing {name} marker")))?;
     let marker_id = property_id(raw, marker)?;
     for (coordinate_name, before_value, after_value) in [
-        ("col", before.column as i128, after.column as i128),
+        ("col", i128::from(before.column), i128::from(after.column)),
         (
             "colOff",
-            before.column_offset as i128,
-            after.column_offset as i128,
+            i128::from(before.column_offset),
+            i128::from(after.column_offset),
         ),
-        ("row", before.row as i128, after.row as i128),
+        ("row", i128::from(before.row), i128::from(after.row)),
         (
             "rowOff",
-            before.row_offset as i128,
-            after.row_offset as i128,
+            i128::from(before.row_offset),
+            i128::from(after.row_offset),
         ),
     ] {
         if before_value == after_value {
@@ -1106,7 +1110,6 @@ fn write_marker(output: &mut Vec<u8>, name: &str, marker: &OleObjectMarker) {
 }
 
 /// Loads OLE anchors and validates all payload and preview relationships for one worksheet.
-
 pub(super) fn parse_document(xml: &[u8]) -> Result<Node> {
     if xml.len() > MAX_XML_BYTES {
         return Err(limit("input XML bytes"));

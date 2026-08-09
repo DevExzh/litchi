@@ -12,7 +12,7 @@ pub enum Anchor {
     Floating,
 }
 
-/// The legacy WordprocessingML element carrying a drawing or embedded object.
+/// The legacy `WordprocessingML` element carrying a drawing or embedded object.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum LegacyAnchorKind {
     /// An embedded or linked object carried by `w:object`.
@@ -21,7 +21,7 @@ pub enum LegacyAnchorKind {
     Picture,
 }
 
-/// The checked Word 2010 identifier carried by a DrawingML or legacy drawing
+/// The checked Word 2010 identifier carried by a `DrawingML` or legacy drawing
 /// anchor.
 ///
 /// Word stores this value as eight hexadecimal ASCII digits.  The zero and
@@ -33,6 +33,7 @@ pub struct AnchorId(u32);
 impl AnchorId {
     /// Construct an anchor identifier in the schema-defined range.
     #[inline]
+    #[must_use]
     pub const fn new(value: u32) -> Option<Self> {
         if value != 0 && value < 0x8000_0000 {
             Some(Self(value))
@@ -43,6 +44,7 @@ impl AnchorId {
 
     /// Return the numeric identifier.
     #[inline]
+    #[must_use]
     pub const fn get(self) -> u32 {
         self.0
     }
@@ -62,12 +64,14 @@ pub struct LegacyAnchor {
 impl LegacyAnchor {
     /// Return whether the entry came from `w:object` or `w:pict`.
     #[inline]
+    #[must_use]
     pub fn kind(self) -> LegacyAnchorKind {
         self.kind
     }
 
     /// Return the checked Word 2010 identifier, when one was authored.
     #[inline]
+    #[must_use]
     pub fn anchor_id(self) -> Option<AnchorId> {
         self.anchor_id
     }
@@ -80,18 +84,18 @@ impl LegacyAnchor {
 /// The semantic family discovered for a drawing object.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Kind {
-    /// A WordprocessingML shape (`wps:wsp`).
+    /// A `WordprocessingML` shape (`wps:wsp`).
     Shape,
     /// A shape containing a Word text-box story (`wps:txbx`).
     TextBox,
-    /// An unknown or non-shape DrawingML object retained as inert inventory.
+    /// An unknown or non-shape `DrawingML` object retained as inert inventory.
     Other,
 }
 
 /// An owned drawing object discovered inside a Word paragraph.
 ///
 /// The object is an inventory projection, not a renderer. Unknown children,
-/// unsupported DrawingML features, and external resources are deliberately
+/// unsupported `DrawingML` features, and external resources are deliberately
 /// ignored by the inventory parser while the discovered object remains in
 /// document order.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -106,15 +110,15 @@ pub struct Object {
     width_emu: i64,
     /// Height in EMUs.
     height_emu: i64,
-    /// Horizontal DrawingML offset in EMUs.
+    /// Horizontal `DrawingML` offset in EMUs.
     x_emu: i64,
-    /// Vertical DrawingML offset in EMUs.
+    /// Vertical `DrawingML` offset in EMUs.
     y_emu: i64,
-    /// Closed DrawingML preset geometry, when a `prstGeom` was present.
+    /// Closed `DrawingML` preset geometry, when a `prstGeom` was present.
     preset: Option<Preset>,
     /// Discovered semantic family.
     kind: Kind,
-    /// Discovered WordprocessingML placement.
+    /// Discovered `WordprocessingML` placement.
     anchor: Anchor,
     /// Checked Word 2010 anchor identifier, when authored.
     anchor_id: Option<AnchorId>,
@@ -123,6 +127,7 @@ pub struct Object {
 impl Object {
     /// Create a shape object with inline placement and no text-box story.
     #[inline]
+    #[must_use]
     pub fn new(
         name: String,
         description: String,
@@ -176,18 +181,21 @@ impl Object {
 
     /// Return the shape title.
     #[inline]
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Return the alternative text.
     #[inline]
+    #[must_use]
     pub fn description(&self) -> &str {
         &self.description
     }
 
     /// Return the text collected from the nested text-box story.
     #[inline]
+    #[must_use]
     pub fn text(&self) -> &str {
         &self.text
     }
@@ -200,29 +208,33 @@ impl Object {
 
     /// Return the width in EMUs.
     #[inline]
+    #[must_use]
     pub fn width_emu(&self) -> i64 {
         self.width_emu
     }
 
     /// Return the height in EMUs.
     #[inline]
+    #[must_use]
     pub fn height_emu(&self) -> i64 {
         self.height_emu
     }
 
     /// Return the horizontal offset in EMUs.
     #[inline]
+    #[must_use]
     pub fn x_emu(&self) -> i64 {
         self.x_emu
     }
 
     /// Return the vertical offset in EMUs.
     #[inline]
+    #[must_use]
     pub fn y_emu(&self) -> i64 {
         self.y_emu
     }
 
-    /// Set the DrawingML offset in EMUs.
+    /// Set the `DrawingML` offset in EMUs.
     #[inline]
     pub fn set_position(&mut self, x_emu: i64, y_emu: i64) {
         self.x_emu = x_emu;
@@ -231,54 +243,63 @@ impl Object {
 
     /// Return the width in pixels at 96 DPI.
     #[inline]
+    #[must_use]
     pub fn width_px(&self) -> u32 {
         emu_to_px_96(self.width_emu)
     }
 
     /// Return the height in pixels at 96 DPI.
     #[inline]
+    #[must_use]
     pub fn height_px(&self) -> u32 {
         emu_to_px_96(self.height_emu)
     }
 
     /// Return the width in points.
     #[inline]
+    #[must_use]
     pub fn width_pt(&self) -> f64 {
         emu_to_pt_f64(self.width_emu)
     }
 
     /// Return the height in points.
     #[inline]
+    #[must_use]
     pub fn height_pt(&self) -> f64 {
         emu_to_pt_f64(self.height_emu)
     }
 
     /// Return the closed preset geometry, when present.
     #[inline]
+    #[must_use]
     pub fn preset(&self) -> Option<Preset> {
         self.preset
     }
 
     /// Return the discovered semantic family.
     #[inline]
+    #[must_use]
     pub fn kind(&self) -> Kind {
         self.kind
     }
 
-    /// Return the discovered WordprocessingML placement.
+    /// Return the discovered `WordprocessingML` placement.
     #[inline]
+    #[must_use]
     pub fn anchor(&self) -> Anchor {
         self.anchor
     }
 
     /// Return the checked Word 2010 anchor identifier.
     #[inline]
+    #[must_use]
     pub fn anchor_id(&self) -> Option<AnchorId> {
         self.anchor_id
     }
 
     /// Return whether the object contains a text-box story.
     #[inline]
+    #[must_use]
     pub fn is_text_box(&self) -> bool {
         self.kind == Kind::TextBox
     }
@@ -295,6 +316,7 @@ impl Object {
 
     /// Return whether the object is inline rather than floating.
     #[inline]
+    #[must_use]
     pub fn is_inline(&self) -> bool {
         self.anchor == Anchor::Inline
     }

@@ -79,7 +79,7 @@ impl<'a> SheetExtReader<'a> {
                 expected: end,
                 found: self.data.len(),
             })?;
-        let value = bytes.try_into().map_err(|_| Error::InvalidLength {
+        let value = bytes.try_into().map_err(|_error| Error::InvalidLength {
             expected: N,
             found: bytes.len(),
         })?;
@@ -102,7 +102,7 @@ fn decode_icv(raw: u32, record_type: u16) -> Result<Option<u8>> {
     if value == ICV_NO_COLOR {
         return Ok(None);
     }
-    let index = u8::try_from(value).map_err(|_| Error::InvalidRecord {
+    let index = u8::try_from(value).map_err(|_error| Error::InvalidRecord {
         record_type,
         message: format!("sheet tab color index {value:#04X} does not fit in an Icv"),
     })?;
@@ -132,21 +132,25 @@ pub struct SheetExtOptional {
 
 impl SheetExtOptional {
     /// Refreshed tab color palette index, when assigned.
+    #[must_use]
     pub fn tab_color_12(&self) -> Option<u8> {
         self.tab_color_12
     }
 
     /// Whether conditional-formatting formulas are evaluated.
+    #[must_use]
     pub fn cond_fmt_calc(&self) -> bool {
         self.cond_fmt_calc
     }
 
     /// Whether the sheet is excluded from publishing.
+    #[must_use]
     pub fn not_published(&self) -> bool {
         self.not_published
     }
 
     /// Full `CFColor` tab color bytes.
+    #[must_use]
     pub fn color(&self) -> &[u8; CF_COLOR_LEN] {
         &self.color
     }
@@ -163,11 +167,13 @@ pub struct SheetExt {
 
 impl SheetExt {
     /// Sheet tab color as a palette index, when assigned.
+    #[must_use]
     pub fn tab_color(&self) -> Option<u8> {
         self.tab_color
     }
 
     /// The optional extension, when present.
+    #[must_use]
     pub fn optional(&self) -> Option<&SheetExtOptional> {
         self.optional.as_ref()
     }

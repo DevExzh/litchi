@@ -2,14 +2,14 @@
 ///
 /// This module handles extracting text from the binary structures in DOC files.
 /// Text in DOC files is stored in a complex way:
-/// - The actual text bytes are in the WordDocument stream
+/// - The actual text bytes are in the `WordDocument` stream
 /// - A "Piece Table" (CLX structure) in the Table stream maps character positions to file positions
 /// - Text can be in either 8-bit (Windows-1252) or 16-bit (UTF-16LE) format
 use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
 use litchi_core::binary::{read_u16_le, read_u32_le};
 
-/// Size of a PieceDescriptor in bytes (8 bytes as per Apache POI)
+/// Size of a `PieceDescriptor` in bytes (8 bytes as per Apache POI)
 pub const PIECE_DESCRIPTOR_SIZE: usize = 8;
 
 /// Bytes per UTF-16LE code unit, for sizing a non-ANSI piece's text run.
@@ -17,10 +17,10 @@ const UTF16_CODE_UNIT_BYTES: usize = 2;
 
 /// CLX (Compound Line Extension) parsing utilities.
 ///
-/// Based on Apache POI's PlexOfCps implementation, the CLX structure is a
+/// Based on Apache POI's `PlexOfCps` implementation, the CLX structure is a
 /// Property List with Character Positions (PLCF) that contains:
 /// - 4-byte count of entries
-/// - For each entry: 4 bytes (CP start) + 4 bytes (CP end) + 8 bytes (PieceDescriptor)
+/// - For each entry: 4 bytes (CP start) + 4 bytes (CP end) + 8 bytes (`PieceDescriptor`)
 /// - Total: (count + 1) * 4 + count * 8 bytes
 ///
 /// Text extractor for DOC files.
@@ -34,12 +34,12 @@ pub struct TextExtractor {
 }
 
 impl TextExtractor {
-    /// Create a new TextExtractor and extract text.
+    /// Create a new `TextExtractor` and extract text.
     ///
     /// # Arguments
     ///
     /// * `fib` - The File Information Block
-    /// * `word_document` - The WordDocument stream
+    /// * `word_document` - The `WordDocument` stream
     /// * `table_stream` - The Table stream (0Table or 1Table)
     pub fn new(
         fib: &FileInformationBlock,
@@ -61,6 +61,7 @@ impl TextExtractor {
 
     /// Get a reference to the full extracted text.
     #[inline]
+    #[must_use]
     pub fn text(&self) -> &str {
         &self.text
     }
@@ -81,6 +82,7 @@ impl TextExtractor {
     ///
     /// MS-DOC ranges must not split a UTF-16 surrogate pair. Such malformed ranges return an
     /// empty slice because Rust strings cannot represent an isolated surrogate code unit.
+    #[must_use]
     pub fn text_at_range(&self, start_cp: u32, end_cp: u32) -> &str {
         let start = usize::try_from(start_cp)
             .unwrap_or(usize::MAX)
@@ -120,7 +122,7 @@ impl TextExtractor {
     /// Extract text using the piece table (CLX structure).
     ///
     /// The piece table maps character positions in the document to file positions
-    /// in the WordDocument stream. This allows Word to efficiently handle insertions
+    /// in the `WordDocument` stream. This allows Word to efficiently handle insertions
     /// and deletions without rewriting the entire file.
     fn extract_text_from_pieces(
         fib: &FileInformationBlock,
@@ -172,13 +174,13 @@ impl TextExtractor {
         }
     }
 
-    /// Parse the piece table from CLX data using Apache POI's ComplexFileTable logic.
+    /// Parse the piece table from CLX data using Apache POI's `ComplexFileTable` logic.
     ///
-    /// The CLX structure follows Apache POI's ComplexFileTable format:
+    /// The CLX structure follows Apache POI's `ComplexFileTable` format:
     /// - Optional GRPPR L sections (type 0x01) for fast-saved files
-    /// - TEXT_PIECE_TABLE_TYPE marker (0x02)
+    /// - `TEXT_PIECE_TABLE_TYPE` marker (0x02)
     /// - 4-byte size of the piece table data
-    /// - The piece table data itself (PlexOfCps structure)
+    /// - The piece table data itself (`PlexOfCps` structure)
     fn parse_piece_table(clx_data: &[u8], word_document: &[u8]) -> Result<Vec<u16>> {
         let mut offset = 0;
 
@@ -248,8 +250,7 @@ impl TextExtractor {
                         offset += 2 + size;
                     } else {
                         return Err(PackageError::Corrupted(format!(
-                            "Unexpected CLX section type 0x{:02X} at end of data",
-                            section_type
+                            "Unexpected CLX section type 0x{section_type:02X} at end of data"
                         )));
                     }
                 },
@@ -261,12 +262,12 @@ impl TextExtractor {
         Ok(Vec::new())
     }
 
-    /// Parse a PlexOfCps structure (Property List with Character Positions).
+    /// Parse a `PlexOfCps` structure (Property List with Character Positions).
     ///
-    /// Based on Apache POI's PlexOfCps implementation:
-    /// Format: [CP0] [CP1] ... [CP_n] [Struct0] [Struct1] ... [Struct_{n-1}]
+    /// Based on Apache POI's `PlexOfCps` implementation:
+    /// Format: [CP0] [CP1] ... [`CP_n`] [Struct0] [Struct1] ... [Struct_{n-1}]
     /// - For n pieces, there are (n+1) CPs (4 bytes each)
-    /// - Followed by n PieceDescriptor structs (8 bytes each)
+    /// - Followed by n `PieceDescriptor` structs (8 bytes each)
     /// - Number of pieces: n = (size - 4) / (4 + 8)
     fn parse_plex_of_cps(plex_data: &[u8]) -> Result<Vec<PieceDescriptor>> {
         if plex_data.len() < 4 {
@@ -308,8 +309,7 @@ impl TextExtractor {
 
             if offset + PIECE_DESCRIPTOR_SIZE > plex_data.len() {
                 return Err(PackageError::Corrupted(format!(
-                    "PieceDescriptor {} truncated",
-                    i
+                    "PieceDescriptor {i} truncated"
                 )));
             }
 
@@ -343,8 +343,8 @@ impl TextExtractor {
 
     /// Extract text from piece descriptors.
     ///
-    /// Based on Apache POI's TextPieceTable logic, each piece descriptor maps
-    /// a range of character positions (CP) to a location in the WordDocument stream.
+    /// Based on Apache POI's `TextPieceTable` logic, each piece descriptor maps
+    /// a range of character positions (CP) to a location in the `WordDocument` stream.
     fn extract_text_from_piece_descriptors(
         pieces: &[PieceDescriptor],
         word_document: &[u8],
@@ -440,14 +440,14 @@ impl TextExtractor {
 
 /// A piece descriptor.
 ///
-/// Maps a range of character positions to a location in the WordDocument stream.
+/// Maps a range of character positions to a location in the `WordDocument` stream.
 #[derive(Debug, Clone)]
 struct PieceDescriptor {
     /// Starting character position
     cp_start: u32,
     /// Ending character position
     cp_end: u32,
-    /// File position in WordDocument stream
+    /// File position in `WordDocument` stream
     file_pos: usize,
     /// Whether text is ANSI (true) or Unicode (false)
     is_ansi: bool,

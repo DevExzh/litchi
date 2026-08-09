@@ -5,7 +5,7 @@ use crate::{Error, Result};
 /// Conditional formatting rule types supported by the XLS writer.
 ///
 /// For the initial implementation we focus on the classic "formula" style
-/// conditional formats (CONDITION_TYPE_FORMULA in BIFF8). This keeps the
+/// conditional formats (`CONDITION_TYPE_FORMULA` in BIFF8). This keeps the
 /// model small while still being expressive: most conditional formatting
 /// scenarios can be expressed as a boolean formula.
 #[derive(Debug, Clone)]
@@ -52,7 +52,7 @@ impl ConditionalFormatOperator {
 }
 
 impl ConditionalFormatType {
-    /// Convert this conditional format description into BIFF8 CFRule payload
+    /// Convert this conditional format description into BIFF8 `CFRule` payload
     /// components.
     ///
     /// Returns `(condition_type, comparison_operator, formula1_bytes, formula2_bytes)`.
@@ -68,8 +68,7 @@ impl ConditionalFormatType {
 
                 let tokens = tokenizer.tokenize(formula).map_err(|e| {
                     Error::InvalidData(format!(
-                        "Invalid conditional formatting formula '{}': {}",
-                        formula, e
+                        "Invalid conditional formatting formula '{formula}': {e}"
                     ))
                 })?;
                 let formula1 = encode_ptg_tokens(&tokens);
@@ -183,7 +182,10 @@ pub enum ConditionalFormat12Type {
 }
 
 impl ConditionalFormat12Type {
-    #[allow(clippy::type_complexity)]
+    #[allow(
+        clippy::type_complexity,
+        reason = "type mirrors the decoded BIFF record structure"
+    )]
     pub(crate) fn biff_parts(&self) -> (u8, u8, &[u8], &[u8], &[u8], &[u8]) {
         match self {
             Self::CellValue {
@@ -236,8 +238,9 @@ pub struct ConditionalFormat12Group {
 }
 
 impl ConditionalFormat {
-    /// Convert the optional pattern into BIFF8 PatternFormatting triple
+    /// Convert the optional pattern into BIFF8 `PatternFormatting` triple
     /// `(pattern_code, fg_index, bg_index)`.
+    #[must_use]
     pub fn to_biff_pattern(&self) -> Option<(u16, u16, u16)> {
         let pat = self.pattern.as_ref()?;
         let pattern_code = pat.pattern as u16;

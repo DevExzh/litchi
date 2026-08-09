@@ -1,7 +1,7 @@
 use super::super::codec::{invalid, limit};
-use super::super::model::*;
-use super::super::*;
-use super::*;
+use super::super::model::Limits;
+use super::super::{BTreeSet, Error, HashSet, OpcPackage, PackURI, Part, Result};
+use super::{ExistingAddInGraph, PackageGraphIndex, PlannedPart, fold_part_name};
 pub(in crate::web) fn preflight_planned_parts(
     package: &OpcPackage,
     index: &PackageGraphIndex,

@@ -1,4 +1,4 @@
-//! Passive AutoText and formatted AutoCorrect metadata for legacy DOC files.
+//! Passive `AutoText` and formatted `AutoCorrect` metadata for legacy DOC files.
 
 use super::super::package::{Error as PackageError, Result};
 use super::super::paragraph::{Paragraph, Run};
@@ -71,7 +71,7 @@ impl GlossaryItemKind {
     }
 }
 
-/// One AutoText or formatted AutoCorrect item and its main-story CP range.
+/// One `AutoText` or formatted `AutoCorrect` item and its main-story CP range.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GlossaryItem {
     name: String,
@@ -100,18 +100,23 @@ impl GlossaryItem {
         Ok(item)
     }
 
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
+    #[must_use]
     pub fn kind(&self) -> GlossaryItemKind {
         self.kind
     }
+    #[must_use]
     pub fn style_index(&self) -> Option<u16> {
         self.style_index
     }
+    #[must_use]
     pub fn start_cp(&self) -> u32 {
         self.start_cp
     }
+    #[must_use]
     pub fn end_cp(&self) -> u32 {
         self.end_cp
     }
@@ -134,9 +139,11 @@ impl GlossaryStyle {
         Ok(style)
     }
 
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
+    #[must_use]
     pub fn use_count(&self) -> u8 {
         self.use_count
     }
@@ -151,15 +158,19 @@ pub struct GlossaryTables {
 }
 
 impl GlossaryTables {
+    #[must_use]
     pub fn item_table(&self) -> &[u8] {
         &self.sttbf_glsy
     }
+    #[must_use]
     pub fn position_table(&self) -> &[u8] {
         &self.plcf_glsy
     }
+    #[must_use]
     pub fn style_table(&self) -> &[u8] {
         &self.sttb_glsy_style
     }
+    #[must_use]
     pub fn into_parts(self) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
         (self.sttbf_glsy, self.plcf_glsy, self.sttb_glsy_style)
     }
@@ -346,21 +357,25 @@ impl AttachedGlossary {
     }
 
     /// The secondary AutoText-only FIB.
+    #[must_use]
     pub fn fib(&self) -> &FileInformationBlock {
         &self.fib
     }
 
     /// Cross-validated item, style, and character-position metadata.
+    #[must_use]
     pub fn metadata(&self) -> &GlossaryMetadata {
         &self.metadata
     }
 
     /// The complete stored AutoText-only main story.
+    #[must_use]
     pub fn text(&self) -> &str {
         self.text_extractor.text()
     }
 
     /// Get one entry's stored content without its structural final character.
+    #[must_use]
     pub fn item_text(&self, index: usize) -> Option<&str> {
         let item = self.metadata.items().get(index)?;
         Some(
@@ -374,6 +389,7 @@ impl AttachedGlossary {
     /// Field instructions, cached results, external targets, controls, and
     /// macro names remain inert and are never resolved, activated, refreshed,
     /// or executed.
+    #[must_use]
     pub fn fields_table(&self) -> &FieldsTable {
         &self.fields_table
     }
@@ -413,6 +429,7 @@ impl AttachedGlossary {
     /// `XE`, `RD`, and `PRIVATE` metadata. Unbalanced or unrecognized field
     /// characters are ignored. Referenced documents are never opened and
     /// conversion payloads are never interpreted.
+    #[must_use]
     pub fn non_plcf_fields(&self) -> NonPlcfFields {
         NonPlcfFields::from_story_texts(FieldStory::ALL.into_iter().filter_map(|story| {
             let (start, end) = story.range(&self.fib)?;
@@ -440,7 +457,7 @@ impl AttachedGlossary {
                 for (text, properties) in runs {
                     let image_offset = properties.pic_offset.filter(|offset| {
                         self.images
-                            .binary_search_by_key(offset, |image| image.pic_offset())
+                            .binary_search_by_key(offset, super::super::image::Image::pic_offset)
                             .is_ok()
                     });
                     let mut run = if let Some(offset) = image_offset {
@@ -465,26 +482,31 @@ impl AttachedGlossary {
     ///
     /// Pass an entry to [`super::super::document::Document::image_data`] to
     /// retrieve its payload from the template's shared Data stream.
+    #[must_use]
     pub fn images(&self) -> &[super::super::image::Image] {
         &self.images
     }
 
-    /// Floating OfficeArt shapes stored by the secondary FIB.
+    /// Floating `OfficeArt` shapes stored by the secondary FIB.
+    #[must_use]
     pub fn shapes(&self) -> &[crate::shape::Shape] {
         &self.shapes
     }
 
     /// Floating-shape anchors in the attached main story.
+    #[must_use]
     pub fn shape_positions(&self) -> &[super::spa::ShapeAnchor] {
         &self.shape_anchors
     }
 
     /// Floating-shape anchors in attached header/footer stories.
+    #[must_use]
     pub fn header_shape_positions(&self) -> &[super::spa::ShapeAnchor] {
         &self.header_shape_anchors
     }
 
     /// Text boxes stored in the attached main story.
+    #[must_use]
     pub fn text_boxes(&self) -> Vec<super::textbox::TextBox> {
         resolve_text_boxes(
             &self.text_extractor,
@@ -494,6 +516,7 @@ impl AttachedGlossary {
     }
 
     /// Text boxes stored in attached header/footer stories.
+    #[must_use]
     pub fn header_text_boxes(&self) -> Vec<super::textbox::TextBox> {
         resolve_text_boxes(
             &self.text_extractor,
@@ -581,7 +604,7 @@ fn collect_images(
             images.push(image);
         }
     }
-    images.sort_unstable_by_key(|image| image.pic_offset());
+    images.sort_unstable_by_key(super::super::image::Image::pic_offset);
     images
 }
 
@@ -739,22 +762,28 @@ impl GlossaryMetadata {
         )
     }
 
+    #[must_use]
     pub fn items(&self) -> &[GlossaryItem] {
         &self.items
     }
+    #[must_use]
     pub fn styles(&self) -> &[GlossaryStyle] {
         &self.styles
     }
+    #[must_use]
     pub fn terminal_cp(&self) -> u32 {
         self.terminal_cp
     }
+    #[must_use]
     pub fn ignored_cp(&self) -> u32 {
         self.ignored_cp
     }
+    #[must_use]
     pub fn main_text_length(&self) -> u32 {
         self.main_text_length
     }
 
+    #[must_use]
     pub fn style_for_item(&self, index: usize) -> Option<&GlossaryStyle> {
         self.items
             .get(index)?
@@ -918,7 +947,7 @@ fn parse_items(data: &[u8]) -> Result<Vec<RawItem>> {
         let raw_style = u16::from_le_bytes([extra[2], extra[3]]);
         let style_index = if raw_style == u16::MAX {
             None
-        } else if raw_style <= i16::MAX as u16 {
+        } else if i16::try_from(raw_style).is_ok() {
             Some(raw_style)
         } else {
             return Err(corrupted(format!(

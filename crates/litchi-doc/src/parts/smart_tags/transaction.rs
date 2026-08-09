@@ -67,8 +67,10 @@ impl Snapshot {
             ));
         }
         let metadata = ansi
-            .map(|ansi| DocumentSmartTags::parse_with(fib, table_stream, ansi))
-            .unwrap_or_else(|| DocumentSmartTags::parse(fib, table_stream))?
+            .map_or_else(
+                || DocumentSmartTags::parse(fib, table_stream),
+                |ansi| DocumentSmartTags::parse_with(fib, table_stream, ansi),
+            )?
             .unwrap_or_else(empty_metadata);
         let topology = Topology::capture(fib, table_stream)?;
         let links = codec::bookmark_links(&topology, table_stream)?;

@@ -1,8 +1,12 @@
-//! Bounded lexical and namespace validation for WordprocessingML numbering.
+#![expect(
+    clippy::unnecessary_wraps,
+    reason = "the Result signature preserves a uniform fallible codec API"
+)]
+//! Bounded lexical and namespace validation for `WordprocessingML` numbering.
 
 use crate::{Error, Result};
 
-/// Word 2012 WordprocessingML namespace used by the numbering extension.
+/// Word 2012 `WordprocessingML` namespace used by the numbering extension.
 pub(crate) const WORD_2012_NAMESPACE: &[u8] =
     b"http://schemas.microsoft.com/office/word/2012/wordml";
 /// Markup-compatibility namespace used by `mc:Ignorable`.

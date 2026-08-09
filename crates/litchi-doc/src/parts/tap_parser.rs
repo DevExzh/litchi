@@ -22,7 +22,10 @@ use bumpalo::Bump;
 /// the parser is dropped.
 pub struct TapParser<'arena> {
     /// Arena allocator for temporary parsing data (reserved for future use).
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "reserved DOC structure retained for format completeness or future round-trip support"
+    )]
     arena: &'arena Bump,
 }
 

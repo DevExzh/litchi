@@ -1,3 +1,23 @@
+#![expect(
+    clippy::cast_possible_truncation,
+    reason = "OOXML numeric values are bounded before conversion"
+)]
+#![expect(
+    clippy::return_self_not_must_use,
+    reason = "the mutating builder method is useful for its side effect"
+)]
+#![expect(
+    clippy::struct_excessive_bools,
+    reason = "the public model preserves independent OOXML flags"
+)]
+#![expect(
+    clippy::unnecessary_wraps,
+    reason = "the Result signature preserves a uniform fallible codec API"
+)]
+#![expect(
+    clippy::unwrap_used,
+    reason = "the invariant is established immediately before extraction"
+)]
 //! Table of Contents support for DOCX documents.
 //!
 //! A TOC is implemented using a complex field with switches to control its behavior.
@@ -49,6 +69,7 @@ impl TableOfContents {
     /// ```rust,ignore
     /// let toc = TableOfContents::new();
     /// ```
+    #[must_use]
     pub fn new() -> Self {
         Self {
             start_level: 1,
@@ -73,6 +94,7 @@ impl TableOfContents {
     /// ```rust,ignore
     /// let toc = TableOfContents::new().heading_levels(1, 4);
     /// ```
+    #[must_use]
     pub fn heading_levels(mut self, start: u32, end: u32) -> Self {
         self.start_level = start.clamp(1, 9);
         self.end_level = end.clamp(start, 9);
@@ -80,24 +102,28 @@ impl TableOfContents {
     }
 
     /// Set whether to include hyperlinks (default: true).
+    #[must_use]
     pub fn hyperlinks(mut self, enabled: bool) -> Self {
         self.hyperlinks = enabled;
         self
     }
 
     /// Set whether to include page numbers (default: true).
+    #[must_use]
     pub fn page_numbers(mut self, enabled: bool) -> Self {
         self.page_numbers = enabled;
         self
     }
 
     /// Set whether to right-align page numbers (default: true).
+    #[must_use]
     pub fn right_align_page_numbers(mut self, enabled: bool) -> Self {
         self.right_align_page_numbers = enabled;
         self
     }
 
     /// Use outline levels instead of heading styles (default: false).
+    #[must_use]
     pub fn use_outline_levels(mut self, enabled: bool) -> Self {
         self.use_outline_levels = enabled;
         self
@@ -116,6 +142,7 @@ impl TableOfContents {
     /// - \h = hyperlinks
     /// - \z = hide tab leader and page numbers in Web Layout view
     /// - \u = use outline levels
+    #[must_use]
     pub fn build_field_instruction(&self) -> String {
         let mut instruction = String::from("TOC");
 
@@ -148,16 +175,19 @@ impl TableOfContents {
     }
 
     /// Get the title (if set).
+    #[must_use]
     pub fn get_title(&self) -> Option<&str> {
         self.title.as_deref()
     }
 
     /// Get the starting heading level.
+    #[must_use]
     pub fn start_level(&self) -> u8 {
         self.start_level as u8
     }
 
     /// Get the ending heading level.
+    #[must_use]
     pub fn end_level(&self) -> u8 {
         self.end_level as u8
     }
@@ -168,7 +198,10 @@ impl TableOfContents {
     ///
     /// Note: This method generates standalone XML. The field-based approach via
     /// `MutableField::toc()` is preferred for integration with the document structure.
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "writer helper is retained for package integration"
+    )]
     pub(crate) fn to_xml(&self) -> Result<String> {
         let mut xml = String::with_capacity(1024);
 
@@ -191,7 +224,7 @@ impl TableOfContents {
         xml.push_str(r#"">"#);
 
         // Placeholder text (updated when user opens document)
-        xml.push_str(r#"<w:r><w:t>"#);
+        xml.push_str(r"<w:r><w:t>");
         xml.push_str(
             "Right-click and select &quot;Update Field&quot; to generate the table of contents.",
         );
@@ -209,7 +242,10 @@ impl TableOfContents {
     ///
     /// Note: This method generates standalone XML. The field-based approach via
     /// `MutableField::toc()` is preferred for integration with the document structure.
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "writer helper is retained for package integration"
+    )]
     pub(crate) fn to_complex_field_xml(&self) -> Result<String> {
         let mut xml = String::with_capacity(1024);
 
@@ -238,7 +274,7 @@ impl TableOfContents {
         xml.push_str(r#"<w:r><w:fldChar w:fldCharType="separate"/></w:r>"#);
 
         // Field result (placeholder text)
-        xml.push_str(r#"<w:r><w:t>"#);
+        xml.push_str(r"<w:r><w:t>");
         xml.push_str(
             "Right-click and select &quot;Update Field&quot; to generate the table of contents.",
         );

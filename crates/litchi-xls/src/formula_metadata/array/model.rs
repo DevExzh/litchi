@@ -33,6 +33,9 @@ pub struct Limits {
 
 impl Limits {
     /// Construct checked compilation and ownership limits.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(
         max_formula_bytes: usize,
         max_formula_scalars: usize,
@@ -61,112 +64,156 @@ impl Limits {
         Ok(limits)
     }
 
+    #[must_use]
     pub const fn max_formula_bytes(self) -> usize {
         self.max_formula_bytes
     }
 
+    #[must_use]
     pub const fn max_formula_scalars(self) -> usize {
         self.max_formula_scalars
     }
 
+    #[must_use]
     pub const fn max_token_bytes(self) -> usize {
         self.max_token_bytes
     }
 
+    #[must_use]
     pub const fn max_tokens(self) -> usize {
         self.max_tokens
     }
 
+    #[must_use]
     pub const fn max_operator_depth(self) -> usize {
         self.max_operator_depth
     }
 
+    #[must_use]
     pub const fn max_string_utf16_units(self) -> usize {
         self.max_string_utf16_units
     }
 
+    #[must_use]
     pub const fn max_cells(self) -> usize {
         self.max_cells
     }
 
     /// Maximum normative function-call nesting in the parsed RPN tree.
+    #[must_use]
     pub const fn max_nesting_depth(self) -> usize {
         self.max_nesting_depth
     }
 
     /// Maximum normative RPN operand pressure at the root expression.
+    #[must_use]
     pub const fn max_operands(self) -> usize {
         self.max_operands
     }
 
+    #[must_use]
     pub const fn max_record_bytes(self) -> usize {
         self.max_record_bytes
     }
 
+    #[must_use]
     pub const fn max_extra_bytes(self) -> usize {
         self.max_extra_bytes
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_max_formula_bytes(mut self, maximum: usize) -> Result<Self> {
         self.max_formula_bytes = maximum;
         self.check()?;
         Ok(self)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_max_formula_scalars(mut self, maximum: usize) -> Result<Self> {
         self.max_formula_scalars = maximum;
         self.check()?;
         Ok(self)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_max_token_bytes(mut self, maximum: usize) -> Result<Self> {
         self.max_token_bytes = maximum;
         self.check()?;
         Ok(self)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_max_tokens(mut self, maximum: usize) -> Result<Self> {
         self.max_tokens = maximum;
         self.check()?;
         Ok(self)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_max_operator_depth(mut self, maximum: usize) -> Result<Self> {
         self.max_operator_depth = maximum;
         self.check()?;
         Ok(self)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_max_string_utf16_units(mut self, maximum: usize) -> Result<Self> {
         self.max_string_utf16_units = maximum;
         self.check()?;
         Ok(self)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_max_cells(mut self, maximum: usize) -> Result<Self> {
         self.max_cells = maximum;
         self.check()?;
         Ok(self)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_max_nesting_depth(mut self, maximum: usize) -> Result<Self> {
         self.max_nesting_depth = maximum;
         self.check()?;
         Ok(self)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_max_operands(mut self, maximum: usize) -> Result<Self> {
         self.max_operands = maximum;
         self.check()?;
         Ok(self)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_max_record_bytes(mut self, maximum: usize) -> Result<Self> {
         self.max_record_bytes = maximum;
         self.check()?;
         Ok(self)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_max_extra_bytes(mut self, maximum: usize) -> Result<Self> {
         self.max_extra_bytes = maximum;
         self.check()?;
@@ -273,55 +320,66 @@ impl Owner {
         Ok(owner)
     }
 
+    #[must_use]
     pub const fn range(&self) -> Range {
         self.range
     }
 
+    #[must_use]
     pub const fn anchor(&self) -> Cell {
         self.range.first()
     }
 
+    #[must_use]
     pub const fn always_calculate(&self) -> bool {
         self.always_calculate
     }
 
     /// Ignored source bits retained for exact no-op serialization.
+    #[must_use]
     pub const fn reserved(&self) -> u16 {
         self.reserved
     }
 
     /// Ignored source bytes retained for exact no-op serialization.
+    #[must_use]
     pub const fn unused(&self) -> [u8; 4] {
         self.unused
     }
 
     /// `ArrayParsedFormula.rgce` bytes.
+    #[must_use]
     pub fn tokens(&self) -> &[u8] {
         &self.tokens
     }
 
     /// `ArrayParsedFormula.rgcb` bytes.
+    #[must_use]
     pub fn extra(&self) -> &[u8] {
         &self.extra
     }
 
     /// The retained cell-cardinality budget.
+    #[must_use]
     pub const fn max_cells(&self) -> usize {
         self.max_cells
     }
 
     /// Number of cells in the complete rectangular owner.
+    #[must_use]
     pub fn cell_count(&self) -> usize {
         let rows = usize::from(self.range.last().row() - self.range.first().row()) + 1;
         let cols = usize::from(self.range.last().col() - self.range.first().col()) + 1;
         rows * cols
     }
 
+    #[must_use]
     pub fn contains(&self, cell: Cell) -> bool {
         self.range.contains(cell)
     }
 
     /// Iterate the complete owner rectangle lazily in row-major order.
+    #[must_use]
     pub fn cells(&self) -> Cells {
         Cells {
             range: self.range,
@@ -388,7 +446,10 @@ impl Iterator for Cells {
         let row = usize::from(self.range.first().row()) + self.offset / columns;
         let col = usize::from(self.range.first().col()) + self.offset % columns;
         self.offset += 1;
-        Some(Cell::new(row as u16, col as u8))
+        Some(Cell::new(
+            crate::utils::truncate_usize_to_u16(row),
+            crate::utils::truncate_usize_to_u8(col),
+        ))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {

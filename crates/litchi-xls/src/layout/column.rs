@@ -19,10 +19,12 @@ pub struct Column {
 }
 
 impl Column {
+    #[must_use]
     pub fn first_column(&self) -> u16 {
         self.first_column
     }
 
+    #[must_use]
     pub fn last_column(&self) -> u16 {
         self.last_column
     }
@@ -31,38 +33,47 @@ impl Column {
     ///
     /// BIFF8 uses column index `0x0100` as the default-column-formatting
     /// sentinel even though visible worksheet columns end at index 255.
+    #[must_use]
     pub fn includes_default_column_formatting(&self) -> bool {
         self.last_column == 0x0100
     }
 
+    #[must_use]
     pub fn width_256ths(&self) -> u16 {
         self.width_256ths
     }
 
+    #[must_use]
     pub fn format_index(&self) -> u16 {
         self.format_index
     }
 
+    #[must_use]
     pub fn is_hidden(&self) -> bool {
         self.hidden
     }
 
+    #[must_use]
     pub fn is_user_set(&self) -> bool {
         self.user_set
     }
 
+    #[must_use]
     pub fn is_best_fit(&self) -> bool {
         self.best_fit
     }
 
+    #[must_use]
     pub fn has_phonetic_guide(&self) -> bool {
         self.phonetic
     }
 
+    #[must_use]
     pub fn outline_level(&self) -> u8 {
         self.outline_level
     }
 
+    #[must_use]
     pub fn is_collapsed(&self) -> bool {
         self.collapsed
     }

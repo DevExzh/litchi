@@ -1,4 +1,16 @@
-//! Bounded WordprocessingML mail-merge XML codec.
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
+//! Bounded `WordprocessingML` mail-merge XML codec.
 
 use super::model::{
     Conformance, DataSourceObject, DataType, Destination, FieldMap, FieldMappingType,
@@ -16,6 +28,10 @@ use quick_xml::reader::NsReader;
 
 impl Settings {
     /// Serialize a standalone `w:mailMerge` fragment in schema order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn to_xml(&self, conformance: Conformance) -> Result<String> {
         validate_model(self)?;
         let mut xml = format!(
@@ -77,6 +93,10 @@ impl Settings {
 }
 
 impl Recipients {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn parse_xml(xml: &[u8]) -> Result<Self> {
         let root = parse_tree(xml)?;
         require_word_element(&root, "recipients")?;
@@ -103,6 +123,10 @@ impl Recipients {
         Ok(Self { recipients })
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn to_xml(&self, conformance: Conformance) -> Result<String> {
         if self.recipients.len() > MAX_RECIPIENTS {
             return Err(invalid("too many mail-merge recipients"));
@@ -134,6 +158,10 @@ impl Recipients {
     }
 }
 
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn parse_settings_mail_merge(xml: &[u8]) -> Result<Option<Settings>> {
     let root = parse_tree(xml)?;
     require_word_element(&root, "settings")?;
@@ -284,7 +312,7 @@ fn parse_mail_merge(node: &Node) -> Result<Settings> {
             1 => value.link_to_query = on_off(child)?,
             2 => value.data_type = Some(DataType::parse(&required_val(child)?)?),
             3 => {
-                value.connect_string = Some(bounded_string(required_val(child)?, "connectString")?)
+                value.connect_string = Some(bounded_string(required_val(child)?, "connectString")?);
             },
             4 => value.query = Some(bounded_string(required_val(child)?, "query")?),
             5 => value.data_source_relationship_id = Some(relationship_id(child)?),
@@ -293,7 +321,7 @@ fn parse_mail_merge(node: &Node) -> Result<Settings> {
             8 => value.destination = Destination::parse(&required_val(child)?)?,
             9 => {
                 value.address_field_name =
-                    Some(bounded_string(required_val(child)?, "addressFieldName")?)
+                    Some(bounded_string(required_val(child)?, "addressFieldName")?);
             },
             10 => value.mail_subject = Some(bounded_string(required_val(child)?, "mailSubject")?),
             11 => value.mail_as_attachment = on_off(child)?,
@@ -366,7 +394,7 @@ fn parse_odso(node: &Node) -> Result<DataSourceObject> {
                 value.column_delimiter = Some(number);
             },
             4 => {
-                value.source_type = Some(bounded_string(required_val(child)?, "odso source type")?)
+                value.source_type = Some(bounded_string(required_val(child)?, "odso source type")?);
             },
             5 => value.first_row_header = on_off(child)?,
             6 => {
@@ -431,7 +459,8 @@ fn parse_field_map(node: &Node) -> Result<FieldMap> {
             0 => value.mapping_type = Some(FieldMappingType::parse(&required_val(child)?)?),
             1 => value.name = Some(bounded_string(required_val(child)?, "field-map name")?),
             2 => {
-                value.mapped_name = Some(bounded_string(required_val(child)?, "mapped field name")?)
+                value.mapped_name =
+                    Some(bounded_string(required_val(child)?, "mapped field name")?);
             },
             3 => {
                 let number = decimal(child, "field-map column")?;
@@ -442,7 +471,7 @@ fn parse_field_map(node: &Node) -> Result<FieldMap> {
             },
             4 => {
                 value.language_id =
-                    Some(bounded_string(required_val(child)?, "field-map language")?)
+                    Some(bounded_string(required_val(child)?, "field-map language")?);
             },
             5 => value.dynamic_address = on_off(child)?,
             _ => return Err(invalid("fieldMapData child index is out of range")),
@@ -635,7 +664,10 @@ impl Node {
 
 // The Text/CData arms keep their `?`-bearing whitespace checks out of the
 // match guards on purpose; guards cannot use `?`.
-#[allow(clippy::collapsible_match)]
+#[allow(
+    clippy::collapsible_match,
+    reason = "separate arms document distinct OOXML states"
+)]
 fn parse_tree(xml: &[u8]) -> Result<Node> {
     let processed = litchi_ooxml_common::mce::process_ooxml(xml)
         .map_err(|error| invalid(format!("mail-merge MCE error: {error}")))?;
@@ -720,7 +752,7 @@ fn parse_tree(xml: &[u8]) -> Result<Node> {
             },
             Event::Eof if !stack.is_empty() => return Err(invalid("unterminated mail-merge XML")),
             Event::Eof => break,
-            _ => {},
+            Event::Comment(_) | Event::Decl(_) | Event::GeneralRef(_) => {},
         }
     }
     root.ok_or_else(|| invalid("mail-merge XML has no root element"))
@@ -898,7 +930,7 @@ fn on_off(node: &Node) -> Result<bool> {
 }
 
 fn decimal(node: &Node, description: &str) -> Result<i32> {
-    required_val(node)?.parse::<i32>().map_err(|_| {
+    required_val(node)?.parse::<i32>().map_err(|_source_error| {
         invalid(format!(
             "{description} is outside the supported 32-bit bound"
         ))
@@ -919,7 +951,7 @@ fn strict_base64(value: &str) -> Result<Vec<u8>> {
         .collect();
     let decoded = BASE64
         .decode(compact.as_bytes())
-        .map_err(|_| invalid("invalid recipient uniqueTag base64"))?;
+        .map_err(|_source_error| invalid("invalid recipient uniqueTag base64"))?;
     if decoded.is_empty()
         || decoded.len() > MAX_UNIQUE_TAG_BYTES
         || BASE64.encode(&decoded) != compact

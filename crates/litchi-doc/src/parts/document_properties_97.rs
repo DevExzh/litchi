@@ -58,18 +58,22 @@ impl std::error::Error for DopExtensionError {}
 pub struct CompatibilityOptions80(u32);
 
 impl CompatibilityOptions80 {
+    #[must_use]
     pub const fn from_raw(raw: u32) -> Self {
         Self(raw)
     }
 
+    #[must_use]
     pub const fn raw(self) -> u32 {
         self.0
     }
 
+    #[must_use]
     pub const fn copts60(self) -> u16 {
         self.0 as u16
     }
 
+    #[must_use]
     pub const fn option(self, index: u8) -> bool {
         index < 16 && self.0 & (1u32 << (16 + index)) != 0
     }
@@ -109,6 +113,7 @@ impl Dop95 {
         Ok(Self { compatibility })
     }
 
+    #[must_use]
     pub const fn compatibility(self) -> CompatibilityOptions80 {
         self.compatibility
     }
@@ -417,7 +422,7 @@ impl Default for DrawingGrid {
     }
 }
 
-/// AutoSummary display mode.
+/// `AutoSummary` display mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AutoSummaryView {
     Highlight,
@@ -426,7 +431,7 @@ pub enum AutoSummaryView {
     NewDocument,
 }
 
-/// Passive AutoSummary state. No summarization is performed by this codec.
+/// Passive `AutoSummary` state. No summarization is performed by this codec.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AutoSummaryState {
     pub valid: bool,
@@ -494,10 +499,12 @@ impl DocumentEventFlags {
         }
     }
 
+    #[must_use]
     pub const fn raw(self) -> u32 {
         self.0
     }
 
+    #[must_use]
     pub const fn contains(self, flag: u32) -> bool {
         self.0 & flag != 0
     }

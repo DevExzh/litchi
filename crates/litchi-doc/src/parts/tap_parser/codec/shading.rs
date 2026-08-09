@@ -2,7 +2,7 @@
 
 use super::prelude::*;
 
-impl<'arena> TapParser<'arena> {
+impl TapParser<'_> {
     pub(in crate::parts::tap_parser) fn parse_cell_shading(
         &self,
         tap: &mut TableProperties,

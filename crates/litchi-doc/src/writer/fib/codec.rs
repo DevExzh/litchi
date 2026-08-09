@@ -12,7 +12,7 @@ impl FibBuilder {
     /// Generate the complete FIB as bytes.
     ///
     /// The layout is the Word 2002 form (nFibNew = 0x0101) with 136
-    /// FibRgFcLcb pairs. FibBase.nFib remains 0x00C1 as required by [MS-DOC].
+    /// `FibRgFcLcb` pairs. FibBase.nFib remains 0x00C1 as required by [MS-DOC].
     pub fn generate(&self) -> Result<Vec<u8>, IoError> {
         let mut fib = vec![0u8; FIB_SIZE];
         validate_layout(&fib)?;

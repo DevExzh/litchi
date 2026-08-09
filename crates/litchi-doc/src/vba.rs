@@ -26,36 +26,43 @@ pub struct VbaProjectStorage {
 
 impl VbaProjectStorage {
     /// Return the CFB path of the MS-OVBA project root storage.
+    #[must_use]
     pub fn project_root_path(&self) -> &[String] {
         &self.project_root_path
     }
 
     /// Return the CFB path of the `VBA` storage.
+    #[must_use]
     pub fn vba_storage_path(&self) -> &[String] {
         &self.vba_storage_path
     }
 
     /// Whether the project root has the required `PROJECT` stream.
+    #[must_use]
     pub fn has_project_stream(&self) -> bool {
         self.has_project_stream
     }
 
     /// Whether the project root has the optional `PROJECTwm` stream.
+    #[must_use]
     pub fn has_project_wm_stream(&self) -> bool {
         self.has_project_wm_stream
     }
 
     /// Whether the project root has the optional `PROJECTlk` stream.
+    #[must_use]
     pub fn has_project_lk_stream(&self) -> bool {
         self.has_project_lk_stream
     }
 
     /// Whether the `VBA` storage has the required `_VBA_PROJECT` stream.
+    #[must_use]
     pub fn has_vba_project_stream(&self) -> bool {
         self.has_vba_project_stream
     }
 
     /// Whether the `VBA` storage has the required compressed `dir` stream.
+    #[must_use]
     pub fn has_dir_stream(&self) -> bool {
         self.has_dir_stream
     }
@@ -65,6 +72,7 @@ impl VbaProjectStorage {
     /// `_VBA_PROJECT`, `dir`, and optional `__SRP_*` streams are excluded.
     /// The stream bytes are not opened, so these names are candidates rather
     /// than a claim that any particular module has executable source code.
+    #[must_use]
     pub fn candidate_module_stream_names(&self) -> &[String] {
         &self.candidate_module_stream_names
     }
@@ -73,11 +81,13 @@ impl VbaProjectStorage {
     ///
     /// MS-OVBA specifies that SRP streams must be ignored. This method exposes
     /// names only; it does not read their content.
+    #[must_use]
     pub fn srp_stream_names(&self) -> &[String] {
         &self.srp_stream_names
     }
 
     /// Whether both streams required inside the `VBA` storage are present.
+    #[must_use]
     pub fn has_required_vba_streams(&self) -> bool {
         self.has_vba_project_stream && self.has_dir_stream
     }
@@ -86,6 +96,7 @@ impl VbaProjectStorage {
     ///
     /// This validates directory topology only. It does not validate the binary
     /// stream formats or load any VBA source code.
+    #[must_use]
     pub fn is_structurally_complete(&self) -> bool {
         self.has_project_stream && self.has_required_vba_streams()
     }
@@ -94,6 +105,7 @@ impl VbaProjectStorage {
     ///
     /// This is a conservative presence signal, not code analysis. Macro/module
     /// stream content is never opened, decompressed, parsed, or executed.
+    #[must_use]
     pub fn may_contain_macro_code(&self) -> bool {
         self.is_structurally_complete() && !self.candidate_module_stream_names.is_empty()
     }

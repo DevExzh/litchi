@@ -2,7 +2,7 @@
 
 use super::{Metadata, Reference};
 
-/// One managed DOC field together with its inert ObjectPool metadata.
+/// One managed DOC field together with its inert `ObjectPool` metadata.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Entry {
     reference: Reference,
@@ -16,7 +16,7 @@ impl Entry {
         &self.reference
     }
 
-    /// The passive metadata discovered in the ObjectPool storage.
+    /// The passive metadata discovered in the `ObjectPool` storage.
     #[must_use]
     pub const fn metadata(&self) -> &Metadata {
         &self.metadata

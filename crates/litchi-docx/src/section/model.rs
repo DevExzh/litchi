@@ -1,3 +1,27 @@
+#![expect(
+    clippy::assigning_clones,
+    reason = "clone assignment preserves validation-before-replacement behavior"
+)]
+#![expect(
+    clippy::cast_possible_truncation,
+    reason = "OOXML numeric values are bounded before conversion"
+)]
+#![expect(
+    clippy::cast_precision_loss,
+    reason = "OOXML unit conversion intentionally uses floating-point output"
+)]
+#![expect(
+    clippy::expect_used,
+    reason = "the invariant is established immediately before extraction"
+)]
+#![expect(
+    clippy::iter_without_into_iter,
+    reason = "the established collection API exposes explicit iterators"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Owned semantic section values and lazy section access.
 
 use super::codec::{self, Snapshot};
@@ -15,7 +39,7 @@ pub(super) const MAX_XML_NODES: usize = 4096;
 /// Maximum XML nesting accepted in one section fragment.
 pub(super) const MAX_XML_DEPTH: usize = 64;
 
-/// Maximum WordprocessingML measurement in twips accepted by Word's section
+/// Maximum `WordprocessingML` measurement in twips accepted by Word's section
 /// page geometry and margin domains (`[MS-OI29500]` §17.6.11 and §17.6.13).
 pub(super) const MAX_TWIPS: i64 = 31_680;
 
@@ -30,8 +54,9 @@ pub enum Orientation {
 }
 
 impl Orientation {
-    /// Convert the orientation to its WordprocessingML lexical value.
+    /// Convert the orientation to its `WordprocessingML` lexical value.
     #[inline]
+    #[must_use]
     pub const fn to_xml(self) -> &'static str {
         match self {
             Self::Portrait => "portrait",
@@ -39,8 +64,9 @@ impl Orientation {
         }
     }
 
-    /// Parse a WordprocessingML orientation value.
+    /// Parse a `WordprocessingML` orientation value.
     #[inline]
+    #[must_use]
     pub fn from_xml(value: &str) -> Option<Self> {
         match value {
             "portrait" => Some(Self::Portrait),
@@ -85,6 +111,7 @@ pub enum Start {
 impl Start {
     /// Convert the section-break placement to its XML lexical value.
     #[inline]
+    #[must_use]
     pub const fn to_xml(self) -> &'static str {
         match self {
             Self::Continuous => "continuous",
@@ -95,8 +122,9 @@ impl Start {
         }
     }
 
-    /// Parse a WordprocessingML section-break placement.
+    /// Parse a `WordprocessingML` section-break placement.
     #[inline]
+    #[must_use]
     pub fn from_xml(value: &str) -> Option<Self> {
         match value {
             "continuous" => Some(Self::Continuous),
@@ -130,7 +158,7 @@ impl fmt::Display for Start {
 
 /// A checked English Metric Unit value.
 ///
-/// WordprocessingML section measurements are encoded as twips. `Emu` keeps
+/// `WordprocessingML` section measurements are encoded as twips. `Emu` keeps
 /// the ergonomic format-neutral unit used by the public DOCX facade and
 /// performs checked conversion at the XML boundary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -143,6 +171,7 @@ impl Emu {
     /// casts are saturating in Rust; XML serialization still requires an
     /// exact checked twip value.
     #[inline]
+    #[must_use]
     pub const fn from_inches(inches: f64) -> Self {
         Self((inches * EMUS_PER_INCH as f64) as i64)
     }
@@ -150,24 +179,31 @@ impl Emu {
     /// Construct from centimeters, retaining the historical infallible
     /// facade.
     #[inline]
+    #[must_use]
     pub const fn from_cm(cm: f64) -> Self {
         Self((cm * EMUS_PER_CM as f64) as i64)
     }
 
     /// Construct from points, retaining the historical infallible facade.
     #[inline]
+    #[must_use]
     pub const fn from_pt(pt: f64) -> Self {
         Self((pt * EMUS_PER_PT as f64) as i64)
     }
 
     /// Construct from twips with saturating arithmetic.
     #[inline]
+    #[must_use]
     pub const fn from_twips(twips: i64) -> Self {
         Self(twips.saturating_mul(EMUS_PER_TWIP))
     }
 
     /// Construct from twips without allowing EMU overflow.
     #[inline]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn try_from_twips(twips: i64) -> Result<Self> {
         twips
             .checked_mul(EMUS_PER_TWIP)
@@ -177,18 +213,30 @@ impl Emu {
 
     /// Construct from inches after checking finiteness and the `i64` EMU
     /// domain.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn try_from_inches(inches: f64) -> Result<Self> {
         Self::try_from_float(inches, EMUS_PER_INCH, "inches")
     }
 
     /// Construct from centimeters after checking finiteness and the `i64`
     /// EMU domain.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn try_from_cm(cm: f64) -> Result<Self> {
         Self::try_from_float(cm, EMUS_PER_CM, "centimeters")
     }
 
     /// Construct from points after checking finiteness and the `i64` EMU
     /// domain.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn try_from_pt(pt: f64) -> Result<Self> {
         Self::try_from_float(pt, EMUS_PER_PT, "points")
     }
@@ -210,18 +258,21 @@ impl Emu {
 
     /// Convert to inches.
     #[inline]
+    #[must_use]
     pub fn to_inches(self) -> f64 {
         self.0 as f64 / EMUS_PER_INCH as f64
     }
 
     /// Convert to centimeters.
     #[inline]
+    #[must_use]
     pub fn to_cm(self) -> f64 {
         self.0 as f64 / EMUS_PER_CM as f64
     }
 
     /// Convert to points.
     #[inline]
+    #[must_use]
     pub fn to_pt(self) -> f64 {
         self.0 as f64 / EMUS_PER_PT as f64
     }
@@ -229,6 +280,7 @@ impl Emu {
     /// Convert to the nearest twip without overflow-prone floating-point
     /// arithmetic.
     #[inline]
+    #[must_use]
     pub fn to_twips(self) -> i64 {
         let quotient = self.0 / EMUS_PER_TWIP;
         let remainder = self.0 % EMUS_PER_TWIP;
@@ -239,8 +291,12 @@ impl Emu {
         }
     }
 
-    /// Return the exact twip representation required by WordprocessingML.
+    /// Return the exact twip representation required by `WordprocessingML`.
     #[inline]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn try_to_twips(self) -> Result<i64> {
         if self.0 % EMUS_PER_TWIP != 0 {
             return Err(Error::InvalidFormat(
@@ -252,6 +308,7 @@ impl Emu {
 
     /// Return the raw EMU count.
     #[inline]
+    #[must_use]
     pub const fn get(self) -> i64 {
         self.0
     }
@@ -380,6 +437,10 @@ impl Default for Section {
 
 impl Section {
     /// Construct a section from a bounded `w:sectPr` fragment.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_xml_bytes(xml_bytes: Vec<u8>) -> Result<Self> {
         codec::validate(&xml_bytes)?;
         super::footnote_columns::Snapshot::from_xml(xml_bytes.clone())?;
@@ -391,11 +452,16 @@ impl Section {
 
     /// Return the authored XML bytes currently held by this section.
     #[inline]
+    #[must_use]
     pub fn xml_bytes(&self) -> &[u8] {
         &self.xml_bytes
     }
 
     /// Return an owned XML snapshot, preserving unknown content.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn to_xml_bytes(&mut self) -> Result<Vec<u8>> {
         if let Some(snapshot) = &self.snapshot
             && snapshot.is_dirty()
@@ -409,12 +475,20 @@ impl Section {
     }
 
     /// Return the current section XML as UTF-8 text.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn to_xml(&mut self) -> Result<String> {
         String::from_utf8(self.to_xml_bytes()?)
             .map_err(|error| Error::InvalidFormat(format!("section XML is not UTF-8: {error}")))
     }
 
     /// Validate the fragment and, on success, cache its semantic snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn validate(&mut self) -> Result<()> {
         self.snapshot_mut().map(|_| ())
     }
@@ -436,6 +510,10 @@ impl Section {
     }
 
     /// Return the local page geometry with parsing errors exposed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn page_size_checked(&mut self) -> Result<PageSize> {
         Ok(self.snapshot_mut()?.state.page_size.unwrap_or_default())
     }
@@ -452,6 +530,10 @@ impl Section {
     }
 
     /// Return local margins with parsing errors exposed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn margins_checked(&mut self) -> Result<Margins> {
         Ok(self.snapshot_mut()?.state.margins.unwrap_or_default())
     }
@@ -510,38 +592,66 @@ impl Section {
     }
 
     /// Return the local section-break placement with parsing errors exposed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn start(&mut self) -> Result<Option<Start>> {
         Ok(self.snapshot_mut()?.state.start)
     }
 
     /// Return local columns, if a `w:cols` child exists.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn columns(&mut self) -> Result<Option<Columns>> {
         Ok(self.snapshot_mut()?.state.columns.clone())
     }
 
     /// Return the direct Word 2012 footnote-area layout, if present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn footnote_columns(&mut self) -> Result<Option<super::footnote_columns::Layout>> {
         Ok(self.footnote_columns_snapshot()?.layout())
     }
 
     /// Return a detached, lossless snapshot for the section's Word 2012
     /// footnote-column extension.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn footnote_columns_snapshot(&mut self) -> Result<super::footnote_columns::Snapshot> {
         let xml = self.to_xml_bytes()?;
         super::footnote_columns::Snapshot::from_xml(xml)
     }
 
     /// Return local header references.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn headers(&mut self) -> Result<Vec<Reference>> {
         Ok(self.snapshot_mut()?.state.headers.clone())
     }
 
     /// Return local footer references.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn footers(&mut self) -> Result<Vec<Reference>> {
         Ok(self.snapshot_mut()?.state.footers.clone())
     }
 
     /// Replace local page geometry and commit one lossless XML edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_page_size(&mut self, page_size: PageSize) -> Result<()> {
         codec::validate_page_size(&page_size)?;
         self.update(|state| {
@@ -550,27 +660,47 @@ impl Section {
     }
 
     /// Remove the local `w:pgSz` child.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn clear_page_size(&mut self) -> Result<()> {
         self.update(|state| state.page_size = None)
     }
 
     /// Replace local margins and commit one lossless XML edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_margins(&mut self, margins: Margins) -> Result<()> {
         codec::validate_margins(&margins)?;
         self.update(|state| state.margins = Some(margins))
     }
 
     /// Remove the local `w:pgMar` child.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn clear_margins(&mut self) -> Result<()> {
         self.update(|state| state.margins = None)
     }
 
     /// Set or clear the local section-break placement.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_start(&mut self, start: Option<Start>) -> Result<()> {
         self.update(|state| state.start = start)
     }
 
     /// Set or clear the local column layout.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_columns(&mut self, columns: Option<Columns>) -> Result<()> {
         if let Some(columns) = &columns {
             codec::validate_columns(columns)?;
@@ -579,6 +709,10 @@ impl Section {
     }
 
     /// Set or remove the direct Word 2012 footnote-area layout atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_footnote_columns(
         &mut self,
         value: Option<super::footnote_columns::Layout>,
@@ -593,11 +727,19 @@ impl Section {
     }
 
     /// Remove the direct Word 2012 footnote-area layout marker.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn clear_footnote_columns(&mut self) -> Result<()> {
         self.set_footnote_columns(None)
     }
 
     /// Apply a preconditioned footnote-layout patch atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn apply_footnote_columns_patch(
         &mut self,
         patch: &super::footnote_columns::Patch,
@@ -644,18 +786,21 @@ pub struct Sections {
 impl Sections {
     /// Construct a section collection.
     #[inline]
+    #[must_use]
     pub fn new(sections: Vec<Section>) -> Self {
         Self { sections }
     }
 
     /// Number of sections.
     #[inline]
+    #[must_use]
     pub fn len(&self) -> usize {
         self.sections.len()
     }
 
     /// Whether the collection is empty.
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.sections.is_empty()
     }
@@ -667,6 +812,10 @@ impl Sections {
     }
 
     /// Insert a section at an existing position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn insert(&mut self, index: usize, section: Section) -> Result<()> {
         if index > self.sections.len() {
             return Err(Error::OutOfBounds {
@@ -693,6 +842,7 @@ impl Sections {
 
     /// Get a section by index.
     #[inline]
+    #[must_use]
     pub fn get(&self, index: usize) -> Option<&Section> {
         self.sections.get(index)
     }
@@ -710,6 +860,10 @@ impl Sections {
     }
 
     /// Resolve page geometry through the section inheritance chain.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn effective_page_size(&mut self, index: usize) -> Result<PageSize> {
         let states = self.states_through(index)?;
         Ok(states
@@ -724,6 +878,10 @@ impl Sections {
 
     /// Resolve margins through the section inheritance chain, retaining each
     /// attribute until a later section overrides it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn effective_margins(&mut self, index: usize) -> Result<Margins> {
         let states = self.states_through(index)?;
         Ok(states
@@ -757,11 +915,19 @@ impl Sections {
     }
 
     /// Resolve the header references inherited by a section.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn effective_headers(&mut self, index: usize) -> Result<Vec<Reference>> {
         self.effective_references(index, true)
     }
 
     /// Resolve the footer references inherited by a section.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn effective_footers(&mut self, index: usize) -> Result<Vec<Reference>> {
         self.effective_references(index, false)
     }

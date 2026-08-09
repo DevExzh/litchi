@@ -1,4 +1,4 @@
-//! Bounded image sniffing and native OfficeArt dimension validation.
+//! Bounded image sniffing and native `OfficeArt` dimension validation.
 
 use super::super::core::WriteError;
 use super::codec::{ASSUMED_DPI, TWIPS_PER_INCH};
@@ -169,7 +169,7 @@ fn dib_dimensions(data: &[u8]) -> Option<(u32, u32)> {
     (width > 0 && height > 0).then_some((width, height))
 }
 
-/// Read the first TIFF IFD's ImageWidth and ImageLength values without
+/// Read the first TIFF IFD's `ImageWidth` and `ImageLength` values without
 /// decoding image strips.
 fn tiff_dimensions(data: &[u8]) -> Option<(u32, u32)> {
     let little_endian = match data.get(..4)? {
@@ -265,11 +265,12 @@ fn wmf_dimensions_twips(data: &[u8]) -> Option<(u32, u32)> {
     }
     let width = u32::try_from(right.checked_sub(left)?).ok()?;
     let height = u32::try_from(bottom.checked_sub(top)?).ok()?;
-    let width_twips =
-        u32::try_from(u64::from(width).checked_mul(TWIPS_PER_INCH.into())? / units_per_inch as u64)
-            .ok()?;
+    let width_twips = u32::try_from(
+        u64::from(width).checked_mul(TWIPS_PER_INCH.into())? / u64::from(units_per_inch),
+    )
+    .ok()?;
     let height_twips = u32::try_from(
-        u64::from(height).checked_mul(TWIPS_PER_INCH.into())? / units_per_inch as u64,
+        u64::from(height).checked_mul(TWIPS_PER_INCH.into())? / u64::from(units_per_inch),
     )
     .ok()?;
     (width_twips > 0 && height_twips > 0).then_some((width_twips, height_twips))
@@ -302,7 +303,7 @@ fn pict_frame(data: &[u8]) -> Option<(usize, i32, i32, i32, i32)> {
     None
 }
 
-/// Clipping bounds stored in an OfficeArtMetafileHeader.
+/// Clipping bounds stored in an `OfficeArtMetafileHeader`.
 pub(super) fn metafile_bounds(picture: &Picture) -> Result<Rect, WriteError> {
     let data = &picture.data;
     let bounds = match picture.kind {

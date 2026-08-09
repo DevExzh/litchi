@@ -109,11 +109,13 @@ pub struct ActiveTab {
 
 impl ActiveTab {
     /// Developer-facing sheet name at the source snapshot.
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Checked zero-based workbook position in the corresponding patch state.
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
@@ -644,6 +646,7 @@ pub enum Change {
 }
 
 impl Change {
+    #[must_use]
     pub fn sheet(&self) -> &str {
         match self {
             Self::Create { sheet, .. } | Self::Remove { sheet, .. } => sheet,
@@ -661,6 +664,7 @@ impl Change {
     }
 
     /// Ordered source/destination positions when this is a tab move.
+    #[must_use]
     pub fn moved(&self) -> Option<(usize, usize)> {
         match self {
             Self::Move { from, to, .. } => Some((*from, *to)),
@@ -679,6 +683,7 @@ impl Change {
     }
 
     /// Name transition when this is a dependency-aware sheet rename.
+    #[must_use]
     pub fn renamed(&self) -> Option<(usize, &str, &str)> {
         match self {
             Self::Rename {
@@ -701,6 +706,7 @@ impl Change {
     }
 
     /// Active-tab transition when this is a workbook-view change.
+    #[must_use]
     pub fn active(&self) -> Option<(&ActiveTab, &ActiveTab)> {
         match self {
             Self::Active { before, after } => Some((before, after)),
@@ -719,6 +725,7 @@ impl Change {
     }
 
     /// Visibility state tuple when this is a workbook tab change.
+    #[must_use]
     pub fn visibility(&self) -> Option<(usize, &Visibility, &Visibility)> {
         match self {
             Self::Visibility {
@@ -742,6 +749,7 @@ impl Change {
     }
 
     /// Worksheet-default transition when this changes `sheetFormatPr`.
+    #[must_use]
     pub fn defaults(&self) -> Option<(Option<&Defaults>, Option<&Defaults>)> {
         match self {
             Self::Defaults { before, after, .. } => Some((before.as_ref(), after.as_ref())),
@@ -750,6 +758,7 @@ impl Change {
     }
 
     /// Office Add-in range-binding transition, when applicable.
+    #[must_use]
     pub fn web(&self) -> Option<(&WebBindings, &WebBindings)> {
         match self {
             Self::Web { before, after, .. } => Some((before, after)),
@@ -758,6 +767,7 @@ impl Change {
     }
 
     /// Merged-range membership transition, when applicable.
+    #[must_use]
     pub const fn merged(&self) -> Option<(Rect, crate::merge::Change)> {
         match self {
             Self::Merge { range, change, .. } => Some((*range, *change)),
@@ -766,6 +776,7 @@ impl Change {
     }
 
     /// Cell state tuple when this is an ordinary cell change.
+    #[must_use]
     pub fn cell(&self) -> Option<(Address, &State, &State)> {
         match self {
             Self::Cell {
@@ -789,6 +800,7 @@ impl Change {
     }
 
     /// Row state tuple when this is a row-property change.
+    #[must_use]
     pub fn row(&self) -> Option<(RowIndex, &RowState, &RowState)> {
         match self {
             Self::Row {
@@ -809,6 +821,7 @@ impl Change {
     }
 
     /// Column state tuple when this is a column-property change.
+    #[must_use]
     pub fn column(&self) -> Option<(ColumnIndex, &ColumnState, &ColumnState)> {
         match self {
             Self::Column {
@@ -832,6 +845,7 @@ impl Change {
     }
 
     /// Added worksheet identity when this is a structural create.
+    #[must_use]
     pub fn created(&self) -> Option<(usize, &str)> {
         match self {
             Self::Create {
@@ -842,6 +856,7 @@ impl Change {
     }
 
     /// Removed worksheet identity when this is a structural delete or inverse.
+    #[must_use]
     pub fn removed(&self) -> Option<(usize, &str)> {
         match self {
             Self::Remove {
@@ -1054,6 +1069,7 @@ pub enum Conflict {
 
 impl Conflict {
     /// Developer-facing sheet name.
+    #[must_use]
     pub fn sheet(&self) -> &str {
         match self {
             Self::Remove { sheet, .. }
@@ -1071,6 +1087,7 @@ impl Conflict {
     }
 
     /// Checked zero-based sheet position in the shared base snapshot.
+    #[must_use]
     pub fn position(&self) -> usize {
         match self {
             Self::Remove { position, .. }
@@ -1088,31 +1105,37 @@ impl Conflict {
     }
 
     /// Whether both edits target this sheet's catalog name.
+    #[must_use]
     pub const fn is_name(&self) -> bool {
         matches!(self, Self::Name { .. })
     }
 
     /// Whether both edits remove or otherwise overlap one removed sheet.
+    #[must_use]
     pub const fn is_remove(&self) -> bool {
         matches!(self, Self::Remove { .. })
     }
 
     /// Whether both edits target this sheet tab's visibility.
+    #[must_use]
     pub const fn is_tab(&self) -> bool {
         matches!(self, Self::Tab { .. })
     }
 
     /// Whether both edits target the workbook's one active-tab facet.
+    #[must_use]
     pub const fn is_active(&self) -> bool {
         matches!(self, Self::Active { .. })
     }
 
     /// Whether both edits target the workbook's one tab-order facet.
+    #[must_use]
     pub const fn is_order(&self) -> bool {
         matches!(self, Self::Order { .. })
     }
 
     /// Overlapping worksheet-default facets, when applicable.
+    #[must_use]
     pub const fn defaults(&self) -> Option<layout::Fields> {
         match self {
             Self::Defaults { fields, .. } => Some(*fields),
@@ -1121,11 +1144,13 @@ impl Conflict {
     }
 
     /// Whether both edits replace bindings on the same worksheet.
+    #[must_use]
     pub const fn is_web(&self) -> bool {
         matches!(self, Self::Web { .. })
     }
 
     /// Structurally overlapping merged ranges, when applicable.
+    #[must_use]
     pub fn merges(&self) -> Option<&[Rect]> {
         match self {
             Self::Merges { ranges, .. } => Some(ranges),
@@ -1134,6 +1159,7 @@ impl Conflict {
     }
 
     /// Deterministically ordered cells written by both edits, when applicable.
+    #[must_use]
     pub fn cells(&self) -> Option<&[Address]> {
         match self {
             Self::Cells { addresses, .. } => Some(addresses),
@@ -1151,6 +1177,7 @@ impl Conflict {
     }
 
     /// Deterministically ordered rows written by both edits, when applicable.
+    #[must_use]
     pub fn rows(&self) -> Option<&[RowIndex]> {
         match self {
             Self::Rows { rows, .. } => Some(rows),
@@ -1169,6 +1196,7 @@ impl Conflict {
 
     /// Deterministically ordered columns written by both edits, when
     /// applicable.
+    #[must_use]
     pub fn columns(&self) -> Option<&[ColumnIndex]> {
         match self {
             Self::Columns { columns, .. } => Some(columns),
@@ -1210,6 +1238,7 @@ pub struct ConflictSet {
 
 impl ConflictSet {
     /// Conflicts in deterministic workbook-effect and sheet order.
+    #[must_use]
     pub fn conflicts(&self) -> &[Conflict] {
         &self.conflicts
     }
@@ -1220,6 +1249,7 @@ impl ConflictSet {
     }
 
     /// Whether no overlapping effects were found.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.conflicts.is_empty()
     }
@@ -1266,11 +1296,13 @@ impl fmt::Debug for JoinError {
 
 impl JoinError {
     /// Structured reason the join was refused.
+    #[must_use]
     pub fn failure(&self) -> &JoinFailure {
         &self.failure
     }
 
     /// Overlapping effects, or `None` for a lineage mismatch.
+    #[must_use]
     pub fn conflicts(&self) -> Option<&ConflictSet> {
         match &self.failure {
             JoinFailure::Overlap(conflicts) => Some(conflicts),
@@ -1279,16 +1311,19 @@ impl JoinError {
     }
 
     /// Borrow the edit that was not merged.
+    #[must_use]
     pub fn rejected(&self) -> &Edit {
         &self.rejected
     }
 
     /// Recover the edit that was not merged.
+    #[must_use]
     pub fn into_rejected(self) -> Edit {
         *self.rejected
     }
 
     /// Recover both the structured reason and rejected edit.
+    #[must_use]
     pub fn into_parts(self) -> (JoinFailure, Edit) {
         (self.failure, *self.rejected)
     }
@@ -1325,6 +1360,7 @@ pub enum PackageChange {
 
 impl PackageChange {
     /// Borrow the task-pane transition represented by this change.
+    #[must_use]
     pub fn task_panes(&self) -> (Option<&common_web::Panes>, Option<&common_web::Panes>) {
         match self {
             Self::TaskPanes { before, after } => (before.as_ref(), after.as_ref()),
@@ -1417,25 +1453,30 @@ pub struct Patch {
 impl Patch {
     pub const VERSION: u16 = 1;
 
+    #[must_use]
     pub const fn version(&self) -> u16 {
         Self::VERSION
     }
 
+    #[must_use]
     pub fn changes(&self) -> &[Change] {
         &self.changes
     }
 
     /// Workbook-scoped semantic changes, kept separate from sheet changes.
+    #[must_use]
     pub fn package_changes(&self) -> &[PackageChange] {
         &self.package_changes
     }
 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.changes
             .len()
             .saturating_add(self.package_changes.len())
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.changes.is_empty() && self.package_changes.is_empty()
     }
@@ -1547,18 +1588,22 @@ pub struct Commit {
 }
 
 impl Commit {
+    #[must_use]
     pub fn workbook(&self) -> &Workbook {
         &self.workbook
     }
 
+    #[must_use]
     pub fn patch(&self) -> &Patch {
         &self.patch
     }
 
+    #[must_use]
     pub fn into_workbook(self) -> Workbook {
         self.workbook
     }
 
+    #[must_use]
     pub fn into_parts(self) -> (Workbook, Patch) {
         (self.workbook, self.patch)
     }

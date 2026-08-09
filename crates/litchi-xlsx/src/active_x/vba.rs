@@ -25,16 +25,19 @@ pub struct Project {
 
 impl Project {
     /// Return the Workbook part that owns the VBA-project relationship.
+    #[must_use]
     pub fn source_part_name(&self) -> &PackURI {
         &self.source_part_name
     }
 
     /// Return the relationship ID from the Workbook part to the VBA Project part.
+    #[must_use]
     pub fn relationship_id(&self) -> &str {
         &self.relationship_id
     }
 
     /// Return the absolute OPC part name of the VBA Project binary part.
+    #[must_use]
     pub fn project_part_name(&self) -> &PackURI {
         &self.project_part_name
     }

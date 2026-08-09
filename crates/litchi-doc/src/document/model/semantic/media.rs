@@ -3,7 +3,7 @@ use super::prelude::*;
 impl Document {
     /// Get image binary data for an embedded image.
     ///
-    /// This method extracts the image data from the WordDocument stream.
+    /// This method extracts the image data from the `WordDocument` stream.
     /// The data is returned as a `Cow` to minimize copying when possible.
     ///
     /// # Arguments
@@ -35,22 +35,23 @@ impl Document {
         image.data(data_stream, word_document)
     }
 
-    /// Get a reference to the WordDocument stream.
+    /// Get a reference to the `WordDocument` stream.
     ///
     /// This is useful for low-level image operations.
     #[inline]
+    #[must_use]
     pub fn word_document(&self) -> &[u8] {
         &self.word_document
     }
 
-    /// Get the appropriate stream for picture data based on pic_offset.
+    /// Get the appropriate stream for picture data based on `pic_offset`.
     ///
-    /// According to Apache POI's PicturesTable.getData():
-    /// - If Data stream exists and pic_offset < data_stream.len(), use Data stream
-    /// - Otherwise use WordDocument stream
+    /// According to Apache POI's `PicturesTable.getData()`:
+    /// - If Data stream exists and `pic_offset` < `data_stream.len()`, use Data stream
+    /// - Otherwise use `WordDocument` stream
     ///
     /// This is because pictures are typically stored in the Data stream,
-    /// not the WordDocument stream.
+    /// not the `WordDocument` stream.
     pub(super) fn get_data_stream(&self, offset: u32) -> Option<&[u8]> {
         if let Some(data_stream) = &self.data_stream
             && (offset as usize) < data_stream.len()
@@ -64,6 +65,7 @@ impl Document {
     ///
     /// The Data stream contains embedded pictures and OLE objects.
     #[inline]
+    #[must_use]
     pub fn data_stream(&self) -> Option<&[u8]> {
         self.data_stream.as_deref()
     }
@@ -72,11 +74,12 @@ impl Document {
     ///
     /// Each entry maps the character position of a 0x0008 floating-shape
     /// anchor character to its positioning attributes ([MS-DOC] Spa): the
-    /// shape id (which matches the `spid` of the shape's OfficeArtFSP), the
+    /// shape id (which matches the `spid` of the shape's `OfficeArtFSP`), the
     /// position rectangle in twips, the position origins, and the
     /// text-wrapping style. Returns an empty slice when the document has no
     /// floating shapes in the main story.
     #[inline]
+    #[must_use]
     pub fn shape_positions(&self) -> &[crate::parts::spa::ShapeAnchor] {
         &self.shape_anchors
     }
@@ -84,9 +87,10 @@ impl Document {
     /// Get the floating-shape anchors of the Header Document.
     ///
     /// Like [`Self::shape_positions`], but for shapes anchored in the
-    /// header/footer story (positions from the PlcfSpaHdr). Returns an empty
+    /// header/footer story (positions from the `PlcfSpaHdr`). Returns an empty
     /// slice when the document has no floating shapes in the header story.
     #[inline]
+    #[must_use]
     pub fn header_shape_positions(&self) -> &[crate::parts::spa::ShapeAnchor] {
         &self.header_shape_anchors
     }
@@ -119,6 +123,7 @@ impl Document {
     /// this maps such a CP to the header (odd, even, or first-page) whose
     /// story range contains it. Returns `None` when the document has no
     /// matching header story.
+    #[must_use]
     pub fn header_story_kind_at_cp(
         &self,
         cp: u32,
@@ -170,9 +175,10 @@ impl Document {
     ///
     /// The text comes from the textbox story (the subdocument counted by
     /// ccpTxbx); each entry's `shape_id` matches the `spid` of the shape's
-    /// OfficeArtFSP record in the drawing layer and the `lid` of its Spa.
+    /// `OfficeArtFSP` record in the drawing layer and the `lid` of its Spa.
     /// Paragraphs within a text box are separated by '\r'. Returns an empty
     /// vector when the document has no textbox story.
+    #[must_use]
     pub fn text_boxes(&self) -> Vec<crate::parts::textbox::TextBox> {
         self.resolve_text_boxes(&self.textbox_entries, self.fib.get_textbox_range(), false)
     }
@@ -180,10 +186,11 @@ impl Document {
     /// Get the text boxes anchored in the header/footer story.
     ///
     /// Like [`Self::text_boxes`], but for the header textbox story (counted
-    /// by ccpHdrTxbx, linked through PlcfHdrtxbxTxt). Each entry's
+    /// by ccpHdrTxbx, linked through `PlcfHdrtxbxTxt`). Each entry's
     /// `header_kind` reports the header (odd, even, or first-page) the box is
     /// anchored in. Returns an empty vector when the document has no header
     /// textbox story.
+    #[must_use]
     pub fn header_text_boxes(&self) -> Vec<crate::parts::textbox::TextBox> {
         self.resolve_text_boxes(
             &self.header_textbox_entries,

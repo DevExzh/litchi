@@ -41,7 +41,7 @@ fn read_u32(data: &[u8], offset: usize, record_type: u16, field: &str) -> Result
 
 fn record_bytes(record_type: u16, payload: Vec<u8>) -> Result<Vec<u8>> {
     let length = u16::try_from(payload.len())
-        .map_err(|_| invalid(record_type, "payload length exceeds BIFF u16"))?;
+        .map_err(|_error| invalid(record_type, "payload length exceeds BIFF u16"))?;
     let mut data = Vec::with_capacity(4 + payload.len());
     data.extend_from_slice(&record_type.to_le_bytes());
     data.extend_from_slice(&length.to_le_bytes());
@@ -54,10 +54,12 @@ fn record_bytes(record_type: u16, payload: Vec<u8>) -> Result<Vec<u8>> {
 pub struct DifferentialFormatId(u32);
 
 impl DifferentialFormatId {
+    #[must_use]
     pub const fn new(index: u32) -> Self {
         Self(index)
     }
 
+    #[must_use]
     pub const fn index(self) -> u32 {
         self.0
     }
@@ -169,6 +171,7 @@ impl TableStyleRegion {
         }
     }
 
+    #[must_use]
     pub const fn is_stripe(self) -> bool {
         matches!(
             self,
@@ -189,6 +192,9 @@ pub struct TableStyleElement {
 }
 
 impl TableStyleElement {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(
         region: TableStyleRegion,
         differential_format: DifferentialFormatId,
@@ -196,6 +202,9 @@ impl TableStyleElement {
         Self::try_with_size(region, 1, differential_format)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_with_stripe_size(
         region: TableStyleRegion,
         stripe_size: u8,
@@ -228,18 +237,26 @@ impl TableStyleElement {
         })
     }
 
+    #[must_use]
     pub const fn region(&self) -> TableStyleRegion {
         self.region
     }
 
+    #[must_use]
     pub fn stripe_size(&self) -> Option<u8> {
-        self.region.is_stripe().then_some(self.size as u8)
+        self.region
+            .is_stripe()
+            .then_some(crate::utils::truncate_u32_to_u8(self.size))
     }
 
+    #[must_use]
     pub const fn differential_format(&self) -> DifferentialFormatId {
         self.differential_format
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse_payload(data: &[u8]) -> Result<Self> {
         if data.len() != TABLE_STYLE_ELEMENT_LEN {
             return Err(invalid(
@@ -273,6 +290,9 @@ impl TableStyleElement {
         )
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_payload(&self) -> Result<Vec<u8>> {
         Self::try_with_size(self.region, self.size, self.differential_format)?;
         let mut data = Vec::with_capacity(TABLE_STYLE_ELEMENT_LEN);
@@ -283,6 +303,9 @@ impl TableStyleElement {
         Ok(data)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         record_bytes(TABLE_STYLE_ELEMENT_RECORD_TYPE, self.to_payload()?)
     }
@@ -299,13 +322,16 @@ pub struct TableStyle {
 }
 
 impl TableStyle {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(
         name: impl Into<String>,
         available_for_tables: bool,
         available_for_pivot_tables: bool,
         elements: Vec<TableStyleElement>,
     ) -> Result<Self> {
-        let declared_element_count = u32::try_from(elements.len()).map_err(|_| {
+        let declared_element_count = u32::try_from(elements.len()).map_err(|_error| {
             invalid(
                 TABLE_STYLE_RECORD_TYPE,
                 "table-style element count overflows",
@@ -322,22 +348,30 @@ impl TableStyle {
         Ok(value)
     }
 
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
+    #[must_use]
     pub const fn is_available_for_tables(&self) -> bool {
         self.available_for_tables
     }
+    #[must_use]
     pub const fn is_available_for_pivot_tables(&self) -> bool {
         self.available_for_pivot_tables
     }
+    #[must_use]
     pub fn elements(&self) -> &[TableStyleElement] {
         &self.elements
     }
+    #[must_use]
     pub const fn declared_element_count(&self) -> u32 {
         self.declared_element_count
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse_payload(data: &[u8]) -> Result<Self> {
         if data.len() < TABLE_STYLE_FIXED_LEN
             || data.len() > TABLE_STYLE_FIXED_LEN + MAX_STYLE_NAME_UNITS * 2
@@ -357,7 +391,7 @@ impl TableStyle {
         }
         let declared_element_count =
             read_u32(data, 14, TABLE_STYLE_RECORD_TYPE, "TableStyle.ctse")?;
-        if declared_element_count > MAX_TABLE_STYLE_ELEMENTS as u32 {
+        if declared_element_count > crate::utils::truncate_usize_to_u32(MAX_TABLE_STYLE_ELEMENTS) {
             return Err(invalid(
                 TABLE_STYLE_RECORD_TYPE,
                 format!("TableStyle declares {declared_element_count} elements; maximum is 28"),
@@ -390,6 +424,9 @@ impl TableStyle {
         })
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_payload(&self) -> Result<Vec<u8>> {
         self.validate_complete()?;
         let units = self.name.encode_utf16().collect::<Vec<_>>();
@@ -398,12 +435,17 @@ impl TableStyle {
         let flags = (u16::from(self.available_for_pivot_tables) << 1)
             | (u16::from(self.available_for_tables) << 2);
         data.extend_from_slice(&flags.to_le_bytes());
-        data.extend_from_slice(&(self.elements.len() as u32).to_le_bytes());
-        data.extend_from_slice(&(units.len() as u16).to_le_bytes());
+        data.extend_from_slice(
+            &crate::utils::truncate_usize_to_u32(self.elements.len()).to_le_bytes(),
+        );
+        data.extend_from_slice(&crate::utils::truncate_usize_to_u16(units.len()).to_le_bytes());
         data.extend(units.into_iter().flat_map(u16::to_le_bytes));
         Ok(data)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         record_bytes(TABLE_STYLE_RECORD_TYPE, self.to_payload()?)
     }
@@ -416,7 +458,9 @@ impl TableStyle {
                 "TableStyle name must contain 1..=255 UTF-16 code units",
             ));
         }
-        if self.declared_element_count > MAX_TABLE_STYLE_ELEMENTS as u32 {
+        if self.declared_element_count
+            > crate::utils::truncate_usize_to_u32(MAX_TABLE_STYLE_ELEMENTS)
+        {
             return Err(invalid(
                 TABLE_STYLE_RECORD_TYPE,
                 "TableStyle element count exceeds 28",
@@ -462,6 +506,9 @@ pub struct TableStyles {
 
 impl TableStyles {
     /// Constructs a catalog header. Use `try_with_custom_styles` for a complete custom catalog.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(
         total_style_count: u32,
         default_table_style: impl Into<String>,
@@ -477,6 +524,9 @@ impl TableStyles {
         Ok(value)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_with_custom_styles(
         default_table_style: impl Into<String>,
         default_pivot_style: impl Into<String>,
@@ -489,7 +539,7 @@ impl TableStyles {
             ));
         }
         let total_style_count = BUILT_IN_STYLE_COUNT
-            .checked_add(custom_styles.len() as u32)
+            .checked_add(crate::utils::truncate_usize_to_u32(custom_styles.len()))
             .ok_or_else(|| invalid(TABLE_STYLES_RECORD_TYPE, "table-style count overflows"))?;
         let value = Self {
             total_style_count,
@@ -501,6 +551,9 @@ impl TableStyles {
         Ok(value)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse_payload(data: &[u8]) -> Result<Self> {
         let maximum = TABLE_STYLES_FIXED_LEN + MAX_STYLE_NAME_UNITS * 4;
         if !(TABLE_STYLES_FIXED_LEN..=maximum).contains(&data.len()) {
@@ -552,28 +605,38 @@ impl TableStyles {
         )
     }
 
+    #[must_use]
     pub const fn total_style_count(&self) -> u32 {
         self.total_style_count
     }
+    #[must_use]
     pub const fn built_in_style_count(&self) -> u32 {
         BUILT_IN_STYLE_COUNT
     }
+    #[must_use]
     pub const fn custom_style_count(&self) -> u32 {
         self.total_style_count - BUILT_IN_STYLE_COUNT
     }
+    #[must_use]
     pub const fn has_custom_styles(&self) -> bool {
         self.custom_style_count() != 0
     }
+    #[must_use]
     pub fn default_table_style(&self) -> &str {
         &self.default_table_style
     }
+    #[must_use]
     pub fn default_pivot_style(&self) -> &str {
         &self.default_pivot_style
     }
+    #[must_use]
     pub fn custom_styles(&self) -> &[TableStyle] {
         &self.custom_styles
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_payload(&self) -> Result<Vec<u8>> {
         self.validate_header()?;
         let table_units = self.default_table_style.encode_utf16().collect::<Vec<_>>();
@@ -583,18 +646,28 @@ impl TableStyles {
         );
         write_frt_header(&mut data, TABLE_STYLES_RECORD_TYPE);
         data.extend_from_slice(&self.total_style_count.to_le_bytes());
-        data.extend_from_slice(&(table_units.len() as u16).to_le_bytes());
-        data.extend_from_slice(&(pivot_units.len() as u16).to_le_bytes());
+        data.extend_from_slice(
+            &crate::utils::truncate_usize_to_u16(table_units.len()).to_le_bytes(),
+        );
+        data.extend_from_slice(
+            &crate::utils::truncate_usize_to_u16(pivot_units.len()).to_le_bytes(),
+        );
         data.extend(table_units.into_iter().flat_map(u16::to_le_bytes));
         data.extend(pivot_units.into_iter().flat_map(u16::to_le_bytes));
         Ok(data)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         record_bytes(TABLE_STYLES_RECORD_TYPE, self.to_payload()?)
     }
 
     /// Serializes the complete `TABLESTYLES` ABNF family in record order.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_family_record_bytes(&self, differential_format_count: usize) -> Result<Vec<u8>> {
         self.validate_complete(differential_format_count)?;
         let mut data = self.to_record_bytes()?;
@@ -677,7 +750,7 @@ fn decode_utf16(data: &[u8], record_type: u16, field: &str) -> Result<String> {
         .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]));
     char::decode_utf16(units)
         .collect::<Result<String, _>>()
-        .map_err(|_| invalid(record_type, format!("{field} contains invalid UTF-16")))
+        .map_err(|_error| invalid(record_type, format!("{field} contains invalid UTF-16")))
 }
 
 pub(crate) struct TableStylesCollector {

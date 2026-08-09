@@ -1,6 +1,9 @@
 //! Package graph access, signatures, and transactional low-level edits.
 
-use super::super::model::*;
+use super::super::model::{
+    CustomProps, CustomPropsHost, Error, OpcPackage, PackURI, Package, Result, Slot, embedded,
+    validate_document_main_content_type,
+};
 
 impl Package {
     /// Refuse a story snapshot while facade-owned state is not materialized.
@@ -18,6 +21,7 @@ impl Package {
     ///
     /// This provides access to lower-level package operations.
     #[inline]
+    #[must_use]
     pub fn opc_package(&self) -> &OpcPackage {
         &self.opc
     }
@@ -31,12 +35,20 @@ impl Package {
 
     /// Verify package signatures with the safe strict policy.
     #[cfg(feature = "sign")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn signatures(&self) -> litchi_opc::sign::Result<Vec<litchi_opc::sign::Report>> {
         self.opc.signatures()
     }
 
     /// Verify package signatures with an explicit trust-neutral policy.
     #[cfg(feature = "sign")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn signatures_with(
         &self,
         policy: &litchi_sign::Policy,
@@ -46,12 +58,20 @@ impl Package {
 
     /// Add a signature while preserving every existing valid signature.
     #[cfg(feature = "sign")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn sign(&mut self, signer: &litchi_sign::Signer) -> litchi_opc::sign::Result<PackURI> {
         self.opc.sign(signer)
     }
 
     /// Add a signature with explicit authoring resource bounds.
     #[cfg(feature = "sign")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn sign_with(
         &mut self,
         signer: &litchi_sign::Signer,
@@ -62,12 +82,20 @@ impl Package {
 
     /// Atomically replace all signatures with one signature.
     #[cfg(feature = "sign")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn resign(&mut self, signer: &litchi_sign::Signer) -> litchi_opc::sign::Result<PackURI> {
         self.opc.resign(signer)
     }
 
     /// Atomically replace signatures with explicit authoring resource bounds.
     #[cfg(feature = "sign")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn resign_with(
         &mut self,
         signer: &litchi_sign::Signer,
@@ -87,41 +115,61 @@ impl Package {
     ///
     /// Use [`embedded::scan_with`] with [`Self::opc_package`] when a lower
     /// layer needs explicitly tuned limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn embedded(&self) -> Result<Vec<embedded::Entry<'_>>> {
         Ok(embedded::scan(&self.opc)?)
     }
 
     /// Load the bounded, inert classic-chart graph owned by the main document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn chart_graph(&self) -> Result<crate::chart::Graph> {
         let document = self.opc.main_document_part()?.partname().clone();
         crate::chart::load(&self.opc, &document)
     }
 
-    /// Load the typed, inert SmartArt (DrawingML diagram) inventory anchored
+    /// Load the typed, inert `SmartArt` (`DrawingML` diagram) inventory anchored
     /// in the main document.
     ///
     /// Each returned [`crate::smartart::Diagram`] carries the
     /// parsed data-model node tree, the layout/quick-style/colors part
     /// metadata, and the diagram part names. Both transitional and Strict
     /// namespace dialects are supported.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn smart_arts(&self) -> Result<Vec<crate::smartart::Diagram>> {
         let document = self.opc.main_document_part()?.partname().clone();
         crate::smartart::load_smart_arts(&self.opc, &document)
     }
 
-    /// Load the typed, inert text-box and WordArt inventory anchored in the
+    /// Load the typed, inert text-box and `WordArt` inventory anchored in the
     /// main document.
     ///
     /// Each returned [`crate::textbox::TextBox`] carries the shape
     /// identity, the `wps:bodyPr` text-body properties, the story as
-    /// paragraphs with runs, and WordArt warp/styling presence flags. Both
-    /// DrawingML shapes and legacy VML `w:pict` fallbacks are recognized, in
+    /// paragraphs with runs, and `WordArt` warp/styling presence flags. Both
+    /// `DrawingML` shapes and legacy VML `w:pict` fallbacks are recognized, in
     /// both the transitional and Strict namespace dialects.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn text_boxes(&self) -> Result<Vec<crate::textbox::TextBox>> {
         crate::textbox::load_text_boxes(self.opc.main_document_part()?.blob())
     }
 
     /// Deterministically store an already coherent classic-chart graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn store_chart_graph(&mut self, graph: &crate::chart::Graph) -> Result<()> {
         let document = self.opc.main_document_part()?.partname().clone();
         crate::chart::store(&mut self.opc, &document, graph)
@@ -137,6 +185,10 @@ impl Package {
     /// properties, and custom properties are validated and facade-owned state
     /// is reloaded. Committing a raw edit disables the legacy document writer
     /// so it cannot later erase the edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn edit_opc<T>(&mut self, edit: impl FnOnce(&mut OpcPackage) -> Result<T>) -> Result<T> {
         self.edit_opc_candidate("edit_opc", true, edit)
     }

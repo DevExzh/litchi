@@ -278,6 +278,24 @@ impl Document {
     pub fn edit(&self) -> crate::edit::Edit {
         crate::edit::Edit::new(self.clone())
     }
+
+    /// Starts a bounded detached edit with caller-selected operation limits.
+    #[must_use]
+    pub fn edit_with_limits(&self, limits: crate::edit::Limits) -> crate::edit::Edit {
+        crate::edit::Edit::new_with_limits(self.clone(), limits)
+    }
+
+    /// Applies a shared durable RTF semantic patch to this exact snapshot.
+    ///
+    /// # Errors
+    /// Returns an error when the format vocabulary, source digest, semantic
+    /// precondition, operation bounds, or candidate validation fails.
+    pub fn apply_durable<Mode>(
+        &self,
+        patch: &litchi_core::patch::Patch<Mode>,
+    ) -> Result<Self, crate::edit::Error> {
+        crate::edit::apply_durable(self, patch)
+    }
 }
 
 impl fmt::Debug for Document {

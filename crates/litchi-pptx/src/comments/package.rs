@@ -232,9 +232,7 @@ pub fn add_presentation_comment_author(
     author: Author,
     conformance: Conformance,
 ) -> Result<()> {
-    let mut graph = if let Some(graph) = load_presentation_comments(package)? {
-        graph
-    } else {
+    let Some(mut graph) = load_presentation_comments(package)? else {
         let presentation = package.main_document_part()?;
         let relationship_id = next_relationship_id(presentation, "rIdCommentAuthors")?;
         let part_name = next_legacy_author_part_name(package)?.to_string();

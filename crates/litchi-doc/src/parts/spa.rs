@@ -1,6 +1,6 @@
 //! Shape Positioning Attributes (SPA) for floating shapes.
 //!
-//! A **PlcfSpa** ([MS-DOC] 2.8.27) maps floating-shape anchor character
+//! A **`PlcfSpa`** ([MS-DOC] 2.8.27) maps floating-shape anchor character
 //! positions to **Spa** records ([MS-DOC] 2.9.253) that carry the shape's
 //! position rectangle, position origin, and text-wrapping style. The Main
 //! Document table is referenced by `fcPlcSpaMom` and the Header Document
@@ -136,7 +136,7 @@ impl ShapeWrapSide {
 /// Shape Positioning Attributes of one floating shape ([MS-DOC] 2.9.253).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Spa {
-    /// Shape identifier; matches the `spid` of the shape's OfficeArtFSP.
+    /// Shape identifier; matches the `spid` of the shape's `OfficeArtFSP`.
     pub shape_id: u32,
     /// Left edge of the position rectangle in twips.
     pub left: i32,
@@ -211,16 +211,19 @@ impl Spa {
     }
 
     /// Width of the position rectangle in twips.
+    #[must_use]
     pub fn width(&self) -> i32 {
         self.right - self.left
     }
 
     /// Height of the position rectangle in twips.
+    #[must_use]
     pub fn height(&self) -> i32 {
         self.bottom - self.top
     }
 
     /// Serialize to the 26-byte Spa structure.
+    #[must_use]
     pub fn to_bytes(&self) -> [u8; SPA_LEN] {
         let mut data = [0u8; SPA_LEN];
         data[0..4].copy_from_slice(&self.shape_id.to_le_bytes());
@@ -250,13 +253,13 @@ impl Spa {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ShapeAnchor {
     /// Character position of the 0x0008 anchor character, relative to the
-    /// start of the story that owns the PlcfSpa.
+    /// start of the story that owns the `PlcfSpa`.
     pub cp: u32,
     /// Positioning attributes of the anchored shape.
     pub spa: Spa,
 }
 
-/// Parse a PlcfSpa ([MS-DOC] 2.8.27): `n + 1` CPs followed by `n` Spa records.
+/// Parse a `PlcfSpa` ([MS-DOC] 2.8.27): `n + 1` CPs followed by `n` Spa records.
 pub fn parse_plcf_spa(data: &[u8]) -> Result<Vec<ShapeAnchor>> {
     // lcb = 4 * (n + 1) + SPA_LEN * n  =>  n = (lcb - 4) / (4 + SPA_LEN)
     let stride = 4 + SPA_LEN;

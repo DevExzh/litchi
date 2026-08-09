@@ -1,4 +1,4 @@
-//! Bounded DrawingML pivot-source and c14 pivot-options codec.
+//! Bounded `DrawingML` pivot-source and c14 pivot-options codec.
 
 use super::{
     Binding, C14_CHART_NAMESPACE, DropZoneVisibility, FieldType, MAX_CHART_PART_BYTES, MAX_DEPTH,

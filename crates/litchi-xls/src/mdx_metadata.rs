@@ -106,7 +106,7 @@ fn parse_lp_wide_string(data: &[u8], record_type: u16) -> Result<String> {
         .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
         .collect();
     String::from_utf16(&units)
-        .map_err(|_| invalid(record_type, "LPWideString is not valid UTF-16LE"))
+        .map_err(|_error| invalid(record_type, "LPWideString is not valid UTF-16LE"))
 }
 
 /// Serialize an `LPWideString` (MS-XLS 2.5.179) into `output`.
@@ -114,11 +114,10 @@ fn append_lp_wide_string(record_type: u16, value: &str, output: &mut Vec<u8>) ->
     let units: Vec<u16> = value.encode_utf16().collect();
     if units.len() > MAX_LP_WIDE_STRING_CHARS {
         return Err(Error::InvalidData(format!(
-            "record 0x{record_type:04X} LPWideString exceeds {} UTF-16 code units",
-            MAX_LP_WIDE_STRING_CHARS
+            "record 0x{record_type:04X} LPWideString exceeds {MAX_LP_WIDE_STRING_CHARS} UTF-16 code units"
         )));
     }
-    output.extend_from_slice(&(units.len() as u16).to_le_bytes());
+    output.extend_from_slice(&crate::utils::truncate_usize_to_u16(units.len()).to_le_bytes());
     for unit in units {
         output.extend_from_slice(&unit.to_le_bytes());
     }
@@ -175,6 +174,7 @@ impl CubeFunction {
     }
 
     /// Raw `Tag_Fn_MDX` code.
+    #[must_use]
     pub const fn code(self) -> u8 {
         self as u8
     }
@@ -218,6 +218,7 @@ impl KpiProperty {
     }
 
     /// Raw `KPIProp` code.
+    #[must_use]
     pub const fn code(self) -> u8 {
         self as u8
     }
@@ -263,6 +264,7 @@ impl MdxSetSortOrder {
     }
 
     /// Raw `SD_SetSortOrder` code.
+    #[must_use]
     pub const fn code(self) -> u8 {
         self as u8
     }
@@ -307,121 +309,149 @@ pub struct MdtInfoFlags(u32);
 impl MdtInfoFlags {
     /// Create a flag set from raw bits; undefined bits are preserved so the
     /// value round-trips losslessly.
+    #[must_use]
     pub const fn from_bits(bits: u32) -> Self {
         Self(bits)
     }
 
     /// Raw 32-bit flag value.
+    #[must_use]
     pub const fn bits(self) -> u32 {
         self.0
     }
 
     /// `fGhostRow`: applied to all cells in newly inserted rows.
+    #[must_use]
     pub const fn ghost_row(self) -> bool {
         self.0 & F_GHOST_ROW != 0
     }
     /// `fGhostCol`: applied to all cells in newly inserted columns.
+    #[must_use]
     pub const fn ghost_column(self) -> bool {
         self.0 & F_GHOST_COL != 0
     }
     /// `fEdit`: preserved when the cell is edited.
+    #[must_use]
     pub const fn preserved_on_edit(self) -> bool {
         self.0 & F_EDIT != 0
     }
     /// `fDelete`: preserved when the cell's value is deleted.
+    #[must_use]
     pub const fn preserved_on_delete(self) -> bool {
         self.0 & F_DELETE != 0
     }
     /// `fCopy`: copied when the cell is copied.
+    #[must_use]
     pub const fn copied_with_cell(self) -> bool {
         self.0 & F_COPY != 0
     }
     /// `fPasteAll`: pasted when everything is pasted from the copied cell.
+    #[must_use]
     pub const fn paste_all(self) -> bool {
         self.0 & F_PASTE_ALL != 0
     }
     /// `fPasteFormulas`: pasted when only formulas are pasted.
+    #[must_use]
     pub const fn paste_formulas(self) -> bool {
         self.0 & F_PASTE_FORMULAS != 0
     }
     /// `fPasteValues`: pasted when only values are pasted.
+    #[must_use]
     pub const fn paste_values(self) -> bool {
         self.0 & F_PASTE_VALUES != 0
     }
     /// `fPasteFormats`: pasted when only formatting is pasted.
+    #[must_use]
     pub const fn paste_formats(self) -> bool {
         self.0 & F_PASTE_FORMATS != 0
     }
     /// `fPasteComments`: pasted when only comments are pasted.
+    #[must_use]
     pub const fn paste_comments(self) -> bool {
         self.0 & F_PASTE_COMMENTS != 0
     }
     /// `fPasteDataValidation`: pasted when only data validation rules are
     /// pasted.
+    #[must_use]
     pub const fn paste_data_validation(self) -> bool {
         self.0 & F_PASTE_DATA_VALIDATION != 0
     }
     /// `fPasteBorders`: pasted when only borders are pasted.
+    #[must_use]
     pub const fn paste_borders(self) -> bool {
         self.0 & F_PASTE_BORDERS != 0
     }
     /// `fPasteColWidths`: pasted when only column widths are pasted.
+    #[must_use]
     pub const fn paste_col_widths(self) -> bool {
         self.0 & F_PASTE_COL_WIDTHS != 0
     }
     /// `fPasteNumberFormats`: pasted when only number formatting is pasted.
+    #[must_use]
     pub const fn paste_number_formats(self) -> bool {
         self.0 & F_PASTE_NUMBER_FORMATS != 0
     }
     /// `fMerge`: preserved after cells are merged.
+    #[must_use]
     pub const fn preserved_on_merge(self) -> bool {
         self.0 & F_MERGE != 0
     }
     /// `fSplitFirst`: copied to the top-left resulting cell when split.
+    #[must_use]
     pub const fn split_first(self) -> bool {
         self.0 & F_SPLIT_FIRST != 0
     }
     /// `fSplitAll`: copied to all resulting cells when split.
+    #[must_use]
     pub const fn split_all(self) -> bool {
         self.0 & F_SPLIT_ALL != 0
     }
     /// `fRowColShift`: preserved when the cell is shifted by row or column
     /// insertion or deletion.
+    #[must_use]
     pub const fn preserved_on_row_col_shift(self) -> bool {
         self.0 & F_ROW_COL_SHIFT != 0
     }
     /// `fClearAll`: preserved when contents, formatting, and comments are
     /// cleared.
+    #[must_use]
     pub const fn preserved_on_clear_all(self) -> bool {
         self.0 & F_CLEAR_ALL != 0
     }
     /// `fClearFormats`: preserved when the formatting is cleared.
+    #[must_use]
     pub const fn preserved_on_clear_formats(self) -> bool {
         self.0 & F_CLEAR_FORMATS != 0
     }
     /// `fClearContents`: preserved when the contents are cleared.
+    #[must_use]
     pub const fn preserved_on_clear_contents(self) -> bool {
         self.0 & F_CLEAR_CONTENTS != 0
     }
     /// `fClearComments`: preserved when the comments are cleared.
+    #[must_use]
     pub const fn preserved_on_clear_comments(self) -> bool {
         self.0 & F_CLEAR_COMMENTS != 0
     }
     /// `fAssign`: preserved when the cell's value is changed by formula
     /// assignment.
+    #[must_use]
     pub const fn preserved_on_assign(self) -> bool {
         self.0 & F_ASSIGN != 0
     }
     /// `fCoerce`: preserved when the cell's value is coerced to a different
     /// type.
+    #[must_use]
     pub const fn preserved_on_coerce(self) -> bool {
         self.0 & F_COERCE != 0
     }
     /// `fAdjust`: updated when the cell's location changes.
+    #[must_use]
     pub const fn adjusted_on_move(self) -> bool {
         self.0 & F_ADJUST != 0
     }
     /// `fCellMeta`: this is cell metadata rather than value metadata.
+    #[must_use]
     pub const fn is_cell_metadata(self) -> bool {
         self.0 & F_CELL_META != 0
     }
@@ -438,7 +468,10 @@ pub struct MdtInfo {
 }
 
 impl MdtInfo {
-    /// Parse an `MDTInfo` record payload (FrtHeader included).
+    /// Parse an `MDTInfo` record payload (`FrtHeader` included).
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         let body = record_body(data, MDT_INFO_RECORD_TYPE)?;
         if body.len() < 4 {
@@ -449,7 +482,10 @@ impl MdtInfo {
         Ok(Self { flags, name })
     }
 
-    /// Serialize the record payload (FrtHeader included).
+    /// Serialize the record payload (`FrtHeader` included).
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_payload(&self) -> Result<Vec<u8>> {
         let mut payload = frt_header_payload(MDT_INFO_RECORD_TYPE);
         payload.extend_from_slice(&self.flags.bits().to_le_bytes());
@@ -473,7 +509,10 @@ pub struct MdxTuple {
 }
 
 impl MdxTuple {
-    /// Parse an `MDXTuple` record payload (FrtHeader included).
+    /// Parse an `MDXTuple` record payload (`FrtHeader` included).
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         let body = record_body(data, MDX_TUPLE_RECORD_TYPE)?;
         if body.len() < 9 {
@@ -498,7 +537,10 @@ impl MdxTuple {
         })
     }
 
-    /// Serialize the record payload (FrtHeader included).
+    /// Serialize the record payload (`FrtHeader` included).
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_payload(&self) -> Result<Vec<u8>> {
         let mut payload = frt_header_payload(MDX_TUPLE_RECORD_TYPE);
         payload.extend_from_slice(&self.connection_name_index.to_le_bytes());
@@ -528,7 +570,10 @@ pub struct MdxSet {
 }
 
 impl MdxSet {
-    /// Parse an `MDXSet` record payload (FrtHeader included).
+    /// Parse an `MDXSet` record payload (`FrtHeader` included).
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         let body = record_body(data, MDX_SET_RECORD_TYPE)?;
         if body.len() < 14 {
@@ -554,7 +599,10 @@ impl MdxSet {
         })
     }
 
-    /// Serialize the record payload (FrtHeader included).
+    /// Serialize the record payload (`FrtHeader` included).
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_payload(&self) -> Result<Vec<u8>> {
         let mut payload = frt_header_payload(MDX_SET_RECORD_TYPE);
         payload.extend_from_slice(&self.connection_name_index.to_le_bytes());
@@ -586,7 +634,10 @@ impl MdxProp {
     /// Fixed body size: `istrConnName` + `tfnSrc` + `istrMbr` + `istrProp`.
     const BODY_LEN: usize = 4 + 1 + 4 + 4;
 
-    /// Parse an `MDXProp` record payload (FrtHeader included).
+    /// Parse an `MDXProp` record payload (`FrtHeader` included).
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         let body = record_body(data, MDX_PROP_RECORD_TYPE)?;
         if body.len() != Self::BODY_LEN {
@@ -607,7 +658,10 @@ impl MdxProp {
         })
     }
 
-    /// Serialize the record payload (FrtHeader included).
+    /// Serialize the record payload (`FrtHeader` included).
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_payload(&self) -> Result<Vec<u8>> {
         let mut payload = frt_header_payload(MDX_PROP_RECORD_TYPE);
         payload.extend_from_slice(&self.connection_name_index.to_le_bytes());
@@ -641,7 +695,10 @@ impl MdxKpi {
     /// + `istrMbrKPI`.
     const BODY_LEN: usize = 4 + 1 + 1 + 4 + 4;
 
-    /// Parse an `MDXKPI` record payload (FrtHeader included).
+    /// Parse an `MDXKPI` record payload (`FrtHeader` included).
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         let body = record_body(data, MDX_KPI_RECORD_TYPE)?;
         if body.len() != Self::BODY_LEN {
@@ -663,7 +720,10 @@ impl MdxKpi {
         })
     }
 
-    /// Serialize the record payload (FrtHeader included).
+    /// Serialize the record payload (`FrtHeader` included).
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_payload(&self) -> Result<Vec<u8>> {
         let mut payload = frt_header_payload(MDX_KPI_RECORD_TYPE);
         payload.extend_from_slice(&self.connection_name_index.to_le_bytes());
@@ -682,7 +742,7 @@ fn parse_index_array(body: &[u8], offset: usize, record_type: u16) -> Result<Vec
     if count < 0 {
         return Err(invalid(record_type, "negative MDX string index count"));
     }
-    let count = count as usize;
+    let count = crate::utils::sign_extend_i32_to_usize(count);
     if body.len() != offset + 4 + count * 4 {
         return Err(invalid(
             record_type,
@@ -697,7 +757,7 @@ fn parse_index_array(body: &[u8], offset: usize, record_type: u16) -> Result<Vec
 /// Serialize `cistr`/`rgistr`.
 fn append_index_array(indexes: &[i32], output: &mut Vec<u8>) -> Result<()> {
     let count = i32::try_from(indexes.len())
-        .map_err(|_| Error::InvalidData("too many MDX string indexes".to_string()))?;
+        .map_err(|_error| Error::InvalidData("too many MDX string indexes".to_string()))?;
     output.extend_from_slice(&count.to_le_bytes());
     for index in indexes {
         output.extend_from_slice(&index.to_le_bytes());
@@ -725,7 +785,10 @@ pub struct Mdb {
 }
 
 impl Mdb {
-    /// Parse an `MDB` record payload (FrtHeader included).
+    /// Parse an `MDB` record payload (`FrtHeader` included).
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         let body = record_body(data, MDB_RECORD_TYPE)?;
         if body.len() % MDIR_LEN != 0 {
@@ -744,7 +807,10 @@ impl Mdb {
         Ok(Self { entries })
     }
 
-    /// Serialize the record payload (FrtHeader included).
+    /// Serialize the record payload (`FrtHeader` included).
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_payload(&self) -> Result<Vec<u8>> {
         let mut payload = frt_header_payload(MDB_RECORD_TYPE);
         for entry in &self.entries {
@@ -800,7 +866,7 @@ impl MdxMetadataRecord {
         }
     }
 
-    /// Serialize the record payload (FrtHeader included).
+    /// Serialize the record payload (`FrtHeader` included).
     fn to_payload(&self) -> Result<Vec<u8>> {
         match self {
             Self::Tuple(tuple) => tuple.to_payload(),
@@ -830,12 +896,14 @@ pub struct MdxMetadata {
 impl MdxMetadata {
     /// Metadata types (`MDTInfo` records), in record order. `MDTInfoIndex`
     /// values are one-based indexes into this collection.
+    #[must_use]
     pub fn infos(&self) -> &[MdtInfo] {
         &self.infos
     }
 
     /// The shared MDX string table (`MDXStr` records), in record order.
     /// `MDXStrIndex` values are zero-based indexes into this collection.
+    #[must_use]
     pub fn strings(&self) -> &[String] {
         &self.strings
     }
@@ -843,16 +911,19 @@ impl MdxMetadata {
     /// The MDX metadata records (`MDXTuple`, `MDXSet`, `MDXProp`, `MDXKPI`),
     /// in record order. `MDir.mdd` values are zero-based indexes into this
     /// collection.
+    #[must_use]
     pub fn records(&self) -> &[MdxMetadataRecord] {
         &self.records
     }
 
     /// The metadata blocks (`MDB` records), in record order.
+    #[must_use]
     pub fn blocks(&self) -> &[Mdb] {
         &self.blocks
     }
 
     /// Whether no MDX metadata was collected.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.infos.is_empty()
             && self.strings.is_empty()
@@ -866,6 +937,9 @@ impl MdxMetadata {
     }
 
     /// Append a shared MDX string (`MDXStr`).
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_string(&mut self, value: String) -> Result<()> {
         if value.encode_utf16().count() > MAX_LP_WIDE_STRING_CHARS {
             return Err(Error::InvalidData(
@@ -878,6 +952,9 @@ impl MdxMetadata {
 
     /// Append an MDX metadata record, validating its `MDXStrIndex`
     /// references against the shared strings collected so far.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_record(&mut self, record: MdxMetadataRecord) -> Result<()> {
         for index in record.referenced_string_indexes() {
             self.validate_string_index(index)?;
@@ -888,9 +965,14 @@ impl MdxMetadata {
 
     /// Append a metadata block (`MDB`), validating its `MDir` references
     /// against the types and records collected so far.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_block(&mut self, block: Mdb) -> Result<()> {
         for entry in &block.entries {
-            if entry.info_index < 1 || entry.info_index as usize > self.infos.len() {
+            if entry.info_index < 1
+                || crate::utils::sign_extend_i32_to_usize(entry.info_index) > self.infos.len()
+            {
                 return Err(invalid(
                     MDB_RECORD_TYPE,
                     format!(
@@ -914,7 +996,7 @@ impl MdxMetadata {
     }
 
     fn validate_string_index(&self, index: i32) -> Result<()> {
-        if index < 0 || index as usize >= self.strings.len() {
+        if index < 0 || crate::utils::sign_extend_i32_to_usize(index) >= self.strings.len() {
             return Err(invalid(
                 MDX_STR_RECORD_TYPE,
                 format!(
@@ -961,7 +1043,7 @@ impl MdxMetadata {
     }
 
     /// Serialize the whole collection in ABNF order as record payloads
-    /// (FrtHeader included, not yet chunked into BIFF records).
+    /// (`FrtHeader` included, not yet chunked into BIFF records).
     pub(crate) fn to_record_payloads(&self) -> Result<Vec<(u16, Vec<u8>)>> {
         let mut payloads = Vec::new();
         for info in &self.infos {

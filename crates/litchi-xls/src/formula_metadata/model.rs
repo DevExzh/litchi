@@ -25,6 +25,7 @@ pub enum Defect {
 
 impl Defect {
     /// Checked BIFF8 location of the source Formula record.
+    #[must_use]
     pub const fn cell(self) -> Cell {
         match self {
             Self::SharedFlagWithoutPtgExp { cell, .. } => cell,
@@ -32,6 +33,7 @@ impl Defect {
     }
 
     /// Explicit compatibility profile that authorized preservation.
+    #[must_use]
     pub const fn compatibility_profile(self) -> CompatibilityProfile {
         match self {
             Self::SharedFlagWithoutPtgExp {
@@ -41,10 +43,12 @@ impl Defect {
         }
     }
 
+    #[must_use]
     pub const fn row(self) -> u16 {
         self.cell().row()
     }
 
+    #[must_use]
     pub const fn column(self) -> u8 {
         self.cell().col()
     }
@@ -68,6 +72,7 @@ pub struct Metadata {
 impl Metadata {
     /// Construct metadata with all flags cleared and an empty application
     /// cache.
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             always_calculate: false,
@@ -82,12 +87,14 @@ impl Metadata {
 
     /// Set whether the formula requests calculation during the next
     /// recalculation.
+    #[must_use]
     pub const fn with_always_calculate(mut self, value: bool) -> Self {
         self.always_calculate = value;
         self
     }
 
     /// Set whether the cell has fill or center-across-selection alignment.
+    #[must_use]
     pub const fn with_fill_alignment(mut self, value: bool) -> Self {
         self.fill_alignment = value;
         self
@@ -99,12 +106,14 @@ impl Metadata {
     /// This low-level flag is preserved by the reader. For authoring, prefer
     /// [`Self::with_shared`], which binds the bit to a checked `ShrFmla`
     /// owner.
+    #[must_use]
     pub const fn with_shared_formula(mut self, value: bool) -> Self {
         self.shared_formula = value;
         self
     }
 
     /// Bind the Formula metadata to a checked shared-formula owner.
+    #[must_use]
     pub fn with_shared(mut self, owner: Owner) -> Self {
         self.shared_formula = true;
         self.shared_owner = Some(Arc::new(owner));
@@ -129,44 +138,53 @@ impl Metadata {
     }
 
     /// Set whether formula error checking is disabled for this cell.
+    #[must_use]
     pub const fn with_clear_errors(mut self, value: bool) -> Self {
         self.clear_errors = value;
         self
     }
 
     /// Set the opaque application-specific calculation cache.
+    #[must_use]
     pub const fn with_calculation_cache(mut self, value: u32) -> Self {
         self.calculation_cache = value;
         self
     }
 
+    #[must_use]
     pub const fn always_calculate(&self) -> bool {
         self.always_calculate
     }
 
+    #[must_use]
     pub const fn fill_alignment(&self) -> bool {
         self.fill_alignment
     }
 
+    #[must_use]
     pub const fn shared_formula(&self) -> bool {
         self.shared_formula
     }
 
+    #[must_use]
     pub const fn clear_errors(&self) -> bool {
         self.clear_errors
     }
 
+    #[must_use]
     pub const fn calculation_cache(&self) -> u32 {
         self.calculation_cache
     }
 
     /// The checked owner used to emit the following `ShrFmla`, if any.
+    #[must_use]
     pub fn shared_owner(&self) -> Option<&Owner> {
         self.shared_owner.as_deref()
     }
 
     /// The checked owner of the following `Array` record, if this Formula is
     /// an array-formula participant.
+    #[must_use]
     pub fn array_owner(&self) -> Option<&ArrayOwner> {
         self.array_owner.as_deref()
     }

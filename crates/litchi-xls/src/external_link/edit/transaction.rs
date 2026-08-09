@@ -197,11 +197,11 @@ impl Transaction {
             ));
         }
         let declared = if valid {
-            i16::try_from(magnitude).map_err(|_| {
+            i16::try_from(magnitude).map_err(|_error| {
                 Error::UnsafeEdit("XCT cache cardinality does not fit signed BIFF8 count".into())
             })?
         } else {
-            -i16::try_from(magnitude).map_err(|_| {
+            -i16::try_from(magnitude).map_err(|_error| {
                 Error::UnsafeEdit("XCT cache cardinality does not fit signed BIFF8 count".into())
             })?
         };

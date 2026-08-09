@@ -20,7 +20,7 @@ pub(super) fn parse_groups(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>)
             .map_err(xml_error)?;
         match event {
             Event::Start(ref element) if is_table(&namespace, element, b"data-pilot-group") => {
-                groups.push(parse_group(reader, element)?)
+                groups.push(parse_group(reader, element)?);
             },
             Event::End(ref element) if is_table(&namespace, element, b"data-pilot-groups") => {
                 break;
@@ -28,7 +28,17 @@ pub(super) fn parse_groups(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>)
             Event::Text(ref text) if text_is_whitespace(text)? => {},
             Event::Comment(_) => {},
             Event::Eof => return Err(invalid_message("unterminated table:data-pilot-groups")),
-            _ => return Err(invalid_message("invalid child in table:data-pilot-groups")),
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {
+                return Err(invalid_message("invalid child in table:data-pilot-groups"));
+            },
         }
         buf.clear();
     }
@@ -71,7 +81,7 @@ fn parse_boundary(
         (Some(value), None) => value
             .parse::<f64>()
             .map(GroupBoundary::Number)
-            .map_err(|_| invalid("group boundary", &value)),
+            .map_err(|_error| invalid("group boundary", &value)),
         (None, Some(value)) if value == "auto" => Ok(GroupBoundary::AutomaticDate),
         (None, Some(value)) => Ok(GroupBoundary::Date(value)),
     }

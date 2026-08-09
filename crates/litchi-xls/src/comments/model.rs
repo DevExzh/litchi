@@ -4,7 +4,7 @@ use crate::error::{Error, Result};
 
 /// BIFF8 maximum payload for a single record.
 pub(crate) const MAX_RECORD_BYTES: usize = 8_224;
-/// The largest number of comment objects addressable by a BIFF8 ObjId.
+/// The largest number of comment objects addressable by a BIFF8 `ObjId`.
 pub(crate) const MAX_COMMENTS: usize = 65_535;
 /// A defensive ceiling for records retained by one worksheet comment collector.
 pub(crate) const MAX_RETAINED_RECORDS: usize = 262_140;
@@ -25,7 +25,7 @@ pub enum Visibility {
     Visible,
 }
 
-/// BIFF8 TxO horizontal alignment.
+/// BIFF8 `TxO` horizontal alignment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HorizontalAlignment {
     Left,
@@ -37,7 +37,7 @@ pub enum HorizontalAlignment {
     Unknown(u8),
 }
 
-/// BIFF8 TxO vertical alignment.
+/// BIFF8 `TxO` vertical alignment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VerticalAlignment {
     Top,
@@ -49,7 +49,7 @@ pub enum VerticalAlignment {
     Unknown(u8),
 }
 
-/// BIFF8 TxO text orientation.
+/// BIFF8 `TxO` text orientation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextOrientation {
     None,
@@ -71,6 +71,7 @@ pub enum RecordKind {
 }
 
 impl RecordKind {
+    #[must_use]
     pub const fn record_type(self) -> u16 {
         match self {
             Self::Note => RECORD_TYPE,
@@ -93,15 +94,18 @@ pub struct CommentRecord {
 }
 
 impl CommentRecord {
+    #[must_use]
     pub fn kind(&self) -> RecordKind {
         self.kind
     }
 
+    #[must_use]
     pub fn record_type(&self) -> u16 {
         self.kind.record_type()
     }
 
     /// The payload excluding the four-byte BIFF record header.
+    #[must_use]
     pub fn payload(&self) -> &[u8] {
         &self.payload
     }
@@ -115,7 +119,7 @@ impl CommentRecord {
         let mut payload = Vec::new();
         payload
             .try_reserve_exact(data.len())
-            .map_err(|_| Error::Allocation("retaining comment record payload"))?;
+            .map_err(|_error| Error::Allocation("retaining comment record payload"))?;
         payload.extend_from_slice(data);
         Ok(Self {
             kind,
@@ -124,7 +128,7 @@ impl CommentRecord {
     }
 }
 
-/// The common FtCmo object properties retained for a comment.
+/// The common `FtCmo` object properties retained for a comment.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ObjectProperties {
     pub(crate) object_type: u16,
@@ -136,29 +140,35 @@ pub struct ObjectProperties {
 }
 
 impl ObjectProperties {
+    #[must_use]
     pub fn object_type(&self) -> u16 {
         self.object_type
     }
 
+    #[must_use]
     pub fn object_id(&self) -> u16 {
         self.object_id
     }
 
+    #[must_use]
     pub fn flags(&self) -> u16 {
         self.flags
     }
 
-    /// The FtCmo flag bits not assigned by MS-XLS.
+    /// The `FtCmo` flag bits not assigned by MS-XLS.
+    #[must_use]
     pub fn reserved_flags(&self) -> u16 {
         self.reserved_flags
     }
 
-    /// FtCmo's four reserved header bytes (ft and cb).
+    /// `FtCmo`'s four reserved header bytes (ft and cb).
+    #[must_use]
     pub fn reserved_header(&self) -> &[u8; 4] {
         &self.reserved_header
     }
 
-    /// FtCmo's three four-byte undefined fields, in source order.
+    /// `FtCmo`'s three four-byte undefined fields, in source order.
+    #[must_use]
     pub fn unused_bytes(&self) -> &[u8; 12] {
         &self.unused
     }
@@ -173,16 +183,19 @@ pub struct ObjectSubrecord {
 }
 
 impl ObjectSubrecord {
+    #[must_use]
     pub fn record_type(&self) -> u16 {
         self.record_type
     }
 
     /// The subrecord body excluding its four-byte Ft header.
+    #[must_use]
     pub fn payload(&self) -> &[u8] {
         &self.payload
     }
 
     /// Whether this is a subrecord understood by the comment codec.
+    #[must_use]
     pub fn is_known(&self) -> bool {
         self.known
     }
@@ -196,7 +209,7 @@ impl ObjectSubrecord {
         let mut owned = Vec::new();
         owned
             .try_reserve_exact(payload.len())
-            .map_err(|_| Error::Allocation("retaining OBJ subrecord payload"))?;
+            .map_err(|_error| Error::Allocation("retaining OBJ subrecord payload"))?;
         owned.extend_from_slice(payload);
         Ok(Self {
             record_type,
@@ -206,11 +219,12 @@ impl ObjectSubrecord {
     }
 }
 
-/// The reserved/padding bytes after an OBJ's FtEnd subrecord.
+/// The reserved/padding bytes after an OBJ's `FtEnd` subrecord.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ObjectPadding(Box<[u8]>);
 
 impl ObjectPadding {
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
     }
@@ -224,13 +238,13 @@ impl ObjectPadding {
         let mut owned = Vec::new();
         owned
             .try_reserve_exact(data.len())
-            .map_err(|_| Error::Allocation("retaining OBJ padding"))?;
+            .map_err(|_error| Error::Allocation("retaining OBJ padding"))?;
         owned.extend_from_slice(data);
         Ok(Self(owned.into_boxed_slice()))
     }
 }
 
-/// Stable identity supplied by an OBJ's FtNts structure.
+/// Stable identity supplied by an OBJ's `FtNts` structure.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ObjectIdentity {
     pub(crate) object_id: u16,
@@ -241,30 +255,35 @@ pub struct ObjectIdentity {
 }
 
 impl ObjectIdentity {
+    #[must_use]
     pub fn object_id(&self) -> u16 {
         self.object_id
     }
 
+    #[must_use]
     pub fn guid(&self) -> &[u8; 16] {
         &self.guid
     }
 
+    #[must_use]
     pub fn shared(&self) -> bool {
         self.shared
     }
 
-    /// The source FtNts Boolean value, including future nonzero values.
+    /// The source `FtNts` Boolean value, including future nonzero values.
+    #[must_use]
     pub fn shared_value(&self) -> u16 {
         self.shared_value
     }
 
-    /// FtNts's four undefined bytes.
+    /// `FtNts`'s four undefined bytes.
+    #[must_use]
     pub fn unused_bytes(&self) -> &[u8; 4] {
         &self.unused
     }
 }
 
-/// One formatting run from the comment's TxORuns structure.
+/// One formatting run from the comment's `TxORuns` structure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TextRun {
     pub(crate) character_index: u16,
@@ -272,16 +291,18 @@ pub struct TextRun {
 }
 
 impl TextRun {
+    #[must_use]
     pub fn character_index(&self) -> u16 {
         self.character_index
     }
 
+    #[must_use]
     pub fn font_index(&self) -> u16 {
         self.font_index
     }
 }
 
-/// The ignored/reserved and inert fields retained from a comment's TxO.
+/// The ignored/reserved and inert fields retained from a comment's `TxO`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TextProperties {
     pub(crate) horizontal_alignment: HorizontalAlignment,
@@ -297,45 +318,55 @@ pub struct TextProperties {
 }
 
 impl TextProperties {
+    #[must_use]
     pub fn horizontal_alignment(&self) -> HorizontalAlignment {
         self.horizontal_alignment
     }
 
+    #[must_use]
     pub fn vertical_alignment(&self) -> VerticalAlignment {
         self.vertical_alignment
     }
 
+    #[must_use]
     pub fn orientation(&self) -> TextOrientation {
         self.orientation
     }
 
+    #[must_use]
     pub fn locked(&self) -> bool {
         self.locked
     }
 
+    #[must_use]
     pub fn justify_last_line(&self) -> bool {
         self.justify_last_line
     }
 
+    #[must_use]
     pub fn secret_edit(&self) -> bool {
         self.secret_edit
     }
 
+    #[must_use]
     pub fn font_when_empty(&self) -> u16 {
         self.font_when_empty
     }
 
-    /// The TxO option bits marked reserved by MS-XLS.
+    /// The `TxO` option bits marked reserved by MS-XLS.
+    #[must_use]
     pub fn reserved_options(&self) -> u16 {
         self.reserved_options
     }
 
-    /// TxO's reserved4/reserved5 bytes, in source order.
+    /// `TxO`'s reserved4/reserved5 bytes, in source order.
+    #[must_use]
     pub fn reserved_fields(&self) -> &[u8; 6] {
         &self.reserved_fields
     }
 
-    /// Raw, unevaluated ObjFmla payload bytes, excluding its length field.
+    /// Raw, unevaluated `ObjFmla` payload bytes, excluding its length field.
+    #[must_use]
     pub fn formula_bytes(&self) -> &[u8] {
         &self.formula_bytes
     }
@@ -350,14 +381,17 @@ pub struct NoteMetadata {
 }
 
 impl NoteMetadata {
+    #[must_use]
     pub fn reserved_flags(&self) -> u16 {
         self.reserved_flags
     }
 
+    #[must_use]
     pub fn reserved_string_flags(&self) -> u8 {
         self.reserved_string_flags
     }
 
+    #[must_use]
     pub fn unused_byte(&self) -> u8 {
         self.unused
     }
@@ -384,64 +418,79 @@ pub struct Comment {
 }
 
 impl Comment {
+    #[must_use]
     pub fn row(&self) -> u16 {
         self.row
     }
 
+    #[must_use]
     pub fn column(&self) -> u8 {
         self.column
     }
 
+    #[must_use]
     pub fn visibility(&self) -> Visibility {
         self.visibility
     }
 
+    #[must_use]
     pub fn row_hidden(&self) -> bool {
         self.row_hidden
     }
 
+    #[must_use]
     pub fn column_hidden(&self) -> bool {
         self.column_hidden
     }
 
+    #[must_use]
     pub fn identity(&self) -> &ObjectIdentity {
         &self.identity
     }
 
+    #[must_use]
     pub fn object_properties(&self) -> &ObjectProperties {
         &self.object_properties
     }
 
-    /// All OBJ subrecords after FtCmo, including known and unknown records.
+    /// All OBJ subrecords after `FtCmo`, including known and unknown records.
+    #[must_use]
     pub fn object_subrecords(&self) -> &[ObjectSubrecord] {
         &self.object_subrecords
     }
 
+    #[must_use]
     pub fn object_padding(&self) -> &[u8] {
         self.object_padding.as_bytes()
     }
 
+    #[must_use]
     pub fn note_metadata(&self) -> NoteMetadata {
         self.note_metadata
     }
 
+    #[must_use]
     pub fn author(&self) -> &str {
         &self.author
     }
 
+    #[must_use]
     pub fn text(&self) -> &str {
         &self.text
     }
 
+    #[must_use]
     pub fn text_properties(&self) -> &TextProperties {
         &self.text_properties
     }
 
+    #[must_use]
     pub fn text_runs(&self) -> &[TextRun] {
         &self.text_runs
     }
 
     /// The NOTE/OBJ/MSODRAWING/TXO/CONTINUE records in source order.
+    #[must_use]
     pub fn records(&self) -> &[CommentRecord] {
         &self.records
     }
@@ -456,7 +505,7 @@ pub(crate) fn boxed_bytes(data: &[u8], context: &'static str) -> Result<Box<[u8]
     let mut owned = Vec::new();
     owned
         .try_reserve_exact(data.len())
-        .map_err(|_| Error::Allocation(context))?;
+        .map_err(|_error| Error::Allocation(context))?;
     owned.extend_from_slice(data);
     Ok(owned.into_boxed_slice())
 }

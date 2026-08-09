@@ -1,6 +1,6 @@
 /// Images and pictures parser for Word binary format.
 ///
-/// Based on Apache POI's Picture and BLIP implementations, and LibreOffice's sw/source/filter/ww8.
+/// Based on Apache POI's Picture and BLIP implementations, and `LibreOffice`'s sw/source/filter/ww8.
 /// Images in DOC files can be:
 /// - Inline pictures (in character runs with picf special character 0x01)
 /// - Floating pictures (in Data stream with Escher BLIP records)
@@ -32,6 +32,7 @@ pub enum PictureType {
 
 impl PictureType {
     /// Detect picture type from binary data
+    #[must_use]
     pub fn from_data(data: &[u8]) -> Self {
         if data.len() < 4 {
             return PictureType::Unknown;
@@ -66,6 +67,7 @@ impl PictureType {
     }
 
     /// Get MIME type for this picture
+    #[must_use]
     pub fn mime_type(&self) -> &'static str {
         match self {
             PictureType::Jpeg => "image/jpeg",
@@ -81,6 +83,7 @@ impl PictureType {
     }
 
     /// Get file extension for this picture
+    #[must_use]
     pub fn extension(&self) -> &'static str {
         match self {
             PictureType::Jpeg => "jpg",
@@ -138,47 +141,49 @@ impl PictureDescriptor {
         // 0x28: dxaCropRight (2 bytes)
         // 0x2A: dyaCropBottom (2 bytes)
 
-        let width = binary::read_i16_le(data, 0x1C)
-            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read width: {}", e)))?
-            as i32;
-        let height = binary::read_i16_le(data, 0x1E)
-            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read height: {}", e)))?
-            as i32;
+        let width = i32::from(
+            binary::read_i16_le(data, 0x1C)
+                .map_err(|e| PackageError::InvalidFormat(format!("Failed to read width: {e}")))?,
+        );
+        let height = i32::from(
+            binary::read_i16_le(data, 0x1E)
+                .map_err(|e| PackageError::InvalidFormat(format!("Failed to read height: {e}")))?,
+        );
         let mx = binary::read_i16_le(data, 0x20)
-            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read mx: {}", e)))?;
+            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read mx: {e}")))?;
         let my = binary::read_i16_le(data, 0x22)
-            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read my: {}", e)))?;
+            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read my: {e}")))?;
         let crop_left = binary::read_i16_le(data, 0x24)
-            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read crop_left: {}", e)))?;
+            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read crop_left: {e}")))?;
         let crop_top = binary::read_i16_le(data, 0x26)
-            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read crop_top: {}", e)))?;
-        let crop_right = binary::read_i16_le(data, 0x28).map_err(|e| {
-            PackageError::InvalidFormat(format!("Failed to read crop_right: {}", e))
-        })?;
-        let crop_bottom = binary::read_i16_le(data, 0x2A).map_err(|e| {
-            PackageError::InvalidFormat(format!("Failed to read crop_bottom: {}", e))
-        })?;
+            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read crop_top: {e}")))?;
+        let crop_right = binary::read_i16_le(data, 0x28)
+            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read crop_right: {e}")))?;
+        let crop_bottom = binary::read_i16_le(data, 0x2A)
+            .map_err(|e| PackageError::InvalidFormat(format!("Failed to read crop_bottom: {e}")))?;
 
         Ok(Self {
             mx,
             my,
-            width,
-            height,
             crop_left,
             crop_top,
             crop_right,
             crop_bottom,
+            width,
+            height,
         })
     }
 
     /// Get scaled width in twips
+    #[must_use]
     pub fn scaled_width(&self) -> i32 {
-        (self.width as i64 * self.mx as i64 / 1000) as i32
+        (i64::from(self.width) * i64::from(self.mx) / 1000) as i32
     }
 
     /// Get scaled height in twips
+    #[must_use]
     pub fn scaled_height(&self) -> i32 {
-        (self.height as i64 * self.my as i64 / 1000) as i32
+        (i64::from(self.height) * i64::from(self.my) / 1000) as i32
     }
 }
 
@@ -197,6 +202,7 @@ pub struct InlinePicture {
 
 impl InlinePicture {
     /// Create a new inline picture
+    #[must_use]
     pub fn new(char_position: u32, descriptor: PictureDescriptor, data: Vec<u8>) -> Self {
         let picture_type = PictureType::from_data(&data);
         Self {
@@ -208,11 +214,13 @@ impl InlinePicture {
     }
 
     /// Get the picture data
+    #[must_use]
     pub fn data(&self) -> &[u8] {
         &self.data
     }
 
     /// Get the picture size in bytes
+    #[must_use]
     pub fn size(&self) -> usize {
         self.data.len()
     }
@@ -256,6 +264,7 @@ pub struct FloatingPicture {
 
 impl FloatingPicture {
     /// Create a new floating picture
+    #[must_use]
     pub fn new(shape_id: u32, data: Vec<u8>) -> Self {
         let picture_type = PictureType::from_data(&data);
         Self {
@@ -272,11 +281,13 @@ impl FloatingPicture {
     }
 
     /// Get the picture data
+    #[must_use]
     pub fn data(&self) -> &[u8] {
         &self.data
     }
 
     /// Get the picture size in bytes
+    #[must_use]
     pub fn size(&self) -> usize {
         self.data.len()
     }
@@ -292,21 +303,25 @@ pub struct PicturesTable {
 
 impl PicturesTable {
     /// Get all inline pictures
+    #[must_use]
     pub fn inline_pictures(&self) -> &[InlinePicture] {
         &self.inline_pictures
     }
 
     /// Get all floating pictures
+    #[must_use]
     pub fn floating_pictures(&self) -> &[FloatingPicture] {
         &self.floating_pictures
     }
 
     /// Get the total count of pictures
+    #[must_use]
     pub fn count(&self) -> usize {
         self.inline_pictures.len() + self.floating_pictures.len()
     }
 
     /// Create a new empty pictures table
+    #[must_use]
     pub fn new() -> Self {
         Self {
             inline_pictures: Vec::new(),
@@ -325,6 +340,7 @@ impl PicturesTable {
     }
 
     /// Find inline picture at character position
+    #[must_use]
     pub fn find_inline_at_position(&self, cp: u32) -> Option<&InlinePicture> {
         self.inline_pictures.iter().find(|p| p.char_position == cp)
     }

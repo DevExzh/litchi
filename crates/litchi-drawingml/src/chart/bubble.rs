@@ -74,6 +74,7 @@ impl Scale {
 
     /// Returns the scale percentage.
     #[inline]
+    #[must_use]
     pub const fn get(self) -> u16 {
         self.0
     }
@@ -122,6 +123,7 @@ pub struct ScaleError {
 impl ScaleError {
     /// Returns the rejected scale percentage.
     #[inline]
+    #[must_use]
     pub const fn value(self) -> u32 {
         self.value
     }

@@ -66,22 +66,19 @@ impl Props {
         }
 
         let xml = codec::encode(self)?;
-        match graph.part_name {
-            Some(part_name) => {
-                if package.get_part(&part_name)?.blob() == xml.as_slice() {
-                    return Ok(());
-                }
-                package.get_part_mut(&part_name)?.set_blob(xml);
-                package.unsign();
-            },
-            None => {
-                let part_name = custom_part_name()?;
-                package.validate_new_part_name(&part_name)?;
-                let part = BlobPart::new(part_name, ct::OFC_CUSTOM_PROPERTIES.to_owned(), xml);
-                package.unsign();
-                package.add_part(Box::new(part));
-                package.relate_to(PART_TARGET, rt::CUSTOM_PROPERTIES);
-            },
+        if let Some(part_name) = graph.part_name {
+            if package.get_part(&part_name)?.blob() == xml.as_slice() {
+                return Ok(());
+            }
+            package.get_part_mut(&part_name)?.set_blob(xml);
+            package.unsign();
+        } else {
+            let part_name = custom_part_name()?;
+            package.validate_new_part_name(&part_name)?;
+            let part = BlobPart::new(part_name, ct::OFC_CUSTOM_PROPERTIES.to_owned(), xml);
+            package.unsign();
+            package.add_part(Box::new(part));
+            package.relate_to(PART_TARGET, rt::CUSTOM_PROPERTIES);
         }
         Ok(())
     }
@@ -201,5 +198,5 @@ fn inspect_graph(package: &OpcPackage) -> Result<PackageGraph> {
 }
 
 pub(super) fn custom_part_name() -> Result<PackURI> {
-    PackURI::new(PART_NAME).map_err(|error| Error::Uri(error.to_string()))
+    PackURI::new(PART_NAME).map_err(|error| Error::Uri(error.clone()))
 }

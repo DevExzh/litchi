@@ -1,4 +1,4 @@
-//! Typed SpreadsheetML chartsheet APIs.
+//! Typed `SpreadsheetML` chartsheet APIs.
 //!
 //! The semantic model and bounded XML codec are layered separately from the
 //! OPC package graph. The historical `litchi_xlsx::chart_sheet::*` facade is

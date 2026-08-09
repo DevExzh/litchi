@@ -459,13 +459,16 @@ fn integration_fragment(
     item: &str,
     ids: &[String],
 ) -> Vec<u8> {
+    use std::fmt::Write as _;
+
     let mut output = format!(
         "<ext xmlns=\"{core}\" uri=\"{uri}\"><f:{list} xmlns:f=\"{family_ns}\" xmlns:r=\"{rel}\">"
     );
     for id in ids {
-        output.push_str(&format!("<f:{item} r:id=\"{}\"/>", xml_escape(id)));
+        write!(output, "<f:{item} r:id=\"{}\"/>", xml_escape(id))
+            .expect("writing to a String is infallible");
     }
-    output.push_str(&format!("</f:{list}></ext>"));
+    write!(output, "</f:{list}></ext>").expect("writing to a String is infallible");
     output.into_bytes()
 }
 

@@ -16,7 +16,7 @@ pub(super) const MODERN_RELATIONSHIP: &str =
 pub enum Family {
     /// Office 2007 Custom UI relationship family.
     Legacy,
-    /// Office 2010 and CustomUI2 relationship family.
+    /// Office 2010 and `CustomUI2` relationship family.
     Modern,
 }
 
@@ -48,7 +48,7 @@ pub enum Version {
     V2007,
     /// Office 2010 Ribbon and Backstage vocabulary.
     V2010,
-    /// CustomUI2 vocabulary documented by the Office extensions.
+    /// `CustomUI2` vocabulary documented by the Office extensions.
     Ui2,
 }
 
@@ -157,7 +157,7 @@ impl<'a> Set<'a> {
         self.legacy
     }
 
-    /// Office 2010 and CustomUI2 relationship-family slot.
+    /// Office 2010 and `CustomUI2` relationship-family slot.
     #[must_use]
     #[inline]
     pub const fn modern(self) -> Option<Ui<'a>> {
@@ -198,8 +198,7 @@ impl<'a> Set<'a> {
     pub(super) fn require_empty(self, family: Family) -> Result<()> {
         if self.get(family).is_some() {
             return Err(Error::Relationship(format!(
-                "a package may contain at most one {:?} Ribbon relationship",
-                family
+                "a package may contain at most one {family:?} Ribbon relationship"
             )));
         }
         Ok(())

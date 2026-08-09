@@ -1,8 +1,12 @@
-//! Canonical semantic formatting types for WordprocessingML.
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
+//! Canonical semantic formatting types for `WordprocessingML`.
 //!
 //! These types are deliberately independent of package storage and XML tree
 //! traversal. Format adapters may use the documented token helpers when they
-//! need to bridge the semantic model to WordprocessingML.
+//! need to bridge the semantic model to `WordprocessingML`.
 
 /// Line spacing options for paragraphs.
 #[derive(Debug, Clone, Copy)]
@@ -31,7 +35,8 @@ pub enum ParagraphAlignment {
 }
 
 impl ParagraphAlignment {
-    /// Returns the WordprocessingML `w:jc/@w:val` token for this alignment.
+    /// Returns the `WordprocessingML` `w:jc/@w:val` token for this alignment.
+    #[must_use]
     pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Left => "left",
@@ -66,7 +71,8 @@ pub enum UnderlineStyle {
 }
 
 impl UnderlineStyle {
-    /// Parses a WordprocessingML `w:u/@w:val` token.
+    /// Parses a `WordprocessingML` `w:u/@w:val` token.
+    #[must_use]
     pub fn from_xml(value: &str) -> Option<Self> {
         match value {
             "none" => Some(Self::None),
@@ -91,7 +97,8 @@ impl UnderlineStyle {
         }
     }
 
-    /// Returns the WordprocessingML `w:u/@w:val` token for this style.
+    /// Returns the `WordprocessingML` `w:u/@w:val` token for this style.
+    #[must_use]
     pub const fn as_str(&self) -> &'static str {
         match self {
             Self::None => "none",
@@ -162,7 +169,8 @@ pub enum TableBorderStyle {
 }
 
 impl TableBorderStyle {
-    /// Returns the WordprocessingML `w:val` token for this border style.
+    /// Returns the `WordprocessingML` `w:val` token for this border style.
+    #[must_use]
     pub const fn as_str(&self) -> &'static str {
         match self {
             Self::None => "none",
@@ -191,6 +199,7 @@ pub enum ImageFormat {
 
 impl ImageFormat {
     /// Detect image format from byte signature.
+    #[must_use]
     pub fn detect_from_bytes(data: &[u8]) -> Option<Self> {
         if data.len() < 8 {
             return None;
@@ -240,6 +249,7 @@ impl ImageFormat {
     }
 
     /// Get file extension for this format.
+    #[must_use]
     pub fn extension(&self) -> &'static str {
         match self {
             Self::Png => "png",
@@ -253,6 +263,7 @@ impl ImageFormat {
     }
 
     /// Get MIME type for this format.
+    #[must_use]
     pub fn mime_type(&self) -> &'static str {
         match self {
             Self::Png => "image/png",

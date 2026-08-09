@@ -1,4 +1,4 @@
-//! Bounded XML codec for DrawingML color fragments.
+//! Bounded XML codec for `DrawingML` color fragments.
 
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
@@ -55,7 +55,7 @@ impl<'a> From<&'a Base> for BaseRef<'a> {
     }
 }
 
-/// Read one DrawingML color-choice fragment.
+/// Read one `DrawingML` color-choice fragment.
 pub fn read(xml: &[u8]) -> Result<Value> {
     let validated = validation::validated_fragment(xml)?;
     let mut reader = Reader::from_reader(validated);
@@ -79,7 +79,7 @@ pub fn read(xml: &[u8]) -> Result<Value> {
     }
 }
 
-/// Write one DrawingML color-choice fragment using the conventional `a`
+/// Write one `DrawingML` color-choice fragment using the conventional `a`
 /// prefix. The result is a fragment and intentionally has no namespace
 /// declaration so the host can retain its own namespace spelling.
 pub fn write(value: &Value) -> Result<Vec<u8>> {
@@ -351,7 +351,7 @@ fn attributes(
         if key == b"xmlns" || key.starts_with(b"xmlns:") {
             continue;
         }
-        if attribute.key.prefix().is_some() || !allowed.iter().any(|expected| *expected == key) {
+        if attribute.key.prefix().is_some() || !allowed.contains(&key) {
             return Ok(None);
         }
         if values.iter().any(|(name, _)| name.as_slice() == key) {

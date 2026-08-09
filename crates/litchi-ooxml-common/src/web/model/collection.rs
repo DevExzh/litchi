@@ -1,7 +1,7 @@
-use super::super::codec::*;
-use super::super::validation::*;
-use super::super::*;
-use super::*;
+use super::super::codec::{invalid, limit};
+use super::super::validation::validate_task_pane;
+use super::super::{Error, Result};
+use super::{MAX_WEB_EXTENSION_ITEMS, Pane, canonicalize_pane_snapshot_resources};
 /// A checked pane selector. Add-in IDs are the semantic primary key; numeric
 /// positions are available for ordered document workflows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -43,6 +43,7 @@ impl Panes {
         self.panes.is_empty()
     }
 
+    #[must_use]
     pub fn iter(&self) -> impl ExactSizeIterator<Item = &Pane> {
         self.panes.iter()
     }

@@ -84,24 +84,28 @@ impl NarrowString {
 
     /// Borrow the exact bytes stored in this value.
     #[inline]
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
     }
 
     /// Consume this value and return its exact bytes.
     #[inline]
+    #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
         self.0
     }
 
     /// Return the byte length of this narrow string.
     #[inline]
+    #[must_use]
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
     /// Whether this narrow string contains no bytes.
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -243,6 +247,7 @@ impl Metadata {
 
     /// Number of recipient records encoded by this route slip.
     #[inline]
+    #[must_use]
     pub fn recipient_count(&self) -> usize {
         self.recipients.len()
     }

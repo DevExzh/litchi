@@ -103,6 +103,9 @@ impl Default for PrintSettings {
 
 impl PrintSettings {
     /// Create validated sheet printing settings.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn new(printable: bool, ranges: Vec<String>) -> Result<Self> {
         validate_cell_range_addresses(&ranges)?;
         Ok(Self { printable, ranges })
@@ -246,6 +249,9 @@ pub struct Range {
 
 impl Range {
     /// Create a non-empty half-open table range.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn new(start: usize, end: usize) -> Result<Self> {
         if start >= end {
             return Err(Error::InvalidFormat(format!(

@@ -63,6 +63,9 @@ impl Transaction {
     }
 
     /// Materialize the staged candidate as a validated immutable snapshot.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn snapshot(&self) -> Result<Snapshot> {
         if self.candidate.as_slice() == self.source.bytes() {
             Ok(self.source.clone())
@@ -78,6 +81,9 @@ impl Transaction {
     }
 
     /// Replace one typed RTD record by semantic collection index.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn replace(&mut self, index: usize, value: Record) -> Result<&mut Self> {
         let current = self.records().get(index).ok_or_else(|| {
             Error::UnsafeEdit(format!(
@@ -96,11 +102,17 @@ impl Transaction {
     }
 
     /// Alias for [`Self::replace`] using the contextual record name.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn replace_record(&mut self, index: usize, value: Record) -> Result<&mut Self> {
         self.replace(index, value)
     }
 
     /// Mutate one typed RTD record through a failure-atomic closure.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn edit(
         &mut self,
         index: usize,
@@ -116,6 +128,9 @@ impl Transaction {
     }
 
     /// Replace only one topic's inert cached value.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_value(&mut self, index: usize, value: Value) -> Result<&mut Self> {
         self.edit(index, |record| {
             record.value = value;
@@ -124,6 +139,9 @@ impl Transaction {
     }
 
     /// Replace only one topic's subscriber cells.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_cells(&mut self, index: usize, cells: Vec<Cell>) -> Result<&mut Self> {
         self.edit(index, |record| {
             record.cells = cells;
@@ -132,6 +150,9 @@ impl Transaction {
     }
 
     /// Insert a typed RTD record before the staged collection index.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn insert(&mut self, index: usize, value: Record) -> Result<&mut Self> {
         let candidate = self
             .package
@@ -141,12 +162,18 @@ impl Transaction {
     }
 
     /// Append a typed RTD record after the complete source stream.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn push(&mut self, value: Record) -> Result<&mut Self> {
         let index = self.records().len();
         self.insert(index, value)
     }
 
     /// Remove one typed RTD record and return its previous semantic value.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn remove(&mut self, index: usize) -> Result<Record> {
         let removed = self.records().get(index).cloned().ok_or_else(|| {
             Error::UnsafeEdit(format!(
@@ -165,6 +192,9 @@ impl Transaction {
     }
 
     /// Validate and publish the staged candidate with a reversible patch.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn commit(self) -> Result<Commit> {
         let source = self.source;
         if self.candidate.as_slice() == source.bytes() {
@@ -184,12 +214,12 @@ impl Transaction {
         // Parse before publishing the candidate.  This validates all prefix
         // dependencies, continuation framing, and bounds atomically.
         let package = Package::parse(&candidate)?;
-        if let Some((index, expected)) = expected {
-            if package.real_time_data().get(index) != Some(&expected) {
-                return Err(Error::UnsafeEdit(
-                    "RealTimeData publication changed the staged record".to_string(),
-                ));
-            }
+        if let Some((index, expected)) = expected
+            && package.real_time_data().get(index) != Some(&expected)
+        {
+            return Err(Error::UnsafeEdit(
+                "RealTimeData publication changed the staged record".to_string(),
+            ));
         }
         self.candidate = candidate;
         self.package = package;

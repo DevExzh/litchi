@@ -11,12 +11,12 @@ use litchi_odraw::image::Kind as BlipKind;
 /// An inline picture to be embedded in a DOC document.
 ///
 /// Encoded bytes are stored as-is except that a 14-byte BMP file header is
-/// removed to obtain the DIB payload required by OfficeArt.
+/// removed to obtain the DIB payload required by `OfficeArt`.
 #[derive(Debug, Clone)]
 pub struct Picture {
     /// Raw BLIP file data.
     pub(super) data: Vec<u8>,
-    /// Detected native OfficeArt kind.
+    /// Detected native `OfficeArt` kind.
     pub(super) kind: BlipKind,
     /// Display width in twips.
     pub(super) width_twips: u32,
@@ -52,7 +52,7 @@ impl Picture {
         Self::from_parts_as(data, kind, width_twips, height_twips)
     }
 
-    /// Create a picture with an explicit native OfficeArt format and display
+    /// Create a picture with an explicit native `OfficeArt` format and display
     /// dimensions. This is useful for headerless DIB and PICT data whose
     /// format cannot always be inferred unambiguously.
     pub fn from_parts_as(
@@ -96,21 +96,25 @@ impl Picture {
     }
 
     /// Raw image bytes.
+    #[must_use]
     pub fn data(&self) -> &[u8] {
         &self.data
     }
 
-    /// Detected native OfficeArt kind.
+    /// Detected native `OfficeArt` kind.
+    #[must_use]
     pub const fn kind(&self) -> BlipKind {
         self.kind
     }
 
     /// Display width in twips.
+    #[must_use]
     pub fn width_twips(&self) -> u32 {
         self.width_twips
     }
 
     /// Display height in twips.
+    #[must_use]
     pub fn height_twips(&self) -> u32 {
         self.height_twips
     }
@@ -146,6 +150,7 @@ pub struct FloatingPosition {
 impl FloatingPosition {
     /// Create a position from offsets in twips, defaulting to page-relative
     /// origins and square wrapping in front of the text.
+    #[must_use]
     pub fn new(left_twips: i32, top_twips: i32) -> Self {
         Self {
             left_twips,
@@ -160,6 +165,7 @@ impl FloatingPosition {
     }
 
     /// Set the horizontal and vertical position origins.
+    #[must_use]
     pub fn with_origins(
         mut self,
         horizontal: ShapeHorizontalOrigin,
@@ -171,24 +177,28 @@ impl FloatingPosition {
     }
 
     /// Set the text-wrapping style.
+    #[must_use]
     pub fn with_text_wrap(mut self, wrap: ShapeTextWrap) -> Self {
         self.wrap = wrap;
         self
     }
 
     /// Set the wrap side restriction.
+    #[must_use]
     pub fn with_wrap_side(mut self, wrap_side: ShapeWrapSide) -> Self {
         self.wrap_side = wrap_side;
         self
     }
 
     /// Place the picture behind (or in front of) the text.
+    #[must_use]
     pub fn behind_text(mut self, behind_text: bool) -> Self {
         self.behind_text = behind_text;
         self
     }
 
     /// Lock the anchor to its paragraph.
+    #[must_use]
     pub fn lock_anchor(mut self, anchor_locked: bool) -> Self {
         self.anchor_locked = anchor_locked;
         self
@@ -223,7 +233,7 @@ pub(crate) struct FloatingShapeInfo<'a> {
 }
 
 impl FloatingShapeInfo<'_> {
-    /// The MSOSPT shape type for the OfficeArtFSP record instance.
+    /// The MSOSPT shape type for the `OfficeArtFSP` record instance.
     pub(super) fn shape_type(&self) -> u16 {
         if self.text.is_some() {
             return super::super::shapes::MSOSPT_TEXT_BOX;

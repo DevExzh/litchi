@@ -1,3 +1,11 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 use crate::{Error, Result};
 use litchi_opc::constants::relationship_type;
 use quick_xml::XmlVersion;
@@ -14,6 +22,7 @@ use super::model::{
 
 impl Chunk {
     /// Serialize this anchor using an isolated, namespace-complete element.
+    #[must_use]
     pub fn xml(&self, conformance: Conformance) -> String {
         let word_ns = conformance.word_namespace();
         let relationship_ns = conformance.relationship_namespace();
@@ -32,6 +41,7 @@ impl Chunk {
 }
 
 /// Whether `value` is a supported alternative-format relationship type.
+#[must_use]
 pub fn is_relationship(value: &str) -> bool {
     matches!(
         value,
@@ -58,6 +68,10 @@ struct PendingChunk {
 /// Input order is preserved. This low-level helper lets package facades retain
 /// exact source ranges while selecting only the active `mc:Choice` or
 /// `mc:Fallback` branch.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn active(xml: &[u8], offsets: &[u32]) -> Result<Vec<u32>> {
     validate_xml(xml)?;
     let limits = litchi_ooxml_common::mce::OffsetLimits {
@@ -83,6 +97,10 @@ pub fn active(xml: &[u8], offsets: &[u32]) -> Result<Vec<u32>> {
 }
 
 /// Parse every altChunk anchor against the full namespace context.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn scan(xml: &[u8]) -> Result<BTreeMap<u32, Chunk>> {
     validate_xml(xml)?;
     let mut reader = NsReader::from_reader(xml);
@@ -91,8 +109,9 @@ pub fn scan(xml: &[u8]) -> Result<BTreeMap<u32, Chunk>> {
     let mut chunks = BTreeMap::new();
 
     loop {
-        let event_start = u32::try_from(reader.buffer_position())
-            .map_err(|_| Error::Invalid("altChunk XML offset does not fit u32".into()))?;
+        let event_start = u32::try_from(reader.buffer_position()).map_err(|_source_error| {
+            Error::Invalid("altChunk XML offset does not fit u32".into())
+        })?;
         let decoder = reader.decoder();
         let event = reader
             .read_event()
@@ -201,7 +220,13 @@ pub fn scan(xml: &[u8]) -> Result<BTreeMap<u32, Chunk>> {
                 }
                 break;
             },
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 

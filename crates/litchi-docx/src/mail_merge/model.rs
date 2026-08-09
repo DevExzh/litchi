@@ -1,3 +1,15 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::assigning_clones,
+    reason = "clone assignment preserves validation-before-replacement behavior"
+)]
+#![expect(
+    clippy::struct_excessive_bools,
+    reason = "the public model preserves independent OOXML flags"
+)]
 //! Package-neutral mail-merge value models.
 
 use crate::{Error, Result};
@@ -104,6 +116,7 @@ impl MainDocumentType {
         }
     }
 
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Catalog => "catalog",
@@ -139,6 +152,7 @@ impl DataType {
         }
     }
 
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::TextFile => "textFile",
@@ -171,6 +185,7 @@ impl Destination {
         }
     }
 
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::NewDocument => "newDocument",
@@ -198,6 +213,7 @@ impl FieldMappingType {
         }
     }
 
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Null => "null",
@@ -217,6 +233,7 @@ pub struct FieldMap {
 }
 
 impl FieldMap {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -244,21 +261,27 @@ impl FieldMap {
         self.dynamic_address = value;
         self
     }
+    #[must_use]
     pub fn mapping_type(&self) -> Option<FieldMappingType> {
         self.mapping_type
     }
+    #[must_use]
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
     }
+    #[must_use]
     pub fn mapped_name(&self) -> Option<&str> {
         self.mapped_name.as_deref()
     }
+    #[must_use]
     pub fn column(&self) -> Option<i32> {
         self.column
     }
+    #[must_use]
     pub fn language_id(&self) -> Option<&str> {
         self.language_id.as_deref()
     }
+    #[must_use]
     pub fn dynamic_address(&self) -> bool {
         self.dynamic_address
     }
@@ -277,6 +300,7 @@ pub struct DataSourceObject {
 }
 
 impl DataSourceObject {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -307,27 +331,35 @@ impl DataSourceObject {
         self.field_maps.push(value);
         self
     }
+    #[must_use]
     pub fn udl(&self) -> Option<&str> {
         self.udl.as_deref()
     }
+    #[must_use]
     pub fn table(&self) -> Option<&str> {
         self.table.as_deref()
     }
+    #[must_use]
     pub fn source_relationship_id(&self) -> Option<&str> {
         self.source_relationship_id.as_deref()
     }
+    #[must_use]
     pub fn column_delimiter(&self) -> Option<i32> {
         self.column_delimiter
     }
+    #[must_use]
     pub fn source_type(&self) -> Option<&str> {
         self.source_type.as_deref()
     }
+    #[must_use]
     pub fn first_row_header(&self) -> bool {
         self.first_row_header
     }
+    #[must_use]
     pub fn field_maps(&self) -> &[FieldMap] {
         &self.field_maps
     }
+    #[must_use]
     pub fn recipient_data_relationship_id(&self) -> Option<&str> {
         self.recipient_data_relationship_id.as_deref()
     }
@@ -383,6 +415,7 @@ impl Default for Settings {
 }
 
 impl Settings {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -459,51 +492,67 @@ impl Settings {
             odso.recipient_data_relationship_id = recipient_data;
         }
     }
+    #[must_use]
     pub fn main_document_type(&self) -> MainDocumentType {
         self.main_document_type
     }
+    #[must_use]
     pub fn link_to_query(&self) -> bool {
         self.link_to_query
     }
+    #[must_use]
     pub fn data_type(&self) -> Option<DataType> {
         self.data_type
     }
+    #[must_use]
     pub fn connect_string(&self) -> Option<&str> {
         self.connect_string.as_deref()
     }
+    #[must_use]
     pub fn query(&self) -> Option<&str> {
         self.query.as_deref()
     }
+    #[must_use]
     pub fn data_source_relationship_id(&self) -> Option<&str> {
         self.data_source_relationship_id.as_deref()
     }
+    #[must_use]
     pub fn header_source_relationship_id(&self) -> Option<&str> {
         self.header_source_relationship_id.as_deref()
     }
+    #[must_use]
     pub fn do_not_suppress_blank_lines(&self) -> bool {
         self.do_not_suppress_blank_lines
     }
+    #[must_use]
     pub fn destination(&self) -> Destination {
         self.destination
     }
+    #[must_use]
     pub fn address_field_name(&self) -> Option<&str> {
         self.address_field_name.as_deref()
     }
+    #[must_use]
     pub fn mail_subject(&self) -> Option<&str> {
         self.mail_subject.as_deref()
     }
+    #[must_use]
     pub fn mail_as_attachment(&self) -> bool {
         self.mail_as_attachment
     }
+    #[must_use]
     pub fn view_merged_data(&self) -> bool {
         self.view_merged_data
     }
+    #[must_use]
     pub fn active_record(&self) -> i32 {
         self.active_record
     }
+    #[must_use]
     pub fn check_errors(&self) -> i32 {
         self.check_errors
     }
+    #[must_use]
     pub fn odso(&self) -> Option<&DataSourceObject> {
         self.odso.as_ref()
     }
@@ -517,6 +566,7 @@ pub struct Recipient {
 }
 
 impl Recipient {
+    #[must_use]
     pub fn new(active: bool, column: Option<i32>, unique_tag: Option<Vec<u8>>) -> Self {
         Self {
             active,
@@ -536,12 +586,15 @@ impl Recipient {
         self.unique_tag = value;
         self
     }
+    #[must_use]
     pub fn active(&self) -> bool {
         self.active
     }
+    #[must_use]
     pub fn column(&self) -> Option<i32> {
         self.column
     }
+    #[must_use]
     pub fn unique_tag(&self) -> Option<&[u8]> {
         self.unique_tag.as_deref()
     }
@@ -558,9 +611,11 @@ pub struct Recipients {
 }
 
 impl Recipients {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
+    #[must_use]
     pub fn recipients(&self) -> &[Recipient] {
         &self.recipients
     }
@@ -568,6 +623,10 @@ impl Recipients {
     pub fn recipients_mut(&mut self) -> &mut Vec<Recipient> {
         &mut self.recipients
     }
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_recipient(&mut self, recipient: Recipient) -> Result<&mut Self> {
         if self.recipients.len() >= MAX_RECIPIENTS {
             return Err(invalid("too many mail-merge recipients"));
@@ -575,6 +634,10 @@ impl Recipients {
         self.recipients.push(recipient);
         Ok(self)
     }
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_recipient_active(&mut self, index: usize, active: bool) -> Result<()> {
         let recipient = self
             .recipients
@@ -584,6 +647,7 @@ impl Recipients {
         Ok(())
     }
 
+    #[must_use]
     pub fn content_type() -> &'static str {
         super::RECIPIENT_CONTENT_TYPE
     }

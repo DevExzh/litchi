@@ -20,8 +20,7 @@ pub(crate) fn validate_sheet_name_chars(
 ) -> Result<()> {
     let wide = field
         .first()
-        .map(|flags| flags & STRING_HIGH_BYTE != 0)
-        .unwrap_or(false);
+        .is_some_and(|flags| flags & STRING_HIGH_BYTE != 0);
     let maximum = if wide {
         REN_SHEET_MAX_UTF16_CHARS
     } else {

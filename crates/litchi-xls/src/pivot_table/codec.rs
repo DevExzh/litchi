@@ -1,9 +1,16 @@
-//! BIFF8 PivotTable and PivotCache codecs.
+//! BIFF8 `PivotTable` and `PivotCache` codecs.
 //!
 //! This module owns SX* record constants, bounded binary parsing, and the
 //! lossless record helpers used by the semantic aggregate.
 
-use super::model::*;
+use super::model::{
+    PageFieldEntry, PivotAdditionalExtension, PivotAxis, PivotAxisField, PivotCache,
+    PivotCacheDateGroupUnit, PivotCacheDateGrouping, PivotCacheDateTime,
+    PivotCacheDiscreteGrouping, PivotCacheError, PivotCacheField, PivotCacheGrouping,
+    PivotCacheItem, PivotCacheNumericGrouping, PivotDataItem, PivotFunction, PivotItemType,
+    PivotLayoutLine, PivotQueryTag, PivotSourceType, PivotViewDef, PivotViewEx9,
+    PivotViewExtension, PivotViewField, PivotViewFieldExtension, PivotViewItem,
+};
 use crate::error::{Error, Result};
 use litchi_core::binary;
 
@@ -63,7 +70,7 @@ fn parse_cache_string(data: &[u8], record_type: u16) -> Result<(String, usize)> 
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect::<Vec<_>>();
         String::from_utf16(&units)
-            .map_err(|_| cache_invalid(record_type, "invalid UTF-16 PivotCache string"))?
+            .map_err(|_error| cache_invalid(record_type, "invalid UTF-16 PivotCache string"))?
     } else {
         chars.iter().map(|byte| char::from(*byte)).collect()
     };
@@ -162,7 +169,13 @@ fn parse_cache_item(record_type: u16, data: &[u8]) -> Result<PivotCacheItem> {
     Ok(item)
 }
 
-/// Parse one `_SX_DB_CUR/nnnn` PivotCache stream.
+/// Parse one `_SX_DB_CUR/nnnn` `PivotCache` stream.
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
+/// # Panics
+///
+/// Panics only if an internal BIFF invariant has been violated.
 pub fn parse_pivot_cache_stream(data: &[u8]) -> Result<PivotCache> {
     let records = cache_records(data)?;
     let (sxdb_type, sxdb) = records
@@ -315,7 +328,7 @@ pub fn parse_pivot_cache_stream(data: &[u8]) -> Result<PivotCache> {
                     PivotCacheItem::Number(value)
                         if value >= 1.0 && value <= f64::from(u16::MAX) && value.fract() == 0.0 =>
                     {
-                        value as u16
+                        crate::utils::saturating_f64_to_u16(value)
                     },
                     _ => {
                         return Err(cache_invalid(
@@ -498,6 +511,9 @@ pub(crate) const fn is_worksheet_view_record(record_type: u16) -> bool {
 /// 38  var  name (XLUnicodeStringNoCch)
 ///     var  dataField (XLUnicodeStringNoCch)
 /// ```
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn parse_sxview(data: &[u8]) -> Result<PivotViewDef> {
     if data.len() < 44 {
         return Err(Error::InvalidLength {
@@ -594,6 +610,9 @@ pub fn parse_sxview(data: &[u8]) -> Result<PivotViewDef> {
 ///  8  u16  cchName  (0xFFFF = not present)
 /// 10  var  name (XLUnicodeStringNoCch)  — only if cchName != 0xFFFF
 /// ```
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn parse_sxvd(data: &[u8]) -> Result<PivotViewField> {
     if data.len() < 10 {
         return Err(Error::InvalidLength {
@@ -609,10 +628,10 @@ pub fn parse_sxvd(data: &[u8]) -> Result<PivotViewField> {
     let cch_name = binary::read_u16_le_at(data, 8)?;
 
     let mut offset = 10;
-    let name = if cch_name != 0xFFFF {
-        Some(read_xl_string_no_cch(data, &mut offset, cch_name as usize)?)
-    } else {
+    let name = if cch_name == 0xFFFF {
         None
+    } else {
+        Some(read_xl_string_no_cch(data, &mut offset, cch_name as usize)?)
     };
 
     if offset != data.len() {
@@ -640,6 +659,9 @@ pub fn parse_sxvd(data: &[u8]) -> Result<PivotViewField> {
 ///  6  u16  cchName  (0xFFFF = not present)
 ///  8  var  name
 /// ```
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn parse_sxvi(data: &[u8]) -> Result<PivotViewItem> {
     if data.len() < 8 {
         return Err(Error::InvalidLength {
@@ -654,10 +676,10 @@ pub fn parse_sxvi(data: &[u8]) -> Result<PivotViewItem> {
     let cch_name = binary::read_u16_le_at(data, 6)?;
 
     let mut offset = 8;
-    let name = if cch_name != 0xFFFF {
-        Some(read_xl_string_no_cch(data, &mut offset, cch_name as usize)?)
-    } else {
+    let name = if cch_name == 0xFFFF {
         None
+    } else {
+        Some(read_xl_string_no_cch(data, &mut offset, cch_name as usize)?)
     };
 
     if offset != data.len() {
@@ -684,6 +706,9 @@ pub fn parse_sxvi(data: &[u8]) -> Result<PivotViewItem> {
 /// 12  u16  cchName
 /// 14  var  name
 /// ```
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn parse_sxdi(data: &[u8]) -> Result<PivotDataItem> {
     if data.len() < 14 {
         return Err(Error::InvalidLength {
@@ -718,6 +743,9 @@ pub fn parse_sxdi(data: &[u8]) -> Result<PivotDataItem> {
 }
 
 /// Parse an SXVS record (2 bytes: source type).
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn parse_sxvs(data: &[u8]) -> Result<PivotSourceType> {
     if data.len() != 2 {
         return Err(Error::InvalidLength {
@@ -732,6 +760,9 @@ pub fn parse_sxvs(data: &[u8]) -> Result<PivotSourceType> {
 ///
 /// Each entry is 6 bytes: `(isxvi: u16, isxvd: u16, idObj: u16)`.
 /// The number of entries is `data.len() / 6`.
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn parse_sxpi(data: &[u8]) -> Result<Vec<PageFieldEntry>> {
     if !data.len().is_multiple_of(6) {
         return Err(cache_invalid(
@@ -754,6 +785,9 @@ pub fn parse_sxpi(data: &[u8]) -> Result<Vec<PageFieldEntry>> {
     Ok(entries)
 }
 
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn parse_sxivd(data: &[u8]) -> Result<Vec<PivotAxisField>> {
     if !data.len().is_multiple_of(2) {
         return Err(cache_invalid(SXIVD_TYPE, "SXIVD length must be even"));
@@ -767,6 +801,12 @@ pub fn parse_sxivd(data: &[u8]) -> Result<Vec<PivotAxisField>> {
         .collect()
 }
 
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
+/// # Panics
+///
+/// Panics only if an internal BIFF invariant has been violated.
 pub fn parse_sxvdex(data: &[u8]) -> Result<PivotViewFieldExtension> {
     if data.len() < 20 {
         return Err(Error::InvalidLength {
@@ -856,6 +896,9 @@ fn parse_optional_sx_string(data: &[u8], offset: &mut usize, cch: u16) -> Result
     }
 }
 
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn parse_sxex(data: &[u8]) -> Result<PivotViewExtension> {
     if data.len() < 24 {
         return Err(Error::InvalidLength {
@@ -906,6 +949,9 @@ fn read_xl_unicode_string(data: &[u8], offset: &mut usize) -> Result<String> {
     )
 }
 
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn parse_qsi_sx_tag(data: &[u8]) -> Result<PivotQueryTag> {
     if data.len() < 19 {
         return Err(Error::InvalidLength {
@@ -933,6 +979,9 @@ pub fn parse_qsi_sx_tag(data: &[u8]) -> Result<PivotQueryTag> {
     })
 }
 
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn parse_sxviewex9(data: &[u8]) -> Result<PivotViewEx9> {
     if data.len() < 17 {
         return Err(Error::InvalidLength {
@@ -960,6 +1009,9 @@ pub fn parse_sxviewex9(data: &[u8]) -> Result<PivotViewEx9> {
     })
 }
 
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn parse_sxaddl(data: &[u8]) -> Result<PivotAdditionalExtension> {
     if data.len() < 6 {
         return Err(Error::InvalidLength {
@@ -978,7 +1030,7 @@ pub fn parse_sxaddl(data: &[u8]) -> Result<PivotAdditionalExtension> {
     })
 }
 
-/// Read an XLUnicodeStringNoCch: 1-byte flags then `cch` chars.
+/// Read an `XLUnicodeStringNoCch`: 1-byte flags then `cch` chars.
 fn read_xl_string_no_cch(data: &[u8], offset: &mut usize, cch: usize) -> Result<String> {
     if cch == 0 {
         let end = offset
@@ -1022,7 +1074,7 @@ fn read_xl_string_no_cch(data: &[u8], offset: &mut usize, cch: usize) -> Result<
             .collect();
         *offset = end;
         String::from_utf16(&words)
-            .map_err(|e| Error::InvalidData(format!("Invalid UTF-16 in pivot string: {}", e)))
+            .map_err(|e| Error::InvalidData(format!("Invalid UTF-16 in pivot string: {e}")))
     } else {
         let end = offset
             .checked_add(cch)

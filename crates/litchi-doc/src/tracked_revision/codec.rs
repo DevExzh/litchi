@@ -1,11 +1,17 @@
 //! MS-DOC codecs and bounded binary helpers for tracked revisions.
 
-use super::model::*;
+use super::model::{CpTable, FcRun, PapxRun, RawPiece, Revision, RevisionKind, RevisionMetadata};
 use crate::DateTime;
 use crate::package::{Error as PackageError, Result};
 use crate::parts::fkp::{ChpxFkp, PapxFkp, ParagraphHeight};
 use crate::sprm::parse_sprms;
-use crate::sprm_operations::*;
+use crate::sprm_operations::{
+    SPRM_C_DTTM_RMARK, SPRM_C_DTTM_RMARK_DEL, SPRM_C_F_RMARK, SPRM_C_F_RMARK_DEL,
+    SPRM_C_IBST_RMARK, SPRM_C_IBST_RMARK_DEL, SPRM_C_IDSL_RMARK, SPRM_C_IDSL_RMARK_DEL,
+    SPRM_C_PROP_RMARK_CURRENT, SPRM_C_PROP_RMARK90, SPRM_C_RSID_PROP, SPRM_C_RSID_RM_DEL,
+    SPRM_C_RSID_TEXT, SPRM_C_WALL, SPRM_P_PROP_RMARK, SPRM_P_PROP_RMARK_CURRENT,
+    SPRM_P_PROP_RMARK90, SPRM_P_WALL, SPRM_T_PROP_RMARK, SPRM_T_RSID, SPRM_T_WALL,
+};
 use std::collections::{BTreeSet, HashMap};
 
 pub(super) const FIB_CCP_TEXT: usize = 76;
@@ -63,7 +69,7 @@ pub(super) fn metadata_from_sprms(
         .iter()
         .rev()
         .find(|s| s.opcode == author_op)
-        .and_then(|s| s.operand_word())
+        .and_then(super::super::sprm::Sprm::operand_word)
         .unwrap_or(0);
     let author = authors
         .get(author_index as usize)
@@ -73,7 +79,7 @@ pub(super) fn metadata_from_sprms(
         .iter()
         .rev()
         .find(|s| s.opcode == time_op)
-        .and_then(|s| s.operand_dword())
+        .and_then(super::super::sprm::Sprm::operand_dword)
         .map(decode_dttm)
         .transpose()?
         .flatten();
@@ -81,12 +87,12 @@ pub(super) fn metadata_from_sprms(
         .iter()
         .rev()
         .find(|s| s.opcode == reason_op)
-        .and_then(|s| s.operand_word());
+        .and_then(super::super::sprm::Sprm::operand_word);
     let rsid = sprms
         .iter()
         .rev()
         .find(|s| s.opcode == rsid_op)
-        .and_then(|s| s.operand_dword());
+        .and_then(super::super::sprm::Sprm::operand_dword);
     Ok(ParsedMetadata {
         author_index,
         author,
@@ -118,7 +124,7 @@ pub(super) fn property_metadata(
                 .iter()
                 .rev()
                 .find(|s| s.opcode == rsid_op)
-                .and_then(|s| s.operand_dword())
+                .and_then(super::super::sprm::Sprm::operand_dword)
         })
         .flatten();
     Ok(ParsedMetadata {
@@ -921,7 +927,7 @@ pub(super) fn read_units(
             let bytes = word
                 .get(offset..offset + count as usize)
                 .ok_or_else(|| corrupted("text range exceeds WordDocument"))?;
-            out.extend(bytes.iter().map(|v| *v as u16));
+            out.extend(bytes.iter().map(|v| u16::from(*v)));
         }
     }
     Ok(out)
@@ -1032,7 +1038,7 @@ pub(super) fn pack_dttm(value: Option<DateTime>) -> Result<u32> {
 pub(super) fn decode_dttm(raw: u32) -> Result<Option<DateTime>> {
     if raw == 0 {
         return Ok(None);
-    };
+    }
     let value = DateTime {
         minute: (raw & 0x3f) as u8,
         hour: ((raw >> 6) & 0x1f) as u8,
@@ -1046,15 +1052,15 @@ pub(super) fn decode_dttm(raw: u32) -> Result<Option<DateTime>> {
 }
 pub(super) fn push_byte(out: &mut Vec<u8>, op: u16, v: u8) {
     out.extend_from_slice(&op.to_le_bytes());
-    out.push(v)
+    out.push(v);
 }
 pub(super) fn push_word(out: &mut Vec<u8>, op: u16, v: u16) {
     out.extend_from_slice(&op.to_le_bytes());
-    out.extend_from_slice(&v.to_le_bytes())
+    out.extend_from_slice(&v.to_le_bytes());
 }
 pub(super) fn push_dword(out: &mut Vec<u8>, op: u16, v: u32) {
     out.extend_from_slice(&op.to_le_bytes());
-    out.extend_from_slice(&v.to_le_bytes())
+    out.extend_from_slice(&v.to_le_bytes());
 }
 pub(super) fn append_table_block(
     word: &mut [u8],

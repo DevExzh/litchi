@@ -157,12 +157,18 @@ impl Snapshot {
         self.conformance
     }
 
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "retained for BIFF12 codec completeness and staged host integration"
+    )]
     pub(crate) fn source(&self) -> &SourceState {
         &self.source
     }
 
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "retained for BIFF12 codec completeness and staged host integration"
+    )]
     pub(crate) fn same_source(&self, other: &Self) -> bool {
         self.source == other.source
     }
@@ -342,7 +348,10 @@ pub(crate) struct SourceState {
     pub(crate) part_names: Vec<PackURI>,
 }
 
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "retained for BIFF12 codec completeness and staged host integration"
+)]
 impl SourceState {
     fn capture(
         package: &OpcPackage,
@@ -412,7 +421,10 @@ pub(crate) struct SourcePart {
     pub(crate) relationships: Vec<SourceRelationship>,
 }
 
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "retained for BIFF12 codec completeness and staged host integration"
+)]
 impl SourcePart {
     fn from_part(part: &dyn Part) -> Self {
         Self {
@@ -448,7 +460,10 @@ pub(crate) struct SourceRelationship {
     pub(crate) mode: TargetMode,
 }
 
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "retained for BIFF12 codec completeness and staged host integration"
+)]
 impl SourceRelationship {
     pub(crate) fn id(&self) -> &str {
         &self.id

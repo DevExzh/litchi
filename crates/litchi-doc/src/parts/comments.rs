@@ -211,16 +211,19 @@ impl CommentsTable {
     }
 
     /// All comments in main-document reference order.
+    #[must_use]
     pub fn references(&self) -> &[CommentReference] {
         &self.references
     }
 
     /// Number of comments.
+    #[must_use]
     pub fn count(&self) -> usize {
         self.references.len()
     }
 
     /// Find the comment whose reference character is at `cp`.
+    #[must_use]
     pub fn find_at_position(&self, cp: u32) -> Option<&CommentReference> {
         self.references
             .iter()
@@ -353,11 +356,8 @@ fn parse_annotation_ranges(
     main_end: u32,
     referenced_tags: &HashSet<u32>,
 ) -> Result<HashMap<u32, (u32, u32)>> {
-    let pointer_lengths = [37usize, 42, 43].map(|index| {
-        fib.get_table_pointer(index)
-            .map(|(_, length)| length)
-            .unwrap_or(0)
-    });
+    let pointer_lengths =
+        [37usize, 42, 43].map(|index| fib.get_table_pointer(index).map_or(0, |(_, length)| length));
     if referenced_tags.is_empty() {
         if pointer_lengths.iter().any(|&length| length != 0) {
             return Err(PackageError::Corrupted(

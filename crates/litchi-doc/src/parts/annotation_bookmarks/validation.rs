@@ -7,7 +7,7 @@ use std::collections::HashSet;
 
 /// FIB index of `fcSttbfAtnBkmk`/`lcbSttbfAtnBkmk`.
 pub(crate) const FIB_INDEX: usize = 37;
-/// Byte offset of the selected FIB pair in WordDocument.
+/// Byte offset of the selected FIB pair in `WordDocument`.
 pub(crate) const POINTER_OFFSET: usize = 154 + FIB_INDEX * 8;
 /// `ATNBE.bmc` is the annotation bookmark class.
 pub(crate) const BMC_ANNOTATION: u16 = 0x0100;

@@ -1,4 +1,4 @@
-//! Bounded SpreadsheetML revision XML codecs.
+//! Bounded `SpreadsheetML` revision XML codecs.
 
 use crate::error::Result;
 use litchi_ooxml_common::mce::process_ooxml;
@@ -8,7 +8,14 @@ use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::collections::HashSet;
 
-use super::model::*;
+use super::model::{
+    MAX_DEPTH, MAX_HEADERS, MAX_NODES, MAX_PART_BYTES, MAX_RECORDS_PER_LOG, MAX_SHEET_IDS,
+    MAX_STRING_BYTES, MAX_USERS, NS, REL_NS, RevisionAttribute, RevisionAttributeNamespace,
+    RevisionConformance, RevisionHeader, RevisionHeaderProperties, RevisionHeaders, RevisionLog,
+    RevisionRecord, RevisionRecordKind, RevisionUser, RevisionUsers, RevisionXmlElement, STRICT_NS,
+    STRICT_REL_NS, bounded, valid_date, validate_attrs, validate_element, validate_guid,
+    validate_headers, validate_log, validate_users,
+};
 use super::{invalid, limit, xml_error};
 
 #[derive(Clone, Debug)]
@@ -588,7 +595,7 @@ fn write_attributes(out: &mut String, attrs: &[RevisionAttribute]) -> Result<()>
             RevisionAttributeNamespace::Relationships => rel_attr(out, &a.name, &a.value),
             RevisionAttributeNamespace::Xml => {
                 let n = format!("xml:{}", a.name);
-                attr(out, &n, &a.value)
+                attr(out, &n, &a.value);
             },
         }
     }
@@ -607,21 +614,21 @@ fn rel_attr(o: &mut String, n: &str, v: &str) {
 }
 fn opt_attr(o: &mut String, n: &str, v: Option<&str>) {
     if let Some(v) = v {
-        attr(o, n, v)
+        attr(o, n, v);
     }
 }
 fn bool_attr(o: &mut String, n: &str, v: Option<bool>) {
     if let Some(v) = v {
-        attr(o, n, if v { "1" } else { "0" })
+        attr(o, n, if v { "1" } else { "0" });
     }
 }
 fn num_attr(o: &mut String, n: &str, v: Option<u32>) {
     if let Some(v) = v {
-        attr(o, n, &v.to_string())
+        attr(o, n, &v.to_string());
     }
 }
 fn text(o: &mut String, v: &str) {
-    escape(o, v, false)
+    escape(o, v, false);
 }
 fn escape(o: &mut String, v: &str, attribute: bool) {
     for c in v.chars() {

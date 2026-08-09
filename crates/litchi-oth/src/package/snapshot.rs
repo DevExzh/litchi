@@ -12,11 +12,17 @@ const PRELIMINARY_XML_MARKER: &str = "<";
 const MAX_OUTPUT_BYTES: usize = 256 * 1024 * 1024;
 
 struct State {
+    bookmarks: Vec<crate::bookmark::Bookmark>,
+    forms: Vec<crate::form::Form>,
     headings: Vec<crate::heading::Heading>,
+    lists: Vec<crate::list::List>,
     order: Vec<crate::codec::BlockOrder>,
     package: Package,
     paragraphs: Vec<crate::paragraph::Paragraph>,
     replacement_sites: Vec<Option<crate::codec::ReplacementSite>>,
+    resources: Vec<crate::resource::Resource>,
+    styles: Vec<crate::style::Style>,
+    text_close: usize,
 }
 
 /// An immutable, validated package snapshot.
@@ -24,6 +30,9 @@ struct State {
 pub(crate) struct Snapshot(Arc<State>);
 
 impl Snapshot {
+    pub(crate) fn is_same(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
     pub(crate) fn open(path: impl AsRef<Path>) -> Result<Self> {
         Self::from_package(Package::open(
             path,
@@ -71,12 +80,26 @@ impl Snapshot {
             paragraphs.push(site.value);
             replacement_sites.push(site.replacement);
         }
+        let mut styles =
+            crate::codec::project_styles(package.content_xml(), crate::style::Origin::Content)?;
+        if let Some(styles_xml) = package.styles_xml() {
+            styles.extend(crate::codec::project_styles(
+                styles_xml,
+                crate::style::Origin::Styles,
+            )?);
+        }
         Ok(Self(Arc::new(State {
+            bookmarks: projection.bookmarks,
+            forms: projection.forms,
             headings: projection.headings,
+            lists: projection.lists,
             order: projection.order,
             package,
             paragraphs,
             replacement_sites,
+            resources: projection.resources,
+            styles,
+            text_close: projection.text_close,
         })))
     }
 
@@ -115,12 +138,36 @@ impl Snapshot {
         &self.0.headings
     }
 
+    pub(crate) fn bookmarks(&self) -> &[crate::bookmark::Bookmark] {
+        &self.0.bookmarks
+    }
+
+    pub(crate) fn lists(&self) -> &[crate::list::List] {
+        &self.0.lists
+    }
+
+    pub(crate) fn resources(&self) -> &[crate::resource::Resource] {
+        &self.0.resources
+    }
+
+    pub(crate) fn forms(&self) -> &[crate::form::Form] {
+        &self.0.forms
+    }
+
+    pub(crate) fn styles(&self) -> &[crate::style::Style] {
+        &self.0.styles
+    }
+
     pub(crate) fn order(&self) -> &[crate::codec::BlockOrder] {
         &self.0.order
     }
 
     pub(crate) fn replacement_site(&self, index: usize) -> Option<&crate::codec::ReplacementSite> {
         self.0.replacement_sites.get(index).and_then(Option::as_ref)
+    }
+
+    pub(crate) fn text_close(&self) -> usize {
+        self.0.text_close
     }
 
     pub(crate) fn rebuild_with_content(&self, content: &str) -> Result<Self> {
@@ -140,7 +187,12 @@ impl Snapshot {
         writer.add_file("content.xml", content.as_bytes())?;
         for path in ["meta.xml", "styles.xml"] {
             if self.0.package.package().has_file(path)? {
-                writer.add_file(path, &self.0.package.package().get_file(path)?)?;
+                let bytes = self.0.package.package().get_file(path)?;
+                let xml = std::str::from_utf8(&bytes).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid OTH {path} UTF-8: {error}"))
+                })?;
+                let compact = crate::codec::compact_for_publication(xml)?;
+                writer.add_file(path, compact.as_bytes())?;
             }
         }
         let excluded_paths = ["content.xml".to_string()];

@@ -1,3 +1,11 @@
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 /// Comment writer support for DOCX documents.
 use crate::error::Result;
 use chrono::DateTime;
@@ -31,7 +39,7 @@ pub enum DateError {
     Allocation(#[source] TryReserveError),
 }
 
-/// An explicitly supplied WordprocessingML comment timestamp.
+/// An explicitly supplied `WordprocessingML` comment timestamp.
 ///
 /// The original RFC 3339 spelling is retained so deterministic saves preserve
 /// the caller's chosen offset and fractional-second precision.
@@ -41,6 +49,10 @@ pub struct Date(String);
 impl Date {
     /// Parse and validate a comment timestamp without consulting an ambient
     /// clock.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn parse(value: impl AsRef<str>) -> std::result::Result<Self, DateError> {
         let value = value.as_ref();
         if value.len() > MAX_DATE_BYTES {
@@ -54,7 +66,7 @@ impl Date {
         }) {
             return Err(DateError::InvalidXml);
         }
-        DateTime::parse_from_rfc3339(value).map_err(|_| DateError::InvalidLexical)?;
+        DateTime::parse_from_rfc3339(value).map_err(|_source_error| DateError::InvalidLexical)?;
 
         let mut owned = String::new();
         owned
@@ -66,6 +78,7 @@ impl Date {
 
     /// Return the preserved RFC 3339 spelling.
     #[inline]
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -97,7 +110,7 @@ pub struct MutableComment {
 impl MutableComment {
     /// Create a new comment without a timestamp.
     ///
-    /// WordprocessingML makes `w:date` optional. Omitting it is the
+    /// `WordprocessingML` makes `w:date` optional. Omitting it is the
     /// deterministic default; use [`Self::new_with_date`] when timestamp
     /// metadata is required.
     ///
@@ -106,6 +119,7 @@ impl MutableComment {
     /// * `id` - Unique comment ID
     /// * `author` - Author name
     /// * `text` - Comment text
+    #[must_use]
     pub fn new(id: u32, author: String, text: String) -> Self {
         Self {
             id,
@@ -117,6 +131,7 @@ impl MutableComment {
     }
 
     /// Create a new comment with a caller-supplied, validated timestamp.
+    #[must_use]
     pub fn new_with_date(id: u32, author: String, text: String, date: Date) -> Self {
         Self {
             id,
@@ -129,12 +144,14 @@ impl MutableComment {
 
     /// Get the comment ID.
     #[inline]
+    #[must_use]
     pub fn id(&self) -> u32 {
         self.id
     }
 
     /// Get the author name.
     #[inline]
+    #[must_use]
     pub fn author(&self) -> &str {
         &self.author
     }
@@ -146,6 +163,7 @@ impl MutableComment {
 
     /// Get the comment text.
     #[inline]
+    #[must_use]
     pub fn text(&self) -> &str {
         &self.text
     }
@@ -157,6 +175,7 @@ impl MutableComment {
 
     /// Get the comment date.
     #[inline]
+    #[must_use]
     pub fn date(&self) -> Option<&Date> {
         self.date.as_ref()
     }
@@ -172,6 +191,7 @@ impl MutableComment {
 
     /// Get the author initials.
     #[inline]
+    #[must_use]
     pub fn initials(&self) -> Option<&str> {
         self.initials.as_deref()
     }
@@ -182,7 +202,10 @@ impl MutableComment {
     }
 
     /// Generate XML for this comment.
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "writer helper is retained for package integration"
+    )]
     pub(crate) fn to_xml(&self) -> Result<String> {
         let mut xml = String::with_capacity(256);
 

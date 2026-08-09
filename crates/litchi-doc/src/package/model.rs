@@ -390,17 +390,9 @@ impl OpenOptions {
 /// Options for opening a DOC CFB package before its document streams are read.
 /// [`Package::open`] remains the concise, bounded default. Use
 /// [`Package::open_with`] when the input contract needs an explicit limit set.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct PackageOpenOptions {
     limits: Limits,
-}
-
-impl Default for PackageOpenOptions {
-    fn default() -> Self {
-        Self {
-            limits: Limits::default(),
-        }
-    }
 }
 
 impl PackageOpenOptions {
@@ -423,7 +415,7 @@ impl PackageOpenOptions {
 pub enum EncryptionKind {
     /// Legacy Word XOR obfuscation.
     XorObfuscation,
-    /// Office CryptoAPI encryption.
+    /// Office `CryptoAPI` encryption.
     CryptoApi,
     /// An encryption version not recognized by this implementation.
     Unknown {
@@ -492,11 +484,11 @@ impl From<crate::sprm::Error> for Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::Io(e) => write!(f, "IO error: {}", e),
-            Error::Ole(e) => write!(f, "OLE error: {}", e),
-            Error::InvalidFormat(s) => write!(f, "Invalid format: {}", s),
-            Error::StreamNotFound(s) => write!(f, "Stream not found: {}", s),
-            Error::Corrupted(s) => write!(f, "Corrupted file: {}", s),
+            Error::Io(e) => write!(f, "IO error: {e}"),
+            Error::Ole(e) => write!(f, "OLE error: {e}"),
+            Error::InvalidFormat(s) => write!(f, "Invalid format: {s}"),
+            Error::StreamNotFound(s) => write!(f, "Stream not found: {s}"),
+            Error::Corrupted(s) => write!(f, "Corrupted file: {s}"),
             Error::ResourceLimit(error) => error.fmt(f),
             Error::PasswordRequired => write!(f, "a password is required to open this document"),
             Error::InvalidPassword => write!(f, "the document password is invalid"),

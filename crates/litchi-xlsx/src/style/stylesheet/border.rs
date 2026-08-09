@@ -1,18 +1,18 @@
-//! Typed SpreadsheetML border definitions.
+//! Typed `SpreadsheetML` border definitions.
 
 use std::fmt;
 use std::str::FromStr;
 
 pub use crate::color::{ParseRgbError, Rgb};
 
-/// SpreadsheetML namespace and edge-name convention.
+/// `SpreadsheetML` namespace and edge-name convention.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Conformance {
     Transitional,
     Strict,
 }
 
-/// A visible SpreadsheetML border line.
+/// A visible `SpreadsheetML` border line.
 ///
 /// An absent line is represented by `Option<Side>::None`; keeping `None` out
 /// of this enum prevents contradictory values such as a styled side whose
@@ -36,7 +36,7 @@ pub enum Line {
 }
 
 impl Line {
-    /// Return the SpreadsheetML token without allocating.
+    /// Return the `SpreadsheetML` token without allocating.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -106,7 +106,7 @@ impl fmt::Display for ParseLineError {
 
 impl std::error::Error for ParseLineError {}
 
-/// Checked SpreadsheetML tint in the inclusive range `-1.0..=1.0`.
+/// Checked `SpreadsheetML` tint in the inclusive range `-1.0..=1.0`.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Tint(u64);
 
@@ -151,7 +151,7 @@ impl fmt::Display for TintError {
 
 impl std::error::Error for TintError {}
 
-/// Typed SpreadsheetML color with an optional checked tint.
+/// Typed `SpreadsheetML` color with an optional checked tint.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Color {
     /// A present `<color>` element with no explicit base value.
@@ -223,7 +223,7 @@ impl Color {
         }
     }
 
-    /// Preserve an explicit SpreadsheetML automatic-color boolean.
+    /// Preserve an explicit `SpreadsheetML` automatic-color boolean.
     #[must_use]
     pub const fn auto_value(enabled: bool) -> Self {
         Self::Auto {

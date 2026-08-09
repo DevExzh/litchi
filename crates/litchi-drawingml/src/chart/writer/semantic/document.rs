@@ -1,4 +1,4 @@
-//! Chart-space and package-level DrawingML chart records.
+//! Chart-space and package-level `DrawingML` chart records.
 
 use super::super::validation::{invalid_chart_input, validate_chart_style};
 use super::super::xml::{write_bool_element, write_fragment, write_text_element};
@@ -54,7 +54,7 @@ pub(in crate::chart::writer) fn write_chart_space<W: Write>(
 
     validate_chart_style(chart.style)?;
     if let Some(ref style) = chart.style {
-        write!(writer, r#"<c:style val="{}"/>"#, style)?;
+        write!(writer, r#"<c:style val="{style}"/>"#)?;
     }
     if let Some(color_map) = chart.color_map_override.as_ref() {
         write_color_map_override(writer, color_map)?;

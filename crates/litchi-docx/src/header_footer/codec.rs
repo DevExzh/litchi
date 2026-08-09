@@ -1,4 +1,4 @@
-//! Bounded WordprocessingML and markup-compatibility codec for stories.
+//! Bounded `WordprocessingML` and markup-compatibility codec for stories.
 
 use crate::error::{Error, Result};
 use litchi_ooxml_common::mce::process_ooxml;
@@ -97,7 +97,13 @@ pub(crate) fn validate(xml: &[u8]) -> Result<Role> {
                 }
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }

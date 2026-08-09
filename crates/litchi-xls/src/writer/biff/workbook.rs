@@ -127,17 +127,17 @@ pub(super) fn write_file_sharing<W: Write>(
     }
     let compressed = utf16.iter().all(|unit| *unit <= 0x00FF);
     let char_bytes = utf16.len() * if compressed { 1 } else { 2 };
-    let data_len = u16::try_from(7 + char_bytes).map_err(|_| {
+    let data_len = u16::try_from(7 + char_bytes).map_err(|_error| {
         Error::InvalidData("FILESHARING payload exceeds BIFF8 record size".to_string())
     })?;
     write_record_header(writer, 0x005B, data_len)?;
     writer.write_all(&u16::from(read_only_recommended).to_le_bytes())?;
     writer.write_all(&password_hash.to_le_bytes())?;
-    writer.write_all(&(utf16.len() as u16).to_le_bytes())?;
+    writer.write_all(&crate::utils::truncate_usize_to_u16(utf16.len()).to_le_bytes())?;
     writer.write_all(&[u8::from(!compressed)])?;
     for unit in utf16 {
         if compressed {
-            writer.write_all(&[unit as u8])?;
+            writer.write_all(&[crate::utils::truncate_u16_to_u8(unit)])?;
         } else {
             writer.write_all(&unit.to_le_bytes())?;
         }
@@ -216,17 +216,21 @@ fn write_function_group_name<W: Write>(writer: &mut W, record_type: u16, name: &
     let compressed = units.iter().all(|unit| *unit <= 0x00ff);
     let string_size = 3 + units.len() * if compressed { 1 } else { 2 };
     let header_size = if record_type == 0x0898 { 12 } else { 0 };
-    write_record_header(writer, record_type, (header_size + string_size) as u16)?;
+    write_record_header(
+        writer,
+        record_type,
+        crate::utils::truncate_usize_to_u16(header_size + string_size),
+    )?;
     if record_type == 0x0898 {
         writer.write_all(&0x0898u16.to_le_bytes())?;
         writer.write_all(&0u16.to_le_bytes())?;
         writer.write_all(&[0; 8])?;
     }
-    writer.write_all(&(units.len() as u16).to_le_bytes())?;
+    writer.write_all(&crate::utils::truncate_usize_to_u16(units.len()).to_le_bytes())?;
     writer.write_all(&[u8::from(!compressed)])?;
     for unit in units {
         if compressed {
-            writer.write_all(&[unit as u8])?;
+            writer.write_all(&[crate::utils::truncate_u16_to_u8(unit)])?;
         } else {
             writer.write_all(&unit.to_le_bytes())?;
         }
@@ -266,7 +270,7 @@ pub(super) fn write_refresh_all<W: Write>(writer: &mut W, refresh_all: bool) -> 
 /// Write BOOKBOOL record.
 ///
 /// Record type: 0x00DA
-#[allow(dead_code)] // Compatibility implementation for the former fixed-bit API.
+#[allow(dead_code, reason = "retained as a BIFF compatibility building block")] // Compatibility implementation for the former fixed-bit API.
 pub(super) fn write_book_bool<W: Write>(writer: &mut W, save_link_values: bool) -> Result<()> {
     write_record_header(writer, 0x00DA, 2)?;
     writer.write_all(&(u16::from(save_link_values)).to_le_bytes())?;
@@ -301,7 +305,7 @@ pub(super) fn write_book_ext<W: Write>(writer: &mut W, value: &crate::BookExt) -
     write_record_header(
         writer,
         crate::book_ext::BOOK_EXT_RECORD_TYPE,
-        payload.len() as u16,
+        crate::utils::truncate_usize_to_u16(payload.len()),
     )?;
     writer.write_all(&payload)?;
     Ok(())
@@ -324,14 +328,14 @@ pub(super) fn write_real_time_data<W: Write>(
     write_record_header(
         writer,
         crate::real_time_data::REAL_TIME_DATA_RECORD_TYPE,
-        first.len() as u16,
+        crate::utils::truncate_usize_to_u16(first.len()),
     )?;
     writer.write_all(first)?;
     for chunk in chunks {
         write_record_header(
             writer,
             crate::real_time_data::CONTINUE_FRT_RECORD_TYPE,
-            chunk.len() as u16,
+            crate::utils::truncate_usize_to_u16(chunk.len()),
         )?;
         writer.write_all(chunk)?;
     }
@@ -351,7 +355,7 @@ pub(super) fn write_web_pub<W: Write>(writer: &mut W, value: &crate::WebPub) -> 
     write_record_header(
         writer,
         crate::web_pub::WEB_PUB_RECORD_TYPE,
-        payload.len() as u16,
+        crate::utils::truncate_usize_to_u16(payload.len()),
     )?;
     writer.write_all(&payload)?;
     Ok(())
@@ -365,20 +369,24 @@ pub(super) fn write_style_ext<W: Write>(writer: &mut W, value: &crate::StyleExt)
     write_record_header(
         writer,
         crate::style_ext::STYLE_EXT_RECORD_TYPE,
-        payload.len() as u16,
+        crate::utils::truncate_usize_to_u16(payload.len()),
     )?;
     writer.write_all(&payload)?;
     Ok(())
 }
 
 /// Write a THEME record (MS-XLS 2.4.326), chunking large theme contents
-/// into ContinueFrt12 records.
+/// into `ContinueFrt12` records.
 ///
 /// Record type: 0x0896
 pub(super) fn write_theme<W: Write>(writer: &mut W, value: &crate::Theme) -> Result<()> {
     for payload in value.to_record_payloads() {
         let record_type = u16::from_le_bytes([payload[0], payload[1]]);
-        write_record_header(writer, record_type, payload.len() as u16)?;
+        write_record_header(
+            writer,
+            record_type,
+            crate::utils::truncate_usize_to_u16(payload.len()),
+        )?;
         writer.write_all(&payload)?;
     }
     Ok(())
@@ -386,7 +394,7 @@ pub(super) fn write_theme<W: Write>(writer: &mut W, value: &crate::Theme) -> Res
 
 /// Write the workbook globals `METADATA` production (MS-XLS 2.1): every MDX
 /// metadata record in ABNF order, chunking oversized payloads into
-/// ContinueFrt12 records (MS-XLS 2.4.61).
+/// `ContinueFrt12` records (MS-XLS 2.4.61).
 ///
 /// Record types: 0x0884–0x088A
 pub(super) fn write_mdx_metadata<W: Write>(
@@ -396,13 +404,17 @@ pub(super) fn write_mdx_metadata<W: Write>(
     for (record_type, payload) in value.to_record_payloads()? {
         let mut chunks = payload.chunks(MAX_RECORD_DATA);
         let first = chunks.next().expect("MDX metadata payload is never empty");
-        write_record_header(writer, record_type, first.len() as u16)?;
+        write_record_header(
+            writer,
+            record_type,
+            crate::utils::truncate_usize_to_u16(first.len()),
+        )?;
         writer.write_all(first)?;
         for chunk in chunks {
             write_record_header(
                 writer,
                 crate::mdx_metadata::CONTINUE_FRT12_RECORD_TYPE,
-                chunk.len() as u16,
+                crate::utils::truncate_usize_to_u16(chunk.len()),
             )?;
             writer.write_all(chunk)?;
         }
@@ -431,7 +443,7 @@ pub(super) fn write_xf_ext<W: Write>(writer: &mut W, value: &crate::XfExt) -> Re
     write_record_header(
         writer,
         crate::xf_ext::XF_EXT_RECORD_TYPE,
-        payload.len() as u16,
+        crate::utils::truncate_usize_to_u16(payload.len()),
     )?;
     writer.write_all(&payload)?;
     Ok(())
@@ -492,7 +504,7 @@ pub(super) fn write_format_record<W: Write>(
 ) -> Result<()> {
     if format_str.is_ascii() {
         let bytes = format_str.as_bytes();
-        let cch = bytes.len().min(u16::MAX as usize) as u16;
+        let cch = crate::utils::truncate_usize_to_u16(bytes.len().min(u16::MAX as usize));
         let data_len = 2u16 + 2 + 1 + cch; // index_code + cch + flags + chars
 
         write_record_header(writer, 0x041E, data_len)?;
@@ -502,7 +514,7 @@ pub(super) fn write_format_record<W: Write>(
         writer.write_all(&bytes[..cch as usize])?;
     } else {
         let utf16: Vec<u16> = format_str.encode_utf16().collect();
-        let cch = utf16.len().min(u16::MAX as usize) as u16;
+        let cch = crate::utils::truncate_usize_to_u16(utf16.len().min(u16::MAX as usize));
         let data_len = 2u16 + 2 + 1 + cch.saturating_mul(2); // index_code + cch + flags + UTF-16LE
 
         write_record_header(writer, 0x041E, data_len)?;
@@ -523,7 +535,7 @@ pub(super) fn write_format_record<W: Write>(
 ///
 /// This helper writes only built-in styles, which use the compact 4-byte
 /// payload:
-///  - field_1_xf_index (2 bytes): low 12 bits = XF index, bit 15 = isBuiltIn
+///  - `field_1_xf_index` (2 bytes): low 12 bits = XF index, bit 15 = isBuiltIn
 ///  - builtinStyle (1 byte): built-in style identifier (e.g., 0 = Normal)
 ///  - outlineLevel (1 byte): usually 0xFF for non-outline styles
 fn write_style_builtin<W: Write>(
@@ -551,7 +563,7 @@ fn write_style_builtin<W: Write>(
 /// - 15:    default cell XF
 /// - 16..20: additional style XFs for comma / currency / percent styles
 ///
-/// Mapping (xf_index, builtin_style_id):
+/// Mapping (`xf_index`, `builtin_style_id)`:
 /// - (0x0010, 3)  => Comma
 /// - (0x0011, 6)  => Comma [0 decimals]
 /// - (0x0012, 4)  => Currency
@@ -577,11 +589,11 @@ pub(super) fn write_builtin_styles<W: Write>(writer: &mut W) -> Result<()> {
     Ok(())
 }
 
-/// Write UseSelFS (Use Natural Language Formulas) record.
+/// Write `UseSelFS` (Use Natural Language Formulas) record.
 ///
 /// Record type: 0x0160, Length: 2
 /// A value of 0 disables natural language formulas (modern Excel default).
-#[allow(dead_code)] // Compatibility implementation for the former fixed-value API.
+#[allow(dead_code, reason = "retained as a BIFF compatibility building block")] // Compatibility implementation for the former fixed-value API.
 pub(super) fn write_usesel_fs<W: Write>(writer: &mut W) -> Result<()> {
     write_record_header(writer, 0x0160, 2)?;
     writer.write_all(&0u16.to_le_bytes())?;
@@ -651,7 +663,7 @@ pub(super) fn write_codepage<W: Write>(writer: &mut W, codepage: u16) -> Result<
 /// * `is_1904` - True for 1904 date system (Mac), false for 1900 (Windows)
 pub(super) fn write_date1904<W: Write>(writer: &mut W, is_1904: bool) -> Result<()> {
     write_record_header(writer, 0x0022, 2)?;
-    let flag = if is_1904 { 1u16 } else { 0u16 };
+    let flag = u16::from(is_1904);
     writer.write_all(&flag.to_le_bytes())?;
     Ok(())
 }
@@ -714,12 +726,12 @@ fn write_unicode_string<W: Write>(writer: &mut W, value: &str, include_count: bo
     let units = value.encode_utf16().collect::<Vec<_>>();
     let compressed = units.iter().all(|unit| *unit <= 0x00ff);
     if include_count {
-        writer.write_all(&(units.len() as u16).to_le_bytes())?;
+        writer.write_all(&crate::utils::truncate_usize_to_u16(units.len()).to_le_bytes())?;
     }
     writer.write_all(&[u8::from(!compressed)])?;
     for unit in units {
         if compressed {
-            writer.write_all(&[unit as u8])?;
+            writer.write_all(&[crate::utils::truncate_u16_to_u8(unit)])?;
         } else {
             writer.write_all(&unit.to_le_bytes())?;
         }
@@ -735,8 +747,8 @@ fn write_external_supbook<W: Write>(
     book.validate()?;
     let path_units = book.encoded_virtual_path.encode_utf16().count();
     let mut data = Vec::new();
-    data.extend_from_slice(&(book.sheets.len() as u16).to_le_bytes());
-    data.extend_from_slice(&(path_units as u16).to_le_bytes());
+    data.extend_from_slice(&crate::utils::truncate_usize_to_u16(book.sheets.len()).to_le_bytes());
+    data.extend_from_slice(&crate::utils::truncate_usize_to_u16(path_units).to_le_bytes());
     write_unicode_string(&mut data, &book.encoded_virtual_path, false)?;
     for sheet in &book.sheets {
         write_unicode_string(&mut data, &sheet.name, true)?;
@@ -746,7 +758,11 @@ fn write_external_supbook<W: Write>(
             "external SupBook exceeds BIFF8 record size".to_string(),
         ));
     }
-    write_record_header(writer, 0x01ae, data.len() as u16)?;
+    write_record_header(
+        writer,
+        0x01ae,
+        crate::utils::truncate_usize_to_u16(data.len()),
+    )?;
     writer.write_all(&data)?;
     for name in names {
         write_external_defined_name(writer, name)?;
@@ -756,8 +772,8 @@ fn write_external_supbook<W: Write>(
             continue;
         }
         write_record_header(writer, 0x0059, 4)?;
-        writer.write_all(&(sheet.cache_rows.len() as i16).to_le_bytes())?;
-        writer.write_all(&(sheet_index as u16).to_le_bytes())?;
+        writer.write_all(&crate::utils::wrap_usize_to_i16(sheet.cache_rows.len()).to_le_bytes())?;
+        writer.write_all(&crate::utils::truncate_usize_to_u16(sheet_index).to_le_bytes())?;
         for row in &sheet.cache_rows {
             write_crn(writer, row)?;
         }
@@ -767,7 +783,7 @@ fn write_external_supbook<W: Write>(
 
 fn write_short_unicode_string<W: Write>(writer: &mut W, value: &str) -> Result<()> {
     let units = value.encode_utf16().collect::<Vec<_>>();
-    writer.write_all(&[units.len() as u8])?;
+    writer.write_all(&[crate::utils::truncate_usize_to_u8(units.len())])?;
     write_unicode_string(writer, value, false)
 }
 
@@ -780,14 +796,20 @@ fn write_external_defined_name<W: Write>(
     data.extend_from_slice(&name.sheet_index.map_or(0, |index| index + 1).to_le_bytes());
     data.extend_from_slice(&0u16.to_le_bytes());
     write_short_unicode_string(&mut data, &name.name)?;
-    data.extend_from_slice(&(name.formula_bytes.len() as u16).to_le_bytes());
+    data.extend_from_slice(
+        &crate::utils::truncate_usize_to_u16(name.formula_bytes.len()).to_le_bytes(),
+    );
     data.extend_from_slice(&name.formula_bytes);
     if data.len() > 8224 {
         return Err(Error::InvalidData(
             "external defined name exceeds BIFF8 record size".to_string(),
         ));
     }
-    write_record_header(writer, 0x0023, data.len() as u16)?;
+    write_record_header(
+        writer,
+        0x0023,
+        crate::utils::truncate_usize_to_u16(data.len()),
+    )?;
     writer.write_all(&data)?;
     Ok(())
 }
@@ -802,21 +824,27 @@ fn write_add_in_supbook<W: Write>(
     for function in functions {
         let mut data = vec![0; 6];
         write_short_unicode_string(&mut data, &function.name)?;
-        data.extend_from_slice(&(function.unused_data.len() as u16).to_le_bytes());
+        data.extend_from_slice(
+            &crate::utils::truncate_usize_to_u16(function.unused_data.len()).to_le_bytes(),
+        );
         data.extend_from_slice(&function.unused_data);
         if data.len() > 8224 {
             return Err(Error::InvalidData(
                 "add-in ExternName exceeds BIFF8 record size".to_string(),
             ));
         }
-        write_record_header(writer, 0x0023, data.len() as u16)?;
+        write_record_header(
+            writer,
+            0x0023,
+            crate::utils::truncate_usize_to_u16(data.len()),
+        )?;
         writer.write_all(&data)?;
     }
     Ok(())
 }
 
 fn encode_clipboard_format(value: crate::ClipboardFormat) -> u16 {
-    (value.code() as u16) & 0x03ff
+    crate::utils::reinterpret_i16_as_u16(value.code()) & 0x03ff
 }
 
 fn encode_ser_ar(value: &crate::CachedValue) -> Result<Vec<u8>> {
@@ -848,10 +876,15 @@ fn write_dde_or_ole_supbook<W: Write>(
     let mut supbook = Vec::new();
     supbook.extend_from_slice(&0u16.to_le_bytes());
     supbook.extend_from_slice(
-        &(link.encoded_virtual_path.encode_utf16().count() as u16).to_le_bytes(),
+        &crate::utils::truncate_usize_to_u16(link.encoded_virtual_path.encode_utf16().count())
+            .to_le_bytes(),
     );
     write_unicode_string(&mut supbook, &link.encoded_virtual_path, false)?;
-    write_record_header(writer, 0x01ae, supbook.len() as u16)?;
+    write_record_header(
+        writer,
+        0x01ae,
+        crate::utils::truncate_usize_to_u16(supbook.len()),
+    )?;
     writer.write_all(&supbook)?;
     for item in &link.items {
         let mut flags = (encode_clipboard_format(item.clipboard_format) << 5)
@@ -878,19 +911,31 @@ fn write_dde_or_ole_supbook<W: Write>(
                 }
             }
         }
-        write_record_header(writer, 0x0023, data.len() as u16)?;
+        write_record_header(
+            writer,
+            0x0023,
+            crate::utils::truncate_usize_to_u16(data.len()),
+        )?;
         writer.write_all(&data)?;
         let mut chunk = Vec::new();
         for value in remaining_values {
             if !chunk.is_empty() && chunk.len() + value.len() > 8224 {
-                write_record_header(writer, 0x003c, chunk.len() as u16)?;
+                write_record_header(
+                    writer,
+                    0x003c,
+                    crate::utils::truncate_usize_to_u16(chunk.len()),
+                )?;
                 writer.write_all(&chunk)?;
                 chunk.clear();
             }
             chunk.extend_from_slice(&value);
         }
         if !chunk.is_empty() {
-            write_record_header(writer, 0x003c, chunk.len() as u16)?;
+            write_record_header(
+                writer,
+                0x003c,
+                crate::utils::truncate_usize_to_u16(chunk.len()),
+            )?;
             writer.write_all(&chunk)?;
         }
     }
@@ -902,13 +947,17 @@ fn write_crn<W: Write>(
     row: &crate::writer::core::ExternalCacheRowOptions,
 ) -> Result<()> {
     let mut data = Vec::new();
-    data.push(row.first_column + row.values.len() as u8 - 1);
+    data.push(row.first_column + crate::utils::truncate_usize_to_u8(row.values.len()) - 1);
     data.push(row.first_column);
     data.extend_from_slice(&row.row.to_le_bytes());
     for value in &row.values {
         data.extend_from_slice(&encode_ser_ar(value)?);
     }
-    write_record_header(writer, 0x005a, data.len() as u16)?;
+    write_record_header(
+        writer,
+        0x005a,
+        crate::utils::truncate_usize_to_u16(data.len()),
+    )?;
     writer.write_all(&data)?;
     Ok(())
 }
@@ -951,37 +1000,43 @@ pub(super) fn write_external_link_table<W: Write>(
             "ExternSheet reference count exceeds BIFF8 record bound".to_string(),
         ));
     }
-    write_record_header(writer, 0x0017, (2 + count * 6) as u16)?;
-    writer.write_all(&(count as u16).to_le_bytes())?;
+    write_record_header(
+        writer,
+        0x0017,
+        crate::utils::truncate_usize_to_u16(2 + count * 6),
+    )?;
+    writer.write_all(&crate::utils::truncate_usize_to_u16(count).to_le_bytes())?;
     if let Some((sheet_count, mode)) = internal {
         match mode {
             ExternSheetMode::PerSheet => {
                 for sheet in 0..sheet_count {
                     writer.write_all(&0u16.to_le_bytes())?;
-                    writer.write_all(&(sheet as i16).to_le_bytes())?;
-                    writer.write_all(&(sheet as i16).to_le_bytes())?;
+                    writer.write_all(&crate::utils::wrap_u16_to_i16(sheet).to_le_bytes())?;
+                    writer.write_all(&crate::utils::wrap_u16_to_i16(sheet).to_le_bytes())?;
                 }
             },
             ExternSheetMode::WorkbookWide => {
                 writer.write_all(&0u16.to_le_bytes())?;
                 writer.write_all(&0i16.to_le_bytes())?;
-                writer.write_all(&(sheet_count as i16 - 1).to_le_bytes())?;
+                writer
+                    .write_all(&(crate::utils::wrap_u16_to_i16(sheet_count) - 1).to_le_bytes())?;
             },
         }
     }
     let first_external_book = usize::from(internal.is_some());
     for (book_offset, book) in external.iter().enumerate() {
-        let book_index = u16::try_from(first_external_book + book_offset)
-            .map_err(|_| Error::InvalidData("supporting-book index exceeds u16".to_string()))?;
+        let book_index = u16::try_from(first_external_book + book_offset).map_err(|_error| {
+            Error::InvalidData("supporting-book index exceeds u16".to_string())
+        })?;
         for sheet in 0..book.sheets.len() {
             writer.write_all(&book_index.to_le_bytes())?;
-            writer.write_all(&(sheet as i16).to_le_bytes())?;
-            writer.write_all(&(sheet as i16).to_le_bytes())?;
+            writer.write_all(&crate::utils::wrap_usize_to_i16(sheet).to_le_bytes())?;
+            writer.write_all(&crate::utils::wrap_usize_to_i16(sheet).to_le_bytes())?;
         }
     }
     let add_in_book = first_external_book + external.len();
     if !add_in_functions.is_empty() {
-        writer.write_all(&(add_in_book as u16).to_le_bytes())?;
+        writer.write_all(&crate::utils::truncate_usize_to_u16(add_in_book).to_le_bytes())?;
         writer.write_all(&(-2i16).to_le_bytes())?;
         writer.write_all(&(-2i16).to_le_bytes())?;
     }
@@ -989,7 +1044,9 @@ pub(super) fn write_external_link_table<W: Write>(
     for offset in 0..dde_or_ole_links.len() {
         writer.write_all(
             &u16::try_from(first_dde_book + offset)
-                .map_err(|_| Error::InvalidData("supporting-book index exceeds u16".to_string()))?
+                .map_err(|_error| {
+                    Error::InvalidData("supporting-book index exceeds u16".to_string())
+                })?
                 .to_le_bytes(),
         )?;
         writer.write_all(&(-2i16).to_le_bytes())?;
@@ -1008,7 +1065,7 @@ pub(super) fn write_external_link_table<W: Write>(
 /// * `position` - Absolute stream position of BOF record for this sheet
 /// * `name` - Sheet name (max 31 characters)
 ///
-/// The sheet name is encoded as ShortXLUnicodeString per BIFF8: 1-byte character count,
+/// The sheet name is encoded as `ShortXLUnicodeString` per BIFF8: 1-byte character count,
 /// 1-byte flags (0x00 = compressed 8-bit, 0x01 = uncompressed UTF-16LE), followed by characters.
 pub(super) fn write_boundsheet<W: Write>(writer: &mut W, position: u32, name: &str) -> Result<()> {
     let truncated = if name.len() > 31 { &name[..31] } else { name };
@@ -1017,7 +1074,11 @@ pub(super) fn write_boundsheet<W: Write>(writer: &mut W, position: u32, name: &s
     let is_ascii = truncated.is_ascii();
     let (cch, flags, name_bytes_vec): (u8, u8, Vec<u8>) = if is_ascii {
         let bytes = truncated.as_bytes();
-        (bytes.len() as u8, 0x00, bytes.to_vec())
+        (
+            crate::utils::truncate_usize_to_u8(bytes.len()),
+            0x00,
+            bytes.to_vec(),
+        )
     } else {
         // UTF-16LE encoding
         let utf16: Vec<u16> = truncated.encode_utf16().collect();
@@ -1025,14 +1086,14 @@ pub(super) fn write_boundsheet<W: Write>(writer: &mut W, position: u32, name: &s
         for ch in &utf16 {
             buf.extend_from_slice(&ch.to_le_bytes());
         }
-        (utf16.len() as u8, 0x01, buf)
+        (crate::utils::truncate_usize_to_u8(utf16.len()), 0x01, buf)
     };
 
     // position(4) + options(2) + cch(1) + flags(1) + name bytes
     let name_bytes_len: u16 = if is_ascii {
-        cch as u16
+        u16::from(cch)
     } else {
-        (cch as u16) * 2
+        u16::from(cch) * 2
     };
     let data_len = 4u16 + 2u16 + 1u16 + 1u16 + name_bytes_len; // 8 + name length
     write_record_header(writer, 0x0085, data_len)?;

@@ -1,11 +1,11 @@
-//! Canonical writer for DrawingML text-body content.
+//! Canonical writer for `DrawingML` text-body content.
 //!
-//! The write_contents function emits the neutral a:CT_TextBody children
-//! shared by SpreadsheetDrawing, PresentationML, and other DrawingML hosts:
+//! The `write_contents` function emits the neutral `a:CT_TextBody` children
+//! shared by `SpreadsheetDrawing`, `PresentationML`, and other `DrawingML` hosts:
 //! a:bodyPr, a:lstStyle, paragraphs, runs, and text. Host crates retain the
 //! surrounding txBody element and their anchor, relationship, and package
-//! state. The emitted order follows the CT_TextBody sequence documented by
-//! [MS-ODRAWXML] and the SpreadsheetDrawing example in 3rdparty/specs/.
+//! state. The emitted order follows the `CT_TextBody` sequence documented by
+//! [MS-ODRAWXML] and the `SpreadsheetDrawing` example in 3rdparty/specs/.
 
 use std::fmt::Write as _;
 
@@ -14,7 +14,7 @@ use litchi_core::xml::escape::escape_xml;
 use super::{Body, Paragraph, Properties, Run};
 use crate::text::{Anchor, Autofit, Columns, Direction, Wrap};
 
-/// Write the neutral content of one DrawingML text body.
+/// Write the neutral content of one `DrawingML` text body.
 ///
 /// The caller owns the host-specific wrapper, for example
 /// <xdr:txBody>...</xdr:txBody> or <p:txBody>...</p:txBody>.
@@ -22,7 +22,7 @@ pub fn write(xml: &mut String, body: &Body) {
     write_contents(xml, &body.properties, &body.paragraphs);
 }
 
-/// Write the neutral content of one DrawingML text body without requiring an
+/// Write the neutral content of one `DrawingML` text body without requiring an
 /// allocation when a host stores properties and paragraphs as separate fields.
 pub fn write_contents(xml: &mut String, properties: &Properties, paragraphs: &[Paragraph]) {
     write_properties(xml, properties);

@@ -156,6 +156,12 @@ pub struct MarkerFormat {
 
 impl MarkerFormat {
     /// Parse a `MarkerFormat` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// # Panics
+    ///
+    /// Panics only if an internal BIFF invariant has been violated.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
             return Err(Error::InvalidLength {
@@ -181,6 +187,7 @@ impl MarkerFormat {
     }
 
     /// Serialize back to a complete `MarkerFormat` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(PAYLOAD_LEN);
         self.foreground.write_payload(&mut payload);
@@ -194,51 +201,61 @@ impl MarkerFormat {
     }
 
     /// Border color of the data marker (`rgbFore`).
+    #[must_use]
     pub fn foreground(&self) -> ChartRgb {
         self.foreground
     }
 
     /// Interior color of the data marker (`rgbBack`).
+    #[must_use]
     pub fn background(&self) -> ChartRgb {
         self.background
     }
 
     /// The data marker type (`imk`).
+    #[must_use]
     pub fn kind(&self) -> DataMarkerKind {
         self.kind
     }
 
     /// Whether the data marker is automatically generated (`fAuto`).
+    #[must_use]
     pub fn is_auto(&self) -> bool {
         self.flags & FLAG_AUTO != 0
     }
 
     /// Whether the data marker interior is not shown (`fNotShowInt`).
+    #[must_use]
     pub fn hides_interior(&self) -> bool {
         self.flags & FLAG_NOT_SHOW_INTERIOR != 0
     }
 
     /// Whether the data marker border is not shown (`fNotShowBrd`).
+    #[must_use]
     pub fn hides_border(&self) -> bool {
         self.flags & FLAG_NOT_SHOW_BORDER != 0
     }
 
     /// Raw flags word, including the 13 reserved bits.
+    #[must_use]
     pub fn flags(&self) -> u16 {
         self.flags
     }
 
     /// Border chart color (`icvFore`).
+    #[must_use]
     pub fn icv_foreground(&self) -> u16 {
         self.icv_foreground
     }
 
     /// Interior chart color (`icvBack`).
+    #[must_use]
     pub fn icv_background(&self) -> u16 {
         self.icv_background
     }
 
     /// Marker size in twips (`miSize`).
+    #[must_use]
     pub fn size_twips(&self) -> u32 {
         self.size_twips
     }

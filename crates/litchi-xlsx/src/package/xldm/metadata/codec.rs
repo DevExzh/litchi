@@ -16,7 +16,12 @@ use super::super::native::{
     DictionaryBody, DictionaryType, NativeData, NativeFile, StringPageData,
 };
 use super::super::{GeneratedNameKind, Storage, classify_generated_path};
-use super::model::*;
+use super::model::{
+    ColumnPolicy, DictionaryPolicy, HierarchyPolicy, MetadataClass, MetadataCollection,
+    MetadataDataObject, MetadataError, MetadataFile, MetadataFileKind, MetadataMember,
+    MetadataModel, MetadataObject, MetadataProperty, MetadataResult, RelationshipIndexKind,
+    RelationshipPolicy,
+};
 use super::model::{hybrid_width, no_split_width};
 
 const MAX_METADATA_BYTES: usize = 16 * 1024 * 1024;
@@ -300,10 +305,10 @@ fn project_object(node: XmlNode) -> MetadataResult<MetadataObject> {
             "Properties" if properties.is_none() => properties = Some(project_properties(child)?),
             "Members" if members.is_none() => members = Some(project_members(child)?),
             "Collections" if collections.is_none() => {
-                collections = Some(project_collections(child)?)
+                collections = Some(project_collections(child)?);
             },
             "DataObjects" if data_objects.is_none() => {
-                data_objects = Some(project_data_objects(child)?)
+                data_objects = Some(project_data_objects(child)?);
             },
             "Properties" | "Members" | "Collections" | "DataObjects" => {
                 return Err(MetadataError::new("duplicate XMObject container"));
@@ -595,10 +600,10 @@ fn validate_object(object: &MetadataObject) -> MetadataResult<()> {
         value if value.starts_with("XMHybridRLECompressionInfo<class ") => (&[], 0b0010),
         _ => (&[], 0),
     };
-    let actual = (!object.properties.is_empty() as u8)
-        | ((!object.members.is_empty() as u8) << 1)
-        | ((!object.collections.is_empty() as u8) << 2)
-        | ((!object.data_objects.is_empty() as u8) << 3);
+    let actual = u8::from(!object.properties.is_empty())
+        | (u8::from(!object.members.is_empty()) << 1)
+        | (u8::from(!object.collections.is_empty()) << 2)
+        | (u8::from(!object.data_objects.is_empty()) << 3);
     if actual != containers {
         return Err(MetadataError::new(format!(
             "{class} has invalid or missing containers"

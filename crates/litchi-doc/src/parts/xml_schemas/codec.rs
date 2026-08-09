@@ -21,7 +21,7 @@ const MAX_SIGNED_COUNT: u32 = 0x7FFF_FFFF;
 /// empty STTB headers (MS-DOC 2.9.352).
 const MIN_XSDR_LEN: usize = 2 + 2 + STTB_HEADER_LEN + STTB_HEADER_LEN;
 /// Maximum byte length of the `fcCustomXForm` path array (MS-DOC
-/// FibRgFcLcb2007).
+/// `FibRgFcLcb2007`).
 pub(super) const MAX_CUSTOM_XFORM_BYTES: u32 = 4168;
 
 impl Collection {

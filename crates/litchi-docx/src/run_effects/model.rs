@@ -1,3 +1,19 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::ref_option,
+    reason = "the public API shape is retained for compatibility"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::wildcard_enum_match_arm,
+    reason = "non-exhaustive dependency enums require a future-safe fallback"
+)]
 //! Typed semantic values for Word 2010 run-property effects.
 //!
 //! The owner deliberately models only the seven visual effects from
@@ -12,7 +28,7 @@ use super::validation;
 pub const MAX_EFFECTS: usize = 64;
 /// Maximum bytes retained for one unsupported extension element.
 pub const MAX_OPAQUE_BYTES: usize = 256 * 1024;
-/// Maximum number of color transforms on one DrawingML color.
+/// Maximum number of color transforms on one `DrawingML` color.
 pub const MAX_COLOR_TRANSFORMS: usize = 32;
 /// Maximum gradient stops accepted by the Word 2010 schema.
 pub const MAX_GRADIENT_STOPS: usize = 10;
@@ -39,23 +55,27 @@ impl Effects {
 
     /// Number of typed and opaque direct children.
     #[inline]
+    #[must_use]
     pub fn len(&self) -> usize {
         self.values.len()
     }
 
     /// Whether the collection has no direct children.
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.values.is_empty()
     }
 
     /// Iterate effects in source order.
     #[inline]
+    #[must_use]
     pub fn iter(&self) -> impl ExactSizeIterator<Item = &Effect> {
         self.values.iter()
     }
 
     /// Return the first glow effect, if present.
+    #[must_use]
     pub fn glow(&self) -> Option<&Glow> {
         self.values.iter().find_map(|effect| match effect {
             Effect::Glow(value) => Some(value),
@@ -64,6 +84,7 @@ impl Effects {
     }
 
     /// Return the first shadow effect, if present.
+    #[must_use]
     pub fn shadow(&self) -> Option<&Shadow> {
         self.values.iter().find_map(|effect| match effect {
             Effect::Shadow(value) => Some(value),
@@ -72,6 +93,7 @@ impl Effects {
     }
 
     /// Return the first reflection effect, if present.
+    #[must_use]
     pub fn reflection(&self) -> Option<&Reflection> {
         self.values.iter().find_map(|effect| match effect {
             Effect::Reflection(value) => Some(value),
@@ -80,6 +102,7 @@ impl Effects {
     }
 
     /// Return the first text outline effect, if present.
+    #[must_use]
     pub fn text_outline(&self) -> Option<&TextOutline> {
         self.values.iter().find_map(|effect| match effect {
             Effect::TextOutline(value) => Some(value),
@@ -88,6 +111,7 @@ impl Effects {
     }
 
     /// Return the first text fill effect, if present.
+    #[must_use]
     pub fn text_fill(&self) -> Option<&TextFill> {
         self.values.iter().find_map(|effect| match effect {
             Effect::TextFill(value) => Some(value),
@@ -96,6 +120,7 @@ impl Effects {
     }
 
     /// Return the first 3-D scene effect, if present.
+    #[must_use]
     pub fn scene3d(&self) -> Option<&Scene3d> {
         self.values.iter().find_map(|effect| match effect {
             Effect::Scene3d(value) => Some(value),
@@ -104,6 +129,7 @@ impl Effects {
     }
 
     /// Return the first 3-D text-properties effect, if present.
+    #[must_use]
     pub fn props3d(&self) -> Option<&Props3d> {
         self.values.iter().find_map(|effect| match effect {
             Effect::Props3d(value) => Some(value),
@@ -120,6 +146,10 @@ impl Effects {
     }
 
     /// Append an effect after validating cardinality and duplicate rules.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn push(&mut self, effect: Effect) -> Result<&mut Self> {
         if self.values.len() >= MAX_EFFECTS {
             return Err(Error::Invalid(format!(
@@ -143,51 +173,91 @@ impl Effects {
     }
 
     /// Append a bounded unsupported extension child.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn push_unknown(&mut self, value: OpaqueExtension) -> Result<&mut Self> {
         self.push(Effect::Unknown(value))
     }
 
     /// Replace or remove one typed effect without disturbing opaque order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_glow(&mut self, value: Option<Glow>) -> Result<&mut Self> {
         self.replace(EffectKind::Glow, value.map(Effect::Glow))
     }
 
     /// Replace or remove one typed effect without disturbing opaque order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_shadow(&mut self, value: Option<Shadow>) -> Result<&mut Self> {
         self.replace(EffectKind::Shadow, value.map(Effect::Shadow))
     }
 
     /// Replace or remove one typed effect without disturbing opaque order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_reflection(&mut self, value: Option<Reflection>) -> Result<&mut Self> {
         self.replace(EffectKind::Reflection, value.map(Effect::Reflection))
     }
 
     /// Replace or remove one typed effect without disturbing opaque order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_text_outline(&mut self, value: Option<TextOutline>) -> Result<&mut Self> {
         self.replace(EffectKind::TextOutline, value.map(Effect::TextOutline))
     }
 
     /// Replace or remove one typed effect without disturbing opaque order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_text_fill(&mut self, value: Option<TextFill>) -> Result<&mut Self> {
         self.replace(EffectKind::TextFill, value.map(Effect::TextFill))
     }
 
     /// Replace or remove one typed effect without disturbing opaque order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_scene3d(&mut self, value: Option<Scene3d>) -> Result<&mut Self> {
         self.replace(EffectKind::Scene3d, value.map(Effect::Scene3d))
     }
 
     /// Replace or remove one typed effect without disturbing opaque order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_props3d(&mut self, value: Option<Props3d>) -> Result<&mut Self> {
         self.replace(EffectKind::Props3d, value.map(Effect::Props3d))
     }
 
     /// Validate every typed and opaque child.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn validate(&self) -> Result<()> {
         validation::validate(self)
     }
 
     /// Parse a complete `w:r` or `w:rPr` XML fragment.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn parse(xml: &[u8]) -> Result<Self> {
         super::codec::parse(xml)
     }
@@ -237,6 +307,7 @@ pub enum Effect {
 
 impl Effect {
     /// Return the contextual effect kind.
+    #[must_use]
     pub const fn kind(&self) -> EffectKind {
         match self {
             Self::Glow(_) => EffectKind::Glow,
@@ -278,10 +349,12 @@ pub enum EffectKind {
 }
 
 impl EffectKind {
+    #[must_use]
     pub const fn is_known(self) -> bool {
         !matches!(self, Self::Unknown)
     }
 
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Glow => "glow",
@@ -305,6 +378,10 @@ pub struct OpaqueExtension {
 
 impl OpaqueExtension {
     /// Retain one complete XML element after applying the byte bound.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(xml: impl Into<Vec<u8>>) -> Result<Self> {
         let xml = xml.into();
         if xml.is_empty() {
@@ -322,6 +399,7 @@ impl OpaqueExtension {
 
     /// Borrow the exact retained XML bytes.
     #[inline]
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         &self.xml
     }
@@ -336,7 +414,7 @@ pub enum Color {
     Scheme(SchemeColor),
 }
 
-/// An RGB color and its ordered DrawingML transforms.
+/// An RGB color and its ordered `DrawingML` transforms.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RgbColor {
     pub value: [u8; 3],
@@ -345,6 +423,7 @@ pub struct RgbColor {
 
 impl RgbColor {
     /// Construct an RGB color without transforms.
+    #[must_use]
     pub const fn new(value: [u8; 3]) -> Self {
         Self {
             value,
@@ -353,7 +432,7 @@ impl RgbColor {
     }
 }
 
-/// A scheme color and its ordered DrawingML transforms.
+/// A scheme color and its ordered `DrawingML` transforms.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SchemeColor {
     pub value: SchemeColorValue,
@@ -407,6 +486,7 @@ impl SchemeColorValue {
         })
     }
 
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Background1 => "bg1",
@@ -430,7 +510,7 @@ impl SchemeColorValue {
     }
 }
 
-/// One DrawingML color transform, represented in thousandths of a percent.
+/// One `DrawingML` color transform, represented in thousandths of a percent.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColorTransform {
     Tint(u32),
@@ -674,6 +754,10 @@ macro_rules! token_type {
         pub struct $name(Box<str>);
 
         impl $name {
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if the operation cannot be completed.
             pub fn new(value: impl AsRef<str>) -> Result<Self> {
                 let value = value.as_ref();
                 if !$values.contains(&value) {
@@ -869,7 +953,16 @@ impl Color {
                         "signed DrawingML color transform is outside -100000..=100000".into(),
                     ));
                 },
-                _ => {},
+                ColorTransform::Tint(_)
+                | ColorTransform::Shade(_)
+                | ColorTransform::Alpha(_)
+                | ColorTransform::HueMod(_)
+                | ColorTransform::Saturation(_)
+                | ColorTransform::SaturationOffset(_)
+                | ColorTransform::SaturationMod(_)
+                | ColorTransform::Luminance(_)
+                | ColorTransform::LuminanceOffset(_)
+                | ColorTransform::LuminanceMod(_) => {},
             }
         }
         Ok(())
@@ -928,7 +1021,7 @@ impl TextFill {
 impl TextOutline {
     pub(crate) fn validate(&self) -> Result<()> {
         if let Some(fill) = &self.fill {
-            fill.validate()?
+            fill.validate()?;
         }
         if let Some(LineJoin::Miter { limit }) = &self.join {
             validate_positive_percentage(*limit, "miter limit")?;

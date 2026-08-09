@@ -7,7 +7,7 @@ pub enum EncryptionProfile {
     WordXorObfuscation,
     /// Office 97 binary RC4 with a 40-bit password-derived secret.
     OfficeBinaryRc4,
-    /// Office CryptoAPI RC4/SHA-1 using a supported byte-aligned key size.
+    /// Office `CryptoAPI` RC4/SHA-1 using a supported byte-aligned key size.
     CryptoApiRc4 {
         /// RC4 key size in bits. Supported values are 40 through 128 in steps of eight.
         key_bits: u16,

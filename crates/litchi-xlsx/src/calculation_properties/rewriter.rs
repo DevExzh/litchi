@@ -196,16 +196,14 @@ pub(super) fn inspect_layout(xml: &[u8], limits: &Limits) -> Result<Layout> {
                 if stack.is_empty() && non_whitespace {
                     return Err(invalid("text outside workbook root"));
                 }
-                if non_whitespace {
-                    if let Some(frame) = stack.last_mut() {
-                        match &mut frame.kind {
-                            Kind::TargetExt { mixed } => {
-                                *mixed = true;
-                                mixed_target = true;
-                            },
-                            Kind::ExtList { other } => *other = true,
-                            _ => {},
-                        }
+                if non_whitespace && let Some(frame) = stack.last_mut() {
+                    match &mut frame.kind {
+                        Kind::TargetExt { mixed } => {
+                            *mixed = true;
+                            mixed_target = true;
+                        },
+                        Kind::ExtList { other } => *other = true,
+                        _ => {},
                     }
                 }
             },
@@ -243,7 +241,10 @@ pub(super) fn inspect_layout(xml: &[u8], limits: &Limits) -> Result<Layout> {
     })
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "arguments are the complete validated calculation-property attribute set"
+)]
 fn inspect_start(
     element: BytesStart<'_>,
     empty: bool,
@@ -301,7 +302,7 @@ fn inspect_start(
             ));
         }
         *root_seen = true;
-        *root_qname = qname.clone();
+        root_qname.clone_from(&qname);
         kind = Kind::Root;
     } else if depth == 1 && core && local.as_ref() == b"calcPr" {
         if calc.is_some() {
@@ -388,7 +389,10 @@ fn inspect_start(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "arguments are the complete calculation-property rewrite state"
+)]
 fn close_frame(
     frame: Frame,
     end: usize,
@@ -413,7 +417,7 @@ fn close_frame(
                 span,
                 start_tag_end: frame.start_tag_end,
                 qname: frame.qname,
-            })
+            });
         },
         Kind::ExtList { other } => {
             *ext_list = Some(ExtensionList {

@@ -1,4 +1,4 @@
-//! Relationship-reference codec for ActiveX descriptor graphs.
+//! Relationship-reference codec for `ActiveX` descriptor graphs.
 
 use super::super::model::{Descriptor, Font, Property, PropertyObject};
 use super::super::{Result, relerr};
@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 
 /// Returns every binary relationship referenced by a descriptor in stable
 /// order. Duplicate references are rejected because one relationship ID must
-/// identify one package edge in the ActiveX graph.
+/// identify one package edge in the `ActiveX` graph.
 pub(crate) fn descriptor_relationship_ids(value: &Descriptor) -> Result<Vec<String>> {
     let mut ids = BTreeSet::new();
     if let Some(id) = value.relationship_id.as_ref() {

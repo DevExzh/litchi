@@ -208,6 +208,7 @@ impl DocumentStructuredTags {
     }
 
     /// All structured document tags in start-CP order.
+    #[must_use]
     pub fn tags(&self) -> &[DocumentStructuredTag] {
         &self.tags
     }

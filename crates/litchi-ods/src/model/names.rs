@@ -1,9 +1,9 @@
-//! Named ranges and named expressions in OpenDocument spreadsheets.
+//! Named ranges and named expressions in `OpenDocument` spreadsheets.
 //!
 //! ODF permits named definitions at document scope and at sheet scope.  A
 //! named range identifies a cell range and can additionally declare one or
 //! more special uses.  A named expression associates a name with an
-//! OpenFormula expression.
+//! `OpenFormula` expression.
 
 use super::structure::validate_cell_range_addresses;
 use litchi_core::{Error, Result, xml::escape_xml};
@@ -31,6 +31,7 @@ impl Scope {
     }
 
     /// Return the local sheet name, or `None` for a global definition.
+    #[must_use]
     pub fn sheet_name(&self) -> Option<&str> {
         match self {
             Self::Global => None,
@@ -54,6 +55,7 @@ pub enum Usage {
 
 impl Usage {
     /// The ODF token used in `table:range-usable-as`.
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::PrintRange => "print-range",
@@ -93,6 +95,9 @@ pub struct Range {
 
 impl Range {
     /// Create a named range with no special usage or base cell.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn new(
         name: impl Into<String>,
         cell_range_address: impl Into<String>,
@@ -110,6 +115,9 @@ impl Range {
     }
 
     /// Set the base cell used to resolve relative references.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn with_base_cell(mut self, address: impl Into<String>) -> Result<Self> {
         self.base_cell_address = Some(address.into());
         self.validate()?;
@@ -117,6 +125,7 @@ impl Range {
     }
 
     /// Add a special use, ignoring a duplicate use already present.
+    #[must_use]
     pub fn with_usage(mut self, usage: Usage) -> Self {
         if !self.usable_as.contains(&usage) {
             self.usable_as.push(usage);
@@ -164,12 +173,12 @@ impl Range {
     }
 }
 
-/// A named OpenFormula expression (`table:named-expression`).
+/// A named `OpenFormula` expression (`table:named-expression`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Expression {
     /// Name by which formulas can refer to the expression.
     pub name: String,
-    /// The OpenFormula expression, including its namespace prefix when present.
+    /// The `OpenFormula` expression, including its namespace prefix when present.
     pub expression: String,
     /// Optional base cell used to resolve relative references.
     pub base_cell_address: Option<String>,
@@ -195,6 +204,9 @@ use formula::Namespace;
 
 impl Expression {
     /// Create a named expression with no base cell.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn new(
         name: impl Into<String>,
         expression: impl Into<String>,
@@ -227,6 +239,9 @@ impl Expression {
     ///
     /// Use this for custom formula prefixes. The prefix is taken from the
     /// expression itself, such as `calc` in `calc:=SUM([.A1:.A3])`.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn new_with_namespace(
         name: impl Into<String>,
         expression: impl Into<String>,
@@ -254,6 +269,9 @@ impl Expression {
     }
 
     /// Set the base cell used to resolve relative references.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn with_base_cell(mut self, address: impl Into<String>) -> Result<Self> {
         self.base_cell_address = Some(address.into());
         self.validate()?;
@@ -322,12 +340,13 @@ impl Expression {
 pub enum Definition {
     /// A named cell range.
     Range(Range),
-    /// A named OpenFormula expression.
+    /// A named `OpenFormula` expression.
     Expression(Expression),
 }
 
 impl Definition {
     /// Definition name.
+    #[must_use]
     pub fn name(&self) -> &str {
         match self {
             Self::Range(value) => &value.name,
@@ -336,6 +355,7 @@ impl Definition {
     }
 
     /// Definition scope.
+    #[must_use]
     pub fn scope(&self) -> &Scope {
         match self {
             Self::Range(value) => &value.scope,

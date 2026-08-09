@@ -55,11 +55,13 @@ pub struct Switch {
 
 impl Switch {
     /// Return the switch character, without its leading backslash.
+    #[must_use]
     pub fn name(&self) -> char {
         self.name
     }
 
     /// Return the optional argument supplied to this switch.
+    #[must_use]
     pub fn argument(&self) -> Option<&str> {
         self.argument.as_deref()
     }

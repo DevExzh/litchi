@@ -50,6 +50,12 @@ pub struct ForceFullCalculation {
 
 impl ForceFullCalculation {
     /// Parse a `ForceFullCalculation` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// # Panics
+    ///
+    /// Panics only if an internal BIFF invariant has been violated.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
             return Err(Error::InvalidLength {
@@ -85,6 +91,7 @@ impl ForceFullCalculation {
     }
 
     /// Serialize back to a complete `ForceFullCalculation` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(PAYLOAD_LEN);
         payload.extend_from_slice(&FORCE_FULL_CALCULATION_RECORD_TYPE.to_le_bytes());
@@ -96,11 +103,13 @@ impl ForceFullCalculation {
 
     /// Whether dependencies are ignored and all cell formulas fully calculate
     /// every time a calculation is triggered (`fNoDeps`).
+    #[must_use]
     pub fn force_full(&self) -> bool {
         self.force_full
     }
 
     /// Raw `frtHeader.grbitFrt` bitfield (`fFrtRef`/`fFrtAlert` are zero).
+    #[must_use]
     pub fn frt_flags(&self) -> u16 {
         self.frt_flags
     }

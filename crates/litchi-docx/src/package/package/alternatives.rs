@@ -1,9 +1,24 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
 //! Package-backed alternative-format anchors and relationship lifecycle.
 
-use super::super::model::*;
+use super::super::model::{
+    BlobPart, Chunk, Conformance, Error, Import, MAX_CHUNKS, PackURI, Package, Rel, Result,
+    TargetMode, is_relationship,
+};
 
 impl Package {
     /// Append a package-backed alternative-format import to the document body.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_alt(&mut self, import: Import, match_source: Option<bool>) -> Result<Chunk> {
         let index = self.document_mut()?.alts().len();
         self.insert_alt(index, import, match_source)
@@ -12,6 +27,10 @@ impl Package {
     /// Insert a package-backed alternative-format import by anchor-relative index.
     ///
     /// Part, relationship, and body mutations are rolled back together on error.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn insert_alt(
         &mut self,
         index: usize,
@@ -43,6 +62,10 @@ impl Package {
     }
 
     /// Replace an anchor and its relationship as one package mutation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn replace_alt(
         &mut self,
         index: usize,
@@ -73,6 +96,10 @@ impl Package {
     }
 
     /// Remove an anchor, its relationship, and an unreachable internal payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove_alt(&mut self, index: usize) -> Result<Chunk> {
         let old = self
             .document_mut()?
@@ -89,6 +116,10 @@ impl Package {
     }
 
     /// Reorder body anchors without changing their package relationships.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn move_alt(&mut self, from: usize, to: usize) -> Result<()> {
         self.document_mut()?.move_alt(from, to)
     }
@@ -96,15 +127,11 @@ impl Package {
     fn alt_chunk_namespace(&self) -> Result<Conformance> {
         let document_uri = PackURI::new("/word/document.xml")
             .map_err(|error| Error::InvalidUri(format!("document URI: {error}")))?;
-        let strict = self
-            .opc
-            .get_part(&document_uri)
-            .map(|part| {
-                part.blob()
-                    .windows(b"http://purl.oclc.org/ooxml/wordprocessingml/main".len())
-                    .any(|window| window == b"http://purl.oclc.org/ooxml/wordprocessingml/main")
-            })
-            .unwrap_or(false);
+        let strict = self.opc.get_part(&document_uri).is_ok_and(|part| {
+            part.blob()
+                .windows(b"http://purl.oclc.org/ooxml/wordprocessingml/main".len())
+                .any(|window| window == b"http://purl.oclc.org/ooxml/wordprocessingml/main")
+        });
         Ok(if strict {
             Conformance::Strict
         } else {
@@ -204,7 +231,7 @@ impl Package {
                 chunk.relationship().as_str()
             ))
         })?;
-        self.opc.get_part(&target).map_err(|_| {
+        self.opc.get_part(&target).map_err(|_source_error| {
             Error::InvalidFormat(format!(
                 "altChunk relationship {:?} targets a missing part",
                 chunk.relationship().as_str()

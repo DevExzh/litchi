@@ -10,7 +10,7 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 pub enum EncryptionKind {
     /// Legacy BIFF8 binary RC4.
     BinaryRc4,
-    /// CryptoAPI encryption.
+    /// `CryptoAPI` encryption.
     CryptoApi,
     /// An unknown `wEncryptionType` value.
     Unknown(u16),
@@ -97,18 +97,18 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::Io(e) => write!(f, "I/O error: {}", e),
-            Error::Cfb(e) => write!(f, "CFB error: {}", e),
-            Error::Vba(e) => write!(f, "VBA project error: {}", e),
+            Error::Io(e) => write!(f, "I/O error: {e}"),
+            Error::Cfb(e) => write!(f, "CFB error: {e}"),
+            Error::Vba(e) => write!(f, "VBA project error: {e}"),
             Error::Graph(e) => write!(f, "Office Graph error: {e}"),
             Error::InvalidRecord {
                 record_type,
                 message,
             } => {
-                write!(f, "Invalid record 0x{:04X}: {}", record_type, message)
+                write!(f, "Invalid record 0x{record_type:04X}: {message}")
             },
             Error::UnsupportedBiffVersion(version) => {
-                write!(f, "Unsupported BIFF version: {}", version)
+                write!(f, "Unsupported BIFF version: {version}")
             },
             Error::PasswordProtected => {
                 write!(f, "Workbook is password protected")
@@ -122,34 +122,34 @@ impl fmt::Display for Error {
                 write!(f, "Malformed FILEPASS record: {message}")
             },
             Error::InvalidLength { expected, found } => {
-                write!(f, "Invalid length: expected {}, found {}", expected, found)
+                write!(f, "Invalid length: expected {expected}, found {found}")
             },
             Error::Allocation(context) => {
                 write!(f, "Allocation failed while {context}")
             },
             Error::UnexpectedEndOfStream(context) => {
-                write!(f, "Unexpected end of stream: {}", context)
+                write!(f, "Unexpected end of stream: {context}")
             },
             Error::InvalidFormula(msg) => {
-                write!(f, "Invalid formula: {}", msg)
+                write!(f, "Invalid formula: {msg}")
             },
             Error::InvalidCellReference(ref_str) => {
-                write!(f, "Invalid cell reference: {}", ref_str)
+                write!(f, "Invalid cell reference: {ref_str}")
             },
             Error::WorksheetNotFound(name) => {
-                write!(f, "Worksheet '{}' not found", name)
+                write!(f, "Worksheet '{name}' not found")
             },
             Error::InvalidFormat(code) => {
-                write!(f, "Invalid format code: {}", code)
+                write!(f, "Invalid format code: {code}")
             },
             Error::Encoding(msg) => {
-                write!(f, "Encoding error: {}", msg)
+                write!(f, "Encoding error: {msg}")
             },
             Error::UnsupportedFeature(feature) => {
-                write!(f, "Unsupported feature: {}", feature)
+                write!(f, "Unsupported feature: {feature}")
             },
             Error::InvalidData(msg) => {
-                write!(f, "Invalid data: {}", msg)
+                write!(f, "Invalid data: {msg}")
             },
             Error::UnsafeEdit(msg) => write!(f, "Unsafe edit refused: {msg}"),
             Error::SourceBoundWorksheetMutation { operation } => write!(
@@ -163,12 +163,11 @@ impl fmt::Display for Error {
             Error::UnexpectedRecordType { expected, found } => {
                 write!(
                     f,
-                    "Unexpected record type: expected 0x{:04X}, found 0x{:04X}",
-                    expected, found
+                    "Unexpected record type: expected 0x{expected:04X}, found 0x{found:04X}"
                 )
             },
             Error::Eof(context) => {
-                write!(f, "End of file: {}", context)
+                write!(f, "End of file: {context}")
             },
         }
     }

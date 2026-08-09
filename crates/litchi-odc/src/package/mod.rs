@@ -2,4 +2,4 @@
 
 mod snapshot;
 
-pub(crate) use snapshot::{MIMETYPE, Snapshot};
+pub(crate) use snapshot::{MIMETYPE, ResourceReplacement, Snapshot, StylesReplacement};

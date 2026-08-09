@@ -1,3 +1,15 @@
+#![expect(
+    clippy::assigning_clones,
+    reason = "clone assignment preserves validation-before-replacement behavior"
+)]
+#![expect(
+    clippy::manual_let_else,
+    reason = "the match form keeps both parser outcomes explicit"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Source-checked glossary catalog and auxiliary-graph transactions.
 
 use super::codec::{invalid, validate_physical_part};
@@ -22,6 +34,10 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Load and validate the glossary owner and every reachable auxiliary part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn load(package: &OpcPackage) -> Result<Self> {
         let main_part = package.main_document_part()?.partname().as_str().to_owned();
         let package_conformance = package_conformance(package)?;
@@ -39,16 +55,22 @@ impl Snapshot {
     }
 
     /// Alias for [`Self::load`] emphasizing the source-bound result.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn read(package: &OpcPackage) -> Result<Self> {
         Self::load(package)
     }
 
     /// Complete raw graph, when a glossary relationship exists.
+    #[must_use]
     pub fn graph(&self) -> Option<&raw::Graph> {
         self.graph.as_ref()
     }
 
     /// Typed catalog, when a glossary relationship exists.
+    #[must_use]
     pub fn catalog(&self) -> Option<&Catalog> {
         self.graph.as_ref().map(|value| &value.catalog)
     }
@@ -59,6 +81,7 @@ impl Snapshot {
     }
 
     /// Opaque auxiliary parts in the captured ownership closure.
+    #[must_use]
     pub fn auxiliary_parts(&self) -> &[raw::Part] {
         self.graph
             .as_ref()
@@ -66,6 +89,7 @@ impl Snapshot {
     }
 
     /// Root-part relationships in the captured glossary graph.
+    #[must_use]
     pub fn relationships(&self) -> &[raw::Rel] {
         self.graph
             .as_ref()
@@ -73,21 +97,25 @@ impl Snapshot {
     }
 
     /// Main document part owning the glossary relationship.
+    #[must_use]
     pub fn main_part_name(&self) -> &str {
         &self.main_part
     }
 
     /// Conformance family used by this package or its glossary owner.
+    #[must_use]
     pub const fn conformance(&self) -> Conformance {
         self.conformance
     }
 
     /// Exact source revision used by optimistic stale checks.
+    #[must_use]
     pub const fn revision(&self) -> Revision {
         self.revision
     }
 
     /// Whether this package has no glossary owner.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.graph.is_none()
     }
@@ -109,6 +137,10 @@ pub struct Transaction<'a> {
 
 impl<'a> Transaction<'a> {
     /// Capture the current package graph and begin an isolated transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(target: &'a mut OpcPackage) -> Result<Self> {
         let before = Snapshot::load(target)?;
         Ok(Self {
@@ -119,16 +151,19 @@ impl<'a> Transaction<'a> {
     }
 
     /// Immutable source snapshot used for conflict checks and inverse patches.
+    #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Borrow the currently staged typed catalog.
+    #[must_use]
     pub fn catalog(&self) -> Option<&Catalog> {
         self.draft.as_ref().map(|value| &value.catalog)
     }
 
     /// Borrow the currently staged opaque auxiliary parts.
+    #[must_use]
     pub fn auxiliary_parts(&self) -> &[raw::Part] {
         self.draft
             .as_ref()
@@ -136,6 +171,7 @@ impl<'a> Transaction<'a> {
     }
 
     /// Borrow the currently staged root relationships.
+    #[must_use]
     pub fn relationships(&self) -> &[raw::Rel] {
         self.draft
             .as_ref()
@@ -143,11 +179,16 @@ impl<'a> Transaction<'a> {
     }
 
     /// Whether the staged complete graph differs from its source.
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.draft != self.before.graph
     }
 
     /// Replace the complete semantic catalog while retaining its graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn replace_catalog(&mut self, value: Catalog) -> Result<bool> {
         let changed = self.update_catalog(|catalog| {
             let changed = *catalog != value;
@@ -158,6 +199,10 @@ impl<'a> Transaction<'a> {
     }
 
     /// Apply an atomic mutation to the typed catalog.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn edit_catalog(
         &mut self,
         edit: impl FnOnce(&mut Catalog) -> Result<()>,
@@ -170,41 +215,73 @@ impl<'a> Transaction<'a> {
     }
 
     /// Add one named AutoText/building-block entry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_entry(&mut self, value: Entry) -> Result<usize> {
         self.update_catalog(|catalog| catalog.add(value))
     }
 
     /// Insert or replace one entry selected by its semantic name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn put_entry(&mut self, value: Entry) -> Result<Option<Entry>> {
         self.update_catalog(|catalog| catalog.put(value))
     }
 
     /// Replace one uniquely selected entry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn replace_entry(&mut self, name: &str, value: Entry) -> Result<Option<Entry>> {
         self.update_catalog(|catalog| catalog.replace(name, value))
     }
 
     /// Rename one uniquely selected entry without rebuilding its body.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn rename_entry(&mut self, name: &str, value: Name) -> Result<bool> {
         self.update_catalog(|catalog| catalog.rename(name, value))
     }
 
     /// Remove one uniquely selected entry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove_entry(&mut self, name: &str) -> Result<Option<Entry>> {
         self.update_catalog(|catalog| catalog.remove(name))
     }
 
     /// Reorder one entry in the semantic catalog.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn move_entry(&mut self, from: usize, to: usize) -> Result<bool> {
         self.update_catalog(|catalog| catalog.move_at(from, to))
     }
 
     /// Remove all entries while retaining the glossary owner and auxiliaries.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn clear_entries(&mut self) -> Result<usize> {
         self.update_catalog(|catalog| Ok(catalog.clear()))
     }
 
     /// Replace the root relationship set while preserving its authored IDs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_relationships(&mut self, relationships: Vec<raw::Rel>) -> Result<bool> {
         let mut graph = self.candidate_graph();
         if graph.rels == relationships {
@@ -217,6 +294,10 @@ impl<'a> Transaction<'a> {
     }
 
     /// Add one root relationship, rejecting duplicate IDs atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_relationship(&mut self, relationship: raw::Rel) -> Result<bool> {
         let mut graph = self.candidate_graph();
         if graph.rels.iter().any(|value| value.id == relationship.id) {
@@ -230,6 +311,10 @@ impl<'a> Transaction<'a> {
     }
 
     /// Remove one root relationship by ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove_relationship(&mut self, id: &str) -> Result<Option<raw::Rel>> {
         let mut graph = self.candidate_graph();
         let Some(index) = graph.rels.iter().position(|value| value.id == id) else {
@@ -242,6 +327,10 @@ impl<'a> Transaction<'a> {
     }
 
     /// Add one opaque auxiliary part to the ownership graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_part(&mut self, part: raw::Part) -> Result<bool> {
         let mut graph = self.candidate_graph();
         let uri = PackURI::new(&part.name).map_err(crate::Error::Uri)?;
@@ -253,8 +342,7 @@ impl<'a> Transaction<'a> {
             })
         {
             return Err(invalid(format!(
-                "glossary auxiliary part '{}' already exists",
-                uri
+                "glossary auxiliary part '{uri}' already exists"
             )));
         }
         graph.parts.push(part);
@@ -264,6 +352,10 @@ impl<'a> Transaction<'a> {
     }
 
     /// Replace one opaque auxiliary part by its absolute part name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn replace_part(
         &mut self,
         name: &str,
@@ -282,8 +374,7 @@ impl<'a> Transaction<'a> {
         });
         let Some(index) = index else {
             return Err(invalid(format!(
-                "glossary auxiliary part '{}' is absent",
-                requested
+                "glossary auxiliary part '{requested}' is absent"
             )));
         };
         if graph.parts[index] == part {
@@ -297,6 +388,10 @@ impl<'a> Transaction<'a> {
     }
 
     /// Replace one opaque auxiliary payload while retaining its relationships.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn replace_part_data(&mut self, name: &str, data: Vec<u8>) -> Result<bool> {
         let mut graph = self.candidate_graph();
         let index = part_index(&graph, name)?;
@@ -311,6 +406,10 @@ impl<'a> Transaction<'a> {
     }
 
     /// Replace one opaque auxiliary relationship set.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_part_relationships(
         &mut self,
         name: &str,
@@ -328,6 +427,10 @@ impl<'a> Transaction<'a> {
     }
 
     /// Remove one auxiliary part; dangling relationships are rejected at commit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove_part(&mut self, name: &str) -> Result<Option<raw::Part>> {
         let mut graph = self.candidate_graph();
         let index = match part_index(&graph, name) {
@@ -342,14 +445,14 @@ impl<'a> Transaction<'a> {
 
     /// Remove the complete glossary owner and its exclusively owned graph.
     pub fn remove_glossary(&mut self) -> bool {
-        if self.draft.take().is_some() {
-            true
-        } else {
-            false
-        }
+        self.draft.take().is_some()
     }
 
     /// Validate and publish the staged graph atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn commit(self) -> Result<Commit> {
         if !self.is_changed() {
             let patch = Patch::new(self.before.clone(), self.before.clone());
@@ -417,18 +520,22 @@ impl Commit {
         }
     }
 
+    #[must_use]
     pub const fn changed(&self) -> bool {
         self.changed
     }
 
+    #[must_use]
     pub const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
+    #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
+    #[must_use]
     pub fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
@@ -446,18 +553,22 @@ impl Patch {
         Self { before, after }
     }
 
+    #[must_use]
     pub const fn before(&self) -> &Snapshot {
         &self.before
     }
 
+    #[must_use]
     pub const fn after(&self) -> &Snapshot {
         &self.after
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
+    #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
@@ -466,6 +577,10 @@ impl Patch {
     }
 
     /// Apply the patch atomically after checking the complete owner graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn apply(&self, target: &mut OpcPackage) -> Result<Snapshot> {
         let current = Snapshot::load(target)?;
         if !current.same_source(&self.before) {
@@ -494,6 +609,10 @@ impl Patch {
     }
 
     /// Apply the inverse patch atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn undo(&self, target: &mut OpcPackage) -> Result<Snapshot> {
         self.inverse().apply(target)
     }
@@ -509,7 +628,7 @@ fn part_index(graph: &raw::Graph, name: &str) -> Result<usize> {
                 .ok()
                 .is_some_and(|candidate| candidate.is_equivalent_to(&requested))
         })
-        .ok_or_else(|| invalid(format!("glossary auxiliary part '{}' is absent", requested)))
+        .ok_or_else(|| invalid(format!("glossary auxiliary part '{requested}' is absent")))
 }
 
 fn validate_candidate(graph: &raw::Graph) -> Result<()> {

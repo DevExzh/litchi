@@ -1,3 +1,27 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
+#![expect(
+    clippy::similar_names,
+    reason = "domain names mirror distinct OOXML roles"
+)]
+#![expect(
+    clippy::struct_excessive_bools,
+    reason = "the public model preserves independent OOXML flags"
+)]
+#![expect(
+    clippy::too_many_arguments,
+    reason = "the signature mirrors the corresponding OOXML record"
+)]
 //! Bounded two-pass, source-coordinate parser for Word 2010 conflict markup.
 
 use std::collections::{HashMap, HashSet};
@@ -361,7 +385,7 @@ pub(crate) fn parse(source: &[u8], limits: Limits) -> Result<Inventory> {
                     let conflict = &mut inventory.conflicts[index];
                     conflict.content = Span::new(conflict.start_tag.end(), begin)?;
                     conflict.span = Span::new(conflict.span.start(), end)?;
-                    if conflict.scope == Scope::Property && conflict.content.len() != 0 {
+                    if conflict.scope == Scope::Property && !conflict.content.is_empty() {
                         return Err(invalid("property conflict marker must be childless"));
                     }
                 }
@@ -375,7 +399,11 @@ pub(crate) fn parse(source: &[u8], limits: Limits) -> Result<Inventory> {
                 }
                 break;
             },
-            _ => {},
+            Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     for (conflict, spans) in inventory.conflicts.iter_mut().zip(text_segments) {
@@ -397,7 +425,7 @@ fn effective_parent(frames: &[Frame]) -> Option<&Frame> {
 fn namespace_bytes(namespace: &ResolveResult<'_>) -> Vec<u8> {
     match namespace {
         ResolveResult::Bound(Namespace(value)) => (*value).to_vec(),
-        _ => Vec::new(),
+        ResolveResult::Unbound | ResolveResult::Unknown(_) => Vec::new(),
     }
 }
 
@@ -413,7 +441,7 @@ fn process_content_directives(
     for attribute in element.attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let (namespace, _) = resolver.resolve_attribute(attribute.key);
-        if !matches!(namespace, ResolveResult::Bound(Namespace(value)) if value.as_ref() == MC)
+        if !matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == MC)
             || attribute.key.local_name().as_ref() != b"ProcessContent"
         {
             continue;
@@ -622,12 +650,10 @@ fn active_starts(source: &[u8], limits: Limits) -> Result<HashSet<usize>> {
                 let (wrapper, range) = classify(&namespace, &element);
                 let ignorable_w14 = frames.last().is_some_and(|frame| frame.ignorable_w14)
                     || declares_w14_ignorable(&element, reader.decoder(), &resolver)?;
-                if wrapper.is_some() || range.is_some() {
-                    if !ignorable_w14 {
-                        return Err(invalid(
-                            "W14 conflict markup requires an effective mc:Ignorable binding",
-                        ));
-                    }
+                if (wrapper.is_some() || range.is_some()) && !ignorable_w14 {
+                    return Err(invalid(
+                        "W14 conflict markup requires an effective mc:Ignorable binding",
+                    ));
                 }
                 push_offset(&mut offsets, start, max_offsets)?;
                 frames.push(MceFrame {
@@ -647,12 +673,10 @@ fn active_starts(source: &[u8], limits: Limits) -> Result<HashSet<usize>> {
                 let (wrapper, range) = classify(&namespace, &element);
                 let ignorable_w14 = frames.last().is_some_and(|frame| frame.ignorable_w14)
                     || declares_w14_ignorable(&element, reader.decoder(), &resolver)?;
-                if wrapper.is_some() || range.is_some() {
-                    if !ignorable_w14 {
-                        return Err(invalid(
-                            "W14 conflict markup requires an effective mc:Ignorable binding",
-                        ));
-                    }
+                if (wrapper.is_some() || range.is_some()) && !ignorable_w14 {
+                    return Err(invalid(
+                        "W14 conflict markup requires an effective mc:Ignorable binding",
+                    ));
                 }
                 push_offset(&mut offsets, start, max_offsets)?;
                 namespace_bindings = pop_namespace_declarations(
@@ -678,7 +702,11 @@ fn active_starts(source: &[u8], limits: Limits) -> Result<HashSet<usize>> {
                 }
                 break;
             },
-            _ => {},
+            Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     let mut capabilities = litchi_ooxml_common::mce::Capabilities::ooxml_baseline();
@@ -747,7 +775,7 @@ fn active_starts(source: &[u8], limits: Limits) -> Result<HashSet<usize>> {
     for offset in selected {
         active.insert(
             usize::try_from(offset)
-                .map_err(|_| invalid("active conflict offset does not fit usize"))?,
+                .map_err(|_source_error| invalid("active conflict offset does not fit usize"))?,
         );
     }
     Ok(active)
@@ -762,8 +790,10 @@ fn push_offset(offsets: &mut Vec<u32>, start: usize, max: usize) -> Result<()> {
     offsets
         .try_reserve(1)
         .map_err(alloc("conflict MCE offsets"))?;
-    offsets
-        .push(u32::try_from(start).map_err(|_| invalid("conflict XML offset does not fit u32"))?);
+    offsets.push(
+        u32::try_from(start)
+            .map_err(|_source_error| invalid("conflict XML offset does not fit u32"))?,
+    );
     Ok(())
 }
 
@@ -869,7 +899,7 @@ fn range_marker(
     Ok(())
 }
 
-/// Decode the CT_Markup end marker.  Unlike CT_TrackChange starts it carries
+/// Decode the `CT_Markup` end marker.  Unlike `CT_TrackChange` starts it carries
 /// only `w:id`; author/date are neither required nor retained.
 fn range_end_id(
     source: &[u8],
@@ -926,7 +956,7 @@ fn range_end_id(
     let value = id.ok_or_else(|| invalid("conflict range end lacks required w:id"))?;
     let id = value
         .parse::<i32>()
-        .map_err(|_| invalid("conflict range-end id is not a signed i32"))?;
+        .map_err(|_source_error| invalid("conflict range-end id is not a signed i32"))?;
     Ok((Id::new(id)?, span))
 }
 fn is_namespace_declaration(key: &[u8]) -> bool {
@@ -1014,7 +1044,7 @@ fn metadata(
     let raw = id.ok_or_else(|| invalid("conflict markup lacks required w:id"))?;
     let id = raw
         .parse::<i32>()
-        .map_err(|_| invalid("conflict markup id is not a signed i32"))?;
+        .map_err(|_source_error| invalid("conflict markup id is not a signed i32"))?;
     let author = author.ok_or_else(|| invalid("conflict markup lacks required w:author"))?;
     Ok((
         Metadata::new(Id::new(id)?, author, date)?,
@@ -1196,7 +1226,7 @@ fn declares_w14_ignorable(
     for attribute in element.attributes() {
         let attribute = attribute.map_err(|e| Error::Xml(e.to_string()))?;
         let (namespace, _) = resolver.resolve_attribute(attribute.key);
-        if !matches!(namespace, ResolveResult::Bound(Namespace(value)) if value.as_ref() == MC)
+        if !matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == MC)
             || attribute.key.local_name().as_ref() != b"Ignorable"
         {
             continue;
@@ -1214,8 +1244,7 @@ fn declares_w14_ignorable(
             // than the default namespace.
             let qualified = format!("{token}:_");
             let (namespace, _) = resolver.resolve_element(QName(qualified.as_bytes()));
-            if matches!(namespace, ResolveResult::Bound(Namespace(value)) if value.as_ref() == W14)
-            {
+            if matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == W14) {
                 return Ok(true);
             }
         }
@@ -1331,11 +1360,12 @@ fn ns(namespace: &ResolveResult<'_>) -> Ns {
         {
             Ns::Math
         },
-        _ => Ns::Other,
+        ResolveResult::Unbound | ResolveResult::Bound(_) | ResolveResult::Unknown(_) => Ns::Other,
     }
 }
 fn pos(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position()).map_err(|_| invalid("XML offset does not fit usize"))
+    usize::try_from(reader.buffer_position())
+        .map_err(|_source_error| invalid("XML offset does not fit usize"))
 }
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())

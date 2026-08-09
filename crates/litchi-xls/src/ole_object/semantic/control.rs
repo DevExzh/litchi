@@ -92,6 +92,7 @@ pub enum DropDownStyle {
 }
 
 impl DropDownStyle {
+    #[must_use]
     pub const fn code(self) -> u16 {
         match self {
             Self::Combo => 0,
@@ -113,6 +114,7 @@ pub struct FtCblsData {
 }
 
 impl FtCblsData {
+    #[must_use]
     pub fn no_3d(&self) -> bool {
         self.flags & super::super::NO_3D != 0
     }
@@ -128,6 +130,7 @@ pub struct FtGboData {
 }
 
 impl FtGboData {
+    #[must_use]
     pub fn no_3d(&self) -> bool {
         self.flags & super::super::NO_3D != 0
     }
@@ -165,24 +168,28 @@ pub struct FtSbs {
 }
 
 impl FtSbs {
+    #[must_use]
     pub fn draw(&self) -> bool {
         self.flags & super::super::SBS_DRAW != 0
     }
 
+    #[must_use]
     pub fn draw_slider_only(&self) -> bool {
         self.flags & super::super::SBS_DRAW_SLIDER_ONLY != 0
     }
 
+    #[must_use]
     pub fn track_elevator(&self) -> bool {
         self.flags & super::super::SBS_TRACK_ELEVATOR != 0
     }
 
+    #[must_use]
     pub fn no_3d(&self) -> bool {
         self.flags & super::super::SBS_NO_3D != 0
     }
 }
 
-/// A list item retaining its original XLUnicodeString encoding.
+/// A list item retaining its original `XLUnicodeString` encoding.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LbsItem {
     pub(crate) text: String,
@@ -190,6 +197,7 @@ pub struct LbsItem {
 }
 
 impl LbsItem {
+    #[must_use]
     pub fn new(text: &str) -> Option<Self> {
         let mut encoded = Vec::new();
         if text.chars().all(|value| u32::from(value) <= 0xFF) {
@@ -216,7 +224,10 @@ impl LbsItem {
         })
     }
 
-    /// Creates an item or reports the MS-XLS XLUnicodeString size limit.
+    /// Creates an item or reports the MS-XLS `XLUnicodeString` size limit.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(text: &str) -> crate::error::Result<Self> {
         Self::new(text).ok_or_else(|| {
             super::super::invalid(
@@ -226,10 +237,12 @@ impl LbsItem {
         })
     }
 
+    #[must_use]
     pub fn text(&self) -> &str {
         &self.text
     }
 
+    #[must_use]
     pub fn encoded(&self) -> &[u8] {
         &self.encoded
     }
@@ -247,11 +260,15 @@ pub struct LbsDropData {
 
 impl LbsDropData {
     /// Creates dropdown metadata from a typed style and display string.
+    #[must_use]
     pub fn new(style: DropDownStyle, line_count: u16, min_width: u16, text: &str) -> Option<Self> {
         Self::try_new(style, line_count, min_width, text).ok()
     }
 
     /// Fallible form of [`LbsDropData::new`], with MS-XLS validation errors.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(
         style: DropDownStyle,
         line_count: u16,
@@ -268,6 +285,7 @@ impl LbsDropData {
     }
 
     /// Creates dropdown metadata while retaining a pre-encoded list item.
+    #[must_use]
     pub fn from_item(
         style: DropDownStyle,
         line_count: u16,
@@ -287,6 +305,7 @@ impl LbsDropData {
         })
     }
 
+    #[must_use]
     pub fn style(&self) -> DropDownStyle {
         match self.flags & super::super::DROP_STYLE_MASK {
             0 => DropDownStyle::Combo,
@@ -296,10 +315,12 @@ impl LbsDropData {
         }
     }
 
+    #[must_use]
     pub fn filtered(&self) -> bool {
         self.flags & super::super::DROP_FILTERED != 0
     }
 
+    #[must_use]
     pub fn text(&self) -> &str {
         self.text.text()
     }
@@ -325,8 +346,11 @@ pub struct FtLbsData {
 
 impl FtLbsData {
     /// Creates complete list metadata from already encoded item values.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn from_items(items: Vec<LbsItem>) -> crate::error::Result<Self> {
-        let entry_count = u16::try_from(items.len()).map_err(|_| {
+        let entry_count = u16::try_from(items.len()).map_err(|_error| {
             super::super::invalid(
                 super::super::FT_LBS_DATA,
                 "list item count exceeds the u16 representation",
@@ -347,6 +371,9 @@ impl FtLbsData {
     }
 
     /// Creates complete list metadata from display strings.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn from_texts<I, T>(texts: I) -> crate::error::Result<Self>
     where
         I: IntoIterator<Item = T>,
@@ -359,22 +386,27 @@ impl FtLbsData {
         Self::from_items(items)
     }
 
+    #[must_use]
     pub fn has_behavior_class(&self) -> bool {
         self.flags & super::super::LBS_USE_CB != 0
     }
 
+    #[must_use]
     pub fn has_item_strings(&self) -> bool {
         self.flags & super::super::LBS_VALID_PLEX != 0
     }
 
+    #[must_use]
     pub fn has_edit_box(&self) -> bool {
         self.flags & super::super::LBS_VALID_IDS != 0
     }
 
+    #[must_use]
     pub fn no_3d(&self) -> bool {
         self.flags & super::super::LBS_NO_3D != 0
     }
 
+    #[must_use]
     pub fn selection_type(&self) -> ListSelectionType {
         match (self.flags >> super::super::LBS_SELECTION_TYPE_SHIFT)
             & super::super::LBS_SELECTION_TYPE_MASK
@@ -386,6 +418,7 @@ impl FtLbsData {
         }
     }
 
+    #[must_use]
     pub fn behavior_class(&self) -> ListBehaviorClass {
         match (self.flags >> super::super::LBS_BEHAVIOR_CLASS_SHIFT) as u8 {
             0x00 => ListBehaviorClass::Regular,
@@ -399,11 +432,15 @@ impl FtLbsData {
         }
     }
 
+    #[must_use]
     pub fn items(&self) -> &[LbsItem] {
         &self.items
     }
 
     /// Replaces authored items and synchronizes `cLines` and `fValidPlex`.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_items_checked(&mut self, items: Vec<LbsItem>) -> crate::error::Result<()> {
         let replacement = Self::from_items(items)?;
         self.entry_count = replacement.entry_count;
@@ -484,12 +521,14 @@ impl FormControl {
         }
     }
 
-    /// Attaches an already framed TxO object to this control.
+    /// Attaches an already framed `TxO` object to this control.
+    #[must_use]
     pub fn with_text_object(mut self, text_object: Vec<u8>) -> Self {
         self.text_object = Some(text_object);
         self
     }
 
+    #[must_use]
     pub fn object_id(&self) -> u16 {
         self.common().map_or(0, |value| value.object_id)
     }
@@ -498,6 +537,7 @@ impl FormControl {
         self.common().and_then(super::obj::FtCmo::object_kind)
     }
 
+    #[must_use]
     pub fn check_box_data(&self) -> Option<&FtCblsData> {
         self.find(|value| match value {
             super::obj::ObjSubrecord::CheckBoxData(value) => Some(value),
@@ -505,6 +545,7 @@ impl FormControl {
         })
     }
 
+    #[must_use]
     pub fn radio_button_data(&self) -> Option<&FtRboData> {
         self.find(|value| match value {
             super::obj::ObjSubrecord::RadioButtonData(value) => Some(value),
@@ -512,6 +553,7 @@ impl FormControl {
         })
     }
 
+    #[must_use]
     pub fn edit_box_data(&self) -> Option<&FtEdoData> {
         self.find(|value| match value {
             super::obj::ObjSubrecord::EditBoxData(value) => Some(value),
@@ -519,6 +561,7 @@ impl FormControl {
         })
     }
 
+    #[must_use]
     pub fn group_box_data(&self) -> Option<&FtGboData> {
         self.find(|value| match value {
             super::obj::ObjSubrecord::GroupBoxData(value) => Some(value),
@@ -526,6 +569,7 @@ impl FormControl {
         })
     }
 
+    #[must_use]
     pub fn scroll_bar_data(&self) -> Option<&FtSbs> {
         self.find(|value| match value {
             super::obj::ObjSubrecord::ScrollBarData(value) => Some(value),
@@ -533,6 +577,7 @@ impl FormControl {
         })
     }
 
+    #[must_use]
     pub fn list_box_data(&self) -> Option<&FtLbsData> {
         self.find(|value| match value {
             super::obj::ObjSubrecord::ListBoxData(value) => Some(value),

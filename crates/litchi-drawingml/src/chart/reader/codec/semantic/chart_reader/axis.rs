@@ -1,4 +1,15 @@
-use super::*;
+use super::{
+    AxisCommon, AxisCrossBetween, AxisCrossMode, AxisOrientation, AxisPosition, BufRead,
+    BytesStart, CategoryAxis, ChartXmlReader, DataSourceRef, DateAxis, Decoder, DisplayUnits,
+    Error, Event, ExtensionList, Layout, Lines, NumberFormat, Result, RichText, SeriesAxis,
+    ShapeProperties, TextProperties, TickLabelPosition, TickMark, TitleText, ValueAxis,
+    bounded_u32_attr, decode_xml_reference, missing_attribute, parse_axis_cross_between,
+    parse_axis_cross_mode, parse_axis_label_align, parse_axis_orientation, parse_axis_position,
+    parse_bool_attr, parse_built_in_unit, parse_chart_lines, parse_layout, parse_number_format,
+    parse_text_element, parse_tick_label_position, parse_tick_mark, parse_time_unit, parse_title,
+    required_f64_attr, required_positive_f64_attr, required_positive_u32_attr, required_u32_attr,
+    set_chart_lines,
+};
 
 #[derive(Default)]
 struct ParsedAxisScaling {
@@ -164,7 +175,7 @@ pub(crate) fn parse_axis_common_element(
         b"delete" => common.deleted = parse_bool_attr(element)?,
         b"axPos" => common.position = Some(parse_axis_position(element)?),
         b"numFmt" => {
-            common.number_format = Some(parse_number_format(element, decoder, "chart axis")?)
+            common.number_format = Some(parse_number_format(element, decoder, "chart axis")?);
         },
         b"majorTickMark" => common.major_tick_mark = parse_tick_mark(element)?,
         b"minorTickMark" => common.minor_tick_mark = parse_tick_mark(element)?,
@@ -320,7 +331,7 @@ pub(crate) fn parse_category_axis<R: BufRead>(
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"title" => {
                 parse_axis_title(reader, &mut common)?;
             },
-            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
+            Ok(Event::Start(ref element) | Event::Empty(ref element))
                 if !parse_axis_common_element(&mut common, element, reader.decoder())? =>
             {
                 if in_scaling && scaling.parse_element(element)? {
@@ -424,7 +435,7 @@ pub(crate) fn parse_value_axis<R: BufRead>(
                     "chart display units are missing their unit".into(),
                 ));
             },
-            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
+            Ok(Event::Start(ref element) | Event::Empty(ref element))
                 if !parse_axis_common_element(&mut common, element, reader.decoder())? =>
             {
                 if in_scaling && scaling.parse_element(element)? {
@@ -522,7 +533,7 @@ pub(crate) fn parse_display_units<R: BufRead>(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
-            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
+            Ok(Event::Start(ref element) | Event::Empty(ref element)) => {
                 match element.local_name().as_ref() {
                     b"builtInUnit" => {
                         if built_in_unit.is_some() {
@@ -756,7 +767,7 @@ pub(crate) fn parse_date_axis<R: BufRead>(
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"title" => {
                 parse_axis_title(reader, &mut common)?;
             },
-            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
+            Ok(Event::Start(ref element) | Event::Empty(ref element))
                 if !parse_axis_common_element(&mut common, element, reader.decoder())? =>
             {
                 if in_scaling && scaling.parse_element(element)? {
@@ -849,7 +860,7 @@ pub(crate) fn parse_series_axis<R: BufRead>(
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"title" => {
                 parse_axis_title(reader, &mut common)?;
             },
-            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
+            Ok(Event::Start(ref element) | Event::Empty(ref element))
                 if !parse_axis_common_element(&mut common, element, reader.decoder())? =>
             {
                 if in_scaling && scaling.parse_element(element)? {

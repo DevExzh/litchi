@@ -5,11 +5,15 @@ use crate::error::{Error, Result};
 
 use super::super::model::Document;
 
-impl<'a> Document<'a> {
+impl Document<'_> {
     /// Resolve an alternative-format anchor to its borrowed opaque OPC payload.
     ///
     /// This validates the relationship type and internal target but never parses,
     /// imports, executes, or fetches the foreign content.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn resolve_alt<'b>(&'b self, chunk: &Chunk) -> Result<Part<'b>> {
         let relationship = self
             .part
@@ -47,6 +51,10 @@ impl<'a> Document<'a> {
     ///
     /// Internal targets are returned as opaque package bytes. External targets
     /// are returned as their relationship URI and are never accessed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn alt_target<'b>(&'b self, chunk: &Chunk) -> Result<Target<'b>> {
         let relationship = self
             .part
@@ -87,6 +95,10 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn is_protected(&self) -> Result<bool> {
         Ok(self.settings()?.is_some_and(|s| s.is_protected()))
     }

@@ -44,31 +44,37 @@ impl Snapshot {
     }
 
     /// Worksheet selected by this snapshot.
+    #[must_use]
     pub fn worksheet(&self) -> &PackURI {
         &self.worksheet
     }
 
     /// Borrow the complete typed OLE graph, when the worksheet has one.
+    #[must_use]
     pub fn objects(&self) -> Option<&OleObjects> {
         self.objects.as_ref()
     }
 
     /// Contextual alias for [`Self::objects`].
+    #[must_use]
     pub fn ole_objects(&self) -> Option<&OleObjects> {
         self.objects()
     }
 
     /// Exact worksheet XML captured by this snapshot.
+    #[must_use]
     pub fn source_xml(&self) -> &[u8] {
         self.source.xml.as_slice()
     }
 
     /// Conformance namespace selected by the worksheet source.
+    #[must_use]
     pub fn conformance(&self) -> super::model::OleObjectConformance {
         self.conformance
     }
 
     /// Whether this worksheet has no OLE-object collection.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.objects.is_none()
     }
@@ -105,10 +111,10 @@ impl SourceState {
                 if let Some(super::model::OleObjectTarget::Internal(resource)) = &object.target {
                     names.insert(resource.part_name.clone());
                 }
-                if let Some(properties) = &object.properties {
-                    if let Some(preview) = &properties.preview {
-                        names.insert(preview.part_name.clone());
-                    }
+                if let Some(properties) = &object.properties
+                    && let Some(preview) = &properties.preview
+                {
+                    names.insert(preview.part_name.clone());
                 }
             }
         }

@@ -28,6 +28,7 @@ impl<'source> Transaction<'source> {
     }
 
     /// Borrow the current ergonomic metadata draft.
+    #[must_use]
     pub fn metadata(&self) -> &CoreMetadata {
         &self.draft
     }
@@ -37,6 +38,9 @@ impl<'source> Transaction<'source> {
     /// ODF fields that the common retained-source patcher does not own must
     /// remain unchanged; silently dropping such edits would violate the
     /// snapshot contract, so they are rejected before any package bytes move.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn replace(&mut self, metadata: CoreMetadata) -> Result<()> {
         validate_supported_change(&self.original, &metadata)?;
         self.draft = metadata;
@@ -56,6 +60,9 @@ impl<'source> Transaction<'source> {
     }
 
     /// Commit the draft into a bounded metadata XML result.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn commit(self) -> Result<Commit<'source>> {
         if self.remove_part {
             return Ok(Commit {
@@ -74,8 +81,7 @@ impl<'source> Transaction<'source> {
 
         let source = self
             .source
-            .map(str::to_owned)
-            .unwrap_or_else(Structure::default_meta_xml);
+            .map_or_else(Structure::default_meta_xml, str::to_owned);
         let source_metadata = if self.source.is_some() {
             self.source_odf
         } else {
@@ -83,7 +89,7 @@ impl<'source> Transaction<'source> {
         };
         let patch = MetaXmlPatch::preserve_all().diff_simple_fields(&source_metadata, &self.draft);
         let xml = litchi_odf_common::core::patch_meta_xml(&source, &patch)?
-            .unwrap_or_else(|| Structure::default_meta_xml());
+            .unwrap_or_else(Structure::default_meta_xml);
         if xml.len() > super::model::MAX_XML_BYTES {
             return Err(Error::InvalidFormat(
                 "patched ODS meta.xml exceeds the size limit".to_string(),
@@ -103,13 +109,17 @@ pub struct Editor<'transaction, 'source> {
     transaction: &'transaction mut Transaction<'source>,
 }
 
-impl<'transaction, 'source> Editor<'transaction, 'source> {
+impl Editor<'_, '_> {
     /// Borrow the current draft.
+    #[must_use]
     pub fn metadata(&self) -> &CoreMetadata {
         self.transaction.metadata()
     }
 
     /// Apply a checked update to the ergonomic metadata projection.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn update<F>(&mut self, update: F) -> Result<()>
     where
         F: FnOnce(&mut CoreMetadata) -> Result<()>,
@@ -119,6 +129,9 @@ impl<'transaction, 'source> Editor<'transaction, 'source> {
         self.transaction.replace(candidate)
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_title(&mut self, value: impl Into<String>) -> Result<()> {
         self.update(|metadata| {
             metadata.title = Some(value.into());
@@ -126,6 +139,9 @@ impl<'transaction, 'source> Editor<'transaction, 'source> {
         })
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn clear_title(&mut self) -> Result<()> {
         self.update(|metadata| {
             metadata.title = None;
@@ -133,6 +149,9 @@ impl<'transaction, 'source> Editor<'transaction, 'source> {
         })
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_author(&mut self, value: impl Into<String>) -> Result<()> {
         self.update(|metadata| {
             metadata.author = Some(value.into());
@@ -140,6 +159,9 @@ impl<'transaction, 'source> Editor<'transaction, 'source> {
         })
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn clear_author(&mut self) -> Result<()> {
         self.update(|metadata| {
             metadata.author = None;
@@ -147,6 +169,9 @@ impl<'transaction, 'source> Editor<'transaction, 'source> {
         })
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_subject(&mut self, value: impl Into<String>) -> Result<()> {
         self.update(|metadata| {
             metadata.subject = Some(value.into());
@@ -154,6 +179,9 @@ impl<'transaction, 'source> Editor<'transaction, 'source> {
         })
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn clear_subject(&mut self) -> Result<()> {
         self.update(|metadata| {
             metadata.subject = None;
@@ -161,6 +189,9 @@ impl<'transaction, 'source> Editor<'transaction, 'source> {
         })
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_description(&mut self, value: impl Into<String>) -> Result<()> {
         self.update(|metadata| {
             metadata.description = Some(value.into());
@@ -168,6 +199,9 @@ impl<'transaction, 'source> Editor<'transaction, 'source> {
         })
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn clear_description(&mut self) -> Result<()> {
         self.update(|metadata| {
             metadata.description = None;
@@ -175,6 +209,9 @@ impl<'transaction, 'source> Editor<'transaction, 'source> {
         })
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_keywords(&mut self, value: impl Into<String>) -> Result<()> {
         self.update(|metadata| {
             metadata.keywords = Some(value.into());
@@ -182,6 +219,9 @@ impl<'transaction, 'source> Editor<'transaction, 'source> {
         })
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn clear_keywords(&mut self) -> Result<()> {
         self.update(|metadata| {
             metadata.keywords = None;
@@ -204,22 +244,26 @@ pub struct Commit<'source> {
 
 impl Commit<'_> {
     /// Borrow the new metadata XML, or `None` when the part is absent.
+    #[must_use]
     pub fn xml(&self) -> Option<&str> {
         self.xml.as_deref()
     }
 
     /// Borrow the new ergonomic projection.
+    #[must_use]
     pub fn metadata(&self) -> &CoreMetadata {
         &self.value
     }
 
     /// Whether the transaction changed the physical part.
+    #[must_use]
     pub fn changed(&self) -> bool {
         self.changed
     }
 }
 
 impl<'source> Commit<'source> {
+    #[must_use]
     pub fn into_xml(self) -> Option<Cow<'source, str>> {
         self.xml
     }

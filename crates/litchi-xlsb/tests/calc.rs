@@ -1,3 +1,10 @@
+#![allow(
+    clippy::pedantic,
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "integration tests use panic-on-failure extraction and exact fixture comparisons"
+)]
+
 use litchi_xlsb::calc::{self, Delta, Error, Mode, Opts, Props, Threads};
 use litchi_xlsb::raw::{Error as RawError, Stage, Writer};
 

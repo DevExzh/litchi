@@ -69,11 +69,13 @@ impl UserIdentity {
     }
 
     /// Return the complete stored field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
 
     /// Return whether this is an address, initials, or name field.
+    #[must_use]
     pub fn kind(&self) -> UserIdentityKind {
         self.kind
     }
@@ -83,6 +85,7 @@ impl UserIdentity {
     /// `Some("")` represents an explicitly supplied blank override. This
     /// stored text is never written to, read from, or compared with a host
     /// identity.
+    #[must_use]
     pub fn override_value(&self) -> Option<&str> {
         self.override_value.as_deref()
     }
@@ -90,6 +93,7 @@ impl UserIdentity {
     /// Return the stored general-formatting request, if any.
     ///
     /// This request is metadata only and is never applied to an identity value.
+    #[must_use]
     pub fn formatting(&self) -> Option<UserIdentityFormat> {
         self.formatting
     }
@@ -97,16 +101,19 @@ impl UserIdentity {
     /// Return the cached visible field result, if present.
     ///
     /// This is stored text only and is never regenerated from a host identity.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a word processor has marked the cached result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
 
     /// Whether a word processor has locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.locked
     }
@@ -142,11 +149,13 @@ pub struct AdvanceAdjustment {
 
 impl AdvanceAdjustment {
     /// Return the requested placement operation.
+    #[must_use]
     pub fn operation(&self) -> AdvanceOperation {
         self.operation
     }
 
     /// Return the stored signed integral number of points.
+    #[must_use]
     pub fn points(&self) -> i64 {
         self.points
     }
@@ -183,6 +192,7 @@ impl Advance {
     }
 
     /// Return the complete stored field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
@@ -191,6 +201,7 @@ impl Advance {
     ///
     /// Repeated operations are preserved; this library does not resolve or
     /// apply them.
+    #[must_use]
     pub fn adjustments(&self) -> &[AdvanceAdjustment] {
         &self.adjustments
     }
@@ -199,16 +210,19 @@ impl Advance {
     ///
     /// `ADVANCE` has no regenerated value here; any returned text is stored
     /// source content only.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a word processor has marked the cached result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
 
     /// Whether a word processor has locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.locked
     }
@@ -219,6 +233,7 @@ impl Field {
     ///
     /// Recognition is limited to the stored field instruction. It never reads
     /// the current user's address or refreshes the cached result.
+    #[must_use]
     pub fn is_user_address(&self) -> bool {
         field_instruction_remainder(&self.instruction, "USERADDRESS").is_some()
     }
@@ -227,6 +242,7 @@ impl Field {
     ///
     /// Recognition is limited to the stored field instruction. It never reads
     /// the current user's initials or refreshes the cached result.
+    #[must_use]
     pub fn is_user_initials(&self) -> bool {
         field_instruction_remainder(&self.instruction, "USERINITIALS").is_some()
     }
@@ -235,11 +251,13 @@ impl Field {
     ///
     /// Recognition is limited to the stored field instruction. It never reads
     /// the current user's name or refreshes the cached result.
+    #[must_use]
     pub fn is_user_name(&self) -> bool {
         field_instruction_remainder(&self.instruction, "USERNAME").is_some()
     }
 
     /// Check whether this is a `USERADDRESS`, `USERINITIALS`, or `USERNAME` field.
+    #[must_use]
     pub fn is_user_identity_field(&self) -> bool {
         self.is_user_address() || self.is_user_initials() || self.is_user_name()
     }
@@ -250,6 +268,10 @@ impl Field {
     /// `USERNAME`. The result exposes only stored override, formatting,
     /// cached-content, and dirty/lock metadata; it never reads or modifies a
     /// host user's identity or refreshes a field.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn user_identity_field(&self) -> Result<Option<UserIdentity>> {
         UserIdentity::from_field(self)
     }
@@ -258,6 +280,7 @@ impl Field {
     ///
     /// Recognition is limited to the stored field instruction. It never moves
     /// text, changes layout, reflows content, or refreshes a cached result.
+    #[must_use]
     pub fn is_advance_field(&self) -> bool {
         field_instruction_remainder(&self.instruction, "ADVANCE").is_some()
     }
@@ -268,6 +291,10 @@ impl Field {
     /// values expose only stored point adjustments, cached content, and
     /// dirty/lock state. This method never moves text, changes layout, reflows
     /// content, or refreshes a field.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn advance_field(&self) -> Result<Option<Advance>> {
         Advance::from_field(self)
     }

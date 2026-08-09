@@ -1,4 +1,4 @@
-//! Closed DrawingML preset-geometry domains.
+//! Closed `DrawingML` preset-geometry domains.
 //!
 //! The token sets in this module are the complete `ST_ShapeType` and
 //! `ST_TextShapeType` enumerations from `dml-main.xsd` in both schema archives:
@@ -11,7 +11,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-/// The closed DrawingML token domain that failed validation.
+/// The closed `DrawingML` token domain that failed validation.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[repr(u8)]
 enum Domain {
@@ -28,7 +28,7 @@ impl Domain {
     }
 }
 
-/// Error returned when a token is outside a closed DrawingML preset domain.
+/// Error returned when a token is outside a closed `DrawingML` preset domain.
 ///
 /// The error does not copy the rejected input. Callers that need to report it
 /// can retain or borrow the token they supplied to [`FromStr`] or [`TryFrom`].
@@ -43,6 +43,7 @@ impl TokenError {
     }
 
     /// Return the ECMA-376 simple-type name whose validation failed.
+    #[must_use]
     pub const fn domain(self) -> &'static str {
         self.domain.schema_name()
     }

@@ -1,3 +1,11 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "the public API shape is retained for compatibility"
+)]
 //! Bounded semantic validation for Word 2010 OpenType extensions.
 
 use crate::error::Result;

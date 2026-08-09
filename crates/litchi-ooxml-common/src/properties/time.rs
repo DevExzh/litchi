@@ -197,7 +197,7 @@ struct Year<'a> {
     digits: &'a str,
 }
 
-fn validate_date<'a>(value: &'a str, minimum: DatePrecision) -> Result<(Year<'a>, DatePrecision)> {
+fn validate_date(value: &str, minimum: DatePrecision) -> Result<(Year<'_>, DatePrecision)> {
     let negative = value.starts_with('-');
     let start = usize::from(negative);
     let separator = value[start..].find('-').map(|index| start + index);

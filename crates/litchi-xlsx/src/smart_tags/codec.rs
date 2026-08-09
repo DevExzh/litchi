@@ -1,4 +1,4 @@
-//! Bounded SpreadsheetML smart-tag XML conversion.
+//! Bounded `SpreadsheetML` smart-tag XML conversion.
 
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
 use litchi_sheet::Cell as Address;

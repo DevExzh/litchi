@@ -10,7 +10,7 @@ use crate::layout::Descent;
 pub use crate::outline::{Outline, OutlineAt, OutlineError};
 use crate::style::StyleState;
 
-/// Checked SpreadsheetML row height in points.
+/// Checked `SpreadsheetML` row height in points.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Height(u64);
 
@@ -25,12 +25,13 @@ impl Height {
     }
 
     /// Return the height in points.
+    #[must_use]
     pub const fn get(self) -> f64 {
         f64::from_bits(self.0)
     }
 }
 
-/// Invalid SpreadsheetML row height.
+/// Invalid `SpreadsheetML` row height.
 #[derive(Debug, Clone, Copy, PartialEq, Error)]
 #[error("row height {value} is outside Excel's finite range 0..=409 points")]
 pub struct HeightError {
@@ -39,6 +40,7 @@ pub struct HeightError {
 
 impl HeightError {
     /// Rejected numeric value.
+    #[must_use]
     pub const fn value(self) -> f64 {
         self.value
     }
@@ -103,7 +105,7 @@ bitflags! {
     }
 }
 
-/// Complete modeled properties of one stored SpreadsheetML row record.
+/// Complete modeled properties of one stored `SpreadsheetML` row record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Properties {
     pub(crate) height: Option<Height>,
@@ -127,56 +129,67 @@ pub struct Props {
 
 impl Props {
     /// Producer-stored row height, if present.
+    #[must_use]
     pub const fn height(&self) -> Option<Height> {
         self.height
     }
 
     /// Producer-stored typographic descent at 100% worksheet zoom.
+    #[must_use]
     pub const fn descent(&self) -> Option<Descent> {
         self.descent
     }
 
     /// Exact local shared-style state without a physical style index.
+    #[must_use]
     pub const fn style(&self) -> &StyleState {
         &self.style
     }
 
     /// Checked outline level.
+    #[must_use]
     pub const fn outline(&self) -> Outline {
         self.outline
     }
 
     /// Whether the row is hidden.
+    #[must_use]
     pub const fn hidden(&self) -> bool {
         self.flags.contains(Flags::HIDDEN)
     }
 
     /// Whether the row height is explicitly customized.
+    #[must_use]
     pub const fn custom_height(&self) -> bool {
         self.flags.contains(Flags::CUSTOM_HEIGHT) || self.descent.is_some()
     }
 
     /// Whether the row's outline is stored in its collapsed state.
+    #[must_use]
     pub const fn collapsed(&self) -> bool {
         self.flags.contains(Flags::COLLAPSED)
     }
 
     /// Whether the row requests a thick top edge.
+    #[must_use]
     pub const fn thick_top(&self) -> bool {
         self.flags.contains(Flags::THICK_TOP)
     }
 
     /// Whether the row requests a thick bottom edge.
+    #[must_use]
     pub const fn thick_bottom(&self) -> bool {
         self.flags.contains(Flags::THICK_BOTTOM)
     }
 
     /// Whether phonetic information is shown by default.
+    #[must_use]
     pub const fn phonetic(&self) -> bool {
         self.flags.contains(Flags::PHONETIC)
     }
 
     /// Whether the producer explicitly applies the row style.
+    #[must_use]
     pub const fn custom_format(&self) -> bool {
         self.flags.contains(Flags::CUSTOM_FORMAT)
     }
@@ -212,7 +225,7 @@ impl State {
     }
 }
 
-/// One stored SpreadsheetML row record.
+/// One stored `SpreadsheetML` row record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Stored {
     pub(crate) index: Index,
@@ -228,7 +241,7 @@ impl Stored {
 /// Borrowed view of one logical worksheet row.
 ///
 /// Every checked grid row has a view. [`Self::stored`] distinguishes an
-/// explicit SpreadsheetML row record from an implicit default row.
+/// explicit `SpreadsheetML` row record from an implicit default row.
 #[derive(Debug, Clone, Copy)]
 pub struct Row<'a> {
     index: Index,
@@ -241,16 +254,19 @@ impl<'a> Row<'a> {
     }
 
     /// Checked zero-based row coordinate.
+    #[must_use]
     pub const fn index(self) -> Index {
         self.index
     }
 
     /// Whether the worksheet contains an explicit row record here.
+    #[must_use]
     pub const fn stored(self) -> bool {
         self.stored.is_some()
     }
 
     /// Producer-stored row height, if present.
+    #[must_use]
     pub const fn height(self) -> Option<Height> {
         match self.stored {
             Some(row) => row.properties.height,
@@ -259,6 +275,7 @@ impl<'a> Row<'a> {
     }
 
     /// Producer-stored typographic descent at 100% worksheet zoom.
+    #[must_use]
     pub const fn descent(self) -> Option<Descent> {
         match self.stored {
             Some(row) => row.properties.descent,
@@ -267,6 +284,7 @@ impl<'a> Row<'a> {
     }
 
     /// Whether the row is explicitly hidden.
+    #[must_use]
     pub const fn hidden(self) -> bool {
         match self.stored {
             Some(row) => row.properties.flags.contains(Flags::HIDDEN),
@@ -275,6 +293,7 @@ impl<'a> Row<'a> {
     }
 
     /// Whether the producer stored a custom-height marker.
+    #[must_use]
     pub const fn custom_height(self) -> bool {
         match self.stored {
             Some(row) => {
@@ -286,6 +305,7 @@ impl<'a> Row<'a> {
     }
 
     /// Effective checked row outline level.
+    #[must_use]
     pub const fn outline(self) -> Outline {
         match self.stored {
             Some(row) => row.properties.outline,
@@ -294,6 +314,7 @@ impl<'a> Row<'a> {
     }
 
     /// Whether the row's outline is stored in its collapsed state.
+    #[must_use]
     pub const fn collapsed(self) -> bool {
         match self.stored {
             Some(row) => row.properties.flags.contains(Flags::COLLAPSED),
@@ -302,6 +323,7 @@ impl<'a> Row<'a> {
     }
 
     /// Whether the row requests a thick top edge.
+    #[must_use]
     pub const fn thick_top(self) -> bool {
         match self.stored {
             Some(row) => row.properties.flags.contains(Flags::THICK_TOP),
@@ -310,6 +332,7 @@ impl<'a> Row<'a> {
     }
 
     /// Whether the row requests a thick bottom edge.
+    #[must_use]
     pub const fn thick_bottom(self) -> bool {
         match self.stored {
             Some(row) => row.properties.flags.contains(Flags::THICK_BOTTOM),
@@ -318,6 +341,7 @@ impl<'a> Row<'a> {
     }
 
     /// Whether phonetic information is shown by default in this row.
+    #[must_use]
     pub const fn phonetic(self) -> bool {
         match self.stored {
             Some(row) => row.properties.flags.contains(Flags::PHONETIC),
@@ -326,6 +350,7 @@ impl<'a> Row<'a> {
     }
 
     /// Whether the producer explicitly applies the row style.
+    #[must_use]
     pub const fn custom_format(self) -> bool {
         match self.stored {
             Some(row) => row.properties.flags.contains(Flags::CUSTOM_FORMAT),

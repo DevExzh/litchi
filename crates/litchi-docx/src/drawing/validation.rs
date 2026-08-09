@@ -1,3 +1,7 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Checked Word 2010 drawing-extension values.
 
 use super::model::AnchorId;
@@ -74,7 +78,7 @@ pub(crate) fn append_word2010_anchor_id(
     };
     write!(
         xml,
-        r##" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="w14" w14:anchorId="{:08x}""##,
+        r#" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="w14" w14:anchorId="{:08x}""#,
         anchor_id.get()
     )
     .map_err(|error| Error::Xml(error.to_string()))?;

@@ -27,33 +27,39 @@ pub struct PrintOptions {
 
 impl PrintOptions {
     /// Center the printed content horizontally on the page.
+    #[must_use]
     pub fn horizontal_centered(&self) -> bool {
         self.horizontal_centered
     }
 
     /// Center the printed content vertically on the page.
+    #[must_use]
     pub fn vertical_centered(&self) -> bool {
         self.vertical_centered
     }
 
     /// Print row and column headings.
+    #[must_use]
     pub fn print_headings(&self) -> bool {
         self.print_headings
     }
 
     /// Raw `gridLines` flag.
+    #[must_use]
     pub fn grid_lines(&self) -> bool {
         self.grid_lines
     }
 
     /// Raw `gridLinesSet` flag.
+    #[must_use]
     pub fn grid_lines_set(&self) -> bool {
         self.grid_lines_set
     }
 
     /// Whether gridlines are actually requested for printing.
     ///
-    /// SpreadsheetML requires both gridline flags to be true.
+    /// `SpreadsheetML` requires both gridline flags to be true.
+    #[must_use]
     pub fn prints_grid_lines(&self) -> bool {
         self.grid_lines && self.grid_lines_set
     }

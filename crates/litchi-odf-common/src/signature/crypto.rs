@@ -286,6 +286,16 @@ pub(crate) fn sign_package(unsigned: &[u8], signer: &DocumentSigner) -> Result<V
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?><dsig:document-signatures xmlns:dsig=\"{DSIG}\" dsig:version=\"1.3\"><ds:Signature xmlns:ds=\"{DS}\" Id=\"{signature_id}\">{signed_info}<ds:SignatureValue>{}</ds:SignatureValue>{key_info}<ds:Object><xades:QualifyingProperties xmlns:xades=\"{XADES}\" Target=\"#{signature_id}\">{signed_properties}</xades:QualifyingProperties></ds:Object></ds:Signature></dsig:document-signatures>",
         BASE64_STANDARD.encode(signature_value)
     );
+    xml_minifier::audit::verify_authored(
+        signature_xml.as_bytes(),
+        xml_minifier::audit::Limits::default(),
+    )
+    .map(|_report| ())
+    .map_err(|error| {
+        format_error(format!(
+            "generated ODF signature XML failed publication validation: {error}"
+        ))
+    })?;
 
     rebuild_with_signature(&archive, &signature_xml)
 }

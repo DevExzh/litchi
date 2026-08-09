@@ -22,6 +22,7 @@ pub enum CompatibilityProfile {
 
 impl CompatibilityProfile {
     /// Stable profile name suitable for diagnostics.
+    #[must_use]
     pub const fn name(self) -> &'static str {
         match self {
             Self::Strict => "strict",
@@ -30,6 +31,7 @@ impl CompatibilityProfile {
     }
 
     /// Evidence provenance for this profile.
+    #[must_use]
     pub const fn provenance(self) -> &'static str {
         match self {
             Self::Strict => "MS-XLS canonical structures",

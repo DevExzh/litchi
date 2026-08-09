@@ -1,4 +1,4 @@
-//! Inert, source-preserving WordprocessingML conflict markup.
+//! Inert, source-preserving `WordprocessingML` conflict markup.
 //!
 //! The module models only conflict annotations. It never evaluates, activates,
 //! or follows embedded code, controls, actions, DDE, macros, or VBA content.

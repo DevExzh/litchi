@@ -1,4 +1,4 @@
-//! Semantic values and state for the main WordprocessingML document.
+//! Semantic values and state for the main `WordprocessingML` document.
 
 use crate::alt::Chunk;
 use crate::paragraph::Paragraph;
@@ -118,7 +118,7 @@ pub enum Block {
 }
 
 impl<'a> Document<'a> {
-    /// Create a new Document from a DocumentPart and OpcPackage reference.
+    /// Create a new Document from a `DocumentPart` and `OpcPackage` reference.
     ///
     /// This is typically called internally by `Package::document()`.
     #[inline]

@@ -76,6 +76,8 @@ pub mod writer;
 
 /// Slide module with factory and enhanced implementation
 pub mod slide;
+/// Source-checked reordering of slides in an opened legacy presentation.
+pub mod slide_order;
 
 // Submodules (organized by functionality)
 pub mod parsers;

@@ -106,7 +106,10 @@ fn test_run_text() {
 }
 
 #[test]
-#[allow(clippy::field_reassign_with_default)]
+#[allow(
+    clippy::field_reassign_with_default,
+    reason = "the test highlights the one field relevant to the fixture"
+)]
 fn test_run_with_formatting() {
     let mut props = CharacterProperties::default();
     props.is_bold = Some(true);

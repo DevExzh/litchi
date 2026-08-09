@@ -23,8 +23,13 @@ fn package(content: &str, extra_path: Option<&str>) -> Vec<u8> {
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     if let Some(path) = extra_path {
+        let bytes: &[u8] = if path.ends_with(".xml") {
+            b"<signature/>"
+        } else {
+            b"opaque"
+        };
         writer
-            .add_file_with_media_type(path, b"opaque", "application/octet-stream")
+            .add_file_with_media_type(path, bytes, "application/octet-stream")
             .unwrap();
     }
     writer.finish_to_bytes().unwrap()
@@ -156,7 +161,13 @@ fn linked_section_noop_and_refusals_are_typed() {
 #[test]
 fn opening_requires_compact_content_xml() {
     let noncompact = CONTENT.replace("<office:body>", "<office:body>\n");
-    assert!(Master::from_bytes(package(&noncompact, None)).is_err());
+    let mut writer = PackageWriter::new();
+    writer.set_mimetype(MIME).unwrap();
+    assert!(
+        writer
+            .add_file("content.xml", noncompact.as_bytes())
+            .is_err()
+    );
 }
 
 #[test]

@@ -6,7 +6,7 @@ use std::str::FromStr;
 use super::border::Tint;
 use crate::color::Rgb;
 
-/// Error returned when a font property is not an exact SpreadsheetML token.
+/// Error returned when a font property is not an exact `SpreadsheetML` token.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseError {
     kind: &'static str,
@@ -46,7 +46,7 @@ impl fmt::Display for ParseError {
 
 impl std::error::Error for ParseError {}
 
-/// The semantic base value of a SpreadsheetML font color.
+/// The semantic base value of a `SpreadsheetML` font color.
 ///
 /// Unlike the wire representation, this type cannot contain competing color
 /// bases. The parser keeps the original lexical start tag separately on
@@ -66,7 +66,7 @@ pub enum FontColorKind {
     Auto(bool),
 }
 
-/// A validated SpreadsheetML font color.
+/// A validated `SpreadsheetML` font color.
 ///
 /// Construction uses typed base values and checked [`Tint`] values, making
 /// conflicting `rgb`/`theme`/`indexed`/`auto` states unrepresentable. Parsed
@@ -185,7 +185,7 @@ pub enum Underline {
 }
 
 impl Underline {
-    /// Return the exact SpreadsheetML token.
+    /// Return the exact `SpreadsheetML` token.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -235,7 +235,7 @@ pub enum Scheme {
 }
 
 impl Scheme {
-    /// Return the exact SpreadsheetML token.
+    /// Return the exact `SpreadsheetML` token.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -275,7 +275,7 @@ pub enum Script {
 }
 
 impl Script {
-    /// Return the exact SpreadsheetML token.
+    /// Return the exact `SpreadsheetML` token.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -344,6 +344,7 @@ pub struct Font {
 impl Font {
     /// Create a new default font.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }

@@ -197,7 +197,7 @@ fn managed_style_ranges(xml: &str) -> Result<(Vec<Range<usize>>, AutomaticStyles
                         Error::InvalidFormat("malformed empty automatic styles".to_string())
                     })?;
                     let name =
-                        String::from_utf8(element.name().as_ref().to_vec()).map_err(|_| {
+                        String::from_utf8(element.name().as_ref().to_vec()).map_err(|_error| {
                             Error::InvalidFormat("automatic styles name is not UTF-8".to_string())
                         })?;
                     insertion = Some(AutomaticStylesInsertion::ExpandEmpty { slash, name });
@@ -238,7 +238,12 @@ fn managed_style_ranges(xml: &str) -> Result<(Vec<Range<usize>>, AutomaticStyles
                 }
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -426,7 +431,7 @@ fn conditional_style_ranges(xml: &str) -> Result<(Vec<Range<usize>>, AutomaticSt
                         Error::InvalidFormat("malformed empty automatic styles".to_string())
                     })?;
                     let name =
-                        String::from_utf8(element.name().as_ref().to_vec()).map_err(|_| {
+                        String::from_utf8(element.name().as_ref().to_vec()).map_err(|_error| {
                             Error::InvalidFormat("automatic styles name is not UTF-8".to_string())
                         })?;
                     insertion = Some(AutomaticStylesInsertion::ExpandEmpty { slash, name });
@@ -459,7 +464,12 @@ fn conditional_style_ranges(xml: &str) -> Result<(Vec<Range<usize>>, AutomaticSt
                 }
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -625,7 +635,16 @@ fn extract_office_fragment(
                 }
             },
             Event::Eof => break,
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -649,8 +668,9 @@ fn collect_namespaces(
         let Some(prefix) = key.strip_prefix(b"xmlns:") else {
             continue;
         };
-        let prefix = String::from_utf8(prefix.to_vec())
-            .map_err(|_| Error::InvalidFormat("namespace prefix is not valid UTF-8".to_string()))?;
+        let prefix = String::from_utf8(prefix.to_vec()).map_err(|_error| {
+            Error::InvalidFormat("namespace prefix is not valid UTF-8".to_string())
+        })?;
         let uri = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
             .map_err(|error| Error::InvalidFormat(format!("invalid namespace URI: {error}")))?

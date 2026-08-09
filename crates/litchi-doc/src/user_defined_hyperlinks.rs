@@ -33,7 +33,7 @@ pub enum HyperlinkAssociation {
     FieldCandidates(Vec<FieldCandidate>),
     /// A caller-proven exact field-begin marker.
     Field(FieldCandidate),
-    /// The MS-DOC OfficeArt sentinel `dwApp == 0xFFFF_FFFF`.
+    /// The MS-DOC `OfficeArt` sentinel `dwApp == 0xFFFF_FFFF`.
     OfficeArtShape,
     /// Application data with no matching `HYPERLINK` field-begin marker.
     UnassociatedApplicationData,
@@ -73,38 +73,47 @@ impl UserDefinedHyperlink {
     }
 
     /// Returns the stored hash without correcting a producer mismatch.
+    #[must_use]
     pub const fn stored_hash(&self) -> u32 {
         self.raw.stored_hash()
     }
     /// Returns the recalculated shared hash without changing stored metadata.
+    #[must_use]
     pub fn calculated_hash(&self) -> u32 {
         self.raw.calculated_hash()
     }
     /// Returns whether the producer's stored hash matches the shared algorithm.
+    #[must_use]
     pub fn hash_matches(&self) -> bool {
         self.raw.hash_matches()
     }
     /// Returns the raw `dwApp` value.
+    #[must_use]
     pub const fn app(&self) -> i32 {
         self.raw.app()
     }
     /// Returns the raw `dwOfficeArt` value.
+    #[must_use]
     pub const fn office_art(&self) -> i32 {
         self.raw.office_art()
     }
     /// Returns the raw `dwInfo` value.
+    #[must_use]
     pub const fn info(&self) -> i32 {
         self.raw.info()
     }
     /// Returns the stored target without URI parsing or normalization.
+    #[must_use]
     pub fn target(&self) -> &str {
         self.raw.target()
     }
     /// Returns the stored location without URI parsing or normalization.
+    #[must_use]
     pub fn location(&self) -> &str {
         self.raw.location()
     }
     /// Returns the structural DOC association or unresolved candidates.
+    #[must_use]
     pub const fn association(&self) -> &HyperlinkAssociation {
         &self.association
     }
@@ -146,6 +155,7 @@ pub struct UserDefinedHyperlinks {
 
 impl UserDefinedHyperlinks {
     /// Contextualizes immutable shared hyperlink metadata for one DOC field table.
+    #[must_use]
     pub fn from_hyperlinks(hyperlinks: Hyperlinks, fields: Option<&FieldsTable>) -> Self {
         Self {
             entries: hyperlinks
@@ -160,6 +170,7 @@ impl UserDefinedHyperlinks {
         Self::from_hyperlinks(hyperlinks, fields)
     }
     /// Returns every stored entry in property-array source order.
+    #[must_use]
     pub fn entries(&self) -> &[UserDefinedHyperlink] {
         &self.entries
     }
@@ -196,6 +207,7 @@ impl UserDefinedHyperlinks {
     /// Returns the MS-DOC section 2.4.7 ordering for explicitly resolved fields.
     /// Candidates, shapes, direct-picture offsets, and other application data
     /// retain source order relative to one another after resolved groups.
+    #[must_use]
     pub fn canonicalized(&self) -> Self {
         let mut resolved: Vec<_> = self
             .entries

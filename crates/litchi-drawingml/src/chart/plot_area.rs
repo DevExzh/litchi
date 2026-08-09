@@ -23,7 +23,7 @@ pub struct PlotArea {
     pub axes: Vec<Axis>,
     /// Optional chart data table
     pub data_table: Option<DataTable>,
-    /// DrawingML shape properties for the plot area
+    /// `DrawingML` shape properties for the plot area
     pub shape_properties: Option<ShapeProperties>,
     /// Plot-area extension list
     pub extension_list: Option<ExtensionList>,
@@ -32,6 +32,7 @@ pub struct PlotArea {
 impl PlotArea {
     /// Create a new plot area.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             layout: None,
@@ -45,6 +46,7 @@ impl PlotArea {
 
     /// Add a type group.
     #[inline]
+    #[must_use]
     pub fn add_type_group(mut self, group: TypeGroup) -> Self {
         self.type_groups.push(group);
         self
@@ -52,6 +54,7 @@ impl PlotArea {
 
     /// Add an axis.
     #[inline]
+    #[must_use]
     pub fn add_axis(mut self, axis: Axis) -> Self {
         self.axes.push(axis);
         self
@@ -69,9 +72,9 @@ pub struct DataTable {
     pub show_outline: bool,
     /// Show legend keys beside series rows
     pub show_legend_keys: bool,
-    /// DrawingML shape properties
+    /// `DrawingML` shape properties
     pub shape_properties: Option<ShapeProperties>,
-    /// DrawingML text properties
+    /// `DrawingML` text properties
     pub text_properties: Option<TextProperties>,
     /// Data-table extension list
     pub extension_list: Option<ExtensionList>,
@@ -123,6 +126,7 @@ pub enum TypeGroup {
 
 impl TypeGroup {
     /// Return the properties shared by every classic chart-type group.
+    #[must_use]
     pub fn common(&self) -> &TypeGroupCommon {
         match self {
             Self::Area(group) => &group.common,
@@ -185,6 +189,7 @@ pub struct TypeGroupCommon {
 impl TypeGroupCommon {
     /// Create new common properties.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             vary_colors: false,
@@ -209,16 +214,17 @@ impl Default for TypeGroupCommon {
     }
 }
 
-/// A schema-defined chart line whose DrawingML styling is optional.
+/// A schema-defined chart line whose `DrawingML` styling is optional.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Lines {
-    /// DrawingML shape properties for the line
+    /// `DrawingML` shape properties for the line
     pub shape_properties: Option<ShapeProperties>,
 }
 
 impl Lines {
     /// Create an unformatted chart line.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -251,6 +257,7 @@ pub struct AreaTypeGroup {
 impl AreaTypeGroup {
     /// Create a new area type group.
     #[inline]
+    #[must_use]
     pub fn new(grouping: BarGrouping) -> Self {
         Self {
             common: TypeGroupCommon::new(),
@@ -276,6 +283,7 @@ pub struct Area3DTypeGroup {
 impl Area3DTypeGroup {
     /// Create a new area 3D type group.
     #[inline]
+    #[must_use]
     pub fn new(grouping: BarGrouping) -> Self {
         Self {
             common: TypeGroupCommon::new(),
@@ -306,6 +314,7 @@ pub struct BarTypeGroup {
 impl BarTypeGroup {
     /// Create a new bar type group.
     #[inline]
+    #[must_use]
     pub fn new(direction: BarDirection, grouping: BarGrouping) -> Self {
         Self {
             common: TypeGroupCommon::new(),
@@ -355,6 +364,7 @@ pub enum BarShape {
 impl BarShape {
     /// Returns the XML value for this shape.
     #[inline]
+    #[must_use]
     pub const fn xml_value(&self) -> &'static str {
         match self {
             Self::Box => "box",
@@ -370,6 +380,7 @@ impl BarShape {
 impl Bar3DTypeGroup {
     /// Create a new bar 3D type group.
     #[inline]
+    #[must_use]
     pub fn new(direction: BarDirection, grouping: BarGrouping) -> Self {
         Self {
             common: TypeGroupCommon::new(),
@@ -398,6 +409,7 @@ pub struct BubbleTypeGroup {
 impl BubbleTypeGroup {
     /// Create a new bubble type group.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             common: TypeGroupCommon::new(),
@@ -409,6 +421,7 @@ impl BubbleTypeGroup {
 
     /// Returns the bubble scale percentage.
     #[inline]
+    #[must_use]
     pub const fn scale(&self) -> BubbleScale {
         self.scale
     }
@@ -422,6 +435,7 @@ impl BubbleTypeGroup {
 
     /// Sets the bubble scale percentage and returns this group.
     #[inline]
+    #[must_use]
     pub fn with_scale(mut self, scale: BubbleScale) -> Self {
         self.set_scale(scale);
         self
@@ -429,6 +443,7 @@ impl BubbleTypeGroup {
 
     /// Returns how each bubble's numeric size is interpreted.
     #[inline]
+    #[must_use]
     pub const fn size(&self) -> BubbleSize {
         self.size
     }
@@ -442,6 +457,7 @@ impl BubbleTypeGroup {
 
     /// Sets how each bubble's numeric size is interpreted and returns this group.
     #[inline]
+    #[must_use]
     pub fn with_size(mut self, size: BubbleSize) -> Self {
         self.set_size(size);
         self
@@ -469,6 +485,7 @@ pub struct DoughnutTypeGroup {
 impl DoughnutTypeGroup {
     /// Create a new doughnut type group.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             common: TypeGroupCommon::new(),
@@ -507,6 +524,7 @@ pub struct LineTypeGroup {
 impl LineTypeGroup {
     /// Create a new line type group.
     #[inline]
+    #[must_use]
     pub fn new(grouping: BarGrouping) -> Self {
         Self {
             common: TypeGroupCommon::new(),
@@ -536,6 +554,7 @@ pub struct Line3DTypeGroup {
 impl Line3DTypeGroup {
     /// Create a new line 3D type group.
     #[inline]
+    #[must_use]
     pub fn new(grouping: BarGrouping) -> Self {
         Self {
             common: TypeGroupCommon::new(),
@@ -558,6 +577,7 @@ pub struct PieTypeGroup {
 impl PieTypeGroup {
     /// Create a new pie type group.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             common: TypeGroupCommon::new(),
@@ -597,6 +617,7 @@ pub struct OfPieTypeGroup {
 impl OfPieTypeGroup {
     /// Create a new of-pie type group.
     #[inline]
+    #[must_use]
     pub fn new(of_pie_type: OfPieType) -> Self {
         Self {
             common: TypeGroupCommon::new(),
@@ -621,6 +642,7 @@ pub struct Pie3DTypeGroup {
 impl Pie3DTypeGroup {
     /// Create a new pie 3D type group.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             common: TypeGroupCommon::new(),
@@ -647,6 +669,7 @@ pub struct RadarTypeGroup {
 impl RadarTypeGroup {
     /// Create a new radar type group.
     #[inline]
+    #[must_use]
     pub fn new(style: RadarStyle) -> Self {
         Self {
             common: TypeGroupCommon::new(),
@@ -667,6 +690,7 @@ pub struct ScatterTypeGroup {
 impl ScatterTypeGroup {
     /// Create a new scatter type group.
     #[inline]
+    #[must_use]
     pub fn new(style: ScatterStyle) -> Self {
         Self {
             common: TypeGroupCommon::new(),
@@ -691,6 +715,7 @@ pub struct StockTypeGroup {
 impl StockTypeGroup {
     /// Create a new stock type group.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             common: TypeGroupCommon::new(),
@@ -713,13 +738,14 @@ impl Default for StockTypeGroup {
 pub struct BandFormat {
     /// Zero-based band index
     pub index: u32,
-    /// DrawingML shape properties for the surface band
+    /// `DrawingML` shape properties for the surface band
     pub shape_properties: Option<ShapeProperties>,
 }
 
 impl BandFormat {
     /// Create a surface band-format entry.
     #[inline]
+    #[must_use]
     pub fn new(index: u32) -> Self {
         Self {
             index,
@@ -742,6 +768,7 @@ pub struct SurfaceTypeGroup {
 impl SurfaceTypeGroup {
     /// Create a new surface type group.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             common: TypeGroupCommon::new(),
@@ -772,6 +799,7 @@ pub struct Surface3DTypeGroup {
 impl Surface3DTypeGroup {
     /// Create a new surface 3D type group.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             common: TypeGroupCommon::new(),

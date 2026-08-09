@@ -1,4 +1,4 @@
-//! Bounded parser for the shared SpreadsheetML cell-format table.
+//! Bounded parser for the shared `SpreadsheetML` cell-format table.
 
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use quick_xml::encoding::Decoder;
@@ -132,7 +132,10 @@ pub(crate) fn parse(content: &[u8]) -> Result<Catalog> {
     })
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "arguments correspond directly to the cell-format wire attributes"
+)]
 fn start(
     parent: Context,
     namespace: &ResolveResult<'_>,

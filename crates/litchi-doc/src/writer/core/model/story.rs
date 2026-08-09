@@ -11,12 +11,12 @@ pub(in crate::writer::core) struct HeaderStoryData {
     pub(in crate::writer::core) shape_anchor_cps: Vec<(u32, FloatingAnchorKind)>,
 }
 
-/// PlcfHdd slot of the odd page header, which Word uses as the default
+/// `PlcfHdd` slot of the odd page header, which Word uses as the default
 /// header when the document does not use facing pages.
 pub(in crate::writer::core) const HEADER_SLOT_ODD: usize = 7;
-/// PlcfHdd slot of the even page header.
+/// `PlcfHdd` slot of the even page header.
 pub(in crate::writer::core) const HEADER_SLOT_EVEN: usize = 6;
-/// PlcfHdd slot of the first page header.
+/// `PlcfHdd` slot of the first page header.
 pub(in crate::writer::core) const HEADER_SLOT_FIRST: usize = 10;
 
 /// Which header a floating text box or picture is anchored in.
@@ -37,7 +37,7 @@ pub enum HeaderKind {
 }
 
 impl HeaderKind {
-    /// The PlcfHdd slot holding this header kind's story.
+    /// The `PlcfHdd` slot holding this header kind's story.
     pub(in crate::writer::core) fn slot(self) -> usize {
         match self {
             Self::Odd => HEADER_SLOT_ODD,
@@ -49,7 +49,7 @@ impl HeaderKind {
 
 /// A floating-item anchor paragraph appended to a header's paragraphs.
 pub(in crate::writer::core) struct HeaderAnchor {
-    /// PlcfHdd slot of the header holding the anchor.
+    /// `PlcfHdd` slot of the header holding the anchor.
     pub(in crate::writer::core) slot: usize,
     /// Paragraph index within that slot's paragraph list.
     pub(in crate::writer::core) paragraph_index: usize,
@@ -103,7 +103,10 @@ pub(in crate::writer::core) struct TextRun {
 
 /// Represents a paragraph
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Reserved for future implementation
+#[allow(
+    dead_code,
+    reason = "reserved DOC structure retained for format completeness or future round-trip support"
+)] // Reserved for future implementation
 pub(in crate::writer::core) struct WritableParagraph {
     /// Text runs in this paragraph
     pub(in crate::writer::core) runs: Vec<TextRun>,
@@ -156,6 +159,7 @@ impl HeaderFooterParagraph {
     }
 
     /// Construct a paragraph from owned character runs and paragraph formatting.
+    #[must_use]
     pub fn from_runs(
         runs: Vec<(String, CharacterFormatting)>,
         formatting: ParagraphFormatting,
@@ -208,11 +212,13 @@ impl HeaderFooterParagraph {
     }
 
     /// Character runs in document order.
+    #[must_use]
     pub fn runs(&self) -> &[(String, CharacterFormatting)] {
         &self.runs
     }
 
     /// Paragraph-level formatting.
+    #[must_use]
     pub fn formatting(&self) -> &ParagraphFormatting {
         &self.formatting
     }

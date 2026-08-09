@@ -59,16 +59,19 @@ impl Formula {
     }
 
     /// Formula expression without the leading `=`.
+    #[must_use]
     pub fn text(&self) -> &str {
         &self.text
     }
 
     /// Semantic formula kind.
+    #[must_use]
     pub fn kind(&self) -> &Kind {
         &self.kind
     }
 
     /// Stored or calculated result, when one is available.
+    #[must_use]
     pub fn cached(&self) -> Option<&Cache> {
         self.cached.as_ref()
     }
@@ -122,16 +125,19 @@ impl Cache {
     }
 
     /// Cached result value.
+    #[must_use]
     pub fn value(&self) -> &Value {
         &self.value
     }
 
     /// How the result entered this snapshot.
+    #[must_use]
     pub fn origin(&self) -> Origin {
         self.origin
     }
 
     /// Whether the cache is known to match current dependencies.
+    #[must_use]
     pub fn freshness(&self) -> Freshness {
         self.freshness
     }

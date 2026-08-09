@@ -363,6 +363,9 @@ pub enum Resource {
 pub enum Kind {
     /// Provably structural whitespace outside `xml:space="preserve"`.
     FormattingWhitespace,
+    /// A whitespace-only text node contains only spaces, so a schema-neutral
+    /// auditor cannot prove whether it is content or indentation.
+    AmbiguousWhitespace,
     /// Attribute boundaries do not use exactly one ASCII space.
     AttributeSeparation,
     /// Whitespace occurs immediately before `>`, `/>`, or an end-tag close.
@@ -525,6 +528,7 @@ enum Space {
 }
 
 struct State {
+    ambiguous_space_offset: Option<usize>,
     attributes: usize,
     depth: usize,
     events: usize,
@@ -532,11 +536,13 @@ struct State {
     roots: usize,
     spaces: Vec<Space>,
     text_bytes: usize,
+    text_run_has_explicit_content: bool,
 }
 
 impl State {
     fn new() -> Self {
         Self {
+            ambiguous_space_offset: None,
             attributes: 0,
             depth: 0,
             events: 0,
@@ -544,6 +550,7 @@ impl State {
             roots: 0,
             spaces: Vec::new(),
             text_bytes: 0,
+            text_run_has_explicit_content: false,
         }
     }
 
@@ -562,6 +569,30 @@ impl State {
 /// Returns [`Error`] for invalid UTF-8, malformed XML, a finite resource-limit
 /// breach, or the first compactness violation.
 pub fn verify(input: &[u8], limits: Limits) -> Result<Report, Error> {
+    verify_with_policy(input, limits, false)
+}
+
+/// Verifies XML that is about to be published from authored or changed bytes.
+///
+/// Unlike [`verify`], this refuses whitespace-only text nodes made entirely of
+/// spaces outside `xml:space="preserve"`. Such nodes can be semantic in mixed
+/// content, but a schema-neutral publication boundary cannot distinguish them
+/// from formatting indentation. Authors that require those spaces must make
+/// the preservation intent explicit with `xml:space="preserve"`.
+///
+/// # Errors
+///
+/// Returns [`Error`] for every failure reported by [`verify`], or
+/// [`Kind::AmbiguousWhitespace`] when authored whitespace cannot be classified.
+pub fn verify_authored(input: &[u8], limits: Limits) -> Result<Report, Error> {
+    verify_with_policy(input, limits, true)
+}
+
+fn verify_with_policy(
+    input: &[u8],
+    limits: Limits,
+    reject_ambiguous_space: bool,
+) -> Result<Report, Error> {
     check_limit(Resource::Bytes, limits.bytes, input.len(), 0)?;
     let xml = std::str::from_utf8(input).map_err(|error| Error::Encoding {
         valid_up_to: error.valid_up_to(),
@@ -585,6 +616,7 @@ pub fn verify(input: &[u8], limits: Limits) -> Result<Report, Error> {
 
         match event {
             Event::Start(tag) => {
+                finish_text_run(&mut state, reject_ambiguous_space)?;
                 check_start(raw, false, start)?;
                 let space = inspect_attributes(
                     &tag,
@@ -602,6 +634,7 @@ pub fn verify(input: &[u8], limits: Limits) -> Result<Report, Error> {
                 state.spaces.push(space);
             },
             Event::Empty(tag) => {
+                finish_text_run(&mut state, reject_ambiguous_space)?;
                 check_start(raw, true, start)?;
                 inspect_attributes(
                     &tag,
@@ -614,6 +647,7 @@ pub fn verify(input: &[u8], limits: Limits) -> Result<Report, Error> {
                 enter_empty(&mut state, limits, start)?;
             },
             Event::End(_) => {
+                finish_text_run(&mut state, reject_ambiguous_space)?;
                 check_end(raw, start)?;
                 if state.depth == 0 || state.spaces.pop().is_none() {
                     return Err(Error::malformed(start, "unexpected end element"));
@@ -624,13 +658,22 @@ pub fn verify(input: &[u8], limits: Limits) -> Result<Report, Error> {
                 let bytes = text.as_ref();
                 check_character_context(state.depth, bytes, start)?;
                 charge_text(&mut state, limits, bytes.len(), start)?;
-                if (state.depth == 0 && is_xml_whitespace(bytes))
+                let whitespace = is_xml_whitespace(bytes);
+                if (state.depth == 0 && whitespace)
                     || (is_structural_whitespace(bytes) && state.current_space() != Space::Preserve)
                 {
                     return Err(Error::NotCompact(Violation {
                         kind: Kind::FormattingWhitespace,
                         offset: start,
                     }));
+                }
+                if reject_ambiguous_space && state.current_space() != Space::Preserve {
+                    if whitespace && !state.text_run_has_explicit_content {
+                        state.ambiguous_space_offset.get_or_insert(start);
+                    } else if !whitespace {
+                        state.ambiguous_space_offset = None;
+                        state.text_run_has_explicit_content = true;
+                    }
                 }
             },
             Event::CData(data) => {
@@ -641,15 +684,30 @@ pub fn verify(input: &[u8], limits: Limits) -> Result<Report, Error> {
                     ));
                 }
                 charge_text(&mut state, limits, data.as_ref().len(), start)?;
+                state.ambiguous_space_offset = None;
+                state.text_run_has_explicit_content = true;
             },
             Event::GeneralRef(reference) => {
                 check_character_context(state.depth, reference.as_ref(), start)?;
                 charge_text(&mut state, limits, raw.len(), start)?;
+                state.ambiguous_space_offset = None;
+                state.text_run_has_explicit_content = true;
             },
-            Event::Decl(_) => check_declaration(raw, start)?,
-            Event::Comment(_) | Event::PI(_) => {},
-            Event::DocType(_) => return Err(Error::Doctype { offset: start }),
-            Event::Eof => break,
+            Event::Decl(_) => {
+                finish_text_run(&mut state, reject_ambiguous_space)?;
+                check_declaration(raw, start)?;
+            },
+            Event::Comment(_) | Event::PI(_) => {
+                finish_text_run(&mut state, reject_ambiguous_space)?;
+            },
+            Event::DocType(_) => {
+                finish_text_run(&mut state, reject_ambiguous_space)?;
+                return Err(Error::Doctype { offset: start });
+            },
+            Event::Eof => {
+                finish_text_run(&mut state, reject_ambiguous_space)?;
+                break;
+            },
         }
     }
 
@@ -670,6 +728,18 @@ pub fn verify(input: &[u8], limits: Limits) -> Result<Report, Error> {
         max_depth: state.max_depth,
         text_bytes: state.text_bytes,
     })
+}
+
+fn finish_text_run(state: &mut State, reject_ambiguous_space: bool) -> Result<(), Error> {
+    if reject_ambiguous_space && let Some(offset) = state.ambiguous_space_offset.take() {
+        return Err(Error::NotCompact(Violation {
+            kind: Kind::AmbiguousWhitespace,
+            offset,
+        }));
+    }
+    state.ambiguous_space_offset = None;
+    state.text_run_has_explicit_content = false;
+    Ok(())
 }
 
 fn charge_text(
@@ -937,6 +1007,43 @@ fn position(reader: &Reader<&[u8]>) -> usize {
 pub mod package {
     use super::{Error as DocumentError, Limits as DocumentLimits, verify as verify_document};
     use core::fmt;
+
+    /// Returns whether a package member must be treated as XML.
+    ///
+    /// Package conventions identify XML both lexically (`.xml`, `.rels`, and
+    /// `.rdf`) and through a manifest/content-type media type. Parameters are
+    /// ignored and media type matching is ASCII case-insensitive.
+    #[must_use]
+    pub fn is_xml_part(name: &str, media_type: &str) -> bool {
+        is_xml_name(name) || is_xml_media_type(media_type)
+    }
+
+    /// Returns whether a media type denotes XML according to the XML media
+    /// type registrations and structured syntax suffix convention.
+    #[must_use]
+    pub fn is_xml_media_type(media_type: &str) -> bool {
+        let essence = media_type
+            .split_once(';')
+            .map_or(media_type, |(value, _parameters)| value)
+            .trim();
+        essence.eq_ignore_ascii_case("application/xml")
+            || essence.eq_ignore_ascii_case("text/xml")
+            || essence
+                .get(essence.len().saturating_sub(4)..)
+                .is_some_and(|suffix| suffix.eq_ignore_ascii_case("+xml"))
+    }
+
+    fn is_xml_name(name: &str) -> bool {
+        let leaf = name.rsplit('/').next().unwrap_or(name);
+        if leaf.eq_ignore_ascii_case("[Content_Types].xml") {
+            return true;
+        }
+        leaf.rsplit_once('.').is_some_and(|(_, extension)| {
+            extension.eq_ignore_ascii_case("xml")
+                || extension.eq_ignore_ascii_case("rels")
+                || extension.eq_ignore_ascii_case("rdf")
+        })
+    }
 
     /// A borrowed named XML package member.
     #[derive(Clone, Copy, Debug)]

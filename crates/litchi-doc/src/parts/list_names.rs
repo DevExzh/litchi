@@ -115,12 +115,15 @@ impl ListNamesTable {
         Self::try_new(names)
     }
 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.names.len()
     }
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.names.is_empty()
     }
+    #[must_use]
     pub fn entries(&self) -> &[String] {
         &self.names
     }
@@ -129,6 +132,7 @@ impl ListNamesTable {
     }
 
     /// Return a non-empty name at an index; empty slots are treated as unnamed.
+    #[must_use]
     pub fn name(&self, index: usize) -> Option<&str> {
         self.get(index).filter(|name| !name.is_empty())
     }

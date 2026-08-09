@@ -1,6 +1,6 @@
-//! Checked SpreadsheetML color scalars.
+//! Checked `SpreadsheetML` color scalars.
 //!
-//! SpreadsheetML serializes RGB values as four hexadecimal bytes in ARGB
+//! `SpreadsheetML` serializes RGB values as four hexadecimal bytes in ARGB
 //! order.  Keeping this scalar in the XLSX owner crate gives styles,
 //! conditional formatting, and future worksheet owners one exact wire type
 //! instead of duplicating loosely validated strings.
@@ -8,7 +8,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-/// A checked four-byte SpreadsheetML ARGB value.
+/// A checked four-byte `SpreadsheetML` ARGB value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Rgb {
     alpha: u8,

@@ -79,7 +79,10 @@ impl WorkbookCalculationCollector {
                     );
                 }
                 self.calculation.multithreaded_calculation = Some(if user_set_thread_count {
-                    Multithreaded::try_with_thread_count(enabled, thread_count as u16)?
+                    Multithreaded::try_with_thread_count(
+                        enabled,
+                        crate::utils::truncate_u32_to_u16(thread_count),
+                    )?
                 } else {
                     Multithreaded::automatic(enabled)
                 });

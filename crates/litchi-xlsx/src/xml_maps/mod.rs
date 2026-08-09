@@ -1,4 +1,4 @@
-//! Layered SpreadsheetML Custom XML Maps ownership.
+//! Layered `SpreadsheetML` Custom XML Maps ownership.
 //!
 //! Typed contextual values live in [`model`], bounded XML conversion lives in
 //! [`codec`], workbook relationship traversal lives in [`package`], and focused

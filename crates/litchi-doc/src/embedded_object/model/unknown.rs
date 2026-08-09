@@ -10,7 +10,7 @@ pub struct Unknown {
 }
 
 impl Unknown {
-    /// The exact path relative to the selected ObjectPool storage.
+    /// The exact path relative to the selected `ObjectPool` storage.
     #[must_use]
     pub fn path(&self) -> &[String] {
         &self.path

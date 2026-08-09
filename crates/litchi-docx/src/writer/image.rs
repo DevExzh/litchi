@@ -1,3 +1,7 @@
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
 //! Image support for DOCX documents.
 use crate::error::{Error, Result};
 use litchi_core::unit::{EMUS_PER_INCH, pt_to_emu_f64, px_to_emu_96};
@@ -16,7 +20,7 @@ pub struct MutableInlineImage {
     pub(crate) data: Vec<u8>,
     /// Image format
     pub(crate) format: ImageFormat,
-    /// Width in EMUs (English Metric Units, 1 inch = 914400 EMUs)
+    /// Width in EMUs (English Metric Units, 1 inch = `914_400` EMUs)
     pub(crate) width_emu: Option<i64>,
     /// Height in EMUs
     pub(crate) height_emu: Option<i64>,
@@ -31,6 +35,10 @@ impl MutableInlineImage {
     /// * `data` - Image binary data
     /// * `width_emu` - Optional width in EMUs (English Metric Units)
     /// * `height_emu` - Optional height in EMUs
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_bytes(
         data: Vec<u8>,
         width_emu: Option<i64>,
@@ -55,21 +63,25 @@ impl MutableInlineImage {
     }
 
     /// Get a reference to the image data.
+    #[must_use]
     pub fn data(&self) -> &[u8] {
         &self.data
     }
 
     /// Get the image format.
+    #[must_use]
     pub fn format(&self) -> ImageFormat {
         self.format
     }
 
     /// Convert image dimensions from pixels to EMUs (assuming 96 DPI).
+    #[must_use]
     pub fn px_to_emu(px: u32) -> i64 {
         px_to_emu_96(px)
     }
 
     /// Convert image dimensions from points to EMUs.
+    #[must_use]
     pub fn pt_to_emu(pt: f64) -> i64 {
         pt_to_emu_f64(pt)
     }
@@ -82,8 +94,7 @@ impl MutableInlineImage {
 
         write!(
             xml,
-            r#"<w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="{}" cy="{}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="1" name="Picture" descr="{}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="0" name="Picture" descr="{}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="{}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="{}" cy="{}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing>"#,
-            width, height, desc, desc, r_id, width, height
+            r#"<w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="{width}" cy="{height}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="1" name="Picture" descr="{desc}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="0" name="Picture" descr="{desc}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="{r_id}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="{width}" cy="{height}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing>"#
         )
         .map_err(|e| Error::Xml(e.to_string()))?;
 
@@ -172,13 +183,13 @@ mod tests {
     #[test]
     fn test_px_to_emu() {
         let emu = MutableInlineImage::px_to_emu(96);
-        assert_eq!(emu, 914400); // 1 inch at 96 DPI
+        assert_eq!(emu, 914_400); // 1 inch at 96 DPI
     }
 
     #[test]
     fn test_pt_to_emu() {
         let emu = MutableInlineImage::pt_to_emu(72.0);
-        assert_eq!(emu, 914400); // 1 inch = 72 points
+        assert_eq!(emu, 914_400); // 1 inch = 72 points
     }
 
     #[test]
@@ -213,7 +224,7 @@ mod tests {
         let image = MutableInlineImage::from_bytes(data, None, None).unwrap();
         let mut xml = String::new();
         let _ = image.to_xml(&mut xml, "rId1");
-        // Default is EMUS_PER_INCH = 914400
+        // Default is EMUS_PER_INCH = 914_400
         assert!(xml.contains("cx=\"914400\""));
         assert!(xml.contains("cy=\"914400\""));
     }

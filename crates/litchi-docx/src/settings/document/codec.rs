@@ -1,4 +1,24 @@
-//! Bounded WordprocessingML settings XML model codec and snapshot edits.
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::format_push_string,
+    reason = "serialization preserves the established byte-emission path"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
+#![expect(
+    clippy::wildcard_enum_match_arm,
+    reason = "non-exhaustive dependency enums require a future-safe fallback"
+)]
+//! Bounded `WordprocessingML` settings XML model codec and snapshot edits.
 
 use super::super::notes::{NoteNumberingProperties, NoteNumberingRestart, NotePosition};
 use super::model::{AttachedTemplate, DocumentSettings};
@@ -152,7 +172,13 @@ impl DocumentSettings {
                     ));
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {},
             }
         }
 
@@ -285,10 +311,10 @@ fn parse_group_child(
                 ));
             } else {
                 let local_name = element.local_name();
-                let raw = std::str::from_utf8(local_name.as_ref()).map_err(|_| {
+                let raw = std::str::from_utf8(local_name.as_ref()).map_err(|_source_error| {
                     Error::InvalidFormat("compatibility flag name is not valid UTF-8".into())
                 })?;
-                let flag = raw.parse::<CompatFlag>().map_err(|_| {
+                let flag = raw.parse::<CompatFlag>().map_err(|_source_error| {
                     Error::InvalidFormat(format!("invalid compatibility flag '{raw}'"))
                 })?;
                 if strict_wordprocessingml && !flag.is_strict() {
@@ -334,9 +360,9 @@ fn parse_note_property_child(
                 return Err(Error::InvalidFormat("duplicate note position".into()));
             }
             let value = required_attribute(element, b"val", decoder, resolver, "note position")?;
-            let parsed_position = value
-                .parse::<NotePosition>()
-                .map_err(|_| Error::InvalidFormat(format!("invalid note position '{value}'")))?;
+            let parsed_position = value.parse::<NotePosition>().map_err(|_source_error| {
+                Error::InvalidFormat(format!("invalid note position '{value}'"))
+            })?;
             if kind == NoteKind::Endnote && !parsed_position.valid_for_endnote() {
                 return Err(Error::InvalidFormat(format!(
                     "position '{}' is not valid for an endnote",
@@ -352,7 +378,7 @@ fn parse_note_property_child(
                 ));
             }
             let value = required_attribute(element, b"val", decoder, resolver, "note numFmt")?;
-            format = Some(value.parse().map_err(|_| {
+            format = Some(value.parse().map_err(|_source_error| {
                 Error::InvalidFormat(format!("invalid note numbering format '{value}'"))
             })?);
         },
@@ -363,7 +389,7 @@ fn parse_note_property_child(
                 ));
             }
             let value = required_attribute(element, b"val", decoder, resolver, "note numStart")?;
-            start = Some(value.parse().map_err(|_| {
+            start = Some(value.parse().map_err(|_source_error| {
                 Error::InvalidFormat(format!("invalid note numbering start '{value}'"))
             })?);
         },
@@ -522,7 +548,7 @@ fn parse_setting(
             let value = required_attribute(element, b"val", decoder, resolver, "default tab stop")?;
             settings
                 .values
-                .set_default_tab_stop_twips(Some(value.parse().map_err(|_| {
+                .set_default_tab_stop_twips(Some(value.parse().map_err(|_source_error| {
                     Error::InvalidFormat(format!("invalid default tab stop '{value}'"))
                 })?));
         },
@@ -915,7 +941,7 @@ fn scan_settings_xml_layout(xml: &[u8]) -> Result<SettingsXmlLayout> {
             "settings XML exceeds {MAX_SETTINGS_XML_BYTES} bytes"
         )));
     }
-    std::str::from_utf8(xml).map_err(|_| {
+    std::str::from_utf8(xml).map_err(|_source_error| {
         Error::InvalidFormat("lossless settings mutation currently requires UTF-8 XML".into())
     })?;
     let mut reader = NsReader::from_reader(xml);
@@ -953,14 +979,16 @@ fn scan_settings_xml_layout(xml: &[u8]) -> Result<SettingsXmlLayout> {
     let mut mail_merge_insert_at = None;
 
     loop {
-        let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::InvalidFormat("settings XML offset is too large".into()))?;
+        let event_start = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+            Error::InvalidFormat("settings XML offset is too large".into())
+        })?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
-        let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::InvalidFormat("settings XML offset is too large".into()))?;
+        let event_end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+            Error::InvalidFormat("settings XML offset is too large".into())
+        })?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
 
@@ -1189,7 +1217,13 @@ fn scan_settings_xml_layout(xml: &[u8]) -> Result<SettingsXmlLayout> {
                     .ok_or_else(|| Error::InvalidFormat("invalid settings XML nesting".into()))?;
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 
@@ -1301,8 +1335,7 @@ fn document_variables_element(layout: &SettingsXmlLayout, variables: &Variables)
     let prefix = layout
         .word_prefix
         .as_deref()
-        .map(String::from_utf8_lossy)
-        .unwrap_or_else(|| "w".into());
+        .map_or_else(|| "w".into(), String::from_utf8_lossy);
     let mut output = format!("<{prefix}:docVars");
     if layout.word_prefix.is_none() {
         let namespace = if layout.strict {
@@ -1321,7 +1354,10 @@ fn document_variables_element(layout: &SettingsXmlLayout, variables: &Variables)
     output
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "signature mirrors the corresponding OOXML record"
+)]
 fn capture_settings_root(
     namespace: &ResolveResult<'_>,
     element: &BytesStart<'_>,
@@ -1368,8 +1404,7 @@ fn attached_template_element(layout: &SettingsXmlLayout, relationship_id: &str) 
     let relationship_prefix = layout
         .relationship_prefix
         .as_deref()
-        .map(String::from_utf8_lossy)
-        .unwrap_or_else(|| "r".into());
+        .map_or_else(|| "r".into(), String::from_utf8_lossy);
     let mut output = format!("<{word_name} {relationship_prefix}:id=\"");
     escape_attribute(&mut output, relationship_id);
     output.push('"');

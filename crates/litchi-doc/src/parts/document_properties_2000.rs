@@ -19,14 +19,17 @@ pub struct CompatibilityOptions {
 }
 
 impl CompatibilityOptions {
+    #[must_use]
     pub const fn from_bytes(bytes: [u8; COPTS_SIZE]) -> Self {
         Self { bytes }
     }
 
+    #[must_use]
     pub const fn as_bytes(&self) -> &[u8; COPTS_SIZE] {
         &self.bytes
     }
 
+    #[must_use]
     pub fn is_set(&self, bit: u8) -> bool {
         let bit = usize::from(bit);
         self.bytes[bit / 8] & (1 << (bit % 8)) != 0
@@ -138,14 +141,17 @@ impl LegacyFeatureSet {
     pub const EAST_ASIAN_WORD_95: u16 = 0x0040;
     pub const WORD_2003: u16 = 0x0800;
 
+    #[must_use]
     pub const fn from_raw(raw: u16) -> Self {
         Self(raw)
     }
 
+    #[must_use]
     pub const fn raw(self) -> u16 {
         self.0
     }
 
+    #[must_use]
     pub const fn contains(self, feature: u16) -> bool {
         self.0 & feature != 0
     }

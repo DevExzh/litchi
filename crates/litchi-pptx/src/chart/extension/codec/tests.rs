@@ -619,9 +619,10 @@ fn rejects_invalid_plot_and_chart_space_formatting_and_print_settings() {
             .is_err()
     );
 
-    let many = (0..=MAX_FORMAT_OVERRIDES)
-        .map(|index| format!("<cx:fmtOvr idx=\"{index}\"/>"))
-        .collect::<String>();
+    let mut many = String::new();
+    for index in 0..=MAX_FORMAT_OVERRIDES {
+        many.push_str(&format!("<cx:fmtOvr idx=\"{index}\"/>"));
+    }
     let excessive = base.replace("<cx:fmtOvr idx=\"2\"><cx:spPr><a:solidFill><a:srgbClr val=\"00FF00\"/></a:solidFill></cx:spPr><cx:extLst/></cx:fmtOvr>", &many);
     assert!(
         Part::from_part(&chart_part(excessive))

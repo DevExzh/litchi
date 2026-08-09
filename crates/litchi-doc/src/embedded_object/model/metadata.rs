@@ -17,7 +17,7 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    /// The ObjectPool storage CLSID, when the CFB directory declared one.
+    /// The `ObjectPool` storage CLSID, when the CFB directory declared one.
     #[must_use]
     pub fn class_id(&self) -> Option<&str> {
         self.class_id.as_deref()
@@ -41,7 +41,7 @@ impl Metadata {
         self.obj_info.as_ref()
     }
 
-    /// Whether the DOC `ObjInfo` flags identify an ActiveX control.
+    /// Whether the DOC `ObjInfo` flags identify an `ActiveX` control.
     #[must_use]
     pub fn is_activex(&self) -> bool {
         self.obj_info.as_ref().is_some_and(|info| info.activex)

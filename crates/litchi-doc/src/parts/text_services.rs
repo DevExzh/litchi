@@ -9,9 +9,9 @@
 use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
 
-/// Table-pointer index of `fcPlcfuim`/`lcbPlcfuim` (MS-DOC 2.5.8 FibRgFcLcb2002).
+/// Table-pointer index of `fcPlcfuim`/`lcbPlcfuim` (MS-DOC 2.5.8 `FibRgFcLcb2002`).
 const UIM_FIB_INDEX: usize = 110;
-/// Table-pointer index of `fcPlfguidUim`/`lcbPlfguidUim` (MS-DOC 2.5.8 FibRgFcLcb2002).
+/// Table-pointer index of `fcPlfguidUim`/`lcbPlfguidUim` (MS-DOC 2.5.8 `FibRgFcLcb2002`).
 const UIM_GUID_FIB_INDEX: usize = 111;
 const MAX_UIM_ENTRIES: usize = 1_000_000;
 /// CPs are signed 31-bit positions in the set of all document parts (MS-DOC 2.2.1).
@@ -102,12 +102,15 @@ impl UimGuidTable {
     }
 
     /// The GUIDs in table order (`rgguidUim`).
+    #[must_use]
     pub fn guids(&self) -> &[[u8; GUID_SIZE]] {
         &self.guids
     }
+    #[must_use]
     pub fn len(&self) -> usize {
         self.guids.len()
     }
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.guids.is_empty()
     }
@@ -189,6 +192,7 @@ impl Uim {
     }
 
     /// Serialize exactly as decoded.
+    #[must_use]
     pub fn to_bytes(self) -> [u8; Self::SIZE] {
         let mut data = [0u8; Self::SIZE];
         data[0..2].copy_from_slice(&self.guid_type_index.to_le_bytes());
@@ -201,26 +205,32 @@ impl Uim {
     }
 
     /// Index of the service-category GUID within `PlfguidUim.rgguidUim`.
+    #[must_use]
     pub fn guid_type_index(&self) -> u16 {
         self.guid_type_index
     }
     /// Index of the service CLSID GUID within `PlfguidUim.rgguidUim`.
+    #[must_use]
     pub fn clsid_tip_index(&self) -> u16 {
         self.clsid_tip_index
     }
     /// Offset of the opaque service payload within the Table Stream (`fc`).
+    #[must_use]
     pub fn data_offset(&self) -> u32 {
         self.data_offset
     }
     /// Characters of main-document text the record describes (`cch`).
+    #[must_use]
     pub fn text_len(&self) -> u32 {
         self.text_len
     }
     /// Size in bytes of the payload at `data_offset` (`cb`).
+    #[must_use]
     pub fn data_len(&self) -> u32 {
         self.data_len
     }
     /// Opaque service-generated private data (`dwPrivate`).
+    #[must_use]
     pub fn private_data(&self) -> u32 {
         self.private_data
     }
@@ -234,13 +244,16 @@ pub struct UimEntry {
 }
 
 impl UimEntry {
+    #[must_use]
     pub const fn new(start_cp: u32, uim: Uim) -> Self {
         Self { start_cp, uim }
     }
 
+    #[must_use]
     pub fn start_cp(&self) -> u32 {
         self.start_cp
     }
+    #[must_use]
     pub fn uim(&self) -> &Uim {
         &self.uim
     }
@@ -312,16 +325,20 @@ impl UimTable {
         })
     }
 
+    #[must_use]
     pub fn entries(&self) -> &[UimEntry] {
         &self.entries
     }
     /// Final PLC CP. The format leaves this undefined; it MUST be ignored.
+    #[must_use]
     pub fn terminal_cp(&self) -> u32 {
         self.terminal_cp
     }
+    #[must_use]
     pub fn len(&self) -> usize {
         self.entries.len()
     }
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
@@ -406,10 +423,12 @@ impl TextServicesTables {
     }
 
     /// Text-services records (`Plcfuim`, MS-DOC 2.8.33).
+    #[must_use]
     pub fn records(&self) -> Option<&UimTable> {
         self.records.as_ref()
     }
     /// Referenced service GUIDs (`PlfguidUim`, MS-DOC 2.9.198).
+    #[must_use]
     pub fn guids(&self) -> Option<&UimGuidTable> {
         self.guids.as_ref()
     }

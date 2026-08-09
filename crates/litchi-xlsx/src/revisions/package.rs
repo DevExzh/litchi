@@ -9,7 +9,10 @@ use super::codec::{
     write_revision_log, write_revision_users,
 };
 use super::invalid;
-use super::model::*;
+use super::model::{
+    HEADERS_CT, HEADERS_REL, LOG_CT, LOG_REL, RevisionConformance, RevisionLogPart, Revisions,
+    STRICT_HEADERS_REL, STRICT_LOG_REL, STRICT_USERS_REL, USERS_CT, USERS_REL, validate_package,
+};
 use super::snapshot::{Snapshot, SourceRelationship};
 
 pub fn load_workbook_revisions(package: &OpcPackage) -> Result<Option<Revisions>> {
@@ -268,8 +271,7 @@ fn remove_workbook_revisions_inner(package: &mut OpcPackage, value: &Revisions) 
         let actual = package.get_part(name)?.partname().clone();
         if incoming_references(package, &actual)? != 1 {
             return Err(invalid(format!(
-                "revision part '{}' has unexpected incoming relationships",
-                actual
+                "revision part '{actual}' has unexpected incoming relationships"
             )));
         }
     }
@@ -340,8 +342,7 @@ fn update_in_place(
         let uri = PackURI::new(name).map_err(invalid)?;
         if incoming_references(package, &uri)? != 1 {
             return Err(invalid(format!(
-                "revision part '{}' has unexpected incoming relationships",
-                uri
+                "revision part '{uri}' has unexpected incoming relationships"
             )));
         }
     }
@@ -403,8 +404,7 @@ fn update_in_place(
         let uri = PackURI::new(&old.part_name).map_err(invalid)?;
         if incoming_references(package, &uri)? != 1 {
             return Err(invalid(format!(
-                "revision log part '{}' has unexpected incoming relationships",
-                uri
+                "revision log part '{uri}' has unexpected incoming relationships"
             )));
         }
     }
@@ -541,13 +541,10 @@ fn apply_relationship_set(
     expected: &[SourceRelationship],
     filter: Option<fn(&str) -> bool>,
 ) -> Result<()> {
-    let expected_ids: HashSet<_> = expected
-        .iter()
-        .map(|relationship| relationship.id())
-        .collect();
+    let expected_ids: HashSet<_> = expected.iter().map(SourceRelationship::id).collect();
     let remove = relationships
         .iter()
-        .filter(|relationship| filter.map_or(true, |f| f(relationship.reltype())))
+        .filter(|relationship| filter.is_none_or(|f| f(relationship.reltype())))
         .filter(|relationship| !expected_ids.contains(relationship.r_id()))
         .map(|relationship| relationship.r_id().to_owned())
         .collect::<Vec<_>>();
@@ -595,8 +592,7 @@ fn validate_owner_references(package: &OpcPackage, value: &Revisions) -> Result<
         let uri = PackURI::new(name).map_err(invalid)?;
         if incoming_references(package, &uri)? != 1 {
             return Err(invalid(format!(
-                "revision part '{}' has unexpected incoming relationships",
-                uri
+                "revision part '{uri}' has unexpected incoming relationships"
             )));
         }
     }

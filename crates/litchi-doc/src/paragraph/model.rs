@@ -48,10 +48,10 @@ impl Paragraph {
     /// pass empty string here and set runs separately to avoid text duplication.
     pub(crate) fn new(text: String) -> Self {
         // Only create default run if text is non-empty
-        let runs = if !text.is_empty() {
-            vec![Run::new(text.clone(), CharacterProperties::default())]
-        } else {
+        let runs = if text.is_empty() {
             Vec::new()
+        } else {
+            vec![Run::new(text.clone(), CharacterProperties::default())]
         };
 
         Self {
@@ -69,7 +69,10 @@ impl Paragraph {
     /// # Arguments
     ///
     /// * `runs` - The runs within this paragraph
-    #[allow(unused)]
+    #[allow(
+        unused,
+        reason = "parsed DOC metadata is retained for format completeness and future round-trip support"
+    )]
     pub(crate) fn with_runs(runs: Vec<Run>) -> Self {
         let text = runs.iter().map(|r| r.text.as_str()).collect::<String>();
         Self {
@@ -83,7 +86,10 @@ impl Paragraph {
     }
 
     /// Create a new Paragraph with text and properties.
-    #[allow(dead_code)] // TODO: remove this once we use this function
+    #[allow(
+        dead_code,
+        reason = "reserved DOC structure retained for format completeness or future round-trip support"
+    )] // TODO: remove this once we use this function
     pub(crate) fn with_properties(
         text: String,
         properties: crate::parts::pap::ParagraphProperties,
@@ -134,21 +140,25 @@ impl Paragraph {
     }
 
     /// Get the paragraph properties.
+    #[must_use]
     pub fn properties(&self) -> &crate::parts::pap::ParagraphProperties {
         &self.properties
     }
 
     /// Tracked paragraph-formatting revision metadata.
+    #[must_use]
     pub fn formatting_revision(&self) -> Option<&RevisionMark> {
         self.formatting_revision.as_ref()
     }
 
     /// Numbering revision metadata for this paragraph.
+    #[must_use]
     pub fn numbering_revision(&self) -> Option<&NumberingRevisionMark> {
         self.numbering_revision.as_ref()
     }
 
     /// Whether a numbered list was applied after the previous revision.
+    #[must_use]
     pub fn numbering_revision_list_applied(&self) -> Option<bool> {
         self.properties.numbering_revision_list_applied
     }
@@ -253,8 +263,9 @@ impl Paragraph {
     }
 
     /// Check if this paragraph contains any formulas.
+    #[must_use]
     pub fn has_formulas(&self) -> bool {
-        self.runs.iter().any(|r| r.has_mtef_formula())
+        self.runs.iter().any(Run::has_mtef_formula)
     }
 }
 
@@ -289,7 +300,7 @@ pub struct Run {
     properties: CharacterProperties,
     /// Owned LaTeX rendered from MTEF while its scoped parser arena is alive.
     mtef_formula_latex: Option<Arc<str>>,
-    /// Embedded image (metadata only, data loaded lazily via Document::image_data)
+    /// Embedded image (metadata only, data loaded lazily via `Document::image_data`)
     image: Option<crate::image::Image>,
     /// Resolved insertion revision metadata.
     insertion_revision: Option<RevisionMark>,
@@ -382,6 +393,7 @@ impl Run {
     /// Returns `Some(true)` if bold is enabled,
     /// `Some(false)` if explicitly disabled,
     /// `None` if not specified (inherits from style).
+    #[must_use]
     pub fn bold(&self) -> Option<bool> {
         self.properties.is_bold
     }
@@ -391,6 +403,7 @@ impl Run {
     /// Returns `Some(true)` if italic is enabled,
     /// `Some(false)` if explicitly disabled,
     /// `None` if not specified (inherits from style).
+    #[must_use]
     pub fn italic(&self) -> Option<bool> {
         self.properties.is_italic
     }
@@ -399,6 +412,7 @@ impl Run {
     ///
     /// Returns `Some(true)` if underline is present,
     /// `None` if not specified.
+    #[must_use]
     pub fn underline(&self) -> Option<bool> {
         match self.properties.underline {
             UnderlineStyle::None => None,
@@ -409,11 +423,13 @@ impl Run {
     /// Get the underline style for this run.
     ///
     /// Returns the specific underline style if applied.
+    #[must_use]
     pub fn underline_style(&self) -> UnderlineStyle {
         self.properties.underline
     }
 
     /// Check if this run is strikethrough.
+    #[must_use]
     pub fn strikethrough(&self) -> Option<bool> {
         self.properties.is_strikethrough
     }
@@ -422,31 +438,37 @@ impl Run {
     ///
     /// Returns the size if specified, None if inherited.
     /// Note: DOC format stores font size in half-points (e.g., 24 = 12pt).
+    #[must_use]
     pub fn font_size(&self) -> Option<u16> {
         self.properties.font_size
     }
 
     /// Get the text color as RGB tuple.
+    #[must_use]
     pub fn color(&self) -> Option<(u8, u8, u8)> {
         self.properties.color
     }
 
     /// Check if text is superscript.
+    #[must_use]
     pub fn is_superscript(&self) -> bool {
         self.properties.vertical_position == VerticalPosition::Superscript
     }
 
     /// Check if text is subscript.
+    #[must_use]
     pub fn is_subscript(&self) -> bool {
         self.properties.vertical_position == VerticalPosition::Subscript
     }
 
     /// Check if text is in small caps.
+    #[must_use]
     pub fn small_caps(&self) -> Option<bool> {
         self.properties.is_small_caps
     }
 
     /// Check if text is in all caps.
+    #[must_use]
     pub fn all_caps(&self) -> Option<bool> {
         self.properties.is_all_caps
     }
@@ -454,26 +476,31 @@ impl Run {
     /// Get the character properties for this run.
     ///
     /// Provides access to all formatting properties.
+    #[must_use]
     pub fn properties(&self) -> &CharacterProperties {
         &self.properties
     }
 
     /// Insertion revision metadata for this run.
+    #[must_use]
     pub fn insertion_revision(&self) -> Option<&RevisionMark> {
         self.insertion_revision.as_ref()
     }
 
     /// Deletion revision metadata for this run.
+    #[must_use]
     pub fn deletion_revision(&self) -> Option<&RevisionMark> {
         self.deletion_revision.as_ref()
     }
 
     /// Character-formatting revision metadata for this run.
+    #[must_use]
     pub fn formatting_revision(&self) -> Option<&RevisionMark> {
         self.formatting_revision.as_ref()
     }
 
     /// Revision metadata for a LISTNUM display-field result.
+    #[must_use]
     pub fn display_field_revision(&self) -> Option<&DisplayFieldRevisionMark> {
         self.display_field_revision.as_ref()
     }
@@ -554,6 +581,7 @@ impl Run {
     /// Check if this run contains an MTEF formula.
     ///
     /// Returns true if this run contains a parsed MTEF formula AST.
+    #[must_use]
     pub fn has_mtef_formula(&self) -> bool {
         self.mtef_formula_latex.is_some()
     }
@@ -562,6 +590,7 @@ impl Run {
     ///
     /// This replaces the former `'static` AST accessor, whose nodes depended on
     /// allocations owned elsewhere in the document.
+    #[must_use]
     pub fn mtef_formula_latex(&self) -> Option<&str> {
         self.mtef_formula_latex.as_deref()
     }
@@ -602,11 +631,13 @@ impl Run {
     }
 
     /// Check if this run is an OLE2 embedded object (like an equation or image).
+    #[must_use]
     pub fn is_ole_object(&self) -> bool {
         self.properties.is_ole2
     }
 
     /// Check if this run contains an embedded image.
+    #[must_use]
     pub fn has_image(&self) -> bool {
         self.image.is_some()
     }
@@ -623,6 +654,7 @@ impl Run {
     ///     // Process image data...
     /// }
     /// ```
+    #[must_use]
     pub fn image(&self) -> Option<&crate::image::Image> {
         self.image.as_ref()
     }

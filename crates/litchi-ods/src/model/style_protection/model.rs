@@ -64,6 +64,7 @@ impl Rule {
     }
 
     /// Bind the lexical condition prefix to a namespace URI.
+    #[must_use]
     pub fn with_formula_namespace(mut self, namespace: formula::Namespace) -> Self {
         self.formula_namespace = Some(namespace);
         self
@@ -126,6 +127,7 @@ impl Protection {
     }
 
     /// Whether editing is prohibited while the containing sheet is protected.
+    #[must_use]
     pub fn is_protected(self) -> bool {
         matches!(
             self,
@@ -134,15 +136,18 @@ impl Protection {
     }
 
     /// Whether the cell formula is hidden while protection is active.
+    #[must_use]
     pub fn hides_formula(self) -> bool {
         matches!(self, Self::FormulaHidden | Self::ProtectedFormulaHidden)
     }
 
     /// Whether both cell content and editing are hidden/protected.
+    #[must_use]
     pub fn hides_content(self) -> bool {
         self == Self::HiddenAndProtected
     }
 
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::None => "none",

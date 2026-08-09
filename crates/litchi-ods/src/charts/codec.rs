@@ -58,8 +58,9 @@ pub(crate) fn inventory(package: &Package, limits: Limits) -> Result<Vec<Chart>>
                     continue;
                 }
                 let bytes = owned.get_file(&content_path)?;
-                let xml = String::from_utf8(bytes)
-                    .map_err(|_| invalid_error("embedded ODS chart content.xml is not UTF-8"))?;
+                let xml = String::from_utf8(bytes).map_err(|_error| {
+                    invalid_error("embedded ODS chart content.xml is not UTF-8")
+                })?;
                 let part = Part::from_xml_with_limit(xml, limits.max_part_bytes())?;
                 (
                     part,
@@ -91,7 +92,13 @@ pub(crate) fn inventory(package: &Package, limits: Limits) -> Result<Vec<Chart>>
                     },
                 )
             },
-            _ => continue,
+            Source::InlineXml { .. }
+            | Source::InlineBinary { .. }
+            | Source::PackageFile { .. }
+            | Source::MissingPackagePart { .. }
+            | Source::Linked { .. }
+            | Source::Missing
+            | _ => continue,
         };
 
         total_bytes = total_bytes
@@ -119,16 +126,25 @@ pub(crate) fn inventory(package: &Package, limits: Limits) -> Result<Vec<Chart>>
 
 impl Part {
     /// Parse an existing standalone chart `content.xml` part.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn from_xml(xml: impl Into<String>) -> Result<Self> {
         Self::from_xml_with_limit(xml.into(), Limits::default().max_part_bytes())
     }
 
     /// Serialize and validate a typed common ODF chart definition.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn from_definition(definition: &Definition) -> Result<Self> {
         Self::from_xml(serialize_content(definition)?)
     }
 
     /// Parse an inline `office:document` chart payload.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn from_inline_xml(xml: impl Into<String>) -> Result<Self> {
         Self::from_inline_with_limit(xml.into(), Limits::default().max_part_bytes())
     }
@@ -245,7 +261,13 @@ pub(crate) fn locate_objects(xml: &str) -> Result<Vec<Span>> {
                         && element.local_name().as_ref() == b"document",
                 },
                 Event::Eof => Token::Eof,
-                _ => Token::Other,
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => Token::Other,
             }
         };
         let end = position(&reader)?;
@@ -318,7 +340,7 @@ pub(crate) fn locate_objects(xml: &str) -> Result<Vec<Span>> {
                 }
             },
             Token::Eof => break,
-            _ => {},
+            Token::Other => {},
         }
         buffer.clear();
     }
@@ -340,7 +362,9 @@ fn namespace_kind(namespace: &ResolveResult<'_>) -> NamespaceKind {
     match namespace {
         ResolveResult::Bound(Namespace(value)) if *value == OFFICE_NS => NamespaceKind::Office,
         ResolveResult::Bound(Namespace(value)) if *value == DRAW_NS => NamespaceKind::Draw,
-        _ => NamespaceKind::Other,
+        ResolveResult::Unbound | ResolveResult::Bound(_) | ResolveResult::Unknown(_) => {
+            NamespaceKind::Other
+        },
     }
 }
 
@@ -353,7 +377,7 @@ fn is_object_name(local: &[u8]) -> bool {
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid_error("ODS XML position exceeds platform limits"))
+        .map_err(|_error| invalid_error("ODS XML position exceeds platform limits"))
 }
 
 fn inline_mimetype(xml: &str) -> Result<Option<String>> {
@@ -401,7 +425,14 @@ fn inline_mimetype(xml: &str) -> Result<Option<String>> {
             Event::Text(value) if value.iter().all(u8::is_ascii_whitespace) => {},
             Event::Decl(_) | Event::Comment(_) | Event::PI(_) => {},
             Event::Eof => return invalid("inline ODS object has no office:document root"),
-            _ => return invalid("inline ODS object has invalid content before its root"),
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {
+                return invalid("inline ODS object has invalid content before its root");
+            },
         }
         buffer.clear();
     }
@@ -448,7 +479,7 @@ fn rename_document_root(
     }
     let replacement = format!("{prefix}:{replacement_local}");
     let mut output = String::with_capacity(xml.len() + 96);
-    output.push_str(&xml[..root_start + 1]);
+    output.push_str(&xml[..=root_start]);
     output.push_str(&replacement);
     if let Some((name, value)) = added_attribute {
         output.push(' ');
@@ -503,7 +534,13 @@ fn root_has_office_mimetype(xml: &str) -> Result<bool> {
             Event::Decl(_) | Event::Comment(_) | Event::PI(_) => {},
             Event::Text(value) if value.iter().all(u8::is_ascii_whitespace) => {},
             Event::Eof => return invalid("ODS chart XML has no document root"),
-            _ => return invalid("ODS chart XML has invalid content before its root"),
+            Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {
+                return invalid("ODS chart XML has invalid content before its root");
+            },
         }
         buffer.clear();
     }

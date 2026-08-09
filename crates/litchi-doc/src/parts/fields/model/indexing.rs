@@ -65,11 +65,13 @@ pub struct TableOfContentsField {
 
 impl TableOfContentsField {
     /// Return the paired field markers and their story-relative positions.
+    #[must_use]
     pub fn field(&self) -> &Field {
         &self.field
     }
 
     /// Return the complete stored `TOC` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
@@ -77,6 +79,7 @@ impl TableOfContentsField {
     /// Return recognized stored configuration options in source order.
     ///
     /// This metadata is never used to generate or update a table.
+    #[must_use]
     pub fn options(&self) -> &[TableOfContentsOption] {
         &self.options
     }
@@ -84,6 +87,7 @@ impl TableOfContentsField {
     /// Return unrecognized stored switches in source order.
     ///
     /// They are retained without interpretation or execution.
+    #[must_use]
     pub fn unknown_switches(&self) -> &[MergeFieldSwitch] {
         &self.unknown_switches
     }
@@ -91,16 +95,19 @@ impl TableOfContentsField {
     /// Return the stored cached field result, if present.
     ///
     /// This value is never regenerated through pagination or field evaluation.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a producer marked the stored result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.field.end_flags.results_dirty
     }
 
     /// Whether a producer locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.field.end_flags.locked
     }
@@ -159,11 +166,13 @@ impl TableOfContentsEntryField {
     }
 
     /// Return the story that stores this field.
+    #[must_use]
     pub const fn story(&self) -> FieldStory {
         self.story
     }
 
     /// Return the story-relative position of this field's begin character.
+    #[must_use]
     pub const fn start_position(&self) -> u32 {
         self.start_cp
     }
@@ -171,16 +180,19 @@ impl TableOfContentsEntryField {
     /// Return the story-relative position of this field's separator character.
     ///
     /// `TC` fields normally have no cached result and therefore no separator.
+    #[must_use]
     pub const fn separator_position(&self) -> Option<u32> {
         self.separator_cp
     }
 
     /// Return the story-relative position of this field's end character.
+    #[must_use]
     pub const fn end_position(&self) -> u32 {
         self.end_cp
     }
 
     /// Return the complete stored `TC` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
@@ -188,6 +200,7 @@ impl TableOfContentsEntryField {
     /// Return the stored text marked for a table of contents.
     ///
     /// This is metadata only and is never inserted into generated content.
+    #[must_use]
     pub fn entry(&self) -> &str {
         &self.entry
     }
@@ -196,6 +209,7 @@ impl TableOfContentsEntryField {
     ///
     /// These options are never used to calculate page numbers, change hidden
     /// text, or update a table of contents.
+    #[must_use]
     pub fn options(&self) -> &[TableOfContentsEntryOption] {
         &self.options
     }
@@ -203,6 +217,7 @@ impl TableOfContentsEntryField {
     /// Return unrecognized stored field switches in source order.
     ///
     /// They are retained without interpretation or execution.
+    #[must_use]
     pub fn unknown_switches(&self) -> &[MergeFieldSwitch] {
         &self.unknown_switches
     }
@@ -210,6 +225,7 @@ impl TableOfContentsEntryField {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This value is never regenerated through pagination or field evaluation.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
@@ -272,11 +288,13 @@ impl TableOfAuthoritiesEntryField {
     }
 
     /// Return the story that stores this field.
+    #[must_use]
     pub const fn story(&self) -> FieldStory {
         self.story
     }
 
     /// Return the story-relative position of this field's begin character.
+    #[must_use]
     pub const fn start_position(&self) -> u32 {
         self.start_cp
     }
@@ -284,16 +302,19 @@ impl TableOfAuthoritiesEntryField {
     /// Return the story-relative position of this field's separator character.
     ///
     /// `TA` fields normally have no cached result and therefore no separator.
+    #[must_use]
     pub const fn separator_position(&self) -> Option<u32> {
         self.separator_cp
     }
 
     /// Return the story-relative position of this field's end character.
+    #[must_use]
     pub const fn end_position(&self) -> u32 {
         self.end_cp
     }
 
     /// Return the complete stored `TA` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
@@ -302,6 +323,7 @@ impl TableOfAuthoritiesEntryField {
     ///
     /// These options are never used to find citations, calculate page numbers,
     /// or generate a table of authorities.
+    #[must_use]
     pub fn options(&self) -> &[TableOfAuthoritiesEntryOption] {
         &self.options
     }
@@ -309,6 +331,7 @@ impl TableOfAuthoritiesEntryField {
     /// Return unrecognized stored field switches in source order.
     ///
     /// They are retained without interpretation or execution.
+    #[must_use]
     pub fn unknown_switches(&self) -> &[MergeFieldSwitch] {
         &self.unknown_switches
     }
@@ -316,6 +339,7 @@ impl TableOfAuthoritiesEntryField {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This value is never regenerated through pagination or field evaluation.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
@@ -379,11 +403,13 @@ impl IndexEntryField {
     }
 
     /// Return the story that stores this field.
+    #[must_use]
     pub const fn story(&self) -> FieldStory {
         self.story
     }
 
     /// Return the story-relative position of this field's begin character.
+    #[must_use]
     pub const fn start_position(&self) -> u32 {
         self.start_cp
     }
@@ -391,16 +417,19 @@ impl IndexEntryField {
     /// Return the story-relative position of this field's separator character.
     ///
     /// `XE` fields normally have no cached result and therefore no separator.
+    #[must_use]
     pub const fn separator_position(&self) -> Option<u32> {
         self.separator_cp
     }
 
     /// Return the story-relative position of this field's end character.
+    #[must_use]
     pub const fn end_position(&self) -> u32 {
         self.end_cp
     }
 
     /// Return the complete stored `XE` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
@@ -408,6 +437,7 @@ impl IndexEntryField {
     /// Return the stored text marked for an index.
     ///
     /// This is metadata only and is never inserted into generated content.
+    #[must_use]
     pub fn entry(&self) -> &str {
         &self.entry
     }
@@ -416,6 +446,7 @@ impl IndexEntryField {
     ///
     /// These options are never used to change hidden text, resolve bookmarks,
     /// calculate pages, or generate an index.
+    #[must_use]
     pub fn options(&self) -> &[IndexEntryOption] {
         &self.options
     }
@@ -423,6 +454,7 @@ impl IndexEntryField {
     /// Return unrecognized stored field switches in source order.
     ///
     /// They are retained without interpretation or execution.
+    #[must_use]
     pub fn unknown_switches(&self) -> &[MergeFieldSwitch] {
         &self.unknown_switches
     }
@@ -430,6 +462,7 @@ impl IndexEntryField {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This value is never regenerated through pagination or field evaluation.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
@@ -472,11 +505,13 @@ impl ReferencedDocumentField {
     }
 
     /// Return the story that stores this field.
+    #[must_use]
     pub const fn story(&self) -> FieldStory {
         self.story
     }
 
     /// Return the story-relative position of this field's begin character.
+    #[must_use]
     pub const fn start_position(&self) -> u32 {
         self.start_cp
     }
@@ -484,21 +519,25 @@ impl ReferencedDocumentField {
     /// Return the story-relative position of this field's separator character.
     ///
     /// `RD` fields normally have no cached result and therefore no separator.
+    #[must_use]
     pub const fn separator_position(&self) -> Option<u32> {
         self.separator_cp
     }
 
     /// Return the story-relative position of this field's end character.
+    #[must_use]
     pub const fn end_position(&self) -> u32 {
         self.end_cp
     }
 
     /// Return the complete stored `RD` field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
 
     /// Return the stored referenced-document path without opening it.
+    #[must_use]
     pub fn source(&self) -> &str {
         &self.source
     }
@@ -507,6 +546,7 @@ impl ReferencedDocumentField {
     /// to this document.
     ///
     /// This is metadata only. The API never resolves the path.
+    #[must_use]
     pub fn uses_relative_path(&self) -> bool {
         self.relative_path
     }
@@ -514,6 +554,7 @@ impl ReferencedDocumentField {
     /// Return all stored field switches in source order.
     ///
     /// They are retained without interpretation or execution.
+    #[must_use]
     pub fn switches(&self) -> &[MergeFieldSwitch] {
         &self.switches
     }
@@ -521,6 +562,7 @@ impl ReferencedDocumentField {
     /// Return the stored field result when a producer supplied one.
     ///
     /// This value is never regenerated by opening or updating a source.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
@@ -560,11 +602,13 @@ impl PrivateField {
     }
 
     /// Return the story that stores this field.
+    #[must_use]
     pub const fn story(&self) -> FieldStory {
         self.story
     }
 
     /// Return the story-relative position of this field's begin character.
+    #[must_use]
     pub const fn start_position(&self) -> u32 {
         self.start_cp
     }
@@ -572,11 +616,13 @@ impl PrivateField {
     /// Return the story-relative position of this field's separator character.
     ///
     /// `PRIVATE` fields normally have no cached result and therefore no separator.
+    #[must_use]
     pub const fn separator_position(&self) -> Option<u32> {
         self.separator_cp
     }
 
     /// Return the story-relative position of this field's end character.
+    #[must_use]
     pub const fn end_position(&self) -> u32 {
         self.end_cp
     }
@@ -585,6 +631,7 @@ impl PrivateField {
     ///
     /// This string remains opaque metadata and is never used to convert a
     /// document or reveal hidden content.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
@@ -593,6 +640,7 @@ impl PrivateField {
     ///
     /// It is never parsed, interpreted, or used to convert a document, reveal
     /// hidden content, or calculate layout.
+    #[must_use]
     pub fn opaque_instructions(&self) -> &str {
         &self.opaque_instructions
     }
@@ -601,6 +649,7 @@ impl PrivateField {
     ///
     /// This value is never regenerated by conversion or used to change
     /// hidden-text visibility.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
@@ -648,31 +697,37 @@ impl NonPlcfFields {
     }
 
     /// Return stored `TC` table-of-contents entries in story and source order.
+    #[must_use]
     pub fn table_of_contents_entries(&self) -> &[TableOfContentsEntryField] {
         &self.table_of_contents_entries
     }
 
     /// Return stored `TA` table-of-authorities entries in story and source order.
+    #[must_use]
     pub fn table_of_authorities_entries(&self) -> &[TableOfAuthoritiesEntryField] {
         &self.table_of_authorities_entries
     }
 
     /// Return stored `XE` index entries in story and source order.
+    #[must_use]
     pub fn index_entries(&self) -> &[IndexEntryField] {
         &self.index_entries
     }
 
     /// Return stored `RD` referenced-document fields without opening them.
+    #[must_use]
     pub fn referenced_documents(&self) -> &[ReferencedDocumentField] {
         &self.referenced_documents
     }
 
     /// Return stored opaque `PRIVATE` conversion-data fields.
+    #[must_use]
     pub fn private_fields(&self) -> &[PrivateField] {
         &self.private_fields
     }
 
     /// Whether no recognized excluded field is present.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.table_of_contents_entries.is_empty()
             && self.table_of_authorities_entries.is_empty()

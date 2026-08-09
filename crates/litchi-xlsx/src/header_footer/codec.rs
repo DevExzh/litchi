@@ -1,4 +1,4 @@
-//! Bounded SpreadsheetML worksheet header/footer XML decoding.
+//! Bounded `SpreadsheetML` worksheet header/footer XML decoding.
 
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;

@@ -1,4 +1,4 @@
-//! Typed SpreadsheetML chartsheet semantic model.
+//! Typed `SpreadsheetML` chartsheet semantic model.
 //!
 //! The root model is kept deliberately small. Its schema children live in
 //! focused modules so that semantic values do not get mixed with the OPC
@@ -67,6 +67,7 @@ pub enum Conformance {
 }
 
 impl Conformance {
+    #[must_use]
     pub fn sml(self) -> &'static str {
         match self {
             Self::Transitional => SML,
@@ -74,6 +75,7 @@ impl Conformance {
         }
     }
 
+    #[must_use]
     pub fn rel(self) -> &'static str {
         match self {
             Self::Transitional => REL,
@@ -81,6 +83,7 @@ impl Conformance {
         }
     }
 
+    #[must_use]
     pub fn xdr(self) -> &'static str {
         match self {
             Self::Transitional => XDR,
@@ -88,6 +91,7 @@ impl Conformance {
         }
     }
 
+    #[must_use]
     pub fn chart(self) -> &'static str {
         match self {
             Self::Transitional => CHART,
@@ -95,6 +99,7 @@ impl Conformance {
         }
     }
 
+    #[must_use]
     pub fn chartsheet_rel(self) -> &'static str {
         match self {
             Self::Transitional => CHARTSHEET_REL,
@@ -102,6 +107,7 @@ impl Conformance {
         }
     }
 
+    #[must_use]
     pub fn drawing_rel(self) -> &'static str {
         match self {
             Self::Transitional => DRAWING_REL,
@@ -109,6 +115,7 @@ impl Conformance {
         }
     }
 
+    #[must_use]
     pub fn chart_rel(self) -> &'static str {
         match self {
             Self::Transitional => CHART_REL,
@@ -116,6 +123,7 @@ impl Conformance {
         }
     }
 
+    #[must_use]
     pub fn image_rel(self) -> &'static str {
         match self {
             Self::Transitional => IMAGE_REL,
@@ -123,6 +131,7 @@ impl Conformance {
         }
     }
 
+    #[must_use]
     pub fn chart_user_shapes_rel(self) -> &'static str {
         match self {
             Self::Transitional => CHART_USER_SHAPES_REL,
@@ -130,6 +139,7 @@ impl Conformance {
         }
     }
 
+    #[must_use]
     pub fn theme_override_rel(self) -> &'static str {
         match self {
             Self::Transitional => THEME_OVERRIDE_REL,
@@ -137,6 +147,7 @@ impl Conformance {
         }
     }
 
+    #[must_use]
     pub fn package_rel(self) -> &'static str {
         match self {
             Self::Transitional => PACKAGE_REL,
@@ -144,6 +155,7 @@ impl Conformance {
         }
     }
 
+    #[must_use]
     pub fn vml_drawing_rel(self) -> &'static str {
         match self {
             Self::Transitional => VML_DRAWING_REL,
@@ -151,6 +163,7 @@ impl Conformance {
         }
     }
 
+    #[must_use]
     pub fn printer_rel(self) -> &'static str {
         match self {
             Self::Transitional => PRINTER_REL,
@@ -159,7 +172,7 @@ impl Conformance {
     }
 }
 
-/// The typed semantic contents of one SpreadsheetML `chartsheet` part.
+/// The typed semantic contents of one `SpreadsheetML` `chartsheet` part.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Chart {
     pub properties: Option<Properties>,

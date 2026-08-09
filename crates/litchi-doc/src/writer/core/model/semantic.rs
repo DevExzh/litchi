@@ -1,4 +1,13 @@
-use super::*;
+use super::{
+    AssociatedStringSlot, BookmarkEntry, CharacterFormatting, CommentEntry,
+    DocumentAssociatedStrings, EncryptionProfile, FloatingAnchorKind, FootnoteEntry,
+    FormattingRevision, GlossaryMetadata, HashMap, HeaderAnchor, HeaderFooterParagraph, HeaderKind,
+    ListFormatOverride, ListNamesTable, ListStructure, ListTemplateTable, NumberingWriter,
+    ParagraphFormatting, ProofingFeature, ProofingStateTable, ProofingTables, SavedByTable,
+    SmartTagEntry, SmartTagRecognizerRange, TableCell, TableRow, TextRun, WritableParagraph,
+    WritableTable, WriteError, Writer, WriterEncryption, WriterPicture, WriterShape, Zeroizing,
+    validate_header_footer_paragraphs, validate_writer_password, writable_paragraph_from_runs,
+};
 
 /// Append one textbox story (main or header) to the text stream.
 ///
@@ -9,6 +18,7 @@ use super::*;
 
 impl Writer {
     /// Create a new DOC writer
+    #[must_use]
     pub fn new() -> Self {
         Self {
             paragraphs: Vec::new(),
@@ -70,6 +80,7 @@ impl Writer {
     }
 
     /// Return the configured password-to-open profile without exposing the password.
+    #[must_use]
     pub fn encryption_profile(&self) -> Option<EncryptionProfile> {
         self.encryption.as_ref().map(|value| value.profile)
     }
@@ -105,6 +116,7 @@ impl Writer {
     }
 
     /// Whether a complete VBA project is configured for output.
+    #[must_use]
     pub fn has_vba(&self) -> bool {
         self.vba_project.is_some()
     }
@@ -123,6 +135,7 @@ impl Writer {
     }
 
     /// Access one configured proofing table.
+    #[must_use]
     pub fn proofing_table(&self, feature: ProofingFeature) -> Option<&ProofingStateTable> {
         self.proofing_tables.get(feature)
     }
@@ -138,6 +151,7 @@ impl Writer {
     }
 
     /// Access the associated-document string table that will be written.
+    #[must_use]
     pub fn associated_strings(&self) -> &DocumentAssociatedStrings {
         &self.associated_strings
     }
@@ -166,6 +180,7 @@ impl Writer {
     }
 
     /// Access the configured save-history table.
+    #[must_use]
     pub fn saved_by_table(&self) -> Option<&SavedByTable> {
         self.saved_by_table.as_ref()
     }
@@ -188,6 +203,7 @@ impl Writer {
     }
 
     /// Access the configured glossary-only metadata.
+    #[must_use]
     pub fn glossary_metadata(&self) -> Option<&GlossaryMetadata> {
         self.glossary_metadata.as_ref()
     }
@@ -200,7 +216,7 @@ impl Writer {
     /// Attach a distinct glossary-only document to this template.
     ///
     /// The attached writer must have [`Writer::set_glossary_metadata`]
-    /// configured. Its main story becomes the template's AutoText story.
+    /// configured. Its main story becomes the template's `AutoText` story.
     ///
     /// # Errors
     ///
@@ -219,6 +235,7 @@ impl Writer {
     }
 
     /// Access the attached glossary writer.
+    #[must_use]
     pub fn attached_glossary(&self) -> Option<&Writer> {
         self.attached_glossary.as_deref()
     }
@@ -342,8 +359,8 @@ impl Writer {
     ///
     /// The picture is written as a single 0x0001 picture character with
     /// sprmCFSpec and sprmCPicLocation applied ([MS-DOC] 1.3); the character
-    /// points to an OfficeArtWordDrawing block (PICF + OfficeArtSpContainer +
-    /// OfficeArtFBSE with an embedded BLIP) in the Data stream. The image
+    /// points to an `OfficeArtWordDrawing` block (PICF + `OfficeArtSpContainer` +
+    /// `OfficeArtFBSE` with an embedded BLIP) in the Data stream. The image
     /// bytes are stored verbatim — no re-encoding is performed.
     pub fn insert_picture(
         &mut self,
@@ -357,8 +374,8 @@ impl Writer {
     /// The anchor is a single 0x0008 character with sprmCFSpec and
     /// sprmCPicLocation applied ([MS-DOC] 1.3). The picture data is stored
     /// like an inline picture's, and the anchor character position is
-    /// recorded in the Main Document's PlcfSpa together with an
-    /// OfficeArtContent drawing group (fcDggInfo) holding the picture-frame
+    /// recorded in the Main Document's `PlcfSpa` together with an
+    /// `OfficeArtContent` drawing group (fcDggInfo) holding the picture-frame
     /// shape, so readers can resolve the anchor to position and image.
     pub fn insert_floating_picture(
         &mut self,
@@ -436,8 +453,8 @@ impl Writer {
     ///
     /// The anchor is a single 0x0008 character with sprmCFSpec applied, and
     /// the shape is emitted into the document's drawing group (fcDggInfo
-    /// OfficeArtContent) with its position recorded in the Main Document's
-    /// PlcfSpa — the same mechanism as floating pictures ([MS-DOC] 1.3).
+    /// `OfficeArtContent`) with its position recorded in the Main Document's
+    /// `PlcfSpa` — the same mechanism as floating pictures ([MS-DOC] 1.3).
     ///
     /// Shape text (text boxes) is not supported; see
     /// [`crate::writer::shapes::Shape`].
@@ -453,9 +470,9 @@ impl Writer {
     ///
     /// Anchoring and positioning work like [`Self::insert_floating_shape`],
     /// but the shape is emitted as an msosptTextBox with an
-    /// OfficeArtClientTextbox record whose TXID links it to an entry in the
-    /// textbox story ([MS-DOC] PlcftxbxTxt). The story text is appended to
-    /// the WordDocument stream after the endnote story and counted in
+    /// `OfficeArtClientTextbox` record whose TXID links it to an entry in the
+    /// textbox story ([MS-DOC] `PlcftxbxTxt`). The story text is appended to
+    /// the `WordDocument` stream after the endnote story and counted in
     /// ccpTxbx. The text is plain: `\n` (or `\r` / `"\r\n"`) separates
     /// paragraphs; no character or paragraph formatting is applied.
     pub fn insert_floating_text_box(
@@ -472,10 +489,10 @@ impl Writer {
     /// The anchor is a single 0x0008 paragraph appended to that header's
     /// paragraphs (created when absent); position and wrapping work like
     /// [`Self::insert_floating_text_box`], but the shape position is recorded
-    /// in the Header Document's PlcfSpaHdr, the text goes to the header
-    /// textbox story (counted in ccpHdrTxbx, linked through PlcfHdrtxbxTxt),
+    /// in the Header Document's `PlcfSpaHdr`, the text goes to the header
+    /// textbox story (counted in ccpHdrTxbx, linked through `PlcfHdrtxbxTxt`),
     /// and the shape joins the Header Document drawing of the fcDggInfo
-    /// OfficeArtContent. Header floating items use their own shape-id cluster
+    /// `OfficeArtContent`. Header floating items use their own shape-id cluster
     /// starting at 2049, so they never collide with main-story shapes.
     ///
     /// Set or replace header paragraphs BEFORE calling this method: the
@@ -509,7 +526,7 @@ impl Writer {
     /// Anchoring works like [`Self::insert_header_text_box`]: the picture is
     /// written as a PICF block with an embedded BLIP in the Data stream
     /// (bytes stored verbatim), referenced by sprmCPicLocation on the 0x0008
-    /// anchor character, positioned through the PlcfSpaHdr, and rendered as a
+    /// anchor character, positioned through the `PlcfSpaHdr`, and rendered as a
     /// picture-frame shape in the Header Document drawing.
     pub fn insert_header_picture(
         &mut self,
@@ -605,7 +622,7 @@ impl Writer {
 
         // Escape quotes inside URL by doubling them per Word field syntax
         let escaped = url.replace('"', "\"\"");
-        let instr = format!("HYPERLINK \"{}\"", escaped);
+        let instr = format!("HYPERLINK \"{escaped}\"");
 
         // Default hyperlink visual style (blue + single underline)
         let link_fmt = CharacterFormatting {
@@ -645,32 +662,32 @@ impl Writer {
         self.add_paragraph_runs(runs, para_fmt)
     }
 
-    /// Set the odd-page header text (HeaderStories index 7)
+    /// Set the odd-page header text (`HeaderStories` index 7)
     pub fn set_odd_header(&mut self, text: &str) {
         self.header_odd = Some(vec![HeaderFooterParagraph::plain(text)]);
     }
-    /// Set the even-page header text (HeaderStories index 6)
+    /// Set the even-page header text (`HeaderStories` index 6)
     pub fn set_even_header(&mut self, text: &str) {
         self.header_even = Some(vec![HeaderFooterParagraph::plain(text)]);
     }
-    /// Set the first-page header text (HeaderStories index 10)
+    /// Set the first-page header text (`HeaderStories` index 10)
     pub fn set_first_header(&mut self, text: &str) {
         self.header_first = Some(vec![HeaderFooterParagraph::plain(text)]);
     }
-    /// Set the odd-page footer text (HeaderStories index 9)
+    /// Set the odd-page footer text (`HeaderStories` index 9)
     pub fn set_odd_footer(&mut self, text: &str) {
         self.footer_odd = Some(vec![HeaderFooterParagraph::plain(text)]);
     }
-    /// Set the even-page footer text (HeaderStories index 8)
+    /// Set the even-page footer text (`HeaderStories` index 8)
     pub fn set_even_footer(&mut self, text: &str) {
         self.footer_even = Some(vec![HeaderFooterParagraph::plain(text)]);
     }
-    /// Set the first-page footer text (HeaderStories index 11)
+    /// Set the first-page footer text (`HeaderStories` index 11)
     pub fn set_first_footer(&mut self, text: &str) {
         self.footer_first = Some(vec![HeaderFooterParagraph::plain(text)]);
     }
 
-    /// Set formatted odd-page header paragraphs (HeaderStories index 7).
+    /// Set formatted odd-page header paragraphs (`HeaderStories` index 7).
     pub fn set_odd_header_paragraphs(
         &mut self,
         paragraphs: Vec<HeaderFooterParagraph>,
@@ -680,7 +697,7 @@ impl Writer {
         Ok(())
     }
 
-    /// Set formatted even-page header paragraphs (HeaderStories index 6).
+    /// Set formatted even-page header paragraphs (`HeaderStories` index 6).
     pub fn set_even_header_paragraphs(
         &mut self,
         paragraphs: Vec<HeaderFooterParagraph>,
@@ -690,7 +707,7 @@ impl Writer {
         Ok(())
     }
 
-    /// Set formatted first-page header paragraphs (HeaderStories index 10).
+    /// Set formatted first-page header paragraphs (`HeaderStories` index 10).
     pub fn set_first_header_paragraphs(
         &mut self,
         paragraphs: Vec<HeaderFooterParagraph>,
@@ -700,7 +717,7 @@ impl Writer {
         Ok(())
     }
 
-    /// Set formatted odd-page footer paragraphs (HeaderStories index 9).
+    /// Set formatted odd-page footer paragraphs (`HeaderStories` index 9).
     pub fn set_odd_footer_paragraphs(
         &mut self,
         paragraphs: Vec<HeaderFooterParagraph>,
@@ -710,7 +727,7 @@ impl Writer {
         Ok(())
     }
 
-    /// Set formatted even-page footer paragraphs (HeaderStories index 8).
+    /// Set formatted even-page footer paragraphs (`HeaderStories` index 8).
     pub fn set_even_footer_paragraphs(
         &mut self,
         paragraphs: Vec<HeaderFooterParagraph>,
@@ -720,7 +737,7 @@ impl Writer {
         Ok(())
     }
 
-    /// Set formatted first-page footer paragraphs (HeaderStories index 11).
+    /// Set formatted first-page footer paragraphs (`HeaderStories` index 11).
     pub fn set_first_footer_paragraphs(
         &mut self,
         paragraphs: Vec<HeaderFooterParagraph>,
@@ -862,6 +879,7 @@ impl Writer {
     }
 
     /// Return explicit section column geometry, or `None` for the file-format default.
+    #[must_use]
     pub fn section_columns(&self) -> Option<&crate::section::columns::Layout> {
         self.section_columns.as_ref()
     }
@@ -876,6 +894,7 @@ impl Writer {
         self.section_right_to_left = value;
     }
 
+    #[must_use]
     pub fn section_right_to_left(&self) -> bool {
         self.section_right_to_left
     }
@@ -885,6 +904,7 @@ impl Writer {
         self.section_text_flow = value;
     }
 
+    #[must_use]
     pub fn section_text_flow(&self) -> crate::TextFlow {
         self.section_text_flow
     }
@@ -902,6 +922,7 @@ impl Writer {
     }
 
     /// Return explicit page borders, or `None` for the file-format default.
+    #[must_use]
     pub fn section_page_borders(&self) -> Option<&crate::section::borders::Borders> {
         self.section_page_borders.as_ref()
     }
@@ -974,17 +995,17 @@ impl Writer {
         let table = self
             .tables
             .get_mut(table_idx)
-            .ok_or_else(|| WriteError::InvalidData(format!("Table {} not found", table_idx)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Table {table_idx} not found")))?;
 
         let row_data = table
             .rows
             .get_mut(row)
-            .ok_or_else(|| WriteError::InvalidData(format!("Row {} not found", row)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Row {row} not found")))?;
 
         let cell = row_data
             .cells
             .get_mut(col)
-            .ok_or_else(|| WriteError::InvalidData(format!("Column {} not found", col)))?;
+            .ok_or_else(|| WriteError::InvalidData(format!("Column {col} not found")))?;
         Ok(cell)
     }
 

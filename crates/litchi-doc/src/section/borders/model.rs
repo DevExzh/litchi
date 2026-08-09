@@ -56,6 +56,7 @@ pub struct Art(u8);
 
 impl Art {
     /// Return the `BrcType` art code in the inclusive range `0x40..=0xE3`.
+    #[must_use]
     pub fn code(self) -> u8 {
         self.0
     }

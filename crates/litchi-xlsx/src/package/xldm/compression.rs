@@ -68,6 +68,7 @@ pub enum NoSplitWidth {
 }
 
 impl NoSplitWidth {
+    #[must_use]
     pub const fn bits(self) -> u8 {
         self as u8
     }
@@ -103,6 +104,7 @@ impl TryFrom<u8> for NoSplitWidth {
 /// (`0..63`). Entries whose field would cross the high end of a 64-bit word,
 /// plus the zero-width row, are the appendix's zero sentinel. Values outside
 /// the table return `None` rather than being truncated.
+#[must_use]
 pub const fn no_split_compression_mask(field_bits: u8, bit_offset: u8) -> Option<u64> {
     if field_bits > 64 || bit_offset >= 64 {
         return None;
@@ -236,6 +238,11 @@ pub fn decompress_hybrid(
     storage_alloc_units: u32,
     limits: CodecLimits,
 ) -> CodecResult<Vec<i32>> {
+    enum Entry {
+        Run(i32, usize),
+        Packed(usize),
+    }
+
     checked_output(row_count, 4, limits)?;
     if primary.len() > limits.max_input_bytes || subsegment.len() > limits.max_input_bytes {
         return Err(CodecError::LimitExceeded("max_input_bytes"));
@@ -293,10 +300,6 @@ pub fn decompress_hybrid(
         HybridKind::NoSplit { width, min } => (width, min),
         HybridKind::Xm123 { .. } => unreachable!(),
     };
-    enum Entry {
-        Run(i32, usize),
-        Packed(usize),
-    }
     let mut entries = Vec::with_capacity(used / 8);
     let mut packed_count = 0usize;
     let mut logical_count = 0usize;
@@ -327,7 +330,7 @@ pub fn decompress_hybrid(
             let expected = i64::try_from(packed_count)
                 .map_err(|_| CodecError::IntegerOverflow)?
                 .checked_add(1)
-                .and_then(|value| value.checked_neg())
+                .and_then(i64::checked_neg)
                 .ok_or(CodecError::IntegerOverflow)?;
             if i64::from(value_or_offset) != expected {
                 return Err(CodecError::Invalid(

@@ -72,6 +72,7 @@ impl HyperlinkEntry {
     }
 
     /// Generate HYPERLINK field code
+    #[must_use]
     pub fn to_field_code(&self) -> String {
         match self.link_type {
             HyperlinkType::Url => format!("HYPERLINK \"{}\"", self.destination),
@@ -90,6 +91,7 @@ pub struct HyperlinksWriter {
 
 impl HyperlinksWriter {
     /// Create a new hyperlinks writer
+    #[must_use]
     pub fn new() -> Self {
         Self {
             hyperlinks: Vec::new(),
@@ -102,16 +104,19 @@ impl HyperlinksWriter {
     }
 
     /// Get all hyperlinks
+    #[must_use]
     pub fn hyperlinks(&self) -> &[HyperlinkEntry] {
         &self.hyperlinks
     }
 
     /// Check if empty
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.hyperlinks.is_empty()
     }
 
     /// Get hyperlinks sorted by position
+    #[must_use]
     pub fn hyperlinks_sorted(&self) -> Vec<&HyperlinkEntry> {
         let mut sorted: Vec<_> = self.hyperlinks.iter().collect();
         sorted.sort_by_key(|h| h.start_position);

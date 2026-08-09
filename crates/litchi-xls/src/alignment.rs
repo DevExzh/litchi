@@ -72,34 +72,42 @@ impl Default for CellAlignment {
 }
 
 impl CellAlignment {
+    #[must_use]
     pub fn horizontal(&self) -> HorizontalAlignment {
         self.horizontal
     }
 
+    #[must_use]
     pub fn vertical(&self) -> VerticalAlignment {
         self.vertical
     }
 
+    #[must_use]
     pub fn wraps_text(&self) -> bool {
         self.wrap_text
     }
 
+    #[must_use]
     pub fn justifies_last_line(&self) -> bool {
         self.justify_last_line
     }
 
+    #[must_use]
     pub fn rotation(&self) -> TextRotation {
         self.rotation
     }
 
+    #[must_use]
     pub fn indent(&self) -> u8 {
         self.indent
     }
 
+    #[must_use]
     pub fn shrinks_to_fit(&self) -> bool {
         self.shrink_to_fit
     }
 
+    #[must_use]
     pub fn reading_order(&self) -> ReadingOrder {
         self.reading_order
     }

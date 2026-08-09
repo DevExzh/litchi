@@ -1,4 +1,4 @@
-//! Typed fc/lcb references from FibRgFcLcb.
+//! Typed fc/lcb references from `FibRgFcLcb`.
 
 use super::header::FibBuilder;
 

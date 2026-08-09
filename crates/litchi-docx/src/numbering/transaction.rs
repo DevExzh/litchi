@@ -1,3 +1,7 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Failure-atomic numbering snapshots, edits, and reversible patches.
 
 use std::sync::Arc;
@@ -24,6 +28,10 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parse and retain a bounded `numbering.xml` source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_xml(xml: impl Into<Vec<u8>>) -> Result<Self> {
         let xml = xml.into();
         let collection = Collection::from_xml(&xml)?;
@@ -55,9 +63,13 @@ impl Snapshot {
     }
 
     /// Return the optional section-break restart policy for one definition.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn restart_numbering_after_break(&self, abstract_num_id: u32) -> Result<Option<bool>> {
         self.definition(abstract_num_id)
-            .map(|definition| definition.restart_numbering_after_break())
+            .map(super::model::Definition::restart_numbering_after_break)
             .ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "abstract numbering definition {abstract_num_id} does not exist"
@@ -84,6 +96,10 @@ pub struct Transaction {
 
 impl Transaction {
     /// Return the projected section-break restart policy for one definition.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn restart_numbering_after_break(&self, abstract_num_id: u32) -> Result<Option<bool>> {
         let original = self.base.restart_numbering_after_break(abstract_num_id)?;
         Ok(self
@@ -95,6 +111,10 @@ impl Transaction {
 
     /// Set or remove the Word 2012 section-break restart attribute on one
     /// existing abstract numbering definition.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_restart_numbering_after_break(
         &mut self,
         abstract_num_id: u32,
@@ -128,6 +148,10 @@ impl Transaction {
     }
 
     /// Remove the direct section-break restart attribute from one definition.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn clear_restart_numbering_after_break(
         &mut self,
         abstract_num_id: u32,
@@ -136,6 +160,10 @@ impl Transaction {
     }
 
     /// Validate and publish the edit without changing the source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn commit(self) -> Result<Commit> {
         if self.changes.is_empty() {
             let patch = Patch {
@@ -217,6 +245,7 @@ pub struct Patch {
 
 impl Patch {
     /// Return the expected policy before applying the patch.
+    #[must_use]
     pub fn before_restart_numbering_after_break(
         &self,
         abstract_num_id: u32,
@@ -228,6 +257,7 @@ impl Patch {
     }
 
     /// Return the policy produced by the patch.
+    #[must_use]
     pub fn after_restart_numbering_after_break(
         &self,
         abstract_num_id: u32,
@@ -267,6 +297,10 @@ impl Patch {
 
     /// Apply the patch only when the target has the exact source bytes and
     /// semantic values captured when it was created.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.xml.as_ref() != self.before_xml.as_ref() {
             return Err(Error::InvalidFormat(

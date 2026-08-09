@@ -30,6 +30,7 @@ pub struct Multithreaded {
 impl Multithreaded {
     /// Use the application's automatic thread count, with multithreaded
     /// calculation either enabled or disabled.
+    #[must_use]
     pub const fn automatic(enabled: bool) -> Self {
         Self {
             enabled,
@@ -38,6 +39,9 @@ impl Multithreaded {
     }
 
     /// Use a user-specified calculation thread count.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_with_thread_count(enabled: bool, thread_count: u16) -> Result<Self> {
         if !(1..=MAX_CALCULATION_THREADS).contains(&thread_count) {
             return invalid(
@@ -53,12 +57,14 @@ impl Multithreaded {
         })
     }
 
+    #[must_use]
     pub const fn enabled(&self) -> bool {
         self.enabled
     }
 
     /// A user-specified thread count, or `None` when the producer selected the
     /// count automatically. The count is metadata when calculation is disabled.
+    #[must_use]
     pub const fn user_thread_count(&self) -> Option<u16> {
         self.user_thread_count
     }
@@ -91,15 +97,19 @@ impl Default for Workbook {
 }
 
 impl Workbook {
+    #[must_use]
     pub fn full_precision(&self) -> bool {
         self.full_precision
     }
+    #[must_use]
     pub fn multithreaded_calculation(&self) -> Option<Multithreaded> {
         self.multithreaded_calculation
     }
+    #[must_use]
     pub fn force_full_calculation(&self) -> bool {
         self.force_full_calculation
     }
+    #[must_use]
     pub fn recalculation_engine_id(&self) -> Option<u32> {
         self.recalculation_engine_id
     }
@@ -131,24 +141,31 @@ impl Default for Worksheet {
 }
 
 impl Worksheet {
+    #[must_use]
     pub fn mode(&self) -> Mode {
         self.mode
     }
+    #[must_use]
     pub fn maximum_iterations(&self) -> u16 {
         self.maximum_iterations
     }
+    #[must_use]
     pub fn iteration_enabled(&self) -> bool {
         self.iteration_enabled
     }
+    #[must_use]
     pub fn iteration_delta(&self) -> f64 {
         self.iteration_delta
     }
+    #[must_use]
     pub fn reference_mode(&self) -> ReferenceMode {
         self.reference_mode
     }
+    #[must_use]
     pub fn recalculate_before_save(&self) -> bool {
         self.recalculate_before_save
     }
+    #[must_use]
     pub fn formulas_pending_recalculation(&self) -> bool {
         self.formulas_pending_recalculation
     }

@@ -1,9 +1,10 @@
-//! Format-agnostic Markdown emission helpers for the Litchi office-formats library.
+//! Bounded Markdown reading, editing, and format-agnostic emission helpers.
 //!
 //! This crate provides the building blocks used by Litchi's higher-level format
 //! crates (and the `litchi` umbrella crate) to render Office documents and
 //! presentations as Markdown:
 //!
+//! - [`reader`] for immutable CommonMark/GFM snapshots and exact-source edits.
 //! - The [`ToMarkdown`] trait for converting types to Markdown.
 //! - [`MarkdownOptions`] and related enums for configuring the output.
 //! - [`escape`] helpers for embedding literal text safely.
@@ -19,6 +20,7 @@
 //! convenience.
 pub mod config;
 pub mod escape;
+pub mod reader;
 pub mod traits;
 pub mod unicode;
 

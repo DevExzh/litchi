@@ -1,3 +1,11 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::unwrap_used,
+    reason = "the invariant is established immediately before extraction"
+)]
 //! Semantic values for the Word 2010 OpenType `rPr` extension family.
 
 use crate::error::{Error, Result};
@@ -62,6 +70,7 @@ impl Ligatures {
         Ok(value)
     }
 
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::None => "none",
@@ -108,6 +117,7 @@ impl NumForm {
         }
     }
 
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Default => "default",
@@ -137,6 +147,7 @@ impl NumSpacing {
         }
     }
 
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Default => "default",
@@ -159,31 +170,37 @@ pub struct OnOff {
 impl OnOff {
     /// Construct an authored `CT_OnOff`; `None` emits an empty/default-on
     /// element, while `Some` emits the corresponding `ST_OnOff` value.
+    #[must_use]
     pub const fn new(authored: Option<bool>) -> Self {
         Self { authored }
     }
 
     /// Construct a present empty element whose schema default is true.
+    #[must_use]
     pub const fn default_on() -> Self {
         Self::new(None)
     }
 
     /// Construct an explicit `val="true"` element.
+    #[must_use]
     pub const fn on() -> Self {
         Self::new(Some(true))
     }
 
     /// Construct an explicit `val="false"` element.
+    #[must_use]
     pub const fn off() -> Self {
         Self::new(Some(false))
     }
 
     /// Return the authored `val`, preserving omission as `None`.
+    #[must_use]
     pub const fn authored(self) -> Option<bool> {
         self.authored
     }
 
     /// Return the effective schema value for an authored element.
+    #[must_use]
     pub const fn effective(self) -> bool {
         match self.authored {
             Some(value) => value,
@@ -193,6 +210,7 @@ impl OnOff {
 
     /// Alias for [`Self::effective`] using the concise semantic vocabulary of
     /// a checked boolean value.
+    #[must_use]
     pub const fn value(self) -> bool {
         self.effective()
     }
@@ -205,6 +223,11 @@ pub struct StyleSetId(NonZeroU8);
 
 impl StyleSetId {
     /// Construct a stylistic-set identifier in the schema range.
+    #[must_use]
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal writer invariant is violated.
     pub const fn new(value: u8) -> Option<Self> {
         if value == 0 || value > 20 {
             None
@@ -214,6 +237,7 @@ impl StyleSetId {
     }
 
     /// Return the wire identifier.
+    #[must_use]
     pub const fn get(self) -> u8 {
         self.0.get()
     }
@@ -237,10 +261,12 @@ pub struct StyleSet {
 }
 
 impl StyleSet {
+    #[must_use]
     pub const fn new(id: StyleSetId) -> Self {
         Self { id, enabled: None }
     }
 
+    #[must_use]
     pub const fn with_enabled(mut self, enabled: Option<bool>) -> Self {
         self.enabled = enabled;
         self
@@ -260,16 +286,28 @@ pub struct OpenType {
 
 impl OpenType {
     /// Parse a complete `w:r` or `w:rPr` fragment.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn parse(xml: &[u8]) -> Result<Self> {
         super::codec::parse(xml)
     }
 
     /// Validate all semantic domains and duplicate identifiers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn validate(&self) -> Result<()> {
         super::validation::validate(self)
     }
 
     /// Replace one stylistic set by id, or append it when absent.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_style_set(&mut self, value: StyleSet) -> Result<&mut Self> {
         super::validation::validate_style_set(&value)?;
         self.stylistic_sets_present = true;
@@ -305,19 +343,20 @@ impl OpenType {
 
     /// Set or remove the `w14:stylisticSets` container while retaining its
     /// ordered style-set children.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_stylistic_sets(&mut self, value: Option<Vec<StyleSet>>) -> Result<&mut Self> {
-        match value {
-            Some(values) => {
-                if values.len() > super::validation::MAX_STYLE_SETS {
-                    return Err(invalid("too many OpenType stylistic sets"));
-                }
-                self.stylistic_sets = values;
-                self.stylistic_sets_present = true;
-            },
-            None => {
-                self.stylistic_sets.clear();
-                self.stylistic_sets_present = false;
-            },
+        if let Some(values) = value {
+            if values.len() > super::validation::MAX_STYLE_SETS {
+                return Err(invalid("too many OpenType stylistic sets"));
+            }
+            self.stylistic_sets = values;
+            self.stylistic_sets_present = true;
+        } else {
+            self.stylistic_sets.clear();
+            self.stylistic_sets_present = false;
         }
         self.validate()?;
         Ok(self)
@@ -331,6 +370,7 @@ impl OpenType {
     }
 
     /// Find one stylistic set by id.
+    #[must_use]
     pub fn style_set(&self, id: StyleSetId) -> Option<StyleSet> {
         self.stylistic_sets
             .iter()

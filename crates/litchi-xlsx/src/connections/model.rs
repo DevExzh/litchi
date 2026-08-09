@@ -1,4 +1,4 @@
-//! Typed SpreadsheetML external connection definitions and collection editing.
+//! Typed `SpreadsheetML` external connection definitions and collection editing.
 
 use super::codec::bounded;
 use super::{codec, invalid};
@@ -27,7 +27,7 @@ pub(super) const MAX_WEB_TABLES: usize = 65_536;
 pub(super) const MAX_TEXT_FIELDS: usize = 2001;
 pub(super) const MAX_STRING_BYTES: usize = 1024 * 1024;
 
-/// SpreadsheetML namespace conformance used when authoring a connection part.
+/// `SpreadsheetML` namespace conformance used when authoring a connection part.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Conformance {
     #[default]
@@ -227,6 +227,10 @@ impl std::fmt::Debug for WebQueryProperties {
     }
 }
 
+#[allow(
+    clippy::missing_fields_in_debug,
+    reason = "sensitive text-import fields are deliberately omitted or redacted"
+)]
 impl std::fmt::Debug for TextImportProperties {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
@@ -243,6 +247,10 @@ impl std::fmt::Debug for TextImportProperties {
     }
 }
 
+#[allow(
+    clippy::missing_fields_in_debug,
+    reason = "all parameter payload alternatives are intentionally represented by one redacted value field"
+)]
 impl std::fmt::Debug for ConnectionParameter {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
@@ -282,6 +290,7 @@ impl std::fmt::Debug for Connection {
 }
 
 impl Connections {
+    #[must_use]
     pub fn find(&self, id: u32) -> Option<&Connection> {
         self.connections
             .iter()
@@ -393,7 +402,6 @@ impl Connections {
 }
 
 /// Store the complete inert connection set and validate every query-table reference first.
-
 pub(super) fn validate(v: &Connections) -> Result<()> {
     validate_connections(v.connections.iter())
 }

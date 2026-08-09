@@ -1,4 +1,4 @@
-//! Contextual DataPilot validation and preservation gates.
+//! Contextual `DataPilot` validation and preservation gates.
 
 use crate::model::data_pilot::{self, Table};
 use litchi_core::{Error, Result};

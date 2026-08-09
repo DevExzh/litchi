@@ -32,11 +32,13 @@ impl SavedByEntry {
         }
     }
 
+    #[must_use]
     pub fn author(&self) -> &str {
         &self.author
     }
 
     /// Saved path as inert metadata; this library never resolves or opens it.
+    #[must_use]
     pub fn location(&self) -> &str {
         &self.location
     }
@@ -147,10 +149,12 @@ impl SavedByTable {
         Ok(Self { entries })
     }
 
+    #[must_use]
     pub fn entries(&self) -> &[SavedByEntry] {
         &self.entries
     }
 
+    #[must_use]
     pub fn latest(&self) -> Option<&SavedByEntry> {
         self.entries.last()
     }

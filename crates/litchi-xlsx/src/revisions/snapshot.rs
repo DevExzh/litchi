@@ -36,21 +36,25 @@ impl Snapshot {
     }
 
     /// Borrow the complete typed revision owner, when present.
+    #[must_use]
     pub fn revisions(&self) -> Option<&Revisions> {
         self.revisions.as_ref()
     }
 
     /// Borrow the revision users part, when present.
+    #[must_use]
     pub fn users(&self) -> Option<&RevisionUsers> {
         self.revisions.as_ref().map(|value| &value.users)
     }
 
     /// Borrow the revision headers part, when present.
+    #[must_use]
     pub fn headers(&self) -> Option<&RevisionHeaders> {
         self.revisions.as_ref().map(|value| &value.headers)
     }
 
     /// Borrow revision log parts in the same order as their headers.
+    #[must_use]
     pub fn logs(&self) -> &[RevisionLogPart] {
         self.revisions
             .as_ref()
@@ -58,22 +62,26 @@ impl Snapshot {
     }
 
     /// Return the conformance used by the source revision relationships.
+    #[must_use]
     pub fn conformance(&self) -> Option<RevisionConformance> {
         self.source.conformance
     }
 
     /// Return the workbook part that owns the revision relationships.
+    #[must_use]
     pub fn workbook_part_name(&self) -> &str {
         &self.source.workbook_part_name
     }
 
     /// Return the workbook part that owns the revision relationships.
+    #[must_use]
     pub fn workbook(&self) -> &str {
         self.workbook_part_name()
     }
 
     /// Return the conformance used for writes, defaulting new owners to
-    /// Transitional SpreadsheetML.
+    /// Transitional `SpreadsheetML`.
+    #[must_use]
     pub fn desired_conformance(&self) -> RevisionConformance {
         self.conformance()
             .unwrap_or(RevisionConformance::Transitional)
@@ -89,6 +97,7 @@ impl Snapshot {
     }
 
     /// Whether this workbook has no revision metadata.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.revisions.is_none()
     }

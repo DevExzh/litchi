@@ -160,6 +160,7 @@ impl Info {
     }
 
     /// Serialize while retaining undefined CAPI bits and ignored fields.
+    #[must_use]
     pub fn to_bytes(self) -> [u8; Self::SIZE] {
         let mut flags = self.raw_flags;
         flags = (flags & !0x0003) | self.location() as u16;
@@ -174,7 +175,7 @@ impl Info {
             .map_or(self.raw_separator, |numbering| numbering.separator() as u16);
         let mut data = [0u8; Self::SIZE];
         data[0..2].copy_from_slice(&flags.to_le_bytes());
-        data[2..4].copy_from_slice(&(self.number_format() as u8 as u16).to_le_bytes());
+        data[2..4].copy_from_slice(&u16::from(self.number_format() as u8).to_le_bytes());
         data[4..6].copy_from_slice(&separator.to_le_bytes());
         data
     }

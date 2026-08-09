@@ -7,7 +7,7 @@ use super::{
     HyphenationMode, TextEffect, UnderlineStyle, VerticalPosition,
 };
 use crate::sprm::{Sprm, parse_sprms};
-use crate::sprm_operations::*;
+use crate::sprm_operations::{SPRM_C_CNF, get_sprm_operation, get_sprm_type};
 
 impl HyphenationMode {
     const fn raw(self) -> u8 {
@@ -98,7 +98,7 @@ impl CharacterProperties {
     /// SPRMs are variable-length records that modify properties.
     /// Format: 2-byte opcode + variable-length operand
     ///
-    /// Based on Apache POI's CharacterSprmUncompressor.
+    /// Based on Apache POI's `CharacterSprmUncompressor`.
     ///
     /// # Arguments
     ///
@@ -124,7 +124,7 @@ impl CharacterProperties {
 
     /// Apply a single SPRM operation to character properties.
     ///
-    /// Based on Apache POI's CharacterSprmUncompressor.unCompressCHPOperation().
+    /// Based on Apache POI's `CharacterSprmUncompressor.unCompressCHPOperation()`.
     ///
     /// # Arguments
     ///
@@ -371,7 +371,8 @@ impl CharacterProperties {
                     let c_inc = c_inc >> 1;
                     if c_inc != 0 {
                         let current = chp.font_size.unwrap_or(24);
-                        chp.font_size = Some((current as i32 + c_inc as i32 * 2).max(2) as u16);
+                        chp.font_size =
+                            Some((i32::from(current) + i32::from(c_inc) * 2).max(2) as u16);
                     }
 
                     let hps_pos = ((operand & 0xFF0000) >> 16) as i8;
@@ -427,7 +428,7 @@ impl CharacterProperties {
             0x44 => {
                 if let Some(inc) = sprm.operand_byte() {
                     let current = chp.font_size.unwrap_or(24);
-                    chp.font_size = Some((current as i32 + inc as i32 * 2).max(2) as u16);
+                    chp.font_size = Some((i32::from(current) + i32::from(inc) * 2).max(2) as u16);
                 }
             },
             // Operation 0x45: sprmCHpsPos - Superscript/subscript position
@@ -466,7 +467,7 @@ impl CharacterProperties {
             0x4A => {
                 if let Some(inc) = sprm.operand_i16() {
                     let current = chp.font_size.unwrap_or(24);
-                    chp.font_size = Some((current as i32 + inc as i32).max(8) as u16);
+                    chp.font_size = Some((i32::from(current) + i32::from(inc)).max(8) as u16);
                 }
             },
             // Operation 0x4B: sprmCHpsKern - Kerning
@@ -482,10 +483,10 @@ impl CharacterProperties {
             // Operation 0x4D: sprmCHpsMul - Font size multiplier
             0x4D => {
                 if let Some(multiplier) = sprm.operand_word() {
-                    let percentage = multiplier as f32 / 100.0;
+                    let percentage = f32::from(multiplier) / 100.0;
                     let current = chp.font_size.unwrap_or(24);
-                    let add = (percentage * current as f32) as i32;
-                    chp.font_size = Some((current as i32 + add) as u16);
+                    let add = (percentage * f32::from(current)) as i32;
+                    chp.font_size = Some((i32::from(current) + add) as u16);
                 }
             },
             // Operation 0x4E: sprmCHresi - Hyphenation

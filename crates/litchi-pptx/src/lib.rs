@@ -12,6 +12,64 @@
 //! [`table::style`] owns typed table-style catalogs and their package graph.
 
 #![forbid(unsafe_code)]
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "the public facade and OOXML models are grouped by presentation feature and schema order"
+)]
+#![allow(
+    clippy::format_push_string,
+    reason = "the XML codecs intentionally append infallible formatted fragments to compact String buffers"
+)]
+#![allow(
+    clippy::match_wildcard_for_single_variants,
+    clippy::wildcard_enum_match_arm,
+    reason = "streaming XML decoders must ignore future quick-xml event variants and unsupported schema content"
+)]
+#![allow(
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    reason = "codec scopes reuse short XML token and relationship names after earlier values are no longer live"
+)]
+#![allow(
+    clippy::many_single_char_names,
+    clippy::module_name_repetitions,
+    clippy::similar_names,
+    clippy::struct_excessive_bools,
+    clippy::struct_field_names,
+    reason = "public names preserve established PowerPoint and OOXML vocabulary"
+)]
+#![allow(
+    clippy::needless_pass_by_value,
+    reason = "public mutation APIs consume owned values so callers cannot accidentally reuse stale document state"
+)]
+#![allow(
+    clippy::option_option,
+    clippy::ptr_arg,
+    clippy::ref_option,
+    reason = "patch APIs use nested and referenced options to distinguish omission, removal, and replacement without changing their established signatures"
+)]
+#![allow(
+    clippy::unnecessary_wraps,
+    reason = "codec and validation helpers retain a uniform Result contract so callers can compose validation transactionally"
+)]
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    reason = "package resource limits bound XML offsets and schema collection sizes below every destination range before these conversions"
+)]
+#![allow(
+    clippy::match_same_arms,
+    reason = "separate schema-token arms document distinct OOXML spellings even when their current semantic action is identical"
+)]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        reason = "unit-test fixture construction and assertions panic by design"
+    )
+)]
 
 pub mod actions;
 pub mod animations;

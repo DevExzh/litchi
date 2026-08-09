@@ -56,28 +56,29 @@ pub enum FileGroupClass {
 }
 
 impl FileGroupClass {
+    #[must_use]
     pub const fn code(self) -> i32 {
         match self {
-            Self::Database => 100002,
-            Self::DataSource => 100003,
-            Self::Dimension => 100006,
-            Self::Cube => 100010,
-            Self::MeasureGroup => 100016,
-            Self::Partition => 100021,
-            Self::DataSourceView => 100053,
-            Self::MdxScript => 100060,
+            Self::Database => 100_002,
+            Self::DataSource => 100_003,
+            Self::Dimension => 100_006,
+            Self::Cube => 100_010,
+            Self::MeasureGroup => 100_016,
+            Self::Partition => 100_021,
+            Self::DataSourceView => 100_053,
+            Self::MdxScript => 100_060,
         }
     }
     pub(super) fn parse(value: i32) -> Result<Self> {
         match value {
-            100002 => Ok(Self::Database),
-            100003 => Ok(Self::DataSource),
-            100006 => Ok(Self::Dimension),
-            100010 => Ok(Self::Cube),
-            100016 => Ok(Self::MeasureGroup),
-            100021 => Ok(Self::Partition),
-            100053 => Ok(Self::DataSourceView),
-            100060 => Ok(Self::MdxScript),
+            100_002 => Ok(Self::Database),
+            100_003 => Ok(Self::DataSource),
+            100_006 => Ok(Self::Dimension),
+            100_010 => Ok(Self::Cube),
+            100_016 => Ok(Self::MeasureGroup),
+            100_021 => Ok(Self::Partition),
+            100_053 => Ok(Self::DataSourceView),
+            100_060 => Ok(Self::MdxScript),
             _ => Err(Error::Invalid(format!(
                 "unknown MS-XLDM file-group class {value}"
             ))),
@@ -211,12 +212,14 @@ pub struct Storage<'a> {
 }
 
 impl Storage<'_> {
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         self.bytes
     }
 
     /// Return one member's bytes without its CRC marker. The returned bytes
     /// remain compressed, encrypted, or otherwise encoded exactly as stored.
+    #[must_use]
     pub fn file_payload(&self, index: usize) -> Option<&[u8]> {
         let entry = self.files.get(index)?;
         let start = usize::try_from(entry.offset.0).ok()?;
@@ -225,6 +228,7 @@ impl Storage<'_> {
             .get(start..start.checked_add(size)?.checked_sub(CRC_SIZE)?)
     }
 
+    #[must_use]
     pub fn file_stored_bytes(&self, index: usize) -> Option<&[u8]> {
         let entry = self.files.get(index)?;
         let start = usize::try_from(entry.offset.0).ok()?;

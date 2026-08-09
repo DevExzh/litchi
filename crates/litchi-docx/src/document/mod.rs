@@ -1,4 +1,4 @@
-//! Semantic WordprocessingML main-document facade.
+//! Semantic `WordprocessingML` main-document facade.
 //!
 //! The document owner keeps its public model, document-XML codec, and
 //! package-bound orchestration in separate layers while retaining the

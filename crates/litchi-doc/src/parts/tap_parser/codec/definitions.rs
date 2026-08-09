@@ -2,7 +2,7 @@
 
 use super::prelude::*;
 
-impl<'arena> TapParser<'arena> {
+impl TapParser<'_> {
     pub(in crate::parts::tap_parser) fn parse_table_definition(
         &self,
         tap: &mut TableProperties,
@@ -77,7 +77,7 @@ impl<'arena> TapParser<'arena> {
         Ok(())
     }
 
-    /// Parse a TableCellDescriptor (TC) structure.
+    /// Parse a `TableCellDescriptor` (TC) structure.
     ///
     /// TC structure (20 bytes total):
     /// - bytes 0-1: flags (fVertical, fBackward, fRotateFont, fVertMerge, fVertRestart, etc.)

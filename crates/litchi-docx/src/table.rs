@@ -1,3 +1,15 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::option_option,
+    reason = "nested options distinguish omitted, present-empty, and present-valued XML"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 use crate::error::{Error, Result};
 /// Table, Row, and Cell structures for Word documents.
 use crate::namespace::{
@@ -72,7 +84,7 @@ fn word_cell_property_value(
                 let mut reader = Reader::from_reader(property_xml);
                 let element = loop {
                     match reader.read_event() {
-                        Ok(Event::Start(element)) | Ok(Event::Empty(element)) => break element,
+                        Ok(Event::Start(element) | Event::Empty(element)) => break element,
                         Ok(Event::Eof) => {
                             return Err(Error::InvalidFormat(
                                 "missing Word cell property".to_string(),
@@ -138,12 +150,12 @@ pub enum VMergeState {
 ///
 /// Uses lazy parsing with caching - XML is parsed once on first access,
 /// then cached results are returned on subsequent calls.
-/// Uses OnceLock for thread-safe single-initialization caching.
+/// Uses `OnceLock` for thread-safe single-initialization caching.
 #[derive(Debug)]
 pub struct Table {
     /// The raw XML data for this table
     xml_data: XmlData,
-    /// Cached parsed rows (lazy initialization with thread-safe OnceLock)
+    /// Cached parsed rows (lazy initialization with thread-safe `OnceLock`)
     cached_rows: OnceLock<SmallVec<[Row; 16]>>,
 }
 
@@ -159,12 +171,17 @@ impl Clone for Table {
 
 impl Table {
     /// Returns tracked revisions in this table and its descendant rows and cells.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn revisions(&self) -> Result<Vec<Revision>> {
         Ok(crate::revision::parse_revisions(self.xml_bytes())?.into_vec())
     }
 
     /// Create a new Table from XML bytes (owned).
     #[inline]
+    #[must_use]
     pub fn new(xml_bytes: Vec<u8>) -> Self {
         Self {
             xml_data: XmlData::Owned(xml_bytes.into_boxed_slice()),
@@ -174,6 +191,7 @@ impl Table {
 
     /// Create a Table from an `Arc<Vec<u8>>` and byte range (zero-copy).
     #[inline]
+    #[must_use]
     pub fn from_arc_range(arena: Arc<Vec<u8>>, start: u32, len: u32) -> Self {
         Self {
             xml_data: XmlData::Shared(XmlSlice::new(arena, start, len)),
@@ -188,6 +206,10 @@ impl Table {
     }
 
     /// Get the number of rows in this table.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn row_count(&self) -> Result<usize> {
         let mut count = 0;
         scan_word_element_ranges(self.xml_bytes(), &[b"tr".as_slice()], |_, _, _| {
@@ -200,6 +222,10 @@ impl Table {
     /// Get the number of columns in this table.
     ///
     /// Returns the column count from the first row, or 0 if the table is empty.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn column_count(&self) -> Result<usize> {
         let rows = self.rows()?;
         if let Some(first_row) = rows.first() {
@@ -214,7 +240,11 @@ impl Table {
     /// # Performance
     ///
     /// Uses lazy parsing with caching - parses XML once on first call,
-    /// returns cached results on subsequent calls. Thread-safe via OnceLock.
+    /// returns cached results on subsequent calls. Thread-safe via `OnceLock`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn rows(&self) -> Result<SmallVec<[Row; 16]>> {
         // Fast path: return cached rows if available
         if let Some(rows) = self.cached_rows.get() {
@@ -243,6 +273,10 @@ impl Table {
     /// Get a specific cell by row and column index.
     ///
     /// Returns `None` if the indices are out of bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn cell(&self, row_idx: usize, col_idx: usize) -> Result<Option<Cell>> {
         let rows = self.rows()?;
         if let Some(row) = rows.get(row_idx) {
@@ -266,7 +300,7 @@ impl Table {
 pub struct Row {
     /// The raw XML data for this row.
     xml_data: XmlData,
-    /// Cached parsed cells (lazy initialization with thread-safe OnceLock)
+    /// Cached parsed cells (lazy initialization with thread-safe `OnceLock`)
     cached_cells: OnceLock<SmallVec<[Cell; 16]>>,
 }
 
@@ -282,12 +316,17 @@ impl Clone for Row {
 
 impl Row {
     /// Returns tracked revisions in this row and its descendant cells.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn revisions(&self) -> Result<Vec<Revision>> {
         Ok(crate::revision::parse_revisions(self.xml_bytes())?.into_vec())
     }
 
     /// Create a new Row from XML bytes.
     #[inline]
+    #[must_use]
     pub fn new(xml_bytes: Vec<u8>) -> Self {
         Self {
             xml_data: XmlData::Owned(xml_bytes.into_boxed_slice()),
@@ -309,6 +348,10 @@ impl Row {
     }
 
     /// Return the HTML division ID referenced by this row, if present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn division_id(&self) -> Result<Option<String>> {
         direct_word_property_value(self.xml_bytes(), b"tr", b"trPr", b"divId")?
             .map(|value| normalize_xml_integer(value, "Word table-row division ID"))
@@ -316,6 +359,10 @@ impl Row {
     }
 
     /// Get the number of cells in this row.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn cell_count(&self) -> Result<usize> {
         let mut count = 0;
         scan_word_element_ranges(self.xml_bytes(), &[b"tc".as_slice()], |_, _, _| {
@@ -330,7 +377,11 @@ impl Row {
     /// # Performance
     ///
     /// Uses lazy parsing with caching - parses XML once on first call,
-    /// returns cached results on subsequent calls. Thread-safe via OnceLock.
+    /// returns cached results on subsequent calls. Thread-safe via `OnceLock`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn cells(&self) -> Result<SmallVec<[Cell; 16]>> {
         // Fast path: return cached cells if available
         if let Some(cells) = self.cached_cells.get() {
@@ -369,7 +420,7 @@ impl Row {
 pub struct Cell {
     /// The raw XML data for this cell.
     xml_data: XmlData,
-    /// Cached extracted text (lazy initialization with thread-safe OnceLock)
+    /// Cached extracted text (lazy initialization with thread-safe `OnceLock`)
     cached_text: OnceLock<String>,
 }
 
@@ -385,12 +436,17 @@ impl Clone for Cell {
 
 impl Cell {
     /// Returns tracked revisions in this cell.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn revisions(&self) -> Result<Vec<Revision>> {
         Ok(crate::revision::parse_revisions(self.xml_bytes())?.into_vec())
     }
 
     /// Create a new Cell from XML bytes.
     #[inline]
+    #[must_use]
     pub fn new(xml_bytes: Vec<u8>) -> Self {
         Self {
             xml_data: XmlData::Owned(xml_bytes.into_boxed_slice()),
@@ -426,6 +482,10 @@ impl Cell {
     ///   ...
     /// </w:tc>
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn grid_span(&self) -> Result<usize> {
         let Some(value) = word_cell_property_value(self.xml_bytes(), b"gridSpan")? else {
             return Ok(1);
@@ -433,9 +493,9 @@ impl Cell {
         let Some(value) = value else {
             return Ok(1);
         };
-        let span = value
-            .parse::<usize>()
-            .map_err(|_| Error::InvalidFormat(format!("invalid Word gridSpan value: {value}")))?;
+        let span = value.parse::<usize>().map_err(|_source_error| {
+            Error::InvalidFormat(format!("invalid Word gridSpan value: {value}"))
+        })?;
         if span == 0 {
             return Err(Error::InvalidFormat(
                 "Word gridSpan must be positive".to_string(),
@@ -470,6 +530,10 @@ impl Cell {
     ///   ...
     /// </w:tc>
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn v_merge(&self) -> Result<Option<VMergeState>> {
         let Some(value) = word_cell_property_value(self.xml_bytes(), b"vMerge")? else {
             return Ok(None);
@@ -490,7 +554,11 @@ impl Cell {
     /// # Performance
     ///
     /// Uses lazy parsing with caching - parses XML once on first call,
-    /// returns cached results on subsequent calls. Thread-safe via OnceLock.
+    /// returns cached results on subsequent calls. Thread-safe via `OnceLock`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn text(&self) -> Result<String> {
         // Fast path: return cached text if available
         if let Some(text) = self.cached_text.get() {
@@ -512,7 +580,11 @@ impl Cell {
     ///
     /// # Performance
     ///
-    /// Uses SmallVec for efficient storage of typically small paragraph collections.
+    /// Uses `SmallVec` for efficient storage of typically small paragraph collections.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn paragraphs(&self) -> Result<SmallVec<[Paragraph; 8]>> {
         let (source, base_offset) = self.xml_data.get_or_create_arc();
         let mut paragraphs = SmallVec::new();

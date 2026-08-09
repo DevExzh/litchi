@@ -1,3 +1,15 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::assigning_clones,
+    reason = "clone assignment preserves validation-before-replacement behavior"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Bibliography source-store authoring for DOCX documents.
 //!
 //! Word keeps its current bibliography source list in a Custom XML data
@@ -30,7 +42,7 @@ const MAX_CUSTOM_PATH_DEPTH: usize = 8;
 /// the read-side bound.
 const MAX_STORE_SOURCES: usize = 65_536;
 
-/// Bibliography source type (`b:SourceType`, ST_SourceType).
+/// Bibliography source type (`b:SourceType`, `ST_SourceType`).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[repr(u8)]
 pub enum BibliographySourceKind {
@@ -72,7 +84,8 @@ pub enum BibliographySourceKind {
 }
 
 impl BibliographySourceKind {
-    /// The ST_SourceType token for this kind.
+    /// The `ST_SourceType` token for this kind.
+    #[must_use]
     pub fn as_token(self) -> &'static str {
         match self {
             Self::Book => "Book",
@@ -109,6 +122,10 @@ pub struct BibliographyPerson {
 
 impl BibliographyPerson {
     /// Create a person with a family name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(last: impl Into<String>) -> Result<Self> {
         let last = last.into();
         validate_field("Last", &last)?;
@@ -123,6 +140,10 @@ impl BibliographyPerson {
     }
 
     /// Set the given name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn with_first(mut self, first: impl Into<String>) -> Result<Self> {
         let first = first.into();
         validate_field("First", &first)?;
@@ -131,6 +152,10 @@ impl BibliographyPerson {
     }
 
     /// Set the middle name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn with_middle(mut self, middle: impl Into<String>) -> Result<Self> {
         let middle = middle.into();
         validate_field("Middle", &middle)?;
@@ -191,6 +216,10 @@ pub struct BibliographySourceBuilder {
 macro_rules! optional_field {
     ($name:ident, $element:literal) => {
         #[doc = concat!("Set the `", $element, "` field.")]
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the operation cannot be completed.
         pub fn $name(mut self, value: impl Into<String>) -> Result<Self> {
             let value = value.into();
             validate_field($element, &value)?;
@@ -202,6 +231,10 @@ macro_rules! optional_field {
 
 impl BibliographySourceBuilder {
     /// Start a source with a kind and a unique citation tag (`b:Tag`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(kind: BibliographySourceKind, tag: impl Into<String>) -> Result<Self> {
         let tag = tag.into();
         if tag.is_empty() || tag.len() > MAX_TAG_LENGTH {
@@ -232,6 +265,10 @@ impl BibliographySourceBuilder {
     optional_field!(comments, "Comments");
 
     /// Add a person to the author name list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn person(mut self, person: BibliographyPerson) -> Result<Self> {
         if self.persons.len() >= MAX_PERSONS {
             return Err(invalid(format!(
@@ -243,6 +280,10 @@ impl BibliographySourceBuilder {
     }
 
     /// Set a corporate (group) author instead of a person name list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn corporate_author(mut self, corporate: impl Into<String>) -> Result<Self> {
         let corporate = corporate.into();
         validate_field("Corporate", &corporate)?;
@@ -256,6 +297,10 @@ impl BibliographySourceBuilder {
     /// For example, `custom_field(vec!["BookTitle"], "…")` emits
     /// `<b:BookTitle>…</b:BookTitle>`. Path segments must be valid XML names
     /// in the bibliography namespace.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn custom_field(mut self, path: Vec<String>, value: String) -> Result<Self> {
         if self.custom_fields.len() >= MAX_CUSTOM_FIELDS {
             return Err(invalid(format!(
@@ -276,11 +321,13 @@ impl BibliographySourceBuilder {
     }
 
     /// The citation tag of this source.
+    #[must_use]
     pub fn tag(&self) -> &str {
         &self.tag
     }
 
     /// The source kind of this source.
+    #[must_use]
     pub fn kind(&self) -> BibliographySourceKind {
         self.kind
     }

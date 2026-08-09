@@ -38,6 +38,9 @@ pub struct Theme {
 
 impl Theme {
     /// A custom theme with inline ECMA-376 theme contents.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn custom(contents: Vec<u8>) -> Result<Self> {
         if contents.is_empty() {
             return Err(invalid("custom theme must carry theme contents"));
@@ -49,6 +52,7 @@ impl Theme {
     }
 
     /// The application default theme.
+    #[must_use]
     pub fn default_theme() -> Self {
         Self {
             version: THEME_VERSION_DEFAULT,
@@ -57,16 +61,19 @@ impl Theme {
     }
 
     /// Raw `dwThemeVersion` theme type.
+    #[must_use]
     pub const fn version(&self) -> u32 {
         self.version
     }
 
     /// Whether the theme is a custom theme with inline contents.
+    #[must_use]
     pub const fn is_custom(&self) -> bool {
         self.version == THEME_VERSION_CUSTOM
     }
 
     /// Opaque ECMA-376 theme contents, when present.
+    #[must_use]
     pub fn contents(&self) -> Option<&[u8]> {
         self.contents.as_deref()
     }

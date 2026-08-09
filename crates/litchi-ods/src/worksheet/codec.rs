@@ -116,16 +116,16 @@ impl Attributes {
                     "default-cell-style-name" => result.default_cell_style_name = Some(value),
                     "formula" => result.formula = Some(value),
                     "number-rows-repeated" => {
-                        result.rows_repeated = positive(&value, "number-rows-repeated")?
+                        result.rows_repeated = positive(&value, "number-rows-repeated")?;
                     },
                     "number-columns-repeated" => {
-                        result.columns_repeated = positive(&value, "number-columns-repeated")?
+                        result.columns_repeated = positive(&value, "number-columns-repeated")?;
                     },
                     "number-rows-spanned" => {
-                        result.rows_spanned = positive(&value, "number-rows-spanned")?
+                        result.rows_spanned = positive(&value, "number-rows-spanned")?;
                     },
                     "number-columns-spanned" => {
-                        result.columns_spanned = positive(&value, "number-columns-spanned")?
+                        result.columns_spanned = positive(&value, "number-columns-spanned")?;
                     },
                     _ => {},
                 }
@@ -155,7 +155,7 @@ impl Attributes {
                 }
             },
             Some("string") => CellValue::Text(text.clone()),
-            Some("float") | Some("double") | Some("decimal") => CellValue::Number(parse_float(
+            Some("float" | "double" | "decimal") => CellValue::Number(parse_float(
                 self.value.as_deref().unwrap_or_default(),
                 "office:value",
             )?),
@@ -400,7 +400,13 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
                             &reader,
                         )?;
                     },
-                    _ => {},
+                    Kind::Root
+                    | Kind::Body
+                    | Kind::Spreadsheet
+                    | Kind::DdeLink
+                    | Kind::DdeCache
+                    | Kind::Text
+                    | Kind::Other => {},
                 }
             },
             Event::Text(text) => {
@@ -463,7 +469,13 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
                         })?;
                         sheets.push(sheet);
                     },
-                    _ => {},
+                    Kind::Root
+                    | Kind::Body
+                    | Kind::Spreadsheet
+                    | Kind::DdeLink
+                    | Kind::DdeCache
+                    | Kind::Text
+                    | Kind::Other => {},
                 }
                 let _ = element;
             },
@@ -567,7 +579,9 @@ fn namespace_kind(namespace: &ResolveResult<'_>) -> NamespaceKind {
         ResolveResult::Bound(Namespace(value)) if *value == TEXT_NAMESPACE.as_bytes() => {
             NamespaceKind::Text
         },
-        _ => NamespaceKind::Other,
+        ResolveResult::Unbound | ResolveResult::Bound(_) | ResolveResult::Unknown(_) => {
+            NamespaceKind::Other
+        },
     }
 }
 
@@ -656,16 +670,16 @@ fn append_empty_text(
 fn positive(value: &str, name: &str) -> Result<usize> {
     let value = value
         .parse::<usize>()
-        .map_err(|_| Error::InvalidFormat(format!("ODS {name} must be a positive integer")))?;
+        .map_err(|_error| Error::InvalidFormat(format!("ODS {name} must be a positive integer")))?;
     NonZeroUsize::new(value)
         .map(NonZeroUsize::get)
         .ok_or_else(|| Error::InvalidFormat(format!("ODS {name} must be positive")))
 }
 
 fn parse_float(value: &str, name: &str) -> Result<f64> {
-    let value = value
-        .parse::<f64>()
-        .map_err(|_| Error::InvalidFormat(format!("ODS {name} requires a finite decimal value")))?;
+    let value = value.parse::<f64>().map_err(|_error| {
+        Error::InvalidFormat(format!("ODS {name} requires a finite decimal value"))
+    })?;
     if value.is_finite() {
         Ok(value)
     } else {
@@ -731,7 +745,7 @@ fn bounded_push(output: &mut String, value: &str, max_bytes: usize) -> Result<()
             "flat ODS rendered rows exceed the {max_bytes} byte limit"
         )));
     }
-    output.try_reserve(value.len()).map_err(|_| {
+    output.try_reserve(value.len()).map_err(|_error| {
         Error::InvalidFormat("flat ODS row rendering allocation failed".to_string())
     })?;
     output.push_str(value);

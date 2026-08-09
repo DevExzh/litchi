@@ -1,8 +1,8 @@
-use super::super::codec::*;
-use super::super::validation::*;
-use super::super::*;
-use super::*;
-/// DrawingML `CT_Blip` metadata used by a web-extension snapshot.
+use super::super::codec::{invalid, limit};
+use super::super::validation::validate_extension_list;
+use super::super::{Arc, PackURI, Result};
+use super::{Compression, Effect, ExtKind, ExtList, MAX_WEB_EXTENSION_ITEMS};
+/// `DrawingML` `CT_Blip` metadata used by a web-extension snapshot.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Snapshot {
     pub(in crate::web) embedded_relationship_id: Option<String>,

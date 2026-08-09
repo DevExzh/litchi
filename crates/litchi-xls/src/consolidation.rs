@@ -64,6 +64,9 @@ pub struct ConsolidationRange {
     last_column: u8,
 }
 impl ConsolidationRange {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(first_row: u16, last_row: u16, first_column: u8, last_column: u8) -> Result<Self> {
         if first_row > last_row || first_column > last_column {
             return invalid(
@@ -78,15 +81,19 @@ impl ConsolidationRange {
             last_column,
         })
     }
+    #[must_use]
     pub fn first_row(&self) -> u16 {
         self.first_row
     }
+    #[must_use]
     pub fn last_row(&self) -> u16 {
         self.last_row
     }
+    #[must_use]
     pub fn first_column(&self) -> u8 {
         self.first_column
     }
+    #[must_use]
     pub fn last_column(&self) -> u8 {
         self.last_column
     }
@@ -98,6 +105,9 @@ pub struct ConsolidationFile {
     encoded_path: String,
 }
 impl ConsolidationFile {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(encoded_path: impl Into<String>) -> Result<Self> {
         let value = Self {
             encoded_path: encoded_path.into(),
@@ -105,15 +115,21 @@ impl ConsolidationFile {
         value.validate(DCON_REF_RECORD_TYPE)?;
         Ok(value)
     }
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn self_reference(sheet_name: &str) -> Result<Self> {
         Self::new(format!("\u{2}{sheet_name}"))
     }
+    #[must_use]
     pub fn encoded_path(&self) -> &str {
         &self.encoded_path
     }
+    #[must_use]
     pub fn is_self_reference(&self) -> bool {
         self.encoded_path.starts_with('\u{2}')
     }
+    #[must_use]
     pub fn is_external(&self) -> bool {
         self.encoded_path.starts_with('\u{1}')
     }
@@ -217,6 +233,7 @@ pub struct Consolidation {
     sources: Vec<ConsolidationSource>,
 }
 impl Consolidation {
+    #[must_use]
     pub fn new(function: ConsolidationFunction) -> Self {
         Self {
             function,
@@ -226,18 +243,23 @@ impl Consolidation {
             sources: Vec::new(),
         }
     }
+    #[must_use]
     pub fn function(&self) -> ConsolidationFunction {
         self.function
     }
+    #[must_use]
     pub fn uses_left_labels(&self) -> bool {
         self.use_left_labels
     }
+    #[must_use]
     pub fn uses_top_labels(&self) -> bool {
         self.use_top_labels
     }
+    #[must_use]
     pub fn creates_links(&self) -> bool {
         self.create_links
     }
+    #[must_use]
     pub fn sources(&self) -> &[ConsolidationSource] {
         &self.sources
     }
@@ -250,6 +272,9 @@ impl Consolidation {
     pub fn set_create_links(&mut self, value: bool) {
         self.create_links = value;
     }
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_source(&mut self, source: ConsolidationSource) -> Result<()> {
         if self.sources.len() >= MAX_SOURCES {
             return invalid(
@@ -518,7 +543,7 @@ fn parse_file(c: &mut Cursor<'_>, count: usize) -> Result<ConsolidationFile> {
             .map(|p| u16::from_le_bytes([p[0], p[1]]))
             .collect::<Vec<_>>();
         String::from_utf16(&units)
-            .map_err(|_| Error::InvalidData("DConFile contains invalid UTF-16".into()))?
+            .map_err(|_error| Error::InvalidData("DConFile contains invalid UTF-16".into()))?
     } else {
         raw.iter().map(|byte| char::from(*byte)).collect()
     };
@@ -605,7 +630,7 @@ impl<'a> Cursor<'a> {
                 .map(|p| u16::from_le_bytes([p[0], p[1]]))
                 .collect::<Vec<_>>();
             String::from_utf16(&units)
-                .map_err(|_| Error::InvalidData("DConName contains invalid UTF-16".into()))
+                .map_err(|_error| Error::InvalidData("DConName contains invalid UTF-16".into()))
         } else {
             Ok(raw.iter().map(|byte| char::from(*byte)).collect())
         }

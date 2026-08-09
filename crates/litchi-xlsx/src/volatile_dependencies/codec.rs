@@ -1,4 +1,4 @@
-//! Bounded SpreadsheetML volatile-dependencies XML codec.
+//! Bounded `SpreadsheetML` volatile-dependencies XML codec.
 
 use std::borrow::Cow;
 
@@ -10,7 +10,12 @@ use quick_xml::reader::NsReader;
 use quick_xml::{Writer, XmlVersion};
 
 use super::invalid;
-use super::model::*;
+use super::model::{
+    MAX_MAINS, MAX_PART_BYTES, MAX_REFERENCES, MAX_SUBTOPICS, MAX_TEXT_BYTES, MAX_TOPICS,
+    MAX_TYPES, NS, NS_TEXT, STRICT_NS, STRICT_NS_TEXT, VolatileDependencies,
+    VolatileDependencyType, VolatileMain, VolatileReference, VolatileTopic, VolatileType,
+    VolatileValue,
+};
 
 impl VolatileDependencies {
     pub fn parse(xml: &[u8]) -> Result<Self> {
@@ -435,7 +440,7 @@ fn empty(
             types[t].mains[m].topics[p].subtopics.push(String::new());
         },
         Some(Context::Topic(t, m, p)) if name(ns, &e, b"tr") => {
-            add_reference(types, t, m, p, &e, decoder)?
+            add_reference(types, t, m, p, &e, decoder)?;
         },
         Some(Context::Root) if name(ns, &e, b"extLst") => {
             if extension.is_some() || types.is_empty() {

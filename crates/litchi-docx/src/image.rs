@@ -1,3 +1,7 @@
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
 use crate::error::{Error, Result};
 /// Image reading support for DOCX documents.
 ///
@@ -69,7 +73,7 @@ pub struct InlineImage {
     /// Image name/title
     name: String,
 
-    /// Width in EMUs (English Metric Units, 1 inch = 914400 EMUs)
+    /// Width in EMUs (English Metric Units, 1 inch = `914_400` EMUs)
     width_emu: i64,
 
     /// Height in EMUs
@@ -77,7 +81,7 @@ pub struct InlineImage {
 }
 
 impl InlineImage {
-    /// Create a new InlineImage from parsed attributes.
+    /// Create a new `InlineImage` from parsed attributes.
     ///
     /// This is typically called internally during XML parsing.
     ///
@@ -89,6 +93,7 @@ impl InlineImage {
     /// * `description` - Image description/alt text
     /// * `name` - Image name/title
     #[inline]
+    #[must_use]
     pub fn new(
         r_embed: String,
         width_emu: i64,
@@ -98,65 +103,74 @@ impl InlineImage {
     ) -> Self {
         Self {
             r_embed,
-            width_emu,
-            height_emu,
             description,
             name,
+            width_emu,
+            height_emu,
         }
     }
 
     /// Get the relationship ID for this image.
     #[inline]
+    #[must_use]
     pub fn r_embed(&self) -> &str {
         &self.r_embed
     }
 
     /// Get the width in EMUs (English Metric Units).
     ///
-    /// EMUs are used throughout Office Open XML. 1 inch = 914400 EMUs.
+    /// EMUs are used throughout Office Open XML. 1 inch = `914_400` EMUs.
     #[inline]
+    #[must_use]
     pub fn width_emu(&self) -> i64 {
         self.width_emu
     }
 
     /// Get the height in EMUs (English Metric Units).
     #[inline]
+    #[must_use]
     pub fn height_emu(&self) -> i64 {
         self.height_emu
     }
 
     /// Get the width in pixels (assuming 96 DPI).
     #[inline]
+    #[must_use]
     pub fn width_px(&self) -> u32 {
         emu_to_px_96(self.width_emu)
     }
 
     /// Get the height in pixels (assuming 96 DPI).
     #[inline]
+    #[must_use]
     pub fn height_px(&self) -> u32 {
         emu_to_px_96(self.height_emu)
     }
 
     /// Get the width in points.
     #[inline]
+    #[must_use]
     pub fn width_pt(&self) -> f64 {
         emu_to_pt_f64(self.width_emu)
     }
 
     /// Get the height in points.
     #[inline]
+    #[must_use]
     pub fn height_pt(&self) -> f64 {
         emu_to_pt_f64(self.height_emu)
     }
 
     /// Get the image description/alt text.
     #[inline]
+    #[must_use]
     pub fn description(&self) -> &str {
         &self.description
     }
 
     /// Get the image name/title.
     #[inline]
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -175,6 +189,10 @@ impl InlineImage {
     ///
     /// Image data is loaded lazily to minimize memory usage. The binary
     /// data is borrowed from the package without copying when possible.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn data<'a>(&self, opc: &'a OpcPackage, rels: &Relationships) -> Result<Cow<'a, [u8]>> {
         // Resolve the relationship to get the image part name
         let rel = rels.get(&self.r_embed).ok_or_else(|| {
@@ -184,12 +202,12 @@ impl InlineImage {
         // Get the target part name
         let part_name = rel
             .target_partname()
-            .map_err(|e| Error::InvalidFormat(format!("Invalid image part reference: {}", e)))?;
+            .map_err(|e| Error::InvalidFormat(format!("Invalid image part reference: {e}")))?;
 
         // Get the part from the package
         let part = opc
             .get_part(&part_name)
-            .map_err(|e| Error::InvalidFormat(format!("Image part not found: {}", e)))?;
+            .map_err(|e| Error::InvalidFormat(format!("Image part not found: {e}")))?;
 
         // Return the binary data as a borrowed slice (zero-copy)
         Ok(Cow::Borrowed(part.blob()))
@@ -201,6 +219,10 @@ impl InlineImage {
     ///
     /// * `opc` - Reference to the OPC package
     /// * `rels` - Relationships from the document part
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn format(&self, opc: &OpcPackage, rels: &Relationships) -> Result<ImageFormat> {
         let data = self.data(opc, rels)?;
         ImageFormat::detect_from_bytes(&data)
@@ -219,7 +241,7 @@ impl InlineImage {
 ///
 /// # Performance
 ///
-/// Uses streaming XML parsing with pre-allocated SmallVec for efficient
+/// Uses streaming XML parsing with pre-allocated `SmallVec` for efficient
 /// storage of typically small image collections. Avoids unnecessary allocations
 /// by reusing buffers.
 ///
@@ -228,7 +250,7 @@ impl InlineImage {
 /// ```xml
 /// <w:drawing>
 ///   <wp:inline>
-///     <wp:extent cx="914400" cy="914400"/>
+///     <wp:extent cx="914_400" cy="914_400"/>
 ///     <wp:docPr name="Picture 1" descr="Description"/>
 ///     <a:graphic>
 ///       <a:graphicData>
@@ -255,15 +277,15 @@ pub(crate) fn parse_inline_images(xml_bytes: &[u8]) -> Result<SmallVec<[InlineIm
     let mut in_blip_fill = false;
 
     // Image attributes being built
-    let mut width_emu: i64 = 914400; // Default 1 inch
-    let mut height_emu: i64 = 914400; // Default 1 inch
+    let mut width_emu: i64 = 914_400; // Default 1 inch
+    let mut height_emu: i64 = 914_400; // Default 1 inch
     let mut description = String::new();
     let mut name = String::new();
     let mut r_embed = String::new();
 
     loop {
         match reader.read_event() {
-            Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+            Ok(Event::Start(e) | Event::Empty(e)) => {
                 let local_name_ref = e.local_name();
                 let local_name = local_name_ref.as_ref();
 
@@ -274,25 +296,25 @@ pub(crate) fn parse_inline_images(xml_bytes: &[u8]) -> Result<SmallVec<[InlineIm
                     b"inline" if in_drawing => {
                         in_inline = true;
                         // Reset state for new image
-                        width_emu = 914400;
-                        height_emu = 914400;
+                        width_emu = 914_400;
+                        height_emu = 914_400;
                         description.clear();
                         name.clear();
                         r_embed.clear();
                     },
                     b"extent" if in_inline => {
                         // Parse width and height from extent element
-                        // <wp:extent cx="914400" cy="914400"/>
+                        // <wp:extent cx="914_400" cy="914_400"/>
                         for attr in e.attributes().flatten() {
                             match attr.key.as_ref() {
                                 b"cx" => {
                                     if let Ok(s) = std::str::from_utf8(&attr.value) {
-                                        width_emu = s.parse().unwrap_or(914400);
+                                        width_emu = s.parse().unwrap_or(914_400);
                                     }
                                 },
                                 b"cy" => {
                                     if let Ok(s) = std::str::from_utf8(&attr.value) {
-                                        height_emu = s.parse().unwrap_or(914400);
+                                        height_emu = s.parse().unwrap_or(914_400);
                                     }
                                 },
                                 _ => {},
@@ -383,13 +405,13 @@ mod tests {
     fn test_inline_image_dimensions() {
         let img = InlineImage::new(
             "rId5".to_string(),
-            914400,  // 1 inch
+            914_400, // 1 inch
             1828800, // 2 inches
             "Test Image".to_string(),
             "Picture 1".to_string(),
         );
 
-        assert_eq!(img.width_emu(), 914400);
+        assert_eq!(img.width_emu(), 914_400);
         assert_eq!(img.height_emu(), 1828800);
         assert_eq!(img.width_px(), 96); // 1 inch at 96 DPI
         assert_eq!(img.height_px(), 192); // 2 inches at 96 DPI

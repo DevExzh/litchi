@@ -1,3 +1,7 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Failure-atomic snapshots, edits, commits, and reversible patches for runs.
 
 use std::sync::Arc;
@@ -17,6 +21,10 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parse and retain a bounded source-preserving `w:r` snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_xml(xml: impl Into<Vec<u8>>) -> Result<Self> {
         let xml = xml.into();
         let symbols = codec::read(&xml)?;
@@ -35,7 +43,6 @@ impl Snapshot {
 
     /// Borrow all direct symbols in source order.
     #[inline]
-    #[must_use]
     pub const fn symbols(&self) -> &Symbols {
         &self.symbols
     }
@@ -74,7 +81,6 @@ pub struct Transaction {
 impl Transaction {
     /// Borrow all symbols projected by this transaction.
     #[inline]
-    #[must_use]
     pub const fn symbols(&self) -> &Symbols {
         &self.next
     }
@@ -87,6 +93,10 @@ impl Transaction {
     }
 
     /// Replace the complete ordered symbol collection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_symbols(&mut self, value: Symbols) -> Result<&mut Self> {
         validate_symbols(&value)?;
         self.next = value;
@@ -94,6 +104,10 @@ impl Transaction {
     }
 
     /// Replace the run's direct symbol with zero or one element.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_symbol(&mut self, value: Option<Symbol>) -> Result<&mut Self> {
         let mut symbols = Symbols::new();
         if let Some(value) = value {
@@ -103,6 +117,10 @@ impl Transaction {
     }
 
     /// Alias for [`Self::set_symbol`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_sym_ex(&mut self, value: Option<Symbol>) -> Result<&mut Self> {
         self.set_symbol(value)
     }
@@ -119,6 +137,10 @@ impl Transaction {
     }
 
     /// Validate and publish the edit without changing the source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn commit(self) -> Result<Commit> {
         let xml = codec::rewrite(self.base.xml_bytes(), &self.next)?;
         let snapshot = Snapshot::from_xml(xml)?;
@@ -177,14 +199,12 @@ pub struct Patch {
 impl Patch {
     /// Borrow the expected source symbols.
     #[inline]
-    #[must_use]
     pub const fn before(&self) -> &Symbols {
         &self.before
     }
 
     /// Borrow the symbols produced by this patch.
     #[inline]
-    #[must_use]
     pub const fn after(&self) -> &Symbols {
         &self.after
     }
@@ -199,6 +219,10 @@ impl Patch {
     }
 
     /// Apply the patch only when the target has the expected source state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.symbols != self.before {
             return Err(Error::InvalidFormat(

@@ -1,4 +1,4 @@
-//! Typed SpreadsheetML conditional-formatting support.
+//! Typed `SpreadsheetML` conditional-formatting support.
 //!
 //! The owner is layered by responsibility: semantic declarations in
 //! [`model`], bounded SpreadsheetML/MCE conversion and differential-format

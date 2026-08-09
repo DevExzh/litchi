@@ -80,12 +80,15 @@ pub struct PageBreak {
 
 impl PageBreak {
     /// First row below a horizontal break, or first column right of a vertical break.
+    #[must_use]
     pub const fn position(&self) -> u16 {
         self.position
     }
+    #[must_use]
     pub const fn range_start(&self) -> u16 {
         self.range_start
     }
+    #[must_use]
     pub const fn range_end(&self) -> u16 {
         self.range_end
     }
@@ -114,54 +117,71 @@ pub struct PrintSetup {
 }
 
 impl PrintSetup {
+    #[must_use]
     pub fn printer_settings_available(&self) -> bool {
         self.printer_settings_available
     }
+    #[must_use]
     pub fn paper_size(&self) -> Option<u16> {
         self.paper_size
     }
+    #[must_use]
     pub fn scale_percent(&self) -> Option<u16> {
         self.scale_percent
     }
+    #[must_use]
     pub fn starting_page_number(&self) -> Option<i16> {
         self.starting_page_number
     }
+    #[must_use]
     pub fn fit_width_pages(&self) -> u16 {
         self.fit_width_pages
     }
+    #[must_use]
     pub fn fit_height_pages(&self) -> u16 {
         self.fit_height_pages
     }
+    #[must_use]
     pub fn print_order(&self) -> PrintOrder {
         self.print_order
     }
+    #[must_use]
     pub fn orientation(&self) -> Option<PrintOrientation> {
         self.orientation
     }
+    #[must_use]
     pub fn is_black_and_white(&self) -> bool {
         self.black_and_white
     }
+    #[must_use]
     pub fn is_draft_quality(&self) -> bool {
         self.draft_quality
     }
+    #[must_use]
     pub fn comments(&self) -> PrintComments {
         self.comments
     }
+    #[must_use]
     pub fn errors(&self) -> PrintErrors {
         self.errors
     }
+    #[must_use]
     pub fn horizontal_resolution_dpi(&self) -> Option<u16> {
         self.horizontal_resolution_dpi
     }
+    #[must_use]
     pub fn vertical_resolution_dpi(&self) -> Option<u16> {
         self.vertical_resolution_dpi
     }
+    #[must_use]
     pub fn header_margin_inches(&self) -> f64 {
         self.header_margin_inches
     }
+    #[must_use]
     pub fn footer_margin_inches(&self) -> f64 {
         self.footer_margin_inches
     }
+    #[must_use]
     pub fn copies(&self) -> Option<u16> {
         self.copies
     }
@@ -212,53 +232,68 @@ pub struct PageSetup {
 }
 
 impl PageSetup {
+    #[must_use]
     pub const fn print_headers(&self) -> bool {
         self.print_headers
     }
+    #[must_use]
     pub const fn print_gridlines(&self) -> bool {
         self.print_gridlines
     }
     /// Raw header text, including `&L`, `&C`, `&R`, and formatting commands.
+    #[must_use]
     pub fn header(&self) -> &str {
         &self.header
     }
     /// Raw footer text, including `&L`, `&C`, `&R`, and formatting commands.
+    #[must_use]
     pub fn footer(&self) -> &str {
         &self.footer
     }
+    #[must_use]
     pub fn is_horizontally_centered(&self) -> bool {
         self.horizontally_centered
     }
+    #[must_use]
     pub fn is_vertically_centered(&self) -> bool {
         self.vertically_centered
     }
+    #[must_use]
     pub fn left_margin_inches(&self) -> Option<f64> {
         self.left_margin_inches
     }
+    #[must_use]
     pub fn right_margin_inches(&self) -> Option<f64> {
         self.right_margin_inches
     }
+    #[must_use]
     pub fn top_margin_inches(&self) -> Option<f64> {
         self.top_margin_inches
     }
+    #[must_use]
     pub fn bottom_margin_inches(&self) -> Option<f64> {
         self.bottom_margin_inches
     }
+    #[must_use]
     pub fn horizontal_page_breaks(&self) -> &[PageBreak] {
         &self.horizontal_page_breaks
     }
+    #[must_use]
     pub fn vertical_page_breaks(&self) -> &[PageBreak] {
         &self.vertical_page_breaks
     }
     /// Opaque DEVMODE payloads from `PLS`; these bytes are never executed.
+    #[must_use]
     pub fn printer_driver_data(&self) -> &[Vec<u8>] {
         &self.printer_driver_data
     }
+    #[must_use]
     pub fn print_setup(&self) -> &PrintSetup {
         &self.print_setup
     }
     /// Even-page and first-page header/footer text and display flags from the
     /// `HeaderFooter` record, when present.
+    #[must_use]
     pub fn header_footer(&self) -> Option<&HeaderFooter> {
         self.header_footer.as_ref()
     }
@@ -307,7 +342,7 @@ fn parse_header_footer(data: &[u8], record_type: u16) -> Result<String> {
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect::<Vec<_>>();
         String::from_utf16(&units)
-            .map_err(|_| invalid(record_type, "header/footer contains invalid UTF-16"))
+            .map_err(|_error| invalid(record_type, "header/footer contains invalid UTF-16"))
     }
 }
 
@@ -351,36 +386,48 @@ pub struct HeaderFooter {
 }
 
 impl HeaderFooter {
+    #[must_use]
     pub fn sheet_view_guid(&self) -> Option<&[u8; 16]> {
         self.sheet_view_guid.as_ref()
     }
+    #[must_use]
     pub const fn diff_odd_even(&self) -> bool {
         self.diff_odd_even
     }
+    #[must_use]
     pub const fn diff_first(&self) -> bool {
         self.diff_first
     }
+    #[must_use]
     pub const fn scale_with_doc(&self) -> bool {
         self.scale_with_doc
     }
+    #[must_use]
     pub const fn align_margins(&self) -> bool {
         self.align_margins
     }
+    #[must_use]
     pub fn even_header(&self) -> &str {
         &self.even_header
     }
+    #[must_use]
     pub fn even_footer(&self) -> &str {
         &self.even_footer
     }
+    #[must_use]
     pub fn first_header(&self) -> &str {
         &self.first_header
     }
+    #[must_use]
     pub fn first_footer(&self) -> &str {
         &self.first_footer
     }
 
     /// Even-page header/footer text; setting either marks the record as
     /// differentiating odd and even pages.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_even(&mut self, header: String, footer: String) -> Result<()> {
         validate_header_footer_text(&header)?;
         validate_header_footer_text(&footer)?;
@@ -392,6 +439,9 @@ impl HeaderFooter {
 
     /// First-page header/footer text; setting either marks the record as
     /// differentiating the first page.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_first(&mut self, header: String, footer: String) -> Result<()> {
         validate_header_footer_text(&header)?;
         validate_header_footer_text(&footer)?;
@@ -522,7 +572,9 @@ impl HeaderFooter {
             &self.first_header,
             &self.first_footer,
         ] {
-            payload.extend_from_slice(&(text.encode_utf16().count() as u16).to_le_bytes());
+            payload.extend_from_slice(
+                &crate::utils::truncate_usize_to_u16(text.encode_utf16().count()).to_le_bytes(),
+            );
         }
         for text in [
             &self.even_header,
@@ -577,7 +629,7 @@ fn parse_no_cch_string(data: &[u8], offset: &mut usize, count: usize) -> Result<
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect::<Vec<_>>();
         String::from_utf16(&units)
-            .map_err(|_| invalid(HEADER_FOOTER_RECORD_TYPE, "header/footer invalid UTF-16"))
+            .map_err(|_error| invalid(HEADER_FOOTER_RECORD_TYPE, "header/footer invalid UTF-16"))
     }
 }
 
@@ -592,7 +644,7 @@ fn write_no_cch_string(out: &mut Vec<u8>, text: &str) {
     out.push(u8::from(!compressed));
     for unit in units {
         if compressed {
-            out.push(unit as u8);
+            out.push(crate::utils::truncate_u16_to_u8(unit));
         } else {
             out.extend_from_slice(&unit.to_le_bytes());
         }
@@ -782,7 +834,8 @@ fn parse_setup(data: &[u8]) -> Result<PrintSetup> {
         printer_settings_available: !no_printer_settings,
         paper_size: printer_value(paper_size),
         scale_percent: printer_value(read_u16(data, 2)),
-        starting_page_number: (flags & 0x0080 != 0).then_some(read_u16(data, 4) as i16),
+        starting_page_number: (flags & 0x0080 != 0)
+            .then_some(crate::utils::wrap_u16_to_i16(read_u16(data, 4))),
         fit_width_pages,
         fit_height_pages,
         print_order: if flags & 0x0001 != 0 {

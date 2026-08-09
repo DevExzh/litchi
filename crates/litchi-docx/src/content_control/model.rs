@@ -1,3 +1,11 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 use crate::error::{Error, Result};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
@@ -86,7 +94,7 @@ impl Default for Limits {
     }
 }
 
-/// WordprocessingML `ST_Lock` value.
+/// `WordprocessingML` `ST_Lock` value.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub enum Lock {
     /// Neither the control nor its contents are locked.
@@ -101,7 +109,7 @@ pub enum Lock {
 }
 
 impl Lock {
-    /// Return the exact WordprocessingML token.
+    /// Return the exact `WordprocessingML` token.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -187,6 +195,10 @@ impl Checksum {
     }
 
     /// Parse the strict canonical eight-character Base64 lexical form.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn parse(value: &str) -> Result<Self> {
         if value.len() != 8 || !value.is_ascii() || !value.ends_with("==") {
             return Err(invalid_checksum());
@@ -194,7 +206,7 @@ impl Checksum {
         let mut bytes = [0u8; 4];
         let written = BASE64
             .decode_slice(value.as_bytes(), &mut bytes)
-            .map_err(|_| invalid_checksum())?;
+            .map_err(|_source_error| invalid_checksum())?;
         if written != bytes.len() || encode(bytes) != value {
             return Err(invalid_checksum());
         }
@@ -209,6 +221,10 @@ impl Checksum {
     /// This follows the observed Word interoperability profile: CRC-32 with a
     /// zero seed, represented as a little-endian integer before Base64 encoding.
     /// The profile is not fully determined by the OOXML schema vocabulary alone.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn compute(data: &[u8], limits: &Limits) -> Result<Self> {
         limits.validate()?;
         if data.len() > limits.max_crc_bytes {
@@ -264,6 +280,10 @@ impl Checksum {
     }
 
     /// Compare against exact custom-XML part bytes without evaluating XML.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn verify(&self, data: &[u8], limits: &Limits) -> Result<ChecksumStatus> {
         let actual = Self::compute(data, limits)?;
         Ok(if self.bytes == actual.bytes {
@@ -367,7 +387,11 @@ pub struct DataBinding {
 }
 
 impl DataBinding {
-    /// Construct checked lexical binding metadata. XPath is never evaluated.
+    /// Construct checked lexical binding metadata. `XPath` is never evaluated.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(xpath: impl Into<String>, store_item_id: impl Into<String>) -> Result<Self> {
         let value = Self {
             flavor: BindingFlavor::Core,
@@ -399,6 +423,10 @@ impl DataBinding {
     /// Construct observed Word 2012 formatted-binding metadata for inspection.
     ///
     /// Canonical MS-DOCX authoring intentionally emits the core flavor.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn word_2012(xpath: impl Into<String>, store_item_id: impl Into<String>) -> Result<Self> {
         let mut value = Self::new(xpath, store_item_id)?;
         value.flavor = BindingFlavor::Word2012;
@@ -412,6 +440,10 @@ impl DataBinding {
     }
 
     /// Add checked inert namespace-prefix declarations.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn with_prefix_mappings(mut self, mappings: impl Into<String>) -> Result<Self> {
         let mappings = mappings.into();
         super::validate_data_binding_values(&self.xpath, &self.store_item_id, Some(&mappings))?;
@@ -426,7 +458,7 @@ impl DataBinding {
         self
     }
 
-    /// Inert XPath lexical text. It is never executed by this API.
+    /// Inert `XPath` lexical text. It is never executed by this API.
     #[must_use]
     pub fn xpath(&self) -> &str {
         &self.xpath
@@ -467,6 +499,10 @@ impl DataBinding {
     }
 
     /// Verify against exact custom-XML data-part bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn verify_checksum(&self, data: &[u8], limits: &Limits) -> Result<ChecksumStatus> {
         match &self.checksum {
             None => Ok(ChecksumStatus::Absent),
@@ -511,11 +547,19 @@ pub struct Inventory {
 
 impl Inventory {
     /// Parse with production defaults and content-control-specific MCE capabilities.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn parse(xml: &[u8]) -> Result<Self> {
         Self::parse_with_limits(xml, &Limits::default())
     }
 
     /// Parse with caller-provided resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn parse_with_limits(xml: &[u8], limits: &Limits) -> Result<Self> {
         super::parse_inventory(xml, limits)
     }

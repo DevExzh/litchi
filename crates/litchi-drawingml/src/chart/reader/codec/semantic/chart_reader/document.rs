@@ -1,4 +1,12 @@
-use super::*;
+use super::{
+    BufRead, BytesStart, ChartXmlReader, ColorMapOverride, ColorMapping, ColorSchemeIndex, Error,
+    Event, ExtensionList, ExternalData, HeaderFooter, IGNORED_NAMESPACE_ELEMENT, Layout, Marker,
+    PageMargins, PageOrientation, PageSetup, PivotFormat, PivotSource, PrintSettings, Protection,
+    Result, ShapeProperties, TextProperties, TitleText, consume_empty_chart_element, get_attr,
+    invalid_attribute, missing_attribute, optional_bool_attr, optional_i32_attr, optional_u32_attr,
+    parse_bool_attr, parse_data_label, parse_series_marker, parse_text_element,
+    required_named_f64_attr, required_u32_attr,
+};
 
 pub(crate) fn parse_pivot_source<R: BufRead>(
     reader: &mut ChartXmlReader<R>,
@@ -168,7 +176,7 @@ pub(crate) fn parse_color_map_override<R: BufRead>(
                 let value = ColorMapOverride::Override(parse_color_mapping(element)?);
                 set_color_map_override_choice(&mut mapping, value)?;
             },
-            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
+            Ok(Event::Start(ref element) | Event::Empty(ref element))
                 if element.local_name().as_ref() != IGNORED_NAMESPACE_ELEMENT.as_bytes() =>
             {
                 return Err(Error::Invalid(
@@ -264,7 +272,7 @@ pub(crate) fn parse_external_data<R: BufRead>(
                 saw_auto_update = true;
                 external_data.auto_update = Some(parse_bool_attr(element)?);
             },
-            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
+            Ok(Event::Start(ref element) | Event::Empty(ref element))
                 if element.local_name().as_ref() != IGNORED_NAMESPACE_ELEMENT.as_bytes() =>
             {
                 return Err(Error::Invalid(
@@ -429,7 +437,7 @@ pub(crate) fn parse_pivot_format<R: BufRead>(
                     "chart pivot-format data label is missing its index".into(),
                 ));
             },
-            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
+            Ok(Event::Start(ref element) | Event::Empty(ref element))
                 if element.local_name().as_ref() == b"idx" =>
             {
                 if index.is_some() {

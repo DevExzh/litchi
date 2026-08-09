@@ -129,12 +129,12 @@ pub(super) fn collection(value: &Collection, main_document_chars: u32) -> Result
                 "SttbFnm file name exceeds its u16 UTF-16 length field",
             ));
         }
-        if let Some(offset) = file.relative_path_offset {
-            if offset >= units || offset > usize::from(u8::MAX) - 1 {
-                return Err(corrupted(
-                    "SttbFnm FNIF ichRelative exceeds the file name length",
-                ));
-            }
+        if let Some(offset) = file.relative_path_offset
+            && (offset >= units || offset > usize::from(u8::MAX) - 1)
+        {
+            return Err(corrupted(
+                "SttbFnm FNIF ichRelative exceeds the file name length",
+            ));
         }
         if file.is_non_file_system_path && (file.valid_on_fat || file.valid_on_ntfs) {
             return Err(corrupted(

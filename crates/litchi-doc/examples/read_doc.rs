@@ -4,6 +4,14 @@
 //!     cargo run -p litchi-doc --example read_doc
 //!     cargo run -p litchi-doc --example read_doc -- path/to/file.doc
 
+#![allow(
+    clippy::doc_markdown,
+    clippy::map_unwrap_or,
+    clippy::print_stdout,
+    clippy::uninlined_format_args,
+    reason = "the interactive example favors familiar terminal output and explanatory prose over library-code style constraints"
+)]
+
 use litchi_doc::Package;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

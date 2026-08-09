@@ -1,4 +1,4 @@
-//! Layered SpreadsheetML workbook future-metadata owner.
+//! Layered `SpreadsheetML` workbook future-metadata owner.
 ///
 /// Semantic values live in `model`, bounded XML/MCE conversion in `codec`,
 /// and the package contract vocabulary in `package`. OPC discovery remains

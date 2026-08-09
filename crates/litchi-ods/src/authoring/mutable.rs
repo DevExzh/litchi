@@ -22,38 +22,54 @@ pub struct MutableSpreadsheet {
 }
 
 impl MutableSpreadsheet {
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         Spreadsheet::open(path).map(Self::from_spreadsheet)
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         Spreadsheet::from_bytes(bytes).map(Self::from_spreadsheet)
     }
 
+    #[must_use]
     pub fn from_spreadsheet(spreadsheet: Spreadsheet) -> Self {
         Self { spreadsheet }
     }
 
+    #[must_use]
     pub fn spreadsheet(&self) -> &Spreadsheet {
         &self.spreadsheet
     }
 
     /// Borrow the compact cross-format metadata projection.
+    #[must_use]
     pub fn metadata(&self) -> &litchi_core::Metadata {
         self.spreadsheet.metadata()
     }
 
     /// Borrow the complete typed ODF metadata model.
+    #[must_use]
     pub fn odf_metadata(&self) -> &crate::metadata::Metadata {
         self.spreadsheet.odf_metadata()
     }
 
     /// Replace the supported metadata projection atomically.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_metadata(&mut self, metadata: litchi_core::Metadata) -> Result<()> {
         self.spreadsheet.publish_metadata(metadata)
     }
 
     /// Apply a short-lived metadata update transactionally.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn update_metadata<F>(&mut self, update: F) -> Result<()>
     where
         F: FnOnce(&mut litchi_core::Metadata) -> Result<()>,
@@ -64,16 +80,23 @@ impl MutableSpreadsheet {
     }
 
     /// Remove the physical `meta.xml` part atomically.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn clear_metadata(&mut self) -> Result<()> {
         self.spreadsheet.remove_metadata()
     }
 
     /// Borrow spreadsheet calculation settings, if present.
+    #[must_use]
     pub fn settings(&self) -> Option<&crate::settings::Settings> {
         self.spreadsheet.settings()
     }
 
     /// Replace or remove calculation settings atomically.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_settings(&mut self, settings: Option<crate::settings::Settings>) -> Result<()> {
         if let Some(settings) = &settings {
             settings.validate()?;
@@ -83,6 +106,9 @@ impl MutableSpreadsheet {
 
     /// Apply a typed calculation-settings update, creating the owner when it
     /// is absent.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn update_settings<F>(&mut self, update: F) -> Result<()>
     where
         F: FnOnce(&mut crate::settings::Settings) -> Result<()>,
@@ -93,11 +119,17 @@ impl MutableSpreadsheet {
     }
 
     /// Remove the calculation-settings element from `content.xml`.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn clear_settings(&mut self) -> Result<()> {
         self.set_settings(None)
     }
 
     /// Capture the source-checked cell-annotation owner for this snapshot.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn annotations(&self) -> Result<crate::annotations::Snapshot> {
         self.spreadsheet.annotations()
     }
@@ -108,6 +140,9 @@ impl MutableSpreadsheet {
     /// logical coordinates.  If the closure or commit fails, this facade and
     /// its package bytes remain unchanged; an empty commit does not rebuild
     /// the archive.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn edit_annotations<F>(&mut self, edit: F) -> Result<()>
     where
         F: FnOnce(&mut crate::annotations::Transaction) -> Result<()>,
@@ -124,6 +159,7 @@ impl MutableSpreadsheet {
     }
 
     /// Return the typed worksheet graph in document order.
+    #[must_use]
     pub fn sheets(&self) -> &[Sheet] {
         self.spreadsheet.sheets()
     }
@@ -167,16 +203,25 @@ impl MutableSpreadsheet {
     }
 
     /// Discover embedded charts in the current immutable package snapshot.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn charts(&self) -> Result<crate::charts::Inventory<'_>> {
         self.spreadsheet.charts()
     }
 
     /// Capture embedded charts as an explicit immutable transaction snapshot.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn chart_snapshot(&self) -> Result<crate::charts::Snapshot> {
         self.spreadsheet.chart_snapshot()
     }
 
     /// Apply an exact-source embedded-chart patch and rehydrate the spreadsheet.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn apply_chart_patch(&mut self, patch: &crate::charts::Patch) -> Result<()> {
         let commit = patch.apply(&self.chart_snapshot()?)?;
         if commit.changed() {
@@ -189,6 +234,9 @@ impl MutableSpreadsheet {
     ///
     /// A failed closure or commit leaves this mutable facade unchanged. An
     /// empty transaction does not rebuild the archive, preserving exact bytes.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn edit_charts<F>(&mut self, edit: F) -> Result<()>
     where
         F: for<'source> FnOnce(&mut crate::charts::Transaction<'source>) -> Result<()>,
@@ -203,18 +251,27 @@ impl MutableSpreadsheet {
         Ok(())
     }
 
-    /// Discover the typed DataPilot catalog in the current package snapshot.
+    /// Discover the typed `DataPilot` catalog in the current package snapshot.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn data_pilots(&self) -> Result<crate::data_pilot::Catalog<'_>> {
         self.spreadsheet.data_pilots()
     }
 
-    /// Capture an immutable, exact-source DataPilot snapshot for explicit
+    /// Capture an immutable, exact-source `DataPilot` snapshot for explicit
     /// `Snapshot` → `Edit` → `Commit` → `Patch` workflows.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn data_pilot_snapshot(&self) -> Result<crate::data_pilot::Snapshot> {
         self.spreadsheet.data_pilot_snapshot()
     }
 
-    /// Apply an exact-source DataPilot patch and rehydrate the full spreadsheet.
+    /// Apply an exact-source `DataPilot` patch and rehydrate the full spreadsheet.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn apply_data_pilot_patch(&mut self, patch: &crate::data_pilot::Patch) -> Result<()> {
         let commit = patch.apply(&self.data_pilot_snapshot()?)?;
         if commit.changed() {
@@ -223,10 +280,13 @@ impl MutableSpreadsheet {
         Ok(())
     }
 
-    /// Clone-stage DataPilot CRUD and publish it as one package edit.
+    /// Clone-stage `DataPilot` CRUD and publish it as one package edit.
     ///
     /// Unknown markup in the owned XML is retained by no-op transactions and
     /// causes a changed transaction to fail before package bytes are rebuilt.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn edit_data_pilots<F>(&mut self, edit: F) -> Result<()>
     where
         F: for<'source> FnOnce(&mut crate::data_pilot::Editor<'_, 'source>) -> Result<()>,
@@ -244,21 +304,29 @@ impl MutableSpreadsheet {
     }
 
     /// Find a worksheet by its exact ODF name.
+    #[must_use]
     pub fn sheet(&self, name: &str) -> Option<&Sheet> {
         self.spreadsheet.sheet(name)
     }
 
     /// Look up a logical cell in the current immutable snapshot.
+    #[must_use]
     pub fn cell(&self, sheet_name: &str, row: usize, column: usize) -> Option<CellView<'_>> {
         self.spreadsheet.cell(sheet_name, row, column)
     }
 
     /// Atomically replace all worksheets in the current package snapshot.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_sheets(&mut self, sheets: Vec<Sheet>) -> Result<()> {
         self.spreadsheet.publish_sheets(sheets)
     }
 
     /// Append one worksheet while preserving document order.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn add_sheet(&mut self, sheet: Sheet) -> Result<()> {
         self.edit_sheets(move |sheets| {
             sheets.push(sheet);
@@ -267,6 +335,9 @@ impl MutableSpreadsheet {
     }
 
     /// Remove one worksheet by its exact ODF name.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn remove_sheet(&mut self, name: &str) -> Result<Sheet> {
         let mut removed = None;
         self.edit_sheets(|sheets| {
@@ -282,6 +353,9 @@ impl MutableSpreadsheet {
     }
 
     /// Atomically replace one logical cell in a named worksheet.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_cell(
         &mut self,
         sheet_name: &str,
@@ -293,11 +367,17 @@ impl MutableSpreadsheet {
     }
 
     /// Clear one logical cell while retaining its direct style, if any.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn clear_cell(&mut self, sheet_name: &str, row: usize, column: usize) -> Result<()> {
         self.edit_sheet(sheet_name, |sheet| sheet.clear_cell(row, column))
     }
 
     /// Set an inert formula on one logical cell.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_formula(
         &mut self,
         sheet_name: &str,
@@ -312,6 +392,9 @@ impl MutableSpreadsheet {
     }
 
     /// Set a direct cell style reference on one logical cell.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_cell_style(
         &mut self,
         sheet_name: &str,
@@ -349,6 +432,7 @@ impl MutableSpreadsheet {
     }
 
     /// Return the ordered named-definition catalog of the edited snapshot.
+    #[must_use]
     pub fn definitions(&self) -> &[Definition] {
         self.spreadsheet.definitions()
     }
@@ -394,31 +478,45 @@ impl MutableSpreadsheet {
     }
 
     /// Append a validated named range atomically.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn add_range(&mut self, range: Range) -> Result<()> {
         self.spreadsheet.add_range(range)
     }
 
     /// Append a validated named expression atomically.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn add_expression(&mut self, expression: Expression) -> Result<()> {
         self.spreadsheet.add_expression(expression)
     }
 
     /// Append a validated named definition atomically.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn add_definition(&mut self, definition: Definition) -> Result<()> {
         self.spreadsheet.add_definition(definition)
     }
 
     /// Replace the complete ordered named-definition catalog atomically.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_definitions(&mut self, definitions: Vec<Definition>) -> Result<()> {
         self.spreadsheet.set_definitions(definitions)
     }
 
     /// Find a named range in the current snapshot.
+    #[must_use]
     pub fn range(&self, name: &str, scope: &Scope) -> Option<&Range> {
         self.spreadsheet.range(name, scope)
     }
 
     /// Find a named expression in the current snapshot.
+    #[must_use]
     pub fn expression(&self, name: &str, scope: &Scope) -> Option<&Expression> {
         self.spreadsheet.expression(name, scope)
     }
@@ -484,10 +582,14 @@ impl MutableSpreadsheet {
         self.spreadsheet.remove_rdf_graph(path)
     }
 
+    #[must_use]
     pub fn to_bytes(self) -> Vec<u8> {
         self.spreadsheet.into_bytes()
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn save(self, path: impl AsRef<Path>) -> Result<()> {
         std::fs::write(path, self.to_bytes()).map_err(Into::into)
     }

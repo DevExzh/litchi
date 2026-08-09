@@ -1,4 +1,4 @@
-//! Bounded SpreadsheetML scenario XML codec.
+//! Bounded `SpreadsheetML` scenario XML codec.
 
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -919,15 +919,13 @@ fn write_unknown_attributes(xml: &mut BoundedXml, opaque: Option<&OpaqueFields>)
     for attribute in &opaque.attributes {
         if let Some(namespace) = attribute.namespace.as_ref()
             && namespace.prefix.as_ref() != "xml"
-        {
-            if !declared
+            && !declared
                 .iter()
                 .any(|prefix| prefix == namespace.prefix.as_ref())
-            {
-                let declaration = format!("xmlns:{}", namespace.prefix);
-                write_attribute(xml, &declaration, &namespace.uri)?;
-                declared.push(namespace.prefix.to_string());
-            }
+        {
+            let declaration = format!("xmlns:{}", namespace.prefix);
+            write_attribute(xml, &declaration, &namespace.uri)?;
+            declared.push(namespace.prefix.to_string());
         }
         write_attribute(xml, attribute.name(), attribute.value())?;
     }

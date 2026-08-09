@@ -73,7 +73,15 @@ pub(super) fn consume_empty_extension(reader: &mut NsReader<&[u8]>, local: &[u8]
             Event::Text(ref text) if text_is_whitespace(text)? => {},
             Event::Comment(_) => {},
             Event::Eof => return Err(invalid_message("unterminated data-pilot extension element")),
-            _ => {
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {
                 return Err(invalid_message(
                     "data-pilot grand-total extension must be empty",
                 ));
@@ -108,7 +116,13 @@ pub(super) fn skip_foreign_element(
                 ));
             },
             Event::Eof => return Err(invalid_message("unterminated data-pilot extension")),
-            _ => {},
+            Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -211,7 +225,7 @@ pub(super) fn optional_i64(
     local: &[u8],
 ) -> Result<Option<i64>> {
     optional_attr(reader, element, local)?
-        .map(|value| value.parse().map_err(|_| invalid("integer", &value)))
+        .map(|value| value.parse().map_err(|_error| invalid("integer", &value)))
         .transpose()
 }
 
@@ -223,7 +237,7 @@ pub(super) fn required_u64(
     let value = required_attr(reader, element, local)?;
     value
         .parse()
-        .map_err(|_| invalid("non-negative integer", &value))
+        .map_err(|_error| invalid("non-negative integer", &value))
 }
 
 pub(super) fn required_f64(
@@ -232,7 +246,7 @@ pub(super) fn required_f64(
     local: &[u8],
 ) -> Result<f64> {
     let value = required_attr(reader, element, local)?;
-    value.parse().map_err(|_| invalid("number", &value))
+    value.parse().map_err(|_error| invalid("number", &value))
 }
 
 pub(super) fn parse_bool(value: &str) -> Result<bool> {

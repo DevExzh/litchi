@@ -30,6 +30,7 @@ impl Default for Builder {
 }
 
 impl Builder {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             content_xml: empty_content().to_owned(),
@@ -45,11 +46,15 @@ impl Builder {
     }
 
     /// Borrow the compact metadata value that will be written to `meta.xml`.
+    #[must_use]
     pub fn metadata(&self) -> &litchi_core::Metadata {
         &self.metadata
     }
 
     /// Replace the supported metadata value used for the next build.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_metadata(&mut self, metadata: litchi_core::Metadata) -> Result<&mut Self> {
         let snapshot = crate::metadata::Snapshot::from_source(None)?;
         let mut transaction = snapshot.transaction();
@@ -59,11 +64,15 @@ impl Builder {
     }
 
     /// Borrow the calculation settings that will be emitted in `content.xml`.
+    #[must_use]
     pub fn settings(&self) -> Option<&Settings> {
         self.settings.as_ref()
     }
 
     /// Set or clear validated calculation settings.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_settings(&mut self, settings: Option<Settings>) -> Result<&mut Self> {
         if let Some(settings) = &settings {
             settings.validate()?;
@@ -73,11 +82,17 @@ impl Builder {
     }
 
     /// Decode the builder's current typed worksheet snapshot.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn sheets(&self) -> Result<Vec<Sheet>> {
         crate::worksheet::codec::parse(&self.content_xml)
     }
 
     /// Atomically replace all worksheets in the builder's content snapshot.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_sheets(&mut self, sheets: Vec<Sheet>) -> Result<&mut Self> {
         let updated = crate::worksheet::package::replace_tables(&self.content_xml, &sheets)?;
         self.content_xml = updated;
@@ -85,6 +100,9 @@ impl Builder {
     }
 
     /// Append one validated worksheet while preserving sheet order.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn add_sheet(&mut self, sheet: Sheet) -> Result<&mut Self> {
         let mut sheets = self.sheets()?;
         sheets.push(sheet);
@@ -92,6 +110,9 @@ impl Builder {
     }
 
     /// Remove one worksheet by its exact ODF name.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn remove_sheet(&mut self, name: &str) -> Result<Sheet> {
         let mut sheets = self.sheets()?;
         let index = sheets
@@ -104,6 +125,9 @@ impl Builder {
     }
 
     /// Atomically replace one logical cell in a named worksheet.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_cell(
         &mut self,
         sheet_name: &str,
@@ -115,11 +139,17 @@ impl Builder {
     }
 
     /// Clear one logical cell while retaining its direct style, if any.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn clear_cell(&mut self, sheet_name: &str, row: usize, column: usize) -> Result<&mut Self> {
         self.edit_sheet(sheet_name, |sheet| sheet.clear_cell(row, column))
     }
 
     /// Set an inert formula on one logical cell.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_formula(
         &mut self,
         sheet_name: &str,
@@ -134,6 +164,9 @@ impl Builder {
     }
 
     /// Set a direct cell style reference on one logical cell.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_cell_style(
         &mut self,
         sheet_name: &str,
@@ -165,21 +198,31 @@ impl Builder {
     }
 
     /// Return authored named definitions in their insertion order.
+    #[must_use]
     pub fn definitions(&self) -> &[Definition] {
         &self.definitions
     }
 
     /// Append a validated named range to the builder.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn add_range(&mut self, range: Range) -> Result<&mut Self> {
         self.add_definition(range.into())
     }
 
     /// Append a validated named expression to the builder.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn add_expression(&mut self, expression: Expression) -> Result<&mut Self> {
         self.add_definition(expression.into())
     }
 
     /// Append a named definition while preserving authored order.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn add_definition(&mut self, definition: Definition) -> Result<&mut Self> {
         let mut candidate = self.definitions.clone();
         candidate.push(definition);
@@ -188,6 +231,9 @@ impl Builder {
         Ok(self)
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn build(self) -> Result<Vec<u8>> {
         let mut content_xml = if self.definitions.is_empty() {
             self.content_xml

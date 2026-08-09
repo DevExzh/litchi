@@ -204,13 +204,13 @@ pub(super) fn write_bar_chart<W: Write>(
     write_group_data_labels(writer, &group.common)?;
 
     if let Some(gap_width) = group.gap_width {
-        write!(writer, r#"<c:gapWidth val="{}"/>"#, gap_width)?;
+        write!(writer, r#"<c:gapWidth val="{gap_width}"/>"#)?;
     } else {
         write!(writer, r#"<c:gapWidth val="150"/>"#)?;
     }
 
     if let Some(overlap) = group.overlap {
-        write!(writer, r#"<c:overlap val="{}"/>"#, overlap)?;
+        write!(writer, r#"<c:overlap val="{overlap}"/>"#)?;
     }
     for lines in &group.series_lines {
         write_chart_lines(writer, "serLines", lines)?;
@@ -253,11 +253,11 @@ pub(super) fn write_bar_3d_chart<W: Write>(
     write_group_data_labels(writer, &group.common)?;
 
     if let Some(gap_width) = group.gap_width {
-        write!(writer, r#"<c:gapWidth val="{}"/>"#, gap_width)?;
+        write!(writer, r#"<c:gapWidth val="{gap_width}"/>"#)?;
     }
 
     if let Some(gap_depth) = group.gap_depth {
-        write!(writer, r#"<c:gapDepth val="{}"/>"#, gap_depth)?;
+        write!(writer, r#"<c:gapDepth val="{gap_depth}"/>"#)?;
     }
 
     if let Some(ref shape) = group.shape {

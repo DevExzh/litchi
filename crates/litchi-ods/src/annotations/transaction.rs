@@ -13,6 +13,9 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parse one complete ODS `content.xml` source.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn parse(source: impl Into<String>) -> Result<Self> {
         let source = source.into();
         let parsed = codec::parse(&source)?;
@@ -24,16 +27,21 @@ impl Snapshot {
     }
 
     /// The exact source XML captured by this snapshot.
+    #[must_use]
     pub fn source_xml(&self) -> &str {
         &self.source
     }
 
     /// Annotation entries in source order.
+    #[must_use]
     pub fn entries(&self) -> &[model::Entry] {
         &self.entries
     }
 
     /// Checked source-order lookup.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn at(&self, index: usize) -> Result<&model::Entry> {
         self.entries.get(index).ok_or_else(|| {
             Error::InvalidFormat(format!(
@@ -44,17 +52,26 @@ impl Snapshot {
     }
 
     /// Find the annotation attached to an exact logical sheet/cell.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn cell(&self, sheet: &str, row: usize, column: usize) -> Result<Option<&model::Entry>> {
         let cell = model::Cell::new(sheet, row, column)?;
         Ok(self.entries.iter().find(|entry| entry.cell() == &cell))
     }
 
     /// Alias emphasizing the contextual sheet/cell selection.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn find(&self, sheet: &str, row: usize, column: usize) -> Result<Option<&model::Entry>> {
         self.cell(sheet, row, column)
     }
 
     /// Find an annotation by its optional ODF `office:name` identifier.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn named(&self, name: &str) -> Result<Option<&model::Entry>> {
         if name.is_empty() {
             return Err(Error::InvalidFormat(
@@ -109,16 +126,19 @@ pub struct Patch {
 
 impl Patch {
     /// Operations in transaction order.
+    #[must_use]
     pub fn operations(&self) -> &[Operation] {
         &self.operations
     }
 
     /// Whether the patch contains no semantic changes.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.operations.is_empty()
     }
 
     /// Fingerprint of the source XML this patch expects.
+    #[must_use]
     pub const fn source_fingerprint(&self) -> u64 {
         self.source_fingerprint
     }
@@ -138,6 +158,9 @@ impl Patch {
     }
 
     /// Apply this patch only to the exact source snapshot from which it came.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn apply(&self, snapshot: &Snapshot) -> Result<Commit> {
         if codec::fingerprint(snapshot.source_xml()) != self.source_fingerprint {
             return Err(Error::InvalidFormat(
@@ -191,16 +214,21 @@ impl Transaction {
     }
 
     /// Current candidate snapshot.
+    #[must_use]
     pub fn snapshot(&self) -> &Snapshot {
         &self.draft
     }
 
     /// Original source snapshot used for source checks and inverse patches.
+    #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Add a new annotation to an existing, non-repeated logical cell.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn add(
         &mut self,
         sheet: &str,
@@ -213,6 +241,9 @@ impl Transaction {
     }
 
     /// Add a new annotation using a checked contextual cell selector.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn add_at(&mut self, cell: model::Cell, annotation: Annotation) -> Result<()> {
         validation::validate_annotation(&annotation)?;
         if self
@@ -236,6 +267,9 @@ impl Transaction {
     }
 
     /// Set a cell annotation, adding it when absent or replacing it in place.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set(
         &mut self,
         sheet: &str,
@@ -248,6 +282,9 @@ impl Transaction {
     }
 
     /// Set a cell annotation using a checked contextual selector.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_at(&mut self, cell: model::Cell, annotation: Annotation) -> Result<()> {
         if let Some(entry) = self.draft.cell(cell.sheet(), cell.row(), cell.column())? {
             let index = entry.index();
@@ -258,12 +295,18 @@ impl Transaction {
     }
 
     /// Replace an annotation by its checked source-order index.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn replace(&mut self, index: usize, annotation: Annotation) -> Result<()> {
         let entry = self.draft.at(index)?.clone();
         self.replace_at(entry.cell().clone(), annotation)
     }
 
     /// Replace an annotation at an exact contextual cell.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn replace_at(&mut self, cell: model::Cell, annotation: Annotation) -> Result<()> {
         validation::validate_annotation(&annotation)?;
         let entry = self
@@ -288,6 +331,9 @@ impl Transaction {
     }
 
     /// Remove an annotation by source-order index and return its value.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn remove(&mut self, index: usize) -> Result<Annotation> {
         let entry = self.draft.at(index)?.clone();
         let annotation = entry.annotation().clone();
@@ -296,6 +342,9 @@ impl Transaction {
     }
 
     /// Remove an annotation at an exact contextual cell and return its value.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn remove_at(&mut self, cell: model::Cell) -> Result<Annotation> {
         let entry = self
             .draft
@@ -317,6 +366,9 @@ impl Transaction {
     }
 
     /// Remove an annotation by sheet name and zero-based coordinates.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn clear(&mut self, sheet: &str, row: usize, column: usize) -> Result<Annotation> {
         let cell = model::Cell::new(sheet, row, column)?;
         self.remove_at(cell)
@@ -329,6 +381,9 @@ impl Transaction {
     }
 
     /// Validate and atomically materialize the candidate.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn commit(self) -> Result<Commit> {
         validation::validate_entries(&self.draft.entries)?;
         let changed = self.before.source != self.draft.source;
@@ -427,42 +482,52 @@ pub struct Commit {
 
 impl Commit {
     /// Whether the source XML changed.
+    #[must_use]
     pub const fn changed(&self) -> bool {
         self.changed
     }
 
     /// Resulting immutable annotation snapshot.
+    #[must_use]
     pub fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Resulting source XML.
+    #[must_use]
     pub fn content_xml(&self) -> &str {
         self.snapshot.source_xml()
     }
 
     /// Reversible semantic patch produced by this commit.
+    #[must_use]
     pub fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Consume the commit into its resulting snapshot.
+    #[must_use]
     pub fn into_snapshot(self) -> Snapshot {
         self.snapshot
     }
 
     /// Consume the commit into its resulting XML source.
+    #[must_use]
     pub fn into_owned_xml(self) -> String {
         self.snapshot.source
     }
 
     /// Consume the commit into its resulting patch.
+    #[must_use]
     pub fn into_patch(self) -> Patch {
         self.patch
     }
 }
 
 /// Apply one concise closure-based annotation edit.
+///
+/// # Errors
+/// Returns an error when the operation cannot be completed.
 pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit>
 where
     F: FnOnce(&mut Transaction) -> Result<()>,

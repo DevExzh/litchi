@@ -1,4 +1,4 @@
-//! Canonical SpreadsheetML data-validation XML serialization.
+//! Canonical `SpreadsheetML` data-validation XML serialization.
 
 use super::super::model::{
     Collection, Conformance, ListSource, Source, Validation, ValidationErrorStyle,

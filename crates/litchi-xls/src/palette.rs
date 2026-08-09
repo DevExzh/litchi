@@ -21,16 +21,19 @@ impl Color {
     }
 
     /// Red component.
+    #[must_use]
     pub fn red(self) -> u8 {
         self.red
     }
 
     /// Green component.
+    #[must_use]
     pub fn green(self) -> u8 {
         self.green
     }
 
     /// Blue component.
+    #[must_use]
     pub fn blue(self) -> u8 {
         self.blue
     }
@@ -124,6 +127,7 @@ impl Default for Palette {
 
 impl Palette {
     /// Resolve a built-in or workbook palette color-table index.
+    #[must_use]
     pub fn color(&self, index: u16) -> Option<Color> {
         if index < FIRST_PALETTE_INDEX {
             return BUILT_IN_COLORS.get(usize::from(index)).copied();
@@ -137,11 +141,13 @@ impl Palette {
     }
 
     /// All 56 palette entries corresponding to color indices `0x08..=0x3f`.
+    #[must_use]
     pub fn palette_colors(&self) -> &[Color; PALETTE_COLOR_COUNT] {
         &self.colors
     }
 
     /// Whether the workbook contained a custom `Palette` record.
+    #[must_use]
     pub fn is_custom(&self) -> bool {
         self.custom
     }
@@ -154,7 +160,7 @@ impl Palette {
             )));
         }
         let color_count = i16::from_le_bytes([data[0], data[1]]);
-        if color_count != PALETTE_COLOR_COUNT as i16 {
+        if color_count != crate::utils::wrap_usize_to_i16(PALETTE_COLOR_COUNT) {
             return Err(Error::InvalidData(format!(
                 "Palette color count is {color_count}; expected {PALETTE_COLOR_COUNT}"
             )));

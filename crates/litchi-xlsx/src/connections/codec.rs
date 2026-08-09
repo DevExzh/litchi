@@ -1,7 +1,13 @@
-//! Bounded SpreadsheetML connection-part XML codec.
+//! Bounded `SpreadsheetML` connection-part XML codec.
 
 use super::invalid;
-use super::model::*;
+use super::model::{
+    CORE_NAMESPACE, Connection, ConnectionParameter, Connections, CredentialsMethod,
+    DatabaseProperties, HtmlFormatting, MAX_CONNECTIONS, MAX_DOM_DEPTH, MAX_DOM_NODES,
+    MAX_PARAMETERS, MAX_STRING_BYTES, MAX_TEXT_FIELDS, MAX_WEB_TABLES, MAX_XML_BYTES,
+    OlapProperties, ParameterType, STRICT_NAMESPACE, TextField, TextFieldType, TextFileType,
+    TextImportProperties, TextQualifier, WebQueryProperties, WebTableSelector, validate,
+};
 use litchi_core::sheet::Result;
 use quick_xml::{
     Reader, XmlVersion,
@@ -98,7 +104,7 @@ pub(super) fn parse_dom(xml: &[u8]) -> Result<Node> {
             Ok(Event::Text(t)) => {
                 let v = t.decode().map_err(xml_error)?.into_owned();
                 if let Some(n) = stack.last_mut() {
-                    n.content.push(Content::Text(v))
+                    n.content.push(Content::Text(v));
                 } else if !v.trim().is_empty() {
                     return Err(invalid("text outside connections"));
                 }
@@ -106,7 +112,7 @@ pub(super) fn parse_dom(xml: &[u8]) -> Result<Node> {
             Ok(Event::CData(t)) => {
                 if let Some(n) = stack.last_mut() {
                     n.content
-                        .push(Content::CData(t.decode().map_err(xml_error)?.into_owned()))
+                        .push(Content::CData(t.decode().map_err(xml_error)?.into_owned()));
                 } else {
                     return Err(invalid("CDATA outside connections"));
                 }
@@ -115,14 +121,14 @@ pub(super) fn parse_dom(xml: &[u8]) -> Result<Node> {
                 if let Some(n) = stack.last_mut() {
                     n.content.push(Content::Comment(
                         t.decode().map_err(xml_error)?.into_owned(),
-                    ))
+                    ));
                 }
             },
             Ok(Event::GeneralRef(t)) => {
                 if let Some(n) = stack.last_mut() {
                     n.content.push(Content::Text(
                         litchi_ooxml_common::xml::decode_xml_reference(&t)?,
-                    ))
+                    ));
                 } else {
                     return Err(invalid("entity outside connections"));
                 }
@@ -161,9 +167,9 @@ fn make(e: &BytesStart<'_>, d: Decoder, stack: &[Node]) -> Result<Node> {
         if k == "xmlns" || k.starts_with("xmlns:") {
             let key = k.strip_prefix("xmlns:").unwrap_or("").to_string();
             if let Some(x) = bindings.iter_mut().find(|x| x.0 == key) {
-                x.1 = v.clone()
+                x.1.clone_from(v);
             } else {
-                bindings.push((key, v.clone()))
+                bindings.push((key, v.clone()));
             }
         }
     }
@@ -200,7 +206,7 @@ fn make(e: &BytesStart<'_>, d: Decoder, stack: &[Node]) -> Result<Node> {
 }
 fn attach(stack: &mut [Node], root: &mut Option<Node>, n: Node) -> Result<()> {
     if let Some(p) = stack.last_mut() {
-        p.content.push(Content::Node(n))
+        p.content.push(Content::Node(n));
     } else if root.replace(n).is_some() {
         return Err(invalid("multiple XML roots"));
     }
@@ -808,9 +814,9 @@ fn opaque(x: &mut BoundedXml, b: &[u8], strict: bool) -> Result<()> {
     parse_dom(b)?;
     let mut s = std::str::from_utf8(b).map_err(xml_error)?.to_string();
     if strict {
-        s = s.replace(CORE_NAMESPACE, STRICT_NAMESPACE)
+        s = s.replace(CORE_NAMESPACE, STRICT_NAMESPACE);
     } else {
-        s = s.replace(STRICT_NAMESPACE, CORE_NAMESPACE)
+        s = s.replace(STRICT_NAMESPACE, CORE_NAMESPACE);
     }
     x.push_str(&s)?;
     Ok(())
@@ -825,11 +831,11 @@ fn node_write(x: &mut String, n: &Node, s: bool) -> Result<()> {
     x.push_str(&n.q);
     for (p, u) in &n.bindings {
         if p.is_empty() {
-            x.push_str(" xmlns=\"")
+            x.push_str(" xmlns=\"");
         } else {
             x.push_str(" xmlns:");
             x.push_str(p);
-            x.push_str("=\"")
+            x.push_str("=\"");
         }
         esc(
             x,
@@ -956,14 +962,10 @@ fn i32opt(n: &Node, l: &str) -> Result<Option<i32>> {
         .transpose()
 }
 fn only(n: &Node, a: &[&str]) -> Result<()> {
-    for x in &n.attrs {
-        if !x.ns.is_empty() || !a.contains(&x.l.as_str()) {
-            // Attribute extensions are deliberately opaque. The package
-            // transaction retains their original source span while typed
-            // access continues to validate every known attribute.
-            continue;
-        }
-    }
+    // Attribute extensions are deliberately opaque. The package transaction
+    // retains their original source span while typed access continues to
+    // validate every known attribute.
+    let _ = (n, a);
     Ok(())
 }
 
@@ -1597,7 +1599,7 @@ struct SourceEdit {
 }
 
 fn apply_source_edits(source: &[u8], mut edits: Vec<SourceEdit>) -> Result<Vec<u8>> {
-    edits.sort_by(|left, right| right.range.start.cmp(&left.range.start));
+    edits.sort_by_key(|edit| std::cmp::Reverse(edit.range.start));
     for pair in edits.windows(2) {
         if pair[0].range.start < pair[1].range.end {
             return Err(invalid("connection source edits overlap"));
@@ -1714,7 +1716,7 @@ impl SourceTree {
     }
 
     fn attribute(&self, source: &[u8], node: usize, name: &str) -> Result<Option<String>> {
-        Ok(self.nodes[node]
+        self.nodes[node]
             .attrs
             .iter()
             .find(|attribute| attribute.local == name)
@@ -1723,16 +1725,14 @@ impl SourceTree {
                     .map(str::to_owned)
                     .map_err(xml_error)
             })
-            .transpose()?)
+            .transpose()
     }
 
     fn child(&self, node: usize, name: &str) -> Result<Option<usize>> {
         let mut result = None;
         for child in &self.nodes[node].children {
-            if self.nodes[*child].local == name {
-                if result.replace(*child).is_some() {
-                    return Err(invalid(format!("connection source has duplicate '{name}'")));
-                }
+            if self.nodes[*child].local == name && result.replace(*child).is_some() {
+                return Err(invalid(format!("connection source has duplicate '{name}'")));
             }
         }
         Ok(result)

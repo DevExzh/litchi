@@ -1,12 +1,12 @@
 //! Boundary-aware TBC codecs.
 
-use super::super::model::*;
+use super::super::model::{CommandId, Control};
 use super::super::validation::validate_count;
 use super::{MAX_BITMAP_SIZE, Reader, corrupted, unsupported};
 use crate::package::Result;
 use litchi_ole_common::toolbar::{ControlHeader, ControlType, Data, GeneralInfo, WString};
 
-pub(super) fn parse_many<'a>(data: &'a [u8]) -> Result<Vec<Control<'a>>> {
+pub(super) fn parse_many(data: &[u8]) -> Result<Vec<Control<'_>>> {
     let mut reader = Reader::new(data);
     let mut controls = Vec::new();
     while !reader.is_empty() {

@@ -1,3 +1,7 @@
+#![expect(
+    clippy::unwrap_used,
+    reason = "the invariant is established immediately before extraction"
+)]
 use super::paragraph::MutableParagraph;
 
 /// Footnote or endnote entry.
@@ -18,11 +22,16 @@ impl Note {
     }
 
     /// Get the note ID (`w:footnote@w:id` / `w:endnote@w:id`).
+    #[must_use]
     pub fn id(&self) -> u32 {
         self.id
     }
 
     /// Add a paragraph to this note.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal writer invariant is violated.
     pub fn add_paragraph(&mut self) -> &mut MutableParagraph {
         let para = MutableParagraph::new();
         self.paragraphs.push(para);

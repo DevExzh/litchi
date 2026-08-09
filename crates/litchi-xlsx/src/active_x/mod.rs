@@ -1,6 +1,6 @@
-//! Inert SpreadsheetML worksheet-control and ActiveX persistence metadata.
+//! Inert `SpreadsheetML` worksheet-control and `ActiveX` persistence metadata.
 //!
-//! ActiveX binaries are deliberately opaque. This module never instantiates a
+//! `ActiveX` binaries are deliberately opaque. This module never instantiates a
 //! control, resolves a CLSID, executes a macro, decodes MS-OFORMS/CFB data or
 //! pictures, or follows an external relationship.
 

@@ -1,4 +1,4 @@
-//! Metadata parsing for DrawingML diagram definition parts.
+//! Metadata parsing for `DrawingML` diagram definition parts.
 //!
 //! The layout (`dgm:layoutDef`), quick-style (`dgm:styleDef`), and colors
 //! (`dgm:colorsDef`) parts share a common header shape: a `uniqueId` attribute

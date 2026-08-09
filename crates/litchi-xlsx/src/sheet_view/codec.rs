@@ -1,4 +1,4 @@
-//! Bounded SpreadsheetML worksheet-view codec.
+//! Bounded `SpreadsheetML` worksheet-view codec.
 
 use crate::error::{Error, Result};
 use crate::raw::namespace::{is_spreadsheetml_name, relationship_attribute_value};
@@ -15,7 +15,9 @@ use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use super::invalid;
-use super::model::*;
+use super::model::{
+    Collection, Entry, Extension, PivotArea, PivotAreaType, PivotSelection, PivotSelectionAxis,
+};
 
 const MAX_VIEWS: usize = 1024;
 const MAX_SELECTION_RANGES: usize = 32_767;
@@ -319,13 +321,13 @@ impl Parser {
             .ok_or_else(|| invalid("unexpected worksheet-view end element"))?;
         match context {
             Context::SheetViews if spreadsheet_ns(ns) && local == b"sheetViews" => {
-                self.finish_collection()?
+                self.finish_collection()?;
             },
             Context::SheetView if spreadsheet_ns(ns) && local == b"sheetView" => {
-                self.finish_view()?
+                self.finish_view()?;
             },
             Context::PivotSelection if spreadsheet_ns(ns) && local == b"pivotSelection" => {
-                self.finish_pivot()?
+                self.finish_pivot()?;
             },
             Context::Worksheet | Context::Outside | Context::Leaf | Context::ExtList(_) => {},
             Context::PivotArea
@@ -627,6 +629,10 @@ impl Parser {
     }
 }
 
+#[allow(
+    clippy::field_reassign_with_default,
+    reason = "fallible view attributes are applied in wire order to preserve precise validation"
+)]
 fn parse_view(element: &BytesStart<'_>, decoder: Decoder) -> Result<Entry> {
     let color_id = optional_u32(element, b"colorId", decoder)?.unwrap_or(64);
     if color_id > 64 {
@@ -671,6 +677,10 @@ fn parse_view(element: &BytesStart<'_>, decoder: Decoder) -> Result<Entry> {
         retained_xml: Vec::new(),
     })
 }
+#[allow(
+    clippy::field_reassign_with_default,
+    reason = "fallible pane attributes are applied in wire order to preserve precise validation"
+)]
 fn parse_pane(element: &BytesStart<'_>, decoder: Decoder) -> Result<Pane> {
     let mut pane = Pane::default();
     pane.horizontal = nonnegative_f64(element, b"xSplit", decoder)?;

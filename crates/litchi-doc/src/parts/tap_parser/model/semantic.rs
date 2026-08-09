@@ -2,7 +2,7 @@
 
 use super::prelude::*;
 
-impl<'arena> TapParser<'arena> {
+impl TapParser<'_> {
     /// Apply a single SPRM to table properties.
     ///
     /// Based on Apache POI's unCompressTAPOperation method.
@@ -187,10 +187,10 @@ impl<'arena> TapParser<'arena> {
             0x0E => tap.horizontal_position = Self::parse_horizontal_position(sprm)?,
             0x0F => tap.vertical_position = Self::parse_vertical_position(sprm)?,
             0x10 => {
-                tap.distance_from_text_left = Self::parse_wrap_distance(sprm, "sprmTDxaFromText")?
+                tap.distance_from_text_left = Self::parse_wrap_distance(sprm, "sprmTDxaFromText")?;
             },
             0x11 => {
-                tap.distance_from_text_top = Self::parse_wrap_distance(sprm, "sprmTDyaFromText")?
+                tap.distance_from_text_top = Self::parse_wrap_distance(sprm, "sprmTDyaFromText")?;
             },
             0x12 => self.parse_full_cell_shading(tap, sprm, 0, false)?,
             // Full-color row border defaults.
@@ -205,11 +205,11 @@ impl<'arena> TapParser<'arena> {
             0x1A..=0x1D => self.parse_cell_border_colors(tap, sprm, operation)?,
             0x1E => {
                 tap.distance_from_text_right =
-                    Self::parse_wrap_distance(sprm, "sprmTDxaFromTextRight")?
+                    Self::parse_wrap_distance(sprm, "sprmTDxaFromTextRight")?;
             },
             0x1F => {
                 tap.distance_from_text_bottom =
-                    Self::parse_wrap_distance(sprm, "sprmTDyaFromTextBottom")?
+                    Self::parse_wrap_distance(sprm, "sprmTDyaFromTextBottom")?;
             },
             // Legacy range border override.
             0x20 => self.parse_cell_border_range(tap, sprm, false)?,
@@ -409,7 +409,7 @@ impl<'arena> TapParser<'arena> {
         Ok(())
     }
 
-    /// Apply the properties controlled by an UpxTapx while retaining the
+    /// Apply the properties controlled by an `UpxTapx` while retaining the
     /// structural, positioning, sizing, and revision state that MS-DOC says a
     /// `sprmTIstd` must preserve.
 

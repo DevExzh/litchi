@@ -31,6 +31,7 @@ pub enum BackgroundImageContentType {
 }
 
 impl BackgroundImageContentType {
+    #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Png => "image/png",
@@ -122,6 +123,7 @@ pub enum ImageContentType {
 }
 
 impl ImageContentType {
+    #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Bmp => "image/bmp",
@@ -208,6 +210,7 @@ pub enum ChartEmbeddedPackageContentType {
     Xltx,
 }
 impl ChartEmbeddedPackageContentType {
+    #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Docx => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",

@@ -1,4 +1,7 @@
-use crate::writer::core::{Writer, model::*};
+use crate::writer::core::{
+    Writer,
+    model::{RevisionWriterData, WriteError},
+};
 use crate::writer::fib::FibBuilder;
 use std::collections::HashMap;
 impl Writer {

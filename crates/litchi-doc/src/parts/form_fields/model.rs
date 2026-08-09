@@ -45,10 +45,10 @@ pub enum CheckBoxState {
 /// iRes value marking an undefined checkbox state or drop-down selection.
 pub(crate) const UNDEFINED_STATE: u8 = 25;
 
-/// A parsed NilPICFAndBinData wrapper (MS-DOC 2.9.158).
+/// A parsed `NilPICFAndBinData` wrapper (MS-DOC 2.9.158).
 ///
 /// Only the cbHeader == 0x0044 layout is accepted. The 62 ignored header
-/// bytes are not retained; to_bytes re-emits them as zero, reproducing the
+/// bytes are not retained; `to_bytes` re-emits them as zero, reproducing the
 /// original bytes for well-formed input where they MUST be zero.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NilPicfAndBinData {
@@ -57,12 +57,13 @@ pub struct NilPicfAndBinData {
 
 impl NilPicfAndBinData {
     /// The stored binary payload (binData).
+    #[must_use]
     pub fn bin_data(&self) -> &[u8] {
         &self.bin_data
     }
 }
 
-/// Typed, inert form-field data (FFData, MS-DOC 2.9.78).
+/// Typed, inert form-field data (`FFData`, MS-DOC 2.9.78).
 ///
 /// All values are stored state only: entry and exit macro names are retained
 /// verbatim and never invoked, the form is never filled, checkbox and
@@ -102,12 +103,14 @@ pub struct FormFieldData {
 
 impl FormFieldData {
     /// The stored kind of the form field (FFDataBits.iType).
+    #[must_use]
     pub const fn kind(&self) -> FormFieldDataKind {
         self.kind
     }
 
     /// The stored text-box value kind (FFDataBits.iTypeTxt), or None when
     /// this is not a text box.
+    #[must_use]
     pub const fn text_kind(&self) -> Option<FormFieldTextKind> {
         match self.kind {
             FormFieldDataKind::Text => Some(self.text_kind),
@@ -117,6 +120,7 @@ impl FormFieldData {
 
     /// The stored maximum length, in characters, of the text-box value
     /// (FFData.cch). Zero means unlimited. Always None for non-text kinds.
+    #[must_use]
     pub const fn max_length(&self) -> Option<u16> {
         match self.kind {
             FormFieldDataKind::Text => Some(self.max_length),
@@ -125,6 +129,7 @@ impl FormFieldData {
     }
 
     /// The stored checkbox state, or None when this is not a check box.
+    #[must_use]
     pub const fn checkbox_state(&self) -> Option<CheckBoxState> {
         match self.kind {
             FormFieldDataKind::CheckBox => Some(match self.state {
@@ -138,6 +143,7 @@ impl FormFieldData {
 
     /// The stored default checkbox state (wDef), or None when this is not a
     /// check box.
+    #[must_use]
     pub const fn is_checked_by_default(&self) -> Option<bool> {
         match self.kind {
             FormFieldDataKind::CheckBox => match self.default_state {
@@ -150,6 +156,7 @@ impl FormFieldData {
 
     /// The stored zero-based default selected item (wDef), or None when this
     /// is not a drop-down list.
+    #[must_use]
     pub const fn default_item_index(&self) -> Option<u16> {
         match self.kind {
             FormFieldDataKind::DropDown => self.default_state,
@@ -159,6 +166,7 @@ impl FormFieldData {
 
     /// The stored zero-based selected item (iRes), or None when this is not a
     /// drop-down list or the stored selection is undefined.
+    #[must_use]
     pub const fn selected_item_index(&self) -> Option<u8> {
         match self.kind {
             FormFieldDataKind::DropDown => match self.state {
@@ -171,6 +179,7 @@ impl FormFieldData {
 
     /// The stored check-box size in half-points (FFData.hps), or None when
     /// this is not a check box.
+    #[must_use]
     pub const fn checkbox_size_half_points(&self) -> Option<u16> {
         match self.kind {
             FormFieldDataKind::CheckBox => Some(self.size_half_points),
@@ -180,17 +189,20 @@ impl FormFieldData {
 
     /// Whether the stored properties size the check box from the surrounding
     /// text size (FFDataBits.iSize). Always false for non-checkbox kinds.
+    #[must_use]
     pub const fn is_checkbox_auto_sized(&self) -> bool {
         self.auto_size
     }
 
     /// The stored drop-down list entries (hsttbDropList). Empty when this is
     /// not a drop-down list.
+    #[must_use]
     pub fn dropdown_items(&self) -> &[String] {
         self.items.as_deref().unwrap_or(&[])
     }
 
     /// The stored name of the form field (xstzName).
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -198,22 +210,26 @@ impl FormFieldData {
     /// The stored default text of the text box (xstzTextDef), or None when
     /// this is not a text box. For a calculated text box this is the stored
     /// expression; it is inert and never evaluated.
+    #[must_use]
     pub fn default_text(&self) -> Option<&str> {
         self.default_text.as_deref()
     }
 
     /// The stored text-box format string (xstzTextFormat). Empty for
     /// non-text kinds.
+    #[must_use]
     pub fn text_format(&self) -> &str {
         &self.text_format
     }
 
     /// The stored help text (xstzHelpText).
+    #[must_use]
     pub fn help_text(&self) -> &str {
         &self.help_text
     }
 
     /// The stored status bar text (xstzStatText).
+    #[must_use]
     pub fn status_text(&self) -> &str {
         &self.status_text
     }
@@ -221,6 +237,7 @@ impl FormFieldData {
     /// The stored entry macro name (xstzEntryMcr).
     ///
     /// This name is inert metadata: it is never resolved, loaded, or invoked.
+    #[must_use]
     pub fn entry_macro(&self) -> &str {
         &self.entry_macro
     }
@@ -228,24 +245,28 @@ impl FormFieldData {
     /// The stored exit macro name (xstzExitMcr).
     ///
     /// This name is inert metadata: it is never resolved, loaded, or invoked.
+    #[must_use]
     pub fn exit_macro(&self) -> &str {
         &self.exit_macro
     }
 
     /// Whether the stored properties mark the help text as custom
     /// (FFDataBits.fOwnHelp).
+    #[must_use]
     pub const fn has_own_help_text(&self) -> bool {
         self.own_help
     }
 
     /// Whether the stored properties mark the status bar text as custom
     /// (FFDataBits.fOwnStat).
+    #[must_use]
     pub const fn has_own_status_text(&self) -> bool {
         self.own_status
     }
 
     /// Whether the stored properties protect the field value from changes
     /// (FFDataBits.fProt).
+    #[must_use]
     pub const fn is_protected(&self) -> bool {
         self.protected
     }
@@ -253,12 +274,14 @@ impl FormFieldData {
     /// Whether the stored properties mark the value for automatic
     /// recalculation (FFDataBits.fRecalc). This flag is retained verbatim;
     /// nothing is ever recalculated.
+    #[must_use]
     pub const fn is_marked_for_recalculation(&self) -> bool {
         self.recalculate
     }
 
     /// Whether the stored properties mark the field as having a list box
     /// (FFDataBits.fHasListBox).
+    #[must_use]
     pub const fn has_list_box(&self) -> bool {
         self.has_list_box
     }

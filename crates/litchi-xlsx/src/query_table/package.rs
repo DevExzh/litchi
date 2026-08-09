@@ -16,6 +16,7 @@ pub const QUERY_TABLE_RELATIONSHIP_TYPE: &str =
 pub const STRICT_QUERY_TABLE_RELATIONSHIP_TYPE: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/queryTable";
 
+#[must_use]
 pub fn is_query_table_relationship_type(value: &str) -> bool {
     matches!(
         value,
@@ -46,8 +47,7 @@ pub fn load_worksheet_query_tables(
         let part = package.get_part(&part_name)?;
         if part.content_type() != QUERY_TABLE_CONTENT_TYPE {
             return Err(invalid(format!(
-                "query-table part '{}' has invalid content type",
-                part_name
+                "query-table part '{part_name}' has invalid content type"
             )));
         }
         if part.rels().iter().next().is_some() {
@@ -209,8 +209,10 @@ pub fn reorder_worksheet_query_tables(
         .rels()
         .iter()
         .find(|relationship| is_query_table_relationship_type(relationship.reltype()))
-        .map(|relationship| relationship.reltype().to_string())
-        .unwrap_or_else(|| QUERY_TABLE_RELATIONSHIP_TYPE.into());
+        .map_or_else(
+            || QUERY_TABLE_RELATIONSHIP_TYPE.into(),
+            |relationship| relationship.reltype().to_string(),
+        );
     let worksheet = package.get_part_mut(worksheet_part)?;
     for item in &existing {
         worksheet.rels_mut().remove(&item.relationship_id);

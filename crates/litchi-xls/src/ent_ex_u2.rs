@@ -24,6 +24,9 @@ pub struct EntExU2 {
 
 impl EntExU2 {
     /// Parse an `EntExU2` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         Ok(Self {
             cache: data.to_vec(),
@@ -31,11 +34,13 @@ impl EntExU2 {
     }
 
     /// Serialize back to a complete `EntExU2` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         self.cache.clone()
     }
 
     /// The opaque `rgb` cache bytes.
+    #[must_use]
     pub fn cache(&self) -> &[u8] {
         &self.cache
     }

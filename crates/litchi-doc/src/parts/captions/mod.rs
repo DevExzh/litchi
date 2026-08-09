@@ -1,7 +1,7 @@
 //! Typed Word caption metadata.
 //!
 //! The owner covers the two extended string tables addressed by the Word 97+
-//! FIB: `SttbfCaption` and `SttbfAutoCaption`. Caption labels and OLE ProgID
+//! FIB: `SttbfCaption` and `SttbfAutoCaption`. Caption labels and OLE `ProgID`
 //! references are inspected, edited, and serialized through immutable package
 //! snapshots; no caption is inserted, no field is refreshed, and no host or
 //! macro is opened or executed.

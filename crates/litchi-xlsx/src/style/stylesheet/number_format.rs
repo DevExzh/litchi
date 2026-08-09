@@ -153,6 +153,7 @@ impl NumberFormat {
 /// Check if a format code represents a date/time format.
 ///
 /// This function uses the same logic as the internal `detect_custom_number_format`.
+#[must_use]
 pub fn is_date_format(format: &str) -> bool {
     let mut escaped = false;
     let mut is_quote = false;
@@ -194,7 +195,10 @@ pub fn is_date_format(format: &str) -> bool {
 ///
 /// Returns `None` if the ID is not a recognized built-in format.
 /// Built-in formats are Excel's standard formats (0-163).
-#[allow(dead_code)] // Reserved for future use
+#[allow(
+    dead_code,
+    reason = "reserved for parsing additional built-in number-format families"
+)]
 pub(crate) fn builtin_format_code(id: u32) -> Option<&'static str> {
     match id {
         0 => Some("General"),

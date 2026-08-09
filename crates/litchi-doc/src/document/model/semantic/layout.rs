@@ -64,7 +64,7 @@ impl Document {
 
     /// Convert extracted paragraph data to Paragraph objects.
     ///
-    /// This is a helper method used by paragraphs() to convert the raw extracted
+    /// This is a helper method used by `paragraphs()` to convert the raw extracted
     /// paragraph data into high-level Paragraph objects with formula and image support.
     pub(super) fn convert_to_paragraphs(
         &self,
@@ -89,7 +89,7 @@ impl Document {
                         // Reuse buffer to avoid repeated allocations
                         object_name_buffer.clear();
                         use std::fmt::Write;
-                        let _ = write!(object_name_buffer, "_{}", pic_offset);
+                        let _ = write!(object_name_buffer, "_{pic_offset}");
 
                         if let Some(mtef_ast) = self.parsed_mtef.get(object_name_buffer.as_str()) {
                             // Found matching formula - create run with MTEF AST (Arc::clone is cheap)
@@ -145,7 +145,7 @@ impl Document {
     /// Get all tables in the document.
     ///
     /// Extracts tables by grouping paragraphs that have table markers.
-    /// Based on Apache POI's TableIterator algorithm.
+    /// Based on Apache POI's `TableIterator` algorithm.
     ///
     /// Returns a vector of `Table` objects representing tables
     /// in the document.

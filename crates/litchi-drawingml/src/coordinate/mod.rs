@@ -1,4 +1,4 @@
-//! Exact, checked DrawingML coordinate domains.
+//! Exact, checked `DrawingML` coordinate domains.
 //!
 //! [`Coordinate`] models the complete `a:ST_Coordinate` union: either a
 //! bounded unqualified EMU integer or an exact `s:ST_UniversalMeasure` value.

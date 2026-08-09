@@ -1,4 +1,19 @@
-use super::*;
+use super::{
+    Area3DTypeGroup, AreaTypeGroup, Axis, BandFormat, Bar3DTypeGroup, BarDirection, BarGrouping,
+    BarTypeGroup, BubbleScale, BubbleSize, BubbleTypeGroup, BufRead, BytesStart, ChartXmlReader,
+    DataLabels, DataSourceRef, DataTable, Decoder, DoughnutTypeGroup, Error, Event, ExtensionList,
+    Layout, LayoutMode, LayoutTarget, Line3DTypeGroup, LineTypeGroup, Lines, OfPieSplitType,
+    OfPieType, OfPieTypeGroup, ParsedTitle, PictureFormat, PictureOptions, Pie3DTypeGroup,
+    PieTypeGroup, PlotArea, RadarStyle, RadarTypeGroup, Result, RichText, ScatterStyle,
+    ScatterTypeGroup, ShapeProperties, StockTypeGroup, Surface3DTypeGroup, SurfaceTypeGroup,
+    TextProperties, TitleText, TypeGroup, TypeGroupCommon, UpDownBars, View3D, WallFloor,
+    bounded_percentage_i32_attr, bounded_percentage_u32_attr, bounded_u32_attr,
+    consume_empty_chart_element, decode_xml_reference, get_attr, invalid_attribute,
+    missing_attribute, parse_bar_shape, parse_bool_attr, parse_category_axis, parse_data_labels,
+    parse_date_axis, parse_grouping, parse_series, parse_series_axis, parse_text_element,
+    parse_value_axis, required_enum_attr, required_f64_attr, required_positive_f64_attr,
+    required_string_attr, required_u32_attr,
+};
 
 pub(crate) fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<ParsedTitle> {
     let mut text = String::new();
@@ -33,7 +48,7 @@ pub(crate) fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<
                     },
                 });
             },
-            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
+            Ok(Event::Start(ref element) | Event::Empty(ref element))
                 if element.local_name().as_ref() == b"overlay" =>
             {
                 if saw_overlay {
@@ -164,7 +179,7 @@ pub(crate) fn parse_view_3d<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Resul
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
+            Ok(Event::Start(ref e) | Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
                     b"rotX" => {
@@ -687,7 +702,7 @@ pub(crate) fn parse_data_table<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Re
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
-            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
+            Ok(Event::Start(ref element) | Event::Empty(ref element)) => {
                 let field = match element.local_name().as_ref() {
                     b"showHorzBorder" => Some((0, &mut data_table.show_horizontal_border)),
                     b"showVertBorder" => Some((1, &mut data_table.show_vertical_border)),
@@ -722,7 +737,7 @@ pub(crate) fn parse_layout<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => match e.local_name().as_ref() {
+            Ok(Event::Start(ref e) | Event::Empty(ref e)) => match e.local_name().as_ref() {
                 b"layoutTarget" => {
                     layout.target = Some(
                         match required_enum_attr(e, "chart layout target")?.as_str() {
@@ -814,7 +829,7 @@ pub(crate) fn parse_common_type_group<R: BufRead>(
                 begin_group_data_labels(&mut saw_data_labels)?;
                 common.data_labels = Some(DataLabels::default());
             },
-            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
+            Ok(Event::Start(ref element) | Event::Empty(ref element)) => {
                 match element.local_name().as_ref() {
                     b"varyColors" => common.vary_colors = parse_bool_attr(element)?,
                     b"axId" if supports_axes => common
@@ -1145,7 +1160,7 @@ pub(crate) fn parse_of_pie_chart<R: BufRead>(
                 saw_custom_split = true;
                 group.custom_split_points = Some(Vec::new());
             },
-            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
+            Ok(Event::Start(ref element) | Event::Empty(ref element)) => {
                 match element.local_name().as_ref() {
                     b"ofPieType" => {
                         if saw_of_pie_type {
@@ -1253,7 +1268,7 @@ pub(crate) fn parse_custom_pie_split<R: BufRead>(
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
+            Ok(Event::Start(ref element) | Event::Empty(ref element))
                 if element.local_name().as_ref() == b"secondPiePt" =>
             {
                 points.push(required_u32_attr(element, "of-pie secondary point")?);
@@ -1310,7 +1325,7 @@ pub(crate) fn parse_up_down_bars<R: BufRead>(reader: &mut ChartXmlReader<R>) -> 
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
-            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
+            Ok(Event::Start(ref element) | Event::Empty(ref element))
                 if element.local_name().as_ref() == b"gapWidth" =>
             {
                 if saw_gap_width {
@@ -1414,7 +1429,7 @@ pub(crate) fn parse_stock_chart<R: BufRead>(
                 begin_group_data_labels(&mut saw_data_labels)?;
                 common.data_labels = Some(DataLabels::default());
             },
-            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
+            Ok(Event::Start(ref element) | Event::Empty(ref element)) => {
                 match element.local_name().as_ref() {
                     b"ser" => {
                         if let Some(series) = parse_series(reader)? {
@@ -1509,7 +1524,7 @@ pub(crate) fn parse_surface_type_group<R: BufRead>(
                     "surface chart contains an empty series".into(),
                 ));
             },
-            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
+            Ok(Event::Start(ref element) | Event::Empty(ref element)) => {
                 match element.local_name().as_ref() {
                     b"wireframe" => wireframe = parse_bool_attr(element)?,
                     b"axId" => common
@@ -1597,7 +1612,7 @@ pub(crate) fn parse_surface_band_format<R: BufRead>(
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
-            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
+            Ok(Event::Start(ref element) | Event::Empty(ref element))
                 if element.local_name().as_ref() == b"idx" =>
             {
                 if index.is_some() {
@@ -1658,7 +1673,7 @@ pub(crate) fn parse_bar_chart<R: BufRead>(
                 begin_group_data_labels(&mut saw_data_labels)?;
                 common.data_labels = Some(DataLabels::default());
             },
-            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
+            Ok(Event::Start(ref e) | Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
                     b"barDir" => {
@@ -1747,7 +1762,7 @@ pub(crate) fn parse_bar_3d_chart<R: BufRead>(
                 begin_group_data_labels(&mut saw_data_labels)?;
                 common.data_labels = Some(DataLabels::default());
             },
-            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
+            Ok(Event::Start(ref e) | Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
                     b"barDir" => {
@@ -1869,7 +1884,7 @@ pub(crate) fn parse_line_chart<R: BufRead>(
                 begin_group_data_labels(&mut saw_data_labels)?;
                 common.data_labels = Some(DataLabels::default());
             },
-            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
+            Ok(Event::Start(ref e) | Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
                     b"grouping" => {
@@ -1935,7 +1950,7 @@ pub(crate) fn parse_pie_chart<R: BufRead>(
                 begin_group_data_labels(&mut saw_data_labels)?;
                 common.data_labels = Some(DataLabels::default());
             },
-            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
+            Ok(Event::Start(ref e) | Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
                     b"varyColors" => {
@@ -2003,7 +2018,7 @@ pub(crate) fn parse_area_chart<R: BufRead>(
                 begin_group_data_labels(&mut saw_data_labels)?;
                 common.data_labels = Some(DataLabels::default());
             },
-            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
+            Ok(Event::Start(ref e) | Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
                     b"grouping" => {
@@ -2063,7 +2078,7 @@ pub(crate) fn parse_scatter_chart<R: BufRead>(
                 begin_group_data_labels(&mut saw_data_labels)?;
                 common.data_labels = Some(DataLabels::default());
             },
-            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
+            Ok(Event::Start(ref e) | Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
                     b"scatterStyle" => {

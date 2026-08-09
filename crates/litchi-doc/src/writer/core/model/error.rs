@@ -34,10 +34,10 @@ impl From<litchi_vba::Error> for WriteError {
 impl std::fmt::Display for WriteError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            WriteError::Io(e) => write!(f, "I/O error: {}", e),
-            WriteError::InvalidData(s) => write!(f, "Invalid data: {}", s),
-            WriteError::Ole(e) => write!(f, "OLE error: {}", e),
-            WriteError::Vba(e) => write!(f, "VBA project error: {}", e),
+            WriteError::Io(e) => write!(f, "I/O error: {e}"),
+            WriteError::InvalidData(s) => write!(f, "Invalid data: {s}"),
+            WriteError::Ole(e) => write!(f, "OLE error: {e}"),
+            WriteError::Vba(e) => write!(f, "VBA project error: {e}"),
         }
     }
 }

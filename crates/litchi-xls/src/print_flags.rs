@@ -47,6 +47,9 @@ pub struct PrintRowCol {
 
 impl PrintRowCol {
     /// Parse a `PrintRowCol` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
             return Err(Error::InvalidLength {
@@ -71,11 +74,13 @@ impl PrintRowCol {
     }
 
     /// Serialize back to a complete `PrintRowCol` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         u16::from(self.print_headers).to_le_bytes().to_vec()
     }
 
     /// Whether the row and column headers are printed.
+    #[must_use]
     pub fn print_headers(&self) -> bool {
         self.print_headers
     }
@@ -94,6 +99,9 @@ pub struct GridSet {
 
 impl GridSet {
     /// Parse a `GridSet` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
             return Err(Error::InvalidLength {
@@ -106,16 +114,19 @@ impl GridSet {
     }
 
     /// Serialize back to a complete `GridSet` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         self.flags.to_le_bytes().to_vec()
     }
 
     /// Whether the gridlines are printed (`fPrintGrid`).
+    #[must_use]
     pub fn print_grid(&self) -> bool {
         self.flags & GRID_SET_PRINT_GRID != 0
     }
 
     /// Raw bitfield value, including the undefined `unused` bits.
+    #[must_use]
     pub fn flags(&self) -> u16 {
         self.flags
     }

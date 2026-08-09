@@ -7,14 +7,14 @@
 /// - Superscript/subscript
 /// - Embedded objects and pictures
 ///
-/// Based on Apache POI's CharacterSprmUncompressor and CharacterProperties.
+/// Based on Apache POI's `CharacterSprmUncompressor` and `CharacterProperties`.
 use super::super::super::package::{Error as PackageError, Result};
 use super::super::tap::TableStyleCondition;
 
 /// Character Properties structure.
 ///
 /// Contains formatting information for a run of text.
-/// Based on Apache POI's CharacterProperties implementation.
+/// Based on Apache POI's `CharacterProperties` implementation.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CharacterProperties {
     /// Bold text
@@ -65,7 +65,7 @@ pub struct CharacterProperties {
     pub is_obj: bool,
     /// Special character flag (fSpec)
     pub is_spec: bool,
-    /// Data flag (fData) - if true, pic_offset points to NilPICFAndBinData, not picture
+    /// Data flag (fData) - if true, `pic_offset` points to `NilPICFAndBinData`, not picture
     pub is_data: bool,
     /// Picture offset for embedded objects (fc in Data stream)
     pub pic_offset: Option<u32>,
@@ -170,6 +170,7 @@ impl CharacterPosition {
     }
 
     /// Return the signed half-point offset.
+    #[must_use]
     pub const fn half_points(self) -> i16 {
         self.0
     }
@@ -202,6 +203,7 @@ pub struct HresiOperand {
 
 impl HresiOperand {
     /// Normal word-breaking, whose dependent `ChHres` byte is zero.
+    #[must_use]
     pub const fn normal() -> Self {
         Self {
             mode: HyphenationMode::Normal,
@@ -228,11 +230,13 @@ impl HresiOperand {
     }
 
     /// Return the word-breaking mode.
+    #[must_use]
     pub const fn mode(self) -> HyphenationMode {
         self.mode
     }
 
     /// Return the dependent printable ASCII byte, or `None` for normal breaking.
+    #[must_use]
     pub const fn replacement_character(self) -> Option<u8> {
         self.replacement_character
     }
@@ -614,12 +618,14 @@ impl From<u8> for CharacterScriptHint {
 pub use litchi_core::VerticalPosition;
 
 impl CharacterProperties {
-    /// Create a new CharacterProperties with default values.
+    /// Create a new `CharacterProperties` with default values.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Check if any formatting is applied.
+    #[must_use]
     pub fn has_formatting(&self) -> bool {
         self.is_bold.is_some()
             || self.is_italic.is_some()

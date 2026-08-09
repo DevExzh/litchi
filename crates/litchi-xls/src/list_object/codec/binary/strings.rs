@@ -6,7 +6,7 @@ use crate::list_object::invalid;
 
 pub(in crate::list_object) fn append_string(out: &mut Vec<u8>, value: &str) {
     let units = value.encode_utf16().collect::<Vec<_>>();
-    out.extend_from_slice(&(units.len() as u16).to_le_bytes());
+    out.extend_from_slice(&crate::utils::truncate_usize_to_u16(units.len()).to_le_bytes());
     if value.is_ascii() {
         out.push(0);
         out.extend_from_slice(value.as_bytes());
@@ -46,7 +46,7 @@ pub(in crate::list_object) fn parse_string(
                 .map(|c| u16::from_le_bytes([c[0], c[1]])),
         )
         .collect::<Result<String, _>>()
-        .map_err(|_| invalid(rt, format!("invalid UTF-16 in {field}")))?
+        .map_err(|_error| invalid(rt, format!("invalid UTF-16 in {field}")))?
     };
     Ok((value, end))
 }

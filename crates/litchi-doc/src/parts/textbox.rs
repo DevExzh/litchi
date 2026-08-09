@@ -1,6 +1,6 @@
-//! Textbox story parsing (PlcftxbxTxt / FTXBXS).
+//! Textbox story parsing (`PlcftxbxTxt` / FTXBXS).
 //!
-//! The PlcftxbxTxt ([MS-DOC] 2.8.32) associates ranges of the textbox story
+//! The `PlcftxbxTxt` ([MS-DOC] 2.8.32) associates ranges of the textbox story
 //! (the subdocument counted by ccpTxbx) with shape objects. Its data elements
 //! are FTXBXS structures ([MS-DOC] 2.9.106); the last one is a reusable spare
 //! and carries no shape.
@@ -22,7 +22,7 @@ pub(crate) const FIB_INDEX_PLCF_HDR_TXBX_TXT: usize = 58;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TextBoxEntry {
     /// Shape identifier (`lid`); matches the `spid` of the shape's
-    /// OfficeArtFSP and the `lid` of the shape's Spa.
+    /// `OfficeArtFSP` and the `lid` of the shape's Spa.
     pub shape_id: u32,
     /// Story-relative start CP of this text box's text.
     pub start_cp: u32,
@@ -33,7 +33,7 @@ pub struct TextBoxEntry {
 /// A text box in a Word document: its shape and plain-text content.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TextBox {
-    /// Shape identifier; matches the `spid` of the shape's OfficeArtFSP and
+    /// Shape identifier; matches the `spid` of the shape's `OfficeArtFSP` and
     /// the `lid` of the shape's Spa.
     pub shape_id: u32,
     /// Plain text content. Paragraphs are separated by '\r'; the trailing
@@ -44,7 +44,7 @@ pub struct TextBox {
     pub header_kind: Option<super::headers::HeaderFooterType>,
 }
 
-/// Parse a PlcftxbxTxt, returning the real (non-reusable) text box entries
+/// Parse a `PlcftxbxTxt`, returning the real (non-reusable) text box entries
 /// in story order.
 pub fn parse_plcf_txbx_txt(data: &[u8]) -> Result<Vec<TextBoxEntry>> {
     // Standard PLC: n+1 CPs, n FTXBXS structures of FTXBXS_LEN bytes.

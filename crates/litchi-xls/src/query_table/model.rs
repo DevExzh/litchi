@@ -1,5 +1,5 @@
 /// Data source type of an external connection (MS-XLS 2.5.64
-/// `DataSourceType`, also the 3-bit `dbt` field of DbQuery, MS-XLS 2.4.80).
+/// `DataSourceType`, also the 3-bit `dbt` field of `DbQuery`, MS-XLS 2.4.80).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QuerySource {
     /// ODBC-based source (`DBT_ODBC`).
@@ -46,11 +46,11 @@ pub enum QueryParameterType {
     Unknown(u16),
 }
 
-/// A parameter of a parameterized query (SXString name followed by a
-/// ParamQry record, MS-XLS 2.4.190).
+/// A parameter of a parameterized query (`SXString` name followed by a
+/// `ParamQry` record, MS-XLS 2.4.190).
 #[derive(Debug, Clone, PartialEq)]
 pub struct QueryParameter {
-    /// Parameter name from the preceding SXString record.
+    /// Parameter name from the preceding `SXString` record.
     pub name: String,
     /// Parameter kind (`PARAMQRY_Fixed.pbt`).
     pub parameter_type: QueryParameterType,
@@ -169,8 +169,8 @@ pub struct TextQuery {
     pub connection_string: String,
 }
 
-/// An OLE DB connection of an external connection (OleDbConn followed by its
-/// ExtString records, MS-XLS 2.4.186). The connection string is stored
+/// An OLE DB connection of an external connection (`OleDbConn` followed by its
+/// `ExtString` records, MS-XLS 2.4.186). The connection string is stored
 /// verbatim and is never used.
 #[derive(Debug, Clone, PartialEq)]
 pub struct OleDbConnection {
@@ -180,7 +180,7 @@ pub struct OleDbConnection {
     /// Whether this is the main (false) or an alternate (true) connection
     /// string (`fLocal`).
     pub local: bool,
-    /// Concatenated ExtString chunks of the connection string.
+    /// Concatenated `ExtString` chunks of the connection string.
     pub connection_string: String,
 }
 
@@ -233,21 +233,21 @@ pub struct QueryTable {
     pub disable_edit: bool,
     /// New data overwrites existing cells (rather than inserting).
     pub overwrite: bool,
-    /// AutoFormat flag (`fAutoFormat`; unused per MS-XLS).
+    /// `AutoFormat` flag (`fAutoFormat`; unused per MS-XLS).
     pub auto_format: bool,
-    /// AutoFormat table index (`itblAutoFmt`).
+    /// `AutoFormat` table index (`itblAutoFmt`).
     pub auto_format_index: u16,
-    /// AutoFormat applies to numeric cell data.
+    /// `AutoFormat` applies to numeric cell data.
     pub auto_format_number: bool,
-    /// AutoFormat applies to cell text.
+    /// `AutoFormat` applies to cell text.
     pub auto_format_font: bool,
-    /// AutoFormat applies to cell text alignment.
+    /// `AutoFormat` applies to cell text alignment.
     pub auto_format_alignment: bool,
-    /// AutoFormat applies to borders.
+    /// `AutoFormat` applies to borders.
     pub auto_format_border: bool,
-    /// AutoFormat applies to patterns.
+    /// `AutoFormat` applies to patterns.
     pub auto_format_pattern: bool,
-    /// AutoFormat applies to cell protection.
+    /// `AutoFormat` applies to cell protection.
     pub auto_format_protection: bool,
     /// Additional option flags from the bound `QsiSXTag` (`dwQsiFuture`),
     /// preserved verbatim; zero when no tag was bound.
@@ -272,22 +272,22 @@ pub struct QueryTable {
     /// Web queries only work on HTML tables (`fTablesOnlyHTML`).
     pub tables_only_html: bool,
     /// Command text: the SQL statement or the Web query URL, concatenated
-    /// from its SXString chunks. Stored verbatim, never executed or
+    /// from its `SXString` chunks. Stored verbatim, never executed or
     /// contacted.
     pub command_text: Option<String>,
-    /// ODBC connection string, concatenated from its SXString chunks.
+    /// ODBC connection string, concatenated from its `SXString` chunks.
     /// Stored verbatim, never used.
     pub connection_string: Option<String>,
-    /// Web query post statement, concatenated from its SXString chunks.
+    /// Web query post statement, concatenated from its `SXString` chunks.
     pub web_post: Option<String>,
     /// SQL statement for server-based fields (`cstSQLSav` chunks).
     pub sql_server_fields: Option<String>,
     /// Query parameters with their prompts, in record order.
     pub parameters: Vec<QueryParameter>,
-    /// Comma-delimited list of table names to import (ExtString after
-    /// DBQueryExt when `fTableNames` is set).
+    /// Comma-delimited list of table names to import (`ExtString` after
+    /// `DBQueryExt` when `fTableNames` is set).
     pub table_names: Option<String>,
-    /// Raw `ConnGrbitDbt` flags of the DBQueryExt record (`grbitDbt`).
+    /// Raw `ConnGrbitDbt` flags of the `DBQueryExt` record (`grbitDbt`).
     pub connection_flags: u16,
     /// Data functionality level the connection was last edited with.
     pub edited_version: u8,
@@ -305,7 +305,7 @@ pub struct QueryTable {
     pub text_query: Option<Box<TextQuery>>,
     /// OLE DB connections, in record order.
     pub ole_db_connections: Vec<OleDbConnection>,
-    /// `rgbFutureBytes` of the DBQueryExt record, preserved verbatim.
+    /// `rgbFutureBytes` of the `DBQueryExt` record, preserved verbatim.
     pub future_bytes: Vec<u8>,
     /// Concatenated payloads of the trailing `SORTDATA12` member (`SortData`
     /// plus its `ContinueFrt12` records), preserved verbatim; empty when the

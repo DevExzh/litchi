@@ -38,11 +38,13 @@ impl<'a> Transaction<'a> {
     }
 
     /// Immutable source snapshot used for conflict checks and inverse patches.
+    #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Borrow the current staged typed graph.
+    #[must_use]
     pub fn comments(&self) -> Option<&Comments> {
         self.draft.as_ref()
     }
@@ -144,10 +146,10 @@ impl<'a> Transaction<'a> {
         if comments.authors[index] == author {
             return Ok(false);
         }
-        comments.authors[index] = author.clone();
+        comments.authors[index].clone_from(&author);
         for comment in comments.comments.values_mut() {
             if comment.author_id == author_id {
-                comment.author = author.clone();
+                comment.author.clone_from(&author);
             }
         }
         validation::comments(&comments)?;
@@ -200,14 +202,11 @@ impl<'a> Transaction<'a> {
 
     /// Remove all classic notes from the worksheet.
     pub fn clear(&mut self) -> bool {
-        if self.draft.take().is_some() {
-            true
-        } else {
-            false
-        }
+        self.draft.take().is_some()
     }
 
     /// Whether the staged semantic graph differs from the source graph.
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.before.comments() != self.draft.as_ref()
     }

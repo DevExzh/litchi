@@ -9,7 +9,7 @@ use super::codec::{
     invalid, parse_cache_row, parse_extern_sheet, parse_external_name, parse_ser_ar_values,
     parse_sup_book, read_u16, validate_reference,
 };
-use super::model::*;
+use super::model::{Links, Name, NameBody, SheetReference, SupportingBook};
 use super::validation::{RecordSpan, replace_record, scan_records};
 use super::{
     CONTINUE_RECORD_TYPE, CRN_RECORD_TYPE, EXTERN_NAME_RECORD_TYPE, EXTERN_SHEET_RECORD_TYPE,

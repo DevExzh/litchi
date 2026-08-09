@@ -1,4 +1,4 @@
-//! Inert OLE2 ObjectPool discovery, wrapping, and copy-on-write storage.
+//! Inert OLE2 `ObjectPool` discovery, wrapping, and copy-on-write storage.
 //!
 //! Storage operations copy bounded CFB entries as opaque bytes. They never
 //! instantiate, resolve, or execute an embedded object.

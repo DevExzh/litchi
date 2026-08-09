@@ -1,3 +1,23 @@
+#![expect(
+    clippy::expect_used,
+    reason = "the invariant is established immediately before extraction"
+)]
+#![expect(
+    clippy::option_option,
+    reason = "nested options distinguish omitted, present-empty, and present-valued XML"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
+#![expect(
+    clippy::unnecessary_wraps,
+    reason = "the Result signature preserves a uniform fallible codec API"
+)]
 //! Bounded, namespace-aware, loss-preserving `sectPr` codec for
 //! `w12:footnoteColumns`.
 
@@ -366,7 +386,13 @@ pub(crate) fn read_with_context(xml: &[u8], context: &Context) -> Result<Parsed>
                 }
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 
@@ -559,7 +585,16 @@ fn parse_extension_range(
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     Err(Error::InvalidFormat(
@@ -804,7 +839,7 @@ fn has_namespace(attributes: &[Attribute], prefix: &[u8], namespace: &[u8]) -> b
 
 fn has_ignorable_prefix_bytes(value: &[u8], prefix: &[u8]) -> bool {
     value
-        .split(|byte| byte.is_ascii_whitespace())
+        .split(u8::is_ascii_whitespace)
         .any(|item| item == prefix)
 }
 
@@ -867,13 +902,13 @@ fn is_extension_element(namespace: &ResolveResult<'_>, element: &BytesStart<'_>)
 fn namespace_uri(namespace: &ResolveResult<'_>) -> Option<Vec<u8>> {
     match namespace {
         ResolveResult::Bound(Namespace(value)) => Some(value.to_vec()),
-        _ => None,
+        ResolveResult::Unbound | ResolveResult::Unknown(_) => None,
     }
 }
 
 fn offset(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| Error::InvalidFormat("section XML offset overflow".into()))
+        .map_err(|_source_error| Error::InvalidFormat("section XML offset overflow".into()))
 }
 
 fn too_deep() -> Error {
@@ -894,14 +929,13 @@ fn trailing_whitespace_start(xml: &[u8], start: usize, end: usize) -> usize {
 fn close_insert(open: &[u8]) -> usize {
     open.iter()
         .rposition(|byte| *byte == b'>')
-        .map(|index| {
+        .map_or(open.len(), |index| {
             if index > 0 && open[index - 1] == b'/' {
                 index - 1
             } else {
                 index
             }
         })
-        .unwrap_or(open.len())
 }
 
 fn expand_root(open: &[u8], name: &[u8]) -> Result<Vec<u8>> {

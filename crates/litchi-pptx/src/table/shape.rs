@@ -241,15 +241,6 @@ fn is_drawingml(
 }
 
 fn scan(xml: &[u8], target: &[u8]) -> Result<Vec<Span>> {
-    if xml.len() > MAX_XML_BYTES {
-        return Err(limit("table XML bytes", MAX_XML_BYTES));
-    }
-    let mut reader = NsReader::from_reader(xml);
-    let mut stack: Vec<(usize, Vec<u8>, bool)> = Vec::new();
-    let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
-    let mut spans = Vec::new();
-    let mut nodes = 0usize;
-
     enum ScanEvent {
         Start { local: Vec<u8>, matched: bool },
         Empty { matched: bool },
@@ -258,6 +249,15 @@ fn scan(xml: &[u8], target: &[u8]) -> Result<Vec<Span>> {
         Forbidden,
         Eof,
     }
+
+    if xml.len() > MAX_XML_BYTES {
+        return Err(limit("table XML bytes", MAX_XML_BYTES));
+    }
+    let mut reader = NsReader::from_reader(xml);
+    let mut stack: Vec<(usize, Vec<u8>, bool)> = Vec::new();
+    let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
+    let mut spans = Vec::new();
+    let mut nodes = 0usize;
 
     loop {
         let start = usize::try_from(reader.buffer_position())

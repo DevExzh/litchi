@@ -327,7 +327,7 @@ pub(crate) fn decode_spreadsheet_text(value: &str) -> Result<String> {
 }
 
 /// Encode XML-illegal control characters and protect literal `_xHHHH_`
-/// sequences from SpreadsheetML's second decoding layer.
+/// sequences from `SpreadsheetML`'s second decoding layer.
 pub(crate) fn encode_spreadsheet_text(value: &str) -> String {
     let mut encoded = String::with_capacity(value.len());
     for (at, character) in value.char_indices() {
@@ -347,7 +347,7 @@ pub(crate) fn encode_spreadsheet_text(value: &str) -> String {
         let mut units = [0; 2];
         for unit in character.encode_utf16(&mut units) {
             use std::fmt::Write as _;
-            let _ = write!(encoded, "_x{unit:04X}_");
+            write!(encoded, "_x{unit:04X}_").expect("writing to a String is infallible");
         }
     }
     encoded

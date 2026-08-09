@@ -2,7 +2,14 @@
 
 use crate::{Error, Result};
 
-use super::{model::*, validation::validate_sheet_name_chars};
+use super::{
+    model::{
+        FileLock, FileLockPurpose, RevisionCellContent, RevisionCellLocation, RevisionCellRange,
+        RevisionRecordHeader, RevisionType, RrInsertSh, RrTabId, RrdChgCell, RrdConflict, RrdHead,
+        RrdInfo, RrdInsDel, RrdMove, RrdRenSheet, RrdUserView, ShortDtr, UsrExcl,
+    },
+    validation::validate_sheet_name_chars,
+};
 
 /// MS-XLS 2.4.226 `RRDHead` record type (record enumeration value 312).
 pub(crate) const RRD_HEAD_RECORD_TYPE: u16 = 0x0138;
@@ -63,11 +70,11 @@ pub(crate) const RRD_MIN_MEMORY_SIZE: u32 = 26;
 pub(crate) const RRD_HEAD_MEMORY_SENTINEL: u32 = 0xFFFF_FFFF;
 /// `RRD.tabid` value marking a revision that belongs to no specific sheet.
 pub(crate) const NO_SHEET_TAB_ID: u16 = 0xFFFF;
-/// Byte length of a Ref8U structure (MS-XLS 2.5.209).
+/// Byte length of a `Ref8U` structure (MS-XLS 2.5.209).
 pub(crate) const REF8U_LEN: usize = 8;
-/// Maximum Ref8U column index (MS-XLS 2.5.209 ColU constraint).
+/// Maximum `Ref8U` column index (MS-XLS 2.5.209 `ColU` constraint).
 pub(crate) const REF8U_MAX_COLUMN: u16 = 0x00FF;
-/// Byte length of a ShortDTR structure (MS-XLS 2.5.239).
+/// Byte length of a `ShortDTR` structure (MS-XLS 2.5.239).
 pub(crate) const SHORT_DTR_LEN: usize = 8;
 /// Byte length of a GUID as stored in these records (MS-DTYP 2.3.4).
 pub(crate) const GUID_LEN: usize = 16;
@@ -99,7 +106,7 @@ pub(crate) const MAX_TAB_ID_COUNT: usize = 4112;
 pub(crate) const RRD_INFO_PAYLOAD_LEN: usize = 50;
 /// Fixed `RRDUserView` payload length.
 pub(crate) const RRD_USER_VIEW_PAYLOAD_LEN: usize = RRD_LEN + GUID_LEN;
-/// `RRDChgCell` fixed part: RRD + 4 flag bytes + RgceLoc + cbOldVal + cetxpRst.
+/// `RRDChgCell` fixed part: RRD + 4 flag bytes + `RgceLoc` + cbOldVal + cetxpRst.
 pub(crate) const RRD_CHG_CELL_FIXED_LEN: usize = RRD_LEN + 4 + 4 + 4 + 2;
 /// Minimum byte length of a `CellParsedFormula` old cell value.
 pub(crate) const MIN_FORMULA_VALUE_LEN: u32 = 0x18;
@@ -172,7 +179,7 @@ fn decode_fixed_string(
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect::<Vec<_>>();
         String::from_utf16(&units)
-            .map_err(|_| invalid(record_type, format!("{context} contains invalid UTF-16")))
+            .map_err(|_error| invalid(record_type, format!("{context} contains invalid UTF-16")))
     } else {
         Ok(bytes.iter().map(|&byte| char::from(byte)).collect())
     }
@@ -182,6 +189,9 @@ fn decode_fixed_string(
 
 impl RevisionType {
     /// Decode the MS-XLS 2.5.212 enumeration value.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn from_u16(record_type: u16, value: u16) -> Result<Self> {
         match value {
             0x0000 => Ok(Self::InsertRow),
@@ -210,6 +220,7 @@ impl RevisionType {
     }
 
     /// The MS-XLS 2.5.212 enumeration value.
+    #[must_use]
     pub fn to_u16(self) -> u16 {
         match self {
             Self::InsertRow => 0x0000,
@@ -236,6 +247,9 @@ impl RevisionType {
 
 impl ShortDtr {
     /// Parse the fixed 8-byte structure with Gregorian calendar validation.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(record_type: u16, data: &[u8]) -> Result<Self> {
         if data.len() != SHORT_DTR_LEN {
             return Err(invalid(
@@ -279,25 +293,32 @@ impl ShortDtr {
         Ok(value)
     }
 
+    #[must_use]
     pub fn year(&self) -> u16 {
         self.year
     }
+    #[must_use]
     pub fn month(&self) -> u8 {
         self.month
     }
+    #[must_use]
     pub fn day(&self) -> u8 {
         self.day
     }
+    #[must_use]
     pub fn hour(&self) -> u8 {
         self.hour
     }
+    #[must_use]
     pub fn minute(&self) -> u8 {
         self.minute
     }
+    #[must_use]
     pub fn second(&self) -> u8 {
         self.second
     }
     /// Weekday: 0 = unspecified, 1 = Monday, ..., 7 = Sunday.
+    #[must_use]
     pub fn weekday(&self) -> u8 {
         self.weekday
     }
@@ -305,6 +326,9 @@ impl ShortDtr {
 
 impl RevisionCellRange {
     /// Parse the fixed 8-byte structure, enforcing the ordering constraints.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(record_type: u16, data: &[u8]) -> Result<Self> {
         if data.len() != REF8U_LEN {
             return Err(invalid(
@@ -333,15 +357,19 @@ impl RevisionCellRange {
         Ok(value)
     }
 
+    #[must_use]
     pub fn first_row(&self) -> u16 {
         self.first_row
     }
+    #[must_use]
     pub fn last_row(&self) -> u16 {
         self.last_row
     }
+    #[must_use]
     pub fn first_column(&self) -> u16 {
         self.first_column
     }
+    #[must_use]
     pub fn last_column(&self) -> u16 {
         self.last_column
     }
@@ -356,21 +384,25 @@ impl RevisionCellLocation {
     }
 
     /// Zero-based row coordinate.
+    #[must_use]
     pub fn row(&self) -> u16 {
         self.row
     }
 
-    /// Zero-based column coordinate (the low 14 bits of the ColRelU).
+    /// Zero-based column coordinate (the low 14 bits of the `ColRelU`).
+    #[must_use]
     pub fn column(&self) -> u16 {
         self.column_flags & 0x3FFF
     }
 
     /// Whether the column coordinate is a relative reference.
+    #[must_use]
     pub fn is_column_relative(&self) -> bool {
         self.column_flags & 0x4000 != 0
     }
 
     /// Whether the row coordinate is a relative reference.
+    #[must_use]
     pub fn is_row_relative(&self) -> bool {
         self.column_flags & 0x8000 != 0
     }
@@ -379,6 +411,9 @@ impl RevisionCellLocation {
 impl RevisionRecordHeader {
     /// Parse the 14-byte structure. `is_head` selects the RRDHead-specific
     /// `cbMemory` rule (fixed sentinel instead of the >= 26 minimum).
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(record_type: u16, data: &[u8], is_head: bool) -> Result<Self> {
         if data.len() < RRD_LEN {
             return Err(invalid(
@@ -419,26 +454,33 @@ impl RevisionRecordHeader {
         })
     }
 
-    /// In-memory size of the revision record structure (ignored for RRDHead).
+    /// In-memory size of the revision record structure (ignored for `RRDHead`).
+    #[must_use]
     pub fn memory_size(&self) -> u32 {
         self.memory_size
     }
+    #[must_use]
     pub fn revision_id(&self) -> i32 {
         self.revision_id
     }
+    #[must_use]
     pub fn revision_type(&self) -> RevisionType {
         self.revision_type
     }
+    #[must_use]
     pub fn is_accepted(&self) -> bool {
         self.accepted
     }
+    #[must_use]
     pub fn is_undo_action(&self) -> bool {
         self.undo_action
     }
+    #[must_use]
     pub fn is_deleted_at_edge_of_sort(&self) -> bool {
         self.deleted_at_edge_of_sort
     }
     /// Sheet the revision belongs to; `None` for the 0xFFFF "no sheet" marker.
+    #[must_use]
     pub fn tab_id(&self) -> Option<u16> {
         if self.tab_id == NO_SHEET_TAB_ID {
             None
@@ -467,6 +509,9 @@ impl RevisionRecordHeader {
 
 impl RrdInfo {
     /// Parse the fixed 50-byte record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse_payload(data: &[u8]) -> Result<Self> {
         if data.len() != RRD_INFO_PAYLOAD_LEN {
             return Err(invalid(
@@ -565,46 +610,59 @@ impl RrdInfo {
     }
 
     /// Major BIFF version last used to save the shared workbook.
+    #[must_use]
     pub fn biff_version(&self) -> u16 {
         self.biff_version
     }
+    #[must_use]
     pub fn is_shared(&self) -> bool {
         self.shared
     }
+    #[must_use]
     pub fn disk_has_revisions(&self) -> bool {
         self.disk_has_revisions
     }
+    #[must_use]
     pub fn auto_delete_revisions(&self) -> bool {
         self.auto_delete_revisions
     }
+    #[must_use]
     pub fn track_revisions(&self) -> bool {
         self.track_revisions
     }
+    #[must_use]
     pub fn is_exclusive(&self) -> bool {
         self.exclusive
     }
     /// GUID of the most recent revision header (or all-zero).
+    #[must_use]
     pub fn guid(&self) -> &[u8; GUID_LEN] {
         &self.guid
     }
     /// GUID of the last saved revision header (or all-zero).
+    #[must_use]
     pub fn root_guid(&self) -> &[u8; GUID_LEN] {
         &self.root_guid
     }
+    #[must_use]
     pub fn revision_id(&self) -> i32 {
         self.revision_id
     }
+    #[must_use]
     pub fn version(&self) -> u32 {
         self.version
     }
     /// Whether revision history is discarded (`fNoRevHist`).
+    #[must_use]
     pub fn history_disabled(&self) -> bool {
         self.history_preserved_off
     }
+    #[must_use]
     pub fn history_protected(&self) -> bool {
         self.history_protected
     }
     /// Days for which revision history is kept; ignored when exclusive.
+    #[must_use]
     pub fn history_interval_days(&self) -> u16 {
         self.history_interval_days
     }
@@ -628,6 +686,9 @@ impl FileLockPurpose {
 
 impl FileLock {
     /// Parse the fixed 162-byte record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse_payload(data: &[u8]) -> Result<Self> {
         if data.len() != FILE_LOCK_PAYLOAD_LEN {
             return Err(invalid(
@@ -663,12 +724,15 @@ impl FileLock {
         })
     }
 
+    #[must_use]
     pub fn purpose(&self) -> FileLockPurpose {
         self.purpose
     }
+    #[must_use]
     pub fn user_name(&self) -> &str {
         &self.user_name
     }
+    #[must_use]
     pub fn unused_bytes(&self) -> &[u8] {
         &self.unused
     }
@@ -677,6 +741,9 @@ impl FileLock {
 impl UsrExcl {
     /// Parse the record payload: `fExclusive`, `sdtr`, `cchUser`, and the
     /// fixed 147-character `stUser` field.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse_payload(data: &[u8]) -> Result<Self> {
         if data.len() < USR_EXCL_PREFIX_LEN + 1 + USR_EXCL_USER_FIELD_CHARS {
             return Err(invalid(
@@ -731,12 +798,15 @@ impl UsrExcl {
         })
     }
 
+    #[must_use]
     pub fn is_exclusive(&self) -> bool {
         self.exclusive
     }
+    #[must_use]
     pub fn date_time(&self) -> ShortDtr {
         self.date_time
     }
+    #[must_use]
     pub fn user_name(&self) -> &str {
         &self.user_name
     }
@@ -744,6 +814,9 @@ impl UsrExcl {
 
 impl RrdHead {
     /// Parse the fixed 158-byte record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse_payload(data: &[u8]) -> Result<Self> {
         const PAYLOAD_LEN: usize =
             RRD_LEN + GUID_LEN + 2 + 2 + RRD_HEAD_USER_FIELD_LEN + SHORT_DTR_LEN + 2;
@@ -805,20 +878,25 @@ impl RrdHead {
     }
 
     /// Identifier of this set of revisions.
+    #[must_use]
     pub fn guid(&self) -> &[u8; GUID_LEN] {
         &self.guid
     }
     /// Sheet code page; 1200 means Unicode.
+    #[must_use]
     pub fn code_page(&self) -> u16 {
         self.code_page
     }
+    #[must_use]
     pub fn user_name(&self) -> &str {
         &self.user_name
     }
+    #[must_use]
     pub fn saved_at(&self) -> ShortDtr {
         self.saved_at
     }
     /// Next available sheet identifier (`tabidMac`).
+    #[must_use]
     pub fn next_tab_id(&self) -> i16 {
         self.next_tab_id
     }
@@ -826,6 +904,9 @@ impl RrdHead {
 
 impl RrTabId {
     /// Parse the record payload, an array of 2-byte sheet identifiers.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse_payload(data: &[u8]) -> Result<Self> {
         if !data.len().is_multiple_of(2) {
             return Err(invalid(
@@ -849,6 +930,7 @@ impl RrTabId {
         Ok(Self { sheet_ids })
     }
 
+    #[must_use]
     pub fn sheet_ids(&self) -> &[u16] {
         &self.sheet_ids
     }
@@ -856,6 +938,9 @@ impl RrTabId {
 
 impl RrdRenSheet {
     /// Parse the fixed 528-byte record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse_payload(data: &[u8]) -> Result<Self> {
         const PAYLOAD_LEN: usize =
             RRD_LEN + 2 + REN_SHEET_NAME_FIELD_LEN + 2 + REN_SHEET_NAME_FIELD_LEN;
@@ -913,12 +998,15 @@ impl RrdRenSheet {
         })
     }
 
+    #[must_use]
     pub fn header(&self) -> &RevisionRecordHeader {
         &self.header
     }
+    #[must_use]
     pub fn old_name(&self) -> &str {
         &self.old_name
     }
+    #[must_use]
     pub fn new_name(&self) -> &str {
         &self.new_name
     }
@@ -926,6 +1014,9 @@ impl RrdRenSheet {
 
 impl RrdInsDel {
     /// Parse the record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse_payload(data: &[u8]) -> Result<Self> {
         const FIXED_LEN: usize = RRD_LEN + 2 + REF8U_LEN + 4;
         if data.len() < FIXED_LEN {
@@ -993,19 +1084,24 @@ impl RrdInsDel {
         })
     }
 
+    #[must_use]
     pub fn header(&self) -> &RevisionRecordHeader {
         &self.header
     }
+    #[must_use]
     pub fn is_end_of_list(&self) -> bool {
         self.end_of_list
     }
+    #[must_use]
     pub fn range(&self) -> RevisionCellRange {
         self.range
     }
+    #[must_use]
     pub fn undo_count(&self) -> u32 {
         self.undo_count
     }
     /// Raw `Ducr` undo array (MS-XLS 2.5.71), preserved without interpreting.
+    #[must_use]
     pub fn undo_data(&self) -> &[u8] {
         &self.undo_data
     }
@@ -1013,6 +1109,9 @@ impl RrdInsDel {
 
 impl RrdMove {
     /// Parse the record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse_payload(data: &[u8]) -> Result<Self> {
         const FIXED_LEN: usize = RRD_LEN + 2 * REF8U_LEN + 2 + 4;
         if data.len() < FIXED_LEN {
@@ -1064,23 +1163,29 @@ impl RrdMove {
         })
     }
 
+    #[must_use]
     pub fn header(&self) -> &RevisionRecordHeader {
         &self.header
     }
+    #[must_use]
     pub fn source(&self) -> RevisionCellRange {
         self.source
     }
+    #[must_use]
     pub fn destination(&self) -> RevisionCellRange {
         self.destination
     }
     /// Sheet on which the source range resides.
+    #[must_use]
     pub fn source_tab_id(&self) -> u16 {
         self.source_tab_id
     }
+    #[must_use]
     pub fn undo_count(&self) -> u32 {
         self.undo_count
     }
     /// Raw `Ducr` undo array (MS-XLS 2.5.71), preserved without interpreting.
+    #[must_use]
     pub fn undo_data(&self) -> &[u8] {
         &self.undo_data
     }
@@ -1088,6 +1193,9 @@ impl RrdMove {
 
 impl RrInsertSh {
     /// Parse the fixed 276-byte record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse_payload(data: &[u8]) -> Result<Self> {
         const PAYLOAD_LEN: usize = RRD_LEN + 2 + 2 + 2 + INSERT_SH_NAME_FIELD_LEN;
         if data.len() != PAYLOAD_LEN {
@@ -1135,13 +1243,16 @@ impl RrInsertSh {
         })
     }
 
+    #[must_use]
     pub fn header(&self) -> &RevisionRecordHeader {
         &self.header
     }
     /// Position of the new sheet in the workbook (`itabPos`).
+    #[must_use]
     pub fn position(&self) -> u16 {
         self.position
     }
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -1166,6 +1277,9 @@ impl RevisionCellContent {
 
 impl RrdChgCell {
     /// Parse the record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse_payload(data: &[u8]) -> Result<Self> {
         if data.len() < RRD_CHG_CELL_FIXED_LEN {
             return Err(invalid(
@@ -1228,7 +1342,7 @@ impl RrdChgCell {
         }
         let formatting_run_count = read_u16(data, RRD_LEN + 12);
         let tail = data[RRD_CHG_CELL_FIXED_LEN..].to_vec();
-        let old_value_size_usize = usize::try_from(old_value_size).map_err(|_| {
+        let old_value_size_usize = usize::try_from(old_value_size).map_err(|_error| {
             invalid(
                 RRD_CHG_CELL_RECORD_TYPE,
                 "RRDChgCell cbOldVal overflows usize",
@@ -1262,65 +1376,83 @@ impl RrdChgCell {
         })
     }
 
+    #[must_use]
     pub fn header(&self) -> &RevisionRecordHeader {
         &self.header
     }
+    #[must_use]
     pub fn new_content(&self) -> RevisionCellContent {
         self.new_content
     }
+    #[must_use]
     pub fn old_content(&self) -> RevisionCellContent {
         self.old_content
     }
     /// Whether Lotus 1-2-3 prefix characters are present (`f123Prefix`).
+    #[must_use]
     pub fn has_lotus_prefix(&self) -> bool {
         self.lotus_prefix
     }
+    #[must_use]
     pub fn has_old_format(&self) -> bool {
         self.has_old_format
     }
+    #[must_use]
     pub fn old_format_empty(&self) -> bool {
         self.old_format_empty
     }
     /// `fXfDxf`: reset the cell format to the cell style before applying `dxf`.
+    #[must_use]
     pub fn resets_to_style_format(&self) -> bool {
         self.reset_to_style_format
     }
     /// `fStyXfDxf`: clear the cell format before applying `dxf`.
+    #[must_use]
     pub fn clears_style_format(&self) -> bool {
         self.clear_style_format
     }
+    #[must_use]
     pub fn has_new_format(&self) -> bool {
         self.has_new_format
     }
+    #[must_use]
     pub fn new_format_empty(&self) -> bool {
         self.new_format_empty
     }
     /// Number format used to display the new cell contents (`ifmtDisp`).
+    #[must_use]
     pub fn display_format(&self) -> u8 {
         self.display_format
     }
+    #[must_use]
     pub fn phonetic_shown(&self) -> bool {
         self.phonetic_shown
     }
+    #[must_use]
     pub fn old_phonetic_shown(&self) -> bool {
         self.old_phonetic_shown
     }
     /// Whether the change came from a formula adjustment (`fEOLFmlaUpdate`).
+    #[must_use]
     pub fn formula_adjusted(&self) -> bool {
         self.formula_adjusted
     }
+    #[must_use]
     pub fn location(&self) -> RevisionCellLocation {
         self.location
     }
     /// Byte size of the old cell contents (`cbOldVal`).
+    #[must_use]
     pub fn old_value_size(&self) -> u32 {
         self.old_value_size
     }
     /// Number of `RRDRstEtxp` records that follow (`cetxpRst`).
+    #[must_use]
     pub fn formatting_run_count(&self) -> u16 {
         self.formatting_run_count
     }
     /// Raw tail: optional DXFN formats followed by the old and new values.
+    #[must_use]
     pub fn tail(&self) -> &[u8] {
         &self.tail
     }
@@ -1328,6 +1460,9 @@ impl RrdChgCell {
 
 impl RrdConflict {
     /// Parse the record payload, which is the RRD structure alone.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse_payload(data: &[u8]) -> Result<Self> {
         if data.len() != RRD_LEN {
             return Err(invalid(
@@ -1349,6 +1484,7 @@ impl RrdConflict {
         Ok(Self { header })
     }
 
+    #[must_use]
     pub fn header(&self) -> &RevisionRecordHeader {
         &self.header
     }
@@ -1356,6 +1492,9 @@ impl RrdConflict {
 
 impl RrdUserView {
     /// Parse the fixed 30-byte record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse_payload(data: &[u8]) -> Result<Self> {
         if data.len() != RRD_USER_VIEW_PAYLOAD_LEN {
             return Err(invalid(
@@ -1393,10 +1532,12 @@ impl RrdUserView {
         Ok(Self { header, guid })
     }
 
+    #[must_use]
     pub fn header(&self) -> &RevisionRecordHeader {
         &self.header
     }
     /// Identifier of the custom view whose revision this record describes.
+    #[must_use]
     pub fn guid(&self) -> &[u8; GUID_LEN] {
         &self.guid
     }

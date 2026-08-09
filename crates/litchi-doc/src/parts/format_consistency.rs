@@ -229,6 +229,7 @@ impl DocumentFormatConsistencyMarks {
     }
 
     /// All marks in start-CP order.
+    #[must_use]
     pub fn marks(&self) -> &[FormatConsistencyMark] {
         &self.marks
     }

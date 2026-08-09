@@ -38,6 +38,9 @@ pub struct Scl {
 
 impl Scl {
     /// Parse an `Scl` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
             return Err(Error::InvalidLength {
@@ -70,6 +73,7 @@ impl Scl {
     }
 
     /// Serialize back to a complete `Scl` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(PAYLOAD_LEN);
         payload.extend_from_slice(&self.numerator.to_le_bytes());
@@ -78,16 +82,19 @@ impl Scl {
     }
 
     /// Numerator of the zoom fraction (`nscl`).
+    #[must_use]
     pub fn numerator(&self) -> i16 {
         self.numerator
     }
 
     /// Denominator of the zoom fraction (`dscl`).
+    #[must_use]
     pub fn denominator(&self) -> i16 {
         self.denominator
     }
 
     /// The zoom level as a floating-point value (`nscl`/`dscl`).
+    #[must_use]
     pub fn zoom(&self) -> f64 {
         f64::from(self.numerator) / f64::from(self.denominator)
     }

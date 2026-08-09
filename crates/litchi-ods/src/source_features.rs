@@ -110,6 +110,9 @@ impl Snapshot {
     /// The parser is bounded and never contacts the URI found in a hyperlink
     /// or drawing. It is not an editing API and does not imply extension
     /// rendering, formula evaluation, or a style calculation.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn parse(xml: &str) -> Result<Self> {
         Self::parse_with(xml, Limits::default())
     }
@@ -119,6 +122,9 @@ impl Snapshot {
     /// DTDs and general entity references are rejected. Only the canonical
     /// `office:document-content` -> `office:body` -> `office:spreadsheet`
     /// envelope is accepted; namespace prefixes themselves are unrestricted.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn parse_with(xml: &str, limits: Limits) -> Result<Self> {
         if xml.len() > limits.input_bytes {
             return Err(Error::InvalidFormat(format!(
@@ -191,7 +197,7 @@ impl Snapshot {
                         closed_root,
                     )? {
                         Element::Hyperlink { sheet, text } => {
-                            push_hyperlink(&mut sheets, sheet, text, limits)?
+                            push_hyperlink(&mut sheets, sheet, text, limits)?;
                         },
                         Element::Root
                         | Element::Body
@@ -202,7 +208,11 @@ impl Snapshot {
                                     .to_string(),
                             ));
                         },
-                        _ => {},
+                        Element::Cell(_)
+                        | Element::ConditionalFormats(_)
+                        | Element::SparklineGroups(_)
+                        | Element::Shapes(_)
+                        | Element::Other => {},
                     }
                 },
                 Event::Text(text) => {
@@ -283,11 +293,13 @@ impl Snapshot {
     }
 
     /// Return source features in worksheet document order.
+    #[must_use]
     pub fn sheets(&self) -> &[Sheet] {
         &self.sheets
     }
 
     /// Select a feature inventory by its exact ODF sheet name.
+    #[must_use]
     pub fn sheet(&self, name: &str) -> Option<&Sheet> {
         self.sheets.iter().find(|sheet| sheet.name == name)
     }
@@ -305,22 +317,27 @@ pub struct Sheet {
 
 impl Sheet {
     /// Exact ODF `table:name`.
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
     /// Number of `calcext:conditional-format` elements.
+    #[must_use]
     pub fn conditional_format_count(&self) -> usize {
         self.conditional_formats
     }
     /// Number of `calcext:sparkline-group` elements.
+    #[must_use]
     pub fn sparkline_group_count(&self) -> usize {
         self.sparkline_groups
     }
     /// Inert hyperlinks in source order. Their targets are never fetched.
+    #[must_use]
     pub fn hyperlinks(&self) -> &[Hyperlink] {
         &self.hyperlinks
     }
     /// In-table drawing occurrences in source order. Their sources are never loaded.
+    #[must_use]
     pub fn drawings(&self) -> &[Drawing] {
         &self.drawings
     }
@@ -335,10 +352,12 @@ pub struct Hyperlink {
 
 impl Hyperlink {
     /// Target IRI as written by the producer. Litchi never dereferences it.
+    #[must_use]
     pub fn href(&self) -> &str {
         &self.href
     }
     /// Decoded visible text contained in the anchor.
+    #[must_use]
     pub fn text(&self) -> &str {
         &self.text
     }
@@ -362,14 +381,17 @@ pub struct Drawing {
 
 impl Drawing {
     /// The drawing element family.
+    #[must_use]
     pub const fn kind(&self) -> DrawingKind {
         self.kind
     }
     /// Optional producer name (`draw:name`).
+    #[must_use]
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
     }
     /// Optional image source (`xlink:href`). It is never dereferenced.
+    #[must_use]
     pub fn href(&self) -> Option<&str> {
         self.href.as_deref()
     }
@@ -459,7 +481,15 @@ fn classify_start(
     }
     let Some(sheet) = stack.iter().rev().find_map(|element| match element {
         Element::Sheet(index) => Some(*index),
-        _ => None,
+        Element::Root
+        | Element::Body
+        | Element::Spreadsheet
+        | Element::Cell(_)
+        | Element::ConditionalFormats(_)
+        | Element::SparklineGroups(_)
+        | Element::Shapes(_)
+        | Element::Hyperlink { .. }
+        | Element::Other => None,
     }) else {
         return Ok(Element::Other);
     };
@@ -591,7 +621,9 @@ fn namespace_kind(namespace: &ResolveResult<'_>) -> NamespaceKind {
         ResolveResult::Bound(Namespace(value)) if *value == CALCEXT_NAMESPACE => {
             NamespaceKind::Calcext
         },
-        _ => NamespaceKind::Other,
+        ResolveResult::Unbound | ResolveResult::Bound(_) | ResolveResult::Unknown(_) => {
+            NamespaceKind::Other
+        },
     }
 }
 

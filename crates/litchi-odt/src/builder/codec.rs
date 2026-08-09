@@ -242,10 +242,10 @@ impl Builder {
     }
 
     /// Generate styles.xml with list styles
-    pub(super) fn generate_styles_xml(&self) -> String {
+    pub(super) fn generate_styles_xml(&self) -> Result<String> {
         let mut xml = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" xmlns:dr3d="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0" xmlns:math="http://www.w3.org/1998/Math/MathML" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" office:version="1.3"><office:font-face-decls/><office:styles><!-- Numbered list style --><text:list-style style:name="L1"><text:list-level-style-number text:level="1" text:style-name="Numbering_20_Symbols" style:num-format="1"><style:list-level-properties text:list-level-position-and-space-mode="label-alignment"><style:list-level-label-alignment text:label-followed-by="listtab" text:list-tab-stop-position="1.27cm" fo:text-indent="-0.635cm" fo:margin-left="1.27cm"/></style:list-level-properties></text:list-level-style-number><text:list-level-style-number text:level="2" text:style-name="Numbering_20_Symbols" style:num-format="1"><style:list-level-properties text:list-level-position-and-space-mode="label-alignment"><style:list-level-label-alignment text:label-followed-by="listtab" text:list-tab-stop-position="1.905cm" fo:text-indent="-0.635cm" fo:margin-left="1.905cm"/></style:list-level-properties></text:list-level-style-number><text:list-level-style-number text:level="3" text:style-name="Numbering_20_Symbols" style:num-format="1"><style:list-level-properties text:list-level-position-and-space-mode="label-alignment"><style:list-level-label-alignment text:label-followed-by="listtab" text:list-tab-stop-position="2.54cm" fo:text-indent="-0.635cm" fo:margin-left="2.54cm"/></style:list-level-properties></text:list-level-style-number></text:list-style></office:styles><office:automatic-styles/><office:master-styles/></office:document-styles>"#.to_string();
         if !self.paragraph_tab_styles.is_empty() {
-            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let insertion = find_required(&xml, "</office:styles>")?;
             let fragments = self
                 .paragraph_tab_styles
                 .iter()
@@ -256,22 +256,17 @@ impl Builder {
                             crate::style::paragraph::drop_cap::same_style_identity(cap, style)
                         })
                         .map_or_else(
-                            || {
-                                style
-                                    .to_xml_fragment()
-                                    .expect("validated paragraph tab style")
-                            },
+                            || style.to_xml_fragment(),
                             |cap| {
                                 crate::style::paragraph::drop_cap::merge_with_tab_style(style, cap)
-                                    .expect("validated merged paragraph style")
                             },
                         )
                 })
-                .collect::<String>();
+                .collect::<Result<String>>()?;
             xml.insert_str(insertion, &fragments);
         }
         if !self.paragraph_drop_cap_styles.is_empty() {
-            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let insertion = find_required(&xml, "</office:styles>")?;
             let fragments = self
                 .paragraph_drop_cap_styles
                 .iter()
@@ -280,164 +275,128 @@ impl Builder {
                         crate::style::paragraph::drop_cap::same_style_identity(cap, tabs)
                     })
                 })
-                .map(|style| {
-                    style
-                        .to_xml_fragment()
-                        .expect("validated paragraph drop-cap style")
-                })
-                .collect::<String>();
+                .map(|style| style.to_xml_fragment())
+                .collect::<Result<String>>()?;
             xml.insert_str(insertion, &fragments);
         }
         if !self.paragraph_flow_styles.is_empty() {
-            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let insertion = find_required(&xml, "</office:styles>")?;
             let fragments = self
                 .paragraph_flow_styles
                 .iter()
-                .map(|x| x.to_xml_fragment().expect("validated paragraph flow style"))
-                .collect::<String>();
+                .map(|x| x.to_xml_fragment())
+                .collect::<Result<String>>()?;
             xml.insert_str(insertion, &fragments);
         }
         if !self.paragraph_margin_styles.is_empty() {
-            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let insertion = find_required(&xml, "</office:styles>")?;
             let fragments = self
                 .paragraph_margin_styles
                 .iter()
-                .map(|x| {
-                    x.to_xml_fragment()
-                        .expect("validated paragraph margin style")
-                })
-                .collect::<String>();
+                .map(|x| x.to_xml_fragment())
+                .collect::<Result<String>>()?;
             xml.insert_str(insertion, &fragments);
         }
         if !self.paragraph_border_styles.is_empty() {
-            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let insertion = find_required(&xml, "</office:styles>")?;
             let fragments = self
                 .paragraph_border_styles
                 .iter()
-                .map(|x| {
-                    x.to_xml_fragment()
-                        .expect("validated paragraph border style")
-                })
-                .collect::<String>();
+                .map(|x| x.to_xml_fragment())
+                .collect::<Result<String>>()?;
             xml.insert_str(insertion, &fragments);
         }
         if !self.paragraph_alignment_styles.is_empty() {
-            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let insertion = find_required(&xml, "</office:styles>")?;
             let fragments = self
                 .paragraph_alignment_styles
                 .iter()
-                .map(|x| {
-                    x.to_xml_fragment()
-                        .expect("validated paragraph alignment style")
-                })
-                .collect::<String>();
+                .map(|x| x.to_xml_fragment())
+                .collect::<Result<String>>()?;
             xml.insert_str(insertion, &fragments);
         }
         if !self.paragraph_break_styles.is_empty() {
-            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let insertion = find_required(&xml, "</office:styles>")?;
             let fragments = self
                 .paragraph_break_styles
                 .iter()
-                .map(|x| {
-                    x.to_xml_fragment()
-                        .expect("validated paragraph break style")
-                })
-                .collect::<String>();
+                .map(|x| x.to_xml_fragment())
+                .collect::<Result<String>>()?;
             xml.insert_str(insertion, &fragments);
         }
         if !self.paragraph_writing_mode_styles.is_empty() {
-            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let insertion = find_required(&xml, "</office:styles>")?;
             let fragments = self
                 .paragraph_writing_mode_styles
                 .iter()
-                .map(|x| {
-                    x.to_xml_fragment()
-                        .expect("validated paragraph writing-mode style")
-                })
-                .collect::<String>();
+                .map(|x| x.to_xml_fragment())
+                .collect::<Result<String>>()?;
             xml.insert_str(insertion, &fragments);
         }
         if !self.table_row_property_styles.is_empty() {
-            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let insertion = find_required(&xml, "</office:styles>")?;
             let fragments = self
                 .table_row_property_styles
                 .iter()
-                .map(|x| {
-                    x.to_xml_fragment()
-                        .expect("validated table-row property style")
-                })
-                .collect::<String>();
+                .map(|x| x.to_xml_fragment())
+                .collect::<Result<String>>()?;
             xml.insert_str(insertion, &fragments);
         }
         if !self.table_property_styles.is_empty() {
-            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let insertion = find_required(&xml, "</office:styles>")?;
             let fragments = self
                 .table_property_styles
                 .iter()
-                .map(|x| x.to_xml_fragment().expect("validated table property style"))
-                .collect::<String>();
+                .map(|x| x.to_xml_fragment())
+                .collect::<Result<String>>()?;
             xml.insert_str(insertion, &fragments);
         }
         if !self.table_column_property_styles.is_empty() {
-            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let insertion = find_required(&xml, "</office:styles>")?;
             let fragments = self
                 .table_column_property_styles
                 .iter()
-                .map(|x| {
-                    x.to_xml_fragment()
-                        .expect("validated table-column property style")
-                })
-                .collect::<String>();
+                .map(|x| x.to_xml_fragment())
+                .collect::<Result<String>>()?;
             xml.insert_str(insertion, &fragments);
         }
         if !self.table_cell_property_styles.is_empty() {
-            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let insertion = find_required(&xml, "</office:styles>")?;
             let fragments = self
                 .table_cell_property_styles
                 .iter()
-                .map(|x| {
-                    x.to_xml_fragment()
-                        .expect("validated table-cell property style")
-                })
-                .collect::<String>();
+                .map(|x| x.to_xml_fragment())
+                .collect::<Result<String>>()?;
             xml.insert_str(insertion, &fragments);
         }
         if !self.section_property_styles.is_empty() {
-            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let insertion = find_required(&xml, "</office:styles>")?;
             let fragments = self
                 .section_property_styles
                 .iter()
-                .map(|x| {
-                    x.to_xml_fragment()
-                        .expect("validated section property style")
-                })
-                .collect::<String>();
+                .map(|x| x.to_xml_fragment())
+                .collect::<Result<String>>()?;
             xml.insert_str(insertion, &fragments);
         }
         if let Some(configuration) = &self.line_numbering_configuration {
-            let insertion = xml.find("</office:styles>").expect("static styles root");
-            let fragment = configuration
-                .to_xml()
-                .expect("validated line-numbering configuration");
+            let insertion = find_required(&xml, "</office:styles>")?;
+            let fragment = configuration.to_xml()?;
             xml.insert_str(insertion, &fragment);
         }
         if self.notes_configurations.footnote.is_some()
             || self.notes_configurations.endnote.is_some()
         {
-            let insertion = xml.find("</office:styles>").expect("static styles root");
-            let fragments = self
-                .notes_configurations
-                .to_xml_fragment()
-                .expect("validated notes configurations");
+            let insertion = find_required(&xml, "</office:styles>")?;
+            let fragments = self.notes_configurations.to_xml_fragment()?;
             xml.insert_str(insertion, &fragments);
         }
         if !self.ruby_styles.is_empty() {
-            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let insertion = find_required(&xml, "</office:styles>")?;
             let fragments = self
                 .ruby_styles
                 .iter()
-                .map(|style| style.to_xml_fragment().expect("validated ruby style"))
-                .collect::<String>();
+                .map(|style| style.to_xml_fragment())
+                .collect::<Result<String>>()?;
             xml.insert_str(insertion, &fragments);
         }
         if !self.page_layout_columns.is_empty()
@@ -448,65 +407,41 @@ impl Builder {
                 .page_layout_columns
                 .iter()
                 .map(|(name, columns)| {
-                    let mut fragment = columns
-                        .to_page_layout_fragment(name)
-                        .expect("validated column page layout");
+                    let mut fragment = columns.to_page_layout_fragment(name)?;
                     if let Some((_, separator)) = self
                         .page_layout_footnote_separators
                         .iter()
                         .find(|(separator_name, _)| separator_name == name)
                     {
-                        let insertion = fragment
-                            .find("</style:page-layout-properties>")
-                            .expect("static column page layout fragment");
-                        fragment.insert_str(
-                            insertion,
-                            &separator
-                                .to_xml_fragment()
-                                .expect("validated footnote separator"),
-                        );
+                        let insertion =
+                            find_required(&fragment, "</style:page-layout-properties>")?;
+                        fragment.insert_str(insertion, &separator.to_xml_fragment()?);
                     }
                     for (_, region, properties) in self
                         .page_layout_header_footer_properties
                         .iter()
                         .filter(|(property_name, _, _)| property_name == name)
                     {
-                        let insertion = fragment
-                            .rfind("</style:page-layout>")
-                            .expect("page layout fragment");
-                        fragment.insert_str(
-                            insertion,
-                            &properties
-                                .to_region_fragment(*region)
-                                .expect("validated header/footer properties"),
-                        );
+                        let insertion = rfind_required(&fragment, "</style:page-layout>")?;
+                        fragment.insert_str(insertion, &properties.to_region_fragment(*region)?);
                     }
-                    fragment
+                    Ok(fragment)
                 })
-                .collect::<String>();
+                .collect::<Result<String>>()?;
             for (name, separator) in &self.page_layout_footnote_separators {
                 if !self
                     .page_layout_columns
                     .iter()
                     .any(|(column_name, _)| column_name == name)
                 {
-                    let mut fragment = separator
-                        .to_page_layout_fragment(name)
-                        .expect("validated footnote separator page layout");
+                    let mut fragment = separator.to_page_layout_fragment(name)?;
                     for (_, region, properties) in self
                         .page_layout_header_footer_properties
                         .iter()
                         .filter(|(property_name, _, _)| property_name == name)
                     {
-                        let insertion = fragment
-                            .rfind("</style:page-layout>")
-                            .expect("page layout fragment");
-                        fragment.insert_str(
-                            insertion,
-                            &properties
-                                .to_region_fragment(*region)
-                                .expect("validated header/footer properties"),
-                        );
+                        let insertion = rfind_required(&fragment, "</style:page-layout>")?;
+                        fragment.insert_str(insertion, &properties.to_region_fragment(*region)?);
                     }
                     fragments.push_str(&fragment);
                 }
@@ -532,11 +467,7 @@ impl Builder {
                     .iter()
                     .filter(|(n, _, _)| n == name)
                 {
-                    fragment.push_str(
-                        &properties
-                            .to_region_fragment(*region)
-                            .expect("validated header/footer properties"),
-                    );
+                    fragment.push_str(&properties.to_region_fragment(*region)?);
                 }
                 fragment.push_str("</style:page-layout>");
                 fragments.push_str(&fragment);
@@ -548,10 +479,9 @@ impl Builder {
             );
         }
         for alignment in &self.list_level_label_alignments {
-            xml = crate::list_label_alignment::set_xml(&xml, alignment)
-                .expect("validated generated list alignment");
+            xml = crate::list_label_alignment::set_xml(&xml, alignment)?;
         }
-        xml
+        Ok(xml)
     }
 }
 
@@ -563,6 +493,22 @@ fn push_metadata_element(output: &mut String, name: &str, value: &str) {
     output.push_str("</");
     output.push_str(name);
     output.push('>');
+}
+
+fn find_required(xml: &str, delimiter: &str) -> Result<usize> {
+    xml.find(delimiter).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "generated styles XML is missing required delimiter {delimiter}"
+        ))
+    })
+}
+
+fn rfind_required(xml: &str, delimiter: &str) -> Result<usize> {
+    xml.rfind(delimiter).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "generated styles XML is missing required delimiter {delimiter}"
+        ))
+    })
 }
 
 fn unwrap_text_body(wrapped: &str, prefix: &str, suffix: &str) -> Result<String> {

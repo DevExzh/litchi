@@ -1,7 +1,7 @@
 //! DOC/OLE package ownership for `PlcfWKB` and `SttbFnm`.
 //!
 //! The detached owner edits only validated table images. This layer owns the
-//! WordDocument FIB and the selected `0Table`/`1Table` stream, appending new
+//! `WordDocument` FIB and the selected `0Table`/`1Table` stream, appending new
 //! table images before atomically publishing both FIB pointer pairs. The old
 //! table images and every unrelated stream remain intact. The common OLE
 //! editor supplies exact no-op bytes, source checks, CLSID preservation, and
@@ -79,7 +79,7 @@ impl Commit {
         &self.patch
     }
 
-    /// The source-checked whole-CFB patch, including WordDocument FIB edits.
+    /// The source-checked whole-CFB patch, including `WordDocument` FIB edits.
     #[must_use]
     pub fn package_patch(&self) -> &ObjectPatch {
         &self.package_patch
@@ -92,7 +92,7 @@ impl Commit {
     }
 }
 
-/// Transactional owner for the WordDocument and selected table stream.
+/// Transactional owner for the `WordDocument` and selected table stream.
 #[derive(Debug, Clone)]
 pub struct Editor {
     package: ObjectEditor,

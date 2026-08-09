@@ -60,6 +60,7 @@ pub struct Comment {
 
 impl Comment {
     /// Construct a comment.
+    #[must_use]
     pub fn new(
         reference_position: u32,
         author: String,
@@ -81,6 +82,7 @@ impl Comment {
     }
 
     /// Comment body text.
+    #[must_use]
     pub fn text(&self) -> &str {
         &self.text
     }

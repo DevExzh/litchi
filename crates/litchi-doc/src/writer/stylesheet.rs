@@ -48,6 +48,7 @@ impl StyleRevision {
     }
 
     /// Set the style-revision timestamp.
+    #[must_use]
     pub fn with_timestamp(mut self, timestamp: DateTime) -> Self {
         self.timestamp = Some(timestamp);
         self
@@ -102,12 +103,14 @@ impl StyleDefinition {
     }
 
     /// Set the parent style index.
+    #[must_use]
     pub fn with_base_style(mut self, index: u16) -> Self {
         self.base_style = Some(index);
         self
     }
 
     /// Set the following-paragraph style index.
+    #[must_use]
     pub fn with_next_style(mut self, index: u16) -> Self {
         self.next_style = index;
         self
@@ -120,18 +123,21 @@ impl StyleDefinition {
     }
 
     /// Replace the kind-specific raw UPX payloads.
+    #[must_use]
     pub fn with_property_sets(mut self, property_sets: Vec<Vec<u8>>) -> Self {
         self.property_sets = property_sets;
         self
     }
 
     /// Attach Word 2000-and-later metadata.
+    #[must_use]
     pub fn with_post_2000(mut self, metadata: StylePost2000) -> Self {
         self.post_2000 = Some(metadata);
         self
     }
 
     /// Mark this paragraph or character style as revised and retain its prior formatting.
+    #[must_use]
     pub fn with_revision(mut self, revision: StyleRevision) -> Self {
         self.revision = Some(revision);
         self.post_2000
@@ -484,6 +490,7 @@ pub fn generate_stylesheet(
 }
 
 /// Generate the mandatory minimal Word 97+ stylesheet.
+#[must_use]
 pub fn generate_minimal_stylesheet() -> Vec<u8> {
     generate_stylesheet(&[], None).expect("the built-in DOC stylesheet is valid")
 }

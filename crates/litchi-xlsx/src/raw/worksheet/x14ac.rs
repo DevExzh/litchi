@@ -129,7 +129,10 @@ fn capture_inner(content: &[u8], capture_rows: bool, marker_only: bool) -> Resul
     Ok(values)
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "arguments correspond directly to the x14ac worksheet attributes"
+)]
 fn start(
     parent: Option<Context>,
     namespace: &ResolveResult<'_>,

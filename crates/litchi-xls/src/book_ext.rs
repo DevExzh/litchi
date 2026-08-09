@@ -92,9 +92,9 @@ pub struct BookExtConditional12 {
 /// Typed `BookExt` record content (MS-XLS 2.4.23).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct BookExt {
-    /// Whether AutoRecover is disabled for the workbook.
+    /// Whether `AutoRecover` is disabled for the workbook.
     pub dont_auto_recover: bool,
-    /// Whether the PivotTable field list is hidden.
+    /// Whether the `PivotTable` field list is hidden.
     pub hide_pivot_list: bool,
     /// Whether personal information is removed on save.
     pub filter_privacy: bool,
@@ -102,7 +102,7 @@ pub struct BookExt {
     pub embed_factoids: bool,
     /// How smart tags are displayed.
     pub factoid_display: FactoidDisplay,
-    /// Whether the workbook was saved during AutoRecover.
+    /// Whether the workbook was saved during `AutoRecover`.
     pub saved_during_recovery: bool,
     /// Whether the workbook was created by a minimal save during recovery.
     pub created_via_minimal_save: bool,
@@ -210,7 +210,7 @@ impl BookExt {
         let mut payload = Vec::with_capacity(len);
         payload.extend_from_slice(&BOOK_EXT_RECORD_TYPE.to_le_bytes());
         payload.extend_from_slice(&[0; FRT_HEADER_LEN - 2]);
-        payload.extend_from_slice(&(len as u32).to_le_bytes());
+        payload.extend_from_slice(&crate::utils::truncate_usize_to_u32(len).to_le_bytes());
         payload.extend_from_slice(&flags.to_le_bytes());
         if let Some(conditional11) = &self.conditional11 {
             let mut grbit = 0u8;

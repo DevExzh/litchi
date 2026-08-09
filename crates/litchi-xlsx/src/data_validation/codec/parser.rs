@@ -1,4 +1,4 @@
-//! SpreadsheetML data-validation XML parsing.
+//! `SpreadsheetML` data-validation XML parsing.
 
 use super::super::model::{
     Collection, Formula, ListSource, Source, Sqref, Validation, ValidationErrorStyle,
@@ -70,7 +70,6 @@ pub fn parse_data_validation_collections(xml: &[u8]) -> Result<Vec<Collection>> 
 }
 
 /// In-flight capture state for a single `dataValidation` element.
-
 fn parse_collection(fragment: &Captured) -> Result<Collection> {
     let wrapped = wrap(&fragment.prefix, &fragment.bytes)?;
     let mut reader = NsReader::from_reader(wrapped.as_slice());
@@ -213,7 +212,7 @@ fn parse_collection(fragment: &Captured) -> Result<Collection> {
                 }
                 depth = depth
                     .checked_add(1)
-                    .ok_or_else(|| invalid("dataValidations nesting overflow"))?
+                    .ok_or_else(|| invalid("dataValidations nesting overflow"))?;
             },
             Event::End(element) => {
                 if depth == 0 {

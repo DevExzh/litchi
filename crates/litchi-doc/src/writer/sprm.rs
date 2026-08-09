@@ -49,6 +49,7 @@ pub struct SprmBuilder {
 
 impl SprmBuilder {
     /// Create a new SPRM builder
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -56,7 +57,7 @@ impl SprmBuilder {
     /// Add a boolean SPRM (0 or 1 value)
     pub fn add_bool(&mut self, code: u16, value: bool) {
         self.sprms.extend_from_slice(&code.to_le_bytes());
-        self.sprms.push(if value { 1 } else { 0 });
+        self.sprms.push(u8::from(value));
     }
 
     /// Add a byte SPRM
@@ -90,6 +91,7 @@ impl SprmBuilder {
     }
 
     /// Get the SPRM sequence as bytes
+    #[must_use]
     pub fn build(&self) -> Vec<u8> {
         self.sprms.clone()
     }
@@ -101,6 +103,7 @@ impl SprmBuilder {
 }
 
 /// Helper to create character property SPRMs
+#[must_use]
 pub fn build_chp_sprms(bold: bool, italic: bool, font_size: Option<u16>) -> Vec<u8> {
     let mut builder = SprmBuilder::new();
 
@@ -118,6 +121,7 @@ pub fn build_chp_sprms(bold: bool, italic: bool, font_size: Option<u16>) -> Vec<
 }
 
 /// Helper to create paragraph property SPRMs
+#[must_use]
 pub fn build_pap_sprms(
     alignment: Option<u8>,
     left_indent: Option<i16>,

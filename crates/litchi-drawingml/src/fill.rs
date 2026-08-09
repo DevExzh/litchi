@@ -1,4 +1,4 @@
-//! DrawingML fill primitives.
+//! `DrawingML` fill primitives.
 
 /// Write a stretch fill covering the complete rectangle.
 #[inline]

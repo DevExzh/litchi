@@ -21,7 +21,13 @@ pub struct Map {
 }
 
 impl Map {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "arguments map positionally to BIFF fields"
+    )]
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(
         id: MapId,
         name: impl Into<String>,
@@ -48,7 +54,10 @@ impl Map {
         )
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "arguments map positionally to BIFF fields"
+    )]
     pub(crate) fn from_parts(
         id: String,
         name: String,
@@ -64,7 +73,7 @@ impl Map {
     ) -> Result<Self> {
         let id = MapId::new(
             id.parse::<u32>()
-                .map_err(|_| invalid("Map ID is not an unsigned decimal value"))?,
+                .map_err(|_error| invalid("Map ID is not an unsigned decimal value"))?,
         )?;
         let name = validate_string(name, 256, "Map Name", false)?;
         let root_element = validate_string(root_element, 65_535, "Map RootElement", false)?;
@@ -88,40 +97,52 @@ impl Map {
         })
     }
 
+    #[must_use]
     pub const fn id(&self) -> MapId {
         self.id
     }
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
+    #[must_use]
     pub fn root_element(&self) -> &str {
         &self.root_element
     }
+    #[must_use]
     pub fn schema_id(&self) -> &SchemaId {
         &self.schema_id
     }
+    #[must_use]
     pub const fn show_import_export_validation_errors(&self) -> bool {
         self.show_import_export_validation_errors
     }
+    #[must_use]
     pub const fn auto_fit(&self) -> bool {
         self.auto_fit
     }
+    #[must_use]
     pub const fn append(&self) -> bool {
         self.append
     }
+    #[must_use]
     pub const fn preserve_sort_auto_filter_layout(&self) -> bool {
         self.preserve_sort_auto_filter_layout
     }
+    #[must_use]
     pub const fn preserve_format(&self) -> bool {
         self.preserve_format
     }
+    #[must_use]
     pub fn data_binding(&self) -> Option<&DataBinding> {
         self.data_binding.as_ref()
     }
+    #[must_use]
     pub fn namespaces(&self) -> &[NamespaceDeclaration] {
         &self.namespaces
     }
 
+    #[must_use]
     pub fn with_data_binding(mut self, value: DataBinding) -> Self {
         self.data_binding = Some(value);
         self

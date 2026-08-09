@@ -1,3 +1,19 @@
+#![expect(
+    clippy::let_underscore_must_use,
+    reason = "the builder return is intentionally ignored after mutation"
+)]
+#![expect(
+    clippy::ptr_arg,
+    reason = "the internal vector API preserves capacity-aware mutation"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
 //! Failure-atomic, source-bound conflict-markup edits.
 //!
 //! Removing an annotation only removes its markup. Inline and range payload is
@@ -75,6 +91,10 @@ impl Transaction {
     }
 
     /// Queue one typed edit after validating its target and metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn apply(&mut self, edit: Edit) -> Result<&mut Self> {
         match edit {
             Edit::SetConflictAuthor { index, author } => self.set_conflict_author(index, author),
@@ -87,6 +107,10 @@ impl Transaction {
     }
 
     /// Replace the author of one source-ordered conflict element.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_conflict_author(
         &mut self,
         index: usize,
@@ -111,6 +135,10 @@ impl Transaction {
     }
 
     /// Replace or remove the optional date of one conflict element.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_conflict_date(&mut self, index: usize, date: Option<String>) -> Result<&mut Self> {
         let conflict = conflict_at(&self.base, index)?;
         refuse_removed_conflict(&self.edit_index, index)?;
@@ -130,6 +158,10 @@ impl Transaction {
 
     /// Remove one annotation without interpreting its insertion/deletion kind.
     /// Inline child bytes are retained exactly; property markers are leaf-only.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove_conflict(&mut self, index: usize) -> Result<&mut Self> {
         conflict_at(&self.base, index)?;
         let removal = EditKey::RemoveConflict(index);
@@ -156,6 +188,10 @@ impl Transaction {
     }
 
     /// Replace the author on one source-ordered paired range start marker.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_range_author(
         &mut self,
         index: usize,
@@ -179,6 +215,10 @@ impl Transaction {
     }
 
     /// Replace or remove the optional date on one paired range start marker.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_range_date(&mut self, index: usize, date: Option<String>) -> Result<&mut Self> {
         let range = range_at(&self.base, index)?;
         refuse_removed_range(&self.edit_index, index)?;
@@ -197,6 +237,10 @@ impl Transaction {
     }
 
     /// Remove both paired markers without changing any byte between them.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove_range(&mut self, index: usize) -> Result<&mut Self> {
         range_at(&self.base, index)?;
         let removal = EditKey::RemoveRange(index);
@@ -224,6 +268,10 @@ impl Transaction {
 
     /// Validate and materialize the complete candidate without mutating the
     /// source. A failed commit leaves this transaction available for retry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn commit(&self) -> Result<Commit> {
         let before = self.base.source_owner();
         let source_limits = self.base.limits();
@@ -435,6 +483,10 @@ impl Patch {
     /// Exact bytes, the compact fingerprint, parser limits, and optional story
     /// binding are all preconditions. The candidate is reparsed before the
     /// shared apply-once gate is consumed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         let claim = self.claim_publication()?;
         if source.limits() != self.source_limits

@@ -1,3 +1,11 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
 //! Run types and implementation for DOCX documents.
 use crate::OfficeMath;
 use crate::error::{Error, Result};
@@ -97,16 +105,28 @@ impl MutableRun {
     }
 
     /// Parse and replace this run's content with an inline Office Math equation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_office_math_xml(&mut self, xml: impl Into<String>) -> Result<&mut Self> {
         let equation = OfficeMath::from_xml(xml)?;
         Ok(self.set_office_math(equation))
     }
 
     /// Get the text content.
+    #[must_use]
     pub fn get_text(&self) -> String {
         match &self.content {
             RunContent::Text(s) => s.clone(),
-            _ => String::new(),
+            RunContent::OfficeMath(_)
+            | RunContent::Symbol(_)
+            | RunContent::PageNumber(_)
+            | RunContent::PageCount
+            | RunContent::Tab
+            | RunContent::PageBreak
+            | RunContent::FootnoteReference(_)
+            | RunContent::EndnoteReference(_) => String::new(),
         }
     }
 
@@ -163,6 +183,10 @@ impl MutableRun {
     }
 
     /// Replace the visual effects for this run after validating their schema.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_effects(&mut self, effects: Effects) -> Result<&mut Self> {
         effects.validate()?;
         self.properties.effects = effects;
@@ -218,7 +242,13 @@ impl MutableRun {
         match &self.content {
             RunContent::FootnoteReference(ref_id) => footnote && *ref_id == id,
             RunContent::EndnoteReference(ref_id) => !footnote && *ref_id == id,
-            _ => false,
+            RunContent::Text(_)
+            | RunContent::OfficeMath(_)
+            | RunContent::Symbol(_)
+            | RunContent::PageNumber(_)
+            | RunContent::PageCount
+            | RunContent::Tab
+            | RunContent::PageBreak => false,
         }
     }
 
@@ -281,7 +311,7 @@ impl MutableRun {
             }
 
             if let Some(size) = self.properties.font_size {
-                write!(xml, "<w:sz w:val=\"{}\"/>", size).map_err(|e| Error::Xml(e.to_string()))?;
+                write!(xml, "<w:sz w:val=\"{size}\"/>").map_err(|e| Error::Xml(e.to_string()))?;
             }
 
             if let Some(ref font_name) = self.properties.font_name {
@@ -295,12 +325,12 @@ impl MutableRun {
             }
 
             if let Some(ref color) = self.properties.color {
-                write!(xml, "<w:color w:val=\"{}\"/>", color)
+                write!(xml, "<w:color w:val=\"{color}\"/>")
                     .map_err(|e| Error::Xml(e.to_string()))?;
             }
 
             if let Some(ref highlight) = self.properties.highlight {
-                write!(xml, "<w:highlight w:val=\"{}\"/>", highlight)
+                write!(xml, "<w:highlight w:val=\"{highlight}\"/>")
                     .map_err(|e| Error::Xml(e.to_string()))?;
             }
 
@@ -428,14 +458,14 @@ impl MutableRun {
                 xml.push_str("<w:br w:type=\"page\"/>");
             },
             RunContent::FootnoteReference(id) => {
-                write!(xml, "<w:footnoteReference w:id=\"{}\"/>", id)
+                write!(xml, "<w:footnoteReference w:id=\"{id}\"/>")
                     .map_err(|e| Error::Xml(e.to_string()))?;
             },
             RunContent::EndnoteReference(id) => {
-                write!(xml, "<w:endnoteReference w:id=\"{}\"/>", id)
+                write!(xml, "<w:endnoteReference w:id=\"{id}\"/>")
                     .map_err(|e| Error::Xml(e.to_string()))?;
             },
-            _ => {},
+            RunContent::Text(_) => {},
         }
 
         // Write line break if set

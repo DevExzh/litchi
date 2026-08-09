@@ -248,7 +248,7 @@ impl<R: Read + Seek> Workbook<R> {
                         });
                     }
                     let record_index = u32::try_from(defined_name_slots.len() + 1)
-                        .map_err(|_| Error::InvalidRecord {
+                        .map_err(|_error| Error::InvalidRecord {
                             record_type: LBL_RECORD_TYPE,
                             message: "Lbl record index overflows".to_string(),
                         })?;

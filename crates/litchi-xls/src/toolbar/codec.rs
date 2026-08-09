@@ -11,7 +11,10 @@ const CTBS_LEN: usize = 14;
 const APPLICATION_ID_LEN: usize = 4;
 
 /// Parse exactly one `CTBWRAPPER`/`XCB` stream.
-pub fn parse<'a>(data: &'a [u8]) -> Result<Wrapper<'a>> {
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
+pub fn parse(data: &[u8]) -> Result<Wrapper<'_>> {
     let (toolbar_set, offset) = parse_toolbar_set(data)?;
     let count = usize::from(toolbar_set.toolbar_count());
     let (toolbars, consumed) = parse_sequence(data, offset, &toolbar_set, count)?;
@@ -25,6 +28,9 @@ pub fn parse<'a>(data: &'a [u8]) -> Result<Wrapper<'a>> {
 }
 
 /// Serialize one complete `CTBWRAPPER`/`XCB` stream.
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn to_bytes(value: &Wrapper<'_>) -> Result<Vec<u8>> {
     value.validate()?;
     let mut output = Vec::new();
@@ -92,10 +98,7 @@ fn parse_sequence<'a>(
     })
 }
 
-fn parse_toolbar_candidates<'a>(
-    data: &'a [u8],
-    offset: usize,
-) -> Result<Vec<(Toolbar<'a>, usize)>> {
+fn parse_toolbar_candidates(data: &[u8], offset: usize) -> Result<Vec<(Toolbar<'_>, usize)>> {
     let bytes = data
         .get(offset..)
         .ok_or_else(|| Error::UnexpectedEndOfStream("XCB CTB toolbar".to_string()))?;
@@ -104,7 +107,7 @@ fn parse_toolbar_candidates<'a>(
     if count < 0 {
         return Err(validation::invalid("TB cCL must not be negative"));
     }
-    let count = usize::try_from(count).map_err(|_| validation::invalid("TB cCL overflows"))?;
+    let count = usize::try_from(count).map_err(|_error| validation::invalid("TB cCL overflows"))?;
     if count > MAX_CONTROLS {
         return Err(validation::invalid("TB cCL exceeds the bounded limit"));
     }
@@ -139,7 +142,7 @@ fn parse_toolbar_candidates<'a>(
             let visual = data
                 .get(toolbar_data..app_offset)
                 .ok_or_else(|| Error::UnexpectedEndOfStream("XCB rVisualData".to_string()))?;
-            Some(VisualData::new(visual.try_into().map_err(|_| {
+            Some(VisualData::new(visual.try_into().map_err(|_error| {
                 validation::invalid("XCB rVisualData must be 60 bytes")
             })?))
         };
@@ -180,11 +183,11 @@ fn parse_toolbar_candidates<'a>(
     Ok(candidates)
 }
 
-fn parse_controls<'a>(
-    data: &'a [u8],
+fn parse_controls(
+    data: &[u8],
     offset: usize,
     remaining: usize,
-) -> Result<Vec<(Vec<Control<'a>>, usize)>> {
+) -> Result<Vec<(Vec<Control<'_>>, usize)>> {
     if remaining == 0 {
         return Ok(vec![(Vec::new(), offset)]);
     }
@@ -220,22 +223,20 @@ fn parse_controls<'a>(
         let command = if command_len == 0 {
             None
         } else {
-            let command_bytes: [u8; 4] = match data.get(data_offset..data_start) {
-                Some(bytes) => match bytes.try_into() {
-                    Ok(bytes) => bytes,
-                    Err(_) => {
-                        if first_error.is_none() {
-                            first_error = Some(validation::invalid("TBCCmd must be four bytes"));
-                        }
-                        continue;
-                    },
-                },
-                None => {
+            let command_bytes: [u8; 4] = if let Some(bytes) = data.get(data_offset..data_start) {
+                if let Ok(bytes) = bytes.try_into() {
+                    bytes
+                } else {
                     if first_error.is_none() {
-                        first_error = Some(Error::UnexpectedEndOfStream("XCB TBCCmd".to_string()));
+                        first_error = Some(validation::invalid("TBCCmd must be four bytes"));
                     }
                     continue;
-                },
+                }
+            } else {
+                if first_error.is_none() {
+                    first_error = Some(Error::UnexpectedEndOfStream("XCB TBCCmd".to_string()));
+                }
+                continue;
             };
             match Command::from_bytes(command_bytes) {
                 Ok(command) => Some(command),
@@ -250,14 +251,13 @@ fn parse_controls<'a>(
 
         let boundaries = find_boundaries(data, data_start, remaining > 1)?;
         for boundary in boundaries {
-            let payload = match data.get(data_start..boundary) {
-                Some(payload) => payload,
-                None => {
-                    if first_error.is_none() {
-                        first_error = Some(validation::invalid("TBCData boundary is out of range"));
-                    }
-                    continue;
-                },
+            let payload = if let Some(payload) = data.get(data_start..boundary) {
+                payload
+            } else {
+                if first_error.is_none() {
+                    first_error = Some(validation::invalid("TBCData boundary is out of range"));
+                }
+                continue;
             };
             let control_data = match Data::parse(payload) {
                 Ok(value) => value,

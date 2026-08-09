@@ -1,4 +1,4 @@
-//! Shared cell-format handles without native SpreadsheetML identifiers.
+//! Shared cell-format handles without native `SpreadsheetML` identifiers.
 
 /// Applied cell-format views used by worksheet-facing APIs.
 pub mod format;
@@ -17,7 +17,7 @@ use crate::workbook::Inner;
 
 /// Opaque style identity used by semantic patch states.
 ///
-/// The physical SpreadsheetML index remains private. Keys are meaningful only
+/// The physical `SpreadsheetML` index remains private. Keys are meaningful only
 /// within the patch lineage that produced them.
 #[derive(Debug)]
 pub(crate) struct StyleLineage;
@@ -95,15 +95,18 @@ impl Styles {
     }
 
     /// Number of shared cell formats.
+    #[must_use]
     pub const fn len(&self) -> usize {
         self.len as usize
     }
 
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.len == 0
     }
 
     /// Base shared cell format used by cells without an explicit local style.
+    #[must_use]
     pub fn base(&self) -> Option<Style> {
         self.get(0)
     }
@@ -112,6 +115,7 @@ impl Styles {
     ///
     /// Copying a style obtained from [`crate::Worksheet::style`] is the preferred
     /// semantic entry point.
+    #[must_use]
     pub fn get(&self, position: usize) -> Option<Style> {
         let key = u32::try_from(position).ok().filter(|key| *key < self.len)?;
         Some(Style {
@@ -121,6 +125,7 @@ impl Styles {
     }
 
     /// Resolve an opaque key when it belongs to this shared-style table.
+    #[must_use]
     pub fn find(&self, key: &StyleKey) -> Option<Style> {
         (key.raw < self.len && Arc::ptr_eq(&key.lineage, &self.owner.style_lineage)).then(|| {
             Style {
@@ -130,6 +135,7 @@ impl Styles {
         })
     }
 
+    #[must_use]
     pub fn iter(&self) -> StylesIter {
         StylesIter {
             owner: Arc::clone(&self.owner),
@@ -207,6 +213,7 @@ impl Style {
     }
 
     /// Opaque, lineage-checked identity for maps and semantic patch states.
+    #[must_use]
     pub fn key(&self) -> StyleKey {
         StyleKey::new(self.raw, Arc::clone(&self.owner.style_lineage))
     }
@@ -216,11 +223,13 @@ impl Style {
     /// This remains true across descendant snapshots whose shared-style table
     /// is byte-for-byte unchanged. Use [`Self::same_workbook`] when exact
     /// snapshot identity matters.
+    #[must_use]
     pub fn same(&self, other: &Self) -> bool {
         self.raw == other.raw && Arc::ptr_eq(&self.owner.style_lineage, &other.owner.style_lineage)
     }
 
     /// Whether two handles belong to the same immutable workbook snapshot.
+    #[must_use]
     pub fn same_workbook(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.owner, &other.owner)
     }

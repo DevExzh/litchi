@@ -217,7 +217,10 @@ pub(super) fn inspect_start(
                 validate_id(&id)?;
                 let auto_update =
                     parse_bool(optional(&attributes, CX, "autoUpdate").unwrap_or("0"))?;
-                scan.info.as_mut().expect("root initialized").external_data = Some(ExternalData {
+                scan.info
+                    .as_mut()
+                    .ok_or_else(|| invalid_error("chart root state is missing"))?
+                    .external_data = Some(ExternalData {
                     relationship_id: id,
                     auto_update,
                 });
@@ -251,7 +254,10 @@ pub(super) fn inspect_start(
                 if empty || required(&attributes, "", "type")?.len() > 64 {
                     return invalid(" dimension requires a bounded type and content");
                 }
-                let data = scan.current_data.as_mut().expect("data depth initialized");
+                let data = scan
+                    .current_data
+                    .as_mut()
+                    .ok_or_else(|| invalid_error("chart data state is missing"))?;
                 if local == "strDim" {
                     data.string_dimensions += 1;
                 } else {
@@ -265,8 +271,18 @@ pub(super) fn inspect_start(
     }
     if scan.chart_depth.is_some_and(|value| depth == value + 1) && namespace == CX {
         match local {
-            "title" => scan.info.as_mut().expect("root initialized").has_title = true,
-            "legend" => scan.info.as_mut().expect("root initialized").has_legend = true,
+            "title" => {
+                scan.info
+                    .as_mut()
+                    .ok_or_else(|| invalid_error("chart root state is missing"))?
+                    .has_title = true;
+            },
+            "legend" => {
+                scan.info
+                    .as_mut()
+                    .ok_or_else(|| invalid_error("chart root state is missing"))?
+                    .has_legend = true;
+            },
             "plotArea" | "extLst" => {},
             _ => return invalid("invalid direct  chart child"),
         }
@@ -284,13 +300,16 @@ pub(super) fn inspect_end(
     let local_name = name.local_name();
     let local = std::str::from_utf8(local_name.as_ref()).map_err(xml_error)?;
     if scan.data_depth == Some(depth) && namespace == CX && local == "data" {
-        let data = scan.current_data.take().expect("data depth initialized");
+        let data = scan
+            .current_data
+            .take()
+            .ok_or_else(|| invalid_error("chart data state is missing"))?;
         if data.string_dimensions + data.numeric_dimensions == 0 {
             return invalid(" data requires at least one dimension");
         }
         scan.info
             .as_mut()
-            .expect("root initialized")
+            .ok_or_else(|| invalid_error("chart root state is missing"))?
             .data_sets
             .push(data);
         scan.data_depth = None;

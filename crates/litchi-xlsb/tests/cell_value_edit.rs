@@ -1,3 +1,10 @@
+#![allow(
+    clippy::pedantic,
+    clippy::unwrap_used,
+    clippy::wildcard_enum_match_arm,
+    reason = "integration tests use panic-on-failure extraction and exhaustive fixture diagnostics"
+)]
+
 //! Real-workbook regression coverage for the bounded `BrtCellReal` seam.
 
 #![allow(

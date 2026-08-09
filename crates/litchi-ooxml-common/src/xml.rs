@@ -7,7 +7,7 @@ use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 use thiserror::Error;
 
-/// Return whether a value follows the XML 1.0 Fifth Edition NCName grammar.
+/// Return whether a value follows the XML 1.0 Fifth Edition `NCName` grammar.
 ///
 /// Relationship IDs and namespace prefixes use this Unicode-aware grammar;
 /// ASCII-only approximations reject valid producer documents.
@@ -28,14 +28,14 @@ pub enum XmlError {
     Invalid(String),
 }
 
-/// Transitional DrawingML main namespace.
+/// Transitional `DrawingML` main namespace.
 pub const DRAWINGML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
-/// Strict DrawingML main namespace.
+/// Strict `DrawingML` main namespace.
 pub const STRICT_DRAWINGML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
-/// Transitional DrawingML chart namespace.
+/// Transitional `DrawingML` chart namespace.
 pub const DRAWINGML_CHART_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/drawingml/2006/chart";
-/// Strict DrawingML chart namespace.
+/// Strict `DrawingML` chart namespace.
 pub const STRICT_DRAWINGML_CHART_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/chart";
 /// Transitional Office Math namespace URI.
 pub const OMML_NAMESPACE_URI: &str = "http://schemas.openxmlformats.org/officeDocument/2006/math";
@@ -65,6 +65,7 @@ pub fn decode_xml_reference(reference: &BytesRef<'_>) -> Result<String> {
     }
 }
 
+#[must_use]
 pub fn is_drawingml_name(
     namespace: &ResolveResult<'_>,
     name: QName<'_>,
@@ -78,6 +79,7 @@ pub fn is_drawingml_name(
         )
 }
 
+#[must_use]
 pub fn is_drawingml_chart_name(
     namespace: &ResolveResult<'_>,
     name: QName<'_>,
@@ -124,6 +126,7 @@ pub fn unqualified_attribute_value(
 /// feed. Returning a borrowed atom lets fixed-token parsers accept surrounding
 /// schema whitespace without allocating; a value that collapses to zero or
 /// multiple atoms returns `None`.
+#[must_use]
 pub fn xsd_token_atom(value: &str) -> Option<&str> {
     let mut atoms = value
         .split([' ', '\t', '\n', '\r'])
@@ -132,6 +135,7 @@ pub fn xsd_token_atom(value: &str) -> Option<&str> {
     atoms.next().is_none().then_some(atom)
 }
 
+#[must_use]
 pub fn is_omml_name(namespace: &ResolveResult<'_>, name: QName<'_>, local_name: &[u8]) -> bool {
     if name.local_name().as_ref() != local_name {
         return false;

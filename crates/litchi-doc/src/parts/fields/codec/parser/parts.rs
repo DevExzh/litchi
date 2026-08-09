@@ -1,6 +1,11 @@
 //! Typed intermediate parts shared by semantic field parsers.
 
-use crate::parts::fields::model::*;
+use crate::parts::fields::model::{
+    AutoTextListOption, DdeFieldKind, DdeRepresentation, ExternalIncludeOption, IncludeFieldKind,
+    IndexEntryOption, IndexOption, LinkFormatting, LinkResultOption, MergeFieldSwitch,
+    ReferenceFieldOption, StyleReferenceFieldOption, TableOfAuthoritiesEntryOption,
+    TableOfAuthoritiesOption, TableOfContentsEntryOption, TableOfContentsOption,
+};
 
 pub(in crate::parts::fields) struct DdeParts {
     pub(in crate::parts::fields) kind: DdeFieldKind,

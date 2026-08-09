@@ -1,6 +1,6 @@
 //! XLSX package publication over the OPC-owned streaming writer.
 //!
-//! This layer deliberately contains no SpreadsheetML model. It is the narrow
+//! This layer deliberately contains no `SpreadsheetML` model. It is the narrow
 //! publication boundary used by both [`crate::package::Package`] and the
 //! immutable workbook snapshot, so serialization never falls back to a host
 //! archive implementation or an archive-sized intermediate buffer.
@@ -13,7 +13,10 @@ use litchi_opc::{OpcPackage, PackageWriter};
 use crate::error::Result;
 
 #[path = "writer/shape.rs"]
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "the bounded writer remains an internal seam for incremental package serialization"
+)]
 pub mod shape;
 
 /// Serialize a validated XLSX package into owned bytes.

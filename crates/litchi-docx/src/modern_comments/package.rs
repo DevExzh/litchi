@@ -1,3 +1,11 @@
+#![expect(
+    clippy::needless_continue,
+    reason = "the explicit continue documents the parser state transition"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! OPC/package graph lifecycle for modern Word comment metadata.
 
 use super::codec::{
@@ -37,6 +45,10 @@ pub const COMMENTS_EXTENSIBLE_CONTENT_TYPE: &str =
 pub const PEOPLE_CONTENT_TYPE: &str =
     "application/vnd.openxmlformats-officedocument.wordprocessingml.people+xml";
 
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn load_modern_comment_metadata(
     package: &OpcPackage,
     document_part_name: &PackURI,
@@ -83,6 +95,10 @@ pub fn load_modern_comment_metadata(
     Ok(metadata)
 }
 
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn store_modern_comment_metadata(
     package: &mut OpcPackage,
     document_part_name: &PackURI,

@@ -1,3 +1,23 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::expect_used,
+    reason = "the invariant is established immediately before extraction"
+)]
+#![expect(
+    clippy::needless_pass_by_value,
+    reason = "the public API shape is retained for compatibility"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
 //! Bounded XML, MCE, and reaction codec for modern Word comments.
 
 use super::model::{
@@ -16,16 +36,22 @@ use std::collections::{HashMap, HashSet};
 pub(super) const REACTIONS_EXTENSION_URI: &str = "{CE6994B0-6A32-4C9F-8C6B-6E91EDA988CE}";
 
 impl Extension {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(uri: Option<String>, child_xml: impl Into<String>) -> Result<Self> {
         let uri = uri.map(|value| normalize_xsd_token(&value));
         let child_xml = canonical_extension_child(&child_xml.into())?;
         Ok(Self { uri, child_xml })
     }
 
+    #[must_use]
     pub fn uri(&self) -> Option<&str> {
         self.uri.as_deref()
     }
 
+    #[must_use]
     pub fn child_xml(&self) -> &str {
         &self.child_xml
     }
@@ -34,6 +60,10 @@ impl Extension {
         self.uri = uri.map(|value| normalize_xsd_token(&value));
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_child_xml(&mut self, child_xml: impl Into<String>) -> Result<()> {
         self.child_xml = canonical_extension_child(&child_xml.into())?;
         Ok(())
@@ -41,6 +71,10 @@ impl Extension {
 }
 
 impl ExtensionList {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(extensions: Vec<Extension>) -> Result<Self> {
         enforce_count("modern comment extension", extensions.len())?;
         let list = Self { extensions };
@@ -48,10 +82,15 @@ impl ExtensionList {
         Ok(list)
     }
 
+    #[must_use]
     pub fn extensions(&self) -> &[Extension] {
         &self.extensions
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn push(&mut self, extension: Extension) -> Result<()> {
         enforce_count(
             "modern comment extension",
@@ -66,6 +105,10 @@ impl ExtensionList {
     }
 }
 
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn parse_comments_extended(xml: &[u8]) -> Result<Vec<Extended>> {
     let document = parse_document(xml)?;
     let root = document.root()?;
@@ -101,6 +144,10 @@ pub fn parse_comments_extended(xml: &[u8]) -> Result<Vec<Extended>> {
     Ok(items)
 }
 
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn parse_comments_ids(xml: &[u8]) -> Result<Vec<IdMapping>> {
     let document = parse_document(xml)?;
     let root = document.root()?;
@@ -134,6 +181,14 @@ pub fn parse_comments_ids(xml: &[u8]) -> Result<Vec<IdMapping>> {
     Ok(items)
 }
 
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
+///
+/// # Panics
+///
+/// Panics if an internal writer invariant is violated.
 pub fn parse_comments_extensible(xml: &[u8]) -> Result<Vec<Comment>> {
     let document = parse_document(xml)?;
     let root = document.root()?;
@@ -190,6 +245,10 @@ pub fn parse_comments_extensible(xml: &[u8]) -> Result<Vec<Comment>> {
     Ok(comments)
 }
 
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn parse_people(xml: &[u8]) -> Result<Vec<Person>> {
     let document = parse_document(xml)?;
     let root = document.root()?;
@@ -229,6 +288,10 @@ pub fn parse_people(xml: &[u8]) -> Result<Vec<Person>> {
     Ok(people)
 }
 
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn write_comments_extended(items: &[Extended], conformance: Conformance) -> Result<Vec<u8>> {
     validate_extended(items)?;
     let mut out = xml_header("w15", WORD_2012_NAMESPACE, "commentsEx", conformance);
@@ -247,6 +310,10 @@ pub fn write_comments_extended(items: &[Extended], conformance: Conformance) -> 
     Ok(out.into_bytes())
 }
 
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn write_comments_ids(items: &[IdMapping], conformance: Conformance) -> Result<Vec<u8>> {
     validate_ids(items)?;
     let mut out = xml_header("w16cid", COMMENTS_IDS_NAMESPACE, "commentsIds", conformance);
@@ -261,6 +328,10 @@ pub fn write_comments_ids(items: &[IdMapping], conformance: Conformance) -> Resu
     Ok(out.into_bytes())
 }
 
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn write_comments_extensible(
     comments: &[Comment],
     conformance: Conformance,
@@ -343,6 +414,10 @@ pub fn write_comments_extensible(
     Ok(out.into_bytes())
 }
 
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn write_people(people: &[Person], conformance: Conformance) -> Result<Vec<u8>> {
     validate_people(people)?;
     let mut out = xml_header("w15", WORD_2012_NAMESPACE, "people", conformance);
@@ -520,7 +595,7 @@ fn parse_comment_extensions(comment: &Node) -> Result<Vec<Reaction>> {
             reject_attributes(reaction, &[("", "reactionType")])?;
             let reaction_type = required_attr(reaction, "", "reactionType")?
                 .parse::<u32>()
-                .map_err(|_| Error::Invalid("invalid reactionType".into()))?;
+                .map_err(|_source_error| Error::Invalid("invalid reactionType".into()))?;
             let mut infos = Vec::new();
             let mut extensions = None;
             for (index, info) in reaction.children.iter().enumerate() {
@@ -692,7 +767,7 @@ fn validate_utc(value: &str) -> Result<()> {
         return invalid(format!("invalid UTC dateTime '{value}'"));
     }
     litchi_ooxml_common::properties::time::DateTime::new(value)
-        .map_err(|_| Error::Invalid(format!("invalid UTC dateTime '{value}'")))?;
+        .map_err(|_source_error| Error::Invalid(format!("invalid UTC dateTime '{value}'")))?;
     if value.ends_with('Z') || value.ends_with("+00:00") || value.ends_with("-00:00") {
         Ok(())
     } else {
@@ -705,7 +780,7 @@ fn parse_hex(value: &str) -> Result<u32> {
         return invalid(format!("'{value}' is not ST_LongHexNumber"));
     }
     u32::from_str_radix(value, 16)
-        .map_err(|_| Error::Invalid(format!("invalid hex number '{value}'")))
+        .map_err(|_source_error| Error::Invalid(format!("invalid hex number '{value}'")))
 }
 
 fn format_hex(value: u32) -> String {
@@ -929,7 +1004,10 @@ fn build_dom(xml: &[u8]) -> Result<XmlDocument> {
     Ok(document)
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "signature mirrors the corresponding OOXML record"
+)]
 fn push_node(
     reader: &Reader<&[u8]>,
     element: &BytesStart<'_>,

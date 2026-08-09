@@ -1,3 +1,11 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::unnecessary_wraps,
+    reason = "the Result signature preserves a uniform fallible codec API"
+)]
 //! Lexical and resource validation for the Word 2012 paragraph extension.
 
 use crate::error::{Error, Result};
@@ -17,8 +25,8 @@ pub(crate) fn validate(value: Option<Collapsed>) -> Result<()> {
 
 pub(crate) fn parse_on_off(value: Option<&str>) -> Result<Collapsed> {
     match value {
-        None | Some("true") | Some("1") | Some("on") => Ok(Collapsed::Enabled),
-        Some("false") | Some("0") | Some("off") => Ok(Collapsed::Disabled),
+        None | Some("true" | "1" | "on") => Ok(Collapsed::Enabled),
+        Some("false" | "0" | "off") => Ok(Collapsed::Disabled),
         Some(value) => Err(Error::InvalidFormat(format!(
             "invalid Word 2012 collapsed value '{value}'"
         ))),

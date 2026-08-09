@@ -1,4 +1,4 @@
-//! SpreadsheetML stylesheet publication.
+//! `SpreadsheetML` stylesheet publication.
 //!
 //! The writer consumes the same semantic stylesheet records as the parser.
 //! It intentionally does not introduce a second builder model: callers can
@@ -21,12 +21,12 @@ use super::{NumberFormat, Styles};
 const TRANSITIONAL_NAMESPACE: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_NAMESPACE: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
 
-/// Write a stylesheet using Transitional SpreadsheetML vocabulary.
+/// Write a stylesheet using Transitional `SpreadsheetML` vocabulary.
 pub fn write(styles: &Styles) -> Result<Vec<u8>> {
     write_in(styles, Conformance::Transitional)
 }
 
-/// Write a stylesheet using the requested SpreadsheetML conformance.
+/// Write a stylesheet using the requested `SpreadsheetML` conformance.
 ///
 /// Transitional publication uses physical `left`/`right` border edges;
 /// Strict publication uses logical `start`/`end` edges. A stylesheet that
@@ -175,10 +175,10 @@ fn write_fill(xml: &mut String, fill: &Fill) -> Result<()> {
             gradient_type,
             stops,
         } => {
-            if let Some(kind) = gradient_type {
-                if !matches!(kind.as_str(), "linear" | "path") {
-                    return Err(invalid(format!("invalid gradient type '{kind}'")));
-                }
+            if let Some(kind) = gradient_type
+                && !matches!(kind.as_str(), "linear" | "path")
+            {
+                return Err(invalid(format!("invalid gradient type '{kind}'")));
             }
             let mut element = String::from("<gradientFill");
             if let Some(kind) = gradient_type {
@@ -223,7 +223,11 @@ fn write_border(xml: &mut String, border: &Border, conformance: Conformance) -> 
     }
 
     let mut element = String::from("<border");
-    if let Some(direction) = border.diagonal.as_ref().and_then(|diagonal| diagonal.dir()) {
+    if let Some(direction) = border
+        .diagonal
+        .as_ref()
+        .and_then(super::border::Diagonal::dir)
+    {
         if direction.is_up() {
             attr(&mut element, "diagonalUp", "1")?;
         }
@@ -356,7 +360,7 @@ fn write_alignment(xml: &mut String, alignment: Alignment, conformance: Conforma
     if matches!(conformance, Conformance::Strict)
         && alignment
             .text_rotation
-            .is_some_and(|rotation| rotation.is_contextual())
+            .is_some_and(super::alignment::Rotation::is_contextual)
     {
         return Err(invalid(
             "context-dependent text rotation 254 requires Transitional SpreadsheetML",

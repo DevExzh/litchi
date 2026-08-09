@@ -1,11 +1,34 @@
+#![expect(
+    clippy::cast_possible_truncation,
+    reason = "OOXML numeric values are bounded before conversion"
+)]
+#![expect(
+    clippy::manual_let_else,
+    reason = "the match form keeps both parser outcomes explicit"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
 //! Word-owned XML part publication and lossless settings snapshots.
 
-use super::super::model::*;
+use super::super::model::{
+    BlobPart, DocumentSettings, Error, MutableDocument, PackURI, Package, Result,
+    SettingsPartSnapshot, StoredRelationship, ct,
+};
 
 use crate::numbering::{Patch as NumberingPatch, Snapshot as NumberingSnapshot};
 
 impl Package {
     /// Load the source-preserving numbering snapshot from the main document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn numbering_snapshot(&self) -> Result<Option<NumberingSnapshot>> {
         use litchi_opc::constants::relationship_type as rt;
 
@@ -24,6 +47,10 @@ impl Package {
     /// The source snapshot must still match the authored numbering part. The
     /// candidate is validated before the existing OPC transaction publishes
     /// its replacement, and a failed publication leaves the package untouched.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn apply_numbering_patch(
         &mut self,
         source: &NumberingSnapshot,
@@ -54,14 +81,14 @@ impl Package {
     }
 
     /// Update the footnotes.xml part with new content.
-    #[allow(unused)] // Kept for future use
+    #[allow(unused, reason = "package mutator is retained for planned integration")] // Kept for future use
     fn update_footnotes_part(&mut self, xml: String) -> Result<()> {
         use litchi_opc::constants::content_type as ct;
         use litchi_opc::constants::relationship_type as rt;
         use litchi_opc::part::BlobPart;
 
         let footnotes_uri = PackURI::new("/word/footnotes.xml")
-            .map_err(|e| Error::InvalidUri(format!("footnotes URI: {}", e)))?;
+            .map_err(|e| Error::InvalidUri(format!("footnotes URI: {e}")))?;
 
         let content_type = ct::WML_FOOTNOTES.to_string();
         let footnotes_part = BlobPart::new(footnotes_uri.clone(), content_type, xml.into_bytes());
@@ -71,7 +98,7 @@ impl Package {
 
         // Create relationship from document to footnotes (use relative path)
         let doc_uri = PackURI::new("/word/document.xml")
-            .map_err(|e| Error::InvalidUri(format!("document URI: {}", e)))?;
+            .map_err(|e| Error::InvalidUri(format!("document URI: {e}")))?;
 
         if let Ok(doc_part) = self.opc.get_part_mut(&doc_uri) {
             let _ = doc_part.relate_to("footnotes.xml", rt::FOOTNOTES);
@@ -81,14 +108,14 @@ impl Package {
     }
 
     /// Update the endnotes.xml part with new content.
-    #[allow(unused)] // Kept for future use
+    #[allow(unused, reason = "package mutator is retained for planned integration")] // Kept for future use
     fn update_endnotes_part(&mut self, xml: String) -> Result<()> {
         use litchi_opc::constants::content_type as ct;
         use litchi_opc::constants::relationship_type as rt;
         use litchi_opc::part::BlobPart;
 
         let endnotes_uri = PackURI::new("/word/endnotes.xml")
-            .map_err(|e| Error::InvalidUri(format!("endnotes URI: {}", e)))?;
+            .map_err(|e| Error::InvalidUri(format!("endnotes URI: {e}")))?;
 
         let content_type = ct::WML_ENDNOTES.to_string();
         let endnotes_part = BlobPart::new(endnotes_uri.clone(), content_type, xml.into_bytes());
@@ -98,7 +125,7 @@ impl Package {
 
         // Create relationship from document to endnotes (use relative path)
         let doc_uri = PackURI::new("/word/document.xml")
-            .map_err(|e| Error::InvalidUri(format!("document URI: {}", e)))?;
+            .map_err(|e| Error::InvalidUri(format!("document URI: {e}")))?;
 
         if let Ok(doc_part) = self.opc.get_part_mut(&doc_uri) {
             let _ = doc_part.relate_to("endnotes.xml", rt::ENDNOTES);
@@ -114,7 +141,7 @@ impl Package {
         use litchi_opc::part::BlobPart;
 
         let comments_uri = PackURI::new("/word/comments.xml")
-            .map_err(|e| Error::InvalidUri(format!("comments URI: {}", e)))?;
+            .map_err(|e| Error::InvalidUri(format!("comments URI: {e}")))?;
 
         let content_type = ct::WML_COMMENTS.to_string();
         let comments_part = BlobPart::new(comments_uri.clone(), content_type, xml.into_bytes());
@@ -124,7 +151,7 @@ impl Package {
 
         // Create relationship from document to comments
         let doc_uri = PackURI::new("/word/document.xml")
-            .map_err(|e| Error::InvalidUri(format!("document URI: {}", e)))?;
+            .map_err(|e| Error::InvalidUri(format!("document URI: {e}")))?;
 
         if let Ok(doc_part) = self.opc.get_part_mut(&doc_uri) {
             let _ = doc_part.relate_to("/word/comments.xml", rt::COMMENTS);
@@ -169,7 +196,7 @@ impl Package {
             Some(relationship) => (relationship.target_partname()?, true),
             None => (
                 PackURI::new("/word/settings.xml")
-                    .map_err(|error| Error::InvalidUri(error.to_string()))?,
+                    .map_err(|error| Error::InvalidUri(error.clone()))?,
                 false,
             ),
         };
@@ -237,7 +264,7 @@ impl Package {
         use litchi_opc::part::BlobPart;
 
         let theme_uri = PackURI::new("/word/theme/theme1.xml")
-            .map_err(|e| Error::InvalidUri(format!("theme URI: {}", e)))?;
+            .map_err(|e| Error::InvalidUri(format!("theme URI: {e}")))?;
 
         let content_type = "application/vnd.openxmlformats-officedocument.theme+xml".to_string();
         let theme_part = BlobPart::new(theme_uri.clone(), content_type, xml.into_bytes());
@@ -247,7 +274,7 @@ impl Package {
 
         // Add relationship from document to theme if not exists
         let doc_uri = PackURI::new("/word/document.xml")
-            .map_err(|e| Error::InvalidUri(format!("document URI: {}", e)))?;
+            .map_err(|e| Error::InvalidUri(format!("document URI: {e}")))?;
 
         if let Ok(doc_part) = self.opc.get_part_mut(&doc_uri) {
             // Check if theme relationship already exists
@@ -267,7 +294,7 @@ impl Package {
         Ok(())
     }
 
-    #[allow(unused)] // Kept for future use
+    #[allow(unused, reason = "package mutator is retained for planned integration")] // Kept for future use
     fn update_watermark_headers(&mut self, mutable_doc: &MutableDocument) -> Result<()> {
         use litchi_opc::constants::content_type as ct;
         use litchi_opc::constants::relationship_type as rt;
@@ -295,7 +322,7 @@ impl Package {
         ];
 
         let doc_uri = PackURI::new("/word/document.xml")
-            .map_err(|e| Error::InvalidUri(format!("document URI: {}", e)))?;
+            .map_err(|e| Error::InvalidUri(format!("document URI: {e}")))?;
 
         for (idx, (header_path, _header_type)) in header_types.iter().enumerate() {
             // Generate watermark XML for this header - need to get watermark again each iteration
@@ -322,19 +349,17 @@ impl Package {
 
                 // Combine watermark and user content
                 format!(
-                    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">{}{}</w:hdr>"#,
-                    watermark_xml, user_paragraphs
+                    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">{watermark_xml}{user_paragraphs}</w:hdr>"#
                 )
             } else {
                 // Just watermark for first and even headers
                 format!(
-                    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">{}</w:hdr>"#,
-                    watermark_xml
+                    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">{watermark_xml}</w:hdr>"#
                 )
             };
 
             let header_uri = PackURI::new(*header_path)
-                .map_err(|e| Error::InvalidUri(format!("header URI: {}", e)))?;
+                .map_err(|e| Error::InvalidUri(format!("header URI: {e}")))?;
 
             let header_part = BlobPart::new(
                 header_uri,

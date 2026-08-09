@@ -1,3 +1,7 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 use crate::{Error, Result};
 
 /// Maximum number of document variables accepted by the bounded codec.
@@ -19,6 +23,7 @@ pub struct Variables {
 
 impl Variables {
     /// Create an empty collection.
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             variables: Vec::new(),
@@ -26,6 +31,7 @@ impl Variables {
     }
 
     /// Get a variable value by its case-sensitive OOXML name.
+    #[must_use]
     pub fn get(&self, name: &str) -> Option<&str> {
         self.variables
             .iter()
@@ -34,11 +40,13 @@ impl Variables {
     }
 
     /// Check whether a variable exists.
+    #[must_use]
     pub fn contains(&self, name: &str) -> bool {
         self.get(name).is_some()
     }
 
     /// Return variable names in deterministic insertion order.
+    #[must_use]
     pub fn names(&self) -> Vec<&str> {
         self.variables
             .iter()
@@ -54,16 +62,22 @@ impl Variables {
     }
 
     /// Number of variables.
+    #[must_use]
     pub fn count(&self) -> usize {
         self.variables.len()
     }
 
     /// Whether the collection is empty.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.variables.is_empty()
     }
 
     /// Insert or replace a variable without changing an existing entry's order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn insert(
         &mut self,
         name: impl Into<String>,
@@ -103,6 +117,10 @@ impl Variables {
     }
 
     /// Validate all collection and attribute limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn validate(&self) -> Result<()> {
         if self.variables.len() > MAX_DOCUMENT_VARIABLES {
             return Err(invalid(format!(

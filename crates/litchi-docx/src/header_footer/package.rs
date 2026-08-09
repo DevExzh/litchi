@@ -1,4 +1,12 @@
-//! WordprocessingML header/footer relationship orchestration.
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+//! `WordprocessingML` header/footer relationship orchestration.
 
 use crate::error::{Error, Result};
 use crate::parts::DocumentPart;
@@ -125,9 +133,9 @@ fn links(document: &DocumentPart<'_>, role: Role) -> Result<Vec<Link>> {
         &[b"sectPr".as_slice()],
         |_, start, length| {
             let start = usize::try_from(start)
-                .map_err(|_| Error::InvalidFormat("section offset overflow".into()))?;
+                .map_err(|_source_error| Error::InvalidFormat("section offset overflow".into()))?;
             let length = usize::try_from(length)
-                .map_err(|_| Error::InvalidFormat("section length overflow".into()))?;
+                .map_err(|_source_error| Error::InvalidFormat("section length overflow".into()))?;
             let end = start
                 .checked_add(length)
                 .ok_or_else(|| Error::InvalidFormat("section range overflow".into()))?;

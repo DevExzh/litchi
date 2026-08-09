@@ -339,7 +339,7 @@ pub fn read<R: BufRead>(reader: R) -> Result<Chart> {
                     xml_reader.capture_empty_fragment(e)?,
                 )?);
             },
-            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
+            Ok(Event::Start(ref e) | Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
                     b"chart" => saw_chart = true,
@@ -415,7 +415,7 @@ pub(super) fn consume_empty_chart_element<R: BufRead>(
             Ok(Event::End(ref element)) if element.local_name().as_ref() == end_name => {
                 return Ok(());
             },
-            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
+            Ok(Event::Start(ref element) | Event::Empty(ref element))
                 if element.local_name().as_ref() != IGNORED_NAMESPACE_ELEMENT.as_bytes() =>
             {
                 return Err(Error::Invalid(format!(

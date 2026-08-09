@@ -1,7 +1,7 @@
 //! Worksheet-level BIFF8 HLink/HLinkTooltip record linkage.
 //!
 //! A tooltip is associated only with the immediately preceding hyperlink
-//! and only when its checked Ref8U range matches. Targets remain inert.
+//! and only when its checked `Ref8U` range matches. Targets remain inert.
 
 use super::codec::{invalid, parse_hlink_record, parse_tooltip};
 use super::model::{Hyperlink, RECORD_TYPE, TOOLTIP_RECORD_TYPE};

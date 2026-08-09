@@ -1,4 +1,4 @@
-//! Typed DrawingML chart record families.
+//! Typed `DrawingML` chart record families.
 //!
 //! The writer is organized around chart-space, presentation, plot-area,
 //! series, axis, legend, and shared-line records. All families share the

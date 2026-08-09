@@ -41,7 +41,7 @@ impl Document {
 
     /// Get the number of tables in the document.
     ///
-    /// Counts top-level tables (table_level == 1) by scanning paragraph properties
+    /// Counts top-level tables (`table_level` == 1) by scanning paragraph properties
     /// for table markers. Based on Apache POI's table detection algorithm.
     ///
     /// # Examples
@@ -86,6 +86,7 @@ impl Document {
     ///
     /// This provides lower-level access to document properties and structure.
     #[inline]
+    #[must_use]
     pub fn fib(&self) -> &FileInformationBlock {
         &self.fib
     }
@@ -94,6 +95,7 @@ impl Document {
     ///
     /// Null fixed-index slots are retained, and each non-empty style exposes its
     /// exact UPX property payloads for subsequent inheritance and formatting.
+    #[must_use]
     pub fn stylesheet(&self) -> Option<&StyleSheet> {
         self.stylesheet.as_ref()
     }
@@ -101,16 +103,19 @@ impl Document {
     /// Get the document's fixed associated-string metadata table.
     ///
     /// Template and mail-merge paths are inert strings and are never opened.
+    #[must_use]
     pub fn associated_strings(&self) -> Option<&DocumentAssociatedStrings> {
         self.associated_strings.as_ref()
     }
 
     /// Get the ordered `LISTNUM` list-name metadata table.
+    #[must_use]
     pub fn list_names(&self) -> Option<&ListNamesTable> {
         self.list_names.as_ref()
     }
 
     /// Get list-level template codes parallel to the document's list definitions.
+    #[must_use]
     pub fn list_templates(&self) -> Option<&ListTemplateTable> {
         self.list_templates.as_ref()
     }
@@ -181,7 +186,7 @@ impl Document {
             .map_err(|error| PackageError::Corrupted(format!("invalid saved-by metadata: {error}")))
     }
 
-    /// Strictly access the caption label and AutoCaption tables.
+    /// Strictly access the caption label and `AutoCaption` tables.
     ///
     /// Parsing is deferred so malformed optional metadata does not prevent the
     /// document's primary text from opening. Caption labels remain inert text
@@ -207,7 +212,7 @@ impl Document {
             })
     }
 
-    /// Strictly access glossary-only AutoText and formatted AutoCorrect metadata.
+    /// Strictly access glossary-only `AutoText` and formatted `AutoCorrect` metadata.
     ///
     /// Ordinary documents return `None`. Parsing is deferred so malformed
     /// optional metadata does not prevent primary text access.
@@ -236,7 +241,7 @@ impl Document {
         )))
     }
 
-    /// Strictly access a template's secondary-FIB attached AutoText document.
+    /// Strictly access a template's secondary-FIB attached `AutoText` document.
     ///
     /// The returned content is passive and never evaluates fields, follows
     /// links, activates embedded objects, or resolves or executes macros.

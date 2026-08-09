@@ -1,4 +1,4 @@
-//! Host-neutral metadata for a DrawingML 3D-model instance.
+//! Host-neutral metadata for a `DrawingML` 3D-model instance.
 //!
 //! `[MS-ODRAWXML]` §2.31 stores the model payload, camera, transform, and
 //! viewport as a `model3d` element.  This first shared slice gives callers a
@@ -27,9 +27,9 @@ pub use validation::{Error, validate, validate_relationships};
 
 /// Microsoft 2017 3D-model namespace defined by `[MS-ODRAWXML]` §2.31.
 pub const NAMESPACE: &str = "http://schemas.microsoft.com/office/drawing/2017/model3d";
-/// Transitional DrawingML namespace used by the imported `a:` vocabulary.
+/// Transitional `DrawingML` namespace used by the imported `a:` vocabulary.
 pub const DRAWING_NAMESPACE: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
-/// Strict DrawingML namespace used by the imported `a:` vocabulary.
+/// Strict `DrawingML` namespace used by the imported `a:` vocabulary.
 pub const DRAWING_NAMESPACE_STRICT: &str = "http://purl.oclc.org/ooxml/drawingml/main";
 /// Transitional OOXML relationship namespace.
 pub const RELATIONSHIP_NAMESPACE: &str =

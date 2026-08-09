@@ -11,9 +11,9 @@ use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
 use super::textbox::{FIB_INDEX_PLCF_HDR_TXBX_TXT, FIB_INDEX_PLCF_TXBX_TXT, FTXBXS_LEN};
 
-/// Table-pointer index of `fcPlcfTxbxBkd`/`lcbPlcfTxbxBkd` (MS-DOC 2.5.6 FibRgFcLcb97).
+/// Table-pointer index of `fcPlcfTxbxBkd`/`lcbPlcfTxbxBkd` (MS-DOC 2.5.6 `FibRgFcLcb97`).
 const TXBX_BKD_FIB_INDEX: usize = 75;
-/// Table-pointer index of `fcPlcfTxbxHdrBkd`/`lcbPlcfTxbxHdrBkd` (MS-DOC 2.5.6 FibRgFcLcb97).
+/// Table-pointer index of `fcPlcfTxbxHdrBkd`/`lcbPlcfTxbxHdrBkd` (MS-DOC 2.5.6 `FibRgFcLcb97`).
 const TXBX_HDR_BKD_FIB_INDEX: usize = 76;
 const MAX_TBKD_ENTRIES: usize = 1_000_000;
 /// CPs are signed 31-bit positions (MS-DOC 2.2.1).
@@ -92,6 +92,7 @@ impl TextBoxBreak {
     pub const SIZE: usize = 6;
 
     /// Create an association with the `FTXBXS` object at `itxbxs`.
+    #[must_use]
     pub const fn new(itxbxs: i16) -> Self {
         Self { itxbxs }
     }
@@ -107,6 +108,7 @@ impl TextBoxBreak {
     }
 
     /// Serialize with a zeroed `dcpDepend` and zeroed flag bits.
+    #[must_use]
     pub fn to_bytes(self) -> [u8; Self::SIZE] {
         let mut data = [0u8; Self::SIZE];
         data[0..2].copy_from_slice(&self.itxbxs.to_le_bytes());
@@ -115,6 +117,7 @@ impl TextBoxBreak {
 
     /// Index of the associated `FTXBXS` object within the corresponding
     /// `PlcftxbxTxt`/`PlcfHdrtxbxTxt`. Meaningless on the final entry.
+    #[must_use]
     pub fn itxbxs(&self) -> i16 {
         self.itxbxs
     }
@@ -128,6 +131,7 @@ pub struct TextBoxBreakEntry {
 }
 
 impl TextBoxBreakEntry {
+    #[must_use]
     pub const fn new(start_cp: u32, break_info: TextBoxBreak) -> Self {
         Self {
             start_cp,
@@ -135,9 +139,11 @@ impl TextBoxBreakEntry {
         }
     }
 
+    #[must_use]
     pub fn start_cp(&self) -> u32 {
         self.start_cp
     }
+    #[must_use]
     pub fn break_info(&self) -> TextBoxBreak {
         self.break_info
     }
@@ -213,19 +219,24 @@ impl TextBoxBreakTable {
         })
     }
 
+    #[must_use]
     pub fn kind(&self) -> TextBoxBreakKind {
         self.kind
     }
+    #[must_use]
     pub fn entries(&self) -> &[TextBoxBreakEntry] {
         &self.entries
     }
     /// Final PLC CP; it only terminates the last range.
+    #[must_use]
     pub fn terminal_cp(&self) -> u32 {
         self.terminal_cp
     }
+    #[must_use]
     pub fn len(&self) -> usize {
         self.entries.len()
     }
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
@@ -329,10 +340,12 @@ impl TextBoxBreakTables {
     }
 
     /// Main textbox break table (`PlcfTxbxBkd`, MS-DOC 2.8.30).
+    #[must_use]
     pub fn main(&self) -> Option<&TextBoxBreakTable> {
         self.main.as_ref()
     }
     /// Header textbox break table (`PlcfTxbxHdrBkd`, MS-DOC 2.8.31).
+    #[must_use]
     pub fn header(&self) -> Option<&TextBoxBreakTable> {
         self.header.as_ref()
     }

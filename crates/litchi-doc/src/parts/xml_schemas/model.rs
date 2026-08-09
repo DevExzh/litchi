@@ -27,6 +27,7 @@ impl Collection {
     }
 
     /// All schema definition references in `rgxsdr` order.
+    #[must_use]
     pub fn schemas(&self) -> &[Reference] {
         &self.schemas
     }

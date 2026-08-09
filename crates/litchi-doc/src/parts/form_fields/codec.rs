@@ -7,7 +7,7 @@ use super::validation;
 
 /// NilPICFAndBinData.cbHeader: the mandated offset of binData.
 pub(super) const CB_HEADER: u16 = 0x0044;
-/// Size in bytes of the NilPICFAndBinData header (lcb + cbHeader + ignored).
+/// Size in bytes of the `NilPICFAndBinData` header (lcb + cbHeader + ignored).
 pub(super) const HEADER_LEN: usize = 68;
 /// FFData.version: the mandated version marker.
 pub(super) const FF_DATA_VERSION: u32 = 0xFFFF_FFFF;
@@ -15,7 +15,7 @@ pub(super) const FF_DATA_VERSION: u32 = 0xFFFF_FFFF;
 pub(super) const STTB_EXTENDED: u16 = 0xFFFF;
 
 impl NilPicfAndBinData {
-    /// Parse one NilPICFAndBinData from the front of data.
+    /// Parse one `NilPICFAndBinData` from the front of data.
     ///
     /// data may extend past the structure, for example when it is the
     /// remainder of the Data stream; exactly lcb bytes are consumed.
@@ -49,7 +49,7 @@ impl NilPicfAndBinData {
         })
     }
 
-    /// Parse one NilPICFAndBinData at offset within the Data stream.
+    /// Parse one `NilPICFAndBinData` at offset within the Data stream.
     pub fn parse_at(data_stream: &[u8], offset: u32) -> Result<Self> {
         let offset = usize::try_from(offset).map_err(|_| {
             validation::corrupted("NilPICFAndBinData offset does not fit in memory")
@@ -62,6 +62,7 @@ impl NilPicfAndBinData {
 
     /// Re-encode the structure, reproducing the original bytes for
     /// well-formed input.
+    #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         let lcb = (HEADER_LEN + self.bin_data.len()) as u32;
         let mut out = Vec::with_capacity(lcb as usize);
@@ -74,7 +75,7 @@ impl NilPicfAndBinData {
 }
 
 impl FormFieldData {
-    /// Parse one FFData, the binData of a NilPICFAndBinData whose cbHeader is
+    /// Parse one `FFData`, the binData of a `NilPICFAndBinData` whose cbHeader is
     /// 0x0044. Trailing bytes are rejected.
     pub fn parse(bin_data: &[u8]) -> Result<Self> {
         let mut cursor = Cursor::new(bin_data);
@@ -145,14 +146,15 @@ impl FormFieldData {
         })
     }
 
-    /// Parse the FFData of the NilPICFAndBinData stored at offset in the Data
+    /// Parse the `FFData` of the `NilPICFAndBinData` stored at offset in the Data
     /// stream.
     pub fn parse_at(data_stream: &[u8], offset: u32) -> Result<Self> {
         Self::parse(NilPicfAndBinData::parse_at(data_stream, offset)?.bin_data())
     }
 
-    /// Re-encode the FFData, reproducing the original bytes for well-formed
+    /// Re-encode the `FFData`, reproducing the original bytes for well-formed
     /// input.
+    #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut bits = match self.kind {
             super::model::FormFieldDataKind::Text => 0,

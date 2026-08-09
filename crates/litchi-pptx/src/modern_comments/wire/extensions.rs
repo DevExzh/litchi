@@ -27,7 +27,7 @@ pub(crate) fn parse_extensions(xml: Option<&[u8]>) -> Result<List> {
         }
         only_attributes(&child.attributes, &["uri"], "modern comment extension")?;
         let uri = attribute(&child.attributes, "uri", true)?
-            .unwrap()
+            .ok_or_else(|| invalid("modern comment extension requires uri"))?
             .to_owned();
         let payloads = scan_with_context(
             &child.xml,

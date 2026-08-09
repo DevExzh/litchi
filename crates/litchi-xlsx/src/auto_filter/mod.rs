@@ -1,4 +1,4 @@
-//! Layered SpreadsheetML worksheet auto-filter and sort-state owner.
+//! Layered `SpreadsheetML` worksheet auto-filter and sort-state owner.
 //!
 //! Typed criteria live in model, bounded fragment conversion in codec,
 //! and worksheet XML extraction in package. Unknown XML is retained as

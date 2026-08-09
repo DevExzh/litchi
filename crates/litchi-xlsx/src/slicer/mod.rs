@@ -1,9 +1,9 @@
-//! Typed, bounded SpreadsheetML slicer ownership.
+//! Typed, bounded `SpreadsheetML` slicer ownership.
 //!
 //! The owner is deliberately split into semantic [`model`], XML [`codec`],
 //! OPC [`package`], read-only [`validation`], and clone-staged [`transaction`]
 //! layers. Slicers are inert controls: this owner never evaluates formulas,
-//! refreshes a PivotCache, renders a UI, or applies a filter to cell data.
+//! refreshes a `PivotCache`, renders a UI, or applies a filter to cell data.
 
 pub mod codec;
 pub mod model;

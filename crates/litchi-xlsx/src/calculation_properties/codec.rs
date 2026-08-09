@@ -18,14 +18,23 @@ use super::limits::Limits;
 use super::model::{Mode, Properties, ReferenceMode};
 use super::rewriter::{Layout, inspect_layout};
 
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg_attr(
+    not(test),
+    allow(
+        dead_code,
+        reason = "the namespace constant is exercised by the test-only strict-conformance parser"
+    )
+)]
 pub(super) const MAX_XML_BYTES: usize = 32 * 1024 * 1024;
 pub(super) const CALC_FEATURES_NAMESPACE: &[u8] =
     b"http://schemas.microsoft.com/office/spreadsheetml/2018/calcfeatures";
 pub(super) const CALC_FEATURES_EXTENSION_URI: &str = "{B58B0392-4F1F-4190-BB64-5DF3571DCE5F}";
 
 /// One semantic and physical view shared by both calculation-metadata owners.
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "this lexical parser is retained for the calculation-properties rewriter"
+)]
 pub(crate) struct Inspection<'a> {
     pub(crate) source: &'a [u8],
     pub(crate) properties: Option<Properties>,
@@ -415,14 +424,11 @@ fn parse_calc_attributes(
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
             .map_err(xml_error)?;
         let value = collapse_whitespace(&value);
-        let (slot, name) = match calc_attribute_index(local.as_ref()) {
-            Some(value) => value,
-            None => {
-                return Err(invalid(format!(
-                    "unknown calcPr attribute '{}'",
-                    String::from_utf8_lossy(local.as_ref()),
-                )));
-            },
+        let Some((slot, name)) = calc_attribute_index(local.as_ref()) else {
+            return Err(invalid(format!(
+                "unknown calcPr attribute '{}'",
+                String::from_utf8_lossy(local.as_ref()),
+            )));
         };
         if std::mem::replace(&mut seen[slot], true) {
             return Err(invalid(format!("duplicate {name} attribute")));
@@ -718,7 +724,7 @@ pub(super) fn workbook_child_rank(local: &[u8]) -> Option<u8> {
 
 pub(super) fn collapse_whitespace(value: &str) -> Cow<'_, str> {
     let pieces: Vec<_> = value
-        .split(|character| matches!(character, ' ' | '\t' | '\r' | '\n'))
+        .split([' ', '\t', '\r', '\n'])
         .filter(|piece| !piece.is_empty())
         .collect();
     match pieces.as_slice() {

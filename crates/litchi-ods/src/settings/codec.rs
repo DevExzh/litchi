@@ -117,9 +117,10 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
                 {
                     validate_attributes(&element, reader.resolver())?;
                 }
-                let qname = String::from_utf8(element.name().as_ref().to_vec()).map_err(|_| {
-                    Error::InvalidFormat("ODS XML element name is not valid UTF-8".to_string())
-                })?;
+                let qname =
+                    String::from_utf8(element.name().as_ref().to_vec()).map_err(|_error| {
+                        Error::InvalidFormat("ODS XML element name is not valid UTF-8".to_string())
+                    })?;
                 stack.push(OpenElement {
                     kind,
                     start: event_start,
@@ -149,9 +150,10 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
                 {
                     validate_attributes(&element, reader.resolver())?;
                 }
-                let qname = String::from_utf8(element.name().as_ref().to_vec()).map_err(|_| {
-                    Error::InvalidFormat("ODS XML element name is not valid UTF-8".to_string())
-                })?;
+                let qname =
+                    String::from_utf8(element.name().as_ref().to_vec()).map_err(|_error| {
+                        Error::InvalidFormat("ODS XML element name is not valid UTF-8".to_string())
+                    })?;
                 let span = Span {
                     start: event_start,
                     tag_end: event_end,
@@ -183,7 +185,13 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
                 opaque = true;
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -252,7 +260,7 @@ fn record(
             }
             *calculation = Some(span);
         },
-        _ => {},
+        Kind::Document | Kind::Body | Kind::Other => {},
     }
     Ok(())
 }
@@ -343,7 +351,7 @@ fn splice(source: &str, start: usize, end: usize, replacement: &str) -> Result<S
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| Error::InvalidFormat("ODS XML position overflows usize".to_string()))
+        .map_err(|_error| Error::InvalidFormat("ODS XML position overflows usize".to_string()))
 }
 
 fn is_element(
@@ -415,6 +423,8 @@ fn namespace_kind(namespace: &ResolveResult<'_>) -> NamespaceKind {
     match namespace {
         ResolveResult::Bound(Namespace(uri)) if *uri == OFFICE_NAMESPACE => NamespaceKind::Office,
         ResolveResult::Bound(Namespace(uri)) if *uri == TABLE_NAMESPACE => NamespaceKind::Table,
-        _ => NamespaceKind::Other,
+        ResolveResult::Unbound | ResolveResult::Bound(_) | ResolveResult::Unknown(_) => {
+            NamespaceKind::Other
+        },
     }
 }

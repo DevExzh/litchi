@@ -23,16 +23,20 @@ pub struct OutlineProperties {
 }
 
 impl OutlineProperties {
+    #[must_use]
     pub fn apply_styles(&self) -> bool {
         self.apply_styles
     }
+    #[must_use]
     pub fn summary_below(&self) -> bool {
         self.summary_below
     }
+    #[must_use]
     pub fn summary_right(&self) -> bool {
         self.summary_right
     }
     /// Stored sheet-level preference. A sheet-view value overrides this on conflict.
+    #[must_use]
     pub fn show_outline_symbols(&self) -> bool {
         self.show_outline_symbols
     }
@@ -74,7 +78,10 @@ struct Parser {
 
 /// Parse the worksheet's exact `worksheet/sheetPr/outlinePr` child path.
 // Text/CData arms keep `?`-bearing whitespace checks out of guards; guards cannot use `?`.
-#[allow(clippy::collapsible_match)]
+#[allow(
+    clippy::collapsible_match,
+    reason = "separate event and element matches keep XML state transitions explicit"
+)]
 pub fn parse_outline_properties(xml: &[u8]) -> Result<Option<OutlineProperties>> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("worksheet XML is too large"));

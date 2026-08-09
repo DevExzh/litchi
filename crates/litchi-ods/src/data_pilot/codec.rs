@@ -1,4 +1,4 @@
-//! ODS host navigation and bounded DataPilot XML replacement.
+//! ODS host navigation and bounded `DataPilot` XML replacement.
 
 use crate::model::data_pilot::{Table, write_data_pilot_tables};
 use litchi_core::{Error, Result};
@@ -28,7 +28,7 @@ pub(crate) struct Span {
     pub(crate) qname: String,
 }
 
-/// The legal spreadsheet host and its optional DataPilot child.
+/// The legal spreadsheet host and its optional `DataPilot` child.
 #[derive(Debug, Clone)]
 pub(crate) struct Location {
     pub(crate) spreadsheet: Span,
@@ -63,7 +63,7 @@ struct OpenElement {
     qname: String,
 }
 
-/// Locate the direct spreadsheet DataPilot owner and its safe insertion point.
+/// Locate the direct spreadsheet `DataPilot` owner and its safe insertion point.
 pub(crate) fn locate(xml: &str) -> Result<Location> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("ODS DataPilot source exceeds the size limit"));
@@ -213,7 +213,13 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
                 opaque = true;
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -267,19 +273,17 @@ fn record(
                 ));
             }
         },
-        Kind::Container => {
-            if container.replace(span).is_some() {
-                return Err(invalid(
-                    "ODS content.xml has duplicate table:data-pilot-tables",
-                ));
-            }
+        Kind::Container if container.replace(span).is_some() => {
+            return Err(invalid(
+                "ODS content.xml has duplicate table:data-pilot-tables",
+            ));
         },
-        _ => {},
+        Kind::Document | Kind::Body | Kind::Container | Kind::Other => {},
     }
     Ok(())
 }
 
-/// Replace only the owned DataPilot container, or insert/remove it as a
+/// Replace only the owned `DataPilot` container, or insert/remove it as a
 /// direct child of the spreadsheet host.
 pub(crate) fn replace(
     source: &str,
@@ -380,7 +384,9 @@ fn allowed_attribute(namespace: ResolveResult<'_>, element: &[u8], attribute: &[
         ResolveResult::Bound(Namespace(uri)) if *uri == *CALC_EXT_NAMESPACE => {
             NamespaceKind::CalcExt
         },
-        _ => NamespaceKind::Other,
+        ResolveResult::Unbound | ResolveResult::Bound(_) | ResolveResult::Unknown(_) => {
+            NamespaceKind::Other
+        },
     };
     match namespace {
         NamespaceKind::Table => match element {
@@ -479,7 +485,7 @@ fn allowed_attribute(namespace: ResolveResult<'_>, element: &[u8], attribute: &[
         NamespaceKind::CalcExt => {
             element == b"data-pilot-level" && attribute == b"repeat-item-labels"
         },
-        _ => false,
+        NamespaceKind::Office | NamespaceKind::Other => false,
     }
 }
 
@@ -514,7 +520,7 @@ fn is_known_element(namespace: NamespaceKind, local: &[u8]) -> bool {
                 | b"data-pilot-group-member"
         ),
         NamespaceKind::TableExt => local == b"data-pilot-grand-total",
-        _ => false,
+        NamespaceKind::Office | NamespaceKind::CalcExt | NamespaceKind::Other => false,
     }
 }
 
@@ -524,12 +530,12 @@ fn is_insertion_anchor(namespace: NamespaceKind, local: &[u8]) -> bool {
 
 fn element_name(element: &BytesStart<'_>) -> Result<String> {
     String::from_utf8(element.name().as_ref().to_vec())
-        .map_err(|_| invalid("ODS DataPilot element name is not UTF-8"))
+        .map_err(|_error| invalid("ODS DataPilot element name is not UTF-8"))
 }
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("ODS DataPilot XML position overflows usize"))
+        .map_err(|_error| invalid("ODS DataPilot XML position overflows usize"))
 }
 
 fn is_element(
@@ -551,7 +557,9 @@ fn namespace_kind(namespace: &ResolveResult<'_>) -> NamespaceKind {
         ResolveResult::Bound(Namespace(uri)) if *uri == CALC_EXT_NAMESPACE => {
             NamespaceKind::CalcExt
         },
-        _ => NamespaceKind::Other,
+        ResolveResult::Unbound | ResolveResult::Bound(_) | ResolveResult::Unknown(_) => {
+            NamespaceKind::Other
+        },
     }
 }
 

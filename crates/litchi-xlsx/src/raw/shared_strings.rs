@@ -504,6 +504,7 @@ impl SharedStringParser {
 
 impl Table {
     /// Create a new empty shared strings table.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -520,16 +521,19 @@ impl Table {
     }
 
     /// Get the number of strings in the table.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.strings.len()
     }
 
     /// Check if the table is empty.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.strings.is_empty()
     }
 
     /// Get all strings.
+    #[must_use]
     pub fn strings(&self) -> &[String] {
         &self.strings
     }
@@ -609,7 +613,7 @@ impl Table {
         Ok(index)
     }
 
-    /// Serialize the table as a Transitional SpreadsheetML shared-string
+    /// Serialize the table as a Transitional `SpreadsheetML` shared-string
     /// part.
     pub fn write_xml(&self) -> Result<Vec<u8>> {
         use std::fmt::Write as _;
@@ -647,7 +651,7 @@ impl Table {
                                     "rich-text font size must be finite and positive",
                                 ));
                             }
-                            write!(xml, r#"<sz val="{}"/>"#, font_size)
+                            write!(xml, r#"<sz val="{font_size}"/>"#)
                                 .map_err(|_| invalid("shared-string XML formatting failed"))?;
                         }
                         if run.bold {

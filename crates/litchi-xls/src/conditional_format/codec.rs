@@ -1,6 +1,10 @@
 //! BIFF8 conditional-format record codecs and worksheet collection grammar.
 
-use super::model::*;
+use super::model::{
+    Alignment, Border, CF_RECORD_TYPE, CF12_RECORD_TYPE, CFEX_RECORD_TYPE, CONDFMT_RECORD_TYPE,
+    CONDFMT12_RECORD_TYPE, Comparison, Extension, Font, Formatting, Formatting12, NumberFormat,
+    Pattern, Protection, Range, Rule, Rule12, Rule12Kind, RuleKind, Style, read_u16, read_u32,
+};
 use crate::error::{Error, Result};
 use crate::formula::{FormulaContext, render_formula};
 use std::collections::HashSet;
@@ -26,8 +30,8 @@ fn parse_range(data: &[u8], record_type: u16) -> Result<Range> {
     Ok(Range {
         first_row,
         last_row,
-        first_column: first_column as u8,
-        last_column: last_column as u8,
+        first_column: crate::utils::truncate_u16_to_u8(first_column),
+        last_column: crate::utils::truncate_u16_to_u8(last_column),
     })
 }
 
@@ -115,7 +119,8 @@ fn parse_simple_xl_unicode(data: &[u8], record_type: u16) -> Result<String> {
             .chunks_exact(2)
             .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
             .collect::<Vec<_>>();
-        String::from_utf16(&units).map_err(|_| invalid(record_type, "invalid UTF-16 number format"))
+        String::from_utf16(&units)
+            .map_err(|_error| invalid(record_type, "invalid UTF-16 number format"))
     }
 }
 
@@ -159,7 +164,7 @@ fn parse_font(data: &[u8]) -> Result<Font> {
                 .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
                 .collect::<Vec<_>>();
             String::from_utf16(&units)
-                .map_err(|_| invalid(CF_RECORD_TYPE, "invalid UTF-16 conditional font name"))?
+                .map_err(|_error| invalid(CF_RECORD_TYPE, "invalid UTF-16 conditional font name"))?
         })
     };
     Ok(Font {
@@ -213,7 +218,7 @@ fn parse_style(data: &[u8]) -> Result<(Style, usize)> {
     };
     let alignment = if options & 0x0800_0000 != 0 {
         let bytes = take(data, &mut offset, 8, "alignment")?;
-        let relative_indent = read_u32(bytes, 4) as i32;
+        let relative_indent = crate::utils::wrap_u32_to_i32(read_u32(bytes, 4));
         if !(-15..=255).contains(&relative_indent) {
             return Err(invalid(
                 CF_RECORD_TYPE,
@@ -408,7 +413,7 @@ fn dxf12_length(data: &[u8], offset: usize, record_type: u16) -> Result<usize> {
             .as_ref()
             .ok_or_else(|| invalid(record_type, "truncated DXFN12"))?,
     )
-    .map_err(|_| invalid(record_type, "DXFN12 length overflows"))?;
+    .map_err(|_error| invalid(record_type, "DXFN12 length overflows"))?;
     if cb == 0 {
         if data.get(offset + 4..offset + 6) != Some(&[0, 0]) {
             return Err(invalid(
@@ -895,7 +900,7 @@ impl Collector {
                         priority: rule.priority,
                         active: true,
                         stop_if_true: rule.stop_if_true,
-                        template: rule.template as u8,
+                        template: crate::utils::truncate_u16_to_u8(rule.template),
                         differential_format: Vec::new(),
                         template_parameters: rule.template_parameters,
                         future_rule: Some(rule),
@@ -919,7 +924,7 @@ impl Collector {
                                 "CFEx legacy rule index is out of range",
                             ));
                         }
-                        self.extensions.push(*extension)
+                        self.extensions.push(*extension);
                     },
                     ParsedExtension::Future {
                         identifier,

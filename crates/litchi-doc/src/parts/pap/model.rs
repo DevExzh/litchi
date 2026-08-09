@@ -8,7 +8,7 @@
 /// - Tab stops
 /// - Table nesting information
 ///
-/// Based on Apache POI's ParagraphSprmUncompressor and ParagraphProperties.
+/// Based on Apache POI's `ParagraphSprmUncompressor` and `ParagraphProperties`.
 use crate::parts::numbering::NumberFormat;
 pub use crate::parts::tap::{CellShading as Shading, ShadingPattern};
 use crate::parts::tap::{TableProperties, TableStyleCondition};
@@ -16,7 +16,7 @@ use crate::parts::tap::{TableProperties, TableStyleCondition};
 /// Paragraph Properties structure.
 ///
 /// Contains formatting information for a paragraph.
-/// Based on Apache POI's ParagraphProperties implementation.
+/// Based on Apache POI's `ParagraphProperties` implementation.
 #[derive(Debug, Clone, Default)]
 pub struct ParagraphProperties {
     /// Justification/alignment
@@ -718,6 +718,7 @@ pub enum BorderStyle {
 
 impl ParagraphProperties {
     /// Check if any formatting is applied.
+    #[must_use]
     pub fn has_formatting(&self) -> bool {
         self.justification != Justification::Left
             || self.indent_left.is_some()
@@ -763,19 +764,20 @@ impl ParagraphProperties {
     }
 
     /// Get indent in inches.
+    #[must_use]
     pub fn get_indent_left_inches(&self) -> f32 {
-        self.indent_left.map(|v| v as f32 / 1440.0).unwrap_or(0.0)
+        self.indent_left.map_or(0.0, |v| v as f32 / 1440.0)
     }
 
     /// Get right indent in inches.
+    #[must_use]
     pub fn get_indent_right_inches(&self) -> f32 {
-        self.indent_right.map(|v| v as f32 / 1440.0).unwrap_or(0.0)
+        self.indent_right.map_or(0.0, |v| v as f32 / 1440.0)
     }
 
     /// Get first line indent in inches.
+    #[must_use]
     pub fn get_indent_first_line_inches(&self) -> f32 {
-        self.indent_first_line
-            .map(|v| v as f32 / 1440.0)
-            .unwrap_or(0.0)
+        self.indent_first_line.map_or(0.0, |v| v as f32 / 1440.0)
     }
 }

@@ -142,7 +142,7 @@ pub(crate) fn package_fib(fib: &FileInformationBlock) -> Result<()> {
     Ok(())
 }
 
-/// Locate one caption FIB pointer pair in the WordDocument stream.
+/// Locate one caption FIB pointer pair in the `WordDocument` stream.
 pub(crate) fn pointer_location(fib: &FileInformationBlock, index: usize) -> Result<usize> {
     package_fib(fib)?;
     let offset = CAPTION_POINTER_BASE

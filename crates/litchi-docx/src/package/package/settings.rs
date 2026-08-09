@@ -1,30 +1,54 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Web settings, attached templates, variables, and glossary ownership.
 
-use super::super::model::*;
+use super::super::model::{
+    ATTACHED_TEMPLATE_RELATIONSHIP, AttachedTemplate, DocumentSettings, Package, Result, Variables,
+    docx_web, extract_document_variables, glossary, patch_attached_template,
+    patch_document_variables, validate_attached_template_target,
+};
 
 use super::parts::settings_part_from_snapshot;
 
 impl Package {
     /// Read typed web-output settings and their conformance family.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn web(&self) -> Result<Option<(docx_web::Settings, docx_web::Conformance)>> {
-        Ok(docx_web::load(&self.opc)?)
+        docx_web::load(&self.opc)
     }
 
     /// Move complete web-output settings into package ownership.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn put_web(
         &mut self,
         settings: docx_web::Settings,
         conformance: docx_web::Conformance,
     ) -> Result<bool> {
-        Ok(docx_web::put(&mut self.opc, settings, conformance)?)
+        docx_web::put(&mut self.opc, settings, conformance)
     }
 
     /// Remove the document-owned web-settings part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove_web(&mut self) -> Result<bool> {
-        Ok(docx_web::remove(&mut self.opc)?)
+        docx_web::remove(&mut self.opc)
     }
 
     /// Inspect the external template associated with this document without dereferencing it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn attached_template(&self) -> Result<Option<AttachedTemplate>> {
         let snapshot = self.settings_part_snapshot()?;
         if !snapshot.relationship_exists {
@@ -39,6 +63,10 @@ impl Package {
     /// Associate this document with an external template URI.
     ///
     /// The URI is recorded inertly and is never fetched or executed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_attached_template_uri(
         &mut self,
         target_uri: impl Into<String>,
@@ -77,6 +105,10 @@ impl Package {
     }
 
     /// Remove the attached-template element and its referenced relationship.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove_attached_template(&mut self) -> Result<Option<AttachedTemplate>> {
         let snapshot = self.settings_part_snapshot()?;
         if !snapshot.relationship_exists {
@@ -98,6 +130,10 @@ impl Package {
     }
 
     /// Read the document variables stored in `settings.xml`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn document_variables(&self) -> Result<Option<Variables>> {
         let snapshot = self.settings_part_snapshot()?;
         if !snapshot.relationship_exists {
@@ -108,6 +144,10 @@ impl Package {
     }
 
     /// Insert or replace one document variable atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_document_variable(
         &mut self,
         name: impl Into<String>,
@@ -127,6 +167,10 @@ impl Package {
     }
 
     /// Remove one document variable atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove_document_variable(&mut self, name: &str) -> Result<Option<String>> {
         let snapshot = self.settings_part_snapshot()?;
         if !snapshot.relationship_exists {
@@ -147,6 +191,10 @@ impl Package {
     }
 
     /// Remove every document variable atomically and return the number removed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn clear_document_variables(&mut self) -> Result<usize> {
         let snapshot = self.settings_part_snapshot()?;
         if !snapshot.relationship_exists {
@@ -169,39 +217,63 @@ impl Package {
     }
 
     /// Load the typed glossary/building-block catalog and its dialect.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn glossary(&self) -> Result<Option<(glossary::Catalog, glossary::Conformance)>> {
-        Ok(glossary::load(&self.opc)?)
+        glossary::load(&self.opc)
     }
 
     /// Move a complete semantic catalog into the package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn put_glossary(
         &mut self,
         catalog: glossary::Catalog,
         conformance: glossary::Conformance,
     ) -> Result<bool> {
-        Ok(glossary::put(&mut self.opc, catalog, conformance)?)
+        glossary::put(&mut self.opc, catalog, conformance)
     }
 
     /// Load the complete low-level glossary OPC graph without copying payloads.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn glossary_graph(&self) -> Result<Option<glossary::raw::Graph>> {
-        Ok(glossary::raw::load(&self.opc)?)
+        glossary::raw::load(&self.opc)
     }
 
     /// Publish a complete low-level glossary OPC graph into the package.
     ///
     /// Returns `false` when the graph is already identical, preserving package
     /// bytes and digital signatures.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn put_glossary_graph(&mut self, graph: &glossary::raw::Graph) -> Result<bool> {
-        Ok(glossary::raw::put(&mut self.opc, graph)?)
+        glossary::raw::put(&mut self.opc, graph)
     }
 
     /// Remove and return the complete low-level glossary OPC graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn take_glossary_graph(&mut self) -> Result<Option<glossary::raw::Graph>> {
-        Ok(glossary::raw::remove(&mut self.opc)?)
+        glossary::raw::remove(&mut self.opc)
     }
 
     /// Remove the complete glossary-owned graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove_glossary(&mut self) -> Result<bool> {
-        Ok(glossary::remove(&mut self.opc)?)
+        glossary::remove(&mut self.opc)
     }
 }

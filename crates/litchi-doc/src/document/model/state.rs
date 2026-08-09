@@ -61,14 +61,17 @@ use std::sync::Arc;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub struct Document {
-    /// File Information Block from WordDocument stream
+    /// File Information Block from `WordDocument` stream
     pub(in crate::document) fib: FileInformationBlock,
-    /// The WordDocument stream - main document binary data
-    /// Used during initialization for TextExtractor and ChpBinTable parsing
-    #[allow(dead_code)]
+    /// The `WordDocument` stream - main document binary data
+    /// Used during initialization for `TextExtractor` and `ChpBinTable` parsing
+    #[allow(
+        dead_code,
+        reason = "reserved DOC structure retained for format completeness or future round-trip support"
+    )]
     pub(in crate::document) word_document: Vec<u8>,
     /// The Data stream - contains embedded objects, pictures, etc.
-    /// According to Apache POI, pictures are stored here, not in WordDocument stream.
+    /// According to Apache POI, pictures are stored here, not in `WordDocument` stream.
     pub(in crate::document) data_stream: Option<Vec<u8>>,
     /// Text extractor - holds the extracted document text
     pub(in crate::document) text_extractor: TextExtractor,
@@ -101,7 +104,7 @@ pub struct Document {
     pub(in crate::document) embedded_fonts: Option<DocumentEmbeddedFonts>,
     /// Typed, inert `MsoEnvelopeCLSID` metadata from the table stream.
     pub(in crate::document) envelope: Option<Envelope>,
-    /// AutoSummary priority ranges for the main document.
+    /// `AutoSummary` priority ranges for the main document.
     pub(in crate::document) auto_summary: Option<DocumentAutoSummary>,
     /// Deferred legacy Word routing-slip lifecycle metadata (`RouteSlip`).
     ///
@@ -144,26 +147,26 @@ pub struct Document {
     pub(in crate::document) text_services: Result<TextServicesTables>,
     /// Deferred strict Word 97/2000 save-history metadata parse
     pub(in crate::document) saved_by_table: Result<SavedByTable>,
-    /// Deferred strict caption label and AutoCaption metadata parse
+    /// Deferred strict caption label and `AutoCaption` metadata parse
     pub(in crate::document) caption_tables: Result<CaptionTables>,
     /// Deferred strict repair-bookmark metadata parse
     pub(in crate::document) repair_bookmarks: Result<Option<DocumentRepairBookmarks>>,
-    /// Deferred strict glossary-only AutoText metadata parse
+    /// Deferred strict glossary-only `AutoText` metadata parse
     pub(in crate::document) glossary_metadata: Result<Option<GlossaryMetadata>>,
     /// Deferred strict secondary-FIB glossary parse for templates
     pub(in crate::document) attached_glossary: Result<Option<AttachedGlossary>>,
     /// Section ranges, layout, and property revision marks
     pub(in crate::document) sections: SectionsTable,
-    /// Floating-shape anchors from the Main Document PlcfSpa (empty when the
+    /// Floating-shape anchors from the Main Document `PlcfSpa` (empty when the
     /// document has no floating shapes in the main story).
     pub(in crate::document) shape_anchors: Vec<crate::parts::spa::ShapeAnchor>,
-    /// Floating-shape anchors from the Header Document PlcfSpa (empty when
+    /// Floating-shape anchors from the Header Document `PlcfSpa` (empty when
     /// the document has no floating shapes in the header story).
     pub(in crate::document) header_shape_anchors: Vec<crate::parts::spa::ShapeAnchor>,
-    /// Text box entries from the PlcftxbxTxt (empty when the document has no
+    /// Text box entries from the `PlcftxbxTxt` (empty when the document has no
     /// textbox story).
     pub(in crate::document) textbox_entries: Vec<crate::parts::textbox::TextBoxEntry>,
-    /// Text box entries from the PlcfHdrtxbxTxt (empty when the document has no
+    /// Text box entries from the `PlcfHdrtxbxTxt` (empty when the document has no
     /// header textbox story).
     pub(in crate::document) header_textbox_entries: Vec<crate::parts::textbox::TextBoxEntry>,
     /// Hyperlinks table
@@ -172,8 +175,11 @@ pub struct Document {
     pub(in crate::document) list_tables: Option<ListTables>,
     /// Word 97+ stylesheet, including raw style UPX property sets.
     pub(in crate::document) stylesheet: Option<StyleSheet>,
-    /// Extracted MTEF data from OLE streams (stream_name -> mtef_data)
-    #[allow(dead_code)]
+    /// Extracted MTEF data from OLE streams (`stream_name` -> `mtef_data`)
+    #[allow(
+        dead_code,
+        reason = "reserved DOC structure retained for format completeness or future round-trip support"
+    )]
     pub(in crate::document) mtef_data: HashMap<String, Vec<u8>>,
     /// Parsed MTEF formulas rendered while their temporary parser arena is alive.
     /// Owned strings avoid a self-referential document and remain cheap to share.

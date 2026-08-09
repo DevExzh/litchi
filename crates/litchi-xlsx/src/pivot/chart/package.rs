@@ -200,34 +200,30 @@ fn resolve_table<'a>(
             .iter()
             .filter(|table| table.name.to_lowercase() == folded)
     };
-    match sheet_prefix {
-        Some(prefix) => {
-            let wanted = prefix.to_lowercase();
-            candidates()
-                .find(|table| table.sheet_name.to_lowercase() == wanted)
-                .ok_or_else(|| {
-                    invalid(format!(
-                        "pivot chart '{chart_uri}' references pivot table '{table_name}' on sheet '{prefix}', which does not host it"
-                    ))
-                })
-        },
-        None => {
-            let host = sheet.name.to_lowercase();
-            if let Some(table) = candidates().find(|table| table.sheet_name.to_lowercase() == host)
-            {
-                return Ok(table);
-            }
-            let mut matches = candidates();
-            match (matches.next(), matches.next()) {
-                (Some(table), None) => Ok(table),
-                (None, _) => Err(invalid(format!(
-                    "pivot chart '{chart_uri}' references missing pivot table '{table_name}'"
-                ))),
-                (Some(_), Some(_)) => Err(invalid(format!(
-                    "pivot chart '{chart_uri}' pivot-table name '{table_name}' is ambiguous"
-                ))),
-            }
-        },
+    if let Some(prefix) = sheet_prefix {
+        let wanted = prefix.to_lowercase();
+        candidates()
+            .find(|table| table.sheet_name.to_lowercase() == wanted)
+            .ok_or_else(|| {
+                invalid(format!(
+                    "pivot chart '{chart_uri}' references pivot table '{table_name}' on sheet '{prefix}', which does not host it"
+                ))
+            })
+    } else {
+        let host = sheet.name.to_lowercase();
+        if let Some(table) = candidates().find(|table| table.sheet_name.to_lowercase() == host) {
+            return Ok(table);
+        }
+        let mut matches = candidates();
+        match (matches.next(), matches.next()) {
+            (Some(table), None) => Ok(table),
+            (None, _) => Err(invalid(format!(
+                "pivot chart '{chart_uri}' references missing pivot table '{table_name}'"
+            ))),
+            (Some(_), Some(_)) => Err(invalid(format!(
+                "pivot chart '{chart_uri}' pivot-table name '{table_name}' is ambiguous"
+            ))),
+        }
     }
 }
 

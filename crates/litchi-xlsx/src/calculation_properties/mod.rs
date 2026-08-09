@@ -10,7 +10,10 @@ mod limits;
 mod model;
 mod package;
 mod patch;
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "the calculation-properties parser remains an internal rewriter seam"
+)]
 mod rewriter;
 mod snapshot;
 mod transaction;
@@ -27,7 +30,13 @@ pub use patch::{Commit, Patch};
 pub use snapshot::Snapshot;
 pub use transaction::Transaction;
 
-#[allow(unused_imports)]
+#[allow(
+    unused_imports,
+    reason = "the facade intentionally retains all calculation-properties codec entry points"
+)]
 pub(crate) use codec::{Inspection, inspect};
-#[allow(unused_imports)]
+#[allow(
+    unused_imports,
+    reason = "the facade intentionally retains the calculation-properties rewrite entry point"
+)]
 pub(crate) use rewriter::{invalidate_formulas, rewrite};

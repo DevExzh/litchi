@@ -21,6 +21,7 @@ impl Document {
     ///     }
     /// }
     /// ```
+    #[must_use]
     pub fn list_tables(&self) -> Option<&ListTables> {
         self.list_tables.as_ref()
     }
@@ -28,6 +29,7 @@ impl Document {
     /// Resolve a non-empty `LISTNUM` name by zero-based `PlfLst` definition index.
     ///
     /// Entries beyond the list-definition array are ignored as required by `[MS-DOC]`.
+    #[must_use]
     pub fn list_name_for_definition_index(&self, index: usize) -> Option<&str> {
         let definition_count = self.list_tables.as_ref()?.structures().len();
         if index >= definition_count {
@@ -41,6 +43,7 @@ impl Document {
     /// Returns `Some(ListLevel)` if the paragraph is part of a list,
     /// `None` otherwise. Any `LFOLVL` start-at or formatting overrides
     /// attached to the paragraph's LFO are applied to the result.
+    #[must_use]
     pub fn paragraph_list_info(
         &self,
         paragraph: &Paragraph,
@@ -56,6 +59,7 @@ impl Document {
     /// The returned binding exposes the selected `LSTF`, `LFO`, base `LVL`,
     /// optional `LFOLVL`, effective formatting, start value, and the
     /// preserve-indents bit encoded by a negative `sprmPIlfo`.
+    #[must_use]
     pub fn paragraph_list_binding(
         &self,
         paragraph: &Paragraph,

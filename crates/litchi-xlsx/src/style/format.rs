@@ -74,7 +74,10 @@ pub enum CellFillPatternType {
 }
 
 impl CellFillPatternType {
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "the raw format identifier is retained for style round trips"
+    )]
     pub(crate) fn as_str(&self) -> &'static str {
         match self {
             Self::None => "none",
@@ -160,7 +163,10 @@ pub enum DataValidationOperator {
 }
 
 impl DataValidationOperator {
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "the raw style identifier is retained for style round trips"
+    )]
     pub(crate) fn as_str(&self) -> &'static str {
         match self {
             Self::Between => "between",

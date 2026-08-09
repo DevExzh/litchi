@@ -15,11 +15,8 @@ pub struct BookmarksTable {
 impl BookmarksTable {
     /// Parse `SttbfBkmk`, `PlcfBkf`, and `PlcfBkl`.
     pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Self> {
-        let lengths = [21usize, 22, 23].map(|index| {
-            fib.get_table_pointer(index)
-                .map(|(_, length)| length)
-                .unwrap_or(0)
-        });
+        let lengths = [21usize, 22, 23]
+            .map(|index| fib.get_table_pointer(index).map_or(0, |(_, length)| length));
         if lengths.iter().all(|&length| length == 0) {
             return Ok(Self::default());
         }
@@ -128,6 +125,7 @@ impl BookmarksTable {
     }
 
     /// All standard bookmarks in start-CP order.
+    #[must_use]
     pub fn bookmarks(&self) -> &[Bookmark] {
         &self.bookmarks
     }

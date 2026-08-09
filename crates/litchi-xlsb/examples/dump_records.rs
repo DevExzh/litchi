@@ -1,5 +1,12 @@
 //! Print the validated record inventory of one decompressed XLSB binary part.
 
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    clippy::print_stdout,
+    clippy::shadow_reuse,
+    reason = "this command-line example intentionally prints each record and keeps its small error type next to main"
+)]
+
 use std::error::Error;
 use std::ffi::OsString;
 use std::fs;

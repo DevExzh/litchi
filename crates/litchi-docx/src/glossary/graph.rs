@@ -1,9 +1,44 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::match_same_arms,
+    reason = "separate arms document distinct OOXML grammar cases"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
+#![expect(
+    clippy::similar_names,
+    reason = "domain names mirror distinct OOXML roles"
+)]
+#![expect(
+    clippy::unnecessary_wraps,
+    reason = "the Result signature preserves a uniform fallible codec API"
+)]
 //! Low-level glossary OPC graph vocabulary and relationship closure validation.
 
-use super::codec::*;
-use super::model::*;
+use super::codec::{
+    Content, Node, bounded, invalid, read, valid_ncname, validate_physical_part, validate_raw_part,
+    write,
+};
+use super::model::{Catalog, Conformance};
 use super::package::Owner;
-use super::*;
+use super::{
+    ACTIVE_X_BINARY_CT, ACTIVE_X_BINARY_REL, ACTIVE_X_DESCRIPTOR_CT, ATTACHED_TOOLBARS_CT,
+    ATTACHED_TOOLBARS_REL, Arc, BlobPart, CHART_COLOR_STYLE_CT, CHART_COLOR_STYLE_REL,
+    CHART_COLOR_STYLE_REL_2012, CHART_STYLE_CT, CHART_STYLE_REL, CHART_STYLE_REL_2012, CT,
+    CUSTOMIZATIONS_CT, CUSTOMIZATIONS_REL, ContentType, DIAGRAM_DRAWING_REL, Error, FONT_DATA_CT,
+    FONT_TTF_CT, HashMap, HashSet, MAX_GRAPH_BYTES, MAX_GRAPH_METADATA_BYTES, MAX_VALUES,
+    OBFUSCATED_FONT_CT, OpcPackage, PRINTER_SETTINGS_CT, PackURI, Part, R, RECIPIENT_DATA_CT, REL,
+    RS, Result, STRICT_REL, STYLES_EFFECTS_CT, STYLES_EFFECTS_REL, VecDeque, ct,
+};
 pub mod raw {
     use super::{Catalog, Conformance};
     use std::sync::Arc;
@@ -26,6 +61,10 @@ pub mod raw {
 
     impl Part {
         /// Validate basic physical metadata and take ownership of a payload.
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the operation cannot be completed.
         pub fn new(
             name: impl Into<String>,
             content_type: impl Into<String>,
@@ -42,26 +81,34 @@ pub mod raw {
             })
         }
 
+        #[must_use]
         pub fn data(&self) -> &[u8] {
             self.data.as_slice()
         }
 
         /// Absolute OPC part name.
+        #[must_use]
         pub fn name(&self) -> &str {
             &self.name
         }
 
         /// OPC content type retained for this opaque part.
+        #[must_use]
         pub fn content_type(&self) -> &str {
             &self.content_type
         }
 
         /// Relationships owned by this opaque part.
+        #[must_use]
         pub fn relationships(&self) -> &[Rel] {
             &self.rels
         }
 
         /// Replace the opaque payload after checking its physical bounds.
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the operation cannot be completed.
         pub fn replace_data(&mut self, data: Vec<u8>) -> super::Result<()> {
             super::validate_raw_part(&self.name, &self.content_type, data.len())?;
             self.data = Arc::new(data);
@@ -69,6 +116,10 @@ pub mod raw {
         }
 
         /// Replace the opaque relationship list after bounded metadata checks.
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the operation cannot be completed.
         pub fn set_relationships(&mut self, relationships: Vec<Rel>) -> super::Result<()> {
             if relationships.len() > super::MAX_VALUES {
                 return Err(super::invalid("glossary relationship limit exceeded"));
@@ -89,6 +140,7 @@ pub mod raw {
         }
 
         /// Consume the part and retain shared ownership of its payload.
+        #[must_use]
         pub fn into_data(self) -> Arc<Vec<u8>> {
             self.data
         }
@@ -126,6 +178,7 @@ pub mod raw {
     }
 
     impl Graph {
+        #[must_use]
         pub fn new(catalog: Catalog, conformance: Conformance) -> Self {
             Self {
                 catalog,
@@ -141,6 +194,7 @@ pub mod raw {
         }
 
         /// Producer-selected glossary root part name.
+        #[must_use]
         pub fn root_name(&self) -> &str {
             &self.root_name
         }
@@ -151,32 +205,47 @@ pub mod raw {
         }
 
         /// Producer-selected ID of the main-document owner relationship.
+        #[must_use]
         pub fn owner_relationship_id(&self) -> Option<&str> {
             self.owner_id.as_deref()
         }
 
         /// Producer-selected main-document part that owns this graph.
+        #[must_use]
         pub fn owner_main_part(&self) -> Option<&str> {
             self.owner_main.as_deref()
         }
 
         /// Producer-selected literal target of the main-document owner relationship.
+        #[must_use]
         pub fn owner_target(&self) -> Option<&str> {
             self.owner_target.as_deref()
         }
     }
 
     /// Load the complete glossary-owned OPC graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn load(package: &litchi_opc::OpcPackage) -> super::Result<Option<Graph>> {
         super::load_graph(package)
     }
 
     /// Publish a complete graph without consuming the caller's recovery copy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn put(package: &mut litchi_opc::OpcPackage, graph: &Graph) -> super::Result<bool> {
         super::put_graph(package, graph)
     }
 
     /// Remove and return the complete graph for graph-preserving transfer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove(package: &mut litchi_opc::OpcPackage) -> super::Result<Option<Graph>> {
         super::remove_graph(package)
     }
@@ -1062,7 +1131,7 @@ pub(in crate::glossary) fn edge_spec(
         (GraphRole::ChartDrawing, "customXml") => {
             internal(TargetProfile::Xml, GraphRole::CustomXml)
         },
-        (GraphRole::DiagramData, "image") | (GraphRole::DiagramLayout, "image") => {
+        (GraphRole::DiagramData | GraphRole::DiagramLayout, "image") => {
             either(TargetProfile::Image, GraphRole::Leaf)
         },
         (GraphRole::DiagramData, "diagramDrawing") => internal(
@@ -1070,9 +1139,7 @@ pub(in crate::glossary) fn edge_spec(
             GraphRole::Leaf,
         ),
         (GraphRole::DiagramData, "hyperlink") => reference,
-        (GraphRole::EmbeddedObject, "hyperlink") | (GraphRole::EmbeddedPackage, "hyperlink") => {
-            reference
-        },
+        (GraphRole::EmbeddedObject | GraphRole::EmbeddedPackage, "hyperlink") => reference,
         (GraphRole::ActiveX, "activeXControlBinary") => {
             internal(TargetProfile::Exact(ACTIVE_X_BINARY_CT), GraphRole::Leaf)
         },

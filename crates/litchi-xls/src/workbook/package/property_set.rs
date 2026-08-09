@@ -30,6 +30,9 @@ impl Snapshot {
     /// property-set streams are parsed through the shared typed owners;
     /// unknown user-defined properties remain attached as their generic
     /// `Section`.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         let mut ole = OleFile::open(Cursor::new(bytes.clone()))?;
         validate_host(&mut ole)?;
@@ -74,19 +77,22 @@ impl Snapshot {
     }
 
     /// Returns the exact source bytes, including all untouched CFB content.
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
-    /// Returns the typed SummaryInformation view when its stream is present.
+    /// Returns the typed `SummaryInformation` view when its stream is present.
+    #[must_use]
     pub const fn summary_information(
         &self,
     ) -> Option<&litchi_ole_common::property_set::summary_information::Snapshot> {
         self.summary_information.as_ref()
     }
 
-    /// Returns the typed DocumentSummaryInformation view when its section is
+    /// Returns the typed `DocumentSummaryInformation` view when its section is
     /// present.
+    #[must_use]
     pub const fn document_summary_information(
         &self,
     ) -> Option<&litchi_ole_common::property_set::document_summary::Snapshot> {
@@ -94,6 +100,7 @@ impl Snapshot {
     }
 
     /// Returns the generic user-defined section when it is present.
+    #[must_use]
     pub const fn user_defined_properties(&self) -> Option<&Section> {
         self.user_defined_properties.as_ref()
     }
@@ -102,6 +109,9 @@ impl Snapshot {
     ///
     /// The common editor rejects signed and encrypted containers before any
     /// edit can be staged.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn transaction(&self) -> Result<Transaction> {
         Ok(Transaction {
             source: self.clone(),
@@ -118,11 +128,15 @@ pub struct Transaction {
 
 impl Transaction {
     /// Returns the immutable package source used for conflict checks.
+    #[must_use]
     pub const fn before(&self) -> &Snapshot {
         &self.source
     }
 
     /// Applies a typed PIDSI edit, staging only an actual section change.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn edit_summary_information<F>(&mut self, edit: F) -> Result<()>
     where
         F: FnOnce(
@@ -151,6 +165,9 @@ impl Transaction {
     }
 
     /// Applies a typed PIDDSI edit, staging only an actual section change.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn edit_document_summary_information<F>(&mut self, edit: F) -> Result<()>
     where
         F: FnOnce(
@@ -180,6 +197,9 @@ impl Transaction {
 
     /// Applies a generic user-defined property-section edit, staging only an
     /// actual section change.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn edit_user_defined_properties<F>(&mut self, edit: F) -> Result<()>
     where
         F: FnOnce(&mut Section) -> std::result::Result<(), OleError>,
@@ -202,17 +222,24 @@ impl Transaction {
     }
 
     /// Removes the user-defined section while retaining the standard
-    /// DocumentSummaryInformation section and all other package streams.
+    /// `DocumentSummaryInformation` section and all other package streams.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn remove_user_defined_properties(&mut self) -> Result<Option<Section>> {
         Ok(self.editor.remove(Binding::UserDefinedProperties)?)
     }
 
     /// Discards the transaction and returns its unchanged source snapshot.
+    #[must_use]
     pub fn rollback(self) -> Snapshot {
         self.source
     }
 
     /// Publishes the edited package and its source-checked reversible patch.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn commit(self) -> Result<Commit> {
         let source = self.source;
         let before = source.bytes().to_vec();
@@ -241,31 +268,37 @@ pub struct Commit {
 
 impl Commit {
     /// Whether publication changed any package byte.
+    #[must_use]
     pub const fn changed(&self) -> bool {
         self.changed
     }
 
     /// Returns the committed package snapshot.
+    #[must_use]
     pub const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Returns the source-checked whole-package patch.
+    #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Consumes the commit into its committed snapshot.
+    #[must_use]
     pub fn into_snapshot(self) -> Snapshot {
         self.snapshot
     }
 
     /// Consumes the commit into its source-checked patch.
+    #[must_use]
     pub fn into_patch(self) -> Patch {
         self.patch
     }
 
     /// Consumes the commit into owned package bytes.
+    #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
         self.snapshot.bytes.to_vec()
     }
@@ -287,21 +320,27 @@ impl Patch {
     }
 
     /// Returns the exact source bytes required by this patch.
+    #[must_use]
     pub fn before(&self) -> &[u8] {
         &self.before
     }
 
     /// Returns the exact output bytes produced by this patch.
+    #[must_use]
     pub fn after(&self) -> &[u8] {
         &self.after
     }
 
     /// Whether this patch is a byte-for-byte no-op.
+    #[must_use]
     pub fn is_noop(&self) -> bool {
         self.before == self.after
     }
 
     /// Applies this patch only to a snapshot with the exact source bytes.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.bytes() != self.before() {
             return Err(crate::error::Error::UnsafeEdit(
@@ -315,6 +354,9 @@ impl Patch {
     }
 
     /// Reverts this patch only from its exact replacement snapshot.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn revert(&self, replacement: &Snapshot) -> Result<Snapshot> {
         if replacement.bytes() != self.after() {
             return Err(crate::error::Error::UnsafeEdit(
@@ -325,6 +367,7 @@ impl Patch {
     }
 
     /// Returns the exact inverse patch.
+    #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
             before: Arc::clone(&self.after),

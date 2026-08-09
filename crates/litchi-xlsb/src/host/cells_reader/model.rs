@@ -23,13 +23,19 @@ pub(super) struct ParsedFormulaCell {
 
 /// Dimensions of a worksheet
 #[derive(Debug, Clone, Copy)]
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "retained for BIFF12 codec completeness and staged host integration"
+)]
 pub struct Dimensions {
     pub start: (u32, u32),
     pub end: (u32, u32),
 }
 
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "retained for BIFF12 codec completeness and staged host integration"
+)]
 impl Dimensions {
     pub fn len(&self) -> usize {
         ((self.end.0 - self.start.0 + 1) * (self.end.1 - self.start.1 + 1)) as usize
@@ -37,7 +43,10 @@ impl Dimensions {
 }
 
 /// XLSB cells reader
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "retained for BIFF12 codec completeness and staged host integration"
+)]
 pub struct CellsReader<'a, RS>
 where
     RS: Read + Seek,

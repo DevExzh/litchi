@@ -145,7 +145,7 @@ pub(super) fn validate_pivot_table_config(config: &PivotTableConfig) -> Result<(
             "PivotTable location is outside its BIFF8 output grid".to_string(),
         ));
     }
-    u16::try_from(config.fields.len()).map_err(|_| {
+    u16::try_from(config.fields.len()).map_err(|_error| {
         Error::InvalidData("PivotTable field count exceeds BIFF8 capacity".to_string())
     })?;
     let expected_rows = usize::from(config.source_last_row - config.source_first_row);
@@ -188,7 +188,7 @@ pub(super) fn validate_pivot_table_config(config: &PivotTableConfig) -> Result<(
         }
     }
     for (field_index, field) in config.fields.iter().enumerate() {
-        u16::try_from(field.cache_items.len()).map_err(|_| {
+        u16::try_from(field.cache_items.len()).map_err(|_error| {
             Error::InvalidData(format!(
                 "PivotCache field {field_index} has too many shared items"
             ))
@@ -408,7 +408,7 @@ pub struct PivotDataItemConfig {
 }
 
 fn column_to_letters(col: u16) -> String {
-    let mut col_index = col as u32;
+    let mut col_index = u32::from(col);
     let mut buf = Vec::new();
 
     loop {
@@ -1045,6 +1045,9 @@ pub struct CustomTableStyles {
 }
 
 impl CustomTableStyles {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(
         differential_formats: Vec<DifferentialFormat>,
         catalog: TableStyles,
@@ -1057,6 +1060,9 @@ impl CustomTableStyles {
         Ok(value)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_from_styles(
         differential_formats: Vec<DifferentialFormat>,
         default_table_style: impl Into<String>,
@@ -1073,10 +1079,12 @@ impl CustomTableStyles {
         )
     }
 
+    #[must_use]
     pub fn differential_formats(&self) -> &[DifferentialFormat] {
         &self.differential_formats
     }
 
+    #[must_use]
     pub const fn catalog(&self) -> &TableStyles {
         &self.catalog
     }

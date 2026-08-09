@@ -561,35 +561,35 @@ pub fn process_markup_compatibility<'a>(
                     Mode::Emit(q) if f.active => {
                         out.extend_from_slice(b"</")?;
                         out.extend_from_slice(q.as_bytes())?;
-                        out.push(b'>')?
+                        out.push(b'>')?;
                     },
                     _ => {},
                 }
             },
             Ok(Event::Text(e)) => {
                 if visible(&stack) {
-                    out.extend_from_slice(e.as_ref())?
+                    out.extend_from_slice(e.as_ref())?;
                 }
             },
             Ok(Event::CData(e)) => {
                 if visible(&stack) {
                     out.extend_from_slice(b"<![CDATA[")?;
                     out.extend_from_slice(e.as_ref())?;
-                    out.extend_from_slice(b"]]>")?
+                    out.extend_from_slice(b"]]>")?;
                 }
             },
             Ok(Event::Comment(e)) => {
                 if visible(&stack) {
                     out.extend_from_slice(b"<!--")?;
                     out.extend_from_slice(e.as_ref())?;
-                    out.extend_from_slice(b"-->")?
+                    out.extend_from_slice(b"-->")?;
                 }
             },
             Ok(Event::Decl(e)) => {
                 if stack.is_empty() && !root {
                     out.extend_from_slice(b"<?")?;
                     out.extend_from_slice(e.as_ref())?;
-                    out.extend_from_slice(b"?>")?
+                    out.extend_from_slice(b"?>")?;
                 } else {
                     return Err(bad("late XML declaration"));
                 }
@@ -604,7 +604,7 @@ pub fn process_markup_compatibility<'a>(
                     }
                     out.push(b'&')?;
                     out.extend_from_slice(e.as_ref())?;
-                    out.push(b';')?
+                    out.push(b';')?;
                 }
             },
             Ok(Event::DocType(_) | Event::PI(_)) => {
@@ -613,7 +613,7 @@ pub fn process_markup_compatibility<'a>(
             Ok(Event::Eof) => break,
             Err(e) => return Err(Error::Xml(e.to_string())),
         }
-        buf.clear()
+        buf.clear();
     }
     if !stack.is_empty() {
         return Err(bad("unterminated XML"));
@@ -648,9 +648,9 @@ fn start(
             a.decoded_and_normalized_value(XmlVersion::Explicit1_0, d)
                 .map_err(xerr)?
                 .into_owned(),
-        ))
+        ));
     }
-    let mut c = st.last().map(|f| f.ctx.clone()).unwrap_or_else(Ctx::root);
+    let mut c = st.last().map_or_else(Ctx::root, |f| f.ctx.clone());
     let mut local_namespaces = Vec::new();
     for (a, v) in &raw {
         if a == "xmlns" {
@@ -674,7 +674,7 @@ fn start(
             active: parent_active,
         };
         if parent_active {
-            write_start(out, &q, &c, &raw, caps, false, rep)?
+            write_start(out, &q, &c, &raw, caps, false, rep)?;
         }
         return close(st, f, empty, out);
     }
@@ -837,7 +837,7 @@ fn start(
     if name.namespace == NAMESPACE {
         match name.local_name.as_str() {
             "AlternateContent" => {
-                validate_alternate_attributes(&raw, &c, caps, AlternateKind::Container)?
+                validate_alternate_attributes(&raw, &c, caps, AlternateKind::Container)?;
             },
             "Choice" => validate_alternate_attributes(&raw, &c, caps, AlternateKind::Choice)?,
             "Fallback" => validate_alternate_attributes(&raw, &c, caps, AlternateKind::Fallback)?,
@@ -888,7 +888,7 @@ fn start(
                     ok &= caps.understands(
                         c.ns.get(p)
                             .ok_or_else(|| bad(format!("unbound Requires {p}")))?,
-                    )
+                    );
                 }
                 if count == 0 {
                     return Err(bad("empty Requires"));
@@ -896,7 +896,7 @@ fn start(
                 let a = parent.active && !*selected && ok;
                 if a {
                     *selected = true;
-                    rep.selected_choices += 1
+                    rep.selected_choices += 1;
                 }
                 (a, Mode::Branch)
             },
@@ -908,7 +908,7 @@ fn start(
                 let a = parent.active && !*selected;
                 if a {
                     *selected = true;
-                    rep.selected_fallbacks += 1
+                    rep.selected_fallbacks += 1;
                 }
                 (a, Mode::Branch)
             },
@@ -962,13 +962,13 @@ fn start(
         Mode::Emit(q.clone())
     };
     if matches!(mode, Mode::Emit(_)) && active {
-        write_start(out, &q, &c, &raw, caps, true, rep)?
+        write_start(out, &q, &c, &raw, caps, true, rep)?;
     }
     if st.is_empty() {
         if *root {
             return Err(bad("multiple roots"));
         }
-        *root = true
+        *root = true;
     }
     close(
         st,
@@ -988,14 +988,14 @@ fn close(st: &mut Vec<Frame>, f: Frame, empty: bool, out: &mut BoundedOutput) ->
             Mode::Emit(q) if f.active => {
                 out.extend_from_slice(b"</")?;
                 out.extend_from_slice(q.as_bytes())?;
-                out.push(b'>')?
+                out.push(b'>')?;
             },
             Mode::Alt { .. } => return Err(bad("empty AlternateContent")),
             _ => {},
         }
     } else {
         reserve_exact(st, 1, "MCE element stack")?;
-        st.push(f)
+        st.push(f);
     }
     Ok(())
 }
@@ -1018,7 +1018,7 @@ fn attr<'a>(r: &'a [(String, String)], n: &str) -> R<Option<&'a str>> {
             if v.is_some() {
                 return Err(bad("duplicate attribute"));
             }
-            v = Some(x.as_str())
+            v = Some(x.as_str());
         }
     }
     Ok(v)
@@ -1159,7 +1159,7 @@ fn write_start(
             && !caps.understands(&n.namespace)
         {
             if ctx.preserves_attribute(&n) {
-                rep.preserved_attributes += 1
+                rep.preserved_attributes += 1;
             } else {
                 rep.ignored_attributes += 1;
                 continue;
@@ -1169,7 +1169,7 @@ fn write_start(
         o.extend_from_slice(a.as_bytes())?;
         o.extend_from_slice(b"=\"")?;
         esc(o, v)?;
-        o.push(b'\"')?
+        o.push(b'\"')?;
     }
     o.push(b'>')?;
     Ok(())
@@ -1185,7 +1185,7 @@ fn esc(o: &mut BoundedOutput, s: &str) -> R<()> {
             '\r' => o.extend_from_slice(b"&#xD;")?,
             _ => {
                 let mut b = [0; 4];
-                o.extend_from_slice(c.encode_utf8(&mut b).as_bytes())?
+                o.extend_from_slice(c.encode_utf8(&mut b).as_bytes())?;
             },
         }
     }

@@ -147,6 +147,7 @@ impl Template {
     }
 
     /// Return the style assigned to a typed region.
+    #[must_use]
     pub fn region(&self, region: Region) -> Option<&Style> {
         match region {
             Region::FirstRow => self.first_row.as_ref(),
@@ -184,6 +185,7 @@ impl Template {
     }
 
     /// Return an owned template with one typed region assigned.
+    #[must_use]
     pub fn with_region(mut self, region: Region, style: Style) -> Self {
         self.set_region(region, Some(style));
         self

@@ -18,7 +18,11 @@ use crate::writer::{MutableWorksheet, WorkbookWriter};
 #[path = "../host/cell.rs"]
 pub(crate) mod cell;
 #[path = "../host/cells_reader/mod.rs"]
-#[allow(dead_code, unreachable_pub)]
+#[allow(
+    dead_code,
+    unreachable_pub,
+    reason = "internal host modules are shared by included package and writer implementations"
+)]
 pub(crate) mod cells_reader;
 #[path = "../host/chart_resources.rs"]
 pub(crate) mod chart_resources;
@@ -47,10 +51,18 @@ pub(crate) mod owner_transaction;
 #[path = "../host/pivot/mod.rs"]
 pub mod pivot;
 #[path = "../host/pivot_tables.rs"]
-#[allow(dead_code, unreachable_pub)]
+#[allow(
+    dead_code,
+    unreachable_pub,
+    reason = "internal host modules are shared by included package and writer implementations"
+)]
 pub(crate) mod pivot_tables;
 #[path = "../host/records.rs"]
-#[allow(dead_code, unreachable_pub)]
+#[allow(
+    dead_code,
+    unreachable_pub,
+    reason = "internal host modules are shared by included package and writer implementations"
+)]
 pub(crate) mod records;
 #[path = "../host/scenarios/mod.rs"]
 pub mod scenarios;
@@ -67,7 +79,11 @@ pub mod table;
 #[path = "../host/template.rs"]
 pub(crate) mod template;
 #[path = "../host/utils.rs"]
-#[allow(dead_code, unreachable_pub)]
+#[allow(
+    dead_code,
+    unreachable_pub,
+    reason = "internal host modules are shared by included package and writer implementations"
+)]
 pub(crate) mod utils;
 #[cfg(feature = "vba-inspection")]
 #[path = "../host/vba_project.rs"]

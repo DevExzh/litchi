@@ -1,4 +1,4 @@
-use super::super::*;
+use super::super::{FileSharing, SheetProtection, Writer};
 use crate::error::{Error, Result};
 
 impl Writer {
@@ -12,12 +12,12 @@ impl Writer {
         for &b in bytes.iter().rev() {
             let high_bit = (hash >> 14) & 0x0001;
             hash = ((hash << 1) & 0x7FFF) | high_bit;
-            hash ^= b as u16;
+            hash ^= u16::from(b);
         }
 
         let high_bit = (hash >> 14) & 0x0001;
         hash = ((hash << 1) & 0x7FFF) | high_bit;
-        hash ^= bytes.len() as u16;
+        hash ^= crate::utils::truncate_usize_to_u16(bytes.len());
         hash ^= 0xCE4B;
         hash
     }
@@ -70,6 +70,9 @@ impl Writer {
     }
 
     /// Configure read-only recommendation and an optional write-reservation password.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_file_sharing(
         &mut self,
         read_only_recommended: bool,
@@ -93,6 +96,9 @@ impl Writer {
         self.file_sharing = None;
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn protect_sheet(
         &mut self,
         sheet: usize,
@@ -103,7 +109,7 @@ impl Writer {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
 
         let password_hash = password.map(Self::hash_password);
         worksheet.sheet_protection = Some(SheetProtection {
@@ -115,11 +121,14 @@ impl Writer {
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn unprotect_sheet(&mut self, sheet: usize) -> Result<()> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.sheet_protection = None;
         Ok(())
     }

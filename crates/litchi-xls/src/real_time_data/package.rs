@@ -1,4 +1,4 @@
-//! Logical RealTimeData record assembly and prefix reconstruction.
+//! Logical `RealTimeData` record assembly and prefix reconstruction.
 
 use super::codec::{
     CONTINUE_FRT_RECORD_TYPE, FRT_HEADER_LEN, MAX_LOGICAL_PAYLOAD_BYTES, MAX_STRING_CHARACTERS,
@@ -61,7 +61,7 @@ impl Package {
             let mut logical_payload = Vec::new();
             logical_payload
                 .try_reserve(logical_len)
-                .map_err(|_| Error::Allocation("assembling RealTimeData records"))?;
+                .map_err(|_error| Error::Allocation("assembling RealTimeData records"))?;
             logical_payload.extend_from_slice(record.payload(bytes));
             while let Some(continuation) = records.get(end_record) {
                 if continuation.record_type != CONTINUE_FRT_RECORD_TYPE {
@@ -73,7 +73,7 @@ impl Package {
                     .ok_or_else(|| invalid("ContinueFrt payload span is inverted"))?;
                 logical_payload
                     .try_reserve(continuation_len)
-                    .map_err(|_| Error::Allocation("assembling RealTimeData continuations"))?;
+                    .map_err(|_error| Error::Allocation("assembling RealTimeData continuations"))?;
                 logical_payload.extend_from_slice(continuation.payload(bytes));
                 end_record = end_record
                     .checked_add(1)
@@ -182,6 +182,9 @@ impl Record {
     /// `previous_topic` is the reconstructed [`Record::topic`] of
     /// the preceding `RealTimeData` record in the globals substream, needed
     /// to re-apply prefix compression; pass `None` for the first record.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8], previous_topic: Option<&str>) -> Result<Self> {
         if data.len() > MAX_LOGICAL_PAYLOAD_BYTES {
             return Err(invalid(format!(
@@ -233,10 +236,10 @@ impl Record {
         let mut cells = Vec::new();
         cells
             .try_reserve_exact(remaining.len() / RTD_E_ITEM_LEN)
-            .map_err(|_| Error::Allocation("retaining RTD subscriber cells"))?;
+            .map_err(|_error| Error::Allocation("retaining RTD subscriber cells"))?;
         for chunk in remaining.chunks_exact(RTD_E_ITEM_LEN) {
             let column = u8::try_from(read_u16(chunk, 2)?)
-                .map_err(|_| invalid("RTD subscriber column exceeds the BIFF8 grid"))?;
+                .map_err(|_error| invalid("RTD subscriber column exceeds the BIFF8 grid"))?;
             cells.push(Cell {
                 row: read_u16(chunk, 0)?,
                 column,
@@ -252,7 +255,7 @@ impl Record {
             let previous = previous_topic
                 .ok_or_else(|| invalid("first RealTimeData record declares a shared prefix"))?;
             let prefix_len = usize::try_from(common_prefix_len)
-                .map_err(|_| invalid("RealTimeData ichSamePrefix overflows"))?;
+                .map_err(|_error| invalid("RealTimeData ichSamePrefix overflows"))?;
             if prefix_len > previous.chars().count() {
                 return Err(invalid(
                     "RealTimeData ichSamePrefix exceeds the previous topic",
@@ -264,7 +267,7 @@ impl Record {
             let mut topic = String::new();
             topic
                 .try_reserve(capacity)
-                .map_err(|_| Error::Allocation("reconstructing RealTimeData topic"))?;
+                .map_err(|_error| Error::Allocation("reconstructing RealTimeData topic"))?;
             topic.extend(previous.chars().take(prefix_len));
             topic.push_str(&stored);
             topic
@@ -288,7 +291,7 @@ impl Record {
     /// `common_prefix_len` and the previous record on the next parse.
     pub(crate) fn to_payload(&self) -> Result<Vec<u8>> {
         let common_prefix_len = usize::try_from(self.common_prefix_len)
-            .map_err(|_| invalid("RTD common prefix does not fit in usize"))?;
+            .map_err(|_error| invalid("RTD common prefix does not fit in usize"))?;
         if common_prefix_len > MAX_STRING_CHARACTERS {
             return Err(invalid(
                 "RTD common prefix exceeds the string resource limit",
@@ -325,7 +328,7 @@ impl Record {
                     return Err(invalid("RTD text exceeds the string resource limit"));
                 }
                 let char_count = u32::try_from(char_count)
-                    .map_err(|_| invalid("RTD text character count overflows u32"))?;
+                    .map_err(|_error| invalid("RTD text character count overflows u32"))?;
                 let kind = if char_count < 256 {
                     RTD_OPER_SHORT_TEXT
                 } else {

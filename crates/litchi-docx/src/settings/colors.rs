@@ -1,3 +1,7 @@
+#![expect(
+    clippy::format_push_string,
+    reason = "serialization preserves the established byte-emission path"
+)]
 use crate::Result;
 
 use super::support::invalid;
@@ -21,6 +25,10 @@ pub enum ColorSchemeIndex {
 
 impl ColorSchemeIndex {
     /// Parse the schema token.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_xml(value: &str) -> Result<Self> {
         match value {
             "dark1" => Ok(Self::Dark1),
@@ -42,6 +50,7 @@ impl ColorSchemeIndex {
     }
 
     /// Get the XML value for this theme color slot.
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Dark1 => "dark1",
@@ -102,6 +111,7 @@ impl ColorSchemeSlot {
     }
 
     /// Get the attribute name carrying this slot.
+    #[must_use]
     pub const fn attribute_name(self) -> &'static str {
         match self {
             Self::Background1 => "bg1",
@@ -128,6 +138,7 @@ pub struct ColorSchemeMapping {
 
 impl ColorSchemeMapping {
     /// Create a mapping with every slot left at its default.
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             slots: [None; ColorSchemeSlot::COUNT],
@@ -148,6 +159,7 @@ impl ColorSchemeMapping {
 
     /// Return the theme color index a slot maps to, when remapped.
     #[inline]
+    #[must_use]
     pub const fn get(&self, slot: ColorSchemeSlot) -> Option<ColorSchemeIndex> {
         self.slots[slot.index()]
     }
@@ -166,6 +178,7 @@ impl ColorSchemeMapping {
     }
 
     /// Serialize a standalone `w:clrSchemeMapping` fragment.
+    #[must_use]
     pub fn to_xml(&self, prefix: &str) -> String {
         let mut xml = format!("<{prefix}:clrSchemeMapping");
         for (slot, index) in self.iter() {

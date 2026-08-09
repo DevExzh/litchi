@@ -68,49 +68,64 @@ impl Default for WorkbookEnvironment {
 }
 
 impl WorkbookEnvironment {
+    #[must_use]
     pub fn is_template(&self) -> bool {
         self.template
     }
+    #[must_use]
     pub fn has_biff5_stream(&self) -> bool {
         self.has_biff5_stream
     }
+    #[must_use]
     pub fn has_excel9_file_marker(&self) -> bool {
         self.excel9_file_marker
     }
+    #[must_use]
     pub fn create_backup_copy(&self) -> bool {
         self.create_backup_copy
     }
+    #[must_use]
     pub fn object_display_mode(&self) -> ObjectDisplayMode {
         self.object_display_mode
     }
     /// Metadata only: the reader never refreshes or opens external data.
+    #[must_use]
     pub fn refresh_external_data_on_load(&self) -> bool {
         self.refresh_external_data_on_load
     }
+    #[must_use]
     pub fn save_external_link_values(&self) -> bool {
         self.save_external_link_values
     }
+    #[must_use]
     pub fn has_envelope(&self) -> bool {
         self.has_envelope
     }
+    #[must_use]
     pub fn envelope_visible(&self) -> bool {
         self.envelope_visible
     }
+    #[must_use]
     pub fn envelope_initialized(&self) -> bool {
         self.envelope_initialized
     }
+    #[must_use]
     pub fn link_update_mode(&self) -> LinkUpdateMode {
         self.link_update_mode
     }
+    #[must_use]
     pub fn hide_unselected_table_borders(&self) -> bool {
         self.hide_unselected_table_borders
     }
+    #[must_use]
     pub fn supports_natural_language_formulas(&self) -> bool {
         self.supports_natural_language_formulas
     }
+    #[must_use]
     pub fn default_country_code(&self) -> u16 {
         self.default_country_code
     }
+    #[must_use]
     pub fn current_country_code(&self) -> u16 {
         self.current_country_code
     }
@@ -177,11 +192,11 @@ impl EnvironmentCollector {
                 };
             },
             REFRESH_ALL_RECORD_TYPE => {
-                self.value.refresh_external_data_on_load = parse_bool(record_type, data)?
+                self.value.refresh_external_data_on_load = parse_bool(record_type, data)?;
             },
             BOOK_BOOL_RECORD_TYPE => self.parse_book_bool(data)?,
             USES_ELFS_RECORD_TYPE => {
-                self.value.supports_natural_language_formulas = parse_bool(record_type, data)?
+                self.value.supports_natural_language_formulas = parse_bool(record_type, data)?;
             },
             COUNTRY_RECORD_TYPE => {
                 require_length(record_type, data, 4)?;

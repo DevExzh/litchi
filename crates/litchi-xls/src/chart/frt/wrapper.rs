@@ -117,6 +117,9 @@ pub struct StartObject {
 
 impl StartObject {
     /// Parse a `StartObject` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != START_OBJECT_LEN {
             return Err(Error::InvalidLength {
@@ -176,6 +179,7 @@ impl StartObject {
     }
 
     /// Serialize back to a complete `StartObject` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(START_OBJECT_LEN);
         payload.extend_from_slice(&START_OBJECT_RECORD_TYPE.to_le_bytes());
@@ -188,17 +192,20 @@ impl StartObject {
     }
 
     /// The kind of object encompassed by the block (`iObjectKind`).
+    #[must_use]
     pub fn kind(&self) -> ObjectKind {
         self.kind
     }
 
     /// Additional object context (`iObjectInstance1`); an application version
     /// for `FrtFontList` blocks, zero otherwise.
+    #[must_use]
     pub fn object_instance1(&self) -> u16 {
         self.object_instance1
     }
 
     /// Raw `frtHeaderOld.grbitFrt` bitfield (`fFrtRef`/`fFrtAlert` are zero).
+    #[must_use]
     pub fn frt_flags(&self) -> u16 {
         self.frt_flags
     }
@@ -222,6 +229,9 @@ pub struct EndObject {
 
 impl EndObject {
     /// Parse an `EndObject` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != END_OBJECT_LEN {
             return Err(Error::InvalidLength {
@@ -247,6 +257,7 @@ impl EndObject {
     }
 
     /// Serialize back to a complete `EndObject` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(END_OBJECT_LEN);
         payload.extend_from_slice(&END_OBJECT_RECORD_TYPE.to_le_bytes());
@@ -259,16 +270,19 @@ impl EndObject {
     }
 
     /// The kind of object encompassed by the block (`iObjectKind`).
+    #[must_use]
     pub fn kind(&self) -> ObjectKind {
         self.kind
     }
 
     /// The preserved `unused1`/`unused2`/`unused3` fields.
+    #[must_use]
     pub fn unused(&self) -> [u16; 3] {
         self.unused
     }
 
     /// Raw `frtHeaderOld.grbitFrt` bitfield (`fFrtRef`/`fFrtAlert` are zero).
+    #[must_use]
     pub fn frt_flags(&self) -> u16 {
         self.frt_flags
     }
@@ -292,6 +306,9 @@ pub struct Wrapper {
 
 impl Wrapper {
     /// Parse an `FrtWrapper` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         // MS-XLS 2.4.130: the padded FrtWrapper is never smaller than the
         // 12-byte FrtHeader structure.
@@ -332,6 +349,7 @@ impl Wrapper {
     }
 
     /// Serialize back to a complete `FrtWrapper` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload =
             Vec::with_capacity(FRT_HEADER_OLD_LEN + self.wrapped.len() + self.padding.len());
@@ -343,21 +361,25 @@ impl Wrapper {
     }
 
     /// The complete wrapped BIFF record bytes (`wrappedRecord`).
+    #[must_use]
     pub fn wrapped_record(&self) -> &[u8] {
         &self.wrapped
     }
 
     /// The record type identifier of the wrapped record.
+    #[must_use]
     pub fn wrapped_record_type(&self) -> u16 {
         u16::from_le_bytes([self.wrapped[0], self.wrapped[1]])
     }
 
     /// The preserved `frtWrapperPadding` bytes.
+    #[must_use]
     pub fn padding(&self) -> &[u8] {
         &self.padding
     }
 
     /// Raw `frtHeaderOld.grbitFrt` bitfield (`fFrtRef`/`fFrtAlert` are zero).
+    #[must_use]
     pub fn frt_flags(&self) -> u16 {
         self.frt_flags
     }

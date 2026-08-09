@@ -19,16 +19,19 @@ pub struct DocumentVariableField {
 
 impl DocumentVariableField {
     /// Return the paired field markers and their story-relative positions.
+    #[must_use]
     pub fn field(&self) -> &Field {
         &self.field
     }
 
     /// Return the complete stored field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
 
     /// Return the stored document-variable name without resolving it.
+    #[must_use]
     pub fn variable_name(&self) -> &str {
         &self.variable_name
     }
@@ -37,6 +40,7 @@ impl DocumentVariableField {
     ///
     /// `DOCVARIABLE` has no field-specific switches. These values remain
     /// inert source metadata and are never applied.
+    #[must_use]
     pub fn unknown_switches(&self) -> &[MergeFieldSwitch] {
         &self.unknown_switches
     }
@@ -44,16 +48,19 @@ impl DocumentVariableField {
     /// Return the stored cached field result, if present.
     ///
     /// This value is never regenerated from a document variable.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a producer marked the stored result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.field.end_flags.results_dirty
     }
 
     /// Whether a producer locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.field.end_flags.locked
     }
@@ -77,16 +84,19 @@ pub struct DocumentPropertyField {
 
 impl DocumentPropertyField {
     /// Return the paired field markers and their story-relative positions.
+    #[must_use]
     pub fn field(&self) -> &Field {
         &self.field
     }
 
     /// Return the complete stored field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
 
     /// Return the stored document-property name without resolving it.
+    #[must_use]
     pub fn property_name(&self) -> &str {
         &self.property_name
     }
@@ -94,6 +104,7 @@ impl DocumentPropertyField {
     /// Return preserved switches in source order without interpreting them.
     ///
     /// These values remain inert source metadata and are never applied.
+    #[must_use]
     pub fn switches(&self) -> &[MergeFieldSwitch] {
         &self.switches
     }
@@ -101,16 +112,19 @@ impl DocumentPropertyField {
     /// Return the stored cached field result, if present.
     ///
     /// This value is never regenerated from a document property.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a producer marked the stored result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.field.end_flags.results_dirty
     }
 
     /// Whether a producer locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.field.end_flags.locked
     }
@@ -137,11 +151,13 @@ pub struct InfoField {
 
 impl InfoField {
     /// Return the paired field markers and their story-relative positions.
+    #[must_use]
     pub fn field(&self) -> &Field {
         &self.field
     }
 
     /// Return the complete stored field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
@@ -149,6 +165,7 @@ impl InfoField {
     /// Return the stored document or template property selector.
     ///
     /// The selector is preserved as metadata and is never looked up.
+    #[must_use]
     pub fn information_type(&self) -> &str {
         &self.information_type
     }
@@ -156,6 +173,7 @@ impl InfoField {
     /// Return the stored optional replacement value.
     ///
     /// This value is never applied to a document or template property.
+    #[must_use]
     pub fn new_value(&self) -> Option<&str> {
         self.new_value.as_deref()
     }
@@ -163,6 +181,7 @@ impl InfoField {
     /// Return preserved switches in source order without interpreting them.
     ///
     /// These values remain inert source metadata and are never applied.
+    #[must_use]
     pub fn switches(&self) -> &[MergeFieldSwitch] {
         &self.switches
     }
@@ -170,16 +189,19 @@ impl InfoField {
     /// Return the stored cached field result, if present.
     ///
     /// This value is never regenerated from a property.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a producer marked the stored result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.field.end_flags.results_dirty
     }
 
     /// Whether a producer locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.field.end_flags.locked
     }
@@ -211,6 +233,7 @@ pub enum DocumentInformationFieldKind {
 
 impl DocumentInformationFieldKind {
     /// The uppercase field keyword stored in a Word field instruction.
+    #[must_use]
     pub const fn field_keyword(self) -> &'static str {
         match self {
             Self::Title => "TITLE",
@@ -289,16 +312,19 @@ pub struct DocumentInformationField {
 
 impl DocumentInformationField {
     /// Return the paired field markers and their story-relative positions.
+    #[must_use]
     pub fn field(&self) -> &Field {
         &self.field
     }
 
     /// Return the complete stored field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
 
     /// Return the recognized built-in document-information category.
+    #[must_use]
     pub const fn kind(&self) -> DocumentInformationFieldKind {
         self.kind
     }
@@ -306,6 +332,7 @@ impl DocumentInformationField {
     /// Return preserved switches in source order without interpreting them.
     ///
     /// These values remain inert source metadata and are never applied.
+    #[must_use]
     pub fn switches(&self) -> &[MergeFieldSwitch] {
         &self.switches
     }
@@ -314,16 +341,19 @@ impl DocumentInformationField {
     ///
     /// This value is never regenerated from document metadata or a host user
     /// profile.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a producer marked the stored result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.field.end_flags.results_dirty
     }
 
     /// Whether a producer locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.field.end_flags.locked
     }
@@ -350,6 +380,7 @@ pub enum DocumentContextFieldKind {
 
 impl DocumentContextFieldKind {
     /// The uppercase field keyword stored in a Word field instruction.
+    #[must_use]
     pub const fn field_keyword(self) -> &'static str {
         match self {
             Self::FileName => "FILENAME",
@@ -410,16 +441,19 @@ pub struct DocumentContextField {
 
 impl DocumentContextField {
     /// Return the paired field markers and their story-relative positions.
+    #[must_use]
     pub fn field(&self) -> &Field {
         &self.field
     }
 
     /// Return the complete stored field instruction.
+    #[must_use]
     pub fn instruction(&self) -> &str {
         &self.instruction
     }
 
     /// Return the recognized built-in document-context or runtime category.
+    #[must_use]
     pub const fn kind(&self) -> DocumentContextFieldKind {
         self.kind
     }
@@ -427,6 +461,7 @@ impl DocumentContextField {
     /// Return preserved switches in source order without interpreting them.
     ///
     /// These values remain inert source metadata and are never applied.
+    #[must_use]
     pub fn switches(&self) -> &[MergeFieldSwitch] {
         &self.switches
     }
@@ -436,16 +471,19 @@ impl DocumentContextField {
     /// This value is never regenerated from a document path, attached
     /// template, host filesystem state or file size, current clock, or page
     /// and section layout.
+    #[must_use]
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
     }
 
     /// Whether a producer marked the stored result stale.
+    #[must_use]
     pub fn is_dirty(&self) -> bool {
         self.field.end_flags.results_dirty
     }
 
     /// Whether a producer locked this field against refresh.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.field.end_flags.locked
     }

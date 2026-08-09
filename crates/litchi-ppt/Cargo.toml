@@ -46,6 +46,7 @@ zeroize            = { workspace = true }
 
 [dev-dependencies]
 sha1 = { workspace = true }
+soapberry-zip = { workspace = true }
 
 [lints]
 workspace = true

@@ -1,3 +1,7 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Semantic validation and bounded resource accounting for web settings.
 
 use super::super::MAX_XML_EVENTS;
@@ -271,7 +275,7 @@ pub(crate) fn parse_i64(value: &str, description: &str) -> Result<i64> {
     }
     value
         .parse::<i64>()
-        .map_err(|_| invalid(format!("invalid {description} value '{value}'")))
+        .map_err(|_source_error| invalid(format!("invalid {description} value '{value}'")))
 }
 
 fn decimal_len(value: i64) -> usize {

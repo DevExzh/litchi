@@ -1,4 +1,4 @@
-//! SpreadsheetML namespace helpers.
+//! `SpreadsheetML` namespace helpers.
 
 use quick_xml::encoding::Decoder;
 use quick_xml::events::BytesStart;
@@ -7,13 +7,14 @@ use quick_xml::name::{Namespace, NamespaceResolver, QName, ResolveResult};
 use crate::error::Result;
 use litchi_ooxml_common::relationships::attribute_value;
 
-/// Transitional SpreadsheetML main namespace.
+/// Transitional `SpreadsheetML` main namespace.
 pub const SPREADSHEETML_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-/// Strict SpreadsheetML main namespace.
+/// Strict `SpreadsheetML` main namespace.
 pub const STRICT_SPREADSHEETML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
 
-/// Test an expanded element name against either SpreadsheetML dialect.
+/// Test an expanded element name against either `SpreadsheetML` dialect.
+#[must_use]
 pub fn is_spreadsheetml_name(
     namespace: &ResolveResult<'_>,
     name: QName<'_>,

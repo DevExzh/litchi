@@ -1,3 +1,23 @@
+#![expect(
+    clippy::cast_possible_truncation,
+    reason = "OOXML numeric values are bounded before conversion"
+)]
+#![expect(
+    clippy::let_underscore_must_use,
+    reason = "the builder return is intentionally ignored after mutation"
+)]
+#![expect(
+    clippy::needless_pass_by_value,
+    reason = "the public API shape is retained for compatibility"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
 //! Source-preserving rewrites for the small web-settings edit vocabulary.
 //!
 //! The semantic parser remains the authority for the complete part.  This
@@ -99,7 +119,13 @@ impl Tree {
                     nodes[index].end = event_end;
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {},
             }
         }
 
@@ -478,7 +504,7 @@ fn border_element(prefix: &str, side: BorderSide, value: &Border) -> String {
         &mut xml,
         prefix,
         b"themeColor",
-        value.theme_color().map(|value| value.as_str()),
+        value.theme_color().map(crate::color::Theme::as_str),
     );
     append_optional_attribute(
         &mut xml,
@@ -528,7 +554,7 @@ fn append_optional_attribute<T: std::fmt::Display>(
 ) {
     if let Some(value) = value {
         let name = qualified(prefix, name);
-        let _ = write!(xml, " {name}=\"{}\"", escape(&value.to_string()));
+        let _ = write!(xml, " {name}=\"{}\"", escape(value.to_string()));
     }
 }
 
@@ -549,7 +575,7 @@ fn attribute_value(xml: &[u8], node: &Node, name: &[u8]) -> Result<Option<String
         .position(u8::is_ascii_whitespace)
         .unwrap_or(content.len());
     let content = String::from_utf8(content)
-        .map_err(|_| invalid("web-settings attribute range is not UTF-8"))?;
+        .map_err(|_source_error| invalid("web-settings attribute range is not UTF-8"))?;
     let element = BytesStart::from_content(content, name_len);
     let mut result = None;
     for attribute in element.attributes() {

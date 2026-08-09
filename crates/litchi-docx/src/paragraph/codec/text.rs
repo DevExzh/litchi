@@ -1,3 +1,15 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::option_option,
+    reason = "nested options distinguish omitted, present-empty, and present-valued XML"
+)]
+#![expect(
+    clippy::ref_option,
+    reason = "the public API shape is retained for compatibility"
+)]
 //! Streaming text extraction for paragraph and run content.
 
 use crate::error::{Error, Result};
@@ -114,7 +126,13 @@ pub(crate) fn extract_word_text(xml_bytes: &[u8]) -> Result<String> {
                 return Err(Error::InvalidFormat("unterminated Word XML".to_string()));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     result.shrink_to_fit();
@@ -149,6 +167,10 @@ impl Paragraph {
     /// # Performance
     ///
     /// Uses streaming XML parsing with pre-allocated buffer to extract text efficiently.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn text(&self) -> Result<String> {
         extract_word_text(self.xml_bytes())
     }

@@ -2,7 +2,7 @@
 
 use super::super::codec::{ranges, u32_at};
 use super::super::semantic::{FormControl, ObjectMetadataEdit, OleObjectRecord};
-use super::super::*;
+use super::super::{BOUNDSHEET, CFB_STREAM, CONTINUE, EOF, Limits, OBJ, TXO, invalid};
 use crate::error::{Error, Result};
 use litchi_cfb::OleFile;
 use litchi_ole_common::object::{Editor as ObjectEditor, Target, Targets};
@@ -23,6 +23,9 @@ pub struct Editor {
 }
 
 impl Editor {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         // Workbook metadata is XLS-owned. Read and parse it before handing
         // the original CFB bytes to the neutral object editor so the target
@@ -42,6 +45,9 @@ impl Editor {
         })
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn objects(&self, worksheet: usize) -> Result<&[OleObjectRecord]> {
         self.sheets
             .get(worksheet)
@@ -51,6 +57,9 @@ impl Editor {
 
     /// Form controls (checkboxes, list boxes, scroll bars, ...) anchored in a
     /// worksheet, in Obj record order.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn form_controls(&self, worksheet: usize) -> Result<&[FormControl]> {
         self.form_controls
             .get(worksheet)
@@ -68,6 +77,9 @@ impl Editor {
     /// instantiate, or execute any external control/runtime content. Unknown
     /// subrecords supplied by the caller are serialized unchanged, and all
     /// controls already present in the source worksheet remain byte-identical.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_form_control(&mut self, worksheet: usize, control: FormControl) -> Result<()> {
         control.validate()?;
         let object_id = control.object_id();
@@ -95,6 +107,9 @@ impl Editor {
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add(
         &mut self,
         worksheet: usize,
@@ -131,6 +146,9 @@ impl Editor {
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn remove(&mut self, worksheet: usize, object_id: u16) -> Result<OleObjectRecord> {
         let mut candidate = self.clone();
         let sheet = candidate
@@ -157,6 +175,9 @@ impl Editor {
         Ok(removed)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn reorder(&mut self, worksheet: usize, ids: &[u16]) -> Result<()> {
         let mut candidate = self.clone();
         let sheet = candidate
@@ -184,6 +205,9 @@ impl Editor {
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn update_object_metadata(
         &mut self,
         worksheet: usize,
@@ -205,6 +229,9 @@ impl Editor {
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn replace_storage(&mut self, storage_name: &str, compound_file: Vec<u8>) -> Result<()> {
         let storage = self
             .sheets
@@ -222,6 +249,9 @@ impl Editor {
             .map_err(Into::into)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn finish(self) -> Result<Vec<u8>> {
         self.package.finish().map_err(Into::into)
     }
@@ -293,7 +323,10 @@ pub(crate) fn targets_for_sheets(sheets: &[Vec<OleObjectRecord>]) -> Result<Targ
     Ok(Targets::new(targets)?)
 }
 
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "type mirrors the decoded BIFF record structure"
+)]
 fn parse_workbook(input: &[u8]) -> Result<(Vec<Vec<OleObjectRecord>>, Vec<Vec<FormControl>>)> {
     let (_, starts) = bindings(input)?;
     let mut sheets = Vec::new();
@@ -413,7 +446,7 @@ fn rewrite_workbook(
             .ok_or_else(|| invalid(BOUNDSHEET, "sheet target missing"))?;
         output[payload..payload + 4].copy_from_slice(
             &u32::try_from(new)
-                .map_err(|_| invalid(BOUNDSHEET, "sheet offset exceeds u32"))?
+                .map_err(|_error| invalid(BOUNDSHEET, "sheet offset exceeds u32"))?
                 .to_le_bytes(),
         );
     }
@@ -476,7 +509,10 @@ fn rewrite_sheet(
     Ok(output)
 }
 
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "type mirrors the decoded BIFF record structure"
+)]
 fn bindings(input: &[u8]) -> Result<(Vec<(usize, usize)>, Vec<(usize, bool)>)> {
     let mut refs = Vec::new();
     for (start, _, kind, body_start, body_end) in ranges(input)? {

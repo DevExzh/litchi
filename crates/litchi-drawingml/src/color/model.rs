@@ -1,4 +1,4 @@
-//! Semantic DrawingML color values.
+//! Semantic `DrawingML` color values.
 
 use std::fmt;
 
@@ -19,24 +19,28 @@ impl Rgb {
 
     /// Return the three channels in red/green/blue order.
     #[inline]
+    #[must_use]
     pub const fn channels(self) -> [u8; 3] {
         self.0
     }
 
     /// Return the red channel.
     #[inline]
+    #[must_use]
     pub const fn red(self) -> u8 {
         self.0[0]
     }
 
     /// Return the green channel.
     #[inline]
+    #[must_use]
     pub const fn green(self) -> u8 {
         self.0[1]
     }
 
     /// Return the blue channel.
     #[inline]
+    #[must_use]
     pub const fn blue(self) -> u8 {
         self.0[2]
     }
@@ -58,6 +62,7 @@ impl Rgb {
 
     /// Return the canonical uppercase hexadecimal lexical form.
     #[inline]
+    #[must_use]
     pub fn to_hex(self) -> String {
         let mut value = String::with_capacity(6);
         write_hex(&mut value, self);
@@ -176,6 +181,7 @@ impl Angle {
 
     /// Return the raw angle value.
     #[inline]
+    #[must_use]
     pub const fn value(self) -> i32 {
         self.0
     }
@@ -200,6 +206,7 @@ impl PositiveAngle {
 
     /// Return the raw angle value.
     #[inline]
+    #[must_use]
     pub const fn value(self) -> u32 {
         self.0
     }
@@ -362,18 +369,21 @@ impl System {
     }
 
     /// Parse a system color without a cached RGB value.
+    #[must_use]
     pub fn from_token(value: &str) -> Option<Self> {
         Self::new(value, None).ok()
     }
 
     /// Return the exact `ST_SystemColorVal` token.
     #[inline]
+    #[must_use]
     pub fn token(&self) -> &str {
         &self.value
     }
 
     /// Return the optional `lastClr` value.
     #[inline]
+    #[must_use]
     pub const fn last_rgb(&self) -> Option<Rgb> {
         self.last
     }
@@ -548,18 +558,20 @@ impl Preset {
     }
 
     /// Parse a preset color token.
+    #[must_use]
     pub fn from_token(value: &str) -> Option<Self> {
         Self::new(value).ok()
     }
 
     /// Return the exact `ST_PresetColorVal` token.
     #[inline]
+    #[must_use]
     pub fn token(&self) -> &str {
         &self.0
     }
 }
 
-/// A typed DrawingML color choice without transforms.
+/// A typed `DrawingML` color choice without transforms.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Base {
@@ -619,7 +631,7 @@ impl From<Preset> for Base {
     }
 }
 
-/// An ordered, typed DrawingML color transform sequence.
+/// An ordered, typed `DrawingML` color transform sequence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Transform {
@@ -713,18 +725,20 @@ impl Transformed {
 
     /// Return the untransformed color choice.
     #[inline]
+    #[must_use]
     pub const fn base(&self) -> &Base {
         &self.base
     }
 
     /// Return transforms in their source order.
     #[inline]
+    #[must_use]
     pub fn transforms(&self) -> &[Transform] {
         &self.transforms
     }
 }
 
-/// A format-neutral DrawingML color choice.
+/// A format-neutral `DrawingML` color choice.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Value {
@@ -749,36 +763,42 @@ pub enum Value {
 impl Value {
     /// Construct a direct sRGB color.
     #[inline]
+    #[must_use]
     pub const fn rgb(value: Rgb) -> Self {
         Self::Rgb(value)
     }
 
     /// Construct a theme-bound color.
     #[inline]
+    #[must_use]
     pub const fn scheme(value: Scheme) -> Self {
         Self::Scheme(value)
     }
 
     /// Construct a scaled RGB color.
     #[inline]
+    #[must_use]
     pub const fn scrgb(value: ScRgb) -> Self {
         Self::ScRgb(value)
     }
 
     /// Construct an HSL color.
     #[inline]
+    #[must_use]
     pub const fn hsl(value: Hsl) -> Self {
         Self::Hsl(value)
     }
 
     /// Construct a system color.
     #[inline]
+    #[must_use]
     pub fn system(value: System) -> Self {
         Self::System(value)
     }
 
     /// Construct a preset color.
     #[inline]
+    #[must_use]
     pub fn preset(value: Preset) -> Self {
         Self::Preset(value)
     }
@@ -802,6 +822,7 @@ impl Value {
 
     /// Return the direct sRGB value, when this is an untransformed RGB choice.
     #[inline]
+    #[must_use]
     pub const fn as_rgb(&self) -> Option<Rgb> {
         match self {
             Self::Rgb(value) => Some(*value),
@@ -817,6 +838,7 @@ impl Value {
 
     /// Return the scheme token, when this is an untransformed theme choice.
     #[inline]
+    #[must_use]
     pub const fn as_scheme(&self) -> Option<Scheme> {
         match self {
             Self::Scheme(value) => Some(*value),
@@ -832,6 +854,7 @@ impl Value {
 
     /// Return the transformed representation, if present.
     #[inline]
+    #[must_use]
     pub const fn as_transformed(&self) -> Option<&Transformed> {
         match self {
             Self::Transformed(value) => Some(value),
@@ -847,6 +870,7 @@ impl Value {
 
     /// Return whether this value is retained as an opaque fragment.
     #[inline]
+    #[must_use]
     pub const fn is_unknown(&self) -> bool {
         matches!(self, Self::Unknown(_))
     }
@@ -888,8 +912,9 @@ pub enum Scheme {
 }
 
 impl Scheme {
-    /// Return the exact DrawingML token.
+    /// Return the exact `DrawingML` token.
     #[inline]
+    #[must_use]
     pub const fn token(self) -> &'static str {
         match self {
             Self::Background => "bg1",
@@ -912,8 +937,9 @@ impl Scheme {
         }
     }
 
-    /// Parse an exact DrawingML scheme-color token.
+    /// Parse an exact `DrawingML` scheme-color token.
     #[inline]
+    #[must_use]
     pub fn from_token(value: &str) -> Option<Self> {
         Some(match value {
             "bg1" => Self::Background,
@@ -938,7 +964,7 @@ impl Scheme {
     }
 }
 
-/// A bounded, well-formed DrawingML color fragment that this semantic owner
+/// A bounded, well-formed `DrawingML` color fragment that this semantic owner
 /// does not model yet.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[must_use]
@@ -958,6 +984,7 @@ impl Unknown {
 
     /// Return the retained fragment without copying it.
     #[inline]
+    #[must_use]
     pub fn as_xml(&self) -> &[u8] {
         &self.xml
     }

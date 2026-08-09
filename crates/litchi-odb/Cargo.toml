@@ -12,6 +12,7 @@ rust-version.workspace = true
 litchi-core = { workspace = true }
 litchi-odf-common = { workspace = true }
 quick-xml = { workspace = true }
+zip = { version = "8", default-features = false, features = ["deflate"] }
 
 [lints]
 workspace = true

@@ -74,7 +74,7 @@ impl Commit {
     }
 }
 
-/// Transactional editor for the WordDocument and selected table stream.
+/// Transactional editor for the `WordDocument` and selected table stream.
 #[derive(Debug, Clone)]
 pub struct Editor {
     package: ObjectEditor,

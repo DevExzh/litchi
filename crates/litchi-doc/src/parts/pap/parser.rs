@@ -1,14 +1,28 @@
 //! High-level paragraph-property parsing and style cascading.
 
-use super::model::*;
+use super::model::{
+    DropCap, DropCapType, FontAlignment, FrameAnchor, FrameHeight, FrameHorizontalAnchor,
+    FrameHorizontalPosition, FrameTextFlow, FrameTextWrap, FrameVerticalAnchor,
+    FrameVerticalPosition, Justification, LegacyBorderPosition, LegacyBorderStyle, LineSpacingType,
+    ParagraphProperties, PhysicalJustification, TextBoxTightWrap,
+};
 use crate::package::{Error as PackageError, Result};
 use crate::parts::{styles::StyleSheet, tap_parser::TapParser};
 use crate::sprm::{Sprm, parse_sprms};
-use crate::sprm_operations::*;
+use crate::sprm_operations::{
+    SPRM_P_BRC_BAR, SPRM_P_BRC_BETWEEN, SPRM_P_BRC_BOTTOM, SPRM_P_BRC_LEFT, SPRM_P_BRC_RIGHT,
+    SPRM_P_BRC_TOP, SPRM_P_CNF, SPRM_P_DXA_LEFT_2000, SPRM_P_DXA_LEFT1_2000, SPRM_P_DXA_RIGHT_2000,
+    SPRM_P_DXC_LEFT, SPRM_P_DXC_LEFT1, SPRM_P_DXC_RIGHT, SPRM_P_DYL_AFTER, SPRM_P_DYL_BEFORE,
+    SPRM_P_F_CONTEXTUAL_SPACING, SPRM_P_F_DYA_AFTER_AUTO, SPRM_P_F_DYA_BEFORE_AUTO,
+    SPRM_P_F_MIRROR_INDENTS, SPRM_P_F_NO_ALLOW_OVERLAP, SPRM_P_F_OPEN_TCH, SPRM_P_IPGP,
+    SPRM_P_ISTD, SPRM_P_ISTD_PERMUTE, SPRM_P_JC_LOGICAL, SPRM_P_NEST_2000, SPRM_P_RSID,
+    SPRM_P_TTWO, SPRM_P_WALL, get_sprm_operation, get_sprm_type,
+};
 use litchi_core::binary::read_u16_le;
 
 impl ParagraphProperties {
-    /// Create a new ParagraphProperties with default values.
+    /// Create a new `ParagraphProperties` with default values.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -17,7 +31,7 @@ impl ParagraphProperties {
     ///
     /// SPRMs are variable-length records that modify properties.
     ///
-    /// Based on Apache POI's ParagraphSprmUncompressor.
+    /// Based on Apache POI's `ParagraphSprmUncompressor`.
     ///
     /// # Arguments
     ///
@@ -240,7 +254,7 @@ impl ParagraphProperties {
 
 /// Apply a single SPRM operation to paragraph properties.
 ///
-/// Based on Apache POI's ParagraphSprmUncompressor.unCompressPAPOperation().
+/// Based on Apache POI's `ParagraphSprmUncompressor.unCompressPAPOperation()`.
 ///
 /// # Arguments
 ///
@@ -248,7 +262,10 @@ impl ParagraphProperties {
 /// * `sprm` - The SPRM operation to apply
 // This is the specification-indexed SPRM dispatch table. Keeping opcode
 // handling together makes overlap and precedence reviewable.
-#[allow(clippy::cognitive_complexity)]
+#[allow(
+    clippy::cognitive_complexity,
+    reason = "the parser keeps branch order aligned with the MS-DOC record grammar"
+)]
 impl ParagraphProperties {
     pub(super) fn apply_sprm(pap: &mut ParagraphProperties, sprm: &Sprm) -> Result<()> {
         match sprm.opcode {
@@ -419,9 +436,9 @@ impl ParagraphProperties {
             },
             // Operation 0x02: sprmPIncLvl - Increment outline level
             0x02 => {
-                let delta = sprm.operand_byte().ok_or_else(|| {
+                let delta = i16::from(sprm.operand_byte().ok_or_else(|| {
                     PackageError::Corrupted("sprmPIncLvl is missing its signed offset".to_string())
-                })? as i8 as i16;
+                })? as i8);
                 if let Some(style @ 1..=9) = pap.style_index {
                     let style = (style as i16 + delta).clamp(1, 9) as u16;
                     pap.style_index = Some(style);

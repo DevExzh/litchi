@@ -1,6 +1,9 @@
 //! BIFF8 payload codecs for external-link records.
 
-use super::model::*;
+use super::model::{
+    CacheRow, CachedValue, ClipboardFormat, ErrorValue, Name, NameBody, Sheet, SheetReference,
+    SupportingBook, ValueMatrix, Workbook,
+};
 use super::{
     CRN_RECORD_TYPE, EXTERN_NAME_RECORD_TYPE, EXTERN_SHEET_RECORD_TYPE, MAX_DDE_OLE_VALUES,
     MAX_EXTERNAL_SHEETS, SUP_BOOK_RECORD_TYPE,
@@ -76,9 +79,9 @@ pub(super) fn parse_external_name(
     }
     let clipboard_bits = (flags >> 5) & 0x03ff;
     let clipboard_format = if clipboard_bits & 0x0200 != 0 {
-        clipboard_bits as i16 - 1024
+        crate::utils::wrap_u16_to_i16(clipboard_bits) - 1024
     } else {
-        clipboard_bits as i16
+        crate::utils::wrap_u16_to_i16(clipboard_bits)
     };
     let clipboard_format = ClipboardFormat::parse(clipboard_format)?;
     let displayed_as_icon = flags & 0x8000 != 0;
@@ -238,9 +241,11 @@ pub(super) fn parse_external_name(
         },
     };
     Ok(Name {
-        supporting_book_index: u16::try_from(book_index).map_err(|_| Error::InvalidRecord {
-            record_type: EXTERN_NAME_RECORD_TYPE,
-            message: "supporting-book index exceeds u16".to_string(),
+        supporting_book_index: u16::try_from(book_index).map_err(|_error| {
+            Error::InvalidRecord {
+                record_type: EXTERN_NAME_RECORD_TYPE,
+                message: "supporting-book index exceeds u16".to_string(),
+            }
         })?,
         built_in,
         automatic,
@@ -494,10 +499,10 @@ pub(super) fn validate_reference(
         },
         SupportingBook::SelfReference => validate_sheet_scope(first, last, internal_sheet_count)?,
         SupportingBook::ExternalWorkbook(book) => {
-            validate_sheet_scope(first, last, book.sheets.len())?
+            validate_sheet_scope(first, last, book.sheets.len())?;
         },
         SupportingBook::Unused { sheet_names } => {
-            validate_sheet_scope(first, last, sheet_names.len())?
+            validate_sheet_scope(first, last, sheet_names.len())?;
         },
     }
     Ok(())
@@ -687,7 +692,7 @@ pub(super) fn read_u16(data: &[u8], offset: usize) -> u16 {
 }
 
 /// Re-encodes only the specified supporting-book metadata.  Sheet cache
-/// records and all records outside this SupBook remain owned by the source
+/// records and all records outside this `SupBook` remain owned by the source
 /// package.
 pub(super) fn encode_supporting_book(
     book: &SupportingBook,
@@ -730,8 +735,9 @@ pub(super) fn encode_supporting_book(
     let mut payload = Vec::new();
     match book {
         SupportingBook::ExternalWorkbook(book) => {
-            let sheet_count = u16::try_from(book.sheets.len())
-                .map_err(|_| Error::Allocation("encoding external supporting-book sheet count"))?;
+            let sheet_count = u16::try_from(book.sheets.len()).map_err(|_error| {
+                Error::Allocation("encoding external supporting-book sheet count")
+            })?;
             if book.sheets.len() > MAX_EXTERNAL_SHEETS {
                 return invalid(
                     SUP_BOOK_RECORD_TYPE,
@@ -826,7 +832,8 @@ fn append_counted_unicode(
             format!("Unicode string exceeds {maximum} UTF-16 code units"),
         );
     }
-    let count = u16::try_from(count).map_err(|_| Error::Allocation("encoding BIFF8 string"))?;
+    let count =
+        u16::try_from(count).map_err(|_error| Error::Allocation("encoding BIFF8 string"))?;
     output.extend_from_slice(&count.to_le_bytes());
     append_unicode_no_cch(output, value);
     Ok(())
@@ -834,7 +841,7 @@ fn append_counted_unicode(
 
 fn append_unicode_no_cch(output: &mut Vec<u8>, value: &str) {
     let compressed = value.chars().all(|character| u32::from(character) <= 0xFF);
-    output.push(if compressed { 0 } else { 1 });
+    output.push(u8::from(!compressed));
     if compressed {
         output.extend(value.chars().map(|character| character as u8));
     } else {
@@ -846,7 +853,7 @@ fn append_unicode_no_cch(output: &mut Vec<u8>, value: &str) {
 
 fn encode_short_unicode(value: &str, record_type: u16) -> Result<Vec<u8>> {
     let count = value.encode_utf16().count();
-    let count = u8::try_from(count).map_err(|_| Error::InvalidRecord {
+    let count = u8::try_from(count).map_err(|_error| Error::InvalidRecord {
         record_type,
         message: "ExternName short Unicode name exceeds 255 UTF-16 code units".into(),
     })?;

@@ -1,4 +1,4 @@
-//! Contextual BIFF writers for MS-XLS PivotTables and pivot caches.
+//! Contextual BIFF writers for MS-XLS `PivotTables` and pivot caches.
 //!
 //! The facade keeps the existing `writer::biff` call surface while separating
 //! typed configurations, wire emission, validation, and focused tests.

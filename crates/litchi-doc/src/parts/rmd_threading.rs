@@ -40,11 +40,13 @@ pub struct MessageDisplayProperties {
 
 impl MessageDisplayProperties {
     /// Creation time of the e-mail message.
+    #[must_use]
     pub fn created(&self) -> Option<DateTime> {
         self.created
     }
 
     /// Index into the `SttbfRMark` table of the message's author.
+    #[must_use]
     pub fn author_index(&self) -> i16 {
         self.author_index
     }
@@ -63,11 +65,13 @@ pub struct ThreadingMessage {
 impl ThreadingMessage {
     /// The message identifier. Empty when the corresponding author did not
     /// author an e-mail message.
+    #[must_use]
     pub fn message_id(&self) -> &str {
         &self.message_id
     }
 
     /// Display properties of the message.
+    #[must_use]
     pub fn display(&self) -> Option<MessageDisplayProperties> {
         self.display
     }
@@ -86,11 +90,13 @@ pub struct DocumentRmdThreading {
 
 impl DocumentRmdThreading {
     /// The review messages parallel to the document's `SttbfRMark` authors.
+    #[must_use]
     pub fn messages(&self) -> &[ThreadingMessage] {
         &self.messages
     }
 
     /// The personal styles parallel to the document's `SttbfRMark` authors.
+    #[must_use]
     pub fn personal_styles(&self) -> &[String] {
         &self.personal_styles
     }

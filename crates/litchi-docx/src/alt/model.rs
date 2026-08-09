@@ -1,3 +1,11 @@
+#![expect(
+    clippy::items_after_statements,
+    reason = "the local helper remains adjacent to its sole use"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 use crate::{Error, Result};
 use litchi_opc::constants::relationship_type;
 
@@ -33,6 +41,10 @@ pub struct Rel(Box<str>);
 
 impl Rel {
     /// Validate an identifier that can be emitted without XML escaping.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         if value.is_empty()
@@ -50,6 +62,7 @@ impl Rel {
 
     /// Borrow the underlying OPC identifier.
     #[inline]
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -68,6 +81,10 @@ pub struct Uri(Box<str>);
 
 impl Uri {
     /// Validate a bounded, inert external target.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         if value.is_empty() || value.len() > 32_768 || value.chars().any(char::is_control) {
@@ -78,12 +95,14 @@ impl Uri {
 
     /// Borrow the preserved target URI.
     #[inline]
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
     /// Move the target URI out without copying it.
     #[inline]
+    #[must_use]
     pub fn into_string(self) -> String {
         self.0.into()
     }
@@ -108,6 +127,7 @@ impl Conformance {
     ///
     /// Word uses the case-sensitive `aFChunk` spelling in Transitional files.
     #[inline]
+    #[must_use]
     pub const fn relationship(self) -> &'static str {
         match self {
             Self::Transitional => relationship_type::MS_ALTERNATIVE_FORMAT_IMPORT,
@@ -149,6 +169,7 @@ pub enum Data {
 
 impl Data {
     /// Canonical media type for the payload.
+    #[must_use]
     pub const fn media_type(&self) -> &'static str {
         match self {
             Self::Docx(_) => {
@@ -169,6 +190,7 @@ impl Data {
     }
 
     /// Conventional package extension for the payload.
+    #[must_use]
     pub const fn extension(&self) -> &'static str {
         match self {
             Self::Docx(_) => "docx",
@@ -185,6 +207,7 @@ impl Data {
     }
 
     /// Borrow the opaque payload bytes.
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         match self {
             Self::Docx(bytes)
@@ -202,17 +225,23 @@ impl Data {
 
     /// Payload size in bytes.
     #[inline]
+    #[must_use]
     pub fn len(&self) -> usize {
         self.bytes().len()
     }
 
     /// Whether the payload is empty.
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.bytes().is_empty()
     }
 
     /// Enforce the package-authoring resource limit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn validate(&self) -> Result<()> {
         if self.len() > MAX_DATA_BYTES {
             return Err(invalid(
@@ -223,6 +252,7 @@ impl Data {
     }
 
     /// Move the opaque payload bytes out without copying them.
+    #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
         match self {
             Self::Docx(bytes)
@@ -251,12 +281,17 @@ pub enum Import {
 impl Import {
     /// Wrap an owned internal payload.
     #[inline]
+    #[must_use]
     pub const fn data(data: Data) -> Self {
         Self::Data(data)
     }
 
     /// Validate an inert external target.
     #[inline]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn link(uri: impl Into<String>) -> Result<Self> {
         Uri::new(uri).map(Self::Link)
     }
@@ -272,6 +307,7 @@ pub struct Chunk {
 impl Chunk {
     /// Bind a low-level anchor to a validated OPC relationship.
     #[inline]
+    #[must_use]
     pub const fn new(relationship: Rel, match_source: Option<bool>) -> Self {
         Self {
             relationship,
@@ -281,6 +317,7 @@ impl Chunk {
 
     /// Relationship identifying the alternative-format import target.
     #[inline]
+    #[must_use]
     pub const fn relationship(&self) -> &Rel {
         &self.relationship
     }
@@ -290,6 +327,7 @@ impl Chunk {
     /// `None` means `<w:matchSrc>` was absent. `Some(true)` includes the
     /// empty-element form, while `Some(false)` represents an explicit false.
     #[inline]
+    #[must_use]
     pub const fn match_source(&self) -> Option<bool> {
         self.match_source
     }

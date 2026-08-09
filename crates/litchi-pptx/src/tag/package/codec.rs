@@ -1102,9 +1102,8 @@ fn source_anchor_identity(
         drop(namespace);
         let end = xml_position(&reader)?;
         if is_selected {
-            let element = match event {
-                Event::Start(element) | Event::Empty(element) => element,
-                _ => return Err(invalid("raw direct p:tags mapping is not an element")),
+            let (Event::Start(element) | Event::Empty(element)) = event else {
+                return Err(invalid("raw direct p:tags mapping is not an element"));
             };
             if end != selected.open_end {
                 return Err(invalid("raw direct p:tags opening span diverged"));

@@ -1,6 +1,26 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::needless_pass_by_value,
+    reason = "the public API shape is retained for compatibility"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
 //! Custom XML data stores, bibliography sources, and SDT bindings.
 
-use super::super::model::*;
+use super::super::model::{
+    BibliographySource, Binding, BlobPart, CustomXmlItem, CustomXmlProps, Error, MAX_ITEMS,
+    NewCustomXmlItem, NewCustomXmlProps, NewStore, OpcPackage, PackURI, Package, Part, Result,
+    SourceStore, custom_xml, discover_bibliography_source_stores,
+};
 use crate::content_control::{Checksum, ChecksumValue, Inventory, PackageLimits, Snapshot};
 use crate::package::story::{self, StoryInventory, StoryTopology};
 use std::sync::Arc;
@@ -101,6 +121,10 @@ struct ChecksumPlan {
 
 impl Package {
     /// Discover every validated Custom XML Data Storage relationship occurrence.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn custom_xml(&self) -> Result<Vec<CustomXmlItem>> {
         Ok(custom_xml::discover(&self.opc)?)
     }
@@ -111,6 +135,10 @@ impl Package {
     /// XML data store. This method exposes stored source values and style
     /// metadata only. It never matches source tags to citations, resolves
     /// schemas or styles, runs transforms, refreshes fields, or changes data.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn bibliography_source_stores(&self) -> Result<Vec<SourceStore>> {
         let items = custom_xml::discover(&self.opc)?;
         discover_bibliography_source_stores(&items)
@@ -120,6 +148,10 @@ impl Package {
     ///
     /// This flattens [`Self::bibliography_source_stores`] without resolving
     /// `CITATION` fields or applying bibliography style rules.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn bibliography_sources(&self) -> Result<Vec<BibliographySource>> {
         let stores = self.bibliography_source_stores()?;
         Ok(stores
@@ -129,11 +161,19 @@ impl Package {
     }
 
     /// Return the number of typed, inert bibliography sources.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn bibliography_source_count(&self) -> Result<usize> {
         Ok(self.bibliography_sources()?.len())
     }
 
     /// Find a Custom XML data store by its case-insensitive datastore item GUID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn custom_xml_by_id(&self, id: &str) -> Result<Option<CustomXmlItem>> {
         Ok(custom_xml::discover(&self.opc)?.into_iter().find(|item| {
             item.props()
@@ -145,6 +185,10 @@ impl Package {
     ///
     /// Signed packages require an explicit [`Self::unsign`] before this
     /// mutating operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_custom_xml(&mut self, store: NewStore) -> Result<CustomXmlItem> {
         custom_xml::validate_content_type(&store.content_type)?;
         custom_xml::validate_payload(&store.xml)?;
@@ -223,6 +267,10 @@ impl Package {
     ///
     /// An exact no-op preserves package signatures. A changed signed package
     /// requires an explicit [`Self::unsign`] first.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_custom_xml(&mut self, id: &str, xml: Vec<u8>) -> Result<()> {
         custom_xml::validate_payload(&xml)?;
         self.mutate_custom_xml(
@@ -236,6 +284,10 @@ impl Package {
     ///
     /// An exact no-op preserves package signatures. A changed signed package
     /// requires an explicit [`Self::unsign`] first.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn replace_custom_xml(&mut self, id: &str, replacement: NewStore) -> Result<()> {
         custom_xml::validate_content_type(&replacement.content_type)?;
         custom_xml::validate_payload(&replacement.xml)?;
@@ -307,6 +359,10 @@ impl Package {
     ///
     /// A missing-store no-op preserves package signatures. Removing an
     /// existing store from a signed package requires [`Self::unsign`] first.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove_custom_xml(&mut self, id: &str) -> Result<bool> {
         self.ensure_story_opc_current("remove_custom_xml")?;
         let present = custom_xml::discover(&self.opc)?.iter().any(|item| {
@@ -338,8 +394,7 @@ impl Package {
                 |source, occurrence, control_id, binding| {
                     if binding.store_item_id().eq_ignore_ascii_case(&id) {
                         return Err(Error::InvalidFormat(format!(
-                            "content-control occurrence {occurrence} (producer ID {control_id:?}) in '{}' still references Custom XML itemID '{id}'",
-                            source
+                            "content-control occurrence {occurrence} (producer ID {control_id:?}) in '{source}' still references Custom XML itemID '{id}'"
                         )));
                     }
                     Ok(())
@@ -402,6 +457,10 @@ impl Package {
     /// appended in place, preserving untouched entries, style metadata, and
     /// the store's relationship/content-type graph. Duplicate tags are
     /// rejected. Returns the Custom XML item GUID of the store.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_bibliography_source(
         &mut self,
         source: crate::bibliography::BibliographySourceBuilder,
@@ -429,6 +488,10 @@ impl Package {
 
     /// Remove the bibliography source with the given tag from the source
     /// store. Returns whether a source was removed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove_bibliography_source(&mut self, tag: &str) -> Result<bool> {
         let Some((item_id, xml)) = self.bibliography_store_item()? else {
             return Ok(false);
@@ -444,6 +507,10 @@ impl Package {
 
     /// Replace the bibliography source with the given tag, preserving entry
     /// order and all untouched entries. Fails when the tag does not exist.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn replace_bibliography_source(
         &mut self,
         tag: &str,
@@ -465,6 +532,10 @@ impl Package {
     ///
     /// An unchanged order preserves package signatures. Reordering a signed
     /// package requires an explicit [`Self::unsign`] first.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn order_custom_xml(&mut self, ordered_ids: &[String]) -> Result<()> {
         self.ensure_story_opc_current("order_custom_xml")?;
         let current = main_store_order(&self.opc)?;
@@ -484,6 +555,10 @@ impl Package {
     }
 
     /// Collect and lexically validate SDT bindings from reachable Word stories.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn custom_xml_bindings(&self) -> Result<Vec<Binding>> {
         let limits = PackageLimits::default();
         let stories = self.story_inventory_with_limits(limits.stories)?;
@@ -599,6 +674,10 @@ fn reorder_custom_xml(package: &mut OpcPackage, ordered_ids: &[String]) -> Resul
 
 impl Package {
     /// Validate that every permitted SDT binding resolves to a datastore item GUID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn validate_custom_xml_bindings(&self) -> Result<()> {
         let item_ids = custom_xml::discover(&self.opc)?
             .into_iter()
@@ -792,13 +871,12 @@ fn checksum_plan(
                         "content-control mutation limit exceeded".into(),
                     ));
                 }
-                let expected = match &checksum {
-                    Some(value) => value.clone(),
-                    None => {
-                        let value = Checksum::compute(payload, &limits.controls)?;
-                        checksum = Some(value.clone());
-                        value
-                    },
+                let expected = if let Some(value) = &checksum {
+                    value.clone()
+                } else {
+                    let value = Checksum::compute(payload, &limits.controls)?;
+                    checksum = Some(value.clone());
+                    value
                 };
                 transaction.set_binding_checksum(ordinal, binding_index, Some(expected))?;
             }

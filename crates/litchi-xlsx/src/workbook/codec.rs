@@ -1,4 +1,4 @@
-//! Raw SpreadsheetML values converted into semantic workbook types.
+//! Raw `SpreadsheetML` values converted into semantic workbook types.
 //!
 //! The XML grammar itself remains in [`crate::raw`]. This boundary only maps
 //! [MS-XLSX] wire values into the typed facade and deliberately preserves

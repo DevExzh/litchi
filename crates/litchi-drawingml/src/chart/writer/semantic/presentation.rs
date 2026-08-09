@@ -118,10 +118,10 @@ pub(super) fn write_view_3d<W: Write>(writer: &mut W, view: &View3D) -> std::io:
     write!(writer, "<c:view3D>")?;
 
     if let Some(rot_x) = view.rot_x {
-        write!(writer, r#"<c:rotX val="{}"/>"#, rot_x)?;
+        write!(writer, r#"<c:rotX val="{rot_x}"/>"#)?;
     }
     if let Some(rot_y) = view.rot_y {
-        write!(writer, r#"<c:rotY val="{}"/>"#, rot_y)?;
+        write!(writer, r#"<c:rotY val="{rot_y}"/>"#)?;
     }
 
     write!(
@@ -131,13 +131,13 @@ pub(super) fn write_view_3d<W: Write>(writer: &mut W, view: &View3D) -> std::io:
     )?;
 
     if let Some(perspective) = view.perspective {
-        write!(writer, r#"<c:perspective val="{}"/>"#, perspective)?;
+        write!(writer, r#"<c:perspective val="{perspective}"/>"#)?;
     }
     if let Some(height) = view.height_percent {
-        write!(writer, r#"<c:hPercent val="{}"/>"#, height)?;
+        write!(writer, r#"<c:hPercent val="{height}"/>"#)?;
     }
     if let Some(depth) = view.depth_percent {
-        write!(writer, r#"<c:depthPercent val="{}"/>"#, depth)?;
+        write!(writer, r#"<c:depthPercent val="{depth}"/>"#)?;
     }
 
     write!(writer, "</c:view3D>")?;
@@ -150,7 +150,7 @@ pub(super) fn write_wall_floor<W: Write>(
     wall_floor: &WallFloor,
 ) -> std::io::Result<()> {
     if let Some(thickness) = wall_floor.thickness {
-        write!(writer, r#"<c:thickness val="{}"/>"#, thickness)?;
+        write!(writer, r#"<c:thickness val="{thickness}"/>"#)?;
     }
     if let Some(shape_properties) = wall_floor.shape_properties.as_ref() {
         write_fragment(writer, shape_properties.as_xml())?;
@@ -187,7 +187,7 @@ pub(super) fn write_picture_options<W: Write>(
                 "chart picture stack unit must be finite and positive",
             ));
         }
-        write!(writer, r#"<c:pictureStackUnit val="{}"/>"#, unit)?;
+        write!(writer, r#"<c:pictureStackUnit val="{unit}"/>"#)?;
     }
     write!(writer, "</c:pictureOptions>")?;
     Ok(())

@@ -56,15 +56,15 @@ pub(crate) fn validate(value: &MapInfo) -> Result<()> {
         validate_namespace_declarations(map.namespaces())?;
         if let Some(binding) = map.data_binding() {
             validate_namespace_declarations(binding.namespaces())?;
-            if let Some(name) = binding.data_binding_name() {
-                if !binding_names.insert(name) {
-                    return Err(invalid("duplicate DataBindingName"));
-                }
+            if let Some(name) = binding.data_binding_name()
+                && !binding_names.insert(name)
+            {
+                return Err(invalid("duplicate DataBindingName"));
             }
-            if let Some(name) = binding.file_binding_name() {
-                if !file_binding_names.insert(name) {
-                    return Err(invalid("duplicate FileBindingName"));
-                }
+            if let Some(name) = binding.file_binding_name()
+                && !file_binding_names.insert(name)
+            {
+                return Err(invalid("duplicate FileBindingName"));
             }
         }
     }

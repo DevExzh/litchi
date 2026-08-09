@@ -19,12 +19,18 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parse and retain one complete BIFF8 record stream.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(bytes: impl AsRef<[u8]>) -> Result<Self> {
         let bytes = Arc::<[u8]>::from(bytes.as_ref().to_vec().into_boxed_slice());
         Self::parse_shared(bytes)
     }
 
     /// Parse an already shared source allocation without another byte copy.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse_shared(bytes: Arc<[u8]>) -> Result<Self> {
         let package = Package::parse(&bytes)?;
         Ok(Self {
@@ -35,6 +41,9 @@ impl Snapshot {
     }
 
     /// Alias for [`Self::parse`] in stream-oriented callers.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn read(bytes: impl AsRef<[u8]>) -> Result<Self> {
         Self::parse(bytes)
     }
@@ -186,6 +195,9 @@ impl Patch {
     }
 
     /// Apply this patch only to its exact source snapshot.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.fingerprint() != self.source_fingerprint || source.bytes() != self.before() {
             return Err(Error::UnsafeEdit(
@@ -200,6 +212,9 @@ impl Patch {
     }
 
     /// Apply the exact inverse replacement to its committed target.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn revert(&self, target: &Snapshot) -> Result<Snapshot> {
         if target.fingerprint() != self.target_fingerprint || target.bytes() != self.after() {
             return Err(Error::UnsafeEdit(

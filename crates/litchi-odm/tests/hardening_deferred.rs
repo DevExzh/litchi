@@ -2,7 +2,7 @@
 
 use litchi_core::Error;
 use litchi_odf_common::core::PackageWriter;
-use litchi_odm::Master;
+use litchi_odm::{Builder, Master};
 
 const MIME: &str = "application/vnd.oasis.opendocument.text-master";
 const CONTENT: &str = concat!(
@@ -43,6 +43,8 @@ fn odm_truncation_and_mutation_sweeps_never_panic() {
 
 #[test]
 fn odm_malformed_and_misplaced_inputs_return_typed_errors() {
+    let doctype = r#"<?xml version="1.0"?><!DOCTYPE x><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body><office:text/></office:body></office:document-content>"#;
+    assert!(Builder::new().content_xml(doctype).build().is_err());
     let cases = [
         package(
             MIME,
@@ -53,10 +55,6 @@ fn odm_malformed_and_misplaced_inputs_return_typed_errors() {
             &content(
                 r#"<text:section text:name="a" xml:id="same"/><text:section text:name="b" xml:id="same"/>"#,
             ),
-        ),
-        package(
-            MIME,
-            r#"<?xml version="1.0"?><!DOCTYPE x><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body><office:text/></office:body></office:document-content>"#,
         ),
         package(
             MIME,

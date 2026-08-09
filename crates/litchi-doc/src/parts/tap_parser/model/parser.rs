@@ -2,7 +2,7 @@
 
 use super::prelude::*;
 
-impl<'arena> TapParser<'arena> {
+impl TapParser<'_> {
     pub(in crate::parts::tap_parser) fn parse_tap_context(
         &self,
         grpprl: &[u8],

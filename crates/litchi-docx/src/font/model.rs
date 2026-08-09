@@ -1,4 +1,16 @@
-//! Semantic WordprocessingML font-table model and inert embedding values.
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::match_same_arms,
+    reason = "separate arms document distinct OOXML grammar cases"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+//! Semantic `WordprocessingML` font-table model and inert embedding values.
 
 use crate::{Error, Result};
 use caseless::Caseless;
@@ -92,6 +104,10 @@ pub struct License(u16);
 
 impl License {
     /// Validate and retain the compact OpenType `fsType` bit field.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(fs_type: u16) -> Result<Self> {
         const DEFINED: u16 = 0x0002 | 0x0004 | 0x0008 | 0x0100 | 0x0200;
         if fs_type & !DEFINED != 0 {
@@ -114,30 +130,37 @@ impl License {
     }
 
     /// Return the validated OpenType bit field.
+    #[must_use]
     pub const fn bits(self) -> u16 {
         self.0
     }
 
+    #[must_use]
     pub const fn restricted(self) -> bool {
         self.0 & 0x0002 != 0
     }
 
+    #[must_use]
     pub const fn preview_print(self) -> bool {
         self.0 & 0x0004 != 0
     }
 
+    #[must_use]
     pub const fn editable(self) -> bool {
         self.0 & 0x0008 != 0
     }
 
+    #[must_use]
     pub const fn no_subsetting(self) -> bool {
         self.0 & 0x0100 != 0
     }
 
+    #[must_use]
     pub const fn bitmap_only(self) -> bool {
         self.0 & 0x0200 != 0
     }
 
+    #[must_use]
     pub const fn installable(self) -> bool {
         self.0 & 0x000E == 0
     }
@@ -150,16 +173,19 @@ pub struct FontKey([u8; 16]);
 
 impl FontKey {
     /// Construct a key from its binary GUID representation.
+    #[must_use]
     pub const fn new(bytes: [u8; 16]) -> Self {
         Self(bytes)
     }
 
     /// Borrow the binary GUID representation.
+    #[must_use]
     pub const fn bytes(&self) -> &[u8; 16] {
         &self.0
     }
 
     /// Move out the binary GUID representation.
+    #[must_use]
     pub const fn into_bytes(self) -> [u8; 16] {
         self.0
     }
@@ -237,6 +263,10 @@ const fn hex_digit(byte: u8) -> Option<u8> {
 }
 
 /// Apply the reversible OOXML GUID XOR transformation to the first 32 bytes.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn obfuscate(data: &mut [u8], font_key: FontKey) -> Result<()> {
     if data.len() < 32 {
         return Err(invalid("OOXML font obfuscation requires at least 32 bytes"));
@@ -252,6 +282,10 @@ pub fn obfuscate(data: &mut [u8], font_key: FontKey) -> Result<()> {
 }
 
 /// Reverse [`obfuscate`]. XOR makes both operations identical.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn deobfuscate(data: &mut [u8], font_key: FontKey) -> Result<()> {
     obfuscate(data, font_key)
 }
@@ -338,6 +372,7 @@ pub enum Charset {
 }
 impl Charset {
     /// Convert a legacy one-byte Word charset code into a typed value.
+    #[must_use]
     pub fn from_legacy(v: u8) -> Self {
         match v {
             0x00 => Self::Ansi,
@@ -383,6 +418,7 @@ impl Charset {
             _ => Err(invalid(format!("invalid strict character set '{v}'"))),
         }
     }
+    #[must_use]
     pub fn legacy_code(self) -> u8 {
         match self {
             Self::Ansi => 0x00,
@@ -407,6 +443,7 @@ impl Charset {
             Self::Legacy(v) => v,
         }
     }
+    #[must_use]
     pub fn strict_name(self) -> Option<&'static str> {
         Some(match self {
             Self::Ansi => "iso-8859-1",
@@ -473,6 +510,10 @@ pub mod raw {
     }
 
     impl Attr {
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the operation cannot be completed.
         pub fn new(qualified_name: impl Into<String>, value: impl Into<String>) -> Result<Self> {
             let qualified_name = qualified_name.into();
             let value = value.into();
@@ -484,10 +525,12 @@ pub mod raw {
             })
         }
 
+        #[must_use]
         pub fn qualified_name(&self) -> &str {
             &self.qualified_name
         }
 
+        #[must_use]
         pub fn value(&self) -> &str {
             &self.value
         }
@@ -500,15 +543,18 @@ pub struct Signature {
     pub(in crate::font) code_pages: [u32; 2],
 }
 impl Signature {
+    #[must_use]
     pub fn new(unicode_subsets: [u32; 4], code_pages: [u32; 2]) -> Self {
         Self {
             unicode_subsets,
             code_pages,
         }
     }
+    #[must_use]
     pub fn unicode_subsets(&self) -> &[u32; 4] {
         &self.unicode_subsets
     }
+    #[must_use]
     pub fn code_pages(&self) -> &[u32; 2] {
         &self.code_pages
     }
@@ -523,6 +569,10 @@ pub struct Resource {
 }
 impl Resource {
     /// Own an inert, already-obfuscated embedded-font payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(data: Vec<u8>) -> Result<Self> {
         Self::from_shared(Arc::new(data))
     }
@@ -538,6 +588,7 @@ impl Resource {
     }
 
     /// Borrow the payload bytes.
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         self.data.as_slice()
     }
@@ -548,6 +599,7 @@ impl Resource {
     }
 
     /// Whether two resources retain the same package allocation.
+    #[must_use]
     pub fn shares_with(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.data, &other.data)
     }
@@ -563,6 +615,7 @@ pub struct Embed {
     pub(in crate::font) extension_attributes: Vec<raw::Attr>,
 }
 impl Embed {
+    #[must_use]
     pub fn new(style: Style, font_key: FontKey, resource: Resource) -> Self {
         Self {
             style,
@@ -579,31 +632,38 @@ impl Embed {
         self.font_key.replace(font_key)
     }
 
+    #[must_use]
     pub fn with_subset(mut self, subsetted: bool) -> Self {
         self.subsetted = Some(subsetted);
         self
     }
 
+    #[must_use]
     pub fn style(&self) -> Style {
         self.style
     }
 
+    #[must_use]
     pub fn key(&self) -> Option<FontKey> {
         self.font_key
     }
 
+    #[must_use]
     pub fn subsetted(&self) -> Option<bool> {
         self.subsetted
     }
 
+    #[must_use]
     pub fn resource(&self) -> Option<&Resource> {
         self.resource.as_ref()
     }
 
+    #[must_use]
     pub fn attrs(&self) -> &[raw::Attr] {
         &self.extension_attributes
     }
 
+    #[must_use]
     pub fn with_attr(mut self, attr: raw::Attr) -> Self {
         self.extension_attributes.push(attr);
         self
@@ -624,6 +684,10 @@ pub struct Font {
     pub(in crate::font) extension_attributes: Vec<raw::Attr>,
 }
 impl Font {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(name: impl Into<String>) -> Result<Self> {
         let name = name.into();
         validate_font_name(&name, "font name")?;
@@ -641,6 +705,10 @@ impl Font {
         })
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn with_alt(mut self, value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         validate_font_name(&value, "alternate font name")?;
@@ -648,10 +716,12 @@ impl Font {
         Ok(self)
     }
 
+    #[must_use]
     pub fn with_panose(mut self, value: [u8; 10]) -> Self {
         self.panose = Some(value);
         self
     }
+    #[must_use]
     pub fn with_charset(mut self, value: Charset) -> Self {
         self.character_set = Some(value);
         self
@@ -660,27 +730,39 @@ impl Font {
     pub fn set_charset(&mut self, value: Option<Charset>) -> Option<Charset> {
         std::mem::replace(&mut self.character_set, value)
     }
+    #[must_use]
     pub fn with_family(mut self, value: Family) -> Self {
         self.family = Some(value);
         self
     }
+    #[must_use]
     pub fn with_not_true_type(mut self, value: bool) -> Self {
         self.not_true_type = Some(value);
         self
     }
+    #[must_use]
     pub fn with_pitch(mut self, value: Pitch) -> Self {
         self.pitch = Some(value);
         self
     }
+    #[must_use]
     pub fn with_signature(mut self, value: Signature) -> Self {
         self.signature = Some(value);
         self
     }
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn with_embed(mut self, value: Embed) -> Result<Self> {
         self.add_embed(value)?;
         Ok(self)
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn rename(&mut self, value: impl Into<String>) -> Result<()> {
         let value = value.into();
         validate_font_name(&value, "font name")?;
@@ -689,6 +771,10 @@ impl Font {
     }
 
     /// Add one embedded face, preserving schema order and rejecting duplicates.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_embed(&mut self, value: Embed) -> Result<()> {
         if self
             .embedded_fonts
@@ -703,6 +789,10 @@ impl Font {
     }
 
     /// Add or replace one embedded face by its typed style.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn put(&mut self, value: Embed) -> Result<Option<Embed>> {
         if let Some(index) = self
             .embedded_fonts
@@ -728,39 +818,50 @@ impl Font {
             .map(|index| self.embedded_fonts.remove(index))
     }
 
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    #[must_use]
     pub fn alt(&self) -> Option<&str> {
         self.alternate_name.as_deref()
     }
+    #[must_use]
     pub fn panose(&self) -> Option<&[u8; 10]> {
         self.panose.as_ref()
     }
+    #[must_use]
     pub fn charset(&self) -> Option<Charset> {
         self.character_set
     }
+    #[must_use]
     pub fn family(&self) -> Option<Family> {
         self.family
     }
+    #[must_use]
     pub fn not_true_type(&self) -> Option<bool> {
         self.not_true_type
     }
+    #[must_use]
     pub fn pitch(&self) -> Option<Pitch> {
         self.pitch
     }
+    #[must_use]
     pub fn signature(&self) -> Option<&Signature> {
         self.signature.as_ref()
     }
+    #[must_use]
     pub fn embeds(&self) -> &[Embed] {
         &self.embedded_fonts
     }
 
+    #[must_use]
     pub fn attrs(&self) -> &[raw::Attr] {
         &self.extension_attributes
     }
 
+    #[must_use]
     pub fn with_attr(mut self, attr: raw::Attr) -> Self {
         self.extension_attributes.push(attr);
         self
@@ -795,6 +896,7 @@ pub struct Table {
 }
 
 impl Table {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             fonts: Vec::new(),
@@ -802,22 +904,30 @@ impl Table {
             extension_attributes: Vec::new(),
         }
     }
+    #[must_use]
     pub fn fonts(&self) -> &[Font] {
         &self.fonts
     }
 
+    #[must_use]
     pub fn iter(&self) -> impl ExactSizeIterator<Item = &Font> {
         self.fonts.iter()
     }
 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.fonts.len()
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.fonts.is_empty()
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn get<'a, 's>(&'a self, key: impl Into<Key<'s>>) -> Result<Option<&'a Font>> {
         match key.into() {
             Key::Name(name) => Ok(
@@ -827,6 +937,10 @@ impl Table {
         }
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add(&mut self, font: Font) -> Result<()> {
         validate_font_entry(&font, false)?;
         if unique_font_offset(&self.fonts, font.name())?.is_some() {
@@ -836,6 +950,10 @@ impl Table {
         Ok(())
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn replace<'s>(
         &mut self,
         key: impl Into<Key<'s>>,
@@ -868,6 +986,10 @@ impl Table {
         Ok(Some(std::mem::replace(slot, replacement)))
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove<'s>(&mut self, key: impl Into<Key<'s>>) -> Result<Option<Font>> {
         let offset = match key.into() {
             Key::Name(name) => unique_font_offset(&self.fonts, name)?,
@@ -876,6 +998,10 @@ impl Table {
         Ok(offset.map(|offset| self.fonts.remove(offset)))
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn reorder<S: AsRef<str>>(&mut self, ordered_names: &[S]) -> Result<()> {
         let mut rank = HashMap::with_capacity(ordered_names.len());
         for (offset, name) in ordered_names.iter().enumerate() {
@@ -903,19 +1029,26 @@ impl Table {
         Ok(())
     }
 
+    #[must_use]
     pub fn attrs(&self) -> &[raw::Attr] {
         &self.extension_attributes
     }
 
+    #[must_use]
     pub fn namespaces(&self) -> &[raw::Attr] {
         &self.namespaces
     }
 
+    #[must_use]
     pub fn with_attr(mut self, attr: raw::Attr) -> Self {
         self.extension_attributes.push(attr);
         self
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn with_namespace(mut self, attr: raw::Attr) -> Result<Self> {
         if attr.qualified_name != "xmlns" && !attr.qualified_name.starts_with("xmlns:") {
             return Err(invalid(
@@ -1034,12 +1167,12 @@ pub(in crate::font) fn validate_resource_len(len: usize) -> Result<()> {
 
 pub(in crate::font) fn validate_font_name(value: &str, kind: &str) -> Result<()> {
     let count = value.chars().count();
-    if !(1..=31).contains(&count) {
+    if (1..=31).contains(&count) {
+        Ok(())
+    } else {
         Err(invalid(format!(
             "{kind} must contain 1 through 31 characters"
         )))
-    } else {
-        Ok(())
     }
 }
 

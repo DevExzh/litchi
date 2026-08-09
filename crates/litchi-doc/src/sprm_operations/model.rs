@@ -256,10 +256,10 @@ pub const SPRM_C_SHD: u16 = 0xCA71;
 /// sprmCBrc - RGB border (operation 0x72)
 pub const SPRM_C_BRC: u16 = 0xCA72;
 
-/// sprmCRgLid0_80 - Language ID v80 (operation 0x73)
+/// `sprmCRgLid0_80` - Language ID v80 (operation 0x73)
 pub const SPRM_C_RG_LID0_80: u16 = 0x4873;
 
-/// sprmCRgLid1_80 - Language ID v80 (operation 0x74)
+/// `sprmCRgLid1_80` - Language ID v80 (operation 0x74)
 pub const SPRM_C_RG_LID1_80: u16 = 0x4874;
 
 /// sprmCFNoProof - No proofing (operation 0x75)
@@ -840,7 +840,7 @@ pub const SPRM_T_JC90: u16 = 0x5400;
 pub const SPRM_S_BKC: u16 = 0x3009;
 
 /// sprmSFTitlePage - Title page (ispmd=0x09, sgc=4(section), spra=1(1-byte))
-/// Encodes to: 001_100_0_000001001 = 0x3009
+/// Encodes to: `001_100_0_000001001` = 0x3009
 pub const SPRM_S_F_TITLE_PAGE: u16 = 0x300A;
 
 /// sprmSCcolumns - Number of columns (operation 0x02)
@@ -876,7 +876,7 @@ pub const SPRM_S_BRC_BOTTOM80: u16 = 0x702D;
 /// sprmSBrcRight80 - right page border as a four-byte Brc80.
 pub const SPRM_S_BRC_RIGHT80: u16 = 0x702E;
 
-/// sprmSPgbProp - shared page-border placement as SPgbPropOperand.
+/// sprmSPgbProp - shared page-border placement as `SPgbPropOperand`.
 pub const SPRM_S_PGB_PROP: u16 = 0x522F;
 
 /// sprmSTextFlow - Section-wide MSOTXFL value.
@@ -884,5 +884,5 @@ pub const SPRM_S_TEXT_FLOW: u16 = 0x5033;
 
 /// sprmSGprfIhdt - Header/Footer presence mask in section (ispmd=0x0E, sgc=4(section), spra=1(1-byte))
 /// Bits: 0x01=EvenHdr, 0x02=OddHdr, 0x04=EvenFtr, 0x08=OddFtr, 0x10=FirstHdr, 0x20=FirstFtr
-/// Encodes to: 001_100_0_000001110 = 0x300E
+/// Encodes to: `001_100_0_000001110` = 0x300E
 pub const SPRM_S_GPRF_IHDT: u16 = 0x300E;

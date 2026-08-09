@@ -484,7 +484,12 @@ fn bump_presentation_node(nodes: &mut usize) -> Result<()> {
 }
 
 fn validate_part_name(part: &PackURI) -> Result<()> {
-    if part.as_str().starts_with("/ppt/") && part.as_str().ends_with(".xml") {
+    if part.as_str().starts_with("/ppt/")
+        && part
+            .as_str()
+            .rsplit_once('.')
+            .is_some_and(|(_, extension)| extension.eq_ignore_ascii_case("xml"))
+    {
         Ok(())
     } else {
         Err(invalid("table-style part must be an XML part below /ppt/"))

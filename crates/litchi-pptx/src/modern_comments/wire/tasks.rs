@@ -67,10 +67,10 @@ fn parse_event(
 ) -> Result<Event> {
     only_attributes(&fragment.attributes, &["time", "id"], "task history event")?;
     let time = attribute(&fragment.attributes, "time", true)?
-        .unwrap()
+        .ok_or_else(|| invalid("task history event requires time"))?
         .to_owned();
     let id = attribute(&fragment.attributes, "id", true)?
-        .unwrap()
+        .ok_or_else(|| invalid("task history event requires id"))?
         .to_owned();
     let mut attributed_by = None;
     let mut anchor = None;
@@ -123,7 +123,7 @@ fn parse_event(
 fn parse_user(fragment: &Fragment) -> Result<User> {
     only_attributes(&fragment.attributes, &["authorId"], "task user")?;
     let author_id = attribute(&fragment.attributes, "authorId", true)?
-        .unwrap()
+        .ok_or_else(|| invalid("task user requires authorId"))?
         .to_owned();
     Ok(User { author_id })
 }
@@ -145,7 +145,7 @@ fn parse_anchor(
                 }
                 comment_id = Some(
                     attribute(&child.attributes, "id", true)?
-                        .unwrap()
+                        .ok_or_else(|| invalid("task anchor comment requires id"))?
                         .to_owned(),
                 );
             },
@@ -168,7 +168,7 @@ fn parse_action(fragment: &Fragment) -> Result<Action> {
             only_attributes(&fragment.attributes, &["authorId"], "task assignment")?;
             Ok(Action::Assign(Assign {
                 author_id: attribute(&fragment.attributes, "authorId", true)?
-                    .unwrap()
+                    .ok_or_else(|| invalid("task assignment requires authorId"))?
                     .to_owned(),
             }))
         },
@@ -180,7 +180,7 @@ fn parse_action(fragment: &Fragment) -> Result<Action> {
             only_attributes(&fragment.attributes, &["val"], "task title")?;
             Ok(Action::Title(Title {
                 value: attribute(&fragment.attributes, "val", true)?
-                    .unwrap()
+                    .ok_or_else(|| invalid("task title requires val"))?
                     .to_owned(),
             }))
         },
@@ -193,7 +193,8 @@ fn parse_action(fragment: &Fragment) -> Result<Action> {
         },
         "pcntCmplt" => {
             only_attributes(&fragment.attributes, &["val"], "task progress")?;
-            let value = attribute(&fragment.attributes, "val", true)?.unwrap();
+            let value = attribute(&fragment.attributes, "val", true)?
+                .ok_or_else(|| invalid("task progress requires val"))?;
             Ok(Action::Progress(super::super::model::Progress::from_str(
                 value,
             )?))
@@ -206,7 +207,7 @@ fn parse_action(fragment: &Fragment) -> Result<Action> {
             only_attributes(&fragment.attributes, &["id"], "task undo")?;
             Ok(Action::Undo(Undo {
                 event_id: attribute(&fragment.attributes, "id", true)?
-                    .unwrap()
+                    .ok_or_else(|| invalid("task undo requires id"))?
                     .to_owned(),
             }))
         },

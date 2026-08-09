@@ -1,3 +1,11 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::format_push_string,
+    reason = "serialization preserves the established byte-emission path"
+)]
 use std::error::Error as StdError;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
@@ -9,7 +17,7 @@ pub const COMPATIBILITY_MODE_SETTING_NAME: &str = "compatibilityMode";
 /// `w:compatSetting` URI under which Word stores its compatibility settings.
 pub const COMPATIBILITY_SETTING_URI: &str = "http://schemas.microsoft.com/office/word";
 
-/// Error returned for a token outside the closed WordprocessingML
+/// Error returned for a token outside the closed `WordprocessingML`
 /// compatibility-flag domain.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ParseCompatFlagError;
@@ -25,7 +33,7 @@ impl StdError for ParseCompatFlagError {}
 macro_rules! define_compat_flags {
     ($($variant:ident => $token:literal),+ $(,)?) => {
         /// A closed `CT_Compat` on/off flag from the Strict or Transitional
-        /// WordprocessingML schema.
+        /// `WordprocessingML` schema.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[repr(u8)]
         pub enum CompatFlag {
@@ -39,7 +47,7 @@ macro_rules! define_compat_flags {
             /// Every compatibility flag accepted by either checked-in schema.
             pub const ALL: &'static [Self] = &[$(Self::$variant),+];
 
-            /// Return the exact WordprocessingML element-local-name token.
+            /// Return the exact `WordprocessingML` element-local-name token.
             #[must_use]
             pub const fn as_str(self) -> &'static str {
                 match self {
@@ -136,7 +144,8 @@ define_compat_flags! {
 }
 
 impl CompatFlag {
-    /// Whether this flag is part of the Strict WordprocessingML domain.
+    /// Whether this flag is part of the Strict `WordprocessingML` domain.
+    #[must_use]
     pub const fn is_strict(self) -> bool {
         matches!(
             self,
@@ -160,23 +169,27 @@ pub struct CompatibilityOption {
 
 impl CompatibilityOption {
     /// Create a compatibility option.
+    #[must_use]
     pub const fn new(flag: CompatFlag, enabled: bool) -> Self {
         Self { flag, enabled }
     }
 
     /// Return the schema-defined flag.
     #[inline]
+    #[must_use]
     pub const fn flag(&self) -> CompatFlag {
         self.flag
     }
 
     /// Whether the option is enabled.
     #[inline]
+    #[must_use]
     pub const fn is_enabled(&self) -> bool {
         self.enabled
     }
 
     /// Serialize the standalone compatibility flag element.
+    #[must_use]
     pub fn to_xml(self, prefix: &str) -> String {
         if self.enabled {
             format!("<{prefix}:{}/>", self.flag.as_str())
@@ -206,23 +219,27 @@ impl CompatibilitySetting {
 
     /// Return the setting name.
     #[inline]
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Return the URI scoping the setting name.
     #[inline]
+    #[must_use]
     pub fn uri(&self) -> &str {
         &self.uri
     }
 
     /// Return the raw setting value.
     #[inline]
+    #[must_use]
     pub fn value(&self) -> &str {
         &self.value
     }
 
     /// Serialize a standalone `w:compatSetting` element.
+    #[must_use]
     pub fn to_xml(&self, prefix: &str) -> String {
         let mut xml = format!("<{prefix}:compatSetting {prefix}:name=\"");
         escape_attribute(&mut xml, &self.name);

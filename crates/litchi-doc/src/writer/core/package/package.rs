@@ -1,13 +1,20 @@
 //! Final DOC stream assembly and OLE2 package writing.
 
 use crate::encryption::encrypt_document_streams_for_write;
-use crate::sprm_operations::*;
+use crate::sprm_operations::SPRM_C_PIC_LOCATION;
 use crate::writer::fib::FibBuilder;
 use crate::writer::font_table::FontTableBuilder;
 use crate::writer::piece_table::{Piece, PieceTableBuilder};
 use litchi_cfb::writer::OleWriter;
 
-use super::super::{codec, model::*};
+use super::super::{
+    codec,
+    model::{
+        CharacterFormatting, FloatingAnchorKind, MainReferenceKind, ParagraphFormatting,
+        VBA_PROJECT_STORAGE_NAME, WORD_DOCUMENT_CLSID, WriteError, Writer, WriterShape, pack_dttm,
+        utf16_code_unit_len,
+    },
+};
 
 /// Fully assembled DOC streams before compound-file packaging.
 pub(in crate::writer::core) struct DocOutputStreams {
@@ -832,7 +839,7 @@ impl Writer {
             self.section_text_flow,
             self.section_page_borders.as_ref(),
         )
-        .map_err(|error| WriteError::InvalidData(error.to_string()))?;
+        .map_err(|error| WriteError::InvalidData(error.clone()))?;
         word_document_stream.extend_from_slice(&sepx_data);
 
         // Write section table to table stream
@@ -956,8 +963,7 @@ impl Writer {
             if !header_floating_shapes.is_empty() {
                 let header_char_count = header_plcfhdd
                     .as_ref()
-                    .map(|header| header.char_count)
-                    .unwrap_or(0);
+                    .map_or(0, |header| header.char_count);
                 let plcf_spa_hdr = crate::writer::images::build_plcf_spa(
                     &header_floating_shapes,
                     header_char_count,

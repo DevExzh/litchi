@@ -1,6 +1,6 @@
 //! Transactional Word embedded-object authoring.
 //!
-//! The owner combines the DOC field/CLX model with the ObjectPool OLE2
+//! The owner combines the DOC field/CLX model with the `ObjectPool` OLE2
 //! package boundary. It accepts only bounded Word 97+ layouts and publishes
 //! edits atomically through Editor.
 

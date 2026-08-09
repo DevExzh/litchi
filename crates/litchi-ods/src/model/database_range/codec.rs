@@ -160,7 +160,16 @@ pub fn parse_database_ranges(xml: &str) -> Result<Vec<Range>> {
                 in_ranges = false;
             },
             Event::Eof => break,
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         buf.clear();
     }
@@ -222,7 +231,16 @@ fn parse_database_range(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) ->
             },
             Event::End(ref element) if is_table(&namespace, element, b"database-range") => break,
             Event::Eof => return Err(unexpected_eof("table:database-range")),
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         buf.clear();
     }
@@ -324,7 +342,16 @@ pub fn parse_filter(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Res
             },
             Event::End(ref element) if is_table(&namespace, element, b"filter") => break,
             Event::Eof => return Err(unexpected_eof("table:filter")),
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         buf.clear();
     }
@@ -389,7 +416,16 @@ fn parse_filter_group(
                 break;
             },
             Event::Eof => return Err(unexpected_eof("filter boolean group")),
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         buf.clear();
     }
@@ -421,7 +457,16 @@ fn parse_condition(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Resu
             },
             Event::End(ref element) if is_table(&namespace, element, b"filter-condition") => break,
             Event::Eof => return Err(unexpected_eof("table:filter-condition")),
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         buf.clear();
     }
@@ -475,7 +520,16 @@ fn parse_sort(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<So
             },
             Event::End(ref element) if is_table(&namespace, element, b"sort") => break,
             Event::Eof => return Err(unexpected_eof("table:sort")),
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         buf.clear();
     }
@@ -523,7 +577,16 @@ fn parse_subtotals(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Resu
             },
             Event::End(ref element) if is_table(&namespace, element, b"subtotal-rules") => break,
             Event::Eof => return Err(unexpected_eof("table:subtotal-rules")),
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         buf.clear();
     }
@@ -551,7 +614,16 @@ fn parse_subtotal_rule(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> 
             },
             Event::End(ref element) if is_table(&namespace, element, b"subtotal-rule") => break,
             Event::Eof => return Err(unexpected_eof("table:subtotal-rule")),
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         buf.clear();
     }
@@ -903,7 +975,7 @@ fn required_u64(
     local_name: &[u8],
 ) -> Result<u64> {
     let value = required_attr(reader, element, local_name)?;
-    value.parse().map_err(|_| {
+    value.parse().map_err(|_error| {
         invalid(
             &format!("table:{}", String::from_utf8_lossy(local_name)),
             &value,

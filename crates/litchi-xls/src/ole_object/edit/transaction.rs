@@ -32,6 +32,9 @@ impl Transaction {
     }
 
     /// Materializes the current candidate as a validated immutable snapshot.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn snapshot(&self) -> Result<Snapshot> {
         Snapshot::open(self.editor.clone().finish()?, self.source.limits())
     }
@@ -43,11 +46,17 @@ impl Transaction {
     }
 
     /// Returns the current typed embedded-OLE records for one worksheet.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn objects(&self, worksheet: usize) -> Result<&[OleObjectRecord]> {
         self.editor.objects(worksheet)
     }
 
     /// Returns the current typed form-control records for one worksheet.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn form_controls(&self, worksheet: usize) -> Result<&[FormControl]> {
         self.editor.form_controls(worksheet)
     }
@@ -56,11 +65,17 @@ impl Transaction {
     ///
     /// Existing controls and their unknown subrecords remain byte-identical;
     /// the new control is appended in worksheet record order.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_form_control(&mut self, worksheet: usize, control: FormControl) -> Result<()> {
         self.with_candidate(|editor| editor.add_form_control(worksheet, control))
     }
 
     /// Adds a typed embedded-OLE `Obj` record and its inert CFB payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_object(
         &mut self,
         worksheet: usize,
@@ -71,6 +86,9 @@ impl Transaction {
     }
 
     /// Removes one embedded-OLE `Obj` record and an unreferenced storage.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn remove_object(&mut self, worksheet: usize, object_id: u16) -> Result<OleObjectRecord> {
         let mut candidate = self.editor.clone();
         let removed = candidate.remove(worksheet, object_id)?;
@@ -79,6 +97,9 @@ impl Transaction {
     }
 
     /// Reorders embedded-OLE records while preserving their raw subrecords.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn reorder_objects(&mut self, worksheet: usize, ids: &[u16]) -> Result<()> {
         self.with_candidate(|editor| editor.reorder(worksheet, ids))
     }
@@ -89,6 +110,9 @@ impl Transaction {
     /// only changes `FtCmo` identity/flags and `FtPioGrbit`; the `FtPictFmla`
     /// storage reference, unknown subrecords, text object, and inert payload
     /// remain untouched.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn update_object_metadata(
         &mut self,
         worksheet: usize,
@@ -99,11 +123,17 @@ impl Transaction {
     }
 
     /// Replaces one referenced storage with a validated inert CFB payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn replace_storage(&mut self, storage_name: &str, compound_file: Vec<u8>) -> Result<()> {
         self.with_candidate(|editor| editor.replace_storage(storage_name, compound_file))
     }
 
     /// Whether the current candidate serializes differently from its source.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn is_changed(&self) -> Result<bool> {
         Ok(self.editor.clone().finish()? != self.source.bytes())
     }
@@ -116,6 +146,9 @@ impl Transaction {
 
     /// Validates and publishes the candidate as a snapshot plus reversible
     /// source-checked patch.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn commit(self) -> Result<Commit> {
         let before = self.source;
         let after = self.editor.finish()?;

@@ -33,11 +33,13 @@ impl Text {
     }
 
     /// Complete decoded text, including alignment and formatting controls.
+    #[must_use]
     pub fn raw(&self) -> &str {
         &self.raw
     }
 
     /// Content of a logical alignment section, excluding its alignment marker.
+    #[must_use]
     pub fn section(&self, kind: SectionKind) -> Option<&str> {
         match kind {
             SectionKind::Left => self.left.as_deref(),
@@ -46,14 +48,17 @@ impl Text {
         }
     }
 
+    #[must_use]
     pub fn left(&self) -> Option<&str> {
         self.left.as_deref()
     }
 
+    #[must_use]
     pub fn center(&self) -> Option<&str> {
         self.center.as_deref()
     }
 
+    #[must_use]
     pub fn right(&self) -> Option<&str> {
         self.right.as_deref()
     }
@@ -75,42 +80,52 @@ pub struct Settings {
 }
 
 impl Settings {
+    #[must_use]
     pub fn different_odd_even(&self) -> bool {
         self.different_odd_even
     }
 
+    #[must_use]
     pub fn different_first(&self) -> bool {
         self.different_first
     }
 
+    #[must_use]
     pub fn scale_with_document(&self) -> bool {
         self.scale_with_document
     }
 
+    #[must_use]
     pub fn align_with_margins(&self) -> bool {
         self.align_with_margins
     }
 
+    #[must_use]
     pub fn odd_header(&self) -> Option<&Text> {
         self.odd_header.as_ref()
     }
 
+    #[must_use]
     pub fn odd_footer(&self) -> Option<&Text> {
         self.odd_footer.as_ref()
     }
 
+    #[must_use]
     pub fn even_header(&self) -> Option<&Text> {
         self.even_header.as_ref()
     }
 
+    #[must_use]
     pub fn even_footer(&self) -> Option<&Text> {
         self.even_footer.as_ref()
     }
 
+    #[must_use]
     pub fn first_header(&self) -> Option<&Text> {
         self.first_header.as_ref()
     }
 
+    #[must_use]
     pub fn first_footer(&self) -> Option<&Text> {
         self.first_footer.as_ref()
     }

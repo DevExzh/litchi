@@ -1,3 +1,11 @@
+#![expect(
+    clippy::match_same_arms,
+    reason = "separate arms document distinct OOXML grammar cases"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Typed and opaque settings-extension validation.
 
 use super::super::support::{invalid, xml_error};
@@ -47,7 +55,8 @@ pub(super) fn validate_opaque_xml(xml: &[u8]) -> Result<()> {
             "opaque settings extension exceeds {MAX_OPAQUE_BYTES} bytes"
         )));
     }
-    std::str::from_utf8(xml).map_err(|_| invalid("opaque settings extension is not UTF-8"))?;
+    std::str::from_utf8(xml)
+        .map_err(|_source_error| invalid("opaque settings extension is not UTF-8"))?;
 
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().check_end_names = true;
@@ -126,7 +135,7 @@ pub(super) fn validate_opaque_xml(xml: &[u8]) -> Result<()> {
                     "opaque settings extension cannot contain a declaration, DTD, or processing instruction",
                 ));
             },
-            _ => {
+            Event::CData(_) | Event::Comment(_) | Event::GeneralRef(_) => {
                 return Err(invalid(
                     "opaque settings extension has content outside its root",
                 ));

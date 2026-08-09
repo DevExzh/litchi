@@ -325,11 +325,13 @@ impl NewSheet<'_> {
     ///
     /// A later tab move or insertion in this transaction can shift it. The
     /// authoritative committed position is recorded by [`Change::Create`].
+    #[must_use]
     pub const fn position(&self) -> usize {
         self.position
     }
 
     /// Current validated developer-facing name in the pending transaction.
+    #[must_use]
     pub fn name(&self) -> &str {
         self.added.name.as_str()
     }

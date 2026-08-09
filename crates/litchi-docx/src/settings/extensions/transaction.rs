@@ -1,3 +1,7 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Source-preserving Word settings-extension snapshots and edits.
 
 use std::sync::Arc;
@@ -16,6 +20,10 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parse and retain a bounded complete settings XML snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_xml(xml: impl Into<Vec<u8>>) -> Result<Self> {
         let xml = xml.into();
         let extensions = Extensions::parse(&xml)?;
@@ -65,18 +73,30 @@ impl Transaction {
     }
 
     /// Set or remove the Word 2012 chart-reference tracking marker.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_chart_tracking_ref_based(&mut self, value: Option<OnOff>) -> Result<&mut Self> {
         self.next.set_chart_tracking_ref_based(value)?;
         Ok(self)
     }
 
     /// Set or remove the Word 2010 paragraph-ID context.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_document_id(&mut self, value: Option<u32>) -> Result<&mut Self> {
         self.next.set_document_id(value)?;
         Ok(self)
     }
 
     /// Set or remove the Word 2012 source-document GUID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_source_document_id(&mut self, value: Option<Guid>) -> Result<&mut Self> {
         self.next.set_source_document_id(value)?;
         Ok(self)
@@ -84,30 +104,50 @@ impl Transaction {
 
     /// Set or remove a present Word 2012 source-document element without a
     /// `val` attribute.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_source_document_id_without_value(&mut self, present: bool) -> Result<&mut Self> {
         self.next.set_source_document_id_without_value(present)?;
         Ok(self)
     }
 
     /// Set or remove the Word 2010 conflict-resolution save marker.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_conflict_mode(&mut self, value: Option<OnOff>) -> Result<&mut Self> {
         self.next.set_conflict_mode(value)?;
         Ok(self)
     }
 
     /// Set or remove the Word 2010 image-editing-data discard marker.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_discard_image_editing_data(&mut self, value: Option<OnOff>) -> Result<&mut Self> {
         self.next.set_discard_image_editing_data(value)?;
         Ok(self)
     }
 
     /// Set or remove the Word 2010 default image DPI value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_default_image_dpi(&mut self, value: Option<i32>) -> Result<&mut Self> {
         self.next.set_default_image_dpi(value)?;
         Ok(self)
     }
 
     /// Validate and publish the edit without changing its source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn commit(self) -> Result<Commit> {
         self.next.validate()?;
         if self.next == self.base.extensions {
@@ -206,6 +246,10 @@ impl Patch {
     }
 
     /// Apply only to the exact source snapshot captured by this patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.xml.as_ref() != self.before_xml.as_ref() {
             return Err(Error::InvalidFormat(

@@ -199,7 +199,7 @@ fn make_node(e: &BytesStart<'_>, d: Decoder, stack: &[Node]) -> Result<Node> {
         if k == "xmlns" || k.starts_with("xmlns:") {
             let key = k.strip_prefix("xmlns:").unwrap_or("").to_string();
             if let Some(old) = bindings.iter_mut().find(|x| x.0 == key) {
-                old.1 = v.clone();
+                old.1.clone_from(v);
             } else {
                 bindings.push((key, v.clone()));
             }

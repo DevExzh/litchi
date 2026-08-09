@@ -43,12 +43,12 @@ pub(in crate::list_object) fn append_web_info(
             WebDefaultValue::String(v) => append_string(out, v),
             WebDefaultValue::Boolean(v) => out.extend_from_slice(&u32::from(*v).to_le_bytes()),
             WebDefaultValue::Number(v) | WebDefaultValue::DateTime(v) => {
-                out.extend_from_slice(&v.to_le_bytes())
+                out.extend_from_slice(&v.to_le_bytes());
             },
         }
     }
     if let Some(v) = &info.validation_formula {
-        append_string(out, v)
+        append_string(out, v);
     }
     out.extend_from_slice(&0u32.to_le_bytes());
     Ok(())

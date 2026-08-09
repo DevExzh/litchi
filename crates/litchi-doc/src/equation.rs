@@ -107,16 +107,19 @@ impl MtefEquation {
     }
 
     /// Complete bytes stored in the `Equation Native` stream.
+    #[must_use]
     pub fn equation_native(&self) -> &[u8] {
         &self.equation_native
     }
 
     /// Headerless MTEF record stream.
+    #[must_use]
     pub fn mtef_payload(&self) -> &[u8] {
         &self.equation_native[EQNOLE_HEADER_SIZE..]
     }
 
     /// Consume this value and return the complete Equation Native stream.
+    #[must_use]
     pub fn into_equation_native(self) -> Vec<u8> {
         self.equation_native
     }
@@ -131,6 +134,7 @@ pub struct MtefEquationWriteOptions {
 }
 
 impl MtefEquationWriteOptions {
+    #[must_use]
     pub fn new(storage_id: u32, equation: MtefEquation, preview: Picture) -> Self {
         Self {
             storage_id,

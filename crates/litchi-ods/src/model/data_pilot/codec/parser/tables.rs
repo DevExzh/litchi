@@ -81,7 +81,14 @@ pub(crate) fn parse_data_pilot_tables(xml: &str) -> Result<Vec<Table>> {
                 depth = depth.saturating_sub(1);
             },
             Event::Eof => break,
-            _ => {},
+            Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         buf.clear();
     }

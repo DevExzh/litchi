@@ -1,10 +1,10 @@
-//! OPC package graph lifecycle for inert ActiveX resources.
+//! OPC package graph lifecycle for inert `ActiveX` resources.
 
 mod load;
 mod transaction;
 
 use super::codec::{relationship_ids_in_xml, replace_controls_xml};
-use super::model::*;
+use super::model::{ControlSet, Controls};
 use super::validation::validate_control_set;
 use super::{
     CONTROL_REL, CONTROL_REL_STRICT, Result, WORKSHEET_CONTENT_TYPE, content_type, relerr,
@@ -17,7 +17,7 @@ use super::{BINARY_CONTENT_TYPE, BINARY_REL, DESCRIPTOR_CONTENT_TYPE, IMAGE_REL}
 #[cfg(test)]
 use litchi_opc::TargetMode;
 
-/// Loads every ActiveX control referenced by one worksheet. All payload bytes remain inert.
+/// Loads every `ActiveX` control referenced by one worksheet. All payload bytes remain inert.
 pub fn load_from_worksheet(package: &OpcPackage, worksheet_uri: &PackURI) -> Result<ControlSet> {
     let worksheet = package.get_part(worksheet_uri)?;
     if worksheet.content_type() != WORKSHEET_CONTENT_TYPE {
@@ -54,7 +54,7 @@ pub fn load_from_worksheet(package: &OpcPackage, worksheet_uri: &PackURI) -> Res
     Ok(ControlSet { controls: loaded })
 }
 
-/// Stores a complete, inert ActiveX graph on a worksheet that has no controls.
+/// Stores a complete, inert `ActiveX` graph on a worksheet that has no controls.
 pub fn store_on_worksheet(
     package: &mut OpcPackage,
     worksheet_uri: &PackURI,
@@ -63,10 +63,10 @@ pub fn store_on_worksheet(
     transaction::store_on_worksheet(package, worksheet_uri, value)
 }
 
-/// Atomically replaces the complete inert ActiveX graph of a worksheet.
+/// Atomically replaces the complete inert `ActiveX` graph of a worksheet.
 ///
 /// An empty set removes the graph. A typed package clone is used only for
-/// rollback; ActiveX payloads are still copied and never interpreted.
+/// rollback; `ActiveX` payloads are still copied and never interpreted.
 pub fn replace_on_worksheet(
     package: &mut OpcPackage,
     worksheet_uri: &PackURI,
@@ -89,7 +89,7 @@ pub fn replace_on_worksheet(
     Ok(())
 }
 
-/// Removes the complete ActiveX graph from a worksheet.
+/// Removes the complete `ActiveX` graph from a worksheet.
 ///
 /// Shared descriptor, binary, or preview parts are retained while any other
 /// internal relationship still targets them.
@@ -153,8 +153,10 @@ pub fn remove_from_worksheet(package: &mut OpcPackage, worksheet_uri: &PackURI) 
 mod tests {
     use super::*;
     use crate::active_x::{
-        AX, MAX_CONTROL_NAME_CHARS, MAX_SHAPE_ID, MAX_STRING, REL, REL_STRICT, SML, SML_STRICT,
-        X14, XDR_STRICT,
+        AX, Binary, Control, ControlProperties, Descriptor, Font, LoadedControl,
+        MAX_CONTROL_NAME_CHARS, MAX_SHAPE_ID, MAX_STRING, Marker, ObjectAnchor, Persistence,
+        Picture, PreviewImage, Property, PropertyObject, REL, REL_STRICT, SML, SML_STRICT, X14,
+        XDR_STRICT,
     };
     use litchi_opc::{BlobPart, PackageWriter, Part};
 

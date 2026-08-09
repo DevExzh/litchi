@@ -261,54 +261,67 @@ impl WorkbookCustomView {
     }
 
     /// The GUID that ties this workbook view to its per-sheet views.
+    #[must_use]
     pub const fn guid(&self) -> &[u8; 16] {
         &self.guid
     }
     /// The active sheet in this view; `None` when `fInvalidTabId` is set.
+    #[must_use]
     pub const fn active_tab(&self) -> Option<u16> {
         self.active_tab
     }
     /// Workbook window position in pixels.
+    #[must_use]
     pub const fn window_position(&self) -> (i32, i32) {
         (self.window_x, self.window_y)
     }
     /// Workbook window size in pixels.
+    #[must_use]
     pub const fn window_size(&self) -> (i32, i32) {
         (self.window_width, self.window_height)
     }
     /// Ratio of sheet-tab area to horizontal-scroll-bar area (0–1000).
+    #[must_use]
     pub const fn tab_ratio(&self) -> u16 {
         self.tab_ratio
     }
     /// Whether a formula bar is displayed.
+    #[must_use]
     pub const fn shows_formula_bar(&self) -> bool {
         self.display_flags & DSP_FMLA_BAR != 0
     }
     /// Whether a status bar is displayed.
+    #[must_use]
     pub const fn shows_status_bar(&self) -> bool {
         self.display_flags & DSP_STATUS != 0
     }
     /// How cell comments appear in this view.
+    #[must_use]
     pub const fn note_display(&self) -> CustomViewNoteDisplay {
         self.note_display
     }
     /// Whether a horizontal scroll bar is displayed.
+    #[must_use]
     pub const fn shows_horizontal_scroll_bar(&self) -> bool {
         self.display_flags & DSP_HSCROLL != 0
     }
     /// Whether a vertical scroll bar is displayed.
+    #[must_use]
     pub const fn shows_vertical_scroll_bar(&self) -> bool {
         self.display_flags & DSP_VSCROLL != 0
     }
     /// Whether sheet tabs are displayed.
+    #[must_use]
     pub const fn shows_sheet_tabs(&self) -> bool {
         self.display_flags & BOT_ADORNMENT != 0
     }
     /// Whether the workbook window is maximized.
+    #[must_use]
     pub const fn is_maximized(&self) -> bool {
         self.display_flags & ZOOM != 0
     }
     /// How drawing and OLE objects appear in the workbook window.
+    #[must_use]
     pub const fn object_display(&self) -> ObjectDisplayMode {
         match (self.display_flags >> HIDE_OBJ_SHIFT) & HIDE_OBJ_MASK {
             1 => ObjectDisplayMode::ShowPlaceholders,
@@ -317,38 +330,47 @@ impl WorkbookCustomView {
         }
     }
     /// Whether the view includes the workbook print settings.
+    #[must_use]
     pub const fn includes_print_settings(&self) -> bool {
         self.display_flags & PRINT_INCL != 0
     }
     /// Whether the view includes hidden rows, hidden columns, and filters.
+    #[must_use]
     pub const fn includes_hidden_rows_columns_and_filters(&self) -> bool {
         self.display_flags & ROW_COL_INCL != 0
     }
     /// Whether updates of linked or external data are coordinated.
+    #[must_use]
     pub const fn timed_update(&self) -> bool {
         self.display_flags & TIMED_UPDATE != 0
     }
     /// Whether the changes being saved have priority in a merge conflict.
+    #[must_use]
     pub const fn all_memory_changes(&self) -> bool {
         self.display_flags & ALL_MEM_CHANGES != 0
     }
     /// Whether the automatic update only merges, or merges and also saves.
+    #[must_use]
     pub const fn only_sync(&self) -> bool {
         self.display_flags & ONLY_SYNC != 0
     }
     /// Whether this is the personal view of a shared workbook.
+    #[must_use]
     pub const fn is_personal_view(&self) -> bool {
         self.window_flags & PERSONAL_VIEW != 0
     }
     /// Whether the workbook window is minimized.
+    #[must_use]
     pub const fn is_minimized(&self) -> bool {
         self.window_flags & ICONIC != 0
     }
     /// Minutes between automatic merges of a shared workbook.
+    #[must_use]
     pub const fn merge_interval(&self) -> u16 {
         self.merge_interval
     }
     /// The name of the custom view.
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -364,15 +386,19 @@ pub struct CustomViewTopLeft {
 }
 
 impl CustomViewTopLeft {
+    #[must_use]
     pub const fn first_row(&self) -> u16 {
         self.first_row
     }
+    #[must_use]
     pub const fn last_row(&self) -> u16 {
         self.last_row
     }
+    #[must_use]
     pub const fn first_col(&self) -> u16 {
         self.first_col
     }
+    #[must_use]
     pub const fn last_col(&self) -> u16 {
         self.last_col
     }
@@ -458,142 +484,177 @@ impl SheetCustomViewBegin {
     }
 
     /// The GUID of the associated `UserBView` record.
+    #[must_use]
     pub const fn guid(&self) -> &[u8; 16] {
         &self.guid
     }
     /// The sheet this custom view belongs to.
+    #[must_use]
     pub const fn tab_id(&self) -> u16 {
         self.tab_id
     }
     /// Zoom level of the window used to display the sheet (10–400).
+    #[must_use]
     pub const fn scale(&self) -> u32 {
         self.scale
     }
     /// Color index of the gridlines displayed in the view.
+    #[must_use]
     pub const fn gridline_color(&self) -> u16 {
         self.gridline_color
     }
     /// The active pane.
+    #[must_use]
     pub const fn active_pane(&self) -> PaneType {
         self.active_pane
     }
     /// Whether page breaks are displayed.
+    #[must_use]
     pub const fn shows_page_breaks(&self) -> bool {
         self.flags & SHOW_BRKS != 0
     }
     /// Whether the window displays formulas instead of values.
+    #[must_use]
     pub const fn shows_formulas(&self) -> bool {
         self.flags & DSP_FMLA_SV != 0
     }
     /// Whether gridlines are displayed.
+    #[must_use]
     pub const fn shows_gridlines(&self) -> bool {
         self.flags & DSP_GRID_SV != 0
     }
     /// Whether row and column headings are displayed.
+    #[must_use]
     pub const fn shows_headings(&self) -> bool {
         self.flags & DSP_RW_COL_SV != 0
     }
     /// Whether outline symbols are displayed.
+    #[must_use]
     pub const fn shows_outline_symbols(&self) -> bool {
         self.flags & DSP_GUTS_SV != 0
     }
     /// Whether zero values are suppressed.
+    #[must_use]
     pub const fn suppresses_zeros(&self) -> bool {
         self.flags & DSP_ZEROS_SV != 0
     }
     /// Whether the sheet is centered between the horizontal margins when printed.
+    #[must_use]
     pub const fn print_centered_horizontally(&self) -> bool {
         self.flags & HORIZONTAL != 0
     }
     /// Whether the sheet is centered between the vertical margins when printed.
+    #[must_use]
     pub const fn print_centered_vertically(&self) -> bool {
         self.flags & VERTICAL != 0
     }
     /// Whether row and column headings are printed.
+    #[must_use]
     pub const fn prints_headings(&self) -> bool {
         self.flags & PRINT_RW_COL != 0
     }
     /// Whether gridlines are printed.
+    #[must_use]
     pub const fn prints_gridlines(&self) -> bool {
         self.flags & PRINT_GRID != 0
     }
     /// Whether the fit-to-page option is enabled.
+    #[must_use]
     pub const fn fits_to_page(&self) -> bool {
         self.flags & FIT_TO_PAGE != 0
     }
     /// Whether the sheet has at least one print area.
+    #[must_use]
     pub const fn has_print_area(&self) -> bool {
         self.flags & PRINT_AREA != 0
     }
     /// Whether the sheet has exactly one print area.
+    #[must_use]
     pub const fn has_single_print_area(&self) -> bool {
         self.flags & ONE_PRINT_AREA != 0
     }
     /// Whether cells are hidden because of filtering.
+    #[must_use]
     pub const fn is_filter_mode(&self) -> bool {
         self.flags & FILTER_MODE != 0
     }
-    /// Whether the AutoFilter icon is shown on the sheet.
+    /// Whether the `AutoFilter` icon is shown on the sheet.
+    #[must_use]
     pub const fn shows_autofilter_icon(&self) -> bool {
         self.flags & EZ_FILTER != 0
     }
     /// Whether the panes are frozen.
+    #[must_use]
     pub const fn is_frozen(&self) -> bool {
         self.flags & FROZEN != 0
     }
     /// Whether the panes are frozen but not split.
+    #[must_use]
     pub const fn is_frozen_without_split(&self) -> bool {
         self.flags & FROZEN_NO_SPLIT != 0
     }
     /// Whether the window is split vertically.
+    #[must_use]
     pub const fn is_split_vertically(&self) -> bool {
         self.flags & SPLIT_V != 0
     }
     /// Whether the window is split horizontally.
+    #[must_use]
     pub const fn is_split_horizontally(&self) -> bool {
         self.flags & SPLIT_H != 0
     }
     /// Whether hidden rows (filtered rows excluded) are present.
+    #[must_use]
     pub const fn hidden_rows(&self) -> CustomViewHiddenRows {
         self.hidden_rows
     }
     /// Whether at least one hidden column is present.
+    #[must_use]
     pub const fn has_hidden_columns(&self) -> bool {
         self.flags & HIDDEN_COL != 0
     }
     /// Whether the advanced filter shows only unique rows.
+    #[must_use]
     pub const fn filters_unique_rows(&self) -> bool {
         self.flags & FILTER_UNIQUE != 0
     }
     /// Whether the sheet is in Page Break Preview view.
+    #[must_use]
     pub const fn is_page_break_preview(&self) -> bool {
         self.flags & SHEET_LAYOUT_VIEW != 0
     }
     /// Whether the sheet is in Page Layout view.
+    #[must_use]
     pub const fn is_page_layout_view(&self) -> bool {
         self.flags & PAGE_LAYOUT_VIEW != 0
     }
     /// Whether the ruler is displayed.
+    #[must_use]
     pub const fn shows_ruler(&self) -> bool {
         self.flags & RULER != 0
     }
     /// The visible area of the logical top-left pane.
+    #[must_use]
     pub const fn top_left(&self) -> CustomViewTopLeft {
         self.top_left
     }
     /// Left-to-right position of the split, expressed as a column number.
+    #[must_use]
     pub const fn split_x(&self) -> f64 {
         self.split_x
     }
     /// Top-to-bottom position of the split, expressed as a row number.
+    #[must_use]
     pub const fn split_y(&self) -> f64 {
         self.split_y
     }
     /// First visible column of the logical right pane (65535 when split).
+    #[must_use]
     pub const fn right_pane_col(&self) -> u16 {
         self.right_pane_col
     }
     /// First visible row of the bottom pane (65535 when split).
+    #[must_use]
     pub const fn bottom_pane_row(&self) -> u16 {
         self.bottom_pane_row
     }
@@ -617,6 +678,9 @@ impl ChartSheetCustomViewBegin {
     /// This is public because the workbook reader never walks chart-sheet
     /// substreams; callers that walk one themselves use this for the
     /// chart-specific layout of the shared `UserSViewBegin` record type.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != USER_S_VIEW_BEGIN_CHART_LEN {
             return Err(Error::InvalidLength {
@@ -654,22 +718,27 @@ impl ChartSheetCustomViewBegin {
     }
 
     /// The GUID of the associated `UserBView` record.
+    #[must_use]
     pub const fn guid(&self) -> &[u8; 16] {
         &self.guid
     }
     /// The sheet this custom view belongs to.
+    #[must_use]
     pub const fn tab_id(&self) -> u32 {
         self.tab_id
     }
     /// Zoom level of the window used to display the sheet (10–400).
+    #[must_use]
     pub const fn scale(&self) -> u32 {
         self.scale
     }
     /// Hidden state of the chart sheet in this view.
+    #[must_use]
     pub const fn visibility(&self) -> SheetVisibility {
         self.visibility
     }
     /// Whether the zoom is set to "Zoom to Fit Selection".
+    #[must_use]
     pub const fn zoom_to_fit(&self) -> bool {
         self.zoom_to_fit
     }
@@ -697,6 +766,7 @@ impl SheetCustomViewEnd {
     }
 
     /// The raw reserved value (1 in conforming files).
+    #[must_use]
     pub const fn reserved(&self) -> u16 {
         self.reserved
     }
@@ -716,10 +786,12 @@ impl SheetCustomView {
     }
 
     /// The sheet-view settings that opened the custom-view bracket.
+    #[must_use]
     pub const fn begin(&self) -> &SheetCustomViewBegin {
         &self.begin
     }
     /// The record that closed the custom-view bracket.
+    #[must_use]
     pub const fn end(&self) -> SheetCustomViewEnd {
         self.end
     }

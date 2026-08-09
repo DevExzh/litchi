@@ -54,7 +54,7 @@ impl<'a> CrtMlFrtReader<'a> {
 
     fn read_bytes<const N: usize>(&mut self) -> Result<[u8; N]> {
         let bytes = self.read_slice(N)?;
-        bytes.try_into().map_err(|_| Error::InvalidLength {
+        bytes.try_into().map_err(|_error| Error::InvalidLength {
             expected: N,
             found: bytes.len(),
         })
@@ -132,7 +132,7 @@ fn validate_record_payload_len(data: &[u8], minimum: usize, context: &str) -> Re
 fn append_chain_bytes(chain: &mut Vec<u8>, bytes: &[u8]) -> Result<()> {
     chain
         .try_reserve(bytes.len())
-        .map_err(|_| Error::Allocation("reassembling CrtMlFrt XmlTkChain"))?;
+        .map_err(|_error| Error::Allocation("reassembling CrtMlFrt XmlTkChain"))?;
     chain.extend_from_slice(bytes);
     Ok(())
 }
@@ -159,6 +159,9 @@ pub struct CrtMlFrt {
 impl CrtMlFrt {
     /// Parse a `CrtMlFrt` record payload plus the payloads of the
     /// `CrtMlFrtContinue` records that follow it.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8], continues: &[Vec<u8>]) -> Result<Self> {
         const MIN_LEN: usize = FRT_HEADER_LEN + FIELD_LEN + FIELD_LEN;
         validate_record_payload_len(data, MIN_LEN, "CrtMlFrt")?;
@@ -184,7 +187,7 @@ impl CrtMlFrt {
         let unused = reader.read_bytes::<FIELD_LEN>()?;
 
         let declared = usize::try_from(declared)
-            .map_err(|_| Error::Allocation("sizing CrtMlFrt XmlTkChain"))?;
+            .map_err(|_error| Error::Allocation("sizing CrtMlFrt XmlTkChain"))?;
         let mut chain_len = first_chain.len();
         for continuation in continues {
             validate_record_payload_len(continuation, FRT_HEADER_LEN, "CrtMlFrtContinue")?;
@@ -209,7 +212,7 @@ impl CrtMlFrt {
         let mut chain = Vec::new();
         chain
             .try_reserve_exact(chain_len)
-            .map_err(|_| Error::Allocation("reassembling CrtMlFrt XmlTkChain"))?;
+            .map_err(|_error| Error::Allocation("reassembling CrtMlFrt XmlTkChain"))?;
         append_chain_bytes(&mut chain, first_chain)?;
         for continuation in continues {
             let mut reader = CrtMlFrtReader::new(continuation);
@@ -231,12 +234,15 @@ impl CrtMlFrt {
     /// Serialize as a sequence of complete record payloads: the `CrtMlFrt`
     /// record followed by `CrtMlFrtContinue` records when the chain exceeds
     /// one record.
+    #[must_use]
     pub fn to_record_payloads(&self) -> Vec<Vec<u8>> {
         let mut first = Vec::new();
         first.extend_from_slice(&CRT_ML_FRT_RECORD_TYPE.to_le_bytes());
         first.extend_from_slice(&self.flags.to_le_bytes());
         first.extend_from_slice(&self.reserved);
-        first.extend_from_slice(&(self.chain.len() as u32).to_le_bytes());
+        first.extend_from_slice(
+            &crate::utils::truncate_usize_to_u32(self.chain.len()).to_le_bytes(),
+        );
         let first_chunk = MAX_RECORD_PAYLOAD - (FRT_HEADER_LEN + FIELD_LEN + FIELD_LEN);
         let mut chunks = self.chain.chunks(first_chunk);
         first.extend_from_slice(chunks.next().unwrap_or(&[]));
@@ -254,21 +260,25 @@ impl CrtMlFrt {
     }
 
     /// Raw `frtHeader.grbitFrt` bitfield (`fFrtRef`/`fFrtAlert` are zero).
+    #[must_use]
     pub const fn flags(&self) -> u16 {
         self.flags
     }
 
     /// The eight `FrtHeader.reserved` bytes retained from the source record.
+    #[must_use]
     pub const fn reserved(&self) -> [u8; 8] {
         self.reserved
     }
 
     /// The opaque `XmlTkChain` bytes.
+    #[must_use]
     pub fn chain(&self) -> &[u8] {
         &self.chain
     }
 
     /// The preserved trailing `unused` field.
+    #[must_use]
     pub const fn unused(&self) -> [u8; 4] {
         self.unused
     }

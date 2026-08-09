@@ -1,4 +1,4 @@
-//! Bounded SpreadsheetML auto-filter fragment codec.
+//! Bounded `SpreadsheetML` auto-filter fragment codec.
 
 use crate::error::{Error, Result};
 use crate::sort::{SortBy, SortMethod};
@@ -9,7 +9,12 @@ use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 use std::collections::HashSet;
 
-use super::model::*;
+use super::model::{
+    CORE, Calendar, ChildOrder, Color, Column, Condition, Custom, Customs, DateGroup, Definition,
+    Dynamic, DynamicType, Grouping, Icon, IconSet, Item, MAX_COLUMNS, MAX_FRAGMENT_BYTES,
+    MAX_ITEMS, MAX_SORT_CONDITIONS, MAX_TEXT_CHARS, MAX_UNKNOWN_BYTES, OpaqueFields, Operator,
+    Payload, Range, STRICT, State, Top10, UnknownAttribute, UnknownElement, Values, opaque_mut,
+};
 
 struct ColumnBuilder {
     column_id: u32,
@@ -109,10 +114,8 @@ pub fn write_auto_filter_fragment(value: &Definition) -> Result<Vec<u8>> {
             write_column(&mut x, column)?;
         }
     }
-    if !sort_written {
-        if let Some(state) = value.sort_state.as_ref() {
-            write_state(&mut x, state)?;
-        }
+    if !sort_written && let Some(state) = value.sort_state.as_ref() {
+        write_state(&mut x, state)?;
     }
     x.extend_from_slice(b"</x:autoFilter>");
     if x.len() > MAX_FRAGMENT_BYTES {
@@ -125,14 +128,14 @@ fn write_payload(x: &mut Vec<u8>, p: &Payload) -> Result<()> {
         Payload::Values(v) => {
             x.extend_from_slice(b"<x:filters");
             if v.blank {
-                a(x, "blank", "1")
+                a(x, "blank", "1");
             }
             if v.calendar_type != Calendar::None {
-                a(x, "calendarType", calendar(v.calendar_type))
+                a(x, "calendarType", calendar(v.calendar_type));
             }
             write_unknown_attributes(x, v.opaque.as_deref())?;
             if v.items.is_empty() && !has_unknown_children(v.opaque.as_deref()) {
-                x.extend_from_slice(b"/>")
+                x.extend_from_slice(b"/>");
             } else {
                 x.push(b'>');
                 let mut written = vec![false; v.items.len()];
@@ -153,7 +156,7 @@ fn write_payload(x: &mut Vec<u8>, p: &Payload) -> Result<()> {
                         write_item(x, item)?;
                     }
                 }
-                x.extend_from_slice(b"</x:filters>")
+                x.extend_from_slice(b"</x:filters>");
             }
         },
         Payload::Custom(v) => {
@@ -162,7 +165,7 @@ fn write_payload(x: &mut Vec<u8>, p: &Payload) -> Result<()> {
             }
             x.extend_from_slice(b"<x:customFilters");
             if v.and {
-                a(x, "and", "1")
+                a(x, "and", "1");
             }
             write_unknown_attributes(x, v.opaque.as_deref())?;
             x.push(b'>');
@@ -184,50 +187,50 @@ fn write_payload(x: &mut Vec<u8>, p: &Payload) -> Result<()> {
                     write_custom(x, filter)?;
                 }
             }
-            x.extend_from_slice(b"</x:customFilters>")
+            x.extend_from_slice(b"</x:customFilters>");
         },
         Payload::Dynamic(v) => {
             x.extend_from_slice(b"<x:dynamicFilter");
             a(x, "type", dynamic(v.filter_type));
             if let Some(q) = v.value {
-                a(x, "val", &q.to_string())
+                a(x, "val", &q.to_string());
             }
             if let Some(q) = v.max_value {
-                a(x, "maxVal", &q.to_string())
+                a(x, "maxVal", &q.to_string());
             }
             write_unknown_attributes(x, v.opaque.as_deref())?;
-            x.extend_from_slice(b"/>")
+            x.extend_from_slice(b"/>");
         },
         Payload::Color(v) => {
             x.extend_from_slice(b"<x:colorFilter");
             a(x, "dxfId", &v.differential_format_id.to_string());
             if !v.cell_color {
-                a(x, "cellColor", "0")
+                a(x, "cellColor", "0");
             }
             write_unknown_attributes(x, v.opaque.as_deref())?;
-            x.extend_from_slice(b"/>")
+            x.extend_from_slice(b"/>");
         },
         Payload::Icon(v) => {
             x.extend_from_slice(b"<x:iconFilter");
             a(x, "iconSet", icon(v.icon_set));
             a(x, "iconId", &v.icon_id.to_string());
             write_unknown_attributes(x, v.opaque.as_deref())?;
-            x.extend_from_slice(b"/>")
+            x.extend_from_slice(b"/>");
         },
         Payload::Top10(v) => {
             x.extend_from_slice(b"<x:top10");
             if !v.top {
-                a(x, "top", "0")
+                a(x, "top", "0");
             }
             if v.percent {
-                a(x, "percent", "1")
+                a(x, "percent", "1");
             }
             a(x, "val", &v.value.to_string());
             if let Some(q) = v.filter_value {
-                a(x, "filterVal", &q.to_string())
+                a(x, "filterVal", &q.to_string());
             }
             write_unknown_attributes(x, v.opaque.as_deref())?;
-            x.extend_from_slice(b"/>")
+            x.extend_from_slice(b"/>");
         },
     }
     Ok(())
@@ -263,10 +266,8 @@ fn write_column(x: &mut Vec<u8>, value: &Column) -> Result<()> {
             }
         }
     }
-    if !payload_written {
-        if let Some(payload) = value.payload.as_ref() {
-            write_payload(x, payload)?;
-        }
+    if !payload_written && let Some(payload) = value.payload.as_ref() {
+        write_payload(x, payload)?;
     }
     x.extend_from_slice(b"</x:filterColumn>");
     Ok(())
@@ -346,12 +347,12 @@ fn write_condition(x: &mut Vec<u8>, state: &State, value: &Condition) -> Result<
         a(x, "iconId", &icon_id.to_string());
     }
     write_unknown_attributes(x, value.opaque.as_deref())?;
-    if !has_unknown_children(value.opaque.as_deref()) {
-        x.extend_from_slice(b"/>");
-    } else {
+    if has_unknown_children(value.opaque.as_deref()) {
         x.push(b'>');
         write_unknown_elements(x, value.opaque.as_deref().unwrap())?;
         x.extend_from_slice(b"</x:sortCondition>");
+    } else {
+        x.extend_from_slice(b"/>");
     }
     Ok(())
 }
@@ -384,12 +385,12 @@ fn write_date_group(x: &mut Vec<u8>, value: &DateGroup) -> Result<()> {
     }
     a(x, "dateTimeGrouping", group(value.grouping));
     write_unknown_attributes(x, value.opaque.as_deref())?;
-    if !has_unknown_children(value.opaque.as_deref()) {
-        x.extend_from_slice(b"/>");
-    } else {
+    if has_unknown_children(value.opaque.as_deref()) {
         x.push(b'>');
         write_unknown_elements(x, value.opaque.as_deref().unwrap())?;
         x.extend_from_slice(b"</x:dateGroupItem>");
+    } else {
+        x.extend_from_slice(b"/>");
     }
     Ok(())
 }
@@ -401,12 +402,12 @@ fn write_custom(x: &mut Vec<u8>, value: &Custom) -> Result<()> {
     }
     a(x, "val", &value.value);
     write_unknown_attributes(x, value.opaque.as_deref())?;
-    if !has_unknown_children(value.opaque.as_deref()) {
-        x.extend_from_slice(b"/>");
-    } else {
+    if has_unknown_children(value.opaque.as_deref()) {
         x.push(b'>');
         write_unknown_elements(x, value.opaque.as_deref().unwrap())?;
         x.extend_from_slice(b"</x:customFilter>");
+    } else {
+        x.extend_from_slice(b"/>");
     }
     Ok(())
 }
@@ -458,7 +459,7 @@ fn a(x: &mut Vec<u8>, n: &str, v: &str) {
             _ => x.push(c),
         }
     }
-    x.push(b'"')
+    x.push(b'"');
 }
 fn calendar(v: Calendar) -> &'static str {
     match v {
@@ -497,7 +498,11 @@ fn custom(v: Operator) -> &'static str {
     }
 }
 fn dynamic(v: DynamicType) -> &'static str {
-    use DynamicType::*;
+    use DynamicType::{
+        AboveAverage, BelowAverage, LastMonth, LastQuarter, LastWeek, LastYear, M1, M2, M3, M4, M5,
+        M6, M7, M8, M9, M10, M11, M12, NextMonth, NextQuarter, NextWeek, NextYear, Null, Q1, Q2,
+        Q3, Q4, ThisMonth, ThisQuarter, ThisWeek, ThisYear, Today, Tomorrow, YearToDate, Yesterday,
+    };
     match v {
         AboveAverage => "aboveAverage",
         BelowAverage => "belowAverage",
@@ -537,7 +542,12 @@ fn dynamic(v: DynamicType) -> &'static str {
     }
 }
 fn icon(v: IconSet) -> &'static str {
-    use IconSet::*;
+    use IconSet::{
+        FiveArrows, FiveArrowsGray, FiveBoxes, FiveQuarters, FiveRating, FourArrows,
+        FourArrowsGray, FourRating, FourRedToBlack, FourTrafficLights, NoIcons, ThreeArrows,
+        ThreeArrowsGray, ThreeFlags, ThreeSigns, ThreeStars, ThreeSymbols, ThreeSymbols2,
+        ThreeTrafficLights1, ThreeTrafficLights2, ThreeTriangles,
+    };
     match v {
         ThreeArrows => "3Arrows",
         ThreeArrowsGray => "3ArrowsGray",
@@ -934,10 +944,7 @@ fn unknown_attributes(
     for attribute in e.attributes().with_checks(true) {
         let attribute = attribute.map_err(xml_error)?;
         let name = attribute.key.as_ref();
-        if name == b"xmlns"
-            || name.starts_with(b"xmlns:")
-            || known.iter().any(|expected| *expected == name)
-        {
+        if name == b"xmlns" || name.starts_with(b"xmlns:") || known.contains(&name) {
             continue;
         }
         let name = std::str::from_utf8(name)
@@ -1002,7 +1009,7 @@ fn capture_unknown(reader: &mut NsReader<&[u8]>, first: Event<'static>) -> Resul
             Event::End(_) => {
                 depth = depth
                     .checked_sub(1)
-                    .ok_or_else(|| invalid("unknown autoFilter nesting underflow"))?
+                    .ok_or_else(|| invalid("unknown autoFilter nesting underflow"))?;
             },
             Event::Eof => return Err(invalid("unterminated unknown autoFilter element")),
             _ => {},
@@ -1200,10 +1207,10 @@ fn set_simple_payload(
             if max_value.is_some() && value.is_none() {
                 return Err(invalid("dynamicFilter maxVal requires val"));
             }
-            if let (Some(value), Some(max_value)) = (value, max_value) {
-                if value >= max_value {
-                    return Err(invalid("dynamicFilter val must be less than maxVal"));
-                }
+            if let (Some(value), Some(max_value)) = (value, max_value)
+                && value >= max_value
+            {
+                return Err(invalid("dynamicFilter val must be less than maxVal"));
             }
             Payload::Dynamic(Dynamic {
                 filter_type: DynamicType::parse(&required_attr(e, b"type", d)?)?,

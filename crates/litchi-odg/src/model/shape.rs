@@ -59,6 +59,29 @@ pub enum ShapeKind {
     RegularPolygon,
 }
 
+impl ShapeKind {
+    pub(crate) const fn element_name(self) -> &'static str {
+        match self {
+            Self::Caption => "caption",
+            Self::Circle => "circle",
+            Self::Connector => "connector",
+            Self::Control => "control",
+            Self::Custom => "custom-shape",
+            Self::Ellipse => "ellipse",
+            Self::Frame => "frame",
+            Self::Group => "g",
+            Self::Line => "line",
+            Self::Measure => "measure",
+            Self::Path => "path",
+            Self::PageThumbnail => "page-thumbnail",
+            Self::Polygon => "polygon",
+            Self::Polyline => "polyline",
+            Self::Rectangle => "rect",
+            Self::RegularPolygon => "regular-polygon",
+        }
+    }
+}
+
 /// One bounded, inert shape view from `content.xml`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Shape {
@@ -88,7 +111,24 @@ pub(crate) struct Properties {
 }
 
 impl Shape {
-    pub(crate) fn new(properties: Properties, kind: ShapeKind, frame: Option<Frame>) -> Self {
+    /// Creates a detached shape value for structural insertion.
+    #[must_use]
+    pub fn new(kind: ShapeKind) -> Self {
+        Self::parsed(
+            Properties {
+                geometry: [None, None, None, None],
+                layer: None,
+                name: None,
+                style_name: None,
+                text_style_name: None,
+                z_index: None,
+            },
+            kind,
+            None,
+        )
+    }
+
+    pub(crate) fn parsed(properties: Properties, kind: ShapeKind, frame: Option<Frame>) -> Self {
         let Properties {
             geometry,
             layer,
@@ -114,6 +154,78 @@ impl Shape {
             text: String::new(),
             frame,
         }
+    }
+
+    /// Sets the optional reference name on a detached shape.
+    #[must_use]
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    /// Assigns a declared drawing layer on a detached shape.
+    #[must_use]
+    pub fn with_layer(mut self, layer: impl Into<String>) -> Self {
+        self.layer = Some(layer.into());
+        self
+    }
+
+    /// Sets the graphic style reference on a detached shape.
+    #[must_use]
+    pub fn with_style_name(mut self, style_name: impl Into<String>) -> Self {
+        self.style_name = Some(style_name.into());
+        self
+    }
+
+    /// Sets the paragraph style reference on a detached shape.
+    #[must_use]
+    pub fn with_text_style_name(mut self, style_name: impl Into<String>) -> Self {
+        self.text_style_name = Some(style_name.into());
+        self
+    }
+
+    /// Sets the explicit stacking position on a detached shape.
+    #[must_use]
+    pub const fn with_z_index(mut self, z_index: u32) -> Self {
+        self.z_index = Some(z_index);
+        self
+    }
+
+    /// Sets all four lexical SVG geometry values on a detached shape.
+    #[must_use]
+    pub fn with_geometry(
+        mut self,
+        x: impl Into<String>,
+        y: impl Into<String>,
+        width: impl Into<String>,
+        height: impl Into<String>,
+    ) -> Self {
+        self.x = Some(x.into());
+        self.y = Some(y.into());
+        self.width = Some(width.into());
+        self.height = Some(height.into());
+        self
+    }
+
+    /// Sets plain paragraph text on a detached shape.
+    #[must_use]
+    pub fn with_text(mut self, text: impl Into<String>) -> Self {
+        self.text = text.into();
+        self
+    }
+
+    /// Sets an accessibility title on a detached shape.
+    #[must_use]
+    pub fn with_title(mut self, title: impl Into<String>) -> Self {
+        self.title = Some(title.into());
+        self
+    }
+
+    /// Sets an accessibility description on a detached shape.
+    #[must_use]
+    pub fn with_description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
     }
 
     pub(crate) fn push_text(&mut self, text: &str) {

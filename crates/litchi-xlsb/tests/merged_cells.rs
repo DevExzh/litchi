@@ -1,3 +1,11 @@
+#![allow(
+    clippy::pedantic,
+    clippy::expect_used,
+    clippy::shadow_reuse,
+    clippy::unwrap_used,
+    reason = "integration tests use panic-on-failure extraction and names that follow successive record states"
+)]
+
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_xlsb::Workbook;
 use litchi_xlsb::merged_cells::MergedCell;

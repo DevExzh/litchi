@@ -1,5 +1,9 @@
 use super::super::model::validate_pivot_table_config;
-use super::super::*;
+use super::super::{
+    CellPos, CellValue, PivotCacheValue, PivotCellXfRole, PivotFieldConfig, PivotTableConfig,
+    WritableCell, WritablePivotDataItem, WritablePivotField, WritablePivotItem, WritablePivotTable,
+    WritableWorksheet, Writer,
+};
 use crate::error::{Error, Result};
 
 impl Writer {
@@ -13,12 +17,15 @@ impl Writer {
     ///
     /// * `sheet` — worksheet index (0-based)
     /// * `config` — pivot table configuration (see [`PivotTableConfig`])
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_pivot_table(&mut self, sheet: usize, config: PivotTableConfig) -> Result<()> {
         validate_pivot_table_config(&config)?;
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
 
         // Generate pivot output cells BEFORE consuming config.fields / config.data_items.
         // Excel validates that DIMENSIONS and cell content are consistent with the
@@ -160,7 +167,7 @@ impl Writer {
         let fc = cfg.first_col;
 
         let offset = |base: u16, amount: usize| -> Result<u16> {
-            let amount = u16::try_from(amount).map_err(|_| {
+            let amount = u16::try_from(amount).map_err(|_error| {
                 Error::InvalidCellReference("PivotTable output exceeds the BIFF8 grid".to_string())
             })?;
             base.checked_add(amount).ok_or_else(|| {

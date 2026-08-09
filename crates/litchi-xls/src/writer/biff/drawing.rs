@@ -79,7 +79,7 @@ impl DrawingObject<'_> {
 
 fn write_mso<W: Write>(writer: &mut W, data: &[u8]) -> Result<()> {
     let length = u16::try_from(data.len())
-        .map_err(|_| Error::InvalidData("MsoDrawing record is too large".to_string()))?;
+        .map_err(|_error| Error::InvalidData("MsoDrawing record is too large".to_string()))?;
     if length > 8224 {
         return Err(Error::InvalidData(
             "MsoDrawing record exceeds 8224 bytes".to_string(),
@@ -97,22 +97,28 @@ fn group_prefix(drawing_id: u32, object_count: usize, shapes_size: usize) -> Res
         ));
     }
     let shape_count = u32::try_from(object_count + 1)
-        .map_err(|_| Error::InvalidData("drawing shape count overflows".to_string()))?;
-    let spgr_length =
-        48u32
-            .checked_add(u32::try_from(shapes_size).map_err(|_| {
-                Error::InvalidData("worksheet drawing size exceeds u32".to_string())
-            })?)
-            .ok_or_else(|| Error::InvalidData("worksheet drawing size overflows".to_string()))?;
+        .map_err(|_error| Error::InvalidData("drawing shape count overflows".to_string()))?;
+    let spgr_length = 48u32
+        .checked_add(u32::try_from(shapes_size).map_err(|_error| {
+            Error::InvalidData("worksheet drawing size exceeds u32".to_string())
+        })?)
+        .ok_or_else(|| Error::InvalidData("worksheet drawing size overflows".to_string()))?;
     let dg_length = 24u32
         .checked_add(spgr_length)
         .ok_or_else(|| Error::InvalidData("worksheet drawing size overflows".to_string()))?;
     let patriarch = drawing_id << 10;
     let mut out = Vec::with_capacity(80);
     write_container_header(&mut out, 0, WriteContainer::Dg, dg_length)?;
-    write_atom_header(&mut out, drawing_id as u16, WriteAtom::Dg, 8)?;
+    write_atom_header(
+        &mut out,
+        crate::utils::truncate_u32_to_u16(drawing_id),
+        WriteAtom::Dg,
+        8,
+    )?;
     out.extend_from_slice(&shape_count.to_le_bytes());
-    out.extend_from_slice(&(patriarch + object_count as u32).to_le_bytes());
+    out.extend_from_slice(
+        &(patriarch + crate::utils::truncate_usize_to_u32(object_count)).to_le_bytes(),
+    );
     write_container_header(&mut out, 0, WriteContainer::Spgr, spgr_length)?;
     let mut patriarch_children = Vec::with_capacity(40);
     write_atom_header(&mut patriarch_children, 0, WriteAtom::Spgr, 16)?;
@@ -150,7 +156,10 @@ pub(super) fn style_properties(
             properties.add_simple(Id::NoFillHitTest, 0x0010_0000);
         },
         ShapeFill::Solid(color) => {
-            properties.add_simple(Id::FillColor, color.officeart_color() as i32);
+            properties.add_simple(
+                Id::FillColor,
+                crate::utils::wrap_u32_to_i32(color.officeart_color()),
+            );
             properties.add_simple(Id::NoFillHitTest, 0x0015_0011);
         },
     }
@@ -161,8 +170,11 @@ pub(super) fn style_properties(
             properties.add_simple(Id::NoLineDrawDash, 0x0008_0000);
         },
         ShapeLine::Solid { color, width_emu } => {
-            properties.add_simple(Id::LineColor, color.officeart_color() as i32);
-            properties.add_simple(Id::LineWidth, width_emu as i32);
+            properties.add_simple(
+                Id::LineColor,
+                crate::utils::wrap_u32_to_i32(color.officeart_color()),
+            );
+            properties.add_simple(Id::LineWidth, crate::utils::wrap_u32_to_i32(width_emu));
             properties.add_simple(Id::NoLineDrawDash, 0x0008_0008);
         },
     }
@@ -224,10 +236,10 @@ fn pivot_shape(shape_id: u32) -> Result<Vec<u8>> {
     Ok(out)
 }
 
-/// ftCmo feature type and payload size (MS-XLS 2.5.143 FtCmo).
+/// ftCmo feature type and payload size (MS-XLS 2.5.143 `FtCmo`).
 const FT_CMO: u16 = 0x0015;
 const FT_CMO_SIZE: u16 = 0x0012;
-/// ftGmo group marker feature type and payload size (MS-XLS 2.5.148 FtGmo).
+/// ftGmo group marker feature type and payload size (MS-XLS 2.5.148 `FtGmo`).
 const FT_GMO: u16 = 0x0006;
 const FT_GMO_SIZE: u16 = 0x0002;
 /// ftCmo object type for group objects (MS-XLS 2.5.143).
@@ -285,7 +297,7 @@ fn write_group_obj<W: Write>(
 
 fn write_continue<W: Write>(writer: &mut W, data: &[u8]) -> Result<()> {
     let length = u16::try_from(data.len())
-        .map_err(|_| Error::InvalidData("shape CONTINUE record is too large".to_string()))?;
+        .map_err(|_error| Error::InvalidData("shape CONTINUE record is too large".to_string()))?;
     if length > 8224 {
         return Err(Error::InvalidData(
             "shape CONTINUE record exceeds 8224 bytes".to_string(),
@@ -316,8 +328,8 @@ fn write_shape_txo<W: Write>(writer: &mut W, text: Option<&ShapeText>) -> Result
     writer.write_all(&0x0212u16.to_le_bytes())?;
     writer.write_all(&0u16.to_le_bytes())?;
     writer.write_all(&[0; 6])?;
-    writer.write_all(&(units.len() as u16).to_le_bytes())?;
-    writer.write_all(&(run_bytes as u16).to_le_bytes())?;
+    writer.write_all(&crate::utils::truncate_usize_to_u16(units.len()).to_le_bytes())?;
+    writer.write_all(&crate::utils::truncate_usize_to_u16(run_bytes).to_le_bytes())?;
     writer.write_all(&text.map_or(0, |text| text.font_when_empty).to_le_bytes())?;
     writer.write_all(&0u16.to_le_bytes())?;
 
@@ -342,7 +354,7 @@ fn write_shape_txo<W: Write>(writer: &mut W, text: Option<&ShapeText>) -> Result
             bytes.extend_from_slice(&run.font_index.to_le_bytes());
             bytes.extend_from_slice(&[0; 4]);
         }
-        bytes.extend_from_slice(&(units.len() as u16).to_le_bytes());
+        bytes.extend_from_slice(&crate::utils::truncate_usize_to_u16(units.len()).to_le_bytes());
         bytes.extend_from_slice(&[0; 6]);
         for chunk in bytes.chunks(8224) {
             write_continue(writer, chunk)?;
@@ -394,7 +406,7 @@ pub(crate) fn write_worksheet_drawing<W: Write>(
     }
     for config in groups {
         let fragments = group_fragments(config, (drawing_id << 10) + offset)?;
-        offset += fragments.len() as u32;
+        offset += crate::utils::truncate_usize_to_u32(fragments.len());
         objects.extend(fragments.into_iter().map(|fragment| DrawingObject::Group {
             obj: fragment.obj,
             escher: fragment.escher,

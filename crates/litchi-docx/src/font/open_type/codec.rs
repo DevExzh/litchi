@@ -1,3 +1,15 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::assigning_clones,
+    reason = "clone assignment preserves validation-before-replacement behavior"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Bounded, namespace-aware, source-preserving codec for Word 2010 OpenType
 //! run-property extensions.
 
@@ -156,7 +168,15 @@ fn locate(xml: &[u8]) -> Result<(Layout, OpenType)> {
                 element.local_name().as_ref(),
                 &fragment_prefix,
             ),
-            _ => false,
+            Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_)
+            | Event::Eof => false,
         };
         let is_w14 = is_word_2010(&namespace);
         let event = event.into_owned();
@@ -213,10 +233,10 @@ fn locate(xml: &[u8]) -> Result<(Layout, OpenType)> {
                 } else {
                     None
                 };
-                if kind.is_some() {
-                    if let Some(prefix) = element.name().prefix() {
-                        layout.extension_prefix = Some(prefix.into_inner().to_vec());
-                    }
+                if kind.is_some()
+                    && let Some(prefix) = element.name().prefix()
+                {
+                    layout.extension_prefix = Some(prefix.into_inner().to_vec());
                 }
                 if child_depth == 1 && is_empty_element_start(&element) {
                     layout.root_empty = Some(ByteRange {
@@ -359,7 +379,7 @@ fn locate(xml: &[u8]) -> Result<(Layout, OpenType)> {
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_) | Event::CData(_) | Event::Comment(_) | Event::GeneralRef(_) => {},
         }
     }
 
@@ -672,7 +692,7 @@ fn parse_style_set(
                 if id.is_some() {
                     return Err(super::model::invalid("duplicate styleSet id attribute"));
                 }
-                id = Some(value.parse::<u8>().map_err(|_| {
+                id = Some(value.parse::<u8>().map_err(|_source_error| {
                     super::model::invalid("styleSet id is not an unsigned decimal number")
                 })?);
             },
@@ -729,7 +749,7 @@ fn name_local(name: &[u8]) -> &[u8] {
 
 fn offset(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| Error::InvalidFormat("Word OpenType XML offset overflow".into()))
+        .map_err(|_source_error| Error::InvalidFormat("Word OpenType XML offset overflow".into()))
 }
 
 fn is_empty_element_start(element: &BytesStart<'_>) -> bool {
@@ -737,8 +757,9 @@ fn is_empty_element_start(element: &BytesStart<'_>) -> bool {
 }
 
 fn render(value: &OpenType, prefix: &[u8]) -> Result<Vec<u8>> {
-    let prefix = std::str::from_utf8(prefix)
-        .map_err(|_| Error::InvalidFormat("OpenType namespace prefix is not UTF-8".into()))?;
+    let prefix = std::str::from_utf8(prefix).map_err(|_source_error| {
+        Error::InvalidFormat("OpenType namespace prefix is not UTF-8".into())
+    })?;
     let mut output = String::new();
     let mut first = true;
     if let Some(value) = value.ligatures {

@@ -4,11 +4,11 @@
 //! These records all carry a legacy 4-byte `FrtHeaderOld` (MS-XLS 2.5.136)
 //! and describe how post-BIFF8 chart features are versioned and scoped:
 //!
-//! - **ChartFrtInfo** (0x0850): application versions that created/last saved
+//! - **`ChartFrtInfo`** (0x0850): application versions that created/last saved
 //!   the file and the `CFrtId` ranges of Future Record Type identifiers used
 //!   in the chart (MS-XLS 2.4.49).
-//! - **CatLab** (0x0856): attributes of an axis label (MS-XLS 2.4.38).
-//! - **StartBlock** (0x0852) / **EndBlock** (0x0853): bracket a collection of
+//! - **`CatLab`** (0x0856): attributes of an axis label (MS-XLS 2.4.38).
+//! - **`StartBlock`** (0x0852) / **`EndBlock`** (0x0853): bracket a collection of
 //!   chart-specific future records so applications that do not support a
 //!   feature can preserve it (MS-XLS 2.4.266 / 2.4.100).
 //!
@@ -17,9 +17,9 @@
 //!
 //! # References
 //!
-//! - MS-XLS 2.4.38 (CatLab), 2.4.49 (ChartFrtInfo), 2.4.100 (EndBlock),
-//!   2.4.266 (StartBlock), 2.5.37 (CFrtId), 2.5.134 (FrtFlags),
-//!   2.5.136 (FrtHeaderOld)
+//! - MS-XLS 2.4.38 (`CatLab`), 2.4.49 (`ChartFrtInfo`), 2.4.100 (`EndBlock`),
+//!   2.4.266 (`StartBlock`), 2.5.37 (`CFrtId`), 2.5.134 (`FrtFlags`),
+//!   2.5.136 (`FrtHeaderOld`)
 
 use crate::{Error, Result};
 
@@ -64,7 +64,7 @@ fn read_u16(data: &[u8], offset: usize) -> Result<u16> {
         expected: end,
         found: data.len(),
     })?;
-    let [first, second] = bytes.try_into().map_err(|_| Error::InvalidLength {
+    let [first, second] = bytes.try_into().map_err(|_error| Error::InvalidLength {
         expected: 2,
         found: bytes.len(),
     })?;
@@ -168,11 +168,13 @@ pub struct RecordRange {
 
 impl RecordRange {
     /// First Future Record Type in the range.
+    #[must_use]
     pub fn first(&self) -> u16 {
         self.first
     }
 
     /// Last Future Record Type in the range.
+    #[must_use]
     pub fn last(&self) -> u16 {
         self.last
     }
@@ -205,26 +207,33 @@ pub struct Info {
 
 impl Info {
     /// Application version that originally created the file.
+    #[must_use]
     pub fn originator(&self) -> Version {
         self.originator
     }
 
     /// Raw `FrtHeaderOld.grbitFrt` bits retained from the source record.
+    #[must_use]
     pub fn frt_flags(&self) -> u16 {
         self.frt_flags
     }
 
     /// Application version that last saved the file.
+    #[must_use]
     pub fn writer(&self) -> Version {
         self.writer
     }
 
     /// Ranges of Future Record Type identifiers used in the chart.
+    #[must_use]
     pub fn ranges(&self) -> &[RecordRange] {
         &self.ranges
     }
 
     /// Parse a `ChartFrtInfo` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         let invalid = |message: String| Error::InvalidRecord {
             record_type: CHART_FRT_INFO_RECORD_TYPE,
@@ -269,6 +278,7 @@ impl Info {
     }
 
     /// Serialize back to a complete `ChartFrtInfo` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload =
             Vec::with_capacity(CHART_FRT_INFO_BASE_LEN + self.ranges.len() * C_FRT_ID_LEN);
@@ -277,7 +287,9 @@ impl Info {
         payload.extend_from_slice(&self.frt_flags.to_le_bytes());
         payload.push(self.originator.to_byte());
         payload.push(self.writer.to_byte());
-        payload.extend_from_slice(&(self.ranges.len() as u16).to_le_bytes());
+        payload.extend_from_slice(
+            &crate::utils::truncate_usize_to_u16(self.ranges.len()).to_le_bytes(),
+        );
         for range in &self.ranges {
             payload.extend_from_slice(&range.first.to_le_bytes());
             payload.extend_from_slice(&range.last.to_le_bytes());
@@ -344,36 +356,45 @@ pub struct CatLab {
 
 impl CatLab {
     /// Distance between the axis and the axis label (percent of the default).
+    #[must_use]
     pub fn offset(&self) -> u16 {
         self.offset
     }
 
     /// Raw `FrtHeaderOld.grbitFrt` bits retained from the source record.
+    #[must_use]
     pub fn frt_flags(&self) -> u16 {
         self.frt_flags
     }
 
     /// Alignment of the axis label.
+    #[must_use]
     pub fn alignment(&self) -> Alignment {
         self.alignment
     }
 
     /// Whether the number of categories between axis labels is automatic.
+    #[must_use]
     pub fn auto_category_label(&self) -> bool {
         self.category_flags & CAT_LAB_AUTO_LABEL != 0
     }
 
     /// Raw `CatLab` category-label bitfield, including ignored bits.
+    #[must_use]
     pub fn category_flags(&self) -> u16 {
         self.category_flags
     }
 
     /// Reserved bytes following the category-label bitfield.
+    #[must_use]
     pub fn reserved(&self) -> [u8; 2] {
         self.reserved
     }
 
     /// Parse a `CatLab` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         let frt_flags = validate_frt_header_old(data, CAT_LAB_RECORD_TYPE, CAT_LAB_LEN)?;
         let offset = read_u16(data, 4)?;
@@ -396,6 +417,7 @@ impl CatLab {
     }
 
     /// Serialize back to a complete `CatLab` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(CAT_LAB_LEN);
         // FrtHeaderOld: rt and the preserved grbitFrt bits.
@@ -427,15 +449,15 @@ pub enum BlockKind {
     Frame,
     /// Legend.
     Legend,
-    /// LegendException record.
+    /// `LegendException` record.
     LegendException,
     /// Series.
     Series,
     /// Sheet.
     Sheet,
-    /// DataFormat record.
+    /// `DataFormat` record.
     DataFormat,
-    /// DropBar record.
+    /// `DropBar` record.
     DropBar,
 }
 
@@ -501,26 +523,33 @@ pub struct StartBlock {
 
 impl StartBlock {
     /// Type of object encompassed by the block.
+    #[must_use]
     pub fn object_kind(&self) -> BlockKind {
         self.object_kind
     }
 
     /// Context of the object.
+    #[must_use]
     pub fn object_context(&self) -> u16 {
         self.object_context
     }
 
     /// First instance qualifier.
+    #[must_use]
     pub fn object_instance1(&self) -> u16 {
         self.object_instance1
     }
 
     /// Second instance qualifier.
+    #[must_use]
     pub fn object_instance2(&self) -> u16 {
         self.object_instance2
     }
 
     /// Parse a `StartBlock` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         let frt_flags = validate_frt_header_old(data, START_BLOCK_RECORD_TYPE, START_BLOCK_LEN)?;
         Ok(Self {
@@ -533,6 +562,7 @@ impl StartBlock {
     }
 
     /// Serialize back to a complete `StartBlock` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(START_BLOCK_LEN);
         // FrtHeaderOld: rt and the preserved grbitFrt bits.
@@ -546,6 +576,7 @@ impl StartBlock {
     }
 
     /// Raw `FrtHeaderOld.grbitFrt` bits retained from the source record.
+    #[must_use]
     pub fn frt_flags(&self) -> u16 {
         self.frt_flags
     }
@@ -566,11 +597,15 @@ pub struct EndBlock {
 
 impl EndBlock {
     /// Type of object encompassed by the block.
+    #[must_use]
     pub fn object_kind(&self) -> BlockKind {
         self.object_kind
     }
 
     /// Parse an `EndBlock` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         let frt_flags = validate_frt_header_old(data, END_BLOCK_RECORD_TYPE, END_BLOCK_LEN)?;
         Ok(Self {
@@ -581,6 +616,7 @@ impl EndBlock {
     }
 
     /// Serialize back to a complete `EndBlock` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(END_BLOCK_LEN);
         // FrtHeaderOld: rt and the preserved grbitFrt bits.
@@ -594,11 +630,13 @@ impl EndBlock {
     }
 
     /// The three undefined fields retained from the source record.
+    #[must_use]
     pub fn unused(&self) -> [u16; 3] {
         self.unused
     }
 
     /// Raw `FrtHeaderOld.grbitFrt` bits retained from the source record.
+    #[must_use]
     pub fn frt_flags(&self) -> u16 {
         self.frt_flags
     }

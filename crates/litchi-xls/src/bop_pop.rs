@@ -62,7 +62,7 @@ impl<'a> BopPopReader<'a> {
                 expected: end,
                 found: self.data.len(),
             })?;
-        let value: [u8; N] = bytes.try_into().map_err(|_| Error::InvalidLength {
+        let value: [u8; N] = bytes.try_into().map_err(|_error| Error::InvalidLength {
             expected: N,
             found: bytes.len(),
         })?;
@@ -172,6 +172,9 @@ pub struct BopPop {
 
 impl BopPop {
     /// Parse a `BopPop` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
             return Err(Error::InvalidLength {
@@ -230,6 +233,7 @@ impl BopPop {
     }
 
     /// Serialize back to a complete `BopPop` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(PAYLOAD_LEN);
         payload.push(self.subtype as u8);
@@ -245,53 +249,63 @@ impl BopPop {
     }
 
     /// The chart group subtype (`pst`).
+    #[must_use]
     pub fn subtype(&self) -> BopPopSubtype {
         self.subtype
     }
 
     /// Whether the split point is determined automatically (`fAutoSplit`).
+    #[must_use]
     pub fn auto_split(&self) -> bool {
         self.auto_split
     }
 
     /// What determines the split (`split`).
+    #[must_use]
     pub fn split(&self) -> BopPopSplit {
         self.split
     }
 
     /// Number of trailing data points in the secondary bar/pie (`iSplitPos`).
+    #[must_use]
     pub fn split_position(&self) -> i16 {
         self.split_position
     }
 
     /// Percentage below which data points move to the secondary bar/pie
     /// (`pcSplitPercent`).
+    #[must_use]
     pub fn split_percent(&self) -> i16 {
         self.split_percent
     }
 
     /// Size of the secondary bar/pie as a percentage of the primary pie
     /// (`pcPie2Size`).
+    #[must_use]
     pub fn pie2_size_percent(&self) -> i16 {
         self.pie2_size_percent
     }
 
     /// Distance between the primary pie and the secondary bar/pie (`pcGap`).
+    #[must_use]
     pub fn gap_percent(&self) -> i16 {
         self.gap_percent
     }
 
     /// Threshold value for a value split (`numSplitValue`).
+    #[must_use]
     pub fn split_value(&self) -> f64 {
         self.split_value
     }
 
     /// Whether one or more data points have shadows (`fHasShadow`).
+    #[must_use]
     pub fn has_shadow(&self) -> bool {
         self.flags & FLAG_HAS_SHADOW != 0
     }
 
     /// Raw flags word, including the 15 reserved bits.
+    #[must_use]
     pub fn flags(&self) -> u16 {
         self.flags
     }

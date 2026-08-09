@@ -1,4 +1,4 @@
-//! Bounded XML codec for classic SpreadsheetML comments.
+//! Bounded XML codec for classic `SpreadsheetML` comments.
 
 use std::collections::{BTreeMap, HashSet};
 use std::fmt::Write as FmtWrite;
@@ -394,7 +394,7 @@ impl Parser {
     }
 }
 
-/// Parse one complete classic SpreadsheetML comments part.
+/// Parse one complete classic `SpreadsheetML` comments part.
 pub fn parse_comments(content: &str) -> Result<Comments> {
     Parser::parse(content)
 }

@@ -42,6 +42,7 @@ fn invalid(record_type: u16, message: impl Into<String>) -> Error {
 /// CFB storage member names compare case-insensitively (MS-CFB 2.6.4), and the
 /// stream MUST live in the root storage. Returns the directory entry's actual
 /// name so callers can open the stream exactly as stored.
+#[must_use]
 pub fn find_revision_log_stream(stream_paths: &[Vec<String>]) -> Option<&str> {
     stream_paths.iter().find_map(|path| {
         if path.len() == 1 && path[0].eq_ignore_ascii_case(REVISION_LOG_STREAM_NAME) {
@@ -99,9 +100,11 @@ pub struct OpaqueRevisionRecord {
 }
 
 impl OpaqueRevisionRecord {
+    #[must_use]
     pub fn record_type(&self) -> u16 {
         self.record_type
     }
+    #[must_use]
     pub fn payload(&self) -> &[u8] {
         &self.payload
     }
@@ -125,14 +128,17 @@ pub struct RrdChgCellRevision {
 }
 
 impl RrdChgCellRevision {
+    #[must_use]
     pub fn record(&self) -> &RrdChgCell {
         &self.record
     }
     /// Raw `Continue` payloads following the `RRDChgCell` record.
+    #[must_use]
     pub fn continue_payloads(&self) -> &[Vec<u8>] {
         &self.continue_payloads
     }
     /// Raw `RRDRstEtxp` payloads; the count matches `cetxpRst`.
+    #[must_use]
     pub fn formatting_runs(&self) -> &[Vec<u8>] {
         &self.formatting_runs
     }
@@ -147,14 +153,17 @@ pub struct RrdInsDelRevision {
 }
 
 impl RrdInsDelRevision {
+    #[must_use]
     pub fn record(&self) -> &RrdInsDel {
         &self.record
     }
     /// Whether the record was wrapped in `RRDInsDelBegin`/`RRDInsDelEnd`
     /// (the ABNF `DEL` production), as opposed to a bare insertion.
+    #[must_use]
     pub fn is_deletion(&self) -> bool {
         self.deletion
     }
+    #[must_use]
     pub fn changes(&self) -> &[RevisionChange] {
         &self.changes
     }
@@ -168,9 +177,11 @@ pub struct RrdMoveRevision {
 }
 
 impl RrdMoveRevision {
+    #[must_use]
     pub fn record(&self) -> &RrdMove {
         &self.record
     }
+    #[must_use]
     pub fn changes(&self) -> &[RevisionChange] {
         &self.changes
     }
@@ -200,14 +211,17 @@ pub struct RevisionHeader {
 }
 
 impl RevisionHeader {
+    #[must_use]
     pub fn head(&self) -> &RrdHead {
         &self.head
     }
     /// Sheet identifiers for this revision set; absent when the workbook has
     /// more than 4112 sheets (MS-XLS 2.4.241).
+    #[must_use]
     pub fn sheet_ids(&self) -> Option<&RrTabId> {
         self.sheet_ids.as_ref()
     }
+    #[must_use]
     pub fn revisions(&self) -> &[Revision] {
         &self.revisions
     }
@@ -223,15 +237,19 @@ pub struct RevisionLog {
 }
 
 impl RevisionLog {
+    #[must_use]
     pub fn info(&self) -> &RrdInfo {
         &self.info
     }
+    #[must_use]
     pub fn file_lock(&self) -> Option<&FileLock> {
         self.file_lock.as_ref()
     }
+    #[must_use]
     pub fn exclusive_lock(&self) -> Option<&UsrExcl> {
         self.exclusive_lock.as_ref()
     }
+    #[must_use]
     pub fn headers(&self) -> &[RevisionHeader] {
         &self.headers
     }
@@ -435,6 +453,9 @@ fn parse_revision(stream: &[FramedRecord<'_>], cursor: &mut usize) -> Result<Rev
 }
 
 /// Parse the `Revision Log` stream bytes into a typed, inert model.
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn parse_revision_log_stream(data: &[u8]) -> Result<RevisionLog> {
     let stream = frame_records(data)?;
     if stream.len() < 2 {

@@ -16,7 +16,7 @@ use super::{Error, Result};
 /// Byte length of a `PlotGrowth` record payload.
 const PAYLOAD_LEN: usize = 8;
 
-/// A FixedPoint value (MS-OSHARED 2.2.1.6): a signed 16.16 fixed-point
+/// A `FixedPoint` value (MS-OSHARED 2.2.1.6): a signed 16.16 fixed-point
 /// number stored as a 32-bit integer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FixedPoint {
@@ -26,16 +26,19 @@ pub struct FixedPoint {
 
 impl FixedPoint {
     /// Wrap a raw 16.16 fixed-point value.
+    #[must_use]
     pub const fn from_raw(raw: i32) -> Self {
         Self { raw }
     }
 
     /// The raw 16.16 fixed-point value.
+    #[must_use]
     pub const fn raw(self) -> i32 {
         self.raw
     }
 
     /// The value as a floating-point number (`raw` / 65536).
+    #[must_use]
     pub fn to_f64(self) -> f64 {
         f64::from(self.raw) / 65536.0
     }
@@ -53,6 +56,12 @@ pub struct PlotGrowth {
 
 impl PlotGrowth {
     /// Parse a `PlotGrowth` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// # Panics
+    ///
+    /// Panics only if an internal BIFF invariant has been violated.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
             return Err(Error::InvalidLength {
@@ -67,6 +76,7 @@ impl PlotGrowth {
     }
 
     /// Serialize back to a complete `PlotGrowth` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(PAYLOAD_LEN);
         payload.extend_from_slice(&self.dx.raw().to_le_bytes());
@@ -75,11 +85,13 @@ impl PlotGrowth {
     }
 
     /// Horizontal growth of the plot area (`dxPlotGrowth`).
+    #[must_use]
     pub fn dx(&self) -> FixedPoint {
         self.dx
     }
 
     /// Vertical growth of the plot area (`dyPlotGrowth`).
+    #[must_use]
     pub fn dy(&self) -> FixedPoint {
         self.dy
     }

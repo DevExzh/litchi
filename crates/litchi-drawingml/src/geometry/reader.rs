@@ -1,8 +1,8 @@
 //! Streaming builder that assembles an [`CustomGeometry`] from an
-//! `a:custGeom` subtree in a DrawingML shape part.
+//! `a:custGeom` subtree in a `DrawingML` shape part.
 //!
 //! A format-owned shape inventory parser drives the builder: it routes every
-//! DrawingML start/empty event under `a:custGeom` through
+//! `DrawingML` start/empty event under `a:custGeom` through
 //! [`CustomGeometryBuilder::open`], every matching close through
 //! [`CustomGeometryBuilder::close`], and finalizes the geometry with
 //! [`CustomGeometryBuilder::finish`] when the `a:custGeom` element ends.
@@ -123,6 +123,7 @@ pub struct CustomGeometryBuilder {
 }
 
 impl CustomGeometryBuilder {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }

@@ -1,3 +1,10 @@
+#![allow(
+    clippy::pedantic,
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "integration tests use panic-on-failure extraction and exact fixture comparisons"
+)]
+
 use litchi_xlsb::formula::{
     ExternalTableReference, Parser, TableColumns, TableDataType, TableNamedColumns, TableReference,
     TableRowType, Token,

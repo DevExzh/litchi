@@ -57,9 +57,12 @@ impl MutablePresentation {
     /// Returns an error if the operation fails.
     pub fn add_slide(&mut self) -> Result<&mut MutableSlide> {
         let id = self.allocate_slide_id()?;
+        let index = self.slides.len();
         self.slides.push(MutableSlide::new(id));
         self.modified = true;
-        Ok(self.slides.last_mut().expect("slide was just pushed"))
+        self.slides
+            .get_mut(index)
+            .ok_or(Error::SlideIndexOutOfBounds { index, len: index })
     }
 
     /// Insert an empty slide at an ordered position.
@@ -77,7 +80,10 @@ impl MutablePresentation {
         let id = self.allocate_slide_id()?;
         self.slides.insert(index, MutableSlide::new(id));
         self.modified = true;
-        Ok(self.slides.get_mut(index).expect("slide was just inserted"))
+        let len = self.slides.len();
+        self.slides
+            .get_mut(index)
+            .ok_or(Error::SlideIndexOutOfBounds { index, len })
     }
 
     /// Number of authored slides.

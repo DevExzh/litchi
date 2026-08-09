@@ -48,22 +48,26 @@ impl Tables {
     }
 
     /// Caption label definitions, when `SttbfCaption` is present.
+    #[must_use]
     pub fn labels(&self) -> Option<&LabelTable> {
         self.labels.as_ref()
     }
 
     /// Caption label definitions, using the protocol-oriented terminology.
+    #[must_use]
     pub fn captions(&self) -> Option<&LabelTable> {
         self.labels()
     }
 
-    /// Automatic-caption ProgID mappings, when `SttbfAutoCaption` is present.
+    /// Automatic-caption `ProgID` mappings, when `SttbfAutoCaption` is present.
+    #[must_use]
     pub fn auto(&self) -> Option<&AutoTable> {
         self.auto.as_ref()
     }
 
     /// Alias phrased in the protocol vocabulary for callers inspecting a
-    /// document's AutoCaption settings.
+    /// document's `AutoCaption` settings.
+    #[must_use]
     pub fn auto_captions(&self) -> Option<&AutoTable> {
         self.auto()
     }

@@ -7,6 +7,7 @@
 //! [`Element`] mutation API and installed through the [`crate::Formula`]
 //! facade.
 
+use crate::facade::StarMathVersion;
 use crate::model::Element;
 
 /// The `MathML` `mathvariant` attribute value family (`MathML` 2 §3.2.2).
@@ -26,10 +27,6 @@ pub enum Variant {
     SansSerifItalic,
     SansSerifBoldItalic,
     Monospace,
-    Initial,
-    Tailed,
-    Looped,
-    Stretched,
 }
 
 impl Variant {
@@ -51,10 +48,6 @@ impl Variant {
             Self::SansSerifItalic => "sans-serif-italic",
             Self::SansSerifBoldItalic => "sans-serif-bold-italic",
             Self::Monospace => "monospace",
-            Self::Initial => "initial",
-            Self::Tailed => "tailed",
-            Self::Looped => "looped",
-            Self::Stretched => "stretched",
         }
     }
 }
@@ -235,11 +228,24 @@ pub fn table(rows: Vec<Vec<Element>>) -> Element {
 /// `StarMath` annotation (the `math:annotation` encoding `OpenOffice` writes).
 #[must_use]
 pub fn semantics(content: Element, starmath_source: Option<&str>) -> Element {
+    semantics_with_starmath(
+        content,
+        starmath_source.map(|source| (StarMathVersion::V5, source)),
+    )
+}
+
+/// A `semantics` wrapper with an explicitly versioned `LibreOffice` `StarMath`
+/// source annotation.
+#[must_use]
+pub fn semantics_with_starmath(
+    content: Element,
+    starmath: Option<(StarMathVersion, &str)>,
+) -> Element {
     let mut wrapper = element("semantics");
     wrapper.push_child(content);
-    if let Some(source) = starmath_source {
+    if let Some((version, source)) = starmath {
         let mut annotation = element("annotation");
-        annotation.set_fixed_attribute("encoding", "StarMath 5.0");
+        annotation.set_fixed_attribute("encoding", version.encoding());
         annotation.push_text(source);
         wrapper.push_child(annotation);
     }

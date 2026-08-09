@@ -43,7 +43,7 @@ pub(super) fn write_axis_common<W: Write>(
 
     write!(writer, "<c:scaling>")?;
     if let Some(log_base) = log_base {
-        write!(writer, r#"<c:logBase val="{}"/>"#, log_base)?;
+        write!(writer, r#"<c:logBase val="{log_base}"/>"#)?;
     }
     write!(
         writer,
@@ -51,10 +51,10 @@ pub(super) fn write_axis_common<W: Write>(
         common.orientation.xml_value()
     )?;
     if let Some(max) = max {
-        write!(writer, r#"<c:max val="{}"/>"#, max)?;
+        write!(writer, r#"<c:max val="{max}"/>"#)?;
     }
     if let Some(min) = min {
-        write!(writer, r#"<c:min val="{}"/>"#, min)?;
+        write!(writer, r#"<c:min val="{min}"/>"#)?;
     }
     if let Some(extension_list) = common.scaling_extension_list.as_ref() {
         write_fragment(writer, extension_list.as_xml())?;
@@ -136,7 +136,7 @@ pub(super) fn write_axis_common<W: Write>(
     write!(writer, r#"<c:crossAx val="{}"/>"#, common.cross_axis_id)?;
 
     if let Some(crosses_at) = common.crosses_at {
-        write!(writer, r#"<c:crossesAt val="{}"/>"#, crosses_at)?;
+        write!(writer, r#"<c:crossesAt val="{crosses_at}"/>"#)?;
     } else {
         write!(
             writer,
@@ -162,7 +162,7 @@ pub(super) fn write_category_axis<W: Write>(
     write!(
         writer,
         r#"<c:lblAlgn val="{}"/>"#,
-        axis.label_align.map(|a| a.xml_value()).unwrap_or("ctr")
+        axis.label_align.map_or("ctr", |a| a.xml_value())
     )?;
     write!(
         writer,
@@ -170,10 +170,10 @@ pub(super) fn write_category_axis<W: Write>(
         axis.label_offset.unwrap_or(100)
     )?;
     if let Some(skip) = axis.tick_label_skip {
-        write!(writer, r#"<c:tickLblSkip val="{}"/>"#, skip)?;
+        write!(writer, r#"<c:tickLblSkip val="{skip}"/>"#)?;
     }
     if let Some(skip) = axis.tick_mark_skip {
-        write!(writer, r#"<c:tickMarkSkip val="{}"/>"#, skip)?;
+        write!(writer, r#"<c:tickMarkSkip val="{skip}"/>"#)?;
     }
     write!(
         writer,
@@ -196,10 +196,10 @@ pub(super) fn write_value_axis<W: Write>(writer: &mut W, axis: &ValueAxis) -> st
     )?;
 
     if let Some(major_unit) = axis.major_unit {
-        write!(writer, r#"<c:majorUnit val="{}"/>"#, major_unit)?;
+        write!(writer, r#"<c:majorUnit val="{major_unit}"/>"#)?;
     }
     if let Some(minor_unit) = axis.minor_unit {
-        write!(writer, r#"<c:minorUnit val="{}"/>"#, minor_unit)?;
+        write!(writer, r#"<c:minorUnit val="{minor_unit}"/>"#)?;
     }
     if let Some(display_units) = &axis.display_units {
         if display_units.built_in_unit.is_some() == display_units.custom_unit.is_some() {
@@ -217,7 +217,7 @@ pub(super) fn write_value_axis<W: Write>(writer: &mut W, axis: &ValueAxis) -> st
                     "chart custom display unit must be finite and positive",
                 ));
             }
-            write!(writer, r#"<c:custUnit val="{}"/>"#, unit)?;
+            write!(writer, r#"<c:custUnit val="{unit}"/>"#)?;
         }
         if display_units.show_label
             || display_units.label.is_some()
@@ -265,19 +265,19 @@ pub(super) fn write_date_axis<W: Write>(writer: &mut W, axis: &DateAxis) -> std:
                 "chart date-axis label offset must be between 0 and 1000",
             ));
         }
-        write!(writer, r#"<c:lblOffset val="{}"/>"#, offset)?;
+        write!(writer, r#"<c:lblOffset val="{offset}"/>"#)?;
     }
     if let Some(unit) = axis.base_time_unit {
         write!(writer, r#"<c:baseTimeUnit val="{}"/>"#, unit.xml_value())?;
     }
     if let Some(unit) = axis.major_unit {
-        write!(writer, r#"<c:majorUnit val="{}"/>"#, unit)?;
+        write!(writer, r#"<c:majorUnit val="{unit}"/>"#)?;
     }
     if let Some(unit) = axis.major_time_unit {
         write!(writer, r#"<c:majorTimeUnit val="{}"/>"#, unit.xml_value())?;
     }
     if let Some(unit) = axis.minor_unit {
-        write!(writer, r#"<c:minorUnit val="{}"/>"#, unit)?;
+        write!(writer, r#"<c:minorUnit val="{unit}"/>"#)?;
     }
     if let Some(unit) = axis.minor_time_unit {
         write!(writer, r#"<c:minorTimeUnit val="{}"/>"#, unit.xml_value())?;
@@ -294,10 +294,10 @@ pub(super) fn write_series_axis<W: Write>(
     write!(writer, "<c:serAx>")?;
     write_axis_common(writer, &axis.common, axis.min, axis.max, axis.log_base)?;
     if let Some(skip) = axis.tick_label_skip {
-        write!(writer, r#"<c:tickLblSkip val="{}"/>"#, skip)?;
+        write!(writer, r#"<c:tickLblSkip val="{skip}"/>"#)?;
     }
     if let Some(skip) = axis.tick_mark_skip {
-        write!(writer, r#"<c:tickMarkSkip val="{}"/>"#, skip)?;
+        write!(writer, r#"<c:tickMarkSkip val="{skip}"/>"#)?;
     }
     write_axis_extension(writer, &axis.common)?;
     write!(writer, "</c:serAx>")?;

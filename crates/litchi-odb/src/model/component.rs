@@ -24,6 +24,47 @@ pub struct Component {
 }
 
 impl Component {
+    /// Creates an inert form or report component declaration.
+    #[must_use]
+    pub fn new(kind: ComponentKind, name: impl Into<String>) -> Self {
+        Self {
+            kind,
+            name: Some(name.into()),
+            title: None,
+            description: None,
+            href: None,
+            as_template: None,
+        }
+    }
+
+    /// Sets the producer-visible title.
+    #[must_use]
+    pub fn with_title(mut self, value: impl Into<String>) -> Self {
+        self.title = Some(value.into());
+        self
+    }
+
+    /// Sets the inert description.
+    #[must_use]
+    pub fn with_description(mut self, value: impl Into<String>) -> Self {
+        self.description = Some(value.into());
+        self
+    }
+
+    /// Sets the inert linked package path or IRI.
+    #[must_use]
+    pub fn with_href(mut self, value: impl Into<String>) -> Self {
+        self.href = Some(value.into());
+        self
+    }
+
+    /// Sets whether the component is a template.
+    #[must_use]
+    pub const fn with_as_template(mut self, value: Option<bool>) -> Self {
+        self.as_template = value;
+        self
+    }
+
     pub(crate) fn parsed(
         kind: ComponentKind,
         name: Option<String>,

@@ -88,6 +88,9 @@ pub struct ObjectLink {
 
 impl ObjectLink {
     /// Parse an `ObjectLink` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
             return Err(Error::InvalidLength {
@@ -118,6 +121,7 @@ impl ObjectLink {
     }
 
     /// Serialize back to a complete `ObjectLink` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(PAYLOAD_LEN);
         payload.extend_from_slice(&(self.target as u16).to_le_bytes());
@@ -127,12 +131,14 @@ impl ObjectLink {
     }
 
     /// The chart object the text is linked to (`wLinkObj`).
+    #[must_use]
     pub fn target(&self) -> ObjectLinkTarget {
         self.target
     }
 
     /// Zero-based index into the Series records (`wLinkVar1`); preserved
     /// verbatim when the target is not `SeriesOrDataPoints`.
+    #[must_use]
     pub fn series_index(&self) -> u16 {
         self.series_index
     }
@@ -140,6 +146,7 @@ impl ObjectLink {
     /// Zero-based category index within the series (`wLinkVar2`), or `0xFFFF`
     /// for the whole series; preserved verbatim when the target is not
     /// `SeriesOrDataPoints`.
+    #[must_use]
     pub fn category_index(&self) -> u16 {
         self.category_index
     }

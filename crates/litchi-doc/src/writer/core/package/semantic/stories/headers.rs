@@ -1,13 +1,22 @@
-use crate::sprm_operations::*;
-use crate::writer::core::{codec, model::*};
+use crate::sprm_operations::SPRM_C_PIC_LOCATION;
+use crate::writer::core::{
+    codec,
+    model::{
+        FloatingAnchorKind, HeaderFieldState, HeaderFooterParagraph, HeaderStoryData,
+        ParagraphFormatting, WriteError, Writer, checked_text_fc, utf16_code_unit_len,
+    },
+};
 use crate::writer::font_table::FontTableBuilder;
 use crate::writer::piece_table::Piece;
 impl Writer {
-    /// Build header/footer story text and PlcfHdd
+    /// Build header/footer story text and `PlcfHdd`
     ///
     /// Appends header/footer text to `text_stream`, extends CHPX/PAPX entries and pieces.
-    /// Returns (plcfhdd_bytes, header_cp_length). If no header/footer set, returns None.
-    #[allow(clippy::too_many_arguments)] // TODO: Refactor to reduce arguments
+    /// Returns (`plcfhdd_bytes`, `header_cp_length`). If no header/footer set, returns None.
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "parameters map one-to-one to a fixed DOC record or semantic construction"
+    )] // TODO: Refactor to reduce arguments
     pub(in crate::writer::core::package) fn build_header_story(
         &self,
         text_fc_start: u32,

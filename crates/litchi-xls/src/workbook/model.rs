@@ -65,7 +65,7 @@ pub struct Workbook<R: Read + Seek> {
     pub(super) function_groups: Option<crate::function_group::FunctionGroups>,
     pub(super) external_links: crate::external_link::Links,
     pub(super) pivot_caches: Vec<crate::PivotCache>,
-    /// SXStreamID values in global PivotCache ordinal order.
+    /// `SXStreamID` values in global `PivotCache` ordinal order.
     pub(super) pivot_cache_stream_ids: Vec<u16>,
     /// Typed, inert workbook XML maps from the root-level `XML` stream.
     pub(super) xml_map: Option<crate::xml_map::MapInfo>,
@@ -98,6 +98,7 @@ pub struct OpenOptions<'a> {
 
 impl<'a> OpenOptions<'a> {
     /// Construct strict options without a password.
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             password: None,
@@ -107,6 +108,7 @@ impl<'a> OpenOptions<'a> {
     }
 
     /// Password used for BIFF8 password-to-open encryption.
+    #[must_use]
     pub const fn password(&self) -> Option<&'a str> {
         self.password
     }
@@ -118,22 +120,26 @@ impl<'a> OpenOptions<'a> {
     }
 
     /// Current formatting-defect policy.
+    #[must_use]
     pub const fn leniency(&self) -> Leniency {
         self.leniency
     }
 
     /// Set the formatting-defect policy.
+    #[must_use]
     pub const fn with_leniency(mut self, leniency: Leniency) -> Self {
         self.leniency = leniency;
         self
     }
 
     /// Current explicit workbook compatibility profile.
+    #[must_use]
     pub const fn compatibility_profile(&self) -> crate::CompatibilityProfile {
         self.compatibility_profile
     }
 
     /// Select an explicit, versioned workbook compatibility profile.
+    #[must_use]
     pub const fn with_compatibility_profile(
         mut self,
         compatibility_profile: crate::CompatibilityProfile,
@@ -165,6 +171,9 @@ impl<R: Read + Seek> Workbook<R> {
     /// Optional `ExtSST` shared-string lookup index.
     ///
     /// A malformed optional index is reported here without preventing workbook content parsing.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn shared_string_index(
         &self,
     ) -> std::result::Result<Option<&crate::shared_string_index::SharedStringIndex>, &Error> {
@@ -224,12 +233,12 @@ impl<R: Read + Seek> Workbook<R> {
         &self.external_links
     }
 
-    /// Parsed workbook PivotCache streams ordered by their one-based stream ID.
+    /// Parsed workbook `PivotCache` streams ordered by their one-based stream ID.
     pub fn pivot_caches(&self) -> &[crate::PivotCache] {
         &self.pivot_caches
     }
 
-    /// Global PivotCache ordinal-to-storage-stream map from SXStreamID records.
+    /// Global `PivotCache` ordinal-to-storage-stream map from `SXStreamID` records.
     pub fn pivot_cache_stream_ids(&self) -> &[u16] {
         &self.pivot_cache_stream_ids
     }
@@ -243,7 +252,10 @@ impl<R: Read + Seek> Workbook<R> {
         self.xml_map.as_ref()
     }
 
-    /// Resolves a worksheet PivotTable's global cache link.
+    /// Resolves a worksheet `PivotTable`'s global cache link.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn pivot_cache_for_table(
         &self,
         table: &pivot_table::PivotTable,
@@ -264,7 +276,10 @@ impl<R: Read + Seek> Workbook<R> {
             })
     }
 
-    /// Parsed PivotTables on one worksheet.
+    /// Parsed `PivotTables` on one worksheet.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn worksheet_pivot_tables(&self, index: usize) -> Result<&[pivot_table::PivotTable]> {
         Ok(self.xls_worksheet(index)?.pivot_tables())
     }
@@ -274,10 +289,13 @@ impl<R: Read + Seek> Workbook<R> {
     /// This provides access to XLS-specific data (protection, comments,
     /// autofilter, pivot tables) that is not exposed through the generic
     /// `WorkbookTrait` / `Worksheet` trait.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn xls_worksheet(&self, index: usize) -> Result<&Worksheet> {
         self.worksheets
             .get(index)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet index {}", index)))
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet index {index}")))
     }
 
     /// All workbook sheet directory entries in tab order.
@@ -345,6 +363,9 @@ impl<R: Read + Seek> Workbook<R> {
     /// Strictly access the user recorded as last creating, opening, or modifying the workbook.
     ///
     /// Noncanonical legacy producer variants are deferred until this metadata is requested.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn write_access(&self) -> Result<Option<&crate::access::WriteAccess>> {
         match &self.write_access {
             Ok(value) => Ok(value.as_ref()),
@@ -355,7 +376,7 @@ impl<R: Read + Seek> Workbook<R> {
         }
     }
 
-    /// Default table and PivotTable style catalog, when present.
+    /// Default table and `PivotTable` style catalog, when present.
     pub fn table_styles(&self) -> Option<&crate::table_styles::TableStyles> {
         self.table_styles.as_ref()
     }
@@ -380,7 +401,7 @@ impl<R: Read + Seek> Workbook<R> {
         self.formatting.differential_format(id)
     }
 
-    /// Resolves an XF's effective property families through its parent StyleXF.
+    /// Resolves an XF's effective property families through its parent `StyleXF`.
     pub fn effective_extended_format(
         &self,
         index: u16,
@@ -446,7 +467,7 @@ impl<R: Read + Seek> Workbook<R> {
     /// The built-in `_FilterDatabase` defined name scoped to a zero-based
     /// sheet index, if present.
     ///
-    /// Its rendered formula describes the AutoFilter cell range.
+    /// Its rendered formula describes the `AutoFilter` cell range.
     pub fn filter_database_name(&self, sheet_index: usize) -> Option<&DefinedName> {
         self.defined_names.iter().find(|defined_name| {
             defined_name.kind == DefinedNameKind::BuiltIn(BuiltInName::FilterDatabase)
@@ -523,8 +544,7 @@ impl<R: Read + Seek + std::fmt::Debug + Send + Sync> litchi_core::sheet::Workboo
     fn worksheet_by_index(&self, index: usize) -> SheetResult<Box<dyn SheetTrait + '_>> {
         if index >= self.worksheets.len() {
             return Err(Box::new(Error::WorksheetNotFound(format!(
-                "Index {} out of bounds",
-                index
+                "Index {index} out of bounds"
             ))));
         }
         // Return reference instead of clone - zero-copy!

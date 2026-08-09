@@ -268,7 +268,10 @@ pub fn add_section(package: &mut OpcPackage, mut section: Section) -> Result<Str
     if section.id.is_none() {
         section.id = Some(new_guid());
     }
-    let id = section.id.clone().expect("section ID was assigned");
+    let id = section
+        .id
+        .clone()
+        .ok_or_else(|| invalid("section ID assignment failed"))?;
     let retained = id.clone();
     mutate(package, move |graph| {
         if graph.sections.get_by_id(&id).is_some() {

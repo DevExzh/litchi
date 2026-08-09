@@ -1,4 +1,4 @@
-//! Physical SpreadsheetML codec for worksheet Office web-extension bindings.
+//! Physical `SpreadsheetML` codec for worksheet Office web-extension bindings.
 
 use std::ops::Range;
 
@@ -11,7 +11,7 @@ use quick_xml::reader::NsReader;
 use crate::error::{Result, allocation, invalid};
 use crate::web::{Binding, Bindings, MAX_BINDINGS, MAX_STRING_BYTES};
 
-/// SpreadsheetML extension URI for worksheet web-extension bindings.
+/// `SpreadsheetML` extension URI for worksheet web-extension bindings.
 pub const EXTENSION_URI: &str = "{F7C9EE02-42E1-4005-9D12-6889AFFD525C}";
 /// Namespace of the worksheet web-extension collection.
 pub const X15_NAMESPACE: &str = "http://schemas.microsoft.com/office/spreadsheetml/2010/11/main";
@@ -230,7 +230,7 @@ pub fn read(worksheet_xml: &[u8]) -> Result<Bindings> {
     Bindings::try_from(values)
 }
 
-/// Write the complete transitional SpreadsheetML `ext` element.
+/// Write the complete transitional `SpreadsheetML` `ext` element.
 pub fn write(bindings: &Bindings) -> Result<Vec<u8>> {
     write_for_namespace(bindings, SML)
 }
@@ -521,10 +521,7 @@ fn resolved_name(reader: &NsReader<&[u8]>, name: QName<'_>) -> Result<(Vec<u8>, 
         ResolveResult::Bound(namespace) => namespace.as_ref().to_vec(),
         ResolveResult::Unbound => Vec::new(),
         ResolveResult::Unknown(prefix) => {
-            return Err(invalid(format!(
-                "unknown XML namespace prefix {:?}",
-                prefix
-            )));
+            return Err(invalid(format!("unknown XML namespace prefix {prefix:?}")));
         },
     };
     Ok((namespace, name.local_name().as_ref().to_vec()))

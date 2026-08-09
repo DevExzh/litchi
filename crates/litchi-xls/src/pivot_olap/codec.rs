@@ -1,4 +1,4 @@
-//! BIFF payload codecs for PivotTable OLAP extension records.
+//! BIFF payload codecs for `PivotTable` OLAP extension records.
 
 use crate::error::{Error, Result};
 
@@ -76,7 +76,7 @@ fn read_u16(data: &[u8], offset: usize) -> u16 {
 }
 
 fn read_i16(data: &[u8], offset: usize) -> i16 {
-    read_u16(data, offset) as i16
+    crate::utils::wrap_u16_to_i16(read_u16(data, offset))
 }
 
 fn read_u32(data: &[u8], offset: usize) -> u32 {
@@ -89,7 +89,7 @@ fn read_u32(data: &[u8], offset: usize) -> u32 {
 }
 
 fn read_i32(data: &[u8], offset: usize) -> i32 {
-    read_u32(data, offset) as i32
+    crate::utils::wrap_u32_to_i32(read_u32(data, offset))
 }
 
 /// Borrow `len` bytes at `offset`, or fail with a truncation error.
@@ -146,7 +146,7 @@ fn parse_olap_string(data: &[u8], record_type: u16) -> Result<(String, usize)> {
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect();
         String::from_utf16(&units)
-            .map_err(|_| invalid(record_type, "XLUnicodeString is not valid UTF-16LE"))?
+            .map_err(|_error| invalid(record_type, "XLUnicodeString is not valid UTF-16LE"))?
     } else {
         bytes.iter().map(|&byte| char::from(byte)).collect()
     };
@@ -163,7 +163,7 @@ fn append_olap_string(record_type: u16, value: &str, output: &mut Vec<u8>) -> Re
             "record 0x{record_type:04X} XLUnicodeString exceeds {MAX_OLAP_STRING_CHARS} UTF-16 characters"
         )));
     }
-    output.extend_from_slice(&(char_count as u16).to_le_bytes());
+    output.extend_from_slice(&crate::utils::truncate_usize_to_u16(char_count).to_le_bytes());
     if compressible {
         output.push(0u8); // fHighByte = 0
         output.extend(value.chars().map(|ch| ch as u8));
@@ -178,6 +178,9 @@ fn append_olap_string(record_type: u16, value: &str, output: &mut Vec<u8>) -> Re
 
 impl PivotViewOlapHeader {
     /// Parse an `SXViewEx` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         let body = frt_body(data, SX_VIEW_EX_RECORD_TYPE, SX_VIEW_EX_FRT_RT)?;
         let fixed = slice_at(body, 0, 16, SX_VIEW_EX_RECORD_TYPE)?;
@@ -196,7 +199,7 @@ impl PivotViewOlapHeader {
                 "SXViewEx record counts must be non-negative",
             ));
         }
-        let future_len = usize::try_from(read_u32(fixed, 12)).map_err(|_| {
+        let future_len = usize::try_from(read_u32(fixed, 12)).map_err(|_error| {
             invalid(
                 SX_VIEW_EX_RECORD_TYPE,
                 "SXViewEx cbFuture cannot be represented",
@@ -216,9 +219,9 @@ impl PivotViewOlapHeader {
             ));
         }
         let value = PivotViewOlapHeader {
-            hierarchy_count: hierarchy_count as u32,
-            page_extension_count: page_extension_count as u32,
-            field_extension_count: field_extension_count as u32,
+            hierarchy_count: crate::utils::reinterpret_i32_as_u32(hierarchy_count),
+            page_extension_count: crate::utils::reinterpret_i32_as_u32(page_extension_count),
+            field_extension_count: crate::utils::reinterpret_i32_as_u32(field_extension_count),
             future_bytes: future_bytes.to_vec(),
         };
         validation::validate_view_header(&value, false)?;
@@ -226,21 +229,26 @@ impl PivotViewOlapHeader {
     }
 
     /// Serialize back to a complete `SXViewEx` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_payload(&self) -> Result<Vec<u8>> {
         validation::validate_view_header(self, true)?;
         let hierarchy_count = i32::try_from(self.hierarchy_count)
-            .map_err(|_| Error::InvalidData("SXViewEx csxth exceeds i32".to_string()))?;
+            .map_err(|_error| Error::InvalidData("SXViewEx csxth exceeds i32".to_string()))?;
         let page_extension_count = i32::try_from(self.page_extension_count)
-            .map_err(|_| Error::InvalidData("SXViewEx csxpi exceeds i32".to_string()))?;
+            .map_err(|_error| Error::InvalidData("SXViewEx csxpi exceeds i32".to_string()))?;
         let field_extension_count = i32::try_from(self.field_extension_count)
-            .map_err(|_| Error::InvalidData("SXViewEx csxvdtex exceeds i32".to_string()))?;
+            .map_err(|_error| Error::InvalidData("SXViewEx csxvdtex exceeds i32".to_string()))?;
         let mut payload = Vec::with_capacity(FRT_HEADER_OLD_LEN + 16 + self.future_bytes.len());
         payload.extend_from_slice(&SX_VIEW_EX_FRT_RT.to_le_bytes());
         payload.extend_from_slice(&0u16.to_le_bytes()); // grbitFrt
         payload.extend_from_slice(&hierarchy_count.to_le_bytes());
         payload.extend_from_slice(&page_extension_count.to_le_bytes());
         payload.extend_from_slice(&field_extension_count.to_le_bytes());
-        payload.extend_from_slice(&(self.future_bytes.len() as u32).to_le_bytes());
+        payload.extend_from_slice(
+            &crate::utils::truncate_usize_to_u32(self.future_bytes.len()).to_le_bytes(),
+        );
         payload.extend_from_slice(&self.future_bytes);
         Ok(payload)
     }
@@ -279,6 +287,9 @@ impl PivotHierarchyAxis {
 
 impl PivotHierarchy {
     /// Parse an `SXTH` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         let body = frt_body(data, SXTH_RECORD_TYPE, SXTH_FRT_RT)?;
         let fixed = slice_at(body, 0, 18, SXTH_RECORD_TYPE)?;
@@ -308,7 +319,7 @@ impl PivotHierarchy {
 
         let level_count =
             usize::try_from(read_u32(slice_at(body, offset, 4, SXTH_RECORD_TYPE)?, 0))
-                .map_err(|_| invalid(SXTH_RECORD_TYPE, "SXTH cisxvd cannot be represented"))?;
+                .map_err(|_error| invalid(SXTH_RECORD_TYPE, "SXTH cisxvd cannot be represented"))?;
         offset += 4;
         let mut level_fields = Vec::with_capacity(level_count.min(body.len() / 4));
         for _ in 0..level_count {
@@ -319,7 +330,7 @@ impl PivotHierarchy {
 
         let hidden_set_count =
             usize::try_from(read_u32(slice_at(body, offset, 4, SXTH_RECORD_TYPE)?, 0)).map_err(
-                |_| {
+                |_error| {
                     invalid(
                         SXTH_RECORD_TYPE,
                         "SXTH cHiddenMemberSets cannot be represented",
@@ -339,7 +350,9 @@ impl PivotHierarchy {
             for _ in 0..hidden_set_count {
                 let name_count =
                     usize::try_from(read_u32(slice_at(body, offset, 4, SXTH_RECORD_TYPE)?, 0))
-                        .map_err(|_| invalid(SXTH_RECORD_TYPE, "hidden member count overflow"))?;
+                        .map_err(|_error| {
+                            invalid(SXTH_RECORD_TYPE, "hidden member count overflow")
+                        })?;
                 offset += 4;
                 let mut member_names = Vec::with_capacity(name_count.min(body.len() / 3));
                 for _ in 0..name_count {
@@ -387,6 +400,9 @@ impl PivotHierarchy {
     }
 
     /// Serialize back to a complete `SXTH` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_payload(&self) -> Result<Vec<u8>> {
         validation::validate_hierarchy(self, true)?;
         let mut flags = 0u32;
@@ -441,9 +457,10 @@ impl PivotHierarchy {
         }
 
         let level_count = u32::try_from(self.level_fields.len())
-            .map_err(|_| Error::InvalidData("SXTH cisxvd exceeds u32".to_string()))?;
-        let hidden_set_count = u32::try_from(self.hidden_member_sets.len())
-            .map_err(|_| Error::InvalidData("SXTH cHiddenMemberSets exceeds u32".to_string()))?;
+            .map_err(|_error| Error::InvalidData("SXTH cisxvd exceeds u32".to_string()))?;
+        let hidden_set_count = u32::try_from(self.hidden_member_sets.len()).map_err(|_error| {
+            Error::InvalidData("SXTH cHiddenMemberSets exceeds u32".to_string())
+        })?;
         let mut payload = Vec::new();
         payload.extend_from_slice(&SXTH_FRT_RT.to_le_bytes());
         payload.extend_from_slice(&0u16.to_le_bytes()); // grbitFrt
@@ -464,7 +481,7 @@ impl PivotHierarchy {
         }
         payload.extend_from_slice(&hidden_set_count.to_le_bytes());
         for set in &self.hidden_member_sets {
-            let name_count = u32::try_from(set.member_names.len()).map_err(|_| {
+            let name_count = u32::try_from(set.member_names.len()).map_err(|_error| {
                 Error::InvalidData("SXTH hidden member count exceeds u32".to_string())
             })?;
             payload.extend_from_slice(&name_count.to_le_bytes());
@@ -478,6 +495,9 @@ impl PivotHierarchy {
 
 impl PivotPageItemOlapExt {
     /// Parse an `SXPIEx` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         let body = frt_body(data, SXPI_EX_RECORD_TYPE, SXPI_EX_FRT_RT)?;
         let hierarchy_index = read_u32(slice_at(body, 0, 4, SXPI_EX_RECORD_TYPE)?, 0);
@@ -497,6 +517,9 @@ impl PivotPageItemOlapExt {
     }
 
     /// Serialize back to a complete `SXPIEx` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_payload(&self) -> Result<Vec<u8>> {
         validation::validate_page_extension(self, true)?;
         let mut payload = Vec::new();
@@ -546,6 +569,9 @@ impl PivotItemOlapFlags {
 
 impl PivotFieldOlapExt {
     /// Parse an `SXVDTEx` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         let body = frt_body(data, SXVDT_EX_RECORD_TYPE, SXVDT_EX_FRT_RT)?;
         let fixed = slice_at(body, 0, 12, SXVDT_EX_RECORD_TYPE)?;
@@ -563,7 +589,7 @@ impl PivotFieldOlapExt {
             ));
         }
         let item_count = usize::try_from(item_count)
-            .map_err(|_| invalid(SXVDT_EX_RECORD_TYPE, "SXVDTEx csxvi overflow"))?;
+            .map_err(|_error| invalid(SXVDT_EX_RECORD_TYPE, "SXVDTEx csxvi overflow"))?;
         let item_bytes = item_count
             .checked_mul(2)
             .ok_or_else(|| invalid(SXVDT_EX_RECORD_TYPE, "SXVDTEx item byte count overflow"))?;
@@ -597,10 +623,13 @@ impl PivotFieldOlapExt {
     }
 
     /// Serialize back to a complete `SXVDTEx` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_payload(&self) -> Result<Vec<u8>> {
         validation::validate_field_extension(self, true)?;
         let item_count = i32::try_from(self.item_flags.len())
-            .map_err(|_| Error::InvalidData("SXVDTEx csxvi exceeds i32".to_string()))?;
+            .map_err(|_error| Error::InvalidData("SXVDTEx csxvi exceeds i32".to_string()))?;
         let mut flags = 0u16;
         if self.tensor_sort {
             flags |= VDT_TENSOR_SORT;

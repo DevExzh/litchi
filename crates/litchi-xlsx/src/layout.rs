@@ -7,7 +7,7 @@ use thiserror::Error;
 
 use crate::outline::Outline;
 
-/// SpreadsheetML's effective base-column-width default.
+/// `SpreadsheetML`'s effective base-column-width default.
 pub const DEFAULT_BASE_WIDTH: u8 = 8;
 
 /// Checked default row height in points.
@@ -35,6 +35,7 @@ impl Height {
     }
 
     /// Return the height in points.
+    #[must_use]
     pub const fn get(self) -> f64 {
         f64::from_bits(self.0.get() - 1)
     }
@@ -49,6 +50,7 @@ pub struct HeightError {
 
 impl HeightError {
     /// Rejected numeric value.
+    #[must_use]
     pub const fn value(self) -> f64 {
         self.value
     }
@@ -110,7 +112,8 @@ impl Width {
         Ok(Self(encoded))
     }
 
-    /// Return the width in SpreadsheetML character units.
+    /// Return the width in `SpreadsheetML` character units.
+    #[must_use]
     pub const fn get(self) -> f64 {
         f64::from_bits(self.0.get() - 1)
     }
@@ -125,6 +128,7 @@ pub struct WidthError {
 
 impl WidthError {
     /// Rejected numeric value.
+    #[must_use]
     pub const fn value(self) -> f64 {
         self.value
     }
@@ -183,6 +187,7 @@ impl Descent {
     }
 
     /// Return the descent in pixels at 100% worksheet zoom.
+    #[must_use]
     pub const fn get(self) -> f64 {
         f64::from_bits(self.0.get() - 1)
     }
@@ -197,6 +202,7 @@ pub struct DescentError {
 
 impl DescentError {
     /// Rejected numeric value.
+    #[must_use]
     pub const fn value(self) -> f64 {
         self.value
     }
@@ -293,6 +299,7 @@ pub struct Defaults {
 
 impl Defaults {
     /// Effective base column width, defaulting to eight characters.
+    #[must_use]
     pub const fn base_width(&self) -> u8 {
         match self.base_width {
             Some(value) => value,
@@ -301,16 +308,19 @@ impl Defaults {
     }
 
     /// Explicit producer-stored base width, if present.
+    #[must_use]
     pub const fn stored_base_width(&self) -> Option<u8> {
         self.base_width
     }
 
     /// Manually stored default column width, if present.
+    #[must_use]
     pub const fn width(&self) -> Option<Width> {
         self.width
     }
 
     /// Required default row height.
+    #[must_use]
     pub const fn height(&self) -> Height {
         self.height
     }
@@ -319,26 +329,31 @@ impl Defaults {
     ///
     /// Microsoft specifies `dyDescent` as making this true even when the core
     /// `customHeight` attribute is absent or explicitly false.
+    #[must_use]
     pub const fn custom_height(&self) -> bool {
         self.flags.contains(Flags::CUSTOM_HEIGHT) || self.descent.is_some()
     }
 
     /// Whether rows without an explicit record are hidden by default.
+    #[must_use]
     pub const fn hidden(&self) -> bool {
         self.flags.contains(Flags::HIDDEN)
     }
 
     /// Whether default rows request a thick top edge.
+    #[must_use]
     pub const fn thick_top(&self) -> bool {
         self.flags.contains(Flags::THICK_TOP)
     }
 
     /// Whether default rows request a thick bottom edge.
+    #[must_use]
     pub const fn thick_bottom(&self) -> bool {
         self.flags.contains(Flags::THICK_BOTTOM)
     }
 
     /// Producer-reported highest row outline level.
+    #[must_use]
     pub const fn row_outline(&self) -> Outline {
         match self.row_outline {
             Some(value) => value,
@@ -347,11 +362,13 @@ impl Defaults {
     }
 
     /// Explicit producer-stored highest row outline level, if present.
+    #[must_use]
     pub const fn stored_row_outline(&self) -> Option<Outline> {
         self.row_outline
     }
 
     /// Producer-reported highest column outline level.
+    #[must_use]
     pub const fn column_outline(&self) -> Outline {
         match self.column_outline {
             Some(value) => value,
@@ -360,11 +377,13 @@ impl Defaults {
     }
 
     /// Explicit producer-stored highest column outline level, if present.
+    #[must_use]
     pub const fn stored_column_outline(&self) -> Option<Outline> {
         self.column_outline
     }
 
     /// Typographic descent in pixels at 100% worksheet zoom.
+    #[must_use]
     pub const fn descent(&self) -> Option<Descent> {
         self.descent
     }

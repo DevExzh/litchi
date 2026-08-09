@@ -1,4 +1,4 @@
-//! ActiveX XML and relationship codecs.
+//! `ActiveX` XML and relationship codecs.
 //!
 //! XML mutation stays byte-preserving for the worksheet owner; relationship
 //! traversal is kept separate so package transactions can consume a compact,

@@ -33,6 +33,12 @@ pub struct InterfaceHdr {
 
 impl InterfaceHdr {
     /// Parse an `InterfaceHdr` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// # Panics
+    ///
+    /// Panics only if an internal BIFF invariant has been violated.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
             return Err(Error::InvalidLength {
@@ -51,11 +57,13 @@ impl InterfaceHdr {
     }
 
     /// Serialize back to a complete `InterfaceHdr` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         self.code_page.to_le_bytes().to_vec()
     }
 
     /// The user-interface code page (`codePage`). Always 0x04B0 (Unicode).
+    #[must_use]
     pub fn code_page(&self) -> u16 {
         self.code_page
     }
@@ -68,6 +76,9 @@ pub struct InterfaceEnd;
 
 impl InterfaceEnd {
     /// Parse an `InterfaceEnd` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if !data.is_empty() {
             return Err(Error::InvalidLength {
@@ -79,6 +90,7 @@ impl InterfaceEnd {
     }
 
     /// Serialize back to a complete `InterfaceEnd` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         Vec::new()
     }

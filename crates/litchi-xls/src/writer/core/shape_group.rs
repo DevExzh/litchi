@@ -20,6 +20,7 @@ pub struct ShapeGroupChild {
 }
 
 impl ShapeGroupChild {
+    #[must_use]
     pub fn new(kind: ShapeKind, anchor: Rect) -> Self {
         Self {
             kind,
@@ -47,7 +48,7 @@ impl ShapeGroupChild {
     }
 }
 
-/// Writable, macro-inert BIFF8 shape group (OfficeArt SpgrContainer).
+/// Writable, macro-inert BIFF8 shape group (`OfficeArt` `SpgrContainer`).
 ///
 /// The group itself is anchored to worksheet cells while every child is anchored
 /// inside [`ShapeGroupWrite::coordinates`], the group coordinate space.
@@ -55,7 +56,7 @@ impl ShapeGroupChild {
 pub struct ShapeGroupWrite {
     /// Cell-relative anchor of the whole group.
     pub anchor: Anchor,
-    /// Coordinate space that child anchors are expressed in (OfficeArtFSPGR).
+    /// Coordinate space that child anchors are expressed in (`OfficeArtFSPGR`).
     pub coordinates: Rect,
     /// Optional requested OBJ identifier for the group. `None` assigns the first
     /// free canonical ID.
@@ -66,6 +67,7 @@ pub struct ShapeGroupWrite {
 }
 
 impl ShapeGroupWrite {
+    #[must_use]
     pub fn new(anchor: Anchor) -> Self {
         Self {
             anchor,
@@ -98,7 +100,9 @@ impl ShapeGroupWrite {
         let mut requested = Vec::new();
         requested
             .try_reserve_exact(requested_capacity)
-            .map_err(|_| Error::Allocation("reserving shape group object-ID validation storage"))?;
+            .map_err(|_error| {
+                Error::Allocation("reserving shape group object-ID validation storage")
+            })?;
         if let Some(object_id) = self.object_id {
             requested.push(object_id);
         }

@@ -37,16 +37,19 @@ impl<'a> Transaction<'a> {
     }
 
     /// Exact immutable source captured when the transaction began.
+    #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Currently staged exact-authored `calcPr` state.
+    #[must_use]
     pub fn properties(&self) -> Option<&Properties> {
         self.properties.as_ref()
     }
 
     /// Currently staged ordered calculation features.
+    #[must_use]
     pub fn features(&self) -> Option<&Features> {
         self.features.as_ref()
     }
@@ -103,6 +106,7 @@ impl<'a> Transaction<'a> {
     }
 
     /// Whether the exact authored semantic state differs from the source.
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         !same_properties(self.before.properties(), self.properties())
             || self.before.features() != self.features()

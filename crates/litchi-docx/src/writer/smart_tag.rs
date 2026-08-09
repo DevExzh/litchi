@@ -1,3 +1,15 @@
+#![expect(
+    clippy::expect_used,
+    reason = "the invariant is established immediately before extraction"
+)]
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
 //! Mutable Word smart tags.
 
 use super::bookmark::MutableBookmark;
@@ -28,16 +40,19 @@ impl MutableSmartTagAttribute {
     }
 
     /// Return the optional property namespace URI.
+    #[must_use]
     pub fn uri(&self) -> Option<&str> {
         self.uri.as_deref()
     }
 
     /// Return the property name.
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Return the property value.
+    #[must_use]
     pub fn value(&self) -> &str {
         &self.value
     }
@@ -70,6 +85,10 @@ impl MutableSmartTag {
     }
 
     /// Add a custom smart-tag property.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal writer invariant is violated.
     pub fn add_attribute(
         &mut self,
         name: impl Into<String>,
@@ -115,6 +134,10 @@ impl MutableSmartTag {
     }
 
     /// Add an inline image from bytes to the tagged content.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_picture_from_bytes(
         &mut self,
         data: Vec<u8>,
@@ -159,16 +182,19 @@ impl MutableSmartTag {
     }
 
     /// Return the optional vocabulary namespace URI.
+    #[must_use]
     pub fn uri(&self) -> Option<&str> {
         self.uri.as_deref()
     }
 
     /// Return the required smart-tag element name.
+    #[must_use]
     pub fn element(&self) -> &str {
         &self.element
     }
 
     /// Return the smart-tag properties.
+    #[must_use]
     pub fn attributes(&self) -> &[MutableSmartTagAttribute] {
         &self.attributes
     }

@@ -1,4 +1,4 @@
-//! Typed SpreadsheetML pivot vocabulary and part codecs.
+//! Typed `SpreadsheetML` pivot vocabulary and part codecs.
 //!
 //! The compact types at this facade are the semantic API. XML-shaped
 //! cache/table records live in the nested modules so callers can opt into
@@ -82,6 +82,7 @@ pub struct PivotTable {
 }
 
 impl PivotTable {
+    #[must_use]
     pub fn fields_by_axis(&self, axis: PivotAxis) -> &[PivotFieldRole] {
         match axis {
             PivotAxis::Row => &self.row_fields,
@@ -91,6 +92,7 @@ impl PivotTable {
         }
     }
 
+    #[must_use]
     pub fn data_fields_map(&self) -> HashMap<&str, &PivotDataField> {
         let mut map = HashMap::with_capacity(self.data_fields.len());
         for field in &self.data_fields {
@@ -122,6 +124,7 @@ pub enum ItemType {
 }
 
 impl ItemType {
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Data => "data",
@@ -142,6 +145,7 @@ impl ItemType {
         }
     }
 
+    #[must_use]
     pub fn parse_str(value: &str) -> Self {
         match value {
             "default" => Self::Default,
@@ -171,6 +175,7 @@ pub enum SortType {
 }
 
 impl SortType {
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Manual => "manual",
@@ -179,6 +184,7 @@ impl SortType {
         }
     }
 
+    #[must_use]
     pub fn parse_str(value: &str) -> Self {
         match value {
             "ascending" => Self::Ascending,
@@ -197,6 +203,7 @@ pub enum AxisType {
 }
 
 impl AxisType {
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::AxisRow => "axisRow",
@@ -206,6 +213,7 @@ impl AxisType {
         }
     }
 
+    #[must_use]
     pub fn parse_str(value: &str) -> Self {
         match value {
             "axisCol" => Self::AxisCol,

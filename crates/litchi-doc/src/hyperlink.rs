@@ -28,31 +28,37 @@ impl Hyperlink {
     }
 
     /// Get the destination
+    #[must_use]
     pub fn destination(&self) -> &str {
         &self.destination
     }
 
     /// Get the display text
+    #[must_use]
     pub fn display_text(&self) -> &str {
         &self.display_text
     }
 
     /// Check if this is a URL hyperlink
+    #[must_use]
     pub fn is_url(&self) -> bool {
         self.link_type == HyperlinkType::Url
     }
 
     /// Check if this is an email hyperlink
+    #[must_use]
     pub fn is_email(&self) -> bool {
         self.link_type == HyperlinkType::Email
     }
 
     /// Check if this is a file hyperlink
+    #[must_use]
     pub fn is_file(&self) -> bool {
         self.link_type == HyperlinkType::File
     }
 
     /// Check if this is a bookmark hyperlink
+    #[must_use]
     pub fn is_bookmark(&self) -> bool {
         self.link_type == HyperlinkType::Bookmark
     }

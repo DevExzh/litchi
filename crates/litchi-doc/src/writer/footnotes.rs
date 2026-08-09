@@ -52,6 +52,7 @@ impl FootnotesWriter {
     }
 
     /// Create a new footnotes writer
+    #[must_use]
     pub fn new() -> Self {
         Self {
             footnotes: Vec::new(),
@@ -63,7 +64,7 @@ impl FootnotesWriter {
         self.footnotes.push(footnote);
     }
 
-    /// Generate the footnote reference PLCF (PlcfFndRef)
+    /// Generate the footnote reference PLCF (`PlcfFndRef`)
     ///
     /// Format: CP array followed by FRD (Footnote Reference Descriptor) array
     /// FRD is 2 bytes: footnote number
@@ -85,6 +86,7 @@ impl FootnotesWriter {
     }
 
     /// Generate `PlcfFndRef` with the main-document character count as its ignored final CP.
+    #[must_use]
     pub fn build_plcf_fnd_ref_with_text_length(&self, ccp_text: u32) -> Vec<u8> {
         let mut plcf = Vec::new();
 
@@ -100,7 +102,7 @@ impl FootnotesWriter {
         plcf
     }
 
-    /// Generate footnote text PLCF (PlcfFndTxt)
+    /// Generate footnote text PLCF (`PlcfFndTxt`)
     ///
     /// Maps character positions in the footnote subdocument
     ///
@@ -190,11 +192,13 @@ impl FootnotesWriter {
     }
 
     /// Get footnote entries
+    #[must_use]
     pub fn footnotes(&self) -> &[FootnoteEntry] {
         &self.footnotes
     }
 
     /// Check if empty
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.footnotes.is_empty()
     }

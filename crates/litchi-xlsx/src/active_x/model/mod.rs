@@ -1,4 +1,4 @@
-//! Layered ActiveX value models.
+//! Layered `ActiveX` value models.
 //!
 //! The submodules keep worksheet placement, descriptor metadata, and package
 //! payloads distinct while the parent re-exports the ergonomic semantic API.

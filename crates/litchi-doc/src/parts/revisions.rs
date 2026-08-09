@@ -74,6 +74,7 @@ impl RevisionAuthorTable {
     }
 
     /// Author names by the indexes stored in revision SPRMs.
+    #[must_use]
     pub fn authors(&self) -> &[String] {
         &self.authors
     }

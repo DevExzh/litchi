@@ -20,11 +20,13 @@ impl Column {
     }
 
     /// Return the column width in twips.
+    #[must_use]
     pub fn width_twips(self) -> u16 {
         self.width_twips
     }
 
     /// Return the spacing after this column, if it is not the final column.
+    #[must_use]
     pub fn spacing_after_twips(self) -> Option<u16> {
         self.spacing_after_twips
     }
@@ -38,13 +40,13 @@ impl Column {
         if !(Layout::MIN_UNEQUAL_WIDTH_TWIPS..=Layout::MAX_TWIPS).contains(&width_twips) {
             return Err(Error::InvalidWidth { index, width_twips });
         }
-        if let Some(spacing_twips) = spacing_after_twips {
-            if spacing_twips > Layout::MAX_TWIPS {
-                return Err(Error::InvalidSpacing {
-                    index,
-                    spacing_twips,
-                });
-            }
+        if let Some(spacing_twips) = spacing_after_twips
+            && spacing_twips > Layout::MAX_TWIPS
+        {
+            return Err(Error::InvalidSpacing {
+                index,
+                spacing_twips,
+            });
         }
         Ok(Self {
             width_twips,
@@ -217,6 +219,7 @@ impl Layout {
     }
 
     /// Number of columns in this section.
+    #[must_use]
     pub fn count(&self) -> usize {
         match self {
             Self::Even { count, .. } => usize::from(*count),
@@ -225,6 +228,7 @@ impl Layout {
     }
 
     /// Whether a vertical line is drawn between columns.
+    #[must_use]
     pub fn line_between(&self) -> bool {
         match self {
             Self::Even { line_between, .. } | Self::Unequal { line_between, .. } => *line_between,
@@ -232,6 +236,7 @@ impl Layout {
     }
 
     /// Return equal-column parameters when this is an equal-width layout.
+    #[must_use]
     pub fn equal(&self) -> Option<(u8, u16, bool)> {
         match self {
             Self::Even {
@@ -244,6 +249,7 @@ impl Layout {
     }
 
     /// Return unequal columns when this is an individually sized layout.
+    #[must_use]
     pub fn unequal_columns(&self) -> Option<&[Column]> {
         match self {
             Self::Even { .. } => None,

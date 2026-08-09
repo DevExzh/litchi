@@ -27,7 +27,7 @@ pub enum Error {
     /// A schema singleton child occurred more than once.
     #[error("model3d child '{0}' occurs more than once")]
     DuplicateChild(&'static str),
-    /// A known child appears outside the normative CT_Model3D sequence.
+    /// A known child appears outside the normative `CT_Model3D` sequence.
     #[error("model3d child '{child}' is out of sequence")]
     ChildOrder {
         /// Local child name.
@@ -139,7 +139,7 @@ pub fn validate(metadata: &Metadata) -> Result<(), Error> {
                 stage = 3;
             },
             ("attrSrcUrl", true) => {
-                if stage < 3 || stage > 4 {
+                if !(3..=4).contains(&stage) {
                     return Err(Error::ChildOrder {
                         child: "attrSrcUrl",
                     });
@@ -147,20 +147,20 @@ pub fn validate(metadata: &Metadata) -> Result<(), Error> {
                 stage = 4;
             },
             ("raster", true) => {
-                if stage < 3 || stage > 5 {
+                if !(3..=5).contains(&stage) {
                     return Err(Error::ChildOrder { child: "raster" });
                 }
                 stage = 5;
             },
             ("extLst", true) => {
-                if extension_list || stage < 3 || stage > 6 {
+                if extension_list || !(3..=6).contains(&stage) {
                     return Err(Error::ChildOrder { child: "extLst" });
                 }
                 extension_list = true;
                 stage = 6;
             },
-            ("objViewport", true) | ("winViewport", true) => {
-                if viewport.is_some() || stage < 3 || stage > 7 {
+            ("objViewport" | "winViewport", true) => {
+                if viewport.is_some() || !(3..=7).contains(&stage) {
                     return if viewport.is_some() {
                         Err(Error::MultipleViewports)
                     } else {
@@ -179,7 +179,7 @@ pub fn validate(metadata: &Metadata) -> Result<(), Error> {
                 ambient = true;
                 stage = 8;
             },
-            ("ptLight", true) | ("spotLight", true) | ("dirLight", true) | ("unkLight", true) => {
+            ("ptLight" | "spotLight" | "dirLight" | "unkLight", true) => {
                 if stage < 7 {
                     return Err(Error::ChildOrder { child: "light" });
                 }

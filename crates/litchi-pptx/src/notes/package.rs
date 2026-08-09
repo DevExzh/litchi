@@ -1286,7 +1286,12 @@ fn validate_leaf_path(uri: &PackURI, prefix: &str, label: &str) -> Result<()> {
     let Some(rest) = uri.as_str().strip_prefix(prefix) else {
         return Err(invalid(format!("{label} is outside {prefix}")));
     };
-    if rest.is_empty() || rest.contains('/') || !rest.ends_with(".xml") {
+    if rest.is_empty()
+        || rest.contains('/')
+        || !rest
+            .rsplit_once('.')
+            .is_some_and(|(_, extension)| extension.eq_ignore_ascii_case("xml"))
+    {
         return Err(invalid(format!("invalid {label} part path")));
     }
     Ok(())

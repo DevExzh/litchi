@@ -1,11 +1,11 @@
-//! Package-level DataPilot content replacement.
+//! Package-level `DataPilot` content replacement.
 
 use super::codec::{self, Location};
 use crate::model::data_pilot::Table;
 use crate::package::Package;
 use litchi_core::{Error, Result};
 
-/// Replace the source-checked DataPilot owner and rebuild only the ODS package.
+/// Replace the source-checked `DataPilot` owner and rebuild only the ODS package.
 pub(crate) fn replace(
     package: &Package,
     source_xml: &str,

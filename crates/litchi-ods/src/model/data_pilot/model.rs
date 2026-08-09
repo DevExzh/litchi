@@ -40,7 +40,7 @@ string_enum! {
     }
 }
 
-/// LibreOffice's inert named grand-total extension metadata.
+/// `LibreOffice`'s inert named grand-total extension metadata.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GrandTotalElement {
     pub orientation: GrandTotalOrientation,
@@ -204,7 +204,7 @@ pub struct LayoutInfo {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Level {
     pub show_empty: Option<bool>,
-    /// LibreOffice `calcext:repeat-item-labels`; retained but never evaluated.
+    /// `LibreOffice` `calcext:repeat-item-labels`; retained but never evaluated.
     pub repeat_item_labels: Option<bool>,
     /// Standard or implementation-defined aggregation names.
     pub subtotals: Vec<String>,
@@ -267,7 +267,7 @@ pub struct Table {
     pub buttons: Option<String>,
     pub show_filter_button: Option<bool>,
     pub drill_down_on_double_click: Option<bool>,
-    /// LibreOffice named grand-total extension elements in schema position.
+    /// `LibreOffice` named grand-total extension elements in schema position.
     pub grand_totals: Vec<GrandTotalElement>,
     pub source: Option<Source>,
     pub fields: Vec<Field>,

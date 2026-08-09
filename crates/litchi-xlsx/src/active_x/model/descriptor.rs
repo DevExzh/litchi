@@ -1,4 +1,4 @@
-//! ActiveX descriptor and nested property-bag models.
+//! `ActiveX` descriptor and nested property-bag models.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Persistence {

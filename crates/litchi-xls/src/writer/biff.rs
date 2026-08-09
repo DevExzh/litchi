@@ -216,7 +216,7 @@ pub(crate) fn has_multibyte_char(s: &str) -> bool {
 }
 
 pub(crate) fn unicode_string_size(value: &str) -> u16 {
-    let char_count = value.chars().count() as u16;
+    let char_count = crate::utils::truncate_usize_to_u16(value.chars().count());
     if has_multibyte_char(value) {
         2u16 + 1u16 + char_count.saturating_mul(2)
     } else {
@@ -225,11 +225,11 @@ pub(crate) fn unicode_string_size(value: &str) -> u16 {
 }
 
 pub(crate) fn write_unicode_string_biff8<W: Write>(writer: &mut W, value: &str) -> Result<()> {
-    let char_count: u16 = value.chars().count() as u16;
+    let char_count: u16 = crate::utils::truncate_usize_to_u16(value.chars().count());
     writer.write_all(&char_count.to_le_bytes())?;
 
     let is_16bit = has_multibyte_char(value);
-    writer.write_all(&[if is_16bit { 0x01 } else { 0x00 }])?;
+    writer.write_all(&[u8::from(is_16bit)])?;
 
     if is_16bit {
         for code_unit in value.encode_utf16() {
@@ -251,7 +251,7 @@ pub(crate) fn write_unicode_string_biff8<W: Write>(writer: &mut W, value: &str) 
 /// - 15:    default cell XF
 /// - 16..20: additional style XFs for comma / currency / percent styles
 ///
-/// Mapping (xf_index, builtin_style_id):
+/// Mapping (`xf_index`, `builtin_style_id)`:
 /// - (0x0010, 3)  => Comma
 /// - (0x0011, 6)  => Comma [0 decimals]
 /// - (0x0012, 4)  => Currency
@@ -274,11 +274,11 @@ pub(crate) fn write_dv<W: Write>(
     validation::write_dv(writer, cfg, ranges)
 }
 
-/// Write UseSelFS (Use Natural Language Formulas) record.
+/// Write `UseSelFS` (Use Natural Language Formulas) record.
 ///
 /// Record type: 0x0160, Length: 2
 /// A value of 0 disables natural language formulas (modern Excel default).
-#[allow(dead_code)] // Compatibility wrapper for the former fixed-value writer API.
+#[allow(dead_code, reason = "retained as a BIFF compatibility building block")] // Compatibility wrapper for the former fixed-value writer API.
 pub(crate) fn write_usesel_fs<W: Write>(writer: &mut W) -> Result<()> {
     workbook::write_usesel_fs(writer)
 }
@@ -383,7 +383,7 @@ pub(crate) fn write_refresh_all<W: Write>(writer: &mut W, refresh_all: bool) -> 
     workbook::write_refresh_all(writer, refresh_all)
 }
 
-#[allow(dead_code)] // Compatibility wrapper retained for existing internal callers.
+#[allow(dead_code, reason = "retained as a BIFF compatibility building block")] // Compatibility wrapper retained for existing internal callers.
 pub(crate) fn write_book_bool<W: Write>(writer: &mut W, save_link_values: bool) -> Result<()> {
     workbook::write_book_bool(writer, save_link_values)
 }
@@ -478,9 +478,9 @@ pub(crate) fn write_pivot_colinfo<W: Write>(
 ///
 /// Record type: 0x023E, Length: 18 (worksheet and macro sheet)
 ///
-/// The `has_freeze_panes` flag controls whether the FREEZE_PANES and
-/// FREEZE_PANES_NO_SPLIT bits are set in the options field.
-#[allow(dead_code)]
+/// The `has_freeze_panes` flag controls whether the `FREEZE_PANES` and
+/// `FREEZE_PANES_NO_SPLIT` bits are set in the options field.
+#[allow(dead_code, reason = "retained as a BIFF compatibility building block")]
 pub(crate) fn write_window2<W: Write>(writer: &mut W, has_freeze_panes: bool) -> Result<()> {
     worksheet::write_window2(writer, has_freeze_panes)
 }
@@ -510,7 +510,7 @@ pub(crate) fn write_selection_options<W: Write>(
     worksheet::write_selection_options(writer, selection)
 }
 
-#[allow(dead_code)]
+#[allow(dead_code, reason = "retained as a BIFF compatibility building block")]
 pub(crate) fn write_default_selection<W: Write>(
     writer: &mut W,
     freeze_rows: u16,
@@ -553,7 +553,7 @@ pub(crate) fn write_phonetic_info<W: Write>(
 /// Write PANE record (freeze panes configuration)
 ///
 /// Record type: 0x0041, Length: 10
-#[allow(dead_code)]
+#[allow(dead_code, reason = "retained as a BIFF compatibility building block")]
 pub(crate) fn write_pane<W: Write>(
     writer: &mut W,
     freeze_rows: u32,
@@ -671,7 +671,7 @@ pub(crate) fn write_window1<W: Write>(
 /// * `position` - Absolute stream position of BOF record for this sheet
 /// * `name` - Sheet name (max 31 characters)
 ///
-/// The sheet name is encoded as ShortXLUnicodeString per BIFF8: 1-byte character count,
+/// The sheet name is encoded as `ShortXLUnicodeString` per BIFF8: 1-byte character count,
 /// 1-byte flags (0x00 = compressed 8-bit, 0x01 = uncompressed UTF-16LE), followed by characters.
 pub(crate) fn write_boundsheet<W: Write>(writer: &mut W, position: u32, name: &str) -> Result<()> {
     workbook::write_boundsheet(writer, position, name)
@@ -729,7 +729,7 @@ pub(crate) fn write_def_col_width<W: Write>(writer: &mut W, width_chars: u16) ->
 /// Write INDEX record.
 ///
 /// Record type: 0x020B
-#[allow(dead_code)]
+#[allow(dead_code, reason = "retained as a BIFF compatibility building block")]
 pub(crate) fn write_index<W: Write>(
     writer: &mut W,
     first_row: u32,
@@ -749,7 +749,7 @@ pub(crate) fn write_index<W: Write>(
 /// Write DBCELL record.
 ///
 /// Record type: 0x00D7
-#[allow(dead_code)]
+#[allow(dead_code, reason = "retained as a BIFF compatibility building block")]
 pub(crate) fn write_dbcell<W: Write>(
     writer: &mut W,
     row_offset: u32,
@@ -856,7 +856,7 @@ pub(crate) fn write_boolerr<W: Write>(
 /// CONTINUE records (0x003C) are used to store the remaining data.
 ///
 /// This implementation properly handles string splitting across CONTINUE boundaries,
-/// based on Apache POI's SSTSerializer.
+/// based on Apache POI's `SSTSerializer`.
 pub(crate) fn write_sst<W: Write>(
     writer: &mut W,
     strings: &[String],
@@ -866,7 +866,10 @@ pub(crate) fn write_sst<W: Write>(
 }
 
 /// Write an AUTOFILTER record (0x009E) for a single column filter condition.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "arguments map positionally to BIFF fields"
+)]
 pub(crate) fn write_autofilter<W: Write>(
     writer: &mut W,
     column_index: u16,
@@ -899,6 +902,9 @@ pub(crate) fn write_sort<W: Write>(
     worksheet::write_sort(writer, case_sensitive, sort_by_columns, keys)
 }
 
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn write_cfheader<W: Write>(
     writer: &mut W,
     ranges: &[(u32, u32, u16, u16)],
@@ -948,6 +954,9 @@ pub(crate) fn write_cf12<W: Write>(writer: &mut W, config: &Cf12Config<'_>) -> R
 }
 
 /// Write an exact `CFEx` marker which must immediately precede its associated `CF12` record.
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn write_cfex12_marker<W: Write>(
     writer: &mut W,
     identifier: u16,

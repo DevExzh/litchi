@@ -24,7 +24,7 @@ pub enum EncryptionProfile {
     XorObfuscation,
     /// Office 97-2003 binary RC4 with its fixed 40-bit key derivation.
     OfficeBinaryRc4,
-    /// CryptoAPI RC4 with a key length from 40 through 128 bits.
+    /// `CryptoAPI` RC4 with a key length from 40 through 128 bits.
     CryptoApiRc4 { key_bits: u16 },
 }
 
@@ -226,13 +226,13 @@ impl BinaryRc4Stream {
 
     fn apply_at(&mut self, mut data: &mut [u8], mut absolute: usize) -> Result<()> {
         while !data.is_empty() {
-            let block = u32::try_from(absolute / BINARY_RC4_BLOCK_SIZE).map_err(|_| {
+            let block = u32::try_from(absolute / BINARY_RC4_BLOCK_SIZE).map_err(|_error| {
                 Error::InvalidData("Workbook stream is too large for binary RC4".to_string())
             })?;
             let block_offset = absolute % BINARY_RC4_BLOCK_SIZE;
             if self.block != Some(block) {
                 let key = derive_binary_rc4_block_key(&self.secret, block);
-                self.cipher = Some(Rc4::new_from_slice(key.as_ref()).map_err(|_| {
+                self.cipher = Some(Rc4::new_from_slice(key.as_ref()).map_err(|_error| {
                     Error::InvalidData("invalid binary RC4 key length".to_string())
                 })?);
                 self.block = Some(block);
@@ -304,7 +304,7 @@ fn prepare_writer_material(encryption: &WriterEncryption) -> Result<WriterEncryp
             encrypted[..16].copy_from_slice(verifier.as_ref());
             encrypted[16..].copy_from_slice(&Md5::digest(verifier.as_ref()));
             Rc4::new_from_slice(key.as_ref())
-                .map_err(|_| Error::InvalidData("invalid binary RC4 key length".to_string()))?
+                .map_err(|_error| Error::InvalidData("invalid binary RC4 key length".to_string()))?
                 .apply_keystream(encrypted.as_mut());
 
             let mut filepass = Vec::with_capacity(BINARY_RC4_FILEPASS_LEN);
@@ -452,7 +452,7 @@ pub(crate) fn encrypt_workbook_for_write(
 ) -> Result<Vec<u8>> {
     let plan = inspect_clear_workbook(&workbook)?;
     let mut material = prepare_writer_material(encryption)?;
-    let filepass_len = u16::try_from(material.filepass.len()).map_err(|_| {
+    let filepass_len = u16::try_from(material.filepass.len()).map_err(|_error| {
         Error::InvalidData("FILEPASS payload exceeds the BIFF8 record limit".to_string())
     })?;
     let shift = material
@@ -462,12 +462,11 @@ pub(crate) fn encrypt_workbook_for_write(
         .ok_or_else(|| Error::InvalidData("FILEPASS record size overflow".to_string()))?;
     for payload in plan.boundsheet_payloads {
         let target = u32::from_le_bytes(workbook[payload..payload + 4].try_into().unwrap());
-        let shifted =
-            target
-                .checked_add(u32::try_from(shift).map_err(|_| {
-                    Error::InvalidData("FILEPASS record size exceeds u32".to_string())
-                })?)
-                .ok_or_else(|| Error::InvalidData("BOUNDSHEET8 offset overflow".to_string()))?;
+        let shifted = target
+            .checked_add(u32::try_from(shift).map_err(|_error| {
+                Error::InvalidData("FILEPASS record size exceeds u32".to_string())
+            })?)
+            .ok_or_else(|| Error::InvalidData("BOUNDSHEET8 offset overflow".to_string()))?;
         workbook[payload..payload + 4].copy_from_slice(&shifted.to_le_bytes());
     }
     let mut record = Vec::with_capacity(shift);
@@ -669,7 +668,7 @@ fn map_cryptoapi_runtime_error(error: CryptoError) -> Error {
 
 fn apply_cryptoapi_at(mut data: &mut [u8], mut absolute: usize, context: &Context) -> Result<()> {
     while !data.is_empty() {
-        let block = u32::try_from(absolute / BINARY_RC4_BLOCK_SIZE).map_err(|_| {
+        let block = u32::try_from(absolute / BINARY_RC4_BLOCK_SIZE).map_err(|_error| {
             Error::InvalidData("Workbook stream is too large for CryptoAPI RC4".to_string())
         })?;
         let block_offset = absolute % BINARY_RC4_BLOCK_SIZE;
@@ -720,7 +719,7 @@ fn verify_binary_rc4_password(
     let secret = derive_binary_rc4_secret(password, &filepass.salt);
     let key = derive_binary_rc4_block_key(&secret, 0);
     let mut cipher = Rc4::new_from_slice(key.as_ref())
-        .map_err(|_| Error::InvalidData("invalid binary RC4 key length".to_string()))?;
+        .map_err(|_error| Error::InvalidData("invalid binary RC4 key length".to_string()))?;
     let mut verifier = Zeroizing::new(filepass.encrypted_verifier);
     let mut verifier_hash = Zeroizing::new(filepass.encrypted_verifier_hash);
     cipher.apply_keystream(verifier.as_mut());
@@ -751,7 +750,7 @@ fn password_bytes(password: &str) -> Vec<u8> {
         .encode_utf16()
         .take(15)
         .map(|unit| {
-            let low = unit as u8;
+            let low = crate::utils::truncate_u16_to_u8(unit);
             if low == 0 { (unit >> 8) as u8 } else { low }
         })
         .collect()
@@ -770,7 +769,7 @@ fn create_xor_verifier(password: &str) -> u16 {
     for byte in bytes.iter().rev() {
         verifier = rotate_left_base15(verifier) ^ u16::from(*byte);
     }
-    rotate_left_base15(verifier) ^ bytes.len() as u16 ^ 0xce4b
+    rotate_left_base15(verifier) ^ crate::utils::truncate_usize_to_u16(bytes.len()) ^ 0xce4b
 }
 
 fn create_xor_key(password: &str) -> u16 {

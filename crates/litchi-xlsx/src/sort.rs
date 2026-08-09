@@ -19,7 +19,7 @@ pub enum SortMethod {
 }
 
 impl SortMethod {
-    /// Return the exact SpreadsheetML token.
+    /// Return the exact `SpreadsheetML` token.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -60,7 +60,7 @@ pub enum SortBy {
 }
 
 impl SortBy {
-    /// Return the exact SpreadsheetML token.
+    /// Return the exact `SpreadsheetML` token.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {

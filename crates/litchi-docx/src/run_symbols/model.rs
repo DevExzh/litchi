@@ -24,11 +24,19 @@ pub struct Symbol {
 
 impl Symbol {
     /// Construct an extended symbol with both schema attributes present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(font: impl Into<String>, character: u32) -> Result<Self> {
         Self::from_parts(Some(font.into()), Some(character))
     }
 
     /// Construct an extended symbol from its optional wire attributes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_parts(font: Option<String>, character: Option<u32>) -> Result<Self> {
         let value = Self { font, character };
         value.validate()?;
@@ -36,12 +44,15 @@ impl Symbol {
     }
 
     /// Construct a symbol with only its Unicode character code.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn with_character(character: u32) -> Result<Self> {
         Self::from_parts(None, Some(character))
     }
 
     /// Construct an explicitly empty `symEx` element.
-    #[must_use]
     pub const fn empty() -> Self {
         Self {
             font: None,
@@ -71,6 +82,10 @@ impl Symbol {
     }
 
     /// Set or remove the optional font attribute.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_font(&mut self, font: Option<impl Into<String>>) -> Result<&mut Self> {
         let candidate = Self {
             font: font.map(Into::into),
@@ -82,6 +97,10 @@ impl Symbol {
     }
 
     /// Set or remove the optional Unicode scalar value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_character(&mut self, character: Option<u32>) -> Result<&mut Self> {
         let candidate = Self {
             font: self.font.clone(),
@@ -93,11 +112,19 @@ impl Symbol {
     }
 
     /// Alias for [`Self::set_character`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_char_code(&mut self, character: Option<u32>) -> Result<&mut Self> {
         self.set_character(character)
     }
 
     /// Validate the complete semantic symbol value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn validate(&self) -> Result<()> {
         validation::validate_symbol(self)
     }
@@ -125,12 +152,15 @@ pub struct Symbols {
 
 impl Symbols {
     /// Construct an empty symbol collection.
-    #[must_use]
     pub const fn new() -> Self {
         Self { values: Vec::new() }
     }
 
     /// Construct and validate a symbol collection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_values(values: Vec<Symbol>) -> Result<Self> {
         let value = Self { values };
         value.validate()?;
@@ -153,6 +183,7 @@ impl Symbols {
 
     /// Borrow symbols in their authored order.
     #[inline]
+    #[must_use]
     pub fn iter(&self) -> impl ExactSizeIterator<Item = &Symbol> {
         self.values.iter()
     }
@@ -172,6 +203,10 @@ impl Symbols {
     }
 
     /// Append a symbol after enforcing collection and value bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn push(&mut self, symbol: Symbol) -> Result<&mut Self> {
         let next_len =
             self.values.len().checked_add(1).ok_or_else(|| {
@@ -193,6 +228,10 @@ impl Symbols {
     }
 
     /// Validate the complete collection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn validate(&self) -> Result<()> {
         validation::validate_symbols(self)
     }

@@ -285,7 +285,7 @@ fn write_property(output: &mut Vec<u8>, property: &RecipientProperty) -> Result<
     );
     match &property.value {
         PropertyValue::Long(value) | PropertyValue::Null(value) | PropertyValue::Error(value) => {
-            put_u32(output, *value)
+            put_u32(output, *value);
         },
         PropertyValue::Boolean(value) => put_u16(output, u16::from(*value)),
         PropertyValue::SystemTime { high, low } => {

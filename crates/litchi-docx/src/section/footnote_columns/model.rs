@@ -16,6 +16,10 @@ pub struct Layout {
 
 impl Layout {
     /// Construct a layout from the decimal column count.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(columns: i32) -> Result<Self> {
         if columns < 0 {
             return Err(Error::InvalidFormat(

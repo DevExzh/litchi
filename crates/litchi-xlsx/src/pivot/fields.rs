@@ -159,6 +159,7 @@ pub enum Subtotal {
 }
 
 impl Subtotal {
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Average => "average",
@@ -175,6 +176,7 @@ impl Subtotal {
         }
     }
 
+    #[must_use]
     pub fn parse_str(s: &str) -> Option<Self> {
         match s {
             "average" => Some(Self::Average),
@@ -192,6 +194,7 @@ impl Subtotal {
         }
     }
 
+    #[must_use]
     pub fn to_pivot_value_function(self) -> PivotValueFunction {
         match self {
             Self::Average => PivotValueFunction::Average,
@@ -223,7 +226,7 @@ impl Default for DataField {
             subtotal: Subtotal::Sum,
             show_data_as: "normal".to_string(),
             base_field: -1,
-            base_item: 1048832,
+            base_item: 1_048_832,
             num_fmt_id: None,
         }
     }

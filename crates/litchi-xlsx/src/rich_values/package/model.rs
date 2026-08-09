@@ -80,6 +80,7 @@ pub enum Kind {
 
 impl Kind {
     /// Classify an OPC content type without inspecting its payload.
+    #[must_use]
     pub fn from_content_type(content_type: &str) -> Option<Self> {
         match content_type {
             RICH_VALUE_DATA_CONTENT_TYPE => Some(Self::Data),
@@ -97,6 +98,7 @@ impl Kind {
     }
 
     /// Return this kind's OPC content type.
+    #[must_use]
     pub const fn content_type(self) -> &'static str {
         match self {
             Self::Data => RICH_VALUE_DATA_CONTENT_TYPE,
@@ -127,6 +129,7 @@ pub enum Document {
 
 impl Document {
     /// Return the typed kind represented by this document.
+    #[must_use]
     pub const fn kind(&self) -> Option<Kind> {
         match self {
             Self::Data(_) => Some(Kind::Data),
@@ -150,21 +153,25 @@ pub struct Part {
 
 impl Part {
     /// The stable OPC part name.
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// The recognized content-family kind.
+    #[must_use]
     pub const fn kind(&self) -> Kind {
         self.kind
     }
 
     /// The typed or inert document owned by this part.
+    #[must_use]
     pub fn document(&self) -> &Document {
         &self.document
     }
 
     /// All outgoing relationships from this part, including external edges.
+    #[must_use]
     pub fn relationships(&self) -> &[Link] {
         &self.relationships
     }
@@ -185,21 +192,25 @@ pub struct Package {
 
 impl Package {
     /// Package-root relationships, retained without resolving external targets.
+    #[must_use]
     pub fn relationships(&self) -> &[Link] {
         &self.relationships
     }
 
     /// Every package-root and part relationship in deterministic order.
+    #[must_use]
     pub fn topology(&self) -> &[Link] {
         &self.topology
     }
 
     /// Recognized rich-value family parts in deterministic name order.
+    #[must_use]
     pub fn parts(&self) -> &[Part] {
         &self.parts
     }
 
     /// Find the first part of a recognized kind.
+    #[must_use]
     pub fn part(&self, kind: Kind) -> Option<&Part> {
         self.parts.iter().find(|part| part.kind == kind)
     }

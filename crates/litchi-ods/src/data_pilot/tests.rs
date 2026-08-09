@@ -1,33 +1,9 @@
 use super::{Field, Orientation, Table};
 use crate::{Builder, MutableSpreadsheet, Spreadsheet};
 
-const XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
-<office:document-content
-    xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
-    xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
-    xmlns:v="urn:example:vendor">
-  <office:body><office:spreadsheet>
-    <t:table t:name="Input"/>
-    <t:data-pilot-tables>
-      <t:data-pilot-table t:name="Pivot" t:target-range-address="Output.A1:B4">
-        <t:source-cell-range t:cell-range-address="Input.A1:B20"/>
-        <t:data-pilot-field t:source-field-name="Region" t:orientation="row"/>
-        <v:future v:flag="retain"><v:value>opaque</v:value></v:future>
-      </t:data-pilot-table>
-    </t:data-pilot-tables>
-    <t:shapes/>
-  </office:spreadsheet></office:body>
-</office:document-content>"#;
+const XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:v="urn:example:vendor"><office:body><office:spreadsheet><t:table t:name="Input"/><t:data-pilot-tables><t:data-pilot-table t:name="Pivot" t:target-range-address="Output.A1:B4"><t:source-cell-range t:cell-range-address="Input.A1:B20"/><t:data-pilot-field t:source-field-name="Region" t:orientation="row"/><v:future v:flag="retain"><v:value>opaque</v:value></v:future></t:data-pilot-table></t:data-pilot-tables><t:shapes/></office:spreadsheet></office:body></office:document-content>"#;
 
-const XML_WITHOUT_OWNER: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
-<office:document-content
-    xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
-    xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0">
-  <office:body><office:spreadsheet>
-    <t:table t:name="Input"/>
-    <t:shapes/>
-  </office:spreadsheet></office:body>
-</office:document-content>"#;
+const XML_WITHOUT_OWNER: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><t:table t:name="Input"/><t:shapes/></office:spreadsheet></office:body></office:document-content>"#;
 
 fn package(xml: &str) -> Vec<u8> {
     Builder::new().content_xml(xml).build().unwrap()
@@ -57,10 +33,10 @@ fn catalog_reads_rich_metadata_and_no_op_is_byte_exact() {
 fn clone_staged_crud_rewrites_only_the_owner_and_reopens() {
     let typed_xml = XML
         .replace(
-            "        <v:future v:flag=\"retain\"><v:value>opaque</v:value></v:future>\n",
+            "<v:future v:flag=\"retain\"><v:value>opaque</v:value></v:future>",
             "",
         )
-        .replace("    xmlns:v=\"urn:example:vendor\"\n", "");
+        .replace(" xmlns:v=\"urn:example:vendor\"", "");
     let mut mutable = MutableSpreadsheet::from_bytes(package(&typed_xml)).unwrap();
     mutable
         .edit_data_pilots(|editor| {

@@ -32,7 +32,7 @@ pub enum Host {
     Excel,
     /// Word documents.
     Word,
-    /// PowerPoint presentations.
+    /// `PowerPoint` presentations.
     PowerPoint,
 }
 

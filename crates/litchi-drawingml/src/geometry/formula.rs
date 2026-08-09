@@ -1,5 +1,5 @@
-//! Typed DrawingML geometry-guide formulas (`a:gd@fmla`,
-//! ST_GeomGuideFormula; ECMA-376 part 1 §20.1.10.11).
+//! Typed `DrawingML` geometry-guide formulas (`a:gd@fmla`,
+//! `ST_GeomGuideFormula`; ECMA-376 part 1 §20.1.10.11).
 //!
 //! A formula is an operation token followed by space-delimited operands,
 //! each a literal or a guide reference. [`Formula`] models every
@@ -154,6 +154,7 @@ pub enum Formula {
 impl Formula {
     /// A `val` formula holding one literal, the common shape of adjust-value
     /// entries.
+    #[must_use]
     pub fn literal(value: i64) -> Self {
         Self::Value {
             x: AdjustValue::Value(value),
@@ -183,7 +184,8 @@ impl Formula {
         }
     }
 
-    /// The formula's ST_GeomGuideFormula operation token.
+    /// The formula's `ST_GeomGuideFormula` operation token.
+    #[must_use]
     pub fn operation(&self) -> &'static str {
         match self {
             Self::MultiplyDivide { .. } => "*/",

@@ -1,10 +1,26 @@
 //! Package-layer transactional editor for DOC tracked revisions.
 
 use super::Limits;
-use super::codec::*;
-use super::model::*;
+use super::codec::{
+    CLX, DOP, FIB_CCP_TEXT, FIB_FC_LCB, MAX_AUTHORS, MAX_REVISIONS, MAX_TEXT_UNITS, PLCFANDREF,
+    PLCFATNBKF, PLCFATNBKL, PLCFBKF, PLCFBKL, PLCFBTE_CHPX, PLCFBTE_PAPX, PLCFFLD_MOM,
+    ParsedMetadata, STTBFRMARK, align2, align512, append_table_block, build_papx_pages, corrupted,
+    delete_piece_range, encode_revision, fib_pair, infer_moves, insert_piece, kind_order,
+    merge_adjacent, metadata_from_sprms, parse_authors, parse_chpx, parse_clx, parse_cp_table,
+    parse_papx, property_metadata, put_u32, read_units, reject_protection,
+    replace_papx_revision_sprms, replace_revision_sprms, restore_before_wall, revision_opcodes,
+    serialize_authors, serialize_clx, slice, split_transform_chpx, split_transform_papx,
+    strict_sprms, u16_at, u32_at, validate_metadata, validate_range,
+};
+use super::model::{CpTable, FcRun, PapxRun, RawPiece, Revision, RevisionKind, RevisionMetadata};
 use crate::package::{Error as PackageError, Result};
-use crate::sprm_operations::*;
+use crate::sprm_operations::{
+    SPRM_C_DTTM_RMARK, SPRM_C_DTTM_RMARK_DEL, SPRM_C_F_RMARK, SPRM_C_F_RMARK_DEL,
+    SPRM_C_IBST_RMARK, SPRM_C_IBST_RMARK_DEL, SPRM_C_IDSL_RMARK, SPRM_C_IDSL_RMARK_DEL,
+    SPRM_C_PROP_RMARK_CURRENT, SPRM_C_PROP_RMARK90, SPRM_C_RSID_PROP, SPRM_C_RSID_RM_DEL,
+    SPRM_C_RSID_TEXT, SPRM_C_WALL, SPRM_P_F_IN_TABLE, SPRM_P_PROP_RMARK, SPRM_P_PROP_RMARK_CURRENT,
+    SPRM_P_PROP_RMARK90, SPRM_P_WALL, SPRM_T_PROP_RMARK, SPRM_T_RSID, SPRM_T_WALL,
+};
 use crate::writer::ChpxFkpBuilder;
 use litchi_ole_common::object::{Editor as ObjectEditor, Targets};
 
@@ -94,10 +110,12 @@ impl RevisionEditor {
         Ok(editor)
     }
 
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.changed
     }
 
+    #[must_use]
     pub fn authors(&self) -> &[String] {
         &self.authors
     }

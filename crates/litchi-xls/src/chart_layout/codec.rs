@@ -66,7 +66,7 @@ impl<'a> LayoutReader<'a> {
                 expected: end,
                 found: self.data.len(),
             })?;
-        let value: [u8; N] = bytes.try_into().map_err(|_| Error::InvalidLength {
+        let value: [u8; N] = bytes.try_into().map_err(|_error| Error::InvalidLength {
             expected: N,
             found: bytes.len(),
         })?;
@@ -153,6 +153,9 @@ fn validate_frt_header(reader: &mut LayoutReader<'_>, record_type: u16, name: &s
 
 impl CrtLayout12 {
     /// Parse a `CrtLayout12` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != CRT_LAYOUT_12_LEN {
             return Err(Error::InvalidLength {
@@ -173,6 +176,7 @@ impl CrtLayout12 {
     }
 
     /// Serialize back to a complete `CrtLayout12` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(CRT_LAYOUT_12_LEN);
         payload.extend_from_slice(&CRT_LAYOUT_12_RECORD_TYPE.to_le_bytes());
@@ -188,6 +192,9 @@ impl CrtLayout12 {
 
 impl CrtLayout12A {
     /// Parse a `CrtLayout12A` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != CRT_LAYOUT_12_A_LEN {
             return Err(Error::InvalidLength {
@@ -222,6 +229,7 @@ impl CrtLayout12A {
     }
 
     /// Serialize back to a complete `CrtLayout12A` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(CRT_LAYOUT_12_A_LEN);
         payload.extend_from_slice(&CRT_LAYOUT_12_A_RECORD_TYPE.to_le_bytes());

@@ -1,4 +1,4 @@
-//! Bounded strict/transitional SpreadsheetML XML and opaque-fragment codec.
+//! Bounded strict/transitional `SpreadsheetML` XML and opaque-fragment codec.
 
 use super::model::{
     CacheDefinition, CachePivotTable, FilterType, Level, OpaqueXml, PivotFilter, Range, State,
@@ -43,15 +43,15 @@ fn parse_state(n: &Node) -> Result<State> {
         match (c.namespace.as_str(), c.name.as_str()) {
             (X15, "selection") if stage == 0 => {
                 selection = Some(parse_range(c)?);
-                stage = 1
+                stage = 1;
             },
             (X15, "bounds") if stage <= 1 && bounds.is_none() => {
                 bounds = Some(parse_range(c)?);
-                stage = 2
+                stage = 2;
             },
             (ns, "extLst") if stage == 2 && (ns == X15 || ns == SML || ns == STRICT_SML) => {
                 extension_list = Some(opaque_from_node(c)?);
-                stage = 3
+                stage = 3;
             },
             _ => return Err(invalid("invalid or out-of-order View state child")),
         }
@@ -131,7 +131,7 @@ fn write_state(x: &mut Vec<u8>, v: &State) -> Result<()> {
     validate_state(v)?;
     x.extend_from_slice(b"<x15:state");
     if let Some(q) = v.single_range_filter_state {
-        bool_attr(x, "singleRangeFilterState", q)
+        bool_attr(x, "singleRangeFilterState", q);
     }
     attr(
         x,
@@ -143,11 +143,11 @@ fn write_state(x: &mut Vec<u8>, v: &State) -> Result<()> {
     attr(x, "filterType", v.filter_type.as_str());
     x.push(b'>');
     if let Some(q) = &v.selection {
-        write_range(x, "selection", q)?
+        write_range(x, "selection", q)?;
     }
     write_range(x, "bounds", &v.bounds)?;
     if let Some(q) = &v.extension_list {
-        append_opaque_any_namespace(x, q, "extLst")?
+        append_opaque_any_namespace(x, q, "extLst")?;
     }
     x.extend_from_slice(b"</x15:state>");
     Ok(())
@@ -156,22 +156,22 @@ fn write_timeline_pivot_filter(x: &mut Vec<u8>, v: &PivotFilter) -> Result<()> {
     validate_timeline_filter(v)?;
     x.extend_from_slice(b"<x15:timelinePivotFilter");
     if let Some(q) = v.use_whole_day {
-        bool_attr(x, "useWholeDay", q)
+        bool_attr(x, "useWholeDay", q);
     }
     attr(x, "fld", &v.field.to_string());
     attr(x, "id", &v.id.to_string());
     if let Some(q) = &v.name {
-        attr(x, "name", q)
+        attr(x, "name", q);
     }
     if let Some(q) = &v.description {
-        attr(x, "description", q)
+        attr(x, "description", q);
     }
     if let Some(q) = &v.auto_filter {
         x.push(b'>');
         x.extend_from_slice(&write_auto_filter_fragment(q)?);
-        x.extend_from_slice(b"</x15:timelinePivotFilter>")
+        x.extend_from_slice(b"</x15:timelinePivotFilter>");
     } else {
-        x.extend_from_slice(b"/>")
+        x.extend_from_slice(b"/>");
     }
     Ok(())
 }

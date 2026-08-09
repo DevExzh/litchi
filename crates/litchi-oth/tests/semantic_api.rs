@@ -3,9 +3,15 @@
     reason = "test code panics on failure; unwrap keeps assertions concise"
 )]
 
-use litchi_core::Position;
-use litchi_odf_common::core::PackageWriter;
-use litchi_oth::{Block, Builder, Template, heading::Heading, link::Link, paragraph::Paragraph};
+use litchi_core::{HistoryLimits, Position};
+use litchi_oth::{
+    Block, Builder, History, JoinFailure, Template, field,
+    heading::Heading,
+    link::Link,
+    list::{Item, List},
+    paragraph::Paragraph,
+    resource,
+};
 use std::sync::Arc;
 
 const COMPACT_CONTENT: &str = concat!(
@@ -278,6 +284,168 @@ fn projects_headings_links_styles_and_odf_whitespace_as_inert_values() {
 }
 
 #[test]
+fn projects_lists_bookmarks_fields_formatting_resources_forms_and_styles() {
+    const CONTENT: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" "#,
+        r#"xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" "#,
+        r#"xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" "#,
+        r#"xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" "#,
+        r#"xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.4">"#,
+        r#"<office:automatic-styles><style:style style:name="Strong" style:family="text"/></office:automatic-styles>"#,
+        r#"<office:body><office:text><text:p>pre<text:bookmark-start text:name="chapter"/><text:span text:style-name="Strong">bold <text:date office:date-value="2026-08-10" text:fixed="true">today</text:date></text:span></text:p>"#,
+        r#"<text:list text:style-name="Numbered"><text:list-item text:start-value="3"><text:p>three<text:bookmark-end text:name="chapter"/></text:p></text:list-item><text:list-item><text:p>four</text:p></text:list-item></text:list>"#,
+        r#"<text:p><draw:frame><draw:image xlink:href="Pictures/pic.png"/><draw:object xlink:href="./Object 1"/></draw:frame></text:p>"#,
+        r#"<office:forms><form:form form:name="Search"><form:text form:id="query" form:name="q"/></form:form></office:forms>"#,
+        r#"</office:text></office:body></office:document-content>"#,
+    );
+    const STYLES: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-styles "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><office:styles>"#,
+        r#"<style:style style:name="Body" style:family="paragraph" style:parent-style-name="Standard"/>"#,
+        r#"</office:styles></office:document-styles>"#,
+    );
+    let template = Template::from_bytes(
+        Builder::new()
+            .content_xml(CONTENT)
+            .styles_xml(STYLES)
+            .build()
+            .unwrap(),
+    )
+    .unwrap();
+    let body = template.text_body().unwrap();
+    assert_eq!(body.lists().len(), 1);
+    assert_eq!(body.lists()[0].style_name(), Some("Numbered"));
+    assert_eq!(body.lists()[0].items()[0].start_value(), Some(3));
+    assert_eq!(body.lists()[0].items()[0].paragraphs()[0].text(), "three");
+    assert_eq!(body.bookmarks()[0].name(), "chapter");
+    assert_eq!(body.bookmarks()[0].start().block(), Position::new(0));
+    assert_eq!(body.bookmarks()[0].end().unwrap().block(), Position::new(1));
+    assert_eq!(
+        body.paragraphs()[0].formatting_runs()[0].style_name(),
+        "Strong"
+    );
+    let projected_field = &body.paragraphs()[0].fields()[0];
+    assert!(matches!(projected_field.kind(), field::Kind::Date));
+    assert!(projected_field.is_fixed());
+    assert_eq!(projected_field.value(), Some("2026-08-10"));
+    assert_eq!(body.resources().len(), 2);
+    assert_eq!(body.resources()[0].kind(), resource::Kind::Image);
+    assert!(body.resources()[0].is_embedded());
+    assert_eq!(body.forms()[0].name(), Some("Search"));
+    assert_eq!(body.forms()[0].controls()[0].kind(), "text");
+    assert_eq!(body.forms()[0].controls()[0].id(), Some("query"));
+    assert_eq!(template.styles().len(), 2);
+    assert_eq!(template.styles()[1].parent_name(), Some("Standard"));
+}
+
+#[test]
+fn typed_list_builder_append_composition_history_and_refusals_reopen() {
+    let bytes = Builder::new()
+        .paragraph(Paragraph::new("before"))
+        .list(List::styled(
+            "Numbered",
+            [
+                Item::new(Paragraph::new("one")),
+                Item::new(Paragraph::new("two")),
+            ],
+        ))
+        .build()
+        .unwrap();
+    let source = Template::from_bytes(bytes).unwrap();
+    assert_eq!(source.text_body().unwrap().lists()[0].items().len(), 2);
+
+    let mut text_edit = source.edit();
+    text_edit
+        .set_paragraph_text(Position::new(0), "after")
+        .unwrap();
+    let mut append_edit = source.edit();
+    append_edit
+        .append_block(List::new([Item::new(Paragraph::new("tail"))]))
+        .unwrap();
+    text_edit.join(append_edit).unwrap();
+    let commit = text_edit.commit().unwrap();
+    assert!(commit.template().content_xml().contains("<text:list>"));
+    assert!(!commit.template().content_xml().contains("\n<"));
+    assert_eq!(commit.template().text_body().unwrap().lists().len(), 2);
+    assert_eq!(commit.patch().appended().len(), 1);
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.template())
+            .unwrap()
+            .as_bytes(),
+        source.as_bytes(),
+    );
+
+    let target = commit.template().clone();
+    let mut history = History::new(source.clone(), HistoryLimits::new(4, 1_000_000));
+    history.record(commit).unwrap();
+    assert_eq!(history.current().as_bytes(), target.as_bytes());
+    assert!(history.undo());
+    assert_eq!(history.current().as_bytes(), source.as_bytes());
+    assert!(history.redo());
+
+    let mut first = source.edit();
+    first.set_paragraph_text(Position::new(0), "first").unwrap();
+    let mut second = source.edit();
+    second
+        .set_paragraph_text(Position::new(0), "second")
+        .unwrap();
+    let error = first.join(second).err().unwrap();
+    assert_eq!(error.failure(), JoinFailure::Paragraph(Position::new(0)));
+    assert!(error.into_rejected().commit().unwrap().changed());
+
+    let alternate = Template::from_bytes(
+        Builder::new()
+            .paragraph(Paragraph::new("alternate"))
+            .build()
+            .unwrap(),
+    )
+    .unwrap();
+    let mut base_edit = source.edit();
+    let cross_lineage = base_edit.join(alternate.edit()).err().unwrap();
+    assert_eq!(cross_lineage.failure(), JoinFailure::DifferentSnapshot);
+
+    let mut first_append = source.edit();
+    first_append
+        .append_block(Paragraph::new("first tail"))
+        .unwrap();
+    let mut second_append = source.edit();
+    second_append
+        .append_block(Paragraph::new("second tail"))
+        .unwrap();
+    assert_eq!(
+        first_append.join(second_append).err().unwrap().failure(),
+        JoinFailure::Append
+    );
+}
+
+#[test]
+fn rich_semantic_ranges_and_resources_fail_closed() {
+    const PREFIX: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" "#,
+        r#"xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" "#,
+        r#"xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:text>"#,
+    );
+    const SUFFIX: &str = "</office:text></office:body></office:document-content>";
+    for body in [
+        r#"<text:p><text:bookmark-start text:name="open"/>text</text:p>"#,
+        r#"<text:p><text:bookmark-end text:name="missing"/></text:p>"#,
+        r"<text:p><draw:image/></text:p>",
+        r"<text:list-item><text:p>orphan</text:p></text:list-item>",
+    ] {
+        let xml = format!("{PREFIX}{body}{SUFFIX}");
+        assert!(Builder::new().content_xml(xml).build().is_err());
+    }
+}
+
+#[test]
 fn multi_paragraph_edit_is_atomic_and_can_fill_an_empty_element() {
     const CONTENT: &str = concat!(
         r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
@@ -319,30 +487,7 @@ fn multi_paragraph_edit_is_atomic_and_can_fill_an_empty_element() {
 
 #[test]
 fn opens_and_edits_the_pretty_printed_libreoffice_web_template() {
-    const CONTENT: &str = include_str!(
-        "../../../3rdparty/libreoffice-core/extras/source/templates/wizard/desktop/html/content.xml"
-    );
-    const META: &str = include_str!(
-        "../../../3rdparty/libreoffice-core/extras/source/templates/wizard/desktop/html/meta.xml"
-    );
-    const SETTINGS: &str = include_str!(
-        "../../../3rdparty/libreoffice-core/extras/source/templates/wizard/desktop/html/settings.xml"
-    );
-    const STYLES: &str = include_str!(
-        "../../../3rdparty/libreoffice-core/extras/source/templates/wizard/desktop/html/styles.xml"
-    );
-
-    let mut writer = PackageWriter::new();
-    writer
-        .set_mimetype("application/vnd.oasis.opendocument.text-web")
-        .unwrap();
-    writer.add_file("content.xml", CONTENT.as_bytes()).unwrap();
-    writer.add_file("meta.xml", META.as_bytes()).unwrap();
-    writer
-        .add_file("settings.xml", SETTINGS.as_bytes())
-        .unwrap();
-    writer.add_file("styles.xml", STYLES.as_bytes()).unwrap();
-    let bytes = writer.finish_to_bytes().unwrap();
+    let bytes = include_bytes!("fixtures/libreoffice-desktop-html.oth").to_vec();
     let source = Template::from_bytes(bytes.clone()).unwrap();
     assert_eq!(source.as_bytes(), bytes);
     assert_eq!(

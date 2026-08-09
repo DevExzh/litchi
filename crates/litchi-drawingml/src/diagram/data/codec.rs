@@ -1,4 +1,4 @@
-//! DrawingML diagram data-model XML parsing and canonical writing.
+//! `DrawingML` diagram data-model XML parsing and canonical writing.
 
 use crate::{Error, Result};
 use litchi_ooxml_common::mce::process_str;
@@ -427,10 +427,10 @@ fn write_point(xml: &mut impl fmt::Write, point: &Point) -> Result<()> {
         PointType::Document => xml.write_str(" type=\"doc\"").map_err(write_error)?,
         PointType::Assistant => xml.write_str(" type=\"asst\"").map_err(write_error)?,
         PointType::ParentTransition(connection) => {
-            write!(xml, " type=\"parTrans\" cxnId=\"{connection}\"").map_err(write_error)?
+            write!(xml, " type=\"parTrans\" cxnId=\"{connection}\"").map_err(write_error)?;
         },
         PointType::SiblingTransition(connection) => {
-            write!(xml, " type=\"sibTrans\" cxnId=\"{connection}\"").map_err(write_error)?
+            write!(xml, " type=\"sibTrans\" cxnId=\"{connection}\"").map_err(write_error)?;
         },
         PointType::Presentation => xml.write_str(" type=\"pres\"").map_err(write_error)?,
     }
@@ -484,7 +484,7 @@ fn write_connection(xml: &mut impl fmt::Write, connection: &Connection) -> Resul
             write_optional_attribute(xml, "presId", Some(presentation))?;
         },
         ConnectionType::PresentationParent => {
-            xml.write_str(" type=\"presParOf\"").map_err(write_error)?
+            xml.write_str(" type=\"presParOf\"").map_err(write_error)?;
         },
         ConnectionType::Unknown => xml
             .write_str(" type=\"unknownRelationship\"")
@@ -672,10 +672,10 @@ fn push_connection(model: &mut DiagramDataModel, element: &BytesStart<'_>) -> Re
             "srcOrd" => source_order = Some(parse_order(&value)?),
             "destOrd" => destination_order = Some(parse_order(&value)?),
             "parTransId" => {
-                parent_transition = Some(parse_id(&value, "diagram connection parTransId")?)
+                parent_transition = Some(parse_id(&value, "diagram connection parTransId")?);
             },
             "sibTransId" => {
-                sibling_transition = Some(parse_id(&value, "diagram connection sibTransId")?)
+                sibling_transition = Some(parse_id(&value, "diagram connection sibTransId")?);
             },
             "presId" => presentation = Some(value),
             _ => {},

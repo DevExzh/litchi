@@ -21,6 +21,7 @@ pub struct RowBlockLayoutRow {
 }
 
 impl RowBlockLayoutRow {
+    #[must_use]
     pub fn new(row: u16, row_record: Vec<u8>, cell_records: Vec<u8>) -> Self {
         Self {
             row,
@@ -29,12 +30,15 @@ impl RowBlockLayoutRow {
         }
     }
 
+    #[must_use]
     pub fn row(&self) -> u16 {
         self.row
     }
+    #[must_use]
     pub fn row_record(&self) -> &[u8] {
         &self.row_record
     }
+    #[must_use]
     pub fn cell_records(&self) -> &[u8] {
         &self.cell_records
     }
@@ -56,6 +60,9 @@ impl RowBlockLayoutPlan {
     ///
     /// The staged bytes must contain all ROW records first, followed by cell
     /// records. Every cell row must have a corresponding ROW record.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn generate_from_staged(
         index_record_position: u64,
         records_between_index_and_rows: u64,
@@ -75,6 +82,9 @@ impl RowBlockLayoutPlan {
     /// `records_between_index_and_rows` is the final byte length of all records
     /// after INDEX and before the first ROW. `default_column_width_offset` is
     /// the offset of DEFCOLWIDTH within those records.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn generate(
         index_record_position: u64,
         records_between_index_and_rows: u64,
@@ -100,11 +110,11 @@ impl RowBlockLayoutPlan {
         }
         let index_record_len = 4usize.checked_add(index_payload_len).ok_or_else(overflow)?;
         let row_table_position_u64 = index_record_position
-            .checked_add(u64::try_from(index_record_len).map_err(|_| overflow())?)
+            .checked_add(u64::try_from(index_record_len).map_err(|_error| overflow())?)
             .and_then(|value| value.checked_add(records_between_index_and_rows))
             .ok_or_else(overflow)?;
         let default_column_width_position_u64 = index_record_position
-            .checked_add(u64::try_from(index_record_len).map_err(|_| overflow())?)
+            .checked_add(u64::try_from(index_record_len).map_err(|_error| overflow())?)
             .and_then(|value| value.checked_add(default_column_width_offset))
             .ok_or_else(overflow)?;
         let index_record_position = checked_u32(index_record_position, "INDEX position")?;
@@ -123,7 +133,7 @@ impl RowBlockLayoutPlan {
             )?;
         }
         let planned_end = row_table_position_u64
-            .checked_add(u64::try_from(row_table.len()).map_err(|_| overflow())?)
+            .checked_add(u64::try_from(row_table.len()).map_err(|_error| overflow())?)
             .ok_or_else(overflow)?;
         checked_u32(planned_end, "worksheet stream end")?;
 
@@ -145,24 +155,31 @@ impl RowBlockLayoutPlan {
         })
     }
 
+    #[must_use]
     pub fn index_record_position(&self) -> u32 {
         self.index_record_position
     }
+    #[must_use]
     pub fn row_table_position(&self) -> u32 {
         self.row_table_position
     }
+    #[must_use]
     pub fn default_column_width_position(&self) -> u32 {
         self.default_column_width_position
     }
+    #[must_use]
     pub fn dbcell_positions(&self) -> &[u32] {
         &self.dbcell_positions
     }
+    #[must_use]
     pub fn index_record(&self) -> &[u8] {
         &self.index_record
     }
+    #[must_use]
     pub fn row_table(&self) -> &[u8] {
         &self.row_table
     }
+    #[must_use]
     pub fn into_records(self) -> (Vec<u8>, Vec<u8>) {
         (self.index_record, self.row_table)
     }
@@ -225,7 +242,7 @@ fn decode_staged_rows(bytes: &[u8]) -> io::Result<Vec<RowBlockLayoutRow>> {
             let row = u16::from_le_bytes([bytes[header_end], bytes[header_end + 1]]);
             let row_index = rows
                 .binary_search_by_key(&row, RowBlockLayoutRow::row)
-                .map_err(|_| invalid("staged cell record has no corresponding ROW record"))?;
+                .map_err(|_error| invalid("staged cell record has no corresponding ROW record"))?;
             rows[row_index]
                 .cell_records
                 .extend_from_slice(&bytes[offset..record_end]);
@@ -291,7 +308,7 @@ impl ArrayLayout {
 /// Validate the cross-record ownership that cannot be proven by checking one
 /// BIFF frame at a time. MS-XLS requires the Array record to immediately
 /// follow the upper-left Formula, and every cell in Ref to contain one
-/// standalone PtgExp Formula targeting that anchor.
+/// standalone `PtgExp` Formula targeting that anchor.
 fn validate_array_formula_groups(rows: &[RowBlockLayoutRow]) -> io::Result<()> {
     let mut arrays = Vec::new();
     let mut owners = HashMap::new();
@@ -333,12 +350,12 @@ fn validate_array_formula_groups(rows: &[RowBlockLayoutRow]) -> io::Result<()> {
                 }
                 arrays
                     .try_reserve(1)
-                    .map_err(|_| invalid("allocating the Array layout registry failed"))?;
+                    .map_err(|_error| invalid("allocating the Array layout registry failed"))?;
                 let index = arrays.len();
                 arrays.push(array);
                 owners
                     .try_reserve(1)
-                    .map_err(|_| invalid("allocating the Array owner index failed"))?;
+                    .map_err(|_error| invalid("allocating the Array owner index failed"))?;
                 owners.insert(array.anchor(), index);
             } else {
                 preceding_formula = None;
@@ -350,7 +367,7 @@ fn validate_array_formula_groups(rows: &[RowBlockLayoutRow]) -> io::Result<()> {
     let mut counts = Vec::new();
     counts
         .try_reserve_exact(arrays.len())
-        .map_err(|_| invalid("allocating Array participant counts failed"))?;
+        .map_err(|_error| invalid("allocating Array participant counts failed"))?;
     counts.resize(arrays.len(), 0usize);
     let mut previous_formula_cell = None;
 
@@ -596,7 +613,7 @@ fn append_block(
     }
     let dbcell_relative = row_table.len();
     let dbcell_position = row_table_position
-        .checked_add(u64::try_from(dbcell_relative).map_err(|_| overflow())?)
+        .checked_add(u64::try_from(dbcell_relative).map_err(|_error| overflow())?)
         .ok_or_else(overflow)?;
     dbcell_positions.push(checked_u32(dbcell_position, "DBCELL position")?);
     let block_data_len = row_table
@@ -607,7 +624,7 @@ fn append_block(
         0
     } else {
         checked_u32(
-            u64::try_from(block_data_len).map_err(|_| overflow())?,
+            u64::try_from(block_data_len).map_err(|_error| overflow())?,
             "DBCELL row offset",
         )?
     };
@@ -658,12 +675,12 @@ fn is_row_addressed_cell_record(record_type: u16) -> bool {
 }
 
 fn checked_u16(value: usize, name: &str) -> io::Result<u16> {
-    u16::try_from(value).map_err(|_| invalid(&format!("{name} does not fit in 16 bits")))
+    u16::try_from(value).map_err(|_error| invalid(&format!("{name} does not fit in 16 bits")))
 }
 
 fn checked_u32(value: u64, name: &str) -> io::Result<u32> {
     u32::try_from(value)
-        .map_err(|_| invalid(&format!("{name} does not fit in a BIFF8 stream pointer")))
+        .map_err(|_error| invalid(&format!("{name} does not fit in a BIFF8 stream pointer")))
 }
 
 fn invalid(message: &str) -> io::Error {

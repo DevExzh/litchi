@@ -29,6 +29,7 @@ pub struct ListLevel {
 
 impl ListLevel {
     /// Create a new list level
+    #[must_use]
     pub fn new(start_at: u32, number_format: NumberFormat) -> Self {
         Self {
             start_at,
@@ -199,6 +200,7 @@ pub struct ListDefinitionMetadata {
 
 impl ListStructure {
     /// Create a new list structure
+    #[must_use]
     pub fn new(list_id: u32) -> Self {
         Self {
             list_id,
@@ -218,6 +220,7 @@ impl ListStructure {
     ///
     /// This does NOT include the variable-length LVL data — use
     /// [`Self::levels_to_bytes`] for that.
+    #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         self.to_bytes_with_metadata(None)
     }
@@ -234,7 +237,7 @@ impl ListStructure {
         for index in 0..9 {
             let style = metadata
                 .and_then(|value| value.style_links[index])
-                .map_or(0x0FFF, |value| value.get());
+                .map_or(0x0FFF, crate::parts::numbering::ListStyleIndex::get);
             buf.write_all(&style.to_le_bytes()).unwrap();
         }
 
@@ -243,11 +246,7 @@ impl ListStructure {
         //   bit 1: fRestartHdn
         //   bit 2: fAutoNum (unused)
         //   bits 3-7: reserved
-        let f_simple = if self.levels.len() <= 1 {
-            0x01u8
-        } else {
-            0x00u8
-        };
+        let f_simple = u8::from(self.levels.len() <= 1);
         let flags = metadata.map_or(f_simple, |value| {
             f_simple
                 | (value.ignored_flags & 0xEA)
@@ -264,7 +263,7 @@ impl ListStructure {
 
     /// Serialize the LVL array for this list structure.
     ///
-    /// Per MS-DOC spec, LVLs are appended after all LSTFs in the PlfLst
+    /// Per MS-DOC spec, LVLs are appended after all LSTFs in the `PlfLst`
     /// and are NOT counted in `lcbPlfLst`.
     pub fn levels_to_bytes(&self) -> Result<Vec<u8>, WriteError> {
         self.levels_to_bytes_with_metadata(None)
@@ -323,11 +322,13 @@ pub struct ListFormatOverrideData {
 
 impl ListFormatOverride {
     /// Create a new list format override
+    #[must_use]
     pub fn new(list_id: u32, lfo_id: u32) -> Self {
         Self { list_id, lfo_id }
     }
 
     /// Serialize to LFO structure (16 bytes)
+    #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut buf = Vec::new();
 
@@ -430,6 +431,7 @@ pub struct NumberingWriter {
 
 impl NumberingWriter {
     /// Create a new numbering writer
+    #[must_use]
     pub fn new() -> Self {
         Self {
             list_structures: Vec::new(),
@@ -505,11 +507,12 @@ impl NumberingWriter {
     }
 
     /// Get number of list structures
+    #[must_use]
     pub fn list_count(&self) -> usize {
         self.list_structures.len()
     }
 
-    /// Generate PlfLst (List Table).
+    /// Generate `PlfLst` (List Table).
     ///
     /// Returns `(plflst_for_lcb, lvl_data)` where:
     /// - `plflst_for_lcb` = cLst (u16) + LSTF array (28 bytes each) — this is what
@@ -552,7 +555,7 @@ impl NumberingWriter {
         Ok((header_buf, lvl_buf))
     }
 
-    /// Generate PlfLfo (List Format Override Table)
+    /// Generate `PlfLfo` (List Format Override Table)
     pub fn build_plflfo(&self) -> Vec<u8> {
         let mut buf = Vec::new();
 
@@ -582,6 +585,7 @@ impl NumberingWriter {
     }
 
     /// Check if empty
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.list_structures.is_empty()
             && self.list_names.is_none()

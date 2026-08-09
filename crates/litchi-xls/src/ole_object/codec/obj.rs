@@ -1,7 +1,15 @@
-//! Lossless BIFF8 Obj and XLUnicodeString codecs.
+//! Lossless BIFF8 Obj and `XLUnicodeString` codecs.
 
-use super::super::semantic::*;
-use super::super::*;
+use super::super::semantic::{
+    CheckState, EditBoxValidation, FormControl, FtCblsData, FtCmo, FtEdoData, FtGboData, FtLbsData,
+    FtPictFmla, FtPioGrbit, FtRboData, FtSbs, LbsDropData, LbsItem, ListSelectionType,
+    ObjSubrecord, ObjectType, OleObjectRecord,
+};
+use super::super::{
+    FORMATTING_RUN_SIZE, FT_CBLS_DATA, FT_CF, FT_CMO, FT_EDO_DATA, FT_END, FT_GBO_DATA,
+    FT_LBS_DATA, FT_PICT_FMLA, FT_PIO, FT_RBO_DATA, FT_SBS, LBS_SELECTION_TYPE_MASK,
+    LBS_SELECTION_TYPE_SHIFT, OBJ, XL_STRING_EXT, XL_STRING_HIGH_BYTE, XL_STRING_RICH, invalid,
+};
 use crate::error::{Error, Result};
 
 fn parse_formula(body: &[u8]) -> Result<FtPictFmla> {
@@ -278,7 +286,7 @@ fn parse_lbs_data(body: &[u8], control_type: Option<u16>) -> Option<FtLbsData> {
     Some(data)
 }
 
-/// Total byte size of the XLUnicodeString (MS-XLS 2.5.294) starting at
+/// Total byte size of the `XLUnicodeString` (MS-XLS 2.5.294) starting at
 /// `data`, including formatting runs and extension data, or `None` when the
 /// framing is truncated or inconsistent.
 fn xl_unicode_string_size(data: &[u8]) -> Option<usize> {
@@ -325,7 +333,7 @@ fn parse_lbs_item(encoded: Vec<u8>) -> Option<LbsItem> {
     Some(LbsItem { text, encoded })
 }
 
-/// Decode the text of an exact-size XLUnicodeString, ignoring formatting runs
+/// Decode the text of an exact-size `XLUnicodeString`, ignoring formatting runs
 /// and extension data.
 pub(super) fn decode_xl_unicode_string(encoded: &[u8]) -> Option<String> {
     if xl_unicode_string_size(encoded)? != encoded.len() {
@@ -356,8 +364,8 @@ pub(super) fn serialize_subrecords(subrecords: &[ObjSubrecord]) -> Result<Vec<u8
     let mut output = Vec::new();
     for value in subrecords {
         let (kind, body) = serialize_subrecord(value)?;
-        let len =
-            u16::try_from(body.len()).map_err(|_| invalid(kind, "Obj subrecord exceeds u16"))?;
+        let len = u16::try_from(body.len())
+            .map_err(|_error| invalid(kind, "Obj subrecord exceeds u16"))?;
         output.extend_from_slice(&kind.to_le_bytes());
         output.extend_from_slice(&len.to_le_bytes());
         output.extend_from_slice(&body);
@@ -379,7 +387,7 @@ fn serialize_subrecord(value: &ObjSubrecord) -> Result<(u16, Vec<u8>)> {
         ObjSubrecord::PictureFlags(value) => (FT_PIO, value.raw.to_le_bytes().to_vec()),
         ObjSubrecord::PictureFormula(value) => {
             let len = u16::try_from(value.formula.len())
-                .map_err(|_| invalid(OBJ, "formula exceeds u16"))?;
+                .map_err(|_error| invalid(OBJ, "formula exceeds u16"))?;
             let mut body = len.to_le_bytes().to_vec();
             body.extend_from_slice(&value.formula);
             match (value.storage_position, value.control_buffer_size) {
@@ -446,7 +454,7 @@ fn serialize_subrecord(value: &ObjSubrecord) -> Result<(u16, Vec<u8>)> {
                 (FT_LBS_DATA, Vec::new())
             } else {
                 let len = u16::try_from(value.formula.len())
-                    .map_err(|_| invalid(OBJ, "ObjFmla exceeds u16"))?;
+                    .map_err(|_error| invalid(OBJ, "ObjFmla exceeds u16"))?;
                 let mut body = len.to_le_bytes().to_vec();
                 body.extend_from_slice(&value.formula);
                 body.extend_from_slice(&value.entry_count.to_le_bytes());
@@ -480,7 +488,10 @@ fn serialize_subrecord(value: &ObjSubrecord) -> Result<(u16, Vec<u8>)> {
     })
 }
 
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "type mirrors the decoded BIFF record structure"
+)]
 pub(crate) fn ranges(input: &[u8]) -> Result<Vec<(usize, usize, u16, usize, usize)>> {
     let mut output = Vec::new();
     let mut offset = 0usize;
@@ -512,13 +523,16 @@ pub(super) fn record(kind: u16, body: &[u8]) -> Result<Vec<u8>> {
     }
     let mut output = Vec::with_capacity(body.len() + 4);
     output.extend_from_slice(&kind.to_le_bytes());
-    output.extend_from_slice(&(body.len() as u16).to_le_bytes());
+    output.extend_from_slice(&crate::utils::truncate_usize_to_u16(body.len()).to_le_bytes());
     output.extend_from_slice(body);
     Ok(output)
 }
 
 impl OleObjectRecord {
     /// Parse an Obj body and validate the embedded-OLE shape.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8], text_object: Option<Vec<u8>>) -> Result<Self> {
         let value = Self {
             subrecords: parse_subrecords(data)?,
@@ -529,6 +543,9 @@ impl OleObjectRecord {
     }
 
     /// Serialize the complete Obj record, retaining unknown subrecords.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         self.validate()?;
         record(OBJ, &serialize_subrecords(&self.subrecords)?)
@@ -554,6 +571,9 @@ impl FormControl {
 
     /// Serialize the control's Obj record exactly as represented by its
     /// semantic/raw subrecords.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         record(OBJ, &serialize_subrecords(&self.subrecords)?)
     }

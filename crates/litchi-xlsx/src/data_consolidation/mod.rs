@@ -1,7 +1,7 @@
 //! Worksheet data-consolidation settings (`CT_DataConsolidate`).
 //!
 //! The facade keeps the typed worksheet model separate from its bounded
-//! SpreadsheetML codec while retaining the historical public API.
+//! `SpreadsheetML` codec while retaining the historical public API.
 
 mod codec;
 mod model;

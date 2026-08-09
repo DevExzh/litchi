@@ -9,6 +9,9 @@ use crate::error::Result;
 impl FormControl {
     /// Validates the structural and type-specific invariants required when a
     /// new form-control Obj is authored.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn validate(&self) -> Result<()> {
         if self.subrecords.is_empty() || self.subrecords.len() > 1_024 {
             return Err(invalid(
@@ -156,6 +159,9 @@ impl FormControl {
 }
 
 impl FtSbs {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn validate(&self) -> Result<()> {
         if self.minimum > self.maximum {
             return Err(invalid(FT_SBS, "FtSbs minimum exceeds maximum"));
@@ -174,6 +180,9 @@ impl FtSbs {
 }
 
 impl LbsDropData {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn validate(&self) -> Result<()> {
         if self.style() == super::super::semantic::DropDownStyle::Reserved {
             return Err(invalid(
@@ -198,6 +207,9 @@ impl LbsDropData {
 }
 
 impl FtLbsData {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn validate(&self) -> Result<()> {
         if self.formula.len() > usize::from(u16::MAX) {
             return Err(invalid(FT_LBS_DATA, "FtLbsData formula exceeds u16"));

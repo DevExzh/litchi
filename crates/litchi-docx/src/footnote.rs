@@ -1,3 +1,11 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::struct_field_names,
+    reason = "the public model retains established field names"
+)]
 use crate::error::{Error, Result};
 /// Footnote and endnote support for reading from Word documents.
 ///
@@ -96,6 +104,7 @@ impl NoteType {
 
     /// Check if this is a normal content note (not a separator).
     #[inline]
+    #[must_use]
     pub fn is_normal(&self) -> bool {
         matches!(self, Self::Normal)
     }
@@ -109,6 +118,7 @@ impl Note {
     /// * `id` - The note ID
     /// * `xml_bytes` - The XML content of the note
     /// * `note_type` - The type of note
+    #[must_use]
     pub fn new(id: u32, xml_bytes: Vec<u8>, note_type: NoteType) -> Self {
         Self {
             id,
@@ -133,18 +143,21 @@ impl Note {
 
     /// Get the note ID.
     #[inline]
+    #[must_use]
     pub fn id(&self) -> u32 {
         self.id
     }
 
     /// Get the note type.
     #[inline]
+    #[must_use]
     pub fn note_type(&self) -> NoteType {
         self.note_type
     }
 
     /// Get the XML bytes of this note.
     #[inline]
+    #[must_use]
     pub fn xml_bytes(&self) -> &[u8] {
         self.xml_data.as_bytes()
     }
@@ -167,6 +180,10 @@ impl Note {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn text(&self) -> Result<String> {
         extract_word_text(self.xml_bytes())
     }
@@ -192,6 +209,10 @@ impl Note {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
         let (source, base_offset) = self.xml_data.get_or_create_arc();
         let mut paragraphs = Vec::new();
@@ -266,7 +287,7 @@ fn parse_note_metadata(xml_bytes: &[u8]) -> Result<(Option<u32>, NoteType)> {
     let mut reader = Reader::from_reader(xml_bytes);
     let element = loop {
         match reader.read_event() {
-            Ok(Event::Start(element)) | Ok(Event::Empty(element)) => break element,
+            Ok(Event::Start(element) | Event::Empty(element)) => break element,
             Ok(Event::Eof) => {
                 return Err(Error::InvalidFormat(
                     "missing Word note element".to_string(),

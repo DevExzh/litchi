@@ -337,7 +337,10 @@ pub(crate) fn rewrite(
     Ok(Some(output))
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "arguments describe all axes and bounds of one reference edit"
+)]
 fn attribute_replacement(
     element: &BytesStart<'_>,
     decoder: Decoder,

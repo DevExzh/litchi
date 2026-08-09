@@ -90,8 +90,8 @@ pub(in crate::list_object) fn validate_frt_any(data: &[u8], rt: u16) -> Result<(
 }
 
 pub(in crate::list_object) fn record(rt: u16, payload: Vec<u8>) -> Result<Vec<u8>> {
-    let len =
-        u16::try_from(payload.len()).map_err(|_| invalid(rt, "payload exceeds BIFF8 length"))?;
+    let len = u16::try_from(payload.len())
+        .map_err(|_error| invalid(rt, "payload exceeds BIFF8 length"))?;
     let mut out = Vec::with_capacity(4 + payload.len());
     out.extend_from_slice(&rt.to_le_bytes());
     out.extend_from_slice(&len.to_le_bytes());

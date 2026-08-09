@@ -23,6 +23,7 @@ smallvec      = { workspace = true }
 soapberry-zip = { workspace = true }
 tempfile      = { workspace = true }
 thiserror     = { workspace = true }
+xml-minifier  = { workspace = true }
 
 [dev-dependencies]
 p256 = { workspace = true }

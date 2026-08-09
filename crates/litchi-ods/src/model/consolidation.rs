@@ -83,6 +83,9 @@ pub struct Options {
 
 impl Options {
     /// Create a validated inert consolidation declaration.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn new(
         function: impl Into<String>,
         source_cell_range_addresses: Vec<String>,
@@ -100,6 +103,9 @@ impl Options {
     }
 
     /// Validate address-list boundaries and the single target address.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn validate(&self) -> Result<()> {
         validate_cell_range_addresses(&self.source_cell_range_addresses)?;
         validate_target_cell_address(&self.target_cell_address)
@@ -156,7 +162,16 @@ pub fn parse_consolidation(xml: &str) -> Result<Option<Options>> {
                 )?);
             },
             Event::Eof => break,
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
 
         if is_start && !consumes_element {
@@ -210,7 +225,13 @@ fn consume_empty_element(reader: &mut NsReader<&[u8]>) -> Result<()> {
                     "unterminated table:consolidation".to_string(),
                 ));
             },
-            _ => {
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::CData(_)
+            | Event::Decl(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {
                 return Err(Error::InvalidFormat(
                     "table:consolidation must be empty".to_string(),
                 ));
@@ -414,10 +435,7 @@ fn valid_sheet_name(value: &str) -> bool {
 
 fn valid_cell_reference(value: &str) -> bool {
     let value = value.strip_prefix('$').unwrap_or(value);
-    let column_length = value
-        .bytes()
-        .take_while(|byte| byte.is_ascii_uppercase())
-        .count();
+    let column_length = value.bytes().take_while(u8::is_ascii_uppercase).count();
     if column_length == 0 {
         return false;
     }

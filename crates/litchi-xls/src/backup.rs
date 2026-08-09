@@ -26,6 +26,12 @@ pub struct Backup {
 
 impl Backup {
     /// Parse a `Backup` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// # Panics
+    ///
+    /// Panics only if an internal BIFF invariant has been violated.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
             return Err(Error::InvalidLength {
@@ -46,11 +52,13 @@ impl Backup {
     }
 
     /// Serialize back to a complete `Backup` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         u16::from(self.save_backup).to_le_bytes().to_vec()
     }
 
     /// Whether a backup copy of the workbook is saved (`fBackup`).
+    #[must_use]
     pub fn save_backup(&self) -> bool {
         self.save_backup
     }

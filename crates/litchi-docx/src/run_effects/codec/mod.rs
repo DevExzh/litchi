@@ -1,3 +1,15 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
 //! XML codec for the Word 2010 `w:rPr` effect children.
 
 use std::fmt::Write as FmtWrite;
@@ -25,6 +37,10 @@ const MAX_DEPTH: usize = 64;
 const MAX_NODES: usize = 8_192;
 
 /// Parse a complete `w:r` or `w:rPr` fragment.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn parse(xml: &[u8]) -> Result<super::model::Effects> {
     if xml.len() > MAX_XML_BYTES {
         return Err(Error::InvalidFormat(format!(
@@ -40,8 +56,9 @@ pub fn parse(xml: &[u8]) -> Result<super::model::Effects> {
     let mut effects = super::model::Effects::new();
 
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::InvalidFormat("Word run effects XML offset overflow".into()))?;
+        let start = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+            Error::InvalidFormat("Word run effects XML offset overflow".into())
+        })?;
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
@@ -103,9 +120,10 @@ pub fn parse(xml: &[u8]) -> Result<super::model::Effects> {
                         ));
                     }
                 } else if rpr_depth == Some(depth) {
-                    let end = usize::try_from(reader.buffer_position()).map_err(|_| {
-                        Error::InvalidFormat("Word run effects XML offset overflow".into())
-                    })?;
+                    let end =
+                        usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+                            Error::InvalidFormat("Word run effects XML offset overflow".into())
+                        })?;
                     consume_direct(&mut effects, &local, is_w14, &xml[start..end])?;
                 }
             },
@@ -117,7 +135,7 @@ pub fn parse(xml: &[u8]) -> Result<super::model::Effects> {
                     return Err(Error::InvalidFormat("mismatched Word run XML end".into()));
                 }
                 depth -= 1;
-                let end = usize::try_from(reader.buffer_position()).map_err(|_| {
+                let end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
                     Error::InvalidFormat("Word run effects XML offset overflow".into())
                 })?;
                 if frame.direct {
@@ -153,7 +171,7 @@ pub fn parse(xml: &[u8]) -> Result<super::model::Effects> {
                         .into(),
                 ));
             },
-            _ => {},
+            Event::Text(_) | Event::CData(_) | Event::Comment(_) | Event::GeneralRef(_) => {},
         }
     }
     if !root_seen || depth != 0 || !stack.is_empty() {
@@ -180,7 +198,7 @@ pub(crate) fn write(value: &super::model::Effects, output: &mut String) -> Resul
             Effect::Unknown(value) => {
                 output.push_str(std::str::from_utf8(value.as_bytes()).map_err(|error| {
                     Error::InvalidFormat(format!("opaque run effect is not UTF-8: {error}"))
-                })?)
+                })?);
             },
         }
     }
@@ -293,7 +311,7 @@ fn parse_node(xml: &[u8]) -> Result<Node> {
                     "run effect XML has forbidden prolog content".into(),
                 ));
             },
-            _ => {},
+            Event::Comment(_) | Event::GeneralRef(_) => {},
         }
     }
     if !stack.is_empty() || depth != 0 {
@@ -861,7 +879,7 @@ fn attr_i32(node: &Node, name: &str) -> Result<Option<i32>> {
 fn parse_number<T: std::str::FromStr>(value: &str, name: &str) -> Result<T> {
     value
         .parse()
-        .map_err(|_| Error::InvalidFormat(format!("invalid numeric {name} attribute")))
+        .map_err(|_source_error| Error::InvalidFormat(format!("invalid numeric {name} attribute")))
 }
 
 fn number<T: std::fmt::Display>(name: &'static str) -> impl FnOnce(T) -> Error {

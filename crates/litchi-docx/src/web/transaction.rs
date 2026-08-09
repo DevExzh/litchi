@@ -1,3 +1,7 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Source-checked web-settings snapshots, semantic edits, and patches.
 
 use std::sync::Arc;
@@ -29,6 +33,10 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parse and retain a bounded web-settings XML source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_xml(xml: impl Into<Vec<u8>>) -> Result<Self> {
         let xml = xml.into();
         let (settings, conformance) = codec::parse(&xml)?;
@@ -127,6 +135,10 @@ impl Transaction {
 
     /// Set the root frameset size expression. The value is retained as
     /// metadata; no URL or target is fetched or rendered.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_frameset_size(&mut self, value: impl Into<String>) -> Result<&mut Self> {
         let value = value.into();
         if self
@@ -163,33 +175,38 @@ impl Transaction {
     }
 
     /// Set or remove the root frameset layout.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_frameset_layout(&mut self, value: Option<Layout>) -> Result<&mut Self> {
         let current = self.next.frameset().and_then(Frameset::layout);
         if current == value {
             return Ok(self);
         }
-        match value {
-            Some(value) => {
-                if let Some(frameset) = self.next.frameset_mut() {
-                    frameset.set_layout(value);
-                } else {
-                    let mut frameset = Frameset::default();
-                    frameset.set_layout(value);
-                    self.next.set_frameset(frameset);
-                }
-            },
-            None => {
-                if let Some(frameset) = self.next.frameset_mut() {
-                    frameset.clear_layout();
-                }
-                self.drop_transaction_created_frameset();
-            },
+        if let Some(value) = value {
+            if let Some(frameset) = self.next.frameset_mut() {
+                frameset.set_layout(value);
+            } else {
+                let mut frameset = Frameset::default();
+                frameset.set_layout(value);
+                self.next.set_frameset(frameset);
+            }
+        } else {
+            if let Some(frameset) = self.next.frameset_mut() {
+                frameset.clear_layout();
+            }
+            self.drop_transaction_created_frameset();
         }
         self.record_frameset_layout(value);
         Ok(self)
     }
 
     /// Remove the explicit root frameset layout.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn clear_frameset_layout(&mut self) -> Result<&mut Self> {
         self.set_frameset_layout(None)
     }
@@ -199,6 +216,10 @@ impl Transaction {
     /// A numeric [`Key::Index`] is resolved once to the division's nonzero
     /// producer ID; the resulting patch is therefore anchored semantically.
     /// The value is inert formatting metadata and never causes target access.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_div_border(
         &mut self,
         key: impl Into<Key>,
@@ -248,6 +269,10 @@ impl Transaction {
     }
 
     /// Validate and publish the source-preserving edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn commit(self) -> Result<Commit> {
         // The canonical writer is used only as a complete semantic validation
         // pass. The authored bytes below are produced by the surgical codec.
@@ -458,6 +483,10 @@ impl Patch {
 
     /// Apply only to the exact source bytes and typed state captured by this
     /// patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.conformance != self.conformance
             || source.xml.as_ref() != self.before_xml.as_ref()

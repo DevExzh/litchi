@@ -30,6 +30,10 @@ pub enum Target {
 }
 
 impl Recipients {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn extract_from_part(part: &dyn Part) -> Result<Self> {
         if part.content_type() != RECIPIENT_CONTENT_TYPE {
             return Err(invalid(format!(

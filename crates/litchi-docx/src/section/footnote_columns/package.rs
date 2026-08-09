@@ -1,3 +1,19 @@
+#![expect(
+    clippy::redundant_locals,
+    reason = "the local rebinding narrows the parser state"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_same,
+    reason = "the validated binding intentionally replaces its fallible precursor"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
 //! Package-facing discovery and section integration for `footnoteColumns`.
 
 use crate::error::{Error, Result};
@@ -22,9 +38,13 @@ const MC_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibi
 /// child is not discarded before the focused owner can snapshot it. Namespace
 /// context inherited from the document root is retained out-of-band by each
 /// snapshot, so detached fragments remain byte-for-byte authored until edited.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn parse_part(part: &dyn Part) -> Result<Vec<Snapshot>> {
     let xml = part.blob();
-    let xml = xml.as_ref();
+    let xml = xml;
     let mut snapshots = Vec::new();
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().check_end_names = true;
@@ -126,7 +146,13 @@ pub fn parse_part(part: &dyn Part) -> Result<Vec<Snapshot>> {
                 ignorable.pop();
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 
@@ -174,5 +200,5 @@ fn direct_ignorable(
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| Error::InvalidFormat("document XML offset overflow".into()))
+        .map_err(|_source_error| Error::InvalidFormat("document XML offset overflow".into()))
 }

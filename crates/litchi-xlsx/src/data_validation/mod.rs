@@ -1,4 +1,4 @@
-//! Typed SpreadsheetML data-validation support.
+//! Typed `SpreadsheetML` data-validation support.
 ///
 /// The owner is layered by responsibility: semantic declarations in
 /// model, bounded XML/MCE conversion in codec, and worksheet replacement/transaction

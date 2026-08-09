@@ -9,7 +9,7 @@ impl Document {
     ///
     /// Each section can have up to six stories: first-page header/footer,
     /// even-page header/footer, and odd-page (default) header/footer.
-    /// Empty stories (where start_cp == end_cp) are omitted.
+    /// Empty stories (where `start_cp` == `end_cp`) are omitted.
     ///
     /// # Example
     ///
@@ -51,7 +51,7 @@ impl Document {
         Ok(self
             .headers_footers()?
             .into_iter()
-            .filter(|hf| hf.is_header())
+            .filter(HeaderFooter::is_header)
             .collect())
     }
 
@@ -60,7 +60,7 @@ impl Document {
         Ok(self
             .headers_footers()?
             .into_iter()
-            .filter(|hf| hf.is_footer())
+            .filter(HeaderFooter::is_footer)
             .collect())
     }
 }

@@ -1,4 +1,8 @@
-//! Layered, inert WordprocessingML mail-merge owner.
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
+//! Layered, inert `WordprocessingML` mail-merge owner.
 
 mod adapter;
 mod codec;

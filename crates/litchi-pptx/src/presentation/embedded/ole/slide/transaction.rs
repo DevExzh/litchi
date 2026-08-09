@@ -321,7 +321,9 @@ impl Transaction {
         value.object.preview_width = definition.preview_width;
         value.object.preview_height = definition.preview_height;
         if definition.mode == Mode::Linked {
-            let target = definition.target.expect("validated linked target");
+            let target = definition
+                .target
+                .ok_or_else(|| invalid("linked OLE replacement has no target"))?;
             let relationship_type = relationship_type(definition.kind).to_owned();
             value.object.target = Some(Target::External {
                 target,
@@ -721,7 +723,9 @@ fn build_after(source: &Snapshot, working: &[Working]) -> Result<Build> {
         object.slide_index = source.slide_index;
 
         if let Some(source_object) = source_object {
-            let source_index = value.source_index.expect("source object index");
+            let source_index = value
+                .source_index
+                .ok_or_else(|| invalid("OLE source object index is missing"))?;
             let located = document
                 .frames
                 .get(source_index)
@@ -749,7 +753,7 @@ fn build_after(source: &Snapshot, working: &[Working]) -> Result<Build> {
                     .clone()
                     .unwrap_or_else(|| format!("OLE Object {next_shape_id}")),
             );
-            additions.push(frame_xml(&object, &relationship_id, next_shape_id));
+            additions.push(frame_xml(&object, &relationship_id, next_shape_id)?);
         }
         upsert_relationship(
             &mut relationships,
@@ -1015,8 +1019,10 @@ fn next_part_name(used: &mut HashSet<PackURI>, kind: Kind) -> Result<PackURI> {
     ))
 }
 
-fn frame_xml(object: &Object, relationship_id: &str, shape_id: u32) -> String {
-    let anchor = object.anchor.expect("validated OLE anchor");
+fn frame_xml(object: &Object, relationship_id: &str, shape_id: u32) -> Result<String> {
+    let anchor = object
+        .anchor
+        .ok_or_else(|| invalid("OLE object anchor is missing"))?;
     let name = object
         .name
         .clone()
@@ -1055,7 +1061,7 @@ fn frame_xml(object: &Object, relationship_id: &str, shape_id: u32) -> String {
         "<p:link/>"
     });
     output.push_str("</p:oleObj></a:graphicData></a:graphic></p:graphicFrame>");
-    output
+    Ok(output)
 }
 
 pub(crate) fn sorted_relationships(

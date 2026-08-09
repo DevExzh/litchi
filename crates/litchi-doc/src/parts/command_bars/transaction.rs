@@ -47,7 +47,7 @@ impl Snapshot {
     }
 }
 
-impl<'a> CommandBars<'a> {
+impl CommandBars<'_> {
     /// Captures this decoded command-bar range as an owned snapshot.
     pub fn snapshot(&self) -> PackageResult<Snapshot> {
         Snapshot::new(Some(self.clone()))

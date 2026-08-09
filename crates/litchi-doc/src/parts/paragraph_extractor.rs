@@ -28,8 +28,8 @@ struct TableTextContext {
 
 /// Paragraph extractor using binary structures.
 ///
-/// Based on Apache POI's ParagraphPropertiesTable (PAPBinTable) and
-/// CharacterPropertiesTable (CHPBinTable).
+/// Based on Apache POI's `ParagraphPropertiesTable` (`PAPBinTable`) and
+/// `CharacterPropertiesTable` (`CHPBinTable`).
 pub struct ParagraphExtractor<'a> {
     /// Paragraph property bin table (shared reference to avoid re-parsing)
     pap_bin_table: Option<&'a PapBinTable>,
@@ -80,7 +80,7 @@ impl<'a> ParagraphExtractor<'a> {
     /// * `text` - Extracted document text (shared via Arc, thread-safe)
     /// * `pap_bin_table` - Pre-parsed paragraph property bin table
     /// * `chp_bin_table` - Pre-parsed character property bin table (avoids re-parsing)
-    /// * `cp_range` - Character position range (start_cp, end_cp)
+    /// * `cp_range` - Character position range (`start_cp`, `end_cp`)
     pub fn new_with_range(
         text: Arc<String>,
         pap_bin_table: Option<&'a PapBinTable>,
@@ -119,7 +119,7 @@ impl<'a> ParagraphExtractor<'a> {
 
     /// Extract paragraphs with properties.
     ///
-    /// Returns a vector of (text, paragraph_properties, character_runs) tuples.
+    /// Returns a vector of (text, `paragraph_properties`, `character_runs`) tuples.
     ///
     /// Based on MS-DOC specification and Apache POI's approach:
     /// Paragraphs in Word documents are delimited by CR (\r = 0x000D) characters.
@@ -128,11 +128,11 @@ impl<'a> ParagraphExtractor<'a> {
         let mut paragraphs = Vec::new();
 
         // Determine the CP range to process
-        let doc_start_cp = self.cp_range.map(|(start, _)| start).unwrap_or(0);
-        let doc_end_cp = self
-            .cp_range
-            .map(|(_, end)| end)
-            .unwrap_or_else(|| self.text_ranges.len().saturating_sub(1) as u32);
+        let doc_start_cp = self.cp_range.map_or(0, |(start, _)| start);
+        let doc_end_cp = self.cp_range.map_or_else(
+            || self.text_ranges.len().saturating_sub(1) as u32,
+            |(_, end)| end,
+        );
 
         // Find all paragraph breaks (CR characters) in the text
         // CR (0x000D / '\r') marks the end of each paragraph in Word documents
@@ -314,8 +314,9 @@ impl<'a> ParagraphExtractor<'a> {
 
         let row_start_cp = row_position
             .checked_sub(1)
-            .map(|previous| runs[row_ends[previous]].end_cp)
-            .unwrap_or(runs[table_start].start_cp);
+            .map_or(runs[table_start].start_cp, |previous| {
+                runs[row_ends[previous]].end_cp
+            });
         let mut cell_index = 0usize;
         for marker_cp in row_start_cp..cp {
             if self.extract_text_range(marker_cp, marker_cp + 1) != "\u{7}" {

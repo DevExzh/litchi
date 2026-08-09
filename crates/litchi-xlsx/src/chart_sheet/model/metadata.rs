@@ -1,4 +1,4 @@
-//! Chartsheet metadata children from SpreadsheetML.
+//! Chartsheet metadata children from `SpreadsheetML`.
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Color {

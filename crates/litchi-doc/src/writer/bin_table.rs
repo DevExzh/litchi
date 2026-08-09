@@ -11,11 +11,12 @@
 ///
 /// * `start_fc` - Starting file offset (FC)
 /// * `end_fc` - Ending file offset (FC)
-/// * `page_number` - FKP page number in WordDocument stream (byte offset / 512)
+/// * `page_number` - FKP page number in `WordDocument` stream (byte offset / 512)
 ///
 /// # Returns
 ///
 /// Bin table as bytes (PLCF structure)
+#[must_use]
 pub fn generate_single_entry_bin_table(start_fc: u32, end_fc: u32, page_number: u32) -> Vec<u8> {
     let mut bte = Vec::new();
 
@@ -41,11 +42,12 @@ pub fn generate_single_entry_bin_table(start_fc: u32, end_fc: u32, page_number: 
 /// # Arguments
 ///
 /// * `ranges` - FC ranges from `FkpPages::ranges`: `(fc_first, fc_last)` per page
-/// * `first_page_number` - Page number of the first FKP page in the WordDocument stream
+/// * `first_page_number` - Page number of the first FKP page in the `WordDocument` stream
 ///
 /// # Returns
 ///
 /// Bin table as bytes: `(n+1) × 4` FCs followed by `n × 4` page numbers.
+#[must_use]
 pub fn generate_bin_table_from_pages(ranges: &[(u32, u32)], first_page_number: u32) -> Vec<u8> {
     let n = ranges.len();
     // Size: (n+1)*4 FCs + n*4 PNs

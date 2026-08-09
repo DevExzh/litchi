@@ -16,15 +16,15 @@ use std::sync::Arc;
 impl Document {
     /// Extract MTEF data from OLE streams during document initialization
     ///
-    /// This method extracts embedded equation objects from the ObjectPool directory.
-    /// Each embedded equation is stored as a separate OLE object within ObjectPool.
+    /// This method extracts embedded equation objects from the `ObjectPool` directory.
+    /// Each embedded equation is stored as a separate OLE object within `ObjectPool`.
     #[cfg(feature = "formula")]
     pub(super) fn extract_mtef_data<R: Read + Seek>(
         ole: &mut OleFile<R>,
     ) -> Result<HashMap<String, Vec<u8>>> {
         // Extract all MTEF formulas from ObjectPool (the primary location for embedded equations)
         let mtef_data = MtefExtractor::extract_all_mtef_from_objectpool(ole).map_err(|e| {
-            PackageError::InvalidFormat(format!("Failed to extract MTEF data: {}", e))
+            PackageError::InvalidFormat(format!("Failed to extract MTEF data: {e}"))
         })?;
 
         // Also try direct stream names for compatibility with older formats
@@ -70,7 +70,7 @@ impl Document {
         Self::table_slice(fib, table_stream, 33).and_then(PieceTable::parse)
     }
 
-    /// Parse the Main Document shape position table (PlcfSpaMom), if present.
+    /// Parse the Main Document shape position table (`PlcfSpaMom`), if present.
     ///
     /// A malformed table yields no anchors rather than failing the document;
     /// floating shapes simply lose their positioning information.
@@ -83,7 +83,7 @@ impl Document {
             .unwrap_or_default()
     }
 
-    /// Parse the Header Document shape position table (PlcfSpaHdr), if present.
+    /// Parse the Header Document shape position table (`PlcfSpaHdr`), if present.
     pub(super) fn parse_header_shape_anchors(
         fib: &FileInformationBlock,
         table_stream: &[u8],
@@ -93,7 +93,7 @@ impl Document {
             .unwrap_or_default()
     }
 
-    /// Parse a textbox story position table (PlcftxbxTxt / PlcfHdrtxbxTxt),
+    /// Parse a textbox story position table (`PlcftxbxTxt` / `PlcfHdrtxbxTxt`),
     /// if present. A malformed table yields no entries rather than failing
     /// the document.
     pub(super) fn parse_textbox_entries(
@@ -166,10 +166,10 @@ impl Document {
         // Common indicators of MathType equations in text
         text.contains("MathType")
             || text.contains("MTExtra")
-            || text.contains("\\")
-            || text.contains("{")
-            || text.contains("}")
-            || (text.len() > 10 && (text.contains("^") || text.contains("_")))
+            || text.contains('\\')
+            || text.contains('{')
+            || text.contains('}')
+            || (text.len() > 10 && (text.contains('^') || text.contains('_')))
     }
 
     /// Parse MTEF data for a given text pattern

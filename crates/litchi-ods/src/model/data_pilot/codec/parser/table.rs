@@ -162,7 +162,14 @@ pub(super) fn parse_table(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) 
                 skip_foreign_element(reader, element)?;
             },
             Event::Empty(_) if !is_table_namespace(&namespace) => {},
-            other => {
+            other @ Event::Start(_)
+            | other @ Event::End(_)
+            | other @ Event::Empty(_)
+            | other @ Event::CData(_)
+            | other @ Event::Decl(_)
+            | other @ Event::PI(_)
+            | other @ Event::DocType(_)
+            | other @ Event::GeneralRef(_) => {
                 return Err(invalid_message(&format!(
                     "invalid child in table:data-pilot-table: {other:?}"
                 )));

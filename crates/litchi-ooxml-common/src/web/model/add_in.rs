@@ -1,7 +1,11 @@
-use super::super::codec::*;
-use super::super::validation::*;
-use super::super::*;
-use super::*;
+use super::super::Result;
+use super::super::codec::{invalid, limit, require_nonempty};
+use super::super::validation::{
+    validate_binding, validate_extension_list, validate_model, validate_store_reference,
+};
+use super::{
+    Binding, ExtKind, ExtList, MAX_WEB_EXTENSION_ITEMS, Property, Reference, Selector, Snapshot,
+};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AddIn {
     pub(in crate::web) id: String,

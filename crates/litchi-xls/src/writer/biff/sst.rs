@@ -14,7 +14,7 @@ use super::write_record_header;
 /// * `writer` - Output writer
 /// * `data` - Continuation data
 fn write_continue<W: Write>(writer: &mut W, data: &[u8]) -> Result<()> {
-    let len = data.len().min(8224) as u16; // Max record size
+    let len = crate::utils::truncate_usize_to_u16(data.len().min(8224)); // Max record size
     write_record_header(writer, 0x003C, len)?;
     writer.write_all(&data[..len as usize])?;
     Ok(())
@@ -35,7 +35,7 @@ fn write_continue<W: Write>(writer: &mut W, data: &[u8]) -> Result<()> {
 /// CONTINUE records (0x003C) are used to store the remaining data.
 ///
 /// This implementation properly handles string splitting across CONTINUE boundaries,
-/// based on Apache POI's SSTSerializer.
+/// based on Apache POI's `SSTSerializer`.
 pub(crate) fn write_sst<W: Write>(
     writer: &mut W,
     strings: &[String],
@@ -53,7 +53,11 @@ pub(crate) fn write_sst<W: Write>(
             return Ok(());
         }
         if first {
-            write_record_header(writer, 0x00FC, buf.len() as u16)?;
+            write_record_header(
+                writer,
+                0x00FC,
+                crate::utils::truncate_usize_to_u16(buf.len()),
+            )?;
             writer.write_all(buf)?;
         } else {
             // Delegate CONTINUE records to the helper so we keep the
@@ -66,7 +70,7 @@ pub(crate) fn write_sst<W: Write>(
 
     // Initialize first SST record with cstTotal and cstUnique
     buffer.extend_from_slice(&cst_total.to_le_bytes());
-    buffer.extend_from_slice(&(strings.len() as u32).to_le_bytes());
+    buffer.extend_from_slice(&crate::utils::truncate_usize_to_u32(strings.len()).to_le_bytes());
 
     // Available payload for this record
     let mut available = MAX_RECORD_DATA - buffer.len();
@@ -103,7 +107,7 @@ pub(crate) fn write_sst<W: Write>(
         }
 
         // Write header
-        buffer.extend_from_slice(&(cch as u16).to_le_bytes());
+        buffer.extend_from_slice(&crate::utils::truncate_usize_to_u16(cch).to_le_bytes());
         buffer.push(high_byte_flag);
         available -= 3;
 
@@ -149,9 +153,8 @@ pub(crate) fn write_sst<W: Write>(
                         buffer.push(high_byte_flag);
                         available = MAX_RECORD_DATA - 1;
                         continue;
-                    } else {
-                        can_write -= 1;
                     }
+                    can_write -= 1;
                 }
                 buffer.extend_from_slice(&data16[written..written + can_write]);
                 written += can_write;

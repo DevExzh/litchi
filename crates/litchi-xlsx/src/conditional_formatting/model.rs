@@ -1,4 +1,4 @@
-//! Semantic SpreadsheetML conditional-formatting values and differential styles.
+//! Semantic `SpreadsheetML` conditional-formatting values and differential styles.
 
 use crate::color::Rgb;
 
@@ -23,6 +23,7 @@ impl Range {
         Self(value)
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -36,7 +37,7 @@ pub struct TokenError {
 }
 
 impl TokenError {
-    /// Construct a token error for a closed SpreadsheetML vocabulary.
+    /// Construct a token error for a closed `SpreadsheetML` vocabulary.
     #[must_use]
     pub fn new(domain: &'static str, token: &str) -> Self {
         Self {
@@ -387,6 +388,7 @@ pub struct Component {
 }
 
 impl Component {
+    #[must_use]
     pub fn raw_xml(&self) -> &[u8] {
         &self.raw_xml
     }
@@ -412,6 +414,7 @@ pub struct Differential {
 }
 
 impl Differential {
+    #[must_use]
     pub fn raw_xml(&self) -> &[u8] {
         &self.raw_xml
     }

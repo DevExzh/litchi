@@ -20,7 +20,7 @@ pub enum Error {
     #[error("invalid DOCX XML: {0}")]
     Xml(String),
 
-    /// A part has a content type forbidden by the WordprocessingML relation.
+    /// A part has a content type forbidden by the `WordprocessingML` relation.
     #[error("invalid DOCX content type: expected {expected}, got {actual}")]
     ContentType { expected: String, actual: String },
 
@@ -32,7 +32,7 @@ pub enum Error {
     #[error("invalid DOCX relationship: {0}")]
     InvalidRelationship(String),
 
-    /// Parsed or requested data violates a WordprocessingML invariant.
+    /// Parsed or requested data violates a `WordprocessingML` invariant.
     #[error("invalid DOCX data: {0}")]
     Invalid(String),
 
@@ -40,7 +40,7 @@ pub enum Error {
     #[error("invalid DOCX format: {0}")]
     InvalidFormat(String),
 
-    /// DrawingML parsing or authoring failed.
+    /// `DrawingML` parsing or authoring failed.
     #[error("DrawingML error: {0}")]
     Drawing(#[from] litchi_drawingml::Error),
 

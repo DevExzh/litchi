@@ -263,6 +263,7 @@ impl Edit {
         Ok(Some(self))
     }
 
+    #[must_use]
     pub fn len(&self) -> usize {
         let existing = self.sheets.values().fold(
             self.removed
@@ -1888,7 +1889,7 @@ impl Edit {
             }) {
                 conflicts.push(Conflict::Name {
                     sheet: right.name.as_str().into(),
-                    position: order::projected_position(&other, Target::Added(right_index))
+                    position: order::projected_position(other, Target::Added(right_index))
                         .unwrap_or_else(|| other.base.len().saturating_add(right_index)),
                 });
             }

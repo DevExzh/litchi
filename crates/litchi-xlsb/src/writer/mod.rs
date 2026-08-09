@@ -54,11 +54,19 @@ mod workbook;
 mod chartsheet;
 
 /// Binary cell range serialization helpers (shared by DV and CF writers)
-#[allow(dead_code, unreachable_pub)]
+#[allow(
+    dead_code,
+    unreachable_pub,
+    reason = "internal host modules are shared by included package and writer implementations"
+)]
 pub(crate) mod bin_range;
 
 /// Data validation writer (BrtBeginDVals / BrtDVal / BrtEndDVals)
-#[allow(dead_code, unreachable_pub)]
+#[allow(
+    dead_code,
+    unreachable_pub,
+    reason = "internal host modules are shared by included package and writer implementations"
+)]
 pub(crate) mod data_validation;
 
 // Re-export main types for public API

@@ -91,7 +91,7 @@ fn read_stream(data: &[u8], offset: usize, record_type: u16, name: &str) -> Resu
 
 fn write_stream(checksum: u32, stream: &[u8], output: &mut Vec<u8>) {
     output.extend_from_slice(&checksum.to_le_bytes());
-    output.extend_from_slice(&(stream.len() as u32).to_le_bytes());
+    output.extend_from_slice(&crate::utils::truncate_usize_to_u32(stream.len()).to_le_bytes());
     output.extend_from_slice(stream);
 }
 
@@ -125,6 +125,12 @@ impl ShapePropsStream {
     const HEADER_LEN: usize = FRT_HEADER_LEN + 2 + 2 + 4 + CB_LEN;
 
     /// Parse a `ShapePropsStream` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// # Panics
+    ///
+    /// Panics only if an internal BIFF invariant has been violated.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < Self::HEADER_LEN {
             return Err(Error::InvalidLength {
@@ -151,6 +157,7 @@ impl ShapePropsStream {
     }
 
     /// Serialize back to a complete `ShapePropsStream` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(Self::HEADER_LEN + self.stream.len());
         payload.extend_from_slice(&SHAPE_PROPS_STREAM_RECORD_TYPE.to_le_bytes());
@@ -164,21 +171,25 @@ impl ShapePropsStream {
 
     /// The chart element the properties apply to (`wObjContext`); the meaning
     /// depends on the containing record rule (MS-XLS 2.4.258).
+    #[must_use]
     pub fn object_context(&self) -> u16 {
         self.object_context
     }
 
     /// Raw `unused` field value.
+    #[must_use]
     pub fn unused(&self) -> u16 {
         self.unused
     }
 
     /// Raw `dwChecksum` value, preserved verbatim.
+    #[must_use]
     pub fn checksum(&self) -> u32 {
         self.checksum
     }
 
     /// The opaque XML property-stream bytes (`rgb`).
+    #[must_use]
     pub fn stream(&self) -> &[u8] {
         &self.stream
     }
@@ -212,6 +223,9 @@ macro_rules! text_property_stream {
             const HEADER_LEN: usize = FRT_HEADER_LEN + 4 + CB_LEN;
 
             /// Parse the record payload.
+            /// # Errors
+            ///
+            /// Returns an error if validation, decoding, encoding, or the requested operation fails.
             pub fn parse(data: &[u8]) -> Result<Self> {
                 if data.len() < Self::HEADER_LEN {
                     return Err(Error::InvalidLength {

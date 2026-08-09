@@ -11,7 +11,7 @@ use super::{MAX_NAMESPACE_TEXT_BYTES, MAX_RELATIONSHIP_ID_BYTES, MAX_RENDERER_TE
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum ValueError {
-    /// A relationship identifier is empty, too long, or not an XML NCName.
+    /// A relationship identifier is empty, too long, or not an XML `NCName`.
     #[error("invalid model3d relationship ID '{value}'")]
     RelationshipId { value: String },
     /// A text or namespace value exceeds the model3d resource bound.
@@ -22,7 +22,7 @@ pub enum ValueError {
         /// Maximum accepted byte length.
         limit: usize,
     },
-    /// A namespace prefix is not an XML NCName.
+    /// A namespace prefix is not an XML `NCName`.
     #[error("invalid model3d namespace prefix '{value}'")]
     NamespacePrefix { value: String },
     /// A namespace URI cannot be empty.
@@ -32,7 +32,7 @@ pub enum ValueError {
 
 /// A bounded `ST_RelationshipId` value.
 ///
-/// The value is retained exactly after XML attribute decoding.  The NCName
+/// The value is retained exactly after XML attribute decoding.  The `NCName`
 /// check follows the shared OOXML lexical helper; the finite bound prevents a
 /// hostile attribute from becoming an unbounded allocation.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]

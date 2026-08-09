@@ -5,7 +5,7 @@ use super::codec::{
     validate_range, validate_sheet_protection, validate_strong_verifier, validate_xml_text,
 };
 
-/// SpreadsheetML namespace form used by the deterministic writer.
+/// `SpreadsheetML` namespace form used by the deterministic writer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Conformance {
     Transitional,
@@ -24,7 +24,7 @@ impl Conformance {
 /// Source schema for a protected-range collection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ProtectedRangeSource {
-    /// ISO/IEC 29500 SpreadsheetML collection.
+    /// ISO/IEC 29500 `SpreadsheetML` collection.
     Core,
     /// Office 2010 `x14` worksheet extension.
     Office2010,
@@ -33,7 +33,7 @@ pub enum ProtectedRangeSource {
 /// Password-verifier metadata. This type does not verify passwords.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProtectionPasswordVerifier {
-    /// Legacy 16-bit SpreadsheetML password verifier.
+    /// Legacy 16-bit `SpreadsheetML` password verifier.
     Legacy(u16),
     /// Salted iterative password hash metadata.
     Strong(StrongProtectionPasswordVerifier),
@@ -65,15 +65,19 @@ impl StrongProtectionPasswordVerifier {
         Ok(value)
     }
 
+    #[must_use]
     pub fn algorithm_name(&self) -> &str {
         &self.algorithm_name
     }
+    #[must_use]
     pub fn hash_value(&self) -> &[u8] {
         &self.hash_value
     }
+    #[must_use]
     pub fn salt_value(&self) -> &[u8] {
         &self.salt_value
     }
+    #[must_use]
     pub fn spin_count(&self) -> u32 {
         self.spin_count
     }
@@ -102,58 +106,76 @@ pub struct Protection {
 }
 
 impl Protection {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use]
     pub fn verifier(&self) -> Option<&ProtectionPasswordVerifier> {
         self.verifier.as_ref()
     }
+    #[must_use]
     pub fn sheet_locked(&self) -> bool {
         self.sheet
     }
+    #[must_use]
     pub fn objects_locked(&self) -> bool {
         self.objects
     }
+    #[must_use]
     pub fn scenarios_locked(&self) -> bool {
         self.scenarios
     }
+    #[must_use]
     pub fn format_cells_locked(&self) -> bool {
         self.format_cells
     }
+    #[must_use]
     pub fn format_columns_locked(&self) -> bool {
         self.format_columns
     }
+    #[must_use]
     pub fn format_rows_locked(&self) -> bool {
         self.format_rows
     }
+    #[must_use]
     pub fn insert_columns_locked(&self) -> bool {
         self.insert_columns
     }
+    #[must_use]
     pub fn insert_rows_locked(&self) -> bool {
         self.insert_rows
     }
+    #[must_use]
     pub fn insert_hyperlinks_locked(&self) -> bool {
         self.insert_hyperlinks
     }
+    #[must_use]
     pub fn delete_columns_locked(&self) -> bool {
         self.delete_columns
     }
+    #[must_use]
     pub fn delete_rows_locked(&self) -> bool {
         self.delete_rows
     }
+    #[must_use]
     pub fn select_locked_cells_locked(&self) -> bool {
         self.select_locked_cells
     }
+    #[must_use]
     pub fn sort_locked(&self) -> bool {
         self.sort
     }
+    #[must_use]
     pub fn auto_filter_locked(&self) -> bool {
         self.auto_filter
     }
+    #[must_use]
     pub fn pivot_tables_locked(&self) -> bool {
         self.pivot_tables
     }
+    #[must_use]
     pub fn select_unlocked_cells_locked(&self) -> bool {
         self.select_unlocked_cells
     }
@@ -267,9 +289,11 @@ pub struct ProtectionRangeReference {
 }
 
 impl ProtectionRangeReference {
+    #[must_use]
     pub fn raw(&self) -> &str {
         &self.raw
     }
+    #[must_use]
     pub fn kind(&self) -> ProtectionRangeReferenceKind {
         self.kind
     }
@@ -287,9 +311,11 @@ impl ProtectionRangeSqref {
         parse_sqref(value.as_ref())
     }
 
+    #[must_use]
     pub fn raw(&self) -> &str {
         &self.raw
     }
+    #[must_use]
     pub fn references(&self) -> &[ProtectionRangeReference] {
         &self.references
     }
@@ -339,18 +365,23 @@ impl ProtectedRange {
         Ok(())
     }
 
+    #[must_use]
     pub fn source(&self) -> ProtectedRangeSource {
         self.source
     }
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
+    #[must_use]
     pub fn sqref(&self) -> &ProtectionRangeSqref {
         &self.sqref
     }
+    #[must_use]
     pub fn verifier(&self) -> Option<&ProtectionPasswordVerifier> {
         self.verifier.as_ref()
     }
+    #[must_use]
     pub fn security_descriptor(&self) -> Option<&str> {
         self.security_descriptor.as_deref()
     }
@@ -370,9 +401,11 @@ impl ProtectedRangeCollection {
         Ok(value)
     }
 
+    #[must_use]
     pub fn source(&self) -> ProtectedRangeSource {
         self.source
     }
+    #[must_use]
     pub fn ranges(&self) -> &[ProtectedRange] {
         &self.ranges
     }
@@ -386,13 +419,16 @@ pub struct Metadata {
 }
 
 impl Metadata {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use]
     pub fn sheet_protection(&self) -> Option<&Protection> {
         self.sheet_protection.as_ref()
     }
+    #[must_use]
     pub fn protected_range_collections(&self) -> &[ProtectedRangeCollection] {
         &self.protected_range_collections
     }

@@ -1,7 +1,10 @@
 //! Raw-value validation for mail-merge wire fields.
 //! This layer turns specification values into typed semantic enums and flags.
 
-use super::model::*;
+use super::model::{
+    FilterComparison, FilterCondition, MailMergeDestination, MailMergeDocumentType, MailMergeType,
+    MergeDataSourceKind, MergeErrorCheck, Rfs, SortDirection, Wpms,
+};
 use crate::package::{Error as PackageError, Result};
 
 pub(super) const FC_PMS: usize = 44;

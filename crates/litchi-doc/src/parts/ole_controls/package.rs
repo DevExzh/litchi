@@ -36,7 +36,7 @@ pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Option<R
     parse_bytes(data).map(Some)
 }
 
-/// Parse inert metadata from selected ObjectPool storages.
+/// Parse inert metadata from selected `ObjectPool` storages.
 ///
 /// The common OLE layer supplies only captured storage and stream bytes. This
 /// DOC owner interprets the `\x03ObjInfo` and optional `\x03OCXDATA` names
@@ -49,7 +49,7 @@ pub fn parse_pool(objects: &Objects) -> Result<ObjectPool> {
     ObjectPool::try_new(entries)
 }
 
-/// Parse one selected ObjectPool storage into passive metadata.
+/// Parse one selected `ObjectPool` storage into passive metadata.
 pub fn parse_object(object: &Object) -> Result<Entry> {
     let path = object.path();
     if path.len() != 2 || path.first().map(String::as_str) != Some(OBJECT_POOL_STORAGE) {
@@ -89,7 +89,7 @@ impl RgxOcxInfo {
 }
 
 impl ObjectPool {
-    /// Inspect selected ObjectPool storages without opening their payloads.
+    /// Inspect selected `ObjectPool` storages without opening their payloads.
     pub fn parse(objects: &Objects) -> Result<Self> {
         parse_pool(objects)
     }

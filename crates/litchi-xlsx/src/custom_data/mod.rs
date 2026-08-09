@@ -1,4 +1,4 @@
-//! Typed SpreadsheetML custom-data properties.
+//! Typed `SpreadsheetML` custom-data properties.
 //!
 //! The model and bounded XML codec are split by responsibility so callers
 //! can reuse the package-neutral types without taking on OPC lifecycle code.

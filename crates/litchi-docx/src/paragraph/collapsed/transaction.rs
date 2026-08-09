@@ -1,3 +1,7 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Failure-atomic snapshots, edits, commits, and reversible patches.
 
 use std::sync::Arc;
@@ -17,6 +21,10 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parse and retain a bounded paragraph snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_xml(xml: impl Into<Vec<u8>>) -> Result<Self> {
         let xml = xml.into();
         let value = codec::read(&xml)?;
@@ -63,6 +71,10 @@ impl Transaction {
     }
 
     /// Set or remove the direct Word 2012 collapse marker.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_collapsed(&mut self, value: Option<Collapsed>) -> Result<&mut Self> {
         validation::validate(value)?;
         self.next = value;
@@ -76,6 +88,10 @@ impl Transaction {
     }
 
     /// Validate and publish the edit without changing the source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn commit(self) -> Result<Commit> {
         let xml = codec::rewrite(self.base.xml_bytes(), self.next)?;
         let snapshot = Snapshot::from_xml(xml)?;
@@ -152,6 +168,10 @@ impl Patch {
     }
 
     /// Apply the patch only when the target has the expected source state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.value != self.before {
             return Err(Error::InvalidFormat(

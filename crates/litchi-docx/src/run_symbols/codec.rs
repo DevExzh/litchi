@@ -1,3 +1,11 @@
+#![expect(
+    clippy::option_option,
+    reason = "nested options distinguish omitted, present-empty, and present-valued XML"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Namespace-aware, source-preserving `symEx` XML codec.
 
 use crate::error::{Error, Result};
@@ -93,7 +101,7 @@ pub(crate) fn write_symbol(value: &Symbol, output: &mut String) -> Result<()> {
         write!(output, r#" {SYMEX_PREFIX}:font="{}""#, escape_xml(font))?;
     }
     if let Some(character) = value.character_value() {
-        write!(output, r#" {SYMEX_PREFIX}:char="{character:08X}""#,)?;
+        write!(output, r#" {SYMEX_PREFIX}:char="{character:08X}""#)?;
     }
     output.push_str("/>");
     Ok(())
@@ -263,7 +271,13 @@ fn locate(xml: &[u8]) -> Result<(Layout, Symbols)> {
                 return Err(Error::InvalidFormat("unterminated Word run XML".into()));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 
@@ -305,7 +319,6 @@ fn validate_root(
     layout.root_name = element.name().as_ref().to_vec();
     if let Some(empty) = empty {
         layout.root_empty = Some(empty);
-    } else {
     }
     Ok(())
 }
@@ -377,8 +390,9 @@ fn is_symex_attribute(namespace: &ResolveResult<'_>, element: &BytesStart<'_>) -
 }
 
 fn offset(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_| Error::InvalidFormat("Word run XML offset does not fit usize".into()))
+    usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+        Error::InvalidFormat("Word run XML offset does not fit usize".into())
+    })
 }
 
 fn splice(source: &[u8], range: ByteRange, replacement: &[u8]) -> Vec<u8> {

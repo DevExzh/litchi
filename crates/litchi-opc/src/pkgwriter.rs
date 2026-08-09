@@ -128,9 +128,57 @@ impl PackageWriter {
         physical: &mut PhysPkgWriter<W>,
         package: &OpcPackage,
     ) -> Result<()> {
+        Self::validate_publication(package)?;
         Self::write_content_types(physical, package)?;
         Self::write_pkg_rels(physical, package)?;
         Self::write_parts(physical, package)
+    }
+
+    fn validate_publication(package: &OpcPackage) -> Result<()> {
+        let content_types = ContentTypesItem::from_package(package)?.to_xml();
+        Self::validate_authored_xml("[Content_Types].xml", content_types.as_bytes())?;
+
+        let package_relationships = package.rels().to_xml();
+        Self::validate_authored_xml("_rels/.rels", package_relationships.as_bytes())?;
+
+        let mut parts = Vec::new();
+        parts
+            .try_reserve_exact(package.part_count())
+            .map_err(|source| crate::OpcError::Allocation {
+                resource: "OPC XML publication part plan",
+                source,
+            })?;
+        parts.extend(package.iter_parts());
+        parts.sort_unstable_by(|left, right| {
+            left.partname().as_str().cmp(right.partname().as_str())
+        });
+        for part in parts {
+            if xml_minifier::audit::package::is_xml_part(
+                part.partname().as_str(),
+                part.content_type(),
+            ) && !package.is_exact_source_xml(part)
+            {
+                Self::validate_authored_xml(part.partname().as_str(), part.blob())?;
+            }
+            if !part.rels().is_empty() {
+                let relationships = part.rels().to_xml();
+                let name = part
+                    .partname()
+                    .rels_uri()
+                    .map_err(crate::error::OpcError::InvalidPackUri)?;
+                Self::validate_authored_xml(name.as_str(), relationships.as_bytes())?;
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_authored_xml(name: &str, bytes: &[u8]) -> Result<()> {
+        xml_minifier::audit::verify_authored(bytes, xml_minifier::audit::Limits::default())
+            .map(|_report| ())
+            .map_err(|source| crate::OpcError::XmlPublication {
+                part: name.to_string(),
+                source,
+            })
     }
 
     /// Write the `[Content_Types].xml` part.
@@ -401,6 +449,130 @@ mod tests {
             PackageWriter::to_bytes(&package),
             Err(crate::OpcError::InvalidContentType { .. })
         ));
+    }
+
+    #[test]
+    fn refuses_arbitrary_authored_xml_bytes_before_publication() {
+        for (part_name, content_type) in [
+            ("/custom/manifest.rdf", "application/octet-stream"),
+            ("/custom/metadata", "application/rdf+xml"),
+            (
+                "/_xmlsignatures/sig1.bin",
+                "application/vnd.openxmlformats-package.digital-signature-xmlsignature+xml",
+            ),
+        ] {
+            let mut package = OpcPackage::new();
+            package.add_part(Box::new(crate::BlobPart::new(
+                PackURI::new(part_name).expect("valid part URI"),
+                content_type.to_string(),
+                b"<root> <child/></root>".to_vec(),
+            )));
+
+            assert!(matches!(
+                PackageWriter::to_bytes(&package),
+                Err(crate::OpcError::XmlPublication { part, .. }) if part == part_name
+            ));
+        }
+    }
+
+    #[test]
+    fn exact_source_xml_bytes_may_remain_opaque() {
+        let content_types = br#"<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/custom/manifest.rdf" ContentType="application/rdf+xml"/></Types>"#;
+        let relationships = br#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>"#;
+        let source_rdf = b"<rdf:RDF xmlns:rdf=\"urn:test\">\n <rdf:Description/>\n</rdf:RDF>";
+        let mut physical = PhysPkgWriter::new();
+        physical
+            .write(
+                &PackURI::new("/[Content_Types].xml").expect("content-types URI"),
+                content_types,
+            )
+            .expect("write content types");
+        physical
+            .write(
+                &PackURI::new("/_rels/.rels").expect("relationship URI"),
+                relationships,
+            )
+            .expect("write relationships");
+        physical
+            .write(
+                &PackURI::new("/custom/manifest.rdf").expect("RDF URI"),
+                source_rdf,
+            )
+            .expect("write source RDF");
+        let source = physical.finish().expect("finish source package");
+
+        let package = OpcPackage::from_vec(source).expect("open source package");
+        let rewritten = PackageWriter::to_bytes(&package).expect("preserve source RDF");
+        let rewritten_physical = crate::phys_pkg::OwnedPhysPkgReader::from_bytes(rewritten)
+            .expect("open rewritten package");
+        assert_eq!(
+            rewritten_physical
+                .read_member("custom/manifest.rdf")
+                .expect("read rewritten RDF"),
+            source_rdf
+        );
+    }
+
+    #[test]
+    fn real_package_enumeration_covers_all_xml_bearing_members() {
+        let mut package = OpcPackage::new();
+        for (part_name, content_type, payload) in [
+            (
+                "/custom/manifest.rdf",
+                "application/rdf+xml",
+                b"<rdf:RDF xmlns:rdf=\"urn:test\"/>".as_slice(),
+            ),
+            (
+                "/custom/metadata",
+                "application/vnd.example.metadata+xml",
+                b"<metadata/>".as_slice(),
+            ),
+            (
+                "/_xmlsignatures/sig1.xml",
+                "application/vnd.openxmlformats-package.digital-signature-xmlsignature+xml",
+                b"<Signature xmlns=\"http://www.w3.org/2000/09/xmldsig#\"/>".as_slice(),
+            ),
+        ] {
+            package.add_part(Box::new(crate::BlobPart::new(
+                PackURI::new(part_name).expect("valid part URI"),
+                content_type.to_string(),
+                payload.to_vec(),
+            )));
+        }
+        let bytes = PackageWriter::to_bytes(&package).expect("publish package");
+        let physical =
+            crate::phys_pkg::OwnedPhysPkgReader::from_bytes(bytes).expect("open published package");
+        let mut audited = Vec::new();
+        for name in physical.member_names().expect("enumerate members") {
+            let media_type = match name.as_str() {
+                "custom/metadata" => "application/vnd.example.metadata+xml",
+                "custom/manifest.rdf" => "application/rdf+xml",
+                "_xmlsignatures/sig1.xml" => {
+                    "application/vnd.openxmlformats-package.digital-signature-xmlsignature+xml"
+                },
+                _ => "application/octet-stream",
+            };
+            if xml_minifier::audit::package::is_xml_part(&name, media_type) {
+                let payload = physical.read_member(&name).expect("read XML member");
+                let _report = xml_minifier::audit::verify_authored(
+                    &payload,
+                    xml_minifier::audit::Limits::default(),
+                )
+                .expect("emitted XML is compact");
+                audited.push(name);
+            }
+        }
+        audited.sort();
+        assert_eq!(
+            audited,
+            [
+                "[Content_Types].xml",
+                "_rels/.rels",
+                "_xmlsignatures/sig1.xml",
+                "custom/manifest.rdf",
+                "custom/metadata",
+            ]
+        );
     }
 
     #[test]

@@ -11,7 +11,7 @@
 
 mod records;
 
-/// Chart future-record version and CFrtId range metadata.
+/// Chart future-record version and `CFrtId` range metadata.
 pub mod info {
     pub use super::records::{Info, RecordRange, Version};
 }
@@ -21,7 +21,7 @@ pub mod label {
     pub use super::records::{Alignment, CatLab};
 }
 
-/// StartBlock and EndBlock chart future-record scopes.
+/// `StartBlock` and `EndBlock` chart future-record scopes.
 pub mod blocks {
     pub use super::records::{BlockKind, EndBlock, StartBlock};
 }

@@ -1,3 +1,27 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
+#![expect(
+    clippy::needless_pass_by_value,
+    reason = "the public API shape is retained for compatibility"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
+#![expect(
+    clippy::similar_names,
+    reason = "domain names mirror distinct OOXML roles"
+)]
 //! Canonical, inert Word bibliography source-store XML.
 //!
 //! Word stores its bibliography source list in Custom XML using the
@@ -31,7 +55,7 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
-/// OOXML bibliography namespace used by current WordprocessingML source lists.
+/// OOXML bibliography namespace used by current `WordprocessingML` source lists.
 pub const OOXML_BIBLIOGRAPHY_NAMESPACE: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/bibliography";
 
@@ -70,21 +94,25 @@ impl BibliographySourceStore {
     /// Return the stored selected bibliography style reference, if any.
     ///
     /// The reference is opaque; this crate never opens or executes a style.
+    #[must_use]
     pub fn selected_style(&self) -> Option<&str> {
         self.selected_style.as_deref()
     }
 
     /// Return the stored bibliography style name, if any.
+    #[must_use]
     pub fn style_name(&self) -> Option<&str> {
         self.style_name.as_deref()
     }
 
     /// Return sources in their persisted XML order.
+    #[must_use]
     pub fn sources(&self) -> &[BibliographySource] {
         &self.sources
     }
 
     /// Return the number of persisted bibliography sources.
+    #[must_use]
     pub fn source_count(&self) -> usize {
         self.sources.len()
     }
@@ -105,6 +133,7 @@ impl BibliographySource {
     ///
     /// Every value path is relative to the enclosing `Source` element and
     /// contains only elements in a recognized bibliography namespace.
+    #[must_use]
     pub fn values(&self) -> &[BibliographySourceValue] {
         &self.values
     }
@@ -127,31 +156,37 @@ impl BibliographySource {
     }
 
     /// Return the source tag used by `CITATION` field instructions, if stored.
+    #[must_use]
     pub fn tag(&self) -> Option<&str> {
         self.value(&["Tag"])
     }
 
     /// Return the stored source type, such as `Book`, if present.
+    #[must_use]
     pub fn source_type(&self) -> Option<&str> {
         self.value(&["SourceType"])
     }
 
     /// Return the stored source GUID, if present.
+    #[must_use]
     pub fn guid(&self) -> Option<&str> {
         self.value(&["Guid"])
     }
 
     /// Return the stored source locale identifier without interpreting it.
+    #[must_use]
     pub fn lcid(&self) -> Option<&str> {
         self.value(&["LCID"])
     }
 
     /// Return the stored title, if present.
+    #[must_use]
     pub fn title(&self) -> Option<&str> {
         self.value(&["Title"])
     }
 
     /// Return the stored year, if present.
+    #[must_use]
     pub fn year(&self) -> Option<&str> {
         self.value(&["Year"])
     }
@@ -169,17 +204,23 @@ pub struct BibliographySourceValue {
 
 impl BibliographySourceValue {
     /// Return the path relative to the enclosing `Source` element.
+    #[must_use]
     pub fn path(&self) -> &[String] {
         &self.path
     }
 
     /// Return the decoded stored scalar XML value.
+    #[must_use]
     pub fn value(&self) -> &str {
         &self.value
     }
 }
 
 /// Parse one bounded bibliography source-store XML payload.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn parse_bibliography_source_store(xml: &[u8]) -> Result<BibliographySourceStore> {
     if xml.len() > MAX_BIBLIOGRAPHY_XML_BYTES {
         return Err(invalid(format!(
@@ -276,6 +317,7 @@ fn collect_source_values(
 }
 
 /// Return whether a namespace/local-name pair is a bibliography root.
+#[must_use]
 pub fn is_bibliography_root(namespace: &str, local_name: &str) -> bool {
     is_bibliography_namespace(namespace) && matches!(local_name, "Sources" | "Source")
 }
@@ -288,6 +330,7 @@ pub fn is_bibliography_node(node: &XmlNode) -> bool {
 }
 
 /// Return whether `value` is one of the accepted bibliography namespace URIs.
+#[must_use]
 pub fn is_bibliography_namespace(value: &str) -> bool {
     matches!(
         value,
@@ -398,7 +441,7 @@ pub fn parse_xml_tree(xml: &[u8]) -> Result<XmlNode> {
             },
             Event::DocType(_) => return Err(invalid("DTD is not allowed in bibliography XML")),
             Event::Eof => break,
-            _ => {},
+            Event::Comment(_) | Event::Decl(_) | Event::PI(_) => {},
         }
     }
 

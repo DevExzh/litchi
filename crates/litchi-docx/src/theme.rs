@@ -1,3 +1,7 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
 use crate::error::{Error, Result};
 /// Theme support for Word documents.
 ///
@@ -41,6 +45,7 @@ pub struct Theme {
 
 impl Theme {
     /// Create a new empty Theme.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             name: None,
@@ -52,24 +57,28 @@ impl Theme {
 
     /// Get the theme name.
     #[inline]
+    #[must_use]
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
     }
 
     /// Get the major font (for headings).
     #[inline]
+    #[must_use]
     pub fn major_font(&self) -> Option<&str> {
         self.major_font.as_deref()
     }
 
     /// Get the minor font (for body text).
     #[inline]
+    #[must_use]
     pub fn minor_font(&self) -> Option<&str> {
         self.minor_font.as_deref()
     }
 
     /// Get the color scheme name.
     #[inline]
+    #[must_use]
     pub fn color_scheme(&self) -> Option<&str> {
         self.color_scheme.as_deref()
     }
@@ -132,7 +141,13 @@ impl Theme {
                     ));
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {},
             }
         }
 

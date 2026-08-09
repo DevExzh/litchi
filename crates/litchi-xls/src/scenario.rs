@@ -19,6 +19,9 @@ pub struct ScenarioRange {
 }
 
 impl ScenarioRange {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(first_row: u16, last_row: u16, first_column: u8, last_column: u8) -> Result<Self> {
         if first_row > last_row || first_column > last_column {
             return Err(Error::InvalidData("scenario range is reversed".to_string()));
@@ -30,15 +33,19 @@ impl ScenarioRange {
             last_column,
         })
     }
+    #[must_use]
     pub fn first_row(&self) -> u16 {
         self.first_row
     }
+    #[must_use]
     pub fn last_row(&self) -> u16 {
         self.last_row
     }
+    #[must_use]
     pub fn first_column(&self) -> u8 {
         self.first_column
     }
+    #[must_use]
     pub fn last_column(&self) -> u8 {
         self.last_column
     }
@@ -70,16 +77,20 @@ impl ScenarioCell {
             value: value.into(),
         }
     }
+    #[must_use]
     pub fn row(&self) -> u16 {
         self.row
     }
+    #[must_use]
     pub fn column(&self) -> u8 {
         self.column
     }
+    #[must_use]
     pub fn is_deleted(&self) -> bool {
         self.deleted
     }
     /// Raw scenario value. It is never parsed or evaluated as a formula or macro.
+    #[must_use]
     pub fn value(&self) -> &str {
         &self.value
     }
@@ -118,21 +129,27 @@ impl Scenario {
     pub fn set_hidden(&mut self, hidden: bool) {
         self.hidden = hidden;
     }
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
+    #[must_use]
     pub fn creator(&self) -> Option<&str> {
         self.creator.as_deref()
     }
+    #[must_use]
     pub fn comment(&self) -> Option<&str> {
         self.comment.as_deref()
     }
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.locked
     }
+    #[must_use]
     pub fn is_hidden(&self) -> bool {
         self.hidden
     }
+    #[must_use]
     pub fn cells(&self) -> &[ScenarioCell] {
         &self.cells
     }
@@ -147,6 +164,7 @@ pub struct ScenarioManager {
 }
 
 impl ScenarioManager {
+    #[must_use]
     pub fn new(scenarios: Vec<Scenario>) -> Self {
         Self {
             current_scenario: None,
@@ -164,15 +182,19 @@ impl ScenarioManager {
     pub fn set_result_ranges(&mut self, ranges: Vec<ScenarioRange>) {
         self.result_ranges = ranges;
     }
+    #[must_use]
     pub fn current_scenario(&self) -> Option<usize> {
         self.current_scenario
     }
+    #[must_use]
     pub fn shown_scenario(&self) -> Option<usize> {
         self.shown_scenario
     }
+    #[must_use]
     pub fn result_ranges(&self) -> &[ScenarioRange] {
         &self.result_ranges
     }
+    #[must_use]
     pub fn scenarios(&self) -> &[Scenario] {
         &self.scenarios
     }
@@ -360,8 +382,8 @@ fn parse_scen_man(data: &[u8]) -> Result<ScenarioManagerHeader> {
             "scenario result range count must be 0..=32",
         );
     }
-    let declared_count = declared as usize;
-    let expected = 8 + result_count as usize * 8;
+    let declared_count = crate::utils::sign_extend_i16_to_usize(declared);
+    let expected = 8 + crate::utils::sign_extend_i16_to_usize(result_count) * 8;
     if data.len() != expected {
         return invalid(
             SCEN_MAN_RECORD_TYPE,
@@ -372,17 +394,18 @@ fn parse_scen_man(data: &[u8]) -> Result<ScenarioManagerHeader> {
         if value == -1 {
             return Ok(None);
         }
-        if value < 0 || value as usize >= declared_count {
+        if value < 0 || crate::utils::sign_extend_i16_to_usize(value) >= declared_count {
             return invalid(
                 SCEN_MAN_RECORD_TYPE,
                 "selected scenario index is out of range",
             );
         }
-        Ok(Some(value as usize))
+        Ok(Some(crate::utils::sign_extend_i16_to_usize(value)))
     };
     let current_scenario = parse_index(current)?;
     let shown_scenario = parse_index(shown)?;
-    let mut result_ranges = Vec::with_capacity(result_count as usize);
+    let mut result_ranges =
+        Vec::with_capacity(crate::utils::sign_extend_i16_to_usize(result_count));
     for chunk in data[8..].chunks_exact(8) {
         let first_row = read_u16(chunk, 0);
         let last_row = read_u16(chunk, 2);
@@ -394,8 +417,8 @@ fn parse_scen_man(data: &[u8]) -> Result<ScenarioManagerHeader> {
         result_ranges.push(ScenarioRange {
             first_row,
             last_row,
-            first_column: first_column as u8,
-            last_column: last_column as u8,
+            first_column: crate::utils::truncate_u16_to_u8(first_column),
+            last_column: crate::utils::truncate_u16_to_u8(last_column),
         });
     }
     Ok(ScenarioManagerHeader {
@@ -557,7 +580,7 @@ impl<'a> Cursor<'a> {
                 .chunks_exact(2)
                 .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
                 .collect();
-            String::from_utf16(&units).map_err(|_| Error::InvalidRecord {
+            String::from_utf16(&units).map_err(|_error| Error::InvalidRecord {
                 record_type: SCENARIO_RECORD_TYPE,
                 message: "Scenario string contains invalid UTF-16".to_string(),
             })

@@ -314,7 +314,10 @@ fn parse_changes_information(xml: &[u8]) -> Result<Info> {
                     root_seen = true;
                     Frame::Root
                 } else {
-                    match stack.last_mut().expect("nonempty") {
+                    match stack
+                        .last_mut()
+                        .ok_or_else(|| invalid("Changes Information child has no parent"))?
+                    {
                         Frame::Root => {
                             expect(&namespace, PC, local.as_ref(), b"docChgLst")?;
                             no_attributes(&element, reader.decoder())?;
@@ -337,7 +340,12 @@ fn parse_changes_information(xml: &[u8]) -> Result<Info> {
                                     ));
                                 }
                                 let data = parse_changes_data(&element, reader.decoder())?;
-                                current_list.as_mut().expect("active list").author = Some(data);
+                                current_list
+                                    .as_mut()
+                                    .ok_or_else(|| {
+                                        invalid("document change list state is missing")
+                                    })?
+                                    .author = Some(data);
                                 list_order = 1;
                                 Frame::Metadata
                             } else if is(&namespace, PC, local.as_ref(), b"docChg") {
@@ -468,16 +476,24 @@ fn parse_changes_information(xml: &[u8]) -> Result<Info> {
                     match &frame {
                         Frame::Root => root_closed = true,
                         Frame::List => {
-                            lists.push(current_list.take().expect("active list"));
+                            lists.push(
+                                current_list.take().ok_or_else(|| {
+                                    invalid("document change list state is missing")
+                                })?,
+                            );
                         },
                         Frame::MetadataExtension => {
                             pending = Some(PendingSlice::Metadata(
-                                metadata_extension_start.take().expect("metadata start"),
+                                metadata_extension_start.take().ok_or_else(|| {
+                                    invalid("metadata extension start is missing")
+                                })?,
                             ));
                         },
                         Frame::ListExtension { .. } => {
                             pending = Some(PendingSlice::ListExtension(
-                                list_extension_start.take().expect("list ext start"),
+                                list_extension_start
+                                    .take()
+                                    .ok_or_else(|| invalid("list extension start is missing"))?,
                             ));
                         },
                         _ => {},
@@ -493,10 +509,16 @@ fn parse_changes_information(xml: &[u8]) -> Result<Info> {
                 validate_end(&namespace, element.local_name().as_ref(), &frame)?;
                 match frame {
                     Frame::Root => root_closed = true,
-                    Frame::List => lists.push(current_list.take().expect("active list")),
+                    Frame::List => lists.push(
+                        current_list
+                            .take()
+                            .ok_or_else(|| invalid("document change list state is missing"))?,
+                    ),
                     Frame::MetadataExtension => {
                         pending = Some(PendingSlice::Metadata(
-                            metadata_extension_start.take().expect("metadata start"),
+                            metadata_extension_start
+                                .take()
+                                .ok_or_else(|| invalid("metadata extension start is missing"))?,
                         ));
                     },
                     Frame::Document {
@@ -506,7 +528,9 @@ fn parse_changes_information(xml: &[u8]) -> Result<Info> {
                             return Err(invalid("docChg requires docMkLst"));
                         }
                         pending = Some(PendingSlice::Document(
-                            document_start.take().expect("document start"),
+                            document_start
+                                .take()
+                                .ok_or_else(|| invalid("document change start is missing"))?,
                             kinds,
                         ));
                     },
@@ -515,7 +539,9 @@ fn parse_changes_information(xml: &[u8]) -> Result<Info> {
                     },
                     Frame::ListExtension { .. } => {
                         pending = Some(PendingSlice::ListExtension(
-                            list_extension_start.take().expect("list ext start"),
+                            list_extension_start
+                                .take()
+                                .ok_or_else(|| invalid("list extension start is missing"))?,
                         ));
                     },
                     Frame::Extension { payloads } if payloads != 1 => {
@@ -570,8 +596,10 @@ fn parse_changes_information(xml: &[u8]) -> Result<Info> {
             .ok_or_else(|| invalid("captured change XML outside docChgLst"))?;
         match slice {
             PendingSlice::Metadata(from) => {
-                list.author.as_mut().expect("author").extension_xml =
-                    Some(bytes[from..end].to_vec());
+                list.author
+                    .as_mut()
+                    .ok_or_else(|| invalid("change author metadata is missing"))?
+                    .extension_xml = Some(bytes[from..end].to_vec());
             },
             PendingSlice::Document(from, kinds) => list.changes.push(Descriptor {
                 change_kinds: kinds,

@@ -38,7 +38,17 @@ pub(super) fn parse_cell_range_source(
             Event::Text(ref text) if text_is_whitespace(text)? => {},
             Event::Comment(_) => {},
             Event::Eof => return Err(invalid_message("unterminated table:source-cell-range")),
-            _ => return Err(invalid_message("invalid child in table:source-cell-range")),
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {
+                return Err(invalid_message("invalid child in table:source-cell-range"));
+            },
         }
         buf.clear();
     }

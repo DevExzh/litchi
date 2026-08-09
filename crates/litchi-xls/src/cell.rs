@@ -24,6 +24,7 @@ pub struct Cell {
 
 impl Cell {
     /// Create a new XLS cell
+    #[must_use]
     pub fn new(row: u32, col: u32, value: CellValue) -> Self {
         Cell {
             row,
@@ -38,6 +39,7 @@ impl Cell {
     }
 
     /// Create a cell with formula
+    #[must_use]
     pub fn with_formula(row: u32, col: u32, value: CellValue, formula: String) -> Self {
         Cell {
             row,
@@ -52,6 +54,7 @@ impl Cell {
     }
 
     /// Create cell from BIFF record
+    #[must_use]
     pub fn from_record(record: &CellRecord, sst: Option<&[String]>) -> Option<Self> {
         Self::from_record_with_formula_context(record, sst, None, None)
     }
@@ -72,14 +75,18 @@ impl Cell {
             _ => None,
         };
         let (row, col, value, formula, formula_bytes) = match record {
-            CellRecord::Blank { row, col, .. } => {
-                (*row as u32, *col as u32, CellValue::Empty, None, None)
-            },
+            CellRecord::Blank { row, col, .. } => (
+                u32::from(*row),
+                u32::from(*col),
+                CellValue::Empty,
+                None,
+                None,
+            ),
             CellRecord::Number {
                 row, col, value, ..
             } => (
-                *row as u32,
-                *col as u32,
+                u32::from(*row),
+                u32::from(*col),
                 CellValue::Float(*value),
                 None,
                 None,
@@ -87,8 +94,8 @@ impl Cell {
             CellRecord::Label {
                 row, col, value, ..
             } => (
-                *row as u32,
-                *col as u32,
+                u32::from(*row),
+                u32::from(*col),
                 CellValue::String(value.clone()),
                 None,
                 None,
@@ -98,15 +105,15 @@ impl Cell {
             } => {
                 let cell_value = match value {
                     BoolErrValue::Bool(b) => CellValue::Bool(*b),
-                    BoolErrValue::Error(e) => CellValue::Error(format!("Error {}", e)),
+                    BoolErrValue::Error(e) => CellValue::Error(format!("Error {e}")),
                 };
-                (*row as u32, *col as u32, cell_value, None, None)
+                (u32::from(*row), u32::from(*col), cell_value, None, None)
             },
             CellRecord::Rk {
                 row, col, value, ..
             } => (
-                *row as u32,
-                *col as u32,
+                u32::from(*row),
+                u32::from(*col),
                 CellValue::Float(*value),
                 None,
                 None,
@@ -130,7 +137,7 @@ impl Cell {
                 } else {
                     CellValue::Error("SST not available".to_string())
                 };
-                (*row as u32, *col as u32, cell_value, None, None)
+                (u32::from(*row), u32::from(*col), cell_value, None, None)
             },
             CellRecord::Formula {
                 row,
@@ -145,14 +152,14 @@ impl Cell {
                     FormulaValue::StringPending => CellValue::Empty,
                     FormulaValue::String(s) => CellValue::String(s.clone()),
                     FormulaValue::Bool(b) => CellValue::Bool(*b),
-                    FormulaValue::Error(e) => CellValue::Error(format!("Error {}", e)),
+                    FormulaValue::Error(e) => CellValue::Error(format!("Error {e}")),
                     FormulaValue::Empty => CellValue::Empty,
                 };
 
                 let formula_text = render_formula(formula, formula_context);
                 (
-                    *row as u32,
-                    *col as u32,
+                    u32::from(*row),
+                    u32::from(*col),
                     cell_value,
                     formula_text,
                     Some(formula.clone()),
@@ -166,8 +173,9 @@ impl Cell {
                     && serial >= 0.0
                     && formatting
                         .and_then(|table| table.cell_format(xf_index))
-                        .map(|format| table_is_date_time(formatting, format.number_format_id()))
-                        .unwrap_or(false) =>
+                        .is_some_and(|format| {
+                            table_is_date_time(formatting, format.number_format_id())
+                        }) =>
             {
                 CellValue::DateTime(serial)
             },
@@ -186,11 +194,13 @@ impl Cell {
         })
     }
 
+    #[must_use]
     pub fn xf_index(&self) -> u16 {
         self.xf_index
     }
 
     /// Original SST index for a BIFF `LabelSst` cell.
+    #[must_use]
     pub fn shared_string_index(&self) -> Option<u32> {
         self.shared_string_index
     }
@@ -200,17 +210,20 @@ impl Cell {
     /// Workbook-dependent formulas that require name or external-sheet tables
     /// return `None`; their original token stream remains available through
     /// [`Self::formula_bytes`].
+    #[must_use]
     pub fn formula(&self) -> Option<&str> {
         self.formula.as_deref()
     }
 
     /// Original BIFF formula token stream for cells read from a workbook.
+    #[must_use]
     pub fn formula_bytes(&self) -> Option<&[u8]> {
         self.formula_bytes.as_deref()
     }
 
     /// Typed BIFF8 calculation flags and application cache for a formula read
     /// from a workbook.
+    #[must_use]
     pub fn formula_metadata(&self) -> Option<&Metadata> {
         self.formula_metadata.as_ref()
     }
@@ -219,11 +232,13 @@ impl Cell {
     ///
     /// Array formulas are represented as inert metadata. Litchi never executes
     /// the token stream or external content referenced by it.
+    #[must_use]
     pub fn array_formula(&self) -> Option<&ArrayFormula> {
         self.formula_metadata.as_ref()?.array_owner()
     }
 
     /// Whether this cell participates in a structurally valid BIFF8 Array.
+    #[must_use]
     pub fn is_array_formula(&self) -> bool {
         self.array_formula().is_some()
     }
@@ -258,9 +273,7 @@ fn record_xf_index(record: &CellRecord) -> u16 {
 }
 
 fn table_is_date_time(formatting: Option<&Formatting>, format_id: u16) -> bool {
-    formatting
-        .map(|table| table.is_date_time_format(format_id))
-        .unwrap_or(false)
+    formatting.is_some_and(|table| table.is_date_time_format(format_id))
 }
 
 impl CellTrait for Cell {

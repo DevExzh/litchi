@@ -1,4 +1,4 @@
-//! DrawingML chart XML writer facade.
+//! `DrawingML` chart XML writer facade.
 //!
 //! The public writer path remains [`crate::chart::writer`]. Writer-specific
 //! series capability state lives in `model`, while XML emission lives in

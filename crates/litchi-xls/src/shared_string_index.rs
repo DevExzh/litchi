@@ -19,7 +19,7 @@ fn invalid(message: impl Into<String>) -> Error {
 fn strings_per_bucket(unique_string_count: u32) -> Result<u16> {
     let value = (unique_string_count / 128 + 1).max(8);
     u16::try_from(value)
-        .map_err(|_| invalid("SST unique-string count is too large for the ExtSST dsst field"))
+        .map_err(|_error| invalid("SST unique-string count is too large for the ExtSST dsst field"))
 }
 
 fn required_bucket_count(unique_string_count: u32, bucket_size: u16) -> Result<usize> {
@@ -31,8 +31,8 @@ fn required_bucket_count(unique_string_count: u32, bucket_size: u16) -> Result<u
     } else {
         (unique_string_count - 1) / u32::from(bucket_size) + 1
     };
-    let count =
-        usize::try_from(count).map_err(|_| invalid("ExtSST bucket count does not fit usize"))?;
+    let count = usize::try_from(count)
+        .map_err(|_error| invalid("ExtSST bucket count does not fit usize"))?;
     if count > MAX_BUCKETS {
         return Err(invalid("ExtSST requires more than 128 buckets"));
     }
@@ -47,6 +47,9 @@ pub struct SharedStringBucket {
 }
 
 impl SharedStringBucket {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(stream_position: u32, record_offset: u16) -> Result<Self> {
         if u32::from(record_offset) >= stream_position {
             return Err(invalid("ISSTInf cbOffset must be less than ib"));
@@ -58,16 +61,19 @@ impl SharedStringBucket {
     }
 
     /// Absolute zero-based position of the bucket's first string.
+    #[must_use]
     pub fn stream_position(self) -> u32 {
         self.stream_position
     }
 
     /// Offset of the first string within its containing SST or Continue record.
+    #[must_use]
     pub fn record_offset(self) -> u16 {
         self.record_offset
     }
 
     /// Absolute position of the containing SST or Continue record header.
+    #[must_use]
     pub fn record_position(self) -> u32 {
         self.stream_position - u32::from(self.record_offset)
     }
@@ -82,6 +88,9 @@ pub struct SharedStringIndex {
 }
 
 impl SharedStringIndex {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(unique_string_count: u32, buckets: Vec<SharedStringBucket>) -> Result<Self> {
         let strings_per_bucket = strings_per_bucket(unique_string_count)?;
         let expected = required_bucket_count(unique_string_count, strings_per_bucket)?;
@@ -98,6 +107,12 @@ impl SharedStringIndex {
         })
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// # Panics
+    ///
+    /// Panics only if an internal BIFF invariant has been violated.
     pub fn parse_payload(unique_string_count: u32, data: &[u8]) -> Result<Self> {
         if !(FIXED_PAYLOAD_LEN..=MAX_PAYLOAD_LEN).contains(&data.len()) {
             return Err(invalid(format!(
@@ -136,17 +151,21 @@ impl SharedStringIndex {
         Self::try_new(unique_string_count, buckets)
     }
 
+    #[must_use]
     pub fn unique_string_count(&self) -> u32 {
         self.unique_string_count
     }
+    #[must_use]
     pub fn strings_per_bucket(&self) -> u16 {
         self.strings_per_bucket
     }
+    #[must_use]
     pub fn buckets(&self) -> &[SharedStringBucket] {
         &self.buckets
     }
 
     /// Bucket containing the given zero-based shared-string index.
+    #[must_use]
     pub fn bucket_for_string(&self, string_index: u32) -> Option<&SharedStringBucket> {
         if string_index >= self.unique_string_count {
             return None;
@@ -156,6 +175,7 @@ impl SharedStringIndex {
     }
 
     /// First shared-string index represented by a bucket.
+    #[must_use]
     pub fn first_string_index(&self, bucket_index: usize) -> Option<u32> {
         if bucket_index >= self.buckets.len() {
             return None;
@@ -166,6 +186,7 @@ impl SharedStringIndex {
     }
 
     /// Serialize the complete `ExtSST` payload deterministically.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut data = Vec::with_capacity(FIXED_PAYLOAD_LEN + self.buckets.len() * BUCKET_LEN);
         data.extend_from_slice(&self.strings_per_bucket.to_le_bytes());
@@ -178,10 +199,13 @@ impl SharedStringIndex {
     }
 
     /// Serialize the complete BIFF record including its four-byte record header.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
         let payload = self.to_payload();
         let length = u16::try_from(payload.len())
-            .map_err(|_| invalid("ExtSST payload length exceeds BIFF u16"))?;
+            .map_err(|_error| invalid("ExtSST payload length exceeds BIFF u16"))?;
         let mut data = Vec::with_capacity(4 + payload.len());
         data.extend_from_slice(&EXT_SST_RECORD_TYPE.to_le_bytes());
         data.extend_from_slice(&length.to_le_bytes());

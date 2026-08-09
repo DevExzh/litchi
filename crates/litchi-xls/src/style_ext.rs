@@ -87,6 +87,9 @@ pub struct StyleExt {
 impl StyleExt {
     /// A style extension; the name is limited to 255 UTF-16 code units, and
     /// `custom` requires a built-in style.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(
         built_in: bool,
         category: StyleCategory,
@@ -107,24 +110,31 @@ impl StyleExt {
         })
     }
 
+    #[must_use]
     pub const fn built_in(&self) -> bool {
         self.built_in
     }
+    #[must_use]
     pub const fn hidden(&self) -> bool {
         self.hidden
     }
+    #[must_use]
     pub const fn custom(&self) -> bool {
         self.custom
     }
+    #[must_use]
     pub const fn category(&self) -> StyleCategory {
         self.category
     }
+    #[must_use]
     pub const fn built_in_data(&self) -> Option<u16> {
         self.built_in_data
     }
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
+    #[must_use]
     pub fn properties(&self) -> &XfProperties {
         &self.properties
     }
@@ -134,6 +144,9 @@ impl StyleExt {
     }
 
     /// Mark the built-in style as customized; requires a built-in style.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_custom(&mut self, custom: bool) -> Result<()> {
         if custom && !self.built_in {
             return Err(invalid("fCustom requires a built-in style"));
@@ -194,7 +207,7 @@ impl StyleExt {
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect::<Vec<_>>();
         let name = String::from_utf16(&units)
-            .map_err(|_| invalid("style name contains invalid UTF-16"))?;
+            .map_err(|_error| invalid("style name contains invalid UTF-16"))?;
         let properties =
             XfProperties::parse(data.get(name_end..).ok_or(Error::InvalidLength {
                 expected: name_end,
@@ -241,7 +254,7 @@ impl StyleExt {
                 .unwrap_or(NOT_BUILT_IN_DATA)
                 .to_le_bytes(),
         );
-        payload.extend_from_slice(&(name_units as u16).to_le_bytes());
+        payload.extend_from_slice(&crate::utils::truncate_usize_to_u16(name_units).to_le_bytes());
         for unit in self.name.encode_utf16() {
             payload.extend_from_slice(&unit.to_le_bytes());
         }

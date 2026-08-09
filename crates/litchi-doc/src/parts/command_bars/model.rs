@@ -39,7 +39,7 @@ impl<'a> XString<'a> {
     }
 
     pub(super) fn from_wire(encoded: &'a [u8]) -> Result<Self> {
-        if encoded.len() % 2 != 0 {
+        if !encoded.len().is_multiple_of(2) {
             return Err(corrupted("Xst payload has an odd byte count"));
         }
         Ok(Self {
@@ -48,16 +48,19 @@ impl<'a> XString<'a> {
     }
 
     /// Number of UTF-16 code units in this string.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.encoded.len() / 2
     }
 
     /// Whether the string is empty.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.encoded.is_empty()
     }
 
     /// Exact UTF-16LE payload without the `cch` prefix.
+    #[must_use]
     pub fn encoded_bytes(&self) -> &[u8] {
         &self.encoded
     }
@@ -70,11 +73,13 @@ impl<'a> XString<'a> {
     }
 
     /// Decode the string for display without changing its stored code units.
+    #[must_use]
     pub fn text(&self) -> String {
         String::from_utf16_lossy(&self.units().collect::<Vec<_>>())
     }
 
     /// Copy a borrowed string into an owned representation.
+    #[must_use]
     pub fn into_owned(self) -> XString<'static> {
         XString {
             encoded: Cow::Owned(self.encoded.into_owned()),
@@ -101,16 +106,19 @@ impl<'a> CommandString<'a> {
     }
 
     /// Return the command name or allocated-command argument.
+    #[must_use]
     pub const fn text(&self) -> &XString<'a> {
         &self.text
     }
 
     /// Return the number of wire references to this string.
+    #[must_use]
     pub const fn references(&self) -> u16 {
         self.references
     }
 
     /// Copy borrowed wire text into an owned representation.
+    #[must_use]
     pub fn into_owned(self) -> CommandString<'static> {
         CommandString {
             text: self.text.into_owned(),
@@ -141,6 +149,7 @@ impl<'a> CommandStrings<'a> {
     }
 
     /// Return command names and allocated-command arguments in table order.
+    #[must_use]
     pub fn strings(&self) -> &[CommandString<'a>] {
         &self.strings
     }
@@ -151,11 +160,13 @@ impl<'a> CommandStrings<'a> {
     }
 
     /// Return the number of indexed command strings.
+    #[must_use]
     pub const fn len(&self) -> usize {
         self.strings.len()
     }
 
     /// Whether the table has no entries.
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.strings.is_empty()
     }
@@ -192,16 +203,19 @@ impl<'a> MacroName<'a> {
     }
 
     /// Return the macro-name-table index referenced by `Mcd.ibst`.
+    #[must_use]
     pub const fn index(&self) -> u16 {
         self.index
     }
 
     /// Return the null-terminated macro name without its wire terminator.
+    #[must_use]
     pub const fn name(&self) -> &XString<'a> {
         &self.name
     }
 
     /// Copy borrowed wire text into an owned representation.
+    #[must_use]
     pub fn into_owned(self) -> MacroName<'static> {
         MacroName {
             index: self.index,
@@ -232,6 +246,7 @@ impl<'a> MacroNames<'a> {
     }
 
     /// Return macro names in their stored order.
+    #[must_use]
     pub fn names(&self) -> &[MacroName<'a>] {
         &self.names
     }
@@ -269,7 +284,11 @@ pub struct MacroCommand {
 
 impl MacroCommand {
     /// Construct a descriptor while retaining all ignored wire fields.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "parameters map one-to-one to a fixed DOC record or semantic construction"
+    )]
+    #[must_use]
     pub const fn new(
         macro_name_index: u16,
         command_name_index: u16,
@@ -294,38 +313,47 @@ impl MacroCommand {
         }
     }
 
+    #[must_use]
     pub const fn macro_name_index(self) -> u16 {
         self.macro_name_index
     }
 
+    #[must_use]
     pub const fn command_name_index(self) -> u16 {
         self.command_name_index
     }
 
+    #[must_use]
     pub const fn reserved1(self) -> u8 {
         self.reserved1
     }
 
+    #[must_use]
     pub const fn reserved2(self) -> u8 {
         self.reserved2
     }
 
+    #[must_use]
     pub const fn reserved3(self) -> u16 {
         self.reserved3
     }
 
+    #[must_use]
     pub const fn reserved4(self) -> u32 {
         self.reserved4
     }
 
+    #[must_use]
     pub const fn reserved5(self) -> u32 {
         self.reserved5
     }
 
+    #[must_use]
     pub const fn reserved6(self) -> u32 {
         self.reserved6
     }
 
+    #[must_use]
     pub const fn reserved7(self) -> u32 {
         self.reserved7
     }
@@ -344,6 +372,7 @@ impl MacroCommands {
         Ok(value)
     }
 
+    #[must_use]
     pub fn commands(&self) -> &[MacroCommand] {
         &self.commands
     }
@@ -367,6 +396,7 @@ pub struct AllocatedCommand {
 
 impl AllocatedCommand {
     /// Construct an allocated command from its raw 13-bit command and flags.
+    #[must_use]
     pub const fn new(argument_index: u16, command: u16, flags: u8) -> Self {
         Self {
             argument_index,
@@ -375,23 +405,28 @@ impl AllocatedCommand {
         }
     }
 
+    #[must_use]
     pub const fn argument_index(self) -> u16 {
         self.argument_index
     }
 
+    #[must_use]
     pub const fn command(self) -> u16 {
         self.command
     }
 
     /// The raw A/B/C flag bits, including the required reserved bit.
+    #[must_use]
     pub const fn flags(self) -> u8 {
         self.flags
     }
 
+    #[must_use]
     pub const fn is_free(self) -> bool {
         self.flags & 0x02 != 0
     }
 
+    #[must_use]
     pub const fn is_referenced(self) -> bool {
         self.flags & 0x04 != 0
     }
@@ -410,6 +445,7 @@ impl AllocatedCommands {
         Ok(value)
     }
 
+    #[must_use]
     pub fn commands(&self) -> &[AllocatedCommand] {
         &self.commands
     }
@@ -431,6 +467,7 @@ pub enum KeyMapKind {
 }
 
 impl KeyMapKind {
+    #[must_use]
     pub const fn raw(self) -> u8 {
         match self {
             Self::Regular => 3,
@@ -457,6 +494,7 @@ pub enum Action {
 }
 
 impl Action {
+    #[must_use]
     pub const fn raw(self) -> u16 {
         match self {
             Self::Command => 0,
@@ -488,6 +526,7 @@ pub struct KeyMap {
 }
 
 impl KeyMap {
+    #[must_use]
     pub const fn new(
         primary_key: u16,
         secondary_key: u16,
@@ -506,26 +545,32 @@ impl KeyMap {
         }
     }
 
+    #[must_use]
     pub const fn primary_key(self) -> u16 {
         self.primary_key
     }
 
+    #[must_use]
     pub const fn secondary_key(self) -> u16 {
         self.secondary_key
     }
 
+    #[must_use]
     pub const fn action(self) -> Action {
         self.action
     }
 
+    #[must_use]
     pub const fn parameter(self) -> u32 {
         self.parameter
     }
 
+    #[must_use]
     pub const fn reserved1(self) -> u16 {
         self.reserved1
     }
 
+    #[must_use]
     pub const fn reserved2(self) -> u16 {
         self.reserved2
     }
@@ -545,10 +590,12 @@ impl KeyMaps {
         Ok(value)
     }
 
+    #[must_use]
     pub const fn kind(&self) -> KeyMapKind {
         self.kind
     }
 
+    #[must_use]
     pub fn entries(&self) -> &[KeyMap] {
         &self.entries
     }
@@ -571,6 +618,7 @@ pub enum Operation {
 }
 
 impl Operation {
+    #[must_use]
     pub const fn raw(self) -> u8 {
         match self {
             Self::Change => 0,
@@ -604,7 +652,11 @@ pub struct ToolbarDelta {
 }
 
 impl ToolbarDelta {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "parameters map one-to-one to a fixed DOC record or semantic construction"
+    )]
+    #[must_use]
     pub const fn new(
         operation: Operation,
         at_end: bool,
@@ -629,50 +681,62 @@ impl ToolbarDelta {
         }
     }
 
+    #[must_use]
     pub const fn operation(self) -> Operation {
         self.operation
     }
 
+    #[must_use]
     pub const fn at_end(self) -> bool {
         self.at_end
     }
 
+    #[must_use]
     pub const fn reserved_flags(self) -> u8 {
         self.reserved_flags
     }
 
+    #[must_use]
     pub const fn control_index(self) -> u8 {
         self.control_index
     }
 
+    #[must_use]
     pub const fn next_command(self) -> u32 {
         self.next_command
     }
 
+    #[must_use]
     pub const fn command(self) -> u32 {
         self.command
     }
 
+    #[must_use]
     pub const fn file_offset(self) -> u32 {
         self.file_offset
     }
 
+    #[must_use]
     pub const fn state(self) -> u16 {
         self.state
     }
 
+    #[must_use]
     pub const fn on_disk(self) -> bool {
         self.state & 0x0001 != 0
     }
 
+    #[must_use]
     pub const fn toolbar_index(self) -> u16 {
         (self.state >> 1) & 0x1FFF
     }
 
+    #[must_use]
     pub const fn dead(self) -> bool {
         self.state & 0x8000 != 0
     }
 
+    #[must_use]
     pub const fn control_size(self) -> u16 {
         self.control_size
     }
@@ -685,7 +749,8 @@ pub enum CustomizationData<'a> {
     Deltas(Vec<ToolbarDelta>),
 }
 
-impl<'a> CustomizationData<'a> {
+impl CustomizationData<'_> {
+    #[must_use]
     pub fn into_owned(self) -> CustomizationData<'static> {
         match self {
             Self::Toolbar(toolbar) => CustomizationData::Toolbar(toolbar.into_owned()),
@@ -728,18 +793,22 @@ impl<'a> Customization<'a> {
         Ok(value)
     }
 
+    #[must_use]
     pub const fn toolbar_id(&self) -> u32 {
         self.toolbar_id
     }
 
+    #[must_use]
     pub const fn reserved(&self) -> u16 {
         self.reserved
     }
 
+    #[must_use]
     pub const fn delta_count(&self) -> u16 {
         self.delta_count
     }
 
+    #[must_use]
     pub const fn data(&self) -> &CustomizationData<'a> {
         &self.data
     }
@@ -749,6 +818,7 @@ impl<'a> Customization<'a> {
     }
 
     /// Copy borrowed toolbar bytes into an owned customization.
+    #[must_use]
     pub fn into_owned(self) -> Customization<'static> {
         Customization {
             toolbar_id: self.toolbar_id,
@@ -799,35 +869,43 @@ impl<'a> Toolbar<'a> {
         Ok(value)
     }
 
+    #[must_use]
     pub const fn name(&self) -> &XString<'a> {
         &self.name
     }
 
+    #[must_use]
     pub const fn header(&self) -> &Header<'a> {
         &self.header
     }
 
+    #[must_use]
     pub const fn visual_data(&self) -> &[u8; 100] {
         &self.visual_data
     }
 
+    #[must_use]
     pub const fn toolbar_index(&self) -> i32 {
         self.toolbar_index
     }
 
+    #[must_use]
     pub const fn reserved(&self) -> u16 {
         self.reserved
     }
 
+    #[must_use]
     pub const fn unused(&self) -> u16 {
         self.unused
     }
 
+    #[must_use]
     pub const fn control_count(&self) -> i32 {
         self.control_count
     }
 
     /// Return the controls in their on-disk order.
+    #[must_use]
     pub fn controls(&self) -> &[Control<'a>] {
         &self.controls
     }
@@ -899,15 +977,18 @@ impl<'a> ToolbarWrapper<'a> {
         value.validate().map(|()| value)
     }
 
+    #[must_use]
     pub fn toolbar_controls(&self) -> &[u8] {
         &self.toolbar_controls
     }
 
     /// Return typed controls referenced by the wrapper's `rtbdc` array.
+    #[must_use]
     pub fn delta_controls(&self) -> &[Control<'a>] {
         &self.delta_controls
     }
 
+    #[must_use]
     pub fn customizations(&self) -> &[Customization<'a>] {
         &self.customizations
     }
@@ -916,6 +997,7 @@ impl<'a> ToolbarWrapper<'a> {
         &mut self.customizations
     }
 
+    #[must_use]
     pub const fn customization_count(&self) -> usize {
         self.customizations.len()
     }
@@ -959,7 +1041,8 @@ pub enum Entry<'a> {
     Toolbar(ToolbarWrapper<'a>),
 }
 
-impl<'a> Entry<'a> {
+impl Entry<'_> {
+    #[must_use]
     pub fn into_owned(self) -> Entry<'static> {
         match self {
             Self::MacroCommands(value) => Entry::MacroCommands(value),
@@ -991,10 +1074,12 @@ impl<'a> CommandBars<'a> {
         Ok(value)
     }
 
+    #[must_use]
     pub const fn version(&self) -> u8 {
         self.version
     }
 
+    #[must_use]
     pub fn entries(&self) -> &[Entry<'a>] {
         &self.entries
     }
@@ -1012,6 +1097,7 @@ impl<'a> CommandBars<'a> {
         }
     }
 
+    #[must_use]
     pub const fn terminator(&self) -> u8 {
         self.terminator
     }

@@ -349,7 +349,7 @@ fn default_metadata_xml_has_no_ambient_timestamp() {
 #[test]
 fn test_generate_styles_xml() {
     let builder = Builder::new();
-    let styles_xml = builder.generate_styles_xml();
+    let styles_xml = builder.generate_styles_xml().unwrap();
     assert!(styles_xml.contains("office:document-styles"));
     assert!(styles_xml.contains("L1")); // Numbered list style
 }

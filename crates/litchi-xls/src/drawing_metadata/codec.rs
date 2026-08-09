@@ -1,4 +1,4 @@
-//! OfficeArt `ClientAnchor` wire codec for XLS worksheets.
+//! `OfficeArt` `ClientAnchor` wire codec for XLS worksheets.
 
 use super::model::{AnchorBehavior, AnchorPoint, SheetAnchor};
 use super::validation::{invalid, invalid_input};
@@ -38,10 +38,11 @@ pub(crate) fn decode_sheet_anchor(record: &Record<'_>) -> io::Result<SheetAnchor
 }
 
 impl SheetAnchor {
-    /// Encodes this metadata as one complete OfficeArt `ClientAnchor` atom.
+    /// Encodes this metadata as one complete `OfficeArt` `ClientAnchor` atom.
     ///
     /// The method emits inert metadata only; attaching it to a workbook
     /// drawing remains the responsibility of the XLS drawing writer.
+    #[must_use]
     pub fn to_record_bytes(self) -> Vec<u8> {
         let mut output = Vec::with_capacity(8 + CLIENT_ANCHOR_LEN);
         output.extend_from_slice(&0u16.to_le_bytes());

@@ -1,4 +1,4 @@
-//! Layered, inert SpreadsheetML volatile-dependency records.
+//! Layered, inert `SpreadsheetML` volatile-dependency records.
 //!
 //! Typed semantic values live in [`model`], bounded XML conversion in
 //! [`codec`], and workbook relationship traversal in [`package`]. The

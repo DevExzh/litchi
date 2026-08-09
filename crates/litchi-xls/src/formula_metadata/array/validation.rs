@@ -499,7 +499,7 @@ fn validate_space(
     stack: &SemanticStack,
     semi: bool,
 ) -> Result<()> {
-    let subtype = data as u8;
+    let subtype = crate::utils::truncate_u16_to_u8(data);
     let next = tokens.get(position + 4).copied();
     match subtype {
         0 | 1 | 6 => {
@@ -896,7 +896,7 @@ fn fixed_ser_ar(
 fn validate_xnum(bytes: &[u8], owner: &str) -> Result<()> {
     let raw: [u8; 8] = bytes
         .try_into()
-        .map_err(|_| invalid(format!("{owner} Xnum is truncated")))?;
+        .map_err(|_error| invalid(format!("{owner} Xnum is truncated")))?;
     let bits = u64::from_le_bytes(raw);
     let exponent = (bits >> 52) & 0x7ff;
     let fraction = bits & 0x000f_ffff_ffff_ffff;

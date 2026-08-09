@@ -86,70 +86,87 @@ pub struct Font {
 }
 
 impl Font {
+    #[must_use]
     pub fn index(&self) -> u16 {
         self.index
     }
 
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    #[must_use]
     pub fn height_twips(&self) -> u16 {
         self.height_twips
     }
 
+    #[must_use]
     pub fn color_index(&self) -> u16 {
         self.color_index
     }
 
+    #[must_use]
     pub fn color(&self, palette: &Palette) -> Option<Color> {
         palette.color(self.color_index)
     }
 
+    #[must_use]
     pub fn weight(&self) -> u16 {
         self.weight
     }
 
+    #[must_use]
     pub fn is_bold(&self) -> bool {
         self.weight >= 700
     }
 
+    #[must_use]
     pub fn is_italic(&self) -> bool {
         self.italic
     }
 
+    #[must_use]
     pub fn is_struck_out(&self) -> bool {
         self.strikeout
     }
 
+    #[must_use]
     pub fn is_outline(&self) -> bool {
         self.outline
     }
 
+    #[must_use]
     pub fn has_shadow(&self) -> bool {
         self.shadow
     }
 
+    #[must_use]
     pub fn is_condensed(&self) -> bool {
         self.condensed
     }
 
+    #[must_use]
     pub fn is_extended(&self) -> bool {
         self.extended
     }
 
+    #[must_use]
     pub fn escapement(&self) -> FontEscapement {
         self.escapement
     }
 
+    #[must_use]
     pub fn underline(&self) -> FontUnderline {
         self.underline
     }
 
+    #[must_use]
     pub fn family(&self) -> FontFamily {
         self.family
     }
 
+    #[must_use]
     pub fn charset(&self) -> FontCharset {
         self.charset
     }
@@ -333,7 +350,7 @@ pub(crate) fn logical_font_index(physical_index: usize) -> Result<u16> {
             .ok_or_else(|| invalid("Font index overflows"))?
     };
     let logical_index = u16::try_from(logical_index)
-        .map_err(|_| invalid("Font index does not fit in BIFF8 FontIndex"))?;
+        .map_err(|_error| invalid("Font index does not fit in BIFF8 FontIndex"))?;
     validate_font_index(logical_index)?;
     Ok(logical_index)
 }

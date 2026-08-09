@@ -1,4 +1,32 @@
-//! Pure list resolution and counter state for WordprocessingML paragraphs.
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::cast_possible_truncation,
+    reason = "OOXML numeric values are bounded before conversion"
+)]
+#![expect(
+    clippy::expect_used,
+    reason = "the invariant is established immediately before extraction"
+)]
+#![expect(
+    clippy::match_same_arms,
+    reason = "separate arms document distinct OOXML grammar cases"
+)]
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "the public API shape is retained for compatibility"
+)]
+//! Pure list resolution and counter state for `WordprocessingML` paragraphs.
 
 use crate::error::{Error, Result};
 use crate::numbering::{Collection, Format, Level, Paragraph, Restart, Suffix};
@@ -105,11 +133,16 @@ fn resolve_level(numbering: &Collection, num_id: u32, level: u8) -> Result<Level
 }
 
 impl ListCounterState {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Advance one numbered paragraph and return its typed marker and suffix.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn advance(
         &mut self,
         numbering: &Collection,
@@ -120,6 +153,10 @@ impl ListCounterState {
     }
 
     /// Advance one numbered paragraph while retaining format and counter data.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn advance_resolved(
         &mut self,
         numbering: &Collection,
@@ -258,7 +295,58 @@ fn format_number(value: i64, format: &Format) -> Option<String> {
         Format::LowerRoman => roman(value).map(|value| value.to_ascii_lowercase()),
         Format::UpperRoman => roman(value),
         Format::None => Some(String::new()),
-        _ => None,
+        Format::Ordinal
+        | Format::CardinalText
+        | Format::OrdinalText
+        | Format::Chicago
+        | Format::IdeographDigital
+        | Format::JapaneseCounting
+        | Format::Aiueo
+        | Format::Iroha
+        | Format::JapaneseLegal
+        | Format::JapaneseDigitalTenThousand
+        | Format::DecimalEnclosedCircle
+        | Format::AiueoFullWidth
+        | Format::IrohaFullWidth
+        | Format::Bullet
+        | Format::Ganada
+        | Format::Chosung
+        | Format::DecimalEnclosedFullStop
+        | Format::DecimalEnclosedParen
+        | Format::DecimalEnclosedCircleChinese
+        | Format::IdeographEnclosedCircle
+        | Format::IdeographTraditional
+        | Format::IdeographZodiac
+        | Format::IdeographZodiacTraditional
+        | Format::TaiwaneseCounting
+        | Format::IdeographLegalTraditional
+        | Format::TaiwaneseCountingThousand
+        | Format::TaiwaneseDigital
+        | Format::ChineseCounting
+        | Format::ChineseLegalSimplified
+        | Format::ChineseCountingThousand
+        | Format::KoreanDigital
+        | Format::KoreanCounting
+        | Format::KoreanLegal
+        | Format::KoreanDigital2
+        | Format::VietnameseCounting
+        | Format::RussianLower
+        | Format::RussianUpper
+        | Format::NumberInDash
+        | Format::Hebrew1
+        | Format::Hebrew2
+        | Format::ArabicAlpha
+        | Format::ArabicAbjad
+        | Format::HindiVowels
+        | Format::HindiConsonants
+        | Format::HindiNumbers
+        | Format::HindiCounting
+        | Format::ThaiLetters
+        | Format::ThaiNumbers
+        | Format::ThaiCounting
+        | Format::BahtText
+        | Format::DollarText
+        | Format::Custom => None,
     }
 }
 

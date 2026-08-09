@@ -10,7 +10,7 @@ use crate::error::{Result, invalid};
 use super::codec::{parse_comments, validate_comments, write_comments};
 use super::model::{Comments, Part as CommentsPart};
 
-/// Content type of a classic SpreadsheetML comments part.
+/// Content type of a classic `SpreadsheetML` comments part.
 pub const COMMENTS_CONTENT_TYPE: &str = ct::SML_COMMENTS;
 /// Transitional worksheet-to-comments relationship type.
 pub const COMMENTS_RELATIONSHIP_TYPE: &str = rt::COMMENTS;
@@ -195,7 +195,7 @@ pub fn validate_graph(package: &OpcPackage) -> Result<()> {
     Ok(())
 }
 
-fn find_relationship<'a>(worksheet: &'a dyn Part) -> Result<Option<&'a litchi_opc::Relationship>> {
+fn find_relationship(worksheet: &dyn Part) -> Result<Option<&litchi_opc::Relationship>> {
     let mut relationships = worksheet
         .rels()
         .iter()
@@ -246,7 +246,7 @@ fn validate_comments_part(part: &dyn Part) -> Result<()> {
 fn next_part_name(package: &OpcPackage) -> Result<PackURI> {
     for suffix in 1..=65_536u32 {
         let candidate = PackURI::new(format!("/xl/comments{suffix}.xml"))
-            .map_err(|error| invalid(error.to_string()))?;
+            .map_err(|error| invalid(error.clone()))?;
         if package.get_part(&candidate).is_err() {
             return Ok(candidate);
         }

@@ -4,6 +4,58 @@
 //! in [`model`], XML codecs in [`codec`], package access in [`package`],
 //! construction in [`authoring`], and the concise entry points in [`facade`].
 
+#![forbid(unsafe_code)]
+// ODF element models and the established spreadsheet facade deliberately use
+// specification-shaped names, ownership, and enum layouts. Changing them for
+// generic API heuristics would be a breaking migration rather than a codec fix.
+#![allow(
+    clippy::large_enum_variant,
+    clippy::module_name_repetitions,
+    clippy::needless_pass_by_value,
+    clippy::ref_option,
+    clippy::return_self_not_must_use,
+    clippy::struct_field_names,
+    clippy::unused_self,
+    reason = "the public ODS API and ODF vocabulary retain specification-shaped names and ownership"
+)]
+// XML event parsers intentionally reuse record-local names as raw attributes
+// become decoded values and active semantic nodes.
+#![allow(
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::similar_names,
+    reason = "short-lived streaming XML bindings mirror successive wire events and their decoded projections"
+)]
+// Remaining expectations are guarded state-machine invariants. Narrowing casts
+// are dominated by ODF range validation or fixed output limits.
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::expect_used,
+    reason = "accesses and conversions are confined to validated parser state and bounded ODF wire domains"
+)]
+// ODF codecs are ordered by document traversal and keep schema cases explicit.
+// These style exceptions retain that audit order while all correctness lints
+// continue to be warning-denied.
+#![allow(
+    clippy::allow_attributes_without_reason,
+    clippy::arbitrary_source_item_ordering,
+    clippy::assigning_clones,
+    clippy::doc_markdown,
+    clippy::float_cmp,
+    clippy::items_after_statements,
+    clippy::match_same_arms,
+    clippy::missing_panics_doc,
+    clippy::needless_for_each,
+    clippy::redundant_closure_for_method_calls,
+    clippy::single_match_else,
+    clippy::unnecessary_sort_by,
+    clippy::unnecessary_wraps,
+    clippy::unnested_or_patterns,
+    clippy::unreadable_literal,
+    reason = "ODF codec declarations follow document order and retain explicit schema branches for reviewability"
+)]
+
 pub mod annotations;
 pub mod authoring;
 pub mod charts;

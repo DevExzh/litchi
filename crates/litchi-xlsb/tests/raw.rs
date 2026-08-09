@@ -1,3 +1,12 @@
+#![allow(
+    clippy::pedantic,
+    clippy::expect_used,
+    clippy::map_err_ignore,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "integration tests use panic-on-failure extraction and exact wire fixture comparisons"
+)]
+
 use std::io::{Cursor as IoCursor, Read};
 
 use litchi_xlsb::raw::{Cursor, Error, Header, Kind, Limits, Records, Stage, Writer, kind};

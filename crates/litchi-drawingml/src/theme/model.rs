@@ -6,7 +6,7 @@ const MAX_NAME_CHARS: usize = 256;
 const MAX_SCRIPT_COUNT: usize = 64;
 const MAX_SCRIPT_CHARS: usize = 16;
 
-/// One of the twelve DrawingML color slots.
+/// One of the twelve `DrawingML` color slots.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Slot {
     Dark1,
@@ -39,6 +39,7 @@ impl Slot {
         Self::FollowedHyperlink,
     ];
 
+    #[must_use]
     pub const fn token(self) -> &'static str {
         match self {
             Self::Dark1 => "dk1",
@@ -56,12 +57,13 @@ impl Slot {
         }
     }
 
+    #[must_use]
     pub fn from_token(token: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|slot| slot.token() == token)
     }
 }
 
-/// A DrawingML system-color token.
+/// A `DrawingML` system-color token.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum System {
     ActiveBorder,
@@ -95,6 +97,7 @@ pub enum System {
 }
 
 impl System {
+    #[must_use]
     pub const fn token(self) -> &'static str {
         match self {
             Self::ActiveBorder => "activeBorder",
@@ -128,6 +131,7 @@ impl System {
         }
     }
 
+    #[must_use]
     pub fn from_token(token: &str) -> Option<Self> {
         Some(match token {
             "activeBorder" => Self::ActiveBorder,
@@ -198,6 +202,7 @@ impl Palette {
         }
     }
 
+    #[must_use]
     pub fn with(mut self, slot: Slot, color: Color) -> Self {
         if let Some(existing) = self.values.iter_mut().find(|(current, _)| *current == slot) {
             existing.1 = color;
@@ -208,11 +213,13 @@ impl Palette {
     }
 
     #[inline]
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     #[inline]
+    #[must_use]
     pub fn color(&self, slot: Slot) -> Option<&Color> {
         self.values
             .iter()
@@ -288,22 +295,25 @@ impl FontSet {
     }
 
     #[inline]
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     #[inline]
+    #[must_use]
     pub fn major(&self) -> &Face {
         &self.major
     }
 
     #[inline]
+    #[must_use]
     pub fn minor(&self) -> &Face {
         &self.minor
     }
 }
 
-/// A parsed DrawingML theme document.
+/// A parsed `DrawingML` theme document.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Theme {
     pub name: String,
@@ -319,15 +329,18 @@ pub struct Override {
 }
 
 impl Override {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use]
     pub fn colors(mut self, value: Palette) -> Self {
         self.colors = Some(value);
         self
     }
 
+    #[must_use]
     pub fn fonts(mut self, value: FontSet) -> Self {
         self.fonts = Some(value);
         self

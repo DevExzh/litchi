@@ -104,7 +104,7 @@ impl PapBinTable {
                 {
                     let piece_modifier = piece_table
                         .piece_for_cp(start_cp)
-                        .map(|piece| piece.property_modifier())
+                        .map(super::piece_table::TextPiece::property_modifier)
                         .unwrap_or_default();
                     let (properties, direct_grpprl, initial_style_index) =
                         Self::parse_properties_with_direct(
@@ -205,7 +205,7 @@ impl PapBinTable {
         Ok((properties, direct_grpprl, style_index))
     }
 
-    /// Expand `sprmPHugePapx`/`sprmPTableProps` PrcData references.
+    /// Expand `sprmPHugePapx`/`sprmPTableProps` `PrcData` references.
     ///
     /// Malformed, cyclic, or excessively deep chains are reported as corruption.
     fn expand_data_indirections(
@@ -275,11 +275,13 @@ impl PapBinTable {
 
     /// All reconstructed paragraph-property runs.
     #[inline]
+    #[must_use]
     pub fn runs(&self) -> &[ParagraphRun] {
         &self.runs
     }
 
     /// Properties covering a logical character position.
+    #[must_use]
     pub fn properties_at(&self, cp: u32) -> Option<&ParagraphProperties> {
         self.run_at(cp).map(|run| &run.properties)
     }

@@ -1,4 +1,4 @@
-//! SpreadsheetML table-part serialization.
+//! `SpreadsheetML` table-part serialization.
 
 use std::fmt::Write as FmtWrite;
 
@@ -8,7 +8,7 @@ use crate::sort::SortState;
 use super::model::{Table, TableColumn, TableFormula, TableStyleInfo, validate_table};
 use super::{MAX_OUTPUT_BYTES, limit, xml_error};
 
-/// Write a validated table part using the transitional SpreadsheetML namespace.
+/// Write a validated table part using the transitional `SpreadsheetML` namespace.
 pub fn write_table_xml(table: &Table) -> Result<Vec<u8>> {
     validate_table(table)?;
     let mut output = BoundedXml::new();

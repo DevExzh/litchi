@@ -34,6 +34,7 @@ impl Mode {
     }
 
     /// The exact 16-bit value that was stored in `PRTI.iProt`.
+    #[must_use]
     pub const fn raw(self) -> u16 {
         match self {
             Self::None => 0x0000,
@@ -75,6 +76,7 @@ impl Selector {
     }
 
     /// The exact 16-bit selector value from `PRTI.uidSel`.
+    #[must_use]
     pub const fn raw(self) -> u16 {
         match self {
             Self::Everyone => 0xFFFF,
@@ -110,6 +112,7 @@ impl Role {
     }
 
     /// The exact 16-bit role value from the username table.
+    #[must_use]
     pub const fn raw(self) -> u16 {
         match self {
             Self::Unspecified => 0x0000,
@@ -160,21 +163,25 @@ impl Reserved {
     }
 
     /// The exact raw `BKC` word.
+    #[must_use]
     pub const fn bkc(&self) -> u16 {
         self.bkc
     }
 
     /// The exact undefined `PRTI.i` word.
+    #[must_use]
     pub const fn prti_i(&self) -> u16 {
         self.prti_i
     }
 
     /// The exact undefined `PRTI.fUseMe` word.
+    #[must_use]
     pub const fn prti_use_me(&self) -> u16 {
         self.prti_use_me
     }
 
     /// Unexpected bytes from the otherwise-required empty bookmark string.
+    #[must_use]
     pub fn bookmark_data(&self) -> &[u8] {
         &self.bookmark_data
     }
@@ -222,6 +229,7 @@ impl Range {
     }
 
     /// The ignored or reserved wire values associated with this range.
+    #[must_use]
     pub fn reserved(&self) -> &Reserved {
         &self.reserved
     }
@@ -240,16 +248,19 @@ impl Ranges {
     }
 
     /// Usernames from `SttbProtUser`, in table order.
+    #[must_use]
     pub fn users(&self) -> &[User] {
         &self.users
     }
 
     /// Editable ranges in start-CP order.
+    #[must_use]
     pub fn ranges(&self) -> &[Range] {
         &self.ranges
     }
 
     /// Resolve a one-based `Selector::User` index.
+    #[must_use]
     pub fn user(&self, index: u16) -> Option<&User> {
         usize::from(index)
             .checked_sub(1)
@@ -258,6 +269,7 @@ impl Ranges {
 
     /// Resolve the username selected by a range, when the selector is an
     /// indexed user rather than a well-known group.
+    #[must_use]
     pub fn editor_for(&self, range: &Range) -> Option<&User> {
         match range.editor {
             Selector::User(index) => self.user(index),

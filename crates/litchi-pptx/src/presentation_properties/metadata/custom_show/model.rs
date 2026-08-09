@@ -78,8 +78,9 @@ impl List {
     pub fn create(&mut self, name: impl Into<String>, slide_ids: Vec<u32>) -> &Show {
         let show = Show::new(self.next_id, name).with_slides(slide_ids);
         self.next_id += 1;
+        let index = self.shows.len();
         self.shows.push(show);
-        self.shows.last().expect("custom show was just pushed")
+        &self.shows[index]
     }
 
     /// Get a custom show by name.
@@ -145,12 +146,9 @@ impl List {
         }
         self.shows = ordered_ids
             .iter()
-            .map(|id| {
-                self.get_by_id(*id)
-                    .expect("permutation was validated")
-                    .clone()
-            })
-            .collect();
+            .map(|id| self.get_by_id(*id).cloned())
+            .collect::<Option<Vec<_>>>()
+            .ok_or_else(|| Error::Invalid("custom-show reorder lost a validated ID".into()))?;
         Ok(())
     }
 

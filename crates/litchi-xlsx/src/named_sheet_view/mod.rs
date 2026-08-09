@@ -1,4 +1,4 @@
-//! Typed SpreadsheetML named-sheet-view metadata.
+//! Typed `SpreadsheetML` named-sheet-view metadata.
 //!
 //! The owner is layered by responsibility: semantic declarations in
 //! model, bounded XML/MCE conversion in codec, and OPC relationship

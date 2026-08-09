@@ -2,10 +2,10 @@
 
 use super::prelude::*;
 
-impl<'arena> TapParser<'arena> {
-    /// Validate the property list nested inside a CNFOperand.
+impl TapParser<'_> {
+    /// Validate the property list nested inside a `CNFOperand`.
     ///
-    /// [MS-DOC] UpxTapx lists table-property SPRMs that cannot occur in a
+    /// [MS-DOC] `UpxTapx` lists table-property SPRMs that cannot occur in a
     /// table-style property list. A conditional list inherits those
     /// restrictions, with the conditional border-style exceptions handled by
     /// operations 0x7F..=0x84 (and the diagonal style operations naturally

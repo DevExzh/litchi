@@ -1,3 +1,10 @@
+#![allow(
+    clippy::pedantic,
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "integration tests use panic-on-failure extraction and exact malformed-fixture comparisons"
+)]
+
 //! Regression tests for workbooks that real producers emit but that a
 //! strictly-literal reading of ECMA-376 / MS-XLSB would reject outright.
 //!

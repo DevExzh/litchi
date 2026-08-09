@@ -19,21 +19,25 @@ impl Patch {
     }
 
     /// Source context required before applying this patch.
+    #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Source context produced by this patch.
+    #[must_use]
     pub fn after(&self) -> &Snapshot {
         &self.after
     }
 
     /// Whether this patch is an exact source no-op.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
     /// Return the exact inverse patch.
+    #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
@@ -85,21 +89,25 @@ impl Commit {
     }
 
     /// Whether the workbook Custom XML Maps owner changed.
+    #[must_use]
     pub fn changed(&self) -> bool {
         self.changed
     }
 
     /// Resulting immutable source snapshot.
+    #[must_use]
     pub fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Reversible source-checked patch.
+    #[must_use]
     pub fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Consume the result into its snapshot and patch.
+    #[must_use]
     pub fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }

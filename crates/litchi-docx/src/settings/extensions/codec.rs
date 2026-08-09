@@ -1,3 +1,19 @@
+#![expect(
+    clippy::expect_used,
+    reason = "the invariant is established immediately before extraction"
+)]
+#![expect(
+    clippy::match_same_arms,
+    reason = "separate arms document distinct OOXML grammar cases"
+)]
+#![expect(
+    clippy::needless_pass_by_value,
+    reason = "the public API shape is retained for compatibility"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Namespace-aware XML codec for direct Word settings extensions.
 
 use super::super::support::{invalid, xml_error};
@@ -53,6 +69,10 @@ struct Layout {
 
 impl OpaqueExtension {
     /// Validate and retain one complete direct-child XML element.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_xml(xml: impl Into<Vec<u8>>) -> Result<Self> {
         let xml = xml.into();
         validate_opaque_xml(&xml)?;
@@ -230,7 +250,7 @@ impl Extensions {
                     ));
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::CData(_) | Event::Decl(_) | Event::GeneralRef(_) => {},
             }
         }
 
@@ -245,6 +265,10 @@ impl Extensions {
     }
 
     /// Serialize direct extension children in their current order.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal writer invariant is violated.
     pub fn to_xml(&self, word_prefix: &str) -> String {
         let mut output = String::new();
         let mut wrote_word_2010_namespace = false;
@@ -624,7 +648,11 @@ fn locate_layout(xml: &[u8]) -> Result<Layout> {
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 
@@ -647,7 +675,7 @@ fn extension_kind_value(extension: &Extension) -> Option<Kind> {
     }
 }
 
-fn find_kind<'a>(extensions: &'a Extensions, kind: Kind) -> Option<&'a Extension> {
+fn find_kind(extensions: &Extensions, kind: Kind) -> Option<&Extension> {
     extensions
         .values
         .iter()
@@ -709,8 +737,10 @@ fn render_extension(extension: &Extension) -> Result<Vec<u8>> {
                 &mut wrote_word_2010_namespace,
             );
         },
-        Extension::Unknown(value) => output
-            .push_str(str::from_utf8(&value.xml).map_err(|_| invalid("opaque XML is not UTF-8"))?),
+        Extension::Unknown(value) => output.push_str(
+            str::from_utf8(&value.xml)
+                .map_err(|_source_error| invalid("opaque XML is not UTF-8"))?,
+        ),
     }
     Ok(output.into_bytes())
 }
@@ -787,7 +817,7 @@ fn parse_known(
             )?
             .trim()
             .parse::<i32>()
-            .map_err(|_| invalid("invalid w14:defaultImageDpi val"))?,
+            .map_err(|_source_error| invalid("invalid w14:defaultImageDpi val"))?,
         )),
     }
 }
@@ -873,8 +903,9 @@ fn parse_hex(value: String) -> Result<u32> {
             "Word settings docId must contain exactly eight hexadecimal digits",
         ));
     }
-    u32::from_str_radix(value, 16)
-        .map_err(|_| invalid("Word settings docId contains an invalid hexadecimal value"))
+    u32::from_str_radix(value, 16).map_err(|_source_error| {
+        invalid("Word settings docId contains an invalid hexadecimal value")
+    })
 }
 
 fn validate_root(
@@ -919,7 +950,7 @@ fn count_node(nodes: &mut usize) -> Result<()> {
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("settings XML offset does not fit usize"))
+        .map_err(|_source_error| invalid("settings XML offset does not fit usize"))
 }
 
 fn active_bindings(reader: &NsReader<&[u8]>) -> Vec<(Option<Vec<u8>>, Vec<u8>)> {
@@ -1058,7 +1089,11 @@ fn capture_unknown(
                 ));
             },
             Event::Eof => return Err(invalid("unterminated unknown settings extension")),
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }

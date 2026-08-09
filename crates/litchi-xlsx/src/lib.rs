@@ -4,6 +4,94 @@
 //! handles. Package relationships and physical identifiers remain in [`raw`].
 
 #![forbid(unsafe_code)]
+// The public model deliberately mirrors the names and shapes in the ECMA-376
+// schemas. Renaming these items or reshaping their signatures solely for style
+// would make the wire model less recognizable and would break the young public
+// API without changing correctness.
+#![allow(
+    clippy::fn_params_excessive_bools,
+    clippy::implicit_hasher,
+    clippy::module_name_repetitions,
+    clippy::needless_pass_by_value,
+    clippy::ref_option,
+    clippy::return_self_not_must_use,
+    clippy::struct_excessive_bools,
+    clippy::struct_field_names,
+    clippy::trivially_copy_pass_by_ref,
+    clippy::unnecessary_wraps,
+    reason = "the stable schema-shaped API follows ECMA-376 rather than Clippy's generic API heuristics"
+)]
+// These documentation suggestions do not affect the package parser or writer.
+// Public error behavior is already expressed by the crate-wide Error type and
+// adding hundreds of identical boilerplate sections would obscure the schema
+// documentation that callers actually need.
+#![allow(
+    clippy::doc_markdown,
+    clippy::empty_docs,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    reason = "the crate documents shared failure contracts centrally and keeps field documentation aligned with schema terminology"
+)]
+// Streaming XML codecs intentionally keep names aligned with the current wire
+// token (`event`, `attribute`, `value`, and similar). Shadowing marks state
+// transitions and keeps each token's lifetime as short as possible.
+#![allow(
+    clippy::many_single_char_names,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::similar_names,
+    reason = "short-lived streaming parser bindings mirror wire tokens and their successive decoded forms"
+)]
+// XML event and schema enums are non-exhaustive integration boundaries. The
+// catch-all arms are required so newer quick-xml events and future Office enum
+// values remain inert instead of making older readers fail closed.
+#![allow(
+    clippy::match_wildcard_for_single_variants,
+    clippy::wildcard_enum_match_arm,
+    reason = "forward-compatible readers deliberately treat unknown wire variants as inert"
+)]
+// Codec declarations are ordered by wire traversal and package transaction
+// phases, not alphabetically or by Rust item kind.
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "wire codecs keep declarations in parse/write and transaction order for auditability"
+)]
+// Dependency errors are normalized at the public boundary so implementation
+// details from quick-xml and OPC do not leak through the stable XLSX Error API.
+#![allow(
+    clippy::map_err_ignore,
+    reason = "discarded dependency errors are intentionally normalized into stable contextual XLSX errors"
+)]
+// These conversions occur only after validating the corresponding OOXML bound
+// or while decoding fixed-width fields whose schema type supplies that bound.
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+    reason = "all narrowing conversions are dominated by schema-bound validation or decode fixed-width wire values"
+)]
+// Remaining unwraps and expectations are parser-state invariants: fixed schema
+// constants, a successful lookup checked immediately beforehand, or a token
+// pushed by the same control-flow branch. They cannot depend on hostile input.
+#![allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "uses are confined to locally proven parser-state and compile-time schema invariants"
+)]
+// OPC part names and relationship suffixes are case-sensitive ASCII wire names;
+// treating them as case-insensitive would accept a different package member.
+#![allow(
+    clippy::case_sensitive_file_extension_comparisons,
+    reason = "OPC part-name suffix comparisons intentionally preserve case-sensitive package identity"
+)]
+// A map with unit values is used where callers need deterministic keyed lookup,
+// not merely set membership, and identical arms keep schema variants explicit.
+#![allow(
+    clippy::match_same_arms,
+    clippy::zero_sized_map_values,
+    reason = "schema variants stay explicit and keyed unit maps preserve the required lookup representation"
+)]
 
 pub mod active_x;
 pub mod auto_filter;
@@ -53,7 +141,12 @@ pub mod sheet_calculation_properties;
 pub mod sheet_protection;
 pub mod sheet_view;
 pub mod slicer;
-#[allow(dead_code, unreachable_pub, unused_imports)]
+#[allow(
+    dead_code,
+    unreachable_pub,
+    unused_imports,
+    reason = "the legacy slicer-cache wire model is retained for round-trip compatibility"
+)]
 mod slicer_cache;
 pub mod smart_tags;
 pub mod sort;
@@ -63,7 +156,12 @@ pub mod table;
 pub mod task_panes;
 pub mod threaded_comments;
 pub mod timeline;
-#[allow(dead_code, unreachable_pub, unused_imports)]
+#[allow(
+    dead_code,
+    unreachable_pub,
+    unused_imports,
+    reason = "the legacy timeline wire model is retained for round-trip compatibility"
+)]
 mod timelines;
 pub mod volatile_dependencies;
 pub mod web;

@@ -17,6 +17,7 @@ pub struct Limits {
 
 impl Limits {
     /// Return the safe default validation budget.
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             max_input_bytes: 32 * 1024 * 1024,

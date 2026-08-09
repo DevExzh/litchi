@@ -1,6 +1,12 @@
 //! BIFF8 comment record linkage and bounded codecs.
 
-use super::model::*;
+use super::model::{
+    COMMENT_OBJECT_TYPE, CONTINUE_TYPE, Comment, CommentRecord, HorizontalAlignment, MAX_COMMENTS,
+    MAX_RECORD_BYTES, MAX_RETAINED_BYTES, MAX_RETAINED_RECORDS, MSODRAWING_TYPE, NoteMetadata,
+    OBJ_TYPE, ObjectIdentity, ObjectPadding, ObjectProperties, ObjectSubrecord, RECORD_TYPE,
+    RecordKind, TXO_TYPE, TextOrientation, TextProperties, TextRun, VerticalAlignment, Visibility,
+    boxed_bytes,
+};
 use crate::error::{Error, Result};
 use std::collections::{HashMap, HashSet};
 
@@ -47,7 +53,7 @@ struct PendingTxo {
 }
 
 /// Worksheet-scoped comment linkage state.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub(crate) struct CommentCollector {
     object_ids: HashSet<u16>,
     comment_guids: HashSet<[u8; 16]>,
@@ -61,25 +67,6 @@ pub(crate) struct CommentCollector {
     retained_records: usize,
     retained_bytes: usize,
     next_order: usize,
-}
-
-impl Default for CommentCollector {
-    fn default() -> Self {
-        Self {
-            object_ids: HashSet::new(),
-            comment_guids: HashSet::new(),
-            objects: HashMap::new(),
-            notes: Vec::new(),
-            note_cells: HashSet::new(),
-            note_object_ids: HashSet::new(),
-            awaiting_drawing: None,
-            awaiting_txo: None,
-            pending_txo: None,
-            retained_records: 0,
-            retained_bytes: 0,
-            next_order: 0,
-        }
-    }
 }
 
 impl CommentCollector {
@@ -158,7 +145,7 @@ impl CommentCollector {
                 }
                 self.object_ids
                     .try_reserve(1)
-                    .map_err(|_| Error::Allocation("retaining OBJ identifiers"))?;
+                    .map_err(|_error| Error::Allocation("retaining OBJ identifiers"))?;
                 if !self.object_ids.insert(object_id) {
                     return invalid(format!("duplicate OBJ object id: {object_id}"));
                 }
@@ -170,13 +157,13 @@ impl CommentCollector {
                     }
                     self.comment_guids
                         .try_reserve(1)
-                        .map_err(|_| Error::Allocation("retaining comment identities"))?;
+                        .map_err(|_error| Error::Allocation("retaining comment identities"))?;
                     if !self.comment_guids.insert(object.identity.guid) {
                         return invalid("duplicate comment FtNts GUID".to_string());
                     }
                     self.objects
                         .try_reserve(1)
-                        .map_err(|_| Error::Allocation("retaining worksheet comments"))?;
+                        .map_err(|_error| Error::Allocation("retaining worksheet comments"))?;
                     self.objects.insert(object_id, object);
                     self.retain_object_record(object_id, RecordKind::Object, data)?;
                     self.awaiting_drawing = Some(object_id);
@@ -186,7 +173,7 @@ impl CommentCollector {
                 let mut note = parse_note_record(data)?;
                 self.note_cells
                     .try_reserve(1)
-                    .map_err(|_| Error::Allocation("retaining NOTE cell identities"))?;
+                    .map_err(|_error| Error::Allocation("retaining NOTE cell identities"))?;
                 if !self.note_cells.insert((note.row, note.column)) {
                     return invalid(format!(
                         "duplicate NOTE for cell ({}, {})",
@@ -195,7 +182,7 @@ impl CommentCollector {
                 }
                 self.note_object_ids
                     .try_reserve(1)
-                    .map_err(|_| Error::Allocation("retaining NOTE object identities"))?;
+                    .map_err(|_error| Error::Allocation("retaining NOTE object identities"))?;
                 if !self.note_object_ids.insert(note.object_id) {
                     return invalid(format!(
                         "duplicate NOTE object reference: {}",
@@ -211,7 +198,7 @@ impl CommentCollector {
                 note.order = self.take_order()?;
                 self.notes
                     .try_reserve(1)
-                    .map_err(|_| Error::Allocation("retaining worksheet NOTE records"))?;
+                    .map_err(|_error| Error::Allocation("retaining worksheet NOTE records"))?;
                 self.notes.push(note);
             },
             _ => {},
@@ -267,15 +254,18 @@ impl CommentCollector {
         object
             .records
             .try_reserve(1)
-            .map_err(|_| Error::Allocation("retaining comment record order"))?;
+            .map_err(|_error| Error::Allocation("retaining comment record order"))?;
         object.records.push(OrderedRecord { order, record });
         Ok(())
     }
 
     fn complete_txo(&mut self, pending: PendingTxo) -> Result<()> {
         let text = String::from_utf16(&pending.code_units)
-            .map_err(|_| Error::InvalidData("TXO text contains invalid UTF-16".to_string()))?;
-        let runs = parse_txo_runs(&pending.run_bytes, pending.character_count as u16)?;
+            .map_err(|_error| Error::InvalidData("TXO text contains invalid UTF-16".to_string()))?;
+        let runs = parse_txo_runs(
+            &pending.run_bytes,
+            crate::utils::truncate_usize_to_u16(pending.character_count),
+        )?;
         let object = self.objects.get_mut(&pending.object_id).ok_or_else(|| {
             Error::InvalidData(format!(
                 "TXO references unknown comment object {}",
@@ -311,7 +301,7 @@ impl CommentCollector {
         let mut comments = Vec::new();
         comments
             .try_reserve_exact(self.notes.len())
-            .map_err(|_| Error::Allocation("finishing worksheet comments"))?;
+            .map_err(|_error| Error::Allocation("finishing worksheet comments"))?;
         for note in self.notes {
             let object = self.objects.get(&note.object_id).ok_or_else(|| {
                 Error::InvalidData(format!(
@@ -334,10 +324,10 @@ impl CommentCollector {
                 .records
                 .len()
                 .checked_add(1)
-                .ok_or_else(|| Error::Allocation("ordering comment records"))?;
+                .ok_or(Error::Allocation("ordering comment records"))?;
             ordered
                 .try_reserve_exact(capacity)
-                .map_err(|_| Error::Allocation("ordering comment records"))?;
+                .map_err(|_error| Error::Allocation("ordering comment records"))?;
             ordered.extend(object.records.iter().map(|value| OrderedRecord {
                 order: value.order,
                 record: value.record.clone(),
@@ -350,19 +340,19 @@ impl CommentCollector {
             let mut records = Vec::new();
             records
                 .try_reserve_exact(ordered.len())
-                .map_err(|_| Error::Allocation("finishing comment record order"))?;
+                .map_err(|_error| Error::Allocation("finishing comment record order"))?;
             records.extend(ordered.into_iter().map(|value| value.record));
 
             let mut text_runs = Vec::new();
             text_runs
                 .try_reserve_exact(object.text_runs.len())
-                .map_err(|_| Error::Allocation("finishing comment text runs"))?;
+                .map_err(|_error| Error::Allocation("finishing comment text runs"))?;
             text_runs.extend_from_slice(&object.text_runs);
 
             let mut subrecords = Vec::new();
             subrecords
                 .try_reserve_exact(object.subrecords.len())
-                .map_err(|_| Error::Allocation("finishing OBJ subrecords"))?;
+                .map_err(|_error| Error::Allocation("finishing OBJ subrecords"))?;
             subrecords.extend(object.subrecords.iter().cloned());
 
             comments.push(Comment {
@@ -424,7 +414,7 @@ pub(crate) fn parse_note_record(data: &[u8]) -> Result<NoteRecord> {
     let author = decode_unicode(&data[11..11 + byte_count], width == 2)?;
     Ok(NoteRecord {
         row,
-        column: column as u8,
+        column: crate::utils::truncate_u16_to_u8(column),
         visibility: if flags & 0x0002 != 0 {
             Visibility::Visible
         } else {
@@ -475,7 +465,7 @@ fn parse_obj(data: &[u8]) -> Result<Option<CommentObject>> {
     let mut subrecords = Vec::new();
     subrecords
         .try_reserve(4)
-        .map_err(|_| Error::Allocation("retaining OBJ subrecords"))?;
+        .map_err(|_error| Error::Allocation("retaining OBJ subrecords"))?;
     let mut padding = ObjectPadding::new(&[])?;
     let mut found_end = false;
     while position < data.len() {
@@ -495,7 +485,7 @@ fn parse_obj(data: &[u8]) -> Result<Option<CommentObject>> {
         let known = sub_type == 0 || sub_type == 0x000D;
         subrecords
             .try_reserve(1)
-            .map_err(|_| Error::Allocation("retaining OBJ subrecords"))?;
+            .map_err(|_error| Error::Allocation("retaining OBJ subrecords"))?;
         subrecords.push(ObjectSubrecord::new(sub_type, body, known)?);
         position = end;
         if sub_type == 0 && size == 0 {
@@ -578,11 +568,11 @@ fn parse_txo(data: &[u8], object_id: u16) -> Result<PendingTxo> {
     let mut code_units = Vec::new();
     code_units
         .try_reserve_exact(character_count)
-        .map_err(|_| Error::Allocation("retaining TXO text"))?;
+        .map_err(|_error| Error::Allocation("retaining TXO text"))?;
     let mut run_bytes = Vec::new();
     run_bytes
         .try_reserve_exact(run_byte_count)
-        .map_err(|_| Error::Allocation("retaining TXO formatting runs"))?;
+        .map_err(|_error| Error::Allocation("retaining TXO formatting runs"))?;
     Ok(PendingTxo {
         object_id,
         character_count,
@@ -644,7 +634,7 @@ fn feed_txo_continue(pending: &mut PendingTxo, data: &[u8]) -> Result<bool> {
             pending
                 .code_units
                 .try_reserve(segment_count)
-                .map_err(|_| Error::Allocation("retaining TXO text"))?;
+                .map_err(|_error| Error::Allocation("retaining TXO text"))?;
             pending.code_units.extend(
                 characters
                     .chunks_exact(2)
@@ -654,7 +644,7 @@ fn feed_txo_continue(pending: &mut PendingTxo, data: &[u8]) -> Result<bool> {
             pending
                 .code_units
                 .try_reserve(segment_count)
-                .map_err(|_| Error::Allocation("retaining TXO text"))?;
+                .map_err(|_error| Error::Allocation("retaining TXO text"))?;
             pending
                 .code_units
                 .extend(characters.iter().map(|&byte| u16::from(byte)));
@@ -669,7 +659,7 @@ fn feed_txo_continue(pending: &mut PendingTxo, data: &[u8]) -> Result<bool> {
     pending
         .run_bytes
         .try_reserve(data.len())
-        .map_err(|_| Error::Allocation("retaining TXO formatting runs"))?;
+        .map_err(|_error| Error::Allocation("retaining TXO formatting runs"))?;
     pending.run_bytes.extend_from_slice(data);
     Ok(pending.run_bytes.len() == pending.run_byte_count)
 }
@@ -684,7 +674,7 @@ pub(crate) fn parse_txo_runs(data: &[u8], character_count: u16) -> Result<Vec<Te
     let run_count = data.len() / 8 - 1;
     let mut runs = Vec::new();
     runs.try_reserve_exact(run_count)
-        .map_err(|_| Error::Allocation("retaining TXO formatting runs"))?;
+        .map_err(|_error| Error::Allocation("retaining TXO formatting runs"))?;
     for index in 0..run_count {
         let offset = index * 8;
         let character_index = u16_at(data, offset)?;
@@ -710,18 +700,18 @@ fn decode_unicode(data: &[u8], wide: bool) -> Result<String> {
         let mut words = Vec::new();
         words
             .try_reserve_exact(data.len() / 2)
-            .map_err(|_| Error::Allocation("decoding comment UTF-16 text"))?;
+            .map_err(|_error| Error::Allocation("decoding comment UTF-16 text"))?;
         words.extend(
             data.chunks_exact(2)
                 .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]])),
         );
         String::from_utf16(&words)
-            .map_err(|_| Error::InvalidData("NOTE author contains invalid UTF-16".to_string()))
+            .map_err(|_error| Error::InvalidData("NOTE author contains invalid UTF-16".to_string()))
     } else {
         let mut value = String::new();
         value
             .try_reserve(data.len())
-            .map_err(|_| Error::Allocation("decoding comment compressed text"))?;
+            .map_err(|_error| Error::Allocation("decoding comment compressed text"))?;
         value.extend(data.iter().map(|&byte| char::from(byte)));
         Ok(value)
     }
@@ -730,7 +720,7 @@ fn decode_unicode(data: &[u8], wide: bool) -> Result<String> {
 fn clone_string(value: &str, context: &'static str) -> Result<String> {
     let mut copy = String::new();
     copy.try_reserve_exact(value.len())
-        .map_err(|_| Error::Allocation(context))?;
+        .map_err(|_error| Error::Allocation(context))?;
     copy.push_str(value);
     Ok(copy)
 }

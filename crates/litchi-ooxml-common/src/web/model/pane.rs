@@ -1,7 +1,12 @@
-use super::super::codec::*;
-use super::super::validation::*;
-use super::super::*;
-use super::*;
+use super::super::codec::{invalid, limit};
+use super::super::validation::{
+    validate_extension_list, validate_external_uri_reference, validate_image_content_type,
+};
+use super::super::{Arc, Error, PackURI, Result};
+use super::{
+    AddIn, Compression, Dock, Effect, ExtKind, ExtList, Image, Link,
+    MAX_WEB_EXTENSION_SNAPSHOT_BYTES, Snapshot, SnapshotResource, SnapshotTarget,
+};
 #[derive(Debug, Clone, PartialEq)]
 pub struct Pane {
     pub(in crate::web) dock_state: Dock,
@@ -261,7 +266,7 @@ impl Pane {
         self
     }
 
-    /// Append one validated DrawingML effect.
+    /// Append one validated `DrawingML` effect.
     pub fn effect(mut self, effect: Effect) -> Result<Self> {
         self.push_effect(effect)?;
         Ok(self)

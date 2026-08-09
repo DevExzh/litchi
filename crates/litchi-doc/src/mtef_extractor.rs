@@ -19,13 +19,19 @@ const MAX_MTEF_OBJECT_SIZE: u32 = 16 * 1024 * 1024;
 
 /// MTEF extractor for OLE documents
 pub(crate) struct MtefExtractor<'arena> {
-    #[allow(dead_code)] // Kept for future use in instance methods
+    #[allow(
+        dead_code,
+        reason = "reserved DOC structure retained for format completeness or future round-trip support"
+    )] // Kept for future use in instance methods
     arena: &'arena bumpalo::Bump,
 }
 
 impl<'arena> MtefExtractor<'arena> {
     /// Create a new MTEF extractor
-    #[allow(dead_code)] // Reserved for future formula integration
+    #[allow(
+        dead_code,
+        reason = "reserved DOC structure retained for format completeness or future round-trip support"
+    )] // Reserved for future formula integration
     pub(crate) fn new(arena: &'arena bumpalo::Bump) -> Self {
         Self { arena }
     }
@@ -40,7 +46,7 @@ impl<'arena> MtefExtractor<'arena> {
     /// # Arguments
     ///
     /// * `ole_file` - The OLE file to extract from
-    /// * `stream_path` - Path components to the stream (e.g., &["ObjectPool", "_1234567890", "Equation Native"])
+    /// * `stream_path` - Path components to the stream (e.g., &["`ObjectPool`", "_1234567890", "Equation Native"])
     ///
     /// # Returns
     ///
@@ -105,7 +111,7 @@ impl<'arena> MtefExtractor<'arena> {
     /// Validate the OLE header manually to avoid zerocopy alignment issues
     ///
     /// The OLE header (EQNOLEFILEHDR) is 28 bytes with the following structure:
-    /// - Offset 0x00-0x01 (2 bytes): cb_hdr = 28 (header size)
+    /// - Offset 0x00-0x01 (2 bytes): `cb_hdr` = 28 (header size)
     /// - Offset 0x02-0x05 (4 bytes): version (typically 0x00020000)
     /// - Offset 0x06-0x07 (2 bytes): format (varies, e.g., 0xC16D, 0xC19B, 0xC1C7, 0xC2D3)
     /// - Offset 0x08-0x0B (4 bytes): cbObject (size of MTEF data after header)
@@ -146,9 +152,9 @@ impl<'arena> MtefExtractor<'arena> {
         true
     }
 
-    /// Extract all MTEF formulas from embedded OLE objects in ObjectPool
+    /// Extract all MTEF formulas from embedded OLE objects in `ObjectPool`
     ///
-    /// In Word documents, embedded equations are stored as OLE objects in the ObjectPool directory.
+    /// In Word documents, embedded equations are stored as OLE objects in the `ObjectPool` directory.
     /// Each embedded object is a storage (directory) with a name like "_1234567890".
     /// Within each storage, there should be a stream named "Equation Native" containing the MTEF data.
     ///
@@ -158,7 +164,7 @@ impl<'arena> MtefExtractor<'arena> {
     ///
     /// # Returns
     ///
-    /// Returns a HashMap mapping object IDs to their MTEF binary data (including OLE header)
+    /// Returns a `HashMap` mapping object IDs to their MTEF binary data (including OLE header)
     pub(crate) fn extract_all_mtef_from_objectpool<R: Read + Seek>(
         ole_file: &mut OleFile<R>,
     ) -> Result<std::collections::HashMap<String, Vec<u8>>, MtefExtractionError> {
@@ -202,7 +208,7 @@ impl<'arena> MtefExtractor<'arena> {
         Ok(mtef_map)
     }
 
-    /// Extract all MTEF formulas from a PowerPoint presentation
+    /// Extract all MTEF formulas from a `PowerPoint` presentation
     ///
     /// In PPT files, MTEF formulas follow a similar pattern to Word documents.
     /// Equations are stored as OLE objects in storage directories that are children of the root storage.
@@ -214,8 +220,11 @@ impl<'arena> MtefExtractor<'arena> {
     ///
     /// # Returns
     ///
-    /// Returns a HashMap mapping storage names to their MTEF binary data (including OLE header)
-    #[allow(dead_code)]
+    /// Returns a `HashMap` mapping storage names to their MTEF binary data (including OLE header)
+    #[allow(
+        dead_code,
+        reason = "reserved DOC structure retained for format completeness or future round-trip support"
+    )]
     pub(crate) fn extract_all_mtef_from_ppt<R: Read + Seek>(
         ole_file: &mut OleFile<R>,
     ) -> Result<std::collections::HashMap<String, Vec<u8>>, MtefExtractionError> {
@@ -277,8 +286,11 @@ impl<'arena> MtefExtractor<'arena> {
     ///
     /// # Returns
     ///
-    /// Returns a vector of MathNode AST nodes representing the parsed formula
-    #[allow(dead_code)] // Reserved for future formula integration
+    /// Returns a vector of `MathNode` AST nodes representing the parsed formula
+    #[allow(
+        dead_code,
+        reason = "reserved DOC structure retained for format completeness or future round-trip support"
+    )] // Reserved for future formula integration
     pub(crate) fn parse_mtef_to_ast(
         &self,
         mtef_data: Vec<u8>,
@@ -301,12 +313,15 @@ impl<'arena> MtefExtractor<'arena> {
     /// # Arguments
     ///
     /// * `ole_file` - The OLE file to extract from
-    /// * `stream_names` - Possible stream names to check (e.g., &["Equation Native", "MSWordEquation"])
+    /// * `stream_names` - Possible stream names to check (e.g., &["Equation Native", "`MSWordEquation`"])
     ///
     /// # Returns
     ///
     /// Returns parsed formula AST nodes if MTEF data is found and valid
-    #[allow(dead_code)] // Reserved for future formula integration
+    #[allow(
+        dead_code,
+        reason = "reserved DOC structure retained for format completeness or future round-trip support"
+    )] // Reserved for future formula integration
     pub(crate) fn extract_and_parse_mtef<R: Read + Seek>(
         &self,
         ole_file: &mut OleFile<R>,
@@ -329,7 +344,10 @@ impl<'arena> MtefExtractor<'arena> {
 #[derive(Debug)]
 pub(crate) enum MtefExtractionError {
     IoError(std::io::Error),
-    #[allow(dead_code)] // Kept for completeness
+    #[allow(
+        dead_code,
+        reason = "reserved DOC structure retained for format completeness or future round-trip support"
+    )] // Kept for completeness
     InvalidOleHeader,
     /// The declared payload cannot be combined with its fixed-size header.
     PayloadSizeOverflow {
@@ -346,7 +364,7 @@ pub(crate) enum MtefExtractionError {
 impl std::fmt::Display for MtefExtractionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MtefExtractionError::IoError(e) => write!(f, "IO error: {}", e),
+            MtefExtractionError::IoError(e) => write!(f, "IO error: {e}"),
             MtefExtractionError::InvalidOleHeader => write!(f, "Invalid OLE header"),
             MtefExtractionError::PayloadSizeOverflow { declared } => write!(
                 f,
@@ -359,7 +377,7 @@ impl std::fmt::Display for MtefExtractionError {
                 f,
                 "Truncated MTEF payload: header declares {declared} bytes, but only {available} are available"
             ),
-            MtefExtractionError::ParseError(msg) => write!(f, "Parse error: {}", msg),
+            MtefExtractionError::ParseError(msg) => write!(f, "Parse error: {msg}"),
         }
     }
 }

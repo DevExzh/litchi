@@ -85,8 +85,7 @@ pub(super) fn validate_control(value: &Control<'_>) -> Result<()> {
     let raw = value.header().control_type().raw();
     if !supported_control_type(raw) {
         return Err(invalid(format!(
-            "TBCHeader control type 0x{:02X} is not defined",
-            raw
+            "TBCHeader control type 0x{raw:02X} is not defined"
         )));
     }
 
@@ -96,10 +95,7 @@ pub(super) fn validate_control(value: &Control<'_>) -> Result<()> {
         }
     } else {
         let data = value.data().ok_or_else(|| {
-            unsupported(format!(
-                "TBCData is required for control type 0x{:02X}",
-                raw
-            ))
+            unsupported(format!("TBCData is required for control type 0x{raw:02X}"))
         })?;
         if (data.general().flags().save_text() || data.general().flags().save_misc_ui_strings())
             && !value.header().specifics().save_ui_strings()
@@ -110,8 +106,7 @@ pub(super) fn validate_control(value: &Control<'_>) -> Result<()> {
         }
         if matches!(raw, 0x07 | 0x0F | 0x12 | 0x13 | 0x15) && !data.specific().is_empty() {
             return Err(invalid(format!(
-                "TBCData control-specific information is forbidden for type 0x{:02X}",
-                raw
+                "TBCData control-specific information is forbidden for type 0x{raw:02X}"
             )));
         }
         if value.command().is_some() && !command_allowed(value.header()) {
@@ -130,7 +125,7 @@ pub(super) fn validate_toolbar(value: &Toolbar<'_>) -> Result<()> {
     if count < 0 {
         return Err(invalid("TB cCL must not be negative"));
     }
-    let count = usize::try_from(count).map_err(|_| invalid("TB cCL overflows usize"))?;
+    let count = usize::try_from(count).map_err(|_error| invalid("TB cCL overflows usize"))?;
     if count > MAX_CONTROLS {
         return Err(invalid("TB cCL exceeds the bounded limit"));
     }

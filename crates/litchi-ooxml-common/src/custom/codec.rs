@@ -14,7 +14,12 @@ use super::model::{
     value_text_bytes,
 };
 use super::reserved;
-use super::schema::*;
+use super::schema::{
+    CUSTOM_NS, DOCUMENT_SUMMARY_FORMAT_ID, MAX_ATTRIBUTE_BYTES, MAX_ATTRIBUTES, MAX_PROPERTIES,
+    MAX_TEXT_BYTES, MAX_TOTAL_NAME_BYTES, MAX_TOTAL_TEXT_BYTES, MAX_XML_BYTES, MAX_XML_DEPTH,
+    SUMMARY_FORMAT_ID, VT_NS, checked_depth, checked_increment, checked_total, count_node, invalid,
+    limit,
+};
 use crate::{Error, Result};
 
 struct PendingProperty {

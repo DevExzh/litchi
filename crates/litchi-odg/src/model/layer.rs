@@ -17,6 +17,20 @@ impl Layer {
         }
     }
 
+    /// Sets the optional display policy on a detached layer.
+    #[must_use]
+    pub fn with_display(mut self, display: impl Into<String>) -> Self {
+        self.display = Some(display.into());
+        self
+    }
+
+    /// Sets the optional protection flag on a detached layer.
+    #[must_use]
+    pub const fn with_protected(mut self, protected: bool) -> Self {
+        self.protected = Some(protected);
+        self
+    }
+
     pub(crate) fn parsed(name: String, display: Option<String>, protected: Option<bool>) -> Self {
         Self {
             name,

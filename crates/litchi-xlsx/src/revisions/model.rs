@@ -387,10 +387,10 @@ pub(super) fn validate_attrs(a: &[RevisionAttribute]) -> Result<()> {
 }
 
 pub(super) fn validate_guid(value: &str) -> Result<()> {
-    if !is_valid_guid(value) {
-        Err(invalid(format!("invalid GUID '{value}'")))
-    } else {
+    if is_valid_guid(value) {
         Ok(())
+    } else {
+        Err(invalid(format!("invalid GUID '{value}'")))
     }
 }
 pub(super) fn valid_date(v: &str) -> Result<()> {

@@ -33,11 +33,12 @@ pub(crate) fn read_properties_with_prefix(
     limits: Limits,
     proven_prefix: Option<&[u8]>,
 ) -> Result<PropertiesSource> {
-    parse(xml, limits, proven_prefix, Root::Properties).map(|parsed| PropertiesSource {
-        value: DrawingProperties::new()
-            .with_editable(parsed.editable)
-            .with_tags(parsed.tags, limits)
-            .expect("parsed tags satisfy the same limits"),
+    let parsed = parse(xml, limits, proven_prefix, Root::Properties)?;
+    let value = DrawingProperties::new()
+        .with_editable(parsed.editable)
+        .with_tags(parsed.tags, limits)?;
+    Ok(PropertiesSource {
+        value,
         inner_extensions: parsed.inner_extensions,
     })
 }
@@ -51,9 +52,9 @@ pub(crate) fn read_tags_with_prefix(
     limits: Limits,
     proven_prefix: Option<&[u8]>,
 ) -> Result<Tags> {
-    Ok(parse(xml, limits, proven_prefix, Root::Tags)?
+    parse(xml, limits, proven_prefix, Root::Tags)?
         .tags
-        .expect("tag-list parser always produces a present list"))
+        .ok_or_else(|| invalid("Designer tag-list parser produced no list"))
 }
 
 pub(crate) fn write_properties(
@@ -249,7 +250,7 @@ fn parse(xml: &[u8], limits: Limits, proven_prefix: Option<&[u8]>, root: Root) -
                             parsed
                                 .tags
                                 .as_mut()
-                                .expect("tag parent creates a collection")
+                                .ok_or_else(|| invalid("Designer tag collection state is missing"))?
                                 .push_with_limits(tag, limits)?;
                             Frame::Tag
                         },

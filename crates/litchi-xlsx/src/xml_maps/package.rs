@@ -1,7 +1,7 @@
 //! Workbook relationship services for Custom XML Maps.
 
 use super::invalid;
-use super::model::*;
+use super::model::{CONTENT_TYPE, MAX_PART_BYTES, REL, STRICT_REL, XmlMapConformance, XmlMapInfo};
 use litchi_core::sheet::Result;
 use litchi_opc::{OpcPackage, PackURI};
 
@@ -21,7 +21,7 @@ pub fn load_from_package_with_conformance(
     load_for_workbook(package, &workbook_uri)
 }
 
-/// Store caller-authored Custom XML Maps metadata in a SpreadsheetML package.
+/// Store caller-authored Custom XML Maps metadata in a `SpreadsheetML` package.
 ///
 /// Existing malformed XML Maps relationships are rejected before mutation. The
 /// writer never resolves inline schema references, opens bound files, or applies
@@ -31,6 +31,16 @@ pub fn store_in_package(
     value: &XmlMapInfo,
     conformance: XmlMapConformance,
 ) -> Result<()> {
+    if let Some((existing, existing_conformance)) = load_from_package_with_conformance(package)?
+        && existing_conformance == conformance
+        && existing == *value
+    {
+        // Retain a byte-identical source-loaded XML Maps part when the caller
+        // requests no semantic or conformance change. This is the package
+        // writer's deliberately narrow source-preservation exemption and also
+        // avoids rewriting opaque inline schema payloads.
+        return Ok(());
+    }
     let xml = value.to_xml(conformance.is_strict())?;
     store_xml_in_package(package, &xml, conformance)
 }

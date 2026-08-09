@@ -182,7 +182,7 @@ pub(crate) fn parse_biff8_string(data: &[u8]) -> Result<String> {
             .map(|v| u16::from_le_bytes([v[0], v[1]]))
             .collect::<Vec<_>>();
         String::from_utf16(&units)
-            .map_err(|_| invalid_error(SERIES_TEXT, "invalid UTF-16 chart string"))
+            .map_err(|_error| invalid_error(SERIES_TEXT, "invalid UTF-16 chart string"))
     } else {
         Ok(data[2..].iter().map(|v| char::from(*v)).collect())
     }
@@ -215,7 +215,7 @@ pub(crate) fn parse_xl_unicode_string(data: &[u8]) -> Result<String> {
             .map(|value| u16::from_le_bytes([value[0], value[1]]))
             .collect::<Vec<_>>();
         String::from_utf16(&units)
-            .map_err(|_| invalid_error(LABEL, "cached Label string is invalid UTF-16"))
+            .map_err(|_error| invalid_error(LABEL, "cached Label string is invalid UTF-16"))
     } else {
         Ok(data[3..].iter().map(|value| char::from(*value)).collect())
     }
@@ -229,14 +229,14 @@ pub(crate) fn xl_unicode_string(value: &str) -> Result<Vec<u8>> {
     }
     let wide = units.iter().any(|value| *value > 255);
     let mut data = Vec::with_capacity(3 + units.len() * if wide { 2 } else { 1 });
-    data.extend((units.len() as u16).to_le_bytes());
+    data.extend(crate::utils::truncate_usize_to_u16(units.len()).to_le_bytes());
     data.push(u8::from(wide));
     if wide {
         for value in units {
             data.extend(value.to_le_bytes());
         }
     } else {
-        data.extend(units.into_iter().map(|value| value as u8));
+        data.extend(units.into_iter().map(crate::utils::truncate_u16_to_u8));
     }
     Ok(data)
 }
@@ -398,13 +398,13 @@ pub(crate) fn u16_at(data: &[u8], o: usize) -> Result<u16> {
     Ok(u16::from_le_bytes(array_at(data, o)?))
 }
 pub(crate) fn i16_at(data: &[u8], o: usize) -> Result<i16> {
-    Ok(u16_at(data, o)? as i16)
+    Ok(crate::utils::wrap_u16_to_i16(u16_at(data, o)?))
 }
 pub(crate) fn u32_at(data: &[u8], o: usize) -> Result<u32> {
     Ok(u32::from_le_bytes(array_at(data, o)?))
 }
 pub(crate) fn i32_at(data: &[u8], o: usize) -> Result<i32> {
-    Ok(u32_at(data, o)? as i32)
+    Ok(crate::utils::wrap_u32_to_i32(u32_at(data, o)?))
 }
 pub(crate) fn f64_at(data: &[u8], o: usize) -> Result<f64> {
     Ok(f64::from_le_bytes(array_at(data, o)?))

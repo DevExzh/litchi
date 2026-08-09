@@ -28,12 +28,12 @@ fn object_dimensions_and_context_are_ergonomic() {
     let object = Object::new(
         "Shape 1".to_string(),
         "Test shape".to_string(),
-        914400,
+        914_400,
         1828800,
         Preset::Rect,
     );
 
-    assert_eq!(object.width_emu(), 914400);
+    assert_eq!(object.width_emu(), 914_400);
     assert_eq!(object.height_emu(), 1828800);
     assert_eq!(object.width_px(), 96);
     assert_eq!(object.height_px(), 192);
@@ -69,8 +69,8 @@ fn defaults_and_document_order_are_preserved() {
     assert_eq!(drawings.len(), 2);
     assert_eq!(drawings[0].name(), "first");
     assert_eq!(drawings[1].name(), "second");
-    assert_eq!(drawings[0].width_emu(), 914400);
-    assert_eq!(drawings[0].height_emu(), 914400);
+    assert_eq!(drawings[0].width_emu(), 914_400);
+    assert_eq!(drawings[0].height_emu(), 914_400);
     assert_eq!(drawings[1].anchor(), Anchor::Floating);
     assert_eq!(drawings[1].kind(), Kind::Other);
 }

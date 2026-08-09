@@ -1,4 +1,16 @@
-//! WordprocessingML web-settings XML parsing and serialization.
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
+//! `WordprocessingML` web-settings XML parsing and serialization.
 
 use super::super::model::{
     Border, Borders, Child, Color, Conformance, Div, Frame, Frameset, Id, Layout, Screen,
@@ -195,7 +207,13 @@ impl Settings {
                     return Err(Error::Invalid("unterminated Word web-settings XML".into()));
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {},
             }
         }
 
@@ -210,6 +228,10 @@ impl Settings {
 }
 
 /// Parse bounded web-settings XML without resolving frame relationships.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn parse(xml: &[u8]) -> Result<(Settings, Conformance)> {
     let processed = process_web_xml(xml)?;
     Settings::parse_xml(processed.as_ref())
@@ -231,6 +253,10 @@ pub(super) fn process_web_xml(xml: &[u8]) -> Result<std::borrow::Cow<'_, [u8]>> 
 }
 
 /// Serialize a checked web-settings model.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn write(value: &Settings, conformance: Conformance) -> Result<Vec<u8>> {
     value.encode(conformance)
 }
@@ -600,10 +626,9 @@ fn parse_setting(
         ),
         b"pixelsPerInch" => {
             let value = required_value(element, decoder, resolver, "pixels per inch")?;
-            let value = value
-                .trim()
-                .parse::<u16>()
-                .map_err(|_| invalid(format!("invalid pixels-per-inch value '{value}'")))?;
+            let value = value.trim().parse::<u16>().map_err(|_source_error| {
+                invalid(format!("invalid pixels-per-inch value '{value}'"))
+            })?;
             validate_pixels_per_inch(value)?;
             set_once(&mut settings.pixels_per_inch, value, "pixelsPerInch")
         },
@@ -723,7 +748,15 @@ fn parse_frameset(
             Event::Eof => {
                 return Err(Error::Invalid("unterminated Word web frameset".into()));
             },
-            _ => {},
+            Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }
@@ -782,7 +815,15 @@ fn parse_div_container(
                     "unterminated Word HTML division container".into(),
                 ));
             },
-            _ => {},
+            Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }
@@ -938,7 +979,15 @@ fn parse_html_div(
             Event::Eof => {
                 return Err(Error::Invalid("unterminated Word HTML division".into()));
             },
-            _ => {},
+            Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }
@@ -1077,7 +1126,15 @@ fn parse_html_div_borders(
                     "unterminated Word HTML division borders".into(),
                 ));
             },
-            _ => {},
+            Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }
@@ -1172,7 +1229,15 @@ fn parse_frame(reader: &mut NsReader<&[u8]>, budget: &mut ParseBudget) -> Result
             Event::Eof => {
                 return Err(Error::Invalid("unterminated Word web frame".into()));
             },
-            _ => {},
+            Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }
@@ -1294,7 +1359,15 @@ fn parse_frameset_split_bar(
                     "unterminated Word frameset split bar".into(),
                 ));
             },
-            _ => {},
+            Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }
@@ -1380,10 +1453,9 @@ fn required_unsigned_long(
     description: &str,
 ) -> Result<u64> {
     let value = required_value(element, decoder, resolver, description)?;
-    value
-        .trim()
-        .parse::<u64>()
-        .map_err(|_| Error::Invalid(format!("invalid unsigned {description} value '{value}'")))
+    value.trim().parse::<u64>().map_err(|_source_error| {
+        Error::Invalid(format!("invalid unsigned {description} value '{value}'"))
+    })
 }
 
 fn optional_unsigned_long_attribute(
@@ -1394,7 +1466,7 @@ fn optional_unsigned_long_attribute(
 ) -> Result<Option<u64>> {
     word_attribute_value(element, name, decoder, resolver)?
         .map(|value| {
-            value.trim().parse::<u64>().map_err(|_| {
+            value.trim().parse::<u64>().map_err(|_source_error| {
                 Error::Invalid(format!("invalid unsigned Word attribute value '{value}'"))
             })
         })
@@ -1431,8 +1503,9 @@ fn optional_hex_byte(
                     "invalid hexadecimal byte '{value}'"
                 )));
             }
-            u8::from_str_radix(&value, 16)
-                .map_err(|_| Error::Invalid(format!("invalid hexadecimal byte '{value}'")))
+            u8::from_str_radix(&value, 16).map_err(|_source_error| {
+                Error::Invalid(format!("invalid hexadecimal byte '{value}'"))
+            })
         })
         .transpose()
 }
@@ -1470,7 +1543,13 @@ fn finish_leaf(
                     "unterminated Word {description} element"
                 )));
             },
-            _ => {
+            Event::Start(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Decl(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {
                 return Err(Error::Invalid(format!(
                     "Word {description} must not contain child content"
                 )));
@@ -1506,7 +1585,14 @@ fn skip_element(reader: &mut NsReader<&[u8]>, budget: &mut ParseBudget) -> Resul
             Event::Eof => {
                 return Err(Error::Invalid("unterminated Word web XML element".into()));
             },
-            _ => {},
+            Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }

@@ -1,4 +1,4 @@
-//! Typed, inert SpreadsheetML calculation-chain metadata and package ownership.
+//! Typed, inert `SpreadsheetML` calculation-chain metadata and package ownership.
 //!
 //! Semantic values live in `model`, XML grammar in `codec`, and OPC graph
 //! ownership in `package`. The facade keeps the ADR 0018 API compact.

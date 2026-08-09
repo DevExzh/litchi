@@ -4,10 +4,15 @@
     reason = "The file keeps public snapshot/transaction types before their private XML machinery."
 )]
 
-use crate::{frame::Frame, source::Source};
+use crate::{
+    frame::{Frame, Properties},
+    map::{Area, AreaKind, AreaProperties, ImageMap},
+    source::Source,
+};
 use litchi_core::{Error, FileFormat, Result};
 use litchi_odf_common::{compact_xml, media};
 use quick_xml::{
+    XmlVersion,
     events::{BytesStart, Event},
     name::{Namespace, ResolveResult},
     reader::NsReader,
@@ -16,10 +21,15 @@ use std::{ops::Range, sync::Arc};
 
 const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
+const STYLE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
+const SVG: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
+const TEXT: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const XLINK: &[u8] = b"http://www.w3.org/1999/xlink";
 const MAX_BYTES: usize = 256 * 1024 * 1024;
 const MAX_DEPTH: usize = 256;
 const MAX_FRAMES: usize = 1_000_000;
+const MAX_MAP_AREAS: usize = 100_000;
+const MAX_MAP_TEXT_BYTES: usize = 64 * 1024;
 
 #[derive(Debug)]
 struct State {
@@ -32,10 +42,28 @@ struct State {
 #[derive(Clone, Debug)]
 struct FrameSite {
     frame_tag: Option<Range<usize>>,
-    name_attribute: Option<String>,
+    attributes: FrameAttributeSites,
+    properties: Properties,
     image_tag: Range<usize>,
     href_attribute: Option<String>,
     binary_contents: Option<Range<usize>>,
+}
+
+#[derive(Clone, Debug, Default)]
+struct FrameAttributeSites {
+    name: Option<String>,
+    style_name: Option<String>,
+    text_style_name: Option<String>,
+    layer: Option<String>,
+    z_index: Option<String>,
+    transform: Option<String>,
+    anchor_type: Option<String>,
+    x: Option<String>,
+    y: Option<String>,
+    width: Option<String>,
+    height: Option<String>,
+    relative_width: Option<String>,
+    relative_height: Option<String>,
 }
 
 /// An immutable, byte-preserving flat ODI snapshot.
@@ -156,33 +184,85 @@ impl FlatImageTransaction {
     ///
     /// Returns an error for an invalid selector or uneditable owner.
     pub fn set_frame_name(&mut self, frame: usize, name: Option<String>) -> Result<()> {
-        let (before_name, before_source) = {
-            let current = self.frame(frame)?;
-            (current.name().map(str::to_owned), current.source().clone())
-        };
-        if before_name.as_deref() == name.as_deref() {
-            if let Some(change) = self.changes.iter_mut().find(|change| change.frame == frame) {
-                change.after_name = change.before_name.clone();
-            }
-            self.remove_noops();
-            return Ok(());
-        }
         if self.site(frame)?.frame_tag.is_none() {
             return Err(invalid(
                 "flat ODI image frame has no editable draw:frame owner",
             ));
         }
-        if let Some(change) = self.changes.iter_mut().find(|change| change.frame == frame) {
-            change.after_name = name;
-        } else {
-            self.changes.push(FrameChange {
-                frame,
-                before_name,
-                after_name: name,
-                before_source: before_source.clone(),
-                after_source: before_source,
-            });
-        }
+        self.change_mut(frame)?.after.set_name(name);
+        self.remove_noops();
+        Ok(())
+    }
+
+    /// Stages the optional graphic style reference.
+    pub fn set_style_name(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.change_mut(frame)?.after.set_style_name(value);
+        self.remove_noops();
+        Ok(())
+    }
+
+    /// Stages the optional paragraph style reference used by frame text.
+    pub fn set_text_style_name(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.change_mut(frame)?.after.set_text_style_name(value);
+        self.remove_noops();
+        Ok(())
+    }
+
+    /// Stages the optional drawing layer name.
+    pub fn set_layer(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.change_mut(frame)?.after.set_layer(value);
+        self.remove_noops();
+        Ok(())
+    }
+
+    /// Stages the optional non-negative stacking order.
+    pub fn set_z_index(&mut self, frame: usize, value: Option<u32>) -> Result<()> {
+        self.change_mut(frame)?.after.set_z_index(value);
+        self.remove_noops();
+        Ok(())
+    }
+
+    /// Stages the optional lexical drawing transform.
+    pub fn set_transform(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.change_mut(frame)?.after.set_transform(value);
+        self.remove_noops();
+        Ok(())
+    }
+
+    /// Stages the optional text anchoring mode.
+    pub fn set_anchor_type(&mut self, frame: usize, value: Option<String>) -> Result<()> {
+        self.change_mut(frame)?.after.set_anchor_type(value);
+        self.remove_noops();
+        Ok(())
+    }
+
+    /// Stages lexical position and size values without unit normalization.
+    pub fn set_geometry(
+        &mut self,
+        frame: usize,
+        x: Option<String>,
+        y: Option<String>,
+        width: Option<String>,
+        height: Option<String>,
+    ) -> Result<()> {
+        self.change_mut(frame)?
+            .after
+            .set_geometry(x, y, width, height);
+        self.remove_noops();
+        Ok(())
+    }
+
+    /// Stages lexical relative width and height values.
+    pub fn set_relative_size(
+        &mut self,
+        frame: usize,
+        width: Option<String>,
+        height: Option<String>,
+    ) -> Result<()> {
+        self.change_mut(frame)?
+            .after
+            .set_relative_size(width, height);
+        self.remove_noops();
         Ok(())
     }
 
@@ -194,14 +274,9 @@ impl FlatImageTransaction {
     ///
     /// Returns an error for an invalid selector or lossy representation change.
     pub fn set_source(&mut self, frame: usize, source: Source) -> Result<()> {
-        let (before_name, before_source) = {
-            let current = self.frame(frame)?;
-            (current.name().map(str::to_owned), current.source().clone())
-        };
+        let before_source = self.frame(frame)?.source().clone();
         if before_source == source {
-            if let Some(change) = self.changes.iter_mut().find(|change| change.frame == frame) {
-                change.after_source = change.before_source.clone();
-            }
+            self.change_mut(frame)?.after.set_source(before_source);
             self.remove_noops();
             return Ok(());
         }
@@ -223,17 +298,8 @@ impl FlatImageTransaction {
                 ));
             },
         }
-        if let Some(change) = self.changes.iter_mut().find(|change| change.frame == frame) {
-            change.after_source = source;
-        } else {
-            self.changes.push(FrameChange {
-                frame,
-                before_name: before_name.clone(),
-                after_name: before_name,
-                before_source,
-                after_source: source,
-            });
-        }
+        self.change_mut(frame)?.after.set_source(source);
+        self.remove_noops();
         Ok(())
     }
 
@@ -257,24 +323,25 @@ impl FlatImageTransaction {
         let mut edits = Vec::with_capacity(self.changes.len() * 2);
         for change in &self.changes {
             let site = self.site(change.frame)?;
-            if change.before_name != change.after_name {
-                let tag = site
+            if frame_attributes_differ(&change.before, &change.after) {
+                let span = site
                     .frame_tag
                     .as_ref()
-                    .ok_or_else(|| invalid("flat ODI frame name site disappeared"))?;
+                    .ok_or_else(|| invalid("flat ODI frame attribute site disappeared"))?;
+                let raw = std::str::from_utf8(
+                    self.source
+                        .as_bytes()
+                        .get(span.clone())
+                        .ok_or_else(|| invalid("ODI frame tag span is invalid"))?,
+                )
+                .map_err(|error| invalid(format!("ODI frame tag is not UTF-8: {error}")))?;
                 edits.push((
-                    tag.clone(),
-                    rewrite_attribute(
-                        self.source.as_bytes(),
-                        tag,
-                        site.name_attribute.as_deref(),
-                        "draw:name",
-                        change.after_name.as_deref(),
-                    )?,
+                    span.clone(),
+                    rewrite_frame_tag(raw, &site.attributes, &change.before, &change.after)?,
                 ));
             }
-            if change.before_source != change.after_source {
-                match &change.after_source {
+            if change.before.source() != change.after.source() {
+                match change.after.source() {
                     Source::Linked(href) => edits.push((
                         site.image_tag.clone(),
                         rewrite_attribute(
@@ -302,9 +369,7 @@ impl FlatImageTransaction {
                 .frames()
                 .get(change.frame)
                 .ok_or_else(|| invalid("flat ODI edit lost its selected frame"))?;
-            if actual.name() != change.after_name.as_deref()
-                || actual.source() != &change.after_source
-            {
+            if actual != &change.after {
                 return Err(invalid("flat ODI edit failed semantic readback"));
             }
         }
@@ -333,10 +398,23 @@ impl FlatImageTransaction {
             .ok_or_else(|| invalid("flat ODI image site selector is out of bounds"))
     }
 
-    fn remove_noops(&mut self) {
-        self.changes.retain(|change| {
-            change.before_name != change.after_name || change.before_source != change.after_source
+    fn change_mut(&mut self, index: usize) -> Result<&mut FrameChange> {
+        if let Some(position) = self.changes.iter().position(|change| change.frame == index) {
+            return Ok(&mut self.changes[position]);
+        }
+        let before = self.frame(index)?.clone();
+        self.changes.push(FrameChange {
+            frame: index,
+            before: before.clone(),
+            after: before,
         });
+        self.changes
+            .last_mut()
+            .ok_or_else(|| invalid("flat ODI failed to stage a frame change"))
+    }
+
+    fn remove_noops(&mut self) {
+        self.changes.retain(|change| change.before != change.after);
     }
 }
 
@@ -414,10 +492,8 @@ impl FlatImagePatch {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FrameChange {
     frame: usize,
-    before_name: Option<String>,
-    after_name: Option<String>,
-    before_source: Source,
-    after_source: Source,
+    before: Frame,
+    after: Frame,
 }
 
 impl FrameChange {
@@ -427,28 +503,38 @@ impl FrameChange {
     }
     #[must_use]
     pub fn before_name(&self) -> Option<&str> {
-        self.before_name.as_deref()
+        self.before.name()
     }
     #[must_use]
     pub fn after_name(&self) -> Option<&str> {
-        self.after_name.as_deref()
+        self.after.name()
     }
     #[must_use]
     pub fn before_source(&self) -> &Source {
-        &self.before_source
+        self.before.source()
     }
     #[must_use]
     pub fn after_source(&self) -> &Source {
-        &self.after_source
+        self.after.source()
+    }
+
+    /// Returns the complete source frame semantics.
+    #[must_use]
+    pub const fn before(&self) -> &Frame {
+        &self.before
+    }
+
+    /// Returns the complete target frame semantics.
+    #[must_use]
+    pub const fn after(&self) -> &Frame {
+        &self.after
     }
 
     fn inverse(&self) -> Self {
         Self {
             frame: self.frame,
-            before_name: self.after_name.clone(),
-            after_name: self.before_name.clone(),
-            before_source: self.after_source.clone(),
-            after_source: self.before_source.clone(),
+            before: self.after.clone(),
+            after: self.before.clone(),
         }
     }
 }
@@ -472,7 +558,8 @@ fn parse(input_bytes: Vec<u8>, root: Root) -> Result<State> {
         return Err(invalid("flat ODI image sites cannot be matched losslessly"));
     }
     let mut frames = Vec::with_capacity(images.len());
-    for image in images {
+    let image_map = scan_image_map(xml)?;
+    for (image, site) in images.into_iter().zip(&sites) {
         let source = match &image.source {
             media::Source::Inline { bytes: payload, .. } => Source::Embedded(payload.clone()),
             media::Source::Linked { href }
@@ -485,7 +572,11 @@ fn parse(input_bytes: Vec<u8>, root: Root) -> Result<State> {
             },
             _ => return Err(invalid("flat ODI image source is not supported")),
         };
-        frames.push(Frame::from_scanned(source, &image));
+        let mut frame = Frame::from_scanned(source, &image);
+        let mut properties = site.properties.clone();
+        properties.image_map.clone_from(&image_map);
+        frame.apply_properties(properties);
+        frames.push(frame);
     }
     Ok(State {
         bytes: input_bytes,
@@ -642,7 +733,7 @@ impl Structure {
 fn scan_sites(xml: &str) -> Result<Vec<FrameSite>> {
     let mut reader = NsReader::from_reader(xml.as_bytes());
     let mut depth = 0usize;
-    let mut frames = Vec::<(usize, Range<usize>, Option<String>)>::new();
+    let mut frames = Vec::<(usize, Range<usize>, FrameAttributeSites, Properties)>::new();
     let mut images = Vec::new();
     let mut image_depth = None;
     let mut binary = None;
@@ -660,18 +751,82 @@ fn scan_sites(xml: &str) -> Result<Vec<FrameSite>> {
                 depth = checked_depth(depth)?;
                 let local = element.local_name();
                 if namespace == NamespaceKind::Draw && local.as_ref() == b"frame" {
+                    let z_index = attribute_value(&reader, &element, DRAW, b"z-index")?
+                        .map(|value| {
+                            value.parse::<u32>().map_err(|_| {
+                                invalid("ODI draw:frame draw:z-index is not a non-negative integer")
+                            })
+                        })
+                        .transpose()?;
                     frames.push((
                         depth,
                         start..end,
-                        attribute_qname(&reader, &element, DRAW, b"name")?,
+                        FrameAttributeSites {
+                            name: attribute_qname(&reader, &element, DRAW, b"name")?,
+                            style_name: attribute_qname(&reader, &element, DRAW, b"style-name")?,
+                            text_style_name: attribute_qname(
+                                &reader,
+                                &element,
+                                DRAW,
+                                b"text-style-name",
+                            )?,
+                            layer: attribute_qname(&reader, &element, DRAW, b"layer")?,
+                            z_index: attribute_qname(&reader, &element, DRAW, b"z-index")?,
+                            transform: attribute_qname(&reader, &element, DRAW, b"transform")?,
+                            anchor_type: attribute_qname(&reader, &element, TEXT, b"anchor-type")?,
+                            x: attribute_qname(&reader, &element, SVG, b"x")?,
+                            y: attribute_qname(&reader, &element, SVG, b"y")?,
+                            width: attribute_qname(&reader, &element, SVG, b"width")?,
+                            height: attribute_qname(&reader, &element, SVG, b"height")?,
+                            relative_width: attribute_qname(
+                                &reader,
+                                &element,
+                                STYLE,
+                                b"rel-width",
+                            )?,
+                            relative_height: attribute_qname(
+                                &reader,
+                                &element,
+                                STYLE,
+                                b"rel-height",
+                            )?,
+                        },
+                        Properties {
+                            style_name: attribute_value(&reader, &element, DRAW, b"style-name")?,
+                            text_style_name: attribute_value(
+                                &reader,
+                                &element,
+                                DRAW,
+                                b"text-style-name",
+                            )?,
+                            layer: attribute_value(&reader, &element, DRAW, b"layer")?,
+                            z_index,
+                            transform: attribute_value(&reader, &element, DRAW, b"transform")?,
+                            relative_width: attribute_value(
+                                &reader,
+                                &element,
+                                STYLE,
+                                b"rel-width",
+                            )?,
+                            relative_height: attribute_value(
+                                &reader,
+                                &element,
+                                STYLE,
+                                b"rel-height",
+                            )?,
+                            copy_of: attribute_value(&reader, &element, DRAW, b"copy-of")?,
+                            image_map: None,
+                        },
                     ));
                 } else if namespace == NamespaceKind::Draw && local.as_ref() == b"image" {
-                    let (frame_tag, name) = frames.last().map_or((None, None), |frame| {
-                        (Some(frame.1.clone()), frame.2.clone())
-                    });
+                    let (frame_tag, attributes, properties) = frames.last().map_or(
+                        (None, FrameAttributeSites::default(), Properties::default()),
+                        |frame| (Some(frame.1.clone()), frame.2.clone(), frame.3.clone()),
+                    );
                     images.push(FrameSite {
                         frame_tag,
-                        name_attribute: name,
+                        attributes,
+                        properties,
                         image_tag: start..end,
                         href_attribute: attribute_qname(&reader, &element, XLINK, b"href")?,
                         binary_contents: None,
@@ -687,12 +842,14 @@ fn scan_sites(xml: &str) -> Result<Vec<FrameSite>> {
             Event::Empty(element) => {
                 let local = element.local_name();
                 if namespace == NamespaceKind::Draw && local.as_ref() == b"image" {
-                    let (frame_tag, name) = frames.last().map_or((None, None), |frame| {
-                        (Some(frame.1.clone()), frame.2.clone())
-                    });
+                    let (frame_tag, attributes, properties) = frames.last().map_or(
+                        (None, FrameAttributeSites::default(), Properties::default()),
+                        |frame| (Some(frame.1.clone()), frame.2.clone(), frame.3.clone()),
+                    );
                     images.push(FrameSite {
                         frame_tag,
-                        name_attribute: name,
+                        attributes,
+                        properties,
                         image_tag: start..end,
                         href_attribute: attribute_qname(&reader, &element, XLINK, b"href")?,
                         binary_contents: None,
@@ -732,6 +889,334 @@ fn scan_sites(xml: &str) -> Result<Vec<FrameSite>> {
     Ok(images)
 }
 
+#[derive(Clone, Copy)]
+enum MapTextKind {
+    Title,
+    Description,
+}
+
+struct ActiveArea {
+    depth: usize,
+    kind: AreaKind,
+    properties: AreaProperties,
+    text: Option<(usize, MapTextKind, String)>,
+}
+
+#[allow(
+    clippy::too_many_lines,
+    reason = "One bounded streaming state machine keeps image-map placement, text, and area closure checks coherent."
+)]
+fn scan_image_map(xml: &str) -> Result<Option<ImageMap>> {
+    let mut reader = NsReader::from_reader(xml.as_bytes());
+    let mut depth = 0usize;
+    let mut frame_depth = None;
+    let mut map_depth = None;
+    let mut map_seen = false;
+    let mut areas = Vec::new();
+    let mut active = None::<ActiveArea>;
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| invalid(format!("invalid ODI image-map XML: {error}")))?;
+        match event {
+            Event::Start(element) => {
+                depth = checked_depth(depth)?;
+                let local = element.local_name();
+                if bound_to(&namespace, DRAW) && local.as_ref() == b"frame" {
+                    frame_depth = Some(depth);
+                } else if local.as_ref() == b"image-map" {
+                    if !bound_to(&namespace, DRAW)
+                        || frame_depth != depth.checked_sub(1)
+                        || map_seen
+                    {
+                        return Err(invalid(
+                            "ODI draw:image-map must be the frame's unique direct image map",
+                        ));
+                    }
+                    map_seen = true;
+                    map_depth = Some(depth);
+                } else if is_area_local(local.as_ref()) {
+                    if !bound_to(&namespace, DRAW) || map_depth != depth.checked_sub(1) {
+                        return Err(invalid(
+                            "ODI image-map area is misplaced or namespace-spoofed",
+                        ));
+                    }
+                    ensure_map_capacity(areas.len())?;
+                    active = Some(parse_area(&reader, &element, depth)?);
+                } else if let Some(area) = active.as_mut()
+                    && depth == area.depth + 1
+                    && bound_to(&namespace, SVG)
+                    && matches!(local.as_ref(), b"title" | b"desc")
+                {
+                    if area.text.is_some() {
+                        return Err(invalid("ODI image-map accessibility text is nested"));
+                    }
+                    let kind = if local.as_ref() == b"title" {
+                        MapTextKind::Title
+                    } else {
+                        MapTextKind::Description
+                    };
+                    area.text = Some((depth, kind, String::new()));
+                }
+            },
+            Event::Empty(element) => {
+                let local = element.local_name();
+                if local.as_ref() == b"image-map" {
+                    if !bound_to(&namespace, DRAW) || frame_depth != Some(depth) || map_seen {
+                        return Err(invalid(
+                            "ODI draw:image-map must be the frame's unique direct image map",
+                        ));
+                    }
+                    map_seen = true;
+                } else if is_area_local(local.as_ref()) {
+                    if !bound_to(&namespace, DRAW) || map_depth != Some(depth) {
+                        return Err(invalid(
+                            "ODI image-map area is misplaced or namespace-spoofed",
+                        ));
+                    }
+                    ensure_map_capacity(areas.len())?;
+                    let area = parse_area(&reader, &element, depth + 1)?;
+                    areas.push(Area::new(area.kind, area.properties));
+                } else if let Some(area) = active.as_mut()
+                    && depth == area.depth
+                    && bound_to(&namespace, SVG)
+                    && matches!(local.as_ref(), b"title" | b"desc")
+                {
+                    let target = if local.as_ref() == b"title" {
+                        &mut area.properties.title
+                    } else {
+                        &mut area.properties.description
+                    };
+                    if target.replace(String::new()).is_some() {
+                        return Err(invalid(
+                            "ODI image-map area contains duplicate accessibility text",
+                        ));
+                    }
+                }
+            },
+            Event::Text(text)
+                if active
+                    .as_ref()
+                    .and_then(|area| area.text.as_ref())
+                    .is_some() =>
+            {
+                let value = text
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|error| invalid(format!("invalid ODI image-map text: {error}")))?;
+                append_map_text(
+                    &mut active
+                        .as_mut()
+                        .and_then(|area| area.text.as_mut())
+                        .ok_or_else(|| invalid("ODI image-map text state disappeared"))?
+                        .2,
+                    &value,
+                )?;
+            },
+            Event::CData(text)
+                if active
+                    .as_ref()
+                    .and_then(|area| area.text.as_ref())
+                    .is_some() =>
+            {
+                let value = text
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|error| invalid(format!("invalid ODI image-map CDATA: {error}")))?;
+                append_map_text(
+                    &mut active
+                        .as_mut()
+                        .and_then(|area| area.text.as_mut())
+                        .ok_or_else(|| invalid("ODI image-map text state disappeared"))?
+                        .2,
+                    &value,
+                )?;
+            },
+            Event::GeneralRef(reference)
+                if active
+                    .as_ref()
+                    .and_then(|area| area.text.as_ref())
+                    .is_some() =>
+            {
+                let value = resolve_reference(&reference)?;
+                append_map_text(
+                    &mut active
+                        .as_mut()
+                        .and_then(|area| area.text.as_mut())
+                        .ok_or_else(|| invalid("ODI image-map text state disappeared"))?
+                        .2,
+                    &value,
+                )?;
+            },
+            Event::End(_) => {
+                if let Some(area) = active.as_mut()
+                    && area.text.as_ref().is_some_and(|text| text.0 == depth)
+                {
+                    let (_, kind, value) = area
+                        .text
+                        .take()
+                        .ok_or_else(|| invalid("ODI image-map text state disappeared"))?;
+                    let target = match kind {
+                        MapTextKind::Title => &mut area.properties.title,
+                        MapTextKind::Description => &mut area.properties.description,
+                    };
+                    if target.replace(value).is_some() {
+                        return Err(invalid(
+                            "ODI image-map area contains duplicate accessibility text",
+                        ));
+                    }
+                } else if active.as_ref().is_some_and(|area| area.depth == depth) {
+                    let area = active
+                        .take()
+                        .ok_or_else(|| invalid("ODI image-map area state disappeared"))?;
+                    areas.push(Area::new(area.kind, area.properties));
+                }
+                if map_depth == Some(depth) {
+                    map_depth = None;
+                }
+                if frame_depth == Some(depth) {
+                    frame_depth = None;
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("ODI image-map XML depth underflow"))?;
+            },
+            Event::DocType(_) => return Err(invalid("DOCTYPE is not allowed in ODI XML")),
+            Event::Eof => break,
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+    if active.is_some() || map_depth.is_some() || depth != 0 {
+        return Err(invalid("unterminated ODI image-map XML"));
+    }
+    Ok(map_seen.then(|| ImageMap::new(areas)))
+}
+
+fn parse_area(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    depth: usize,
+) -> Result<ActiveArea> {
+    let required = |namespace, local, label| {
+        attribute_value(reader, element, namespace, local)?
+            .ok_or_else(|| invalid(format!("ODI image-map area requires {label}")))
+    };
+    let kind = match element.local_name().as_ref() {
+        b"area-rectangle" => AreaKind::Rectangle {
+            x: required(SVG, b"x", "svg:x")?,
+            y: required(SVG, b"y", "svg:y")?,
+            width: required(SVG, b"width", "svg:width")?,
+            height: required(SVG, b"height", "svg:height")?,
+        },
+        b"area-circle" => AreaKind::Circle {
+            center_x: required(SVG, b"cx", "svg:cx")?,
+            center_y: required(SVG, b"cy", "svg:cy")?,
+            radius: required(SVG, b"r", "svg:r")?,
+        },
+        b"area-polygon" => AreaKind::Polygon {
+            x: required(SVG, b"x", "svg:x")?,
+            y: required(SVG, b"y", "svg:y")?,
+            width: required(SVG, b"width", "svg:width")?,
+            height: required(SVG, b"height", "svg:height")?,
+            view_box: required(SVG, b"viewBox", "svg:viewBox")?,
+            points: required(DRAW, b"points", "draw:points")?,
+        },
+        _ => return Err(invalid("unsupported ODI image-map area")),
+    };
+    let no_href = match attribute_value(reader, element, DRAW, b"nohref")? {
+        None => false,
+        Some(value) if value == "nohref" => true,
+        Some(_) => return Err(invalid("ODI image-map draw:nohref must equal 'nohref'")),
+    };
+    Ok(ActiveArea {
+        depth,
+        kind,
+        properties: AreaProperties {
+            href: attribute_value(reader, element, XLINK, b"href")?,
+            target_frame_name: attribute_value(reader, element, OFFICE, b"target-frame-name")?,
+            name: attribute_value(reader, element, OFFICE, b"name")?,
+            no_href,
+            link_type: attribute_value(reader, element, XLINK, b"type")?,
+            show: attribute_value(reader, element, XLINK, b"show")?,
+            title: None,
+            description: None,
+        },
+        text: None,
+    })
+}
+
+fn is_area_local(local: &[u8]) -> bool {
+    matches!(local, b"area-rectangle" | b"area-circle" | b"area-polygon")
+}
+
+fn ensure_map_capacity(current: usize) -> Result<()> {
+    if current >= MAX_MAP_AREAS {
+        return Err(invalid("ODI image-map area count exceeds the limit"));
+    }
+    Ok(())
+}
+
+fn append_map_text(target: &mut String, value: &str) -> Result<()> {
+    if target.len().saturating_add(value.len()) > MAX_MAP_TEXT_BYTES {
+        return Err(invalid(
+            "ODI image-map accessibility text exceeds the limit",
+        ));
+    }
+    target.push_str(value);
+    Ok(())
+}
+
+fn resolve_reference(reference: &quick_xml::events::BytesRef<'_>) -> Result<String> {
+    if let Some(character) = reference.resolve_char_ref().map_err(|error| {
+        invalid(format!(
+            "invalid ODI image-map character reference: {error}"
+        ))
+    })? {
+        return Ok(character.to_string());
+    }
+    match reference.as_ref() {
+        b"amp" => Ok("&".to_owned()),
+        b"lt" => Ok("<".to_owned()),
+        b"gt" => Ok(">".to_owned()),
+        b"apos" => Ok("'".to_owned()),
+        b"quot" => Ok("\"".to_owned()),
+        _ => Err(invalid("unsupported entity in ODI image-map text")),
+    }
+}
+
+fn bound_to(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
+    matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == expected)
+}
+
+fn attribute_value(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    namespace: &[u8],
+    local: &[u8],
+) -> Result<Option<String>> {
+    let mut result = None;
+    for raw in element.attributes() {
+        let attribute =
+            raw.map_err(|error| invalid(format!("invalid ODI XML attribute: {error}")))?;
+        let (resolved, name) = reader.resolver().resolve_attribute(attribute.key);
+        if bound_to(&resolved, namespace) && name.as_ref() == local {
+            if result.is_some() {
+                return Err(invalid("duplicate expanded ODI XML attribute"));
+            }
+            result = Some(
+                attribute
+                    .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                    .map_err(|error| invalid(format!("invalid ODI attribute value: {error}")))?
+                    .into_owned(),
+            );
+        }
+    }
+    Ok(result)
+}
+
 fn attribute_qname(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
@@ -752,6 +1237,133 @@ fn attribute_qname(
         }
     }
     Ok(None)
+}
+
+fn frame_attributes_differ(before: &Frame, after: &Frame) -> bool {
+    before.name() != after.name()
+        || before.style_name() != after.style_name()
+        || before.text_style_name() != after.text_style_name()
+        || before.layer() != after.layer()
+        || before.z_index() != after.z_index()
+        || before.transform() != after.transform()
+        || before.anchor_type() != after.anchor_type()
+        || before.x() != after.x()
+        || before.y() != after.y()
+        || before.width() != after.width()
+        || before.height() != after.height()
+        || before.relative_width() != after.relative_width()
+        || before.relative_height() != after.relative_height()
+}
+
+fn rewrite_frame_tag(
+    source: &str,
+    sites: &FrameAttributeSites,
+    before: &Frame,
+    after: &Frame,
+) -> Result<String> {
+    let mut tag = source.to_owned();
+    rewrite_changed_attribute(
+        &mut tag,
+        sites.name.as_deref(),
+        "draw:name",
+        before.name(),
+        after.name(),
+    )?;
+    rewrite_changed_attribute(
+        &mut tag,
+        sites.style_name.as_deref(),
+        "draw:style-name",
+        before.style_name(),
+        after.style_name(),
+    )?;
+    rewrite_changed_attribute(
+        &mut tag,
+        sites.text_style_name.as_deref(),
+        "draw:text-style-name",
+        before.text_style_name(),
+        after.text_style_name(),
+    )?;
+    rewrite_changed_attribute(
+        &mut tag,
+        sites.layer.as_deref(),
+        "draw:layer",
+        before.layer(),
+        after.layer(),
+    )?;
+    let before_z = before.z_index().map(|value| value.to_string());
+    let after_z = after.z_index().map(|value| value.to_string());
+    rewrite_changed_attribute(
+        &mut tag,
+        sites.z_index.as_deref(),
+        "draw:z-index",
+        before_z.as_deref(),
+        after_z.as_deref(),
+    )?;
+    rewrite_changed_attribute(
+        &mut tag,
+        sites.transform.as_deref(),
+        "draw:transform",
+        before.transform(),
+        after.transform(),
+    )?;
+    rewrite_changed_attribute(
+        &mut tag,
+        sites.anchor_type.as_deref(),
+        "text:anchor-type",
+        before.anchor_type(),
+        after.anchor_type(),
+    )?;
+    for (site, fallback, old, new) in [
+        (sites.x.as_deref(), "svg:x", before.x(), after.x()),
+        (sites.y.as_deref(), "svg:y", before.y(), after.y()),
+        (
+            sites.width.as_deref(),
+            "svg:width",
+            before.width(),
+            after.width(),
+        ),
+        (
+            sites.height.as_deref(),
+            "svg:height",
+            before.height(),
+            after.height(),
+        ),
+        (
+            sites.relative_width.as_deref(),
+            "style:rel-width",
+            before.relative_width(),
+            after.relative_width(),
+        ),
+        (
+            sites.relative_height.as_deref(),
+            "style:rel-height",
+            before.relative_height(),
+            after.relative_height(),
+        ),
+    ] {
+        rewrite_changed_attribute(&mut tag, site, fallback, old, new)?;
+    }
+    Ok(tag)
+}
+
+fn rewrite_changed_attribute(
+    tag: &mut String,
+    existing: Option<&str>,
+    fallback: &str,
+    before: Option<&str>,
+    after: Option<&str>,
+) -> Result<()> {
+    if before == after {
+        return Ok(());
+    }
+    let escaped = after.map(|value| quick_xml::escape::escape(value).into_owned());
+    *tag = match (existing, escaped) {
+        (Some(name), Some(value)) => replace_attribute(tag, name, &value)?,
+        (Some(name), None) => remove_attribute(tag, name)?,
+        (None, Some(value)) => insert_attribute(tag, fallback, &value)?,
+        (None, None) => tag.clone(),
+    };
+    Ok(())
 }
 
 fn rewrite_attribute(

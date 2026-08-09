@@ -17,6 +17,9 @@ impl FtPioGrbit {
 }
 
 impl OleObjectRecord {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn validate(&self) -> Result<()> {
         if self.subrecords.len() > 1_024 {
             return Err(invalid(OBJ, "too many Obj subrecords"));

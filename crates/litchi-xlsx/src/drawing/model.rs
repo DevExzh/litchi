@@ -1,8 +1,8 @@
-//! Semantic SpreadsheetDrawing objects.
+//! Semantic `SpreadsheetDrawing` objects.
 //!
 //! The worksheet/chartsheet owner keeps only the small amount of information
 //! needed to resolve drawing relationships. Full shape and text semantics stay
-//! with [`crate::shapes`] and reuse the neutral DrawingML text-body model.
+//! with [`crate::shapes`] and reuse the neutral `DrawingML` text-body model.
 
 use super::super::chart::Anchor;
 
@@ -51,7 +51,7 @@ impl Drawing {
     }
 }
 
-/// One anchored SpreadsheetDrawing object.
+/// One anchored `SpreadsheetDrawing` object.
 #[derive(Debug, Clone)]
 pub enum Object {
     /// A picture whose image relationship remains owned by the package graph.
@@ -85,7 +85,7 @@ impl Object {
     }
 }
 
-/// A SpreadsheetDrawing picture object.
+/// A `SpreadsheetDrawing` picture object.
 #[derive(Debug, Clone)]
 pub struct Picture {
     /// Cell-based anchor used by the chart integration model.
@@ -96,7 +96,7 @@ pub struct Picture {
     pub description: Option<String>,
 }
 
-/// A SpreadsheetDrawing chart object.
+/// A `SpreadsheetDrawing` chart object.
 #[derive(Debug, Clone)]
 pub struct Chart {
     /// Cell-based anchor used by the chart integration model.
@@ -108,11 +108,11 @@ pub struct Chart {
 /// The supported structural class of an unknown anchored object.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum UnknownKind {
-    /// A DrawingML shape (`xdr:sp`).
+    /// A `DrawingML` shape (`xdr:sp`).
     Shape,
-    /// A DrawingML group (`xdr:grpSp`).
+    /// A `DrawingML` group (`xdr:grpSp`).
     Group,
-    /// A DrawingML connector (`xdr:cxnSp`).
+    /// A `DrawingML` connector (`xdr:cxnSp`).
     Connection,
     /// An embedded or otherwise inert content part (`xdr:contentPart`).
     ContentPart,
@@ -131,7 +131,7 @@ pub struct Unknown {
     pub kind: UnknownKind,
 }
 
-/// Shared DrawingML text-body vocabulary used by SpreadsheetDrawing shapes.
+/// Shared `DrawingML` text-body vocabulary used by `SpreadsheetDrawing` shapes.
 pub mod text {
     pub use litchi_drawingml::text::body::{Body, Insets, Paragraph, Properties, Run};
     pub use litchi_drawingml::text::{

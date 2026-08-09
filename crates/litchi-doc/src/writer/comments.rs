@@ -45,12 +45,14 @@ impl CommentEntry {
     }
 
     /// Attach this comment to a main-document range.
+    #[must_use]
     pub fn with_range(mut self, start: u32, exclusive_end: u32) -> Self {
         self.range = Some((start, exclusive_end));
         self
     }
 
     /// Set Word 2002+ timestamp, reply-tree, and ink metadata.
+    #[must_use]
     pub fn with_extended_metadata(mut self, metadata: ExtendedMetadata) -> Self {
         self.extended_metadata = Some(metadata);
         self

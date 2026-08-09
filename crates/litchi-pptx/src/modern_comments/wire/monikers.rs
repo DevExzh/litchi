@@ -28,14 +28,14 @@ pub(super) fn parse_monikers(xml: &[u8]) -> Result<List> {
             no_attributes_except_id(&child.attributes)?;
             nodes.push(Node::Comment {
                 id: attribute(&child.attributes, "id", true)?
-                    .unwrap()
+                    .ok_or_else(|| invalid("comment moniker requires id"))?
                     .to_owned(),
             });
         } else if child.namespace == PC2 && child.local == "cmRplyMk" {
             no_attributes_except_id(&child.attributes)?;
             nodes.push(Node::Reply {
                 id: attribute(&child.attributes, "id", true)?
-                    .unwrap()
+                    .ok_or_else(|| invalid("comment reply moniker requires id"))?
                     .to_owned(),
             });
         } else {

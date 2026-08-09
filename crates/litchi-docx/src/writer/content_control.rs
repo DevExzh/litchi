@@ -1,3 +1,7 @@
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
 /// Content control writer support for DOCX documents.
 ///
 /// Content controls are structured document regions that can contain text, dates,
@@ -75,10 +79,11 @@ impl MutableContentControl {
     /// ```rust,ignore
     /// let control = MutableContentControl::rich_text(1, Some("CustomerName"));
     /// ```
+    #[must_use]
     pub fn rich_text(id: u32, tag: Option<&str>) -> Self {
         Self {
             id,
-            tag: tag.map(|s| s.to_string()),
+            tag: tag.map(ToString::to_string),
             title: None,
             control_type: ContentControlType::RichText,
             allow_delete: true,
@@ -97,10 +102,11 @@ impl MutableContentControl {
     ///
     /// * `id` - Unique control ID
     /// * `tag` - Optional tag for programmatic identification
+    #[must_use]
     pub fn plain_text(id: u32, tag: Option<&str>) -> Self {
         Self {
             id,
-            tag: tag.map(|s| s.to_string()),
+            tag: tag.map(ToString::to_string),
             title: None,
             control_type: ContentControlType::PlainText,
             allow_delete: true,
@@ -131,10 +137,11 @@ impl MutableContentControl {
     /// ];
     /// let control = MutableContentControl::dropdown(1, Some("Color"), items);
     /// ```
+    #[must_use]
     pub fn dropdown(id: u32, tag: Option<&str>, items: Vec<(String, String)>) -> Self {
         Self {
             id,
-            tag: tag.map(|s| s.to_string()),
+            tag: tag.map(ToString::to_string),
             title: None,
             control_type: ContentControlType::DropDownList { items },
             allow_delete: true,
@@ -157,7 +164,7 @@ impl MutableContentControl {
     pub fn date_picker(id: u32, tag: Option<&str>, format: impl Into<String>) -> Self {
         Self {
             id,
-            tag: tag.map(|s| s.to_string()),
+            tag: tag.map(ToString::to_string),
             title: None,
             control_type: ContentControlType::DatePicker {
                 format: format.into(),
@@ -179,10 +186,11 @@ impl MutableContentControl {
     /// * `id` - Unique control ID
     /// * `tag` - Optional tag for programmatic identification
     /// * `checked` - Initial checked state
+    #[must_use]
     pub fn checkbox(id: u32, tag: Option<&str>, checked: bool) -> Self {
         Self {
             id,
-            tag: tag.map(|s| s.to_string()),
+            tag: tag.map(ToString::to_string),
             title: None,
             control_type: ContentControlType::Checkbox { checked },
             allow_delete: true,
@@ -197,12 +205,14 @@ impl MutableContentControl {
 
     /// Get the control ID.
     #[inline]
+    #[must_use]
     pub fn id(&self) -> u32 {
         self.id
     }
 
     /// Get the control tag.
     #[inline]
+    #[must_use]
     pub fn tag(&self) -> Option<&str> {
         self.tag.as_deref()
     }
@@ -214,6 +224,7 @@ impl MutableContentControl {
 
     /// Get the control title.
     #[inline]
+    #[must_use]
     pub fn title(&self) -> Option<&str> {
         self.title.as_deref()
     }
@@ -238,7 +249,7 @@ impl MutableContentControl {
 
     /// Set legacy literal placeholder text.
     ///
-    /// WordprocessingML placeholder properties reference glossary document
+    /// `WordprocessingML` placeholder properties reference glossary document
     /// parts rather than containing literal text. A control retaining this
     /// legacy value is rejected during checked serialization.
     pub fn set_placeholder(&mut self, placeholder: Option<String>) {
@@ -249,6 +260,10 @@ impl MutableContentControl {
     }
 
     /// Set an explicit glossary document-part name for w:placeholder.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_placeholder_doc_part(&mut self, name: Option<String>) -> Result<&mut Self> {
         self.placeholder_doc_part = name;
         self.placeholder = None;
@@ -256,12 +271,20 @@ impl MutableContentControl {
     }
 
     /// Set an explicit glossary document-part name using builder syntax.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn with_placeholder_doc_part(mut self, name: impl Into<String>) -> Result<Self> {
         self.set_placeholder_doc_part(Some(name.into()))?;
         Ok(self)
     }
 
     /// Set the optional bounded xsd:dateTime fullDate value of a date picker.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_date_value(&mut self, value: Option<String>) -> Result<&mut Self> {
         if value.is_some() && !matches!(self.control_type, ContentControlType::DatePicker { .. }) {
             return Err(Error::InvalidFormat(
@@ -274,6 +297,7 @@ impl MutableContentControl {
 
     /// Return the custom XML data binding, when present.
     #[inline]
+    #[must_use]
     pub fn data_binding(&self) -> Option<&DataBinding> {
         self.data_binding.as_ref()
     }
@@ -285,6 +309,10 @@ impl MutableContentControl {
     }
 
     /// Construct and install a checked custom XML data binding.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn bind(
         &mut self,
         xpath: impl Into<String>,
@@ -296,7 +324,11 @@ impl MutableContentControl {
 
     /// Construct and install a checked Word 2012 formatted data binding.
     ///
-    /// The XPath remains inert lexical metadata and is never executed.
+    /// The `XPath` remains inert lexical metadata and is never executed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn bind_word_2012(
         &mut self,
         xpath: impl Into<String>,
@@ -314,6 +346,10 @@ impl MutableContentControl {
     }
 
     /// Construct and install a checked binding using builder syntax.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn with_binding(
         mut self,
         xpath: impl Into<String>,
@@ -324,6 +360,10 @@ impl MutableContentControl {
     }
 
     /// Construct and install a checked Word 2012 binding using builder syntax.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn with_word_2012_binding(
         mut self,
         xpath: impl Into<String>,
@@ -335,6 +375,7 @@ impl MutableContentControl {
 
     /// Return the Word 2024 formatting exception, when present.
     #[inline]
+    #[must_use]
     pub fn formatting_allowed(&self) -> Option<FormattingAllowed> {
         self.formatting_allowed
     }
@@ -343,6 +384,10 @@ impl MutableContentControl {
     ///
     /// The extension is meaningful only for contentLocked and
     /// sdtContentLocked, so setting it on an editable control is rejected.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_formatting_allowed(
         &mut self,
         allowed: Option<FormattingAllowed>,
@@ -357,12 +402,17 @@ impl MutableContentControl {
     }
 
     /// Set the Word 2024 formatting exception using builder syntax.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn with_formatting_allowed(mut self, allowed: FormattingAllowed) -> Result<Self> {
         self.set_formatting_allowed(Some(allowed))?;
         Ok(self)
     }
 
     /// Get the content control type.
+    #[must_use]
     pub fn control_type(&self) -> &ContentControlType {
         &self.control_type
     }
@@ -370,7 +420,10 @@ impl MutableContentControl {
     /// Generate XML for this content control (start tag).
     ///
     /// Content controls wrap around content, so this generates the opening tags.
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "writer helper is retained for package integration"
+    )]
     pub(crate) fn to_xml_start(&self) -> Result<String> {
         if self.placeholder.is_some() {
             return Err(Error::InvalidFormat(
@@ -409,14 +462,19 @@ impl MutableContentControl {
         let properties = write_sdt_pr(&view, &Limits::default())?;
         let mut xml = properties.into_xml();
         xml.try_reserve("<w:sdt><w:sdtContent>".len())
-            .map_err(|_| Error::InvalidFormat("content-control output allocation failed".into()))?;
+            .map_err(|_source_error| {
+                Error::InvalidFormat("content-control output allocation failed".into())
+            })?;
         xml.insert_str(0, "<w:sdt>");
         xml.push_str("<w:sdtContent>");
         Ok(xml)
     }
 
     /// Generate XML for content control end tag.
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "writer helper is retained for package integration"
+    )]
     pub(crate) fn to_xml_end() -> &'static str {
         "</w:sdtContent></w:sdt>"
     }

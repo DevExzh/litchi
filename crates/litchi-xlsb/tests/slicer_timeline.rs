@@ -1,3 +1,15 @@
+#![allow(
+    clippy::pedantic,
+    clippy::expect_used,
+    clippy::map_err_ignore,
+    clippy::shadow_reuse,
+    clippy::shadow_same,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    clippy::wildcard_enum_match_arm,
+    reason = "integration tests use panic-on-failure extraction and successive names that mirror package transaction states"
+)]
+
 //! Transactional XLSB slicer/timeline package-owner regressions.
 
 use litchi_opc::{BlobPart, PackURI, PackageWriter, Part, TargetMode};

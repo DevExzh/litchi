@@ -1,4 +1,4 @@
-//! Exact little-endian codecs for `OcxInfo`, `RgxOcxInfo`, and ObjectPool `ODT`.
+//! Exact little-endian codecs for `OcxInfo`, `RgxOcxInfo`, and `ObjectPool` `ODT`.
 
 use super::model::{Format, Metadata, OcxInfo, Persist1, Persist2, RgxOcxInfo, Story};
 use super::validation;
@@ -48,7 +48,7 @@ pub fn to_bytes(table: &RgxOcxInfo) -> Result<Vec<u8>> {
     Ok(data)
 }
 
-/// Decode one complete ObjectPool `ODT`/`ObjInfo` stream.
+/// Decode one complete `ObjectPool` `ODT`/`ObjInfo` stream.
 pub fn parse_metadata(data: &[u8]) -> Result<Metadata> {
     if data.len() != ODT_MIN_SIZE && data.len() != ODT_MAX_SIZE {
         return Err(corrupted("ObjectPool ObjInfo ODT must be 4 or 6 bytes"));
@@ -63,7 +63,7 @@ pub fn parse_metadata(data: &[u8]) -> Result<Metadata> {
     Metadata::try_new(persist1, format, persist2)
 }
 
-/// Encode one complete ObjectPool `ODT`/`ObjInfo` stream.
+/// Encode one complete `ObjectPool` `ODT`/`ObjInfo` stream.
 pub fn to_metadata_bytes(metadata: &Metadata) -> Result<Vec<u8>> {
     metadata.validate()?;
     let mut data = Vec::with_capacity(if metadata.persist2().is_some() { 6 } else { 4 });
@@ -88,12 +88,12 @@ impl RgxOcxInfo {
 }
 
 impl Metadata {
-    /// Decode one complete ObjectPool `ODT`/`ObjInfo` stream.
+    /// Decode one complete `ObjectPool` `ODT`/`ObjInfo` stream.
     pub fn parse_bytes(data: &[u8]) -> Result<Self> {
         parse_metadata(data)
     }
 
-    /// Encode one complete ObjectPool `ODT`/`ObjInfo` stream.
+    /// Encode one complete `ObjectPool` `ODT`/`ObjInfo` stream.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         to_metadata_bytes(self)
     }

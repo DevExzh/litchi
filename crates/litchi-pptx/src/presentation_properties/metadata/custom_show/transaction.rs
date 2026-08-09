@@ -280,7 +280,10 @@ impl Transaction {
             .clone();
         candidate.replace_by_id(id, replacement)?;
         validate(&self.original, &candidate)?;
-        let changed = before != *candidate.get_by_id(id).expect("show was retained");
+        let changed = before
+            != *candidate
+                .get_by_id(id)
+                .ok_or_else(|| invalid(format!("custom show {id} disappeared")))?;
         self.working = candidate;
         Ok(changed)
     }

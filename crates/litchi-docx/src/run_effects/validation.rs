@@ -108,7 +108,7 @@ pub(crate) fn validate_opaque(value: &OpaqueExtension) -> Result<()> {
                     ));
                 }
             },
-            Ok(Event::Decl(_)) | Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::Decl(_) | Event::DocType(_) | Event::PI(_)) => {
                 return Err(Error::Invalid(
                     "opaque run effect cannot contain declarations or processing instructions"
                         .into(),

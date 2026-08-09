@@ -999,9 +999,6 @@ impl<'a> RtfDocument<'a> {
     }
 
     pub(crate) fn plain_body_text_editability(&self) -> Result<(), &'static str> {
-        if !self.opaque_nodes.is_empty() {
-            return Err("opaque syntax is retained losslessly but not editable here");
-        }
         if !self.body_story_events.is_empty() || !self.tables.is_empty() {
             return Err("the body contains tables or positioned structure");
         }

@@ -101,6 +101,9 @@ impl Link {
     }
 
     /// Create a validated simple hyperlink with visible text.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn with_text(href: impl Into<String>, text: impl Into<String>) -> Result<Self> {
         let mut hyperlink = Self::new(href);
         hyperlink.text = text.into();
@@ -110,11 +113,13 @@ impl Link {
     }
 
     /// The target IRI of the hyperlink.
+    #[must_use]
     pub fn href(&self) -> &str {
         &self.href
     }
 
     /// The visible plain-text content of the hyperlink.
+    #[must_use]
     pub fn text(&self) -> &str {
         &self.text
     }
@@ -124,6 +129,7 @@ impl Link {
     /// A range can be empty for a zero-width `text:a` anchor. The range is
     /// meaningful together with [`Cell::text`](super::Cell::text), not as an
     /// offset into the hyperlink's own text.
+    #[must_use]
     pub fn range(&self) -> Range<usize> {
         self.range.clone()
     }
@@ -133,6 +139,9 @@ impl Link {
     }
 
     /// Validate data before it is serialized as an ODF `text:a` element.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn validate(&self) -> Result<()> {
         validate_href(&self.href)?;
         validate_xml_string(&self.text, "cell hyperlink text")?;
@@ -206,7 +215,7 @@ fn validate_href(href: &str) -> Result<()> {
             "cell hyperlink href must not be empty".to_string(),
         ));
     }
-    if href.chars().any(|character| character.is_control()) {
+    if href.chars().any(char::is_control) {
         return Err(Error::InvalidFormat(
             "cell hyperlink href must not contain control characters".to_string(),
         ));

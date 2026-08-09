@@ -61,6 +61,7 @@ pub enum SystemGeneratedData<'a> {
 }
 
 impl SystemGeneratedData<'_> {
+    #[must_use]
     pub fn expected_compression(&self) -> SystemGeneratedCompression {
         match self {
             Self::Idf(_) => SystemGeneratedCompression::XmReNoSplit,
@@ -81,6 +82,7 @@ pub struct SystemGeneratedFile<'a> {
 }
 
 impl SystemGeneratedFile<'_> {
+    #[must_use]
     pub fn expected_compression(&self) -> SystemGeneratedCompression {
         self.data.expected_compression()
     }

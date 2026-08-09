@@ -15,11 +15,17 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parse an exact `content.xml` source with default resource limits.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn parse(source: impl Into<Arc<str>>) -> Result<Self> {
         Self::parse_with_limits(source, Limits::default())
     }
 
     /// Parse an exact `content.xml` source with explicit resource limits.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn parse_with_limits(source: impl Into<Arc<str>>, limits: Limits) -> Result<Self> {
         let source = source.into();
         if source.len() > limits.max_input_bytes() {
@@ -41,21 +47,25 @@ impl Snapshot {
     }
 
     /// The exact source XML captured by this snapshot.
+    #[must_use]
     pub fn source_xml(&self) -> &str {
         &self.source
     }
 
     /// Clone the shared exact source binding.
+    #[must_use]
     pub fn source_arc(&self) -> Arc<str> {
         Arc::clone(&self.source)
     }
 
     /// The present tracked-change owner, distinguishing absence from emptiness.
+    #[must_use]
     pub fn changes(&self) -> Option<&Changes> {
         self.map.changes.as_ref()
     }
 
     /// Presence and value of `table:track-changes` on the owner.
+    #[must_use]
     pub fn tracking(&self) -> Option<bool> {
         self.map
             .owner
@@ -65,6 +75,9 @@ impl Snapshot {
     }
 
     /// Presence and value of one exact record's acceptance-state attribute.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn acceptance(&self, id: &str) -> Result<Option<Acceptance>> {
         if id.is_empty() {
             return invalid("tracked-change id must not be empty");
@@ -89,11 +102,15 @@ impl Snapshot {
     }
 
     /// Resource limits retained for edits and patch application.
+    #[must_use]
     pub const fn limits(&self) -> Limits {
         self.limits
     }
 
     /// Begin an inert, failure-atomic transaction with bounded fallible cloning.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn transaction(&self) -> Result<Transaction> {
         Transaction::new(self.clone())
     }
@@ -174,6 +191,9 @@ pub struct Transaction {
 
 impl Transaction {
     /// Create a transaction from a source-bound snapshot.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn new(snapshot: Snapshot) -> Result<Self> {
         let changes = match (snapshot.changes(), snapshot.map.validated.as_deref()) {
             (Some(value), Some(validated)) => {
@@ -188,16 +208,16 @@ impl Transaction {
         let mut acceptance = Vec::new();
         acceptance
             .try_reserve_exact(snapshot.acceptance_values().len())
-            .map_err(|_| allocation_error("tracked-change acceptance draft"))?;
+            .map_err(|_error| allocation_error("tracked-change acceptance draft"))?;
         acceptance.extend_from_slice(snapshot.acceptance_values());
         let mut records = Vec::new();
         records
             .try_reserve_exact(snapshot.map.record_resources.len())
-            .map_err(|_| allocation_error("tracked-change provenance draft"))?;
+            .map_err(|_error| allocation_error("tracked-change provenance draft"))?;
         let mut token_indices = HashMap::new();
         token_indices
             .try_reserve(snapshot.map.record_resources.len())
-            .map_err(|_| allocation_error("tracked-change source-token index"))?;
+            .map_err(|_error| allocation_error("tracked-change source-token index"))?;
         for (source_index, resources) in snapshot.map.record_resources.iter().copied().enumerate() {
             records.push(DraftRecord {
                 source_index: Some(source_index),
@@ -215,7 +235,7 @@ impl Transaction {
             .map(|validated| &validated.ids);
         let mut ids = HashMap::new();
         ids.try_reserve(cached_ids.map_or(0, HashMap::len))
-            .map_err(|_| allocation_error("tracked-change transaction ID index"))?;
+            .map_err(|_error| allocation_error("tracked-change transaction ID index"))?;
         if let Some(cached_ids) = cached_ids {
             for (id, index) in cached_ids {
                 ids.insert(
@@ -244,21 +264,27 @@ impl Transaction {
     }
 
     /// Original source snapshot used for stale checks and rollback.
+    #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Current present owner value, distinguishing absence from emptiness.
+    #[must_use]
     pub fn changes(&self) -> Option<&Changes> {
         self.changes.as_ref()
     }
 
     /// Current presence and value of `table:track-changes`.
+    #[must_use]
     pub const fn tracking(&self) -> Option<bool> {
         self.tracking
     }
 
     /// Set or remove the tracking attribute without accepting or applying records.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_tracking(&mut self, tracking: Option<bool>) -> Result<()> {
         let Some(changes) = self.changes.as_mut() else {
             if tracking.is_none() {
@@ -272,6 +298,9 @@ impl Transaction {
     }
 
     /// Insert a validated inert record at an exact source-order index.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn insert(&mut self, index: usize, change: Change) -> Result<()> {
         let was_absent = self.changes.is_none();
         let record_count = self
@@ -280,8 +309,7 @@ impl Transaction {
             .map_or(0, |changes| changes.changes.len());
         if index > record_count {
             return invalid(format!(
-                "tracked-change insertion index {index} exceeds {} records",
-                record_count
+                "tracked-change insertion index {index} exceeds {record_count} records"
             ));
         }
         let record_resources = change.resources_with_limits(&self.before.limits)?;
@@ -317,14 +345,14 @@ impl Transaction {
             .as_mut()
             .expect("tracked-change ID index")
             .try_reserve(1)
-            .map_err(|_| allocation_error("tracked-change ID index"))?;
+            .map_err(|_error| allocation_error("tracked-change ID index"))?;
         let source_token = self.next_source_token;
         let next_source_token = source_token.checked_add(1).ok_or_else(|| {
             Error::InvalidFormat("tracked-change source-token overflow".to_string())
         })?;
         self.token_indices
             .try_reserve(1)
-            .map_err(|_| allocation_error("tracked-change source-token index"))?;
+            .map_err(|_error| allocation_error("tracked-change source-token index"))?;
         reserve_one(&mut self.acceptance, "tracked-change acceptance states")?;
         reserve_one(&mut self.records, "tracked-change source records")?;
         if has_multi_deletion_marker(&change) {
@@ -449,12 +477,18 @@ impl Transaction {
     }
 
     /// Append a validated inert record.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn append(&mut self, change: Change) -> Result<()> {
         let index = self.changes.as_ref().map_or(0, |value| value.changes.len());
         self.insert(index, change)
     }
 
     /// Replace the record selected by an exact ID.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn replace(&mut self, id: &str, change: Change) -> Result<()> {
         let index = self.find_index(id)?;
         let record_resources = change.resources_with_limits(&self.before.limits)?;
@@ -484,7 +518,7 @@ impl Transaction {
             .as_mut()
             .expect("tracked-change ID index")
             .try_reserve(1)
-            .map_err(|_| allocation_error("tracked-change ID index"))?;
+            .map_err(|_error| allocation_error("tracked-change ID index"))?;
         if has_multi_deletion_marker(&change) {
             reserve_one(
                 &mut self.multi_deletion_groups,
@@ -559,6 +593,9 @@ impl Transaction {
     }
 
     /// Remove and return the record selected by an exact ID.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn remove(&mut self, id: &str) -> Result<Change> {
         let index = self.find_index(id)?;
         let shifts_following =
@@ -632,6 +669,9 @@ impl Transaction {
     }
 
     /// Move one exact ID to a checked final index. `len()` means the end.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn move_to(&mut self, id: &str, index: usize) -> Result<()> {
         let from = self.find_index(id)?;
         let len = self.changes.as_ref().expect("checked owner").changes.len();
@@ -668,6 +708,9 @@ impl Transaction {
     }
 
     /// Replace the complete ordering with an exact permutation of current IDs.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn reorder(&mut self, ids: &[String]) -> Result<()> {
         let record_count = self
             .changes
@@ -682,10 +725,10 @@ impl Transaction {
         let mut order = Vec::new();
         order
             .try_reserve_exact(ids.len())
-            .map_err(|_| allocation_error("tracked-change reorder plan"))?;
+            .map_err(|_error| allocation_error("tracked-change reorder plan"))?;
         let mut seen = Vec::new();
         seen.try_reserve_exact(ids.len())
-            .map_err(|_| allocation_error("tracked-change reorder seen set"))?;
+            .map_err(|_error| allocation_error("tracked-change reorder seen set"))?;
         seen.resize(ids.len(), false);
         for id in ids {
             let index = *self
@@ -705,12 +748,12 @@ impl Transaction {
         let mut at_position = Vec::new();
         at_position
             .try_reserve_exact(order.len())
-            .map_err(|_| allocation_error("tracked-change reorder positions"))?;
+            .map_err(|_error| allocation_error("tracked-change reorder positions"))?;
         at_position.extend(0..order.len());
         let mut position_of = Vec::new();
         position_of
             .try_reserve_exact(order.len())
-            .map_err(|_| allocation_error("tracked-change reorder inverse positions"))?;
+            .map_err(|_error| allocation_error("tracked-change reorder inverse positions"))?;
         position_of.extend(0..order.len());
 
         for target in 0..order.len() {
@@ -752,6 +795,9 @@ impl Transaction {
     }
 
     /// Set or remove one record's acceptance-state attribute.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_acceptance(&mut self, id: &str, acceptance: Option<Acceptance>) -> Result<()> {
         let index = self.find_index(id)?;
         let before = self.changes.as_ref().expect("checked owner").changes[index]
@@ -784,6 +830,9 @@ impl Transaction {
     }
 
     /// Explicitly replace the complete semantic owner.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn replace_all(&mut self, changes: Option<Changes>) -> Result<()> {
         let (resources, record_resources) =
             resources_for_changes(changes.as_ref(), &self.before.limits)?;
@@ -799,13 +848,13 @@ impl Transaction {
         if let Some(value) = &changes {
             acceptance
                 .try_reserve_exact(value.changes.len())
-                .map_err(|_| allocation_error("tracked-change acceptance states"))?;
+                .map_err(|_error| allocation_error("tracked-change acceptance states"))?;
             records
                 .try_reserve_exact(value.changes.len())
-                .map_err(|_| allocation_error("tracked-change source records"))?;
+                .map_err(|_error| allocation_error("tracked-change source records"))?;
             token_indices
                 .try_reserve(value.changes.len())
-                .map_err(|_| allocation_error("tracked-change source-token index"))?;
+                .map_err(|_error| allocation_error("tracked-change source-token index"))?;
             for (token, (change, resources)) in
                 value.changes.iter().zip(record_resources).enumerate()
             {
@@ -835,6 +884,9 @@ impl Transaction {
     }
 
     /// Restore the original semantic and presence state without reparsing.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn rollback(&mut self) -> Result<()> {
         let reset = Self::new(self.before.clone())?;
         self.changes = reset.changes;
@@ -852,6 +904,7 @@ impl Transaction {
     }
 
     /// Whether the current semantic and authored-presence state differs.
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.changes != self.before.map.changes
             || self.tracking != self.before.tracking()
@@ -859,6 +912,9 @@ impl Transaction {
     }
 
     /// Validate, materialize through checked descending-equivalent splices, and reparse.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn commit(self) -> Result<Commit> {
         if let Some(changes) = &self.changes {
             changes.validate_with_limits(&self.before.limits)?;
@@ -976,7 +1032,7 @@ impl Transaction {
                 let mut splices = Vec::new();
                 splices
                     .try_reserve_exact(self.before.map.records.len().saturating_add(2))
-                    .map_err(|_| allocation_error("tracked-change splice plan"))?;
+                    .map_err(|_error| allocation_error("tracked-change splice plan"))?;
                 if self.tracking != self.before.tracking() {
                     let replacement = codec::rewrite_owner_tracking(
                         source,
@@ -1038,9 +1094,9 @@ impl Transaction {
                     let mut addition = String::new();
                     for index in self.before.map.records.len()..changes.changes.len() {
                         let record = self.render_record(index)?;
-                        addition
-                            .try_reserve(record.len())
-                            .map_err(|_| allocation_error("tracked-change record insertion"))?;
+                        addition.try_reserve(record.len()).map_err(|_error| {
+                            allocation_error("tracked-change record insertion")
+                        })?;
                         addition.push_str(&record);
                     }
                     if let Some(close) = owner.element.close {
@@ -1148,7 +1204,7 @@ impl Transaction {
         let mut ids = HashMap::new();
         let count = self.changes.as_ref().map_or(0, |value| value.changes.len());
         ids.try_reserve(count)
-            .map_err(|_| allocation_error("tracked-change ID index"))?;
+            .map_err(|_error| allocation_error("tracked-change ID index"))?;
         if let Some(changes) = &self.changes {
             for (index, change) in changes.changes.iter().enumerate() {
                 let id = try_owned_string(&change.metadata().id, "tracked-change ID index")?;
@@ -1490,21 +1546,25 @@ impl Patch {
     }
 
     /// Whether source and target bytes are identical.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.source == self.target
     }
 
     /// Exact source XML required by this patch.
+    #[must_use]
     pub fn source(&self) -> &str {
         &self.source
     }
 
     /// Exact target XML produced by this patch.
+    #[must_use]
     pub fn target(&self) -> &str {
         &self.target
     }
 
     /// Return the exact inverse patch.
+    #[must_use]
     pub fn inverse(&self) -> Self {
         Self::new(
             Arc::clone(&self.target),
@@ -1514,6 +1574,9 @@ impl Patch {
     }
 
     /// Apply only to the exact source snapshot from which this patch was built.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn apply(&self, snapshot: &Snapshot) -> Result<Commit> {
         if snapshot.source_xml() != self.source() {
             return invalid("tracked-change patch source snapshot does not match");
@@ -1552,40 +1615,51 @@ pub struct Commit {
 }
 
 impl Commit {
+    #[must_use]
     pub const fn changed(&self) -> bool {
         self.changed
     }
 
+    #[must_use]
     pub fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
+    #[must_use]
     pub fn patch(&self) -> &Patch {
         &self.patch
     }
 
+    #[must_use]
     pub fn content_xml(&self) -> &str {
         self.snapshot.source_xml()
     }
 
+    #[must_use]
     pub fn source_arc(&self) -> Arc<str> {
         self.snapshot.source_arc()
     }
 
+    #[must_use]
     pub fn into_snapshot(self) -> Snapshot {
         self.snapshot
     }
 
+    #[must_use]
     pub fn into_source(self) -> Arc<str> {
         self.snapshot.source
     }
 
+    #[must_use]
     pub fn into_patch(self) -> Patch {
         self.patch
     }
 }
 
 /// Apply one concise inert tracked-change edit.
+///
+/// # Errors
+/// Returns an error when the operation cannot be completed.
 pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit>
 where
     F: FnOnce(&mut Transaction) -> Result<()>,
@@ -1641,7 +1715,7 @@ fn apply_splices(source: &str, mut splices: Vec<Splice>, limits: &Limits) -> Res
     let mut output = String::new();
     output
         .try_reserve_exact(length)
-        .map_err(|_| allocation_error("tracked-change output"))?;
+        .map_err(|_error| allocation_error("tracked-change output"))?;
     cursor = 0;
     for splice in splices {
         output.push_str(&source[cursor..splice.span.start]);
@@ -1664,7 +1738,7 @@ fn metadata_mut(change: &mut Change) -> &mut super::Metadata {
 fn default_acceptance_presence(change: &Change) -> Option<Acceptance> {
     match change.metadata().acceptance {
         Acceptance::Pending => None,
-        value => Some(value),
+        value @ Acceptance::Accepted | value @ Acceptance::Rejected => Some(value),
     }
 }
 
@@ -1683,7 +1757,7 @@ fn resources_for_changes(
     let mut records = Vec::new();
     records
         .try_reserve_exact(changes.changes.len())
-        .map_err(|_| allocation_error("tracked-change resource deltas"))?;
+        .map_err(|_error| allocation_error("tracked-change resource deltas"))?;
     for change in &changes.changes {
         let resources = change.resources_with_limits(limits)?;
         total = add_resources(total, resources, limits)?;
@@ -1699,7 +1773,7 @@ fn multi_deletion_span(change: &Change) -> Option<usize> {
     deletion
         .multi_deletion_spanned
         .as_ref()
-        .and_then(|span| span.to_usize())
+        .and_then(super::model::Integer::to_usize)
 }
 
 fn has_multi_deletion_marker(change: &Change) -> bool {
@@ -1717,7 +1791,7 @@ fn build_multi_deletion_groups(changes: Option<&Changes>) -> Result<Vec<MultiDel
         };
         groups
             .try_reserve(1)
-            .map_err(|_| allocation_error("tracked-change multi-deletion groups"))?;
+            .map_err(|_error| allocation_error("tracked-change multi-deletion groups"))?;
         groups.push(MultiDeletionGroup {
             start,
             end: start.checked_add(span).ok_or_else(|| {
@@ -1778,7 +1852,7 @@ fn build_inbound_index(changes: Option<&Changes>) -> Result<HashMap<String, Inbo
     };
     inbound
         .try_reserve(changes.changes.len())
-        .map_err(|_| allocation_error("tracked-change inbound index"))?;
+        .map_err(|_error| allocation_error("tracked-change inbound index"))?;
     for (source_token, change) in changes.changes.iter().enumerate() {
         let mut failure = None;
         change.for_each_relation(|target, kind| {
@@ -1866,7 +1940,9 @@ fn subtract_resources(left: Resources, right: Resources) -> Result<Resources> {
 }
 
 fn reserve_one<T>(values: &mut Vec<T>, label: &str) -> Result<()> {
-    values.try_reserve(1).map_err(|_| allocation_error(label))
+    values
+        .try_reserve(1)
+        .map_err(|_error| allocation_error(label))
 }
 
 #[cfg(test)]
@@ -2010,7 +2086,7 @@ fn try_owned_string(value: &str, label: &str) -> Result<String> {
     let mut owned = String::new();
     owned
         .try_reserve_exact(value.len())
-        .map_err(|_| allocation_error(label))?;
+        .map_err(|_error| allocation_error(label))?;
     owned.push_str(value);
     Ok(owned)
 }

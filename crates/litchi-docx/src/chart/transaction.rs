@@ -1,3 +1,7 @@
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
 //! Source-checked transactions over a DOCX chart ownership graph.
 
 use std::sync::Arc;
@@ -28,6 +32,10 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Load and validate the complete chart graph owned by `document_name`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn load(package: &OpcPackage, document_name: &PackURI) -> Result<Self> {
         let graph = package::load(package, document_name)?;
         let document = package.get_part(document_name)?;
@@ -41,6 +49,10 @@ impl Snapshot {
     }
 
     /// Alias emphasizing that the snapshot is bound to package source bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn read(package: &OpcPackage, document_name: &PackURI) -> Result<Self> {
         Self::load(package, document_name)
     }
@@ -103,6 +115,10 @@ pub struct Transaction<'a> {
 
 impl<'a> Transaction<'a> {
     /// Capture the current chart graph and begin a package-bound transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(target: &'a mut OpcPackage, document_name: &PackURI) -> Result<Self> {
         let before = Snapshot::load(target, document_name)?;
         Ok(Self {
@@ -113,6 +129,10 @@ impl<'a> Transaction<'a> {
     }
 
     /// Alias for [`Self::new`] at call sites that prefer a verb.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn begin(target: &'a mut OpcPackage, document_name: &PackURI) -> Result<Self> {
         Self::new(target, document_name)
     }
@@ -152,6 +172,10 @@ impl<'a> Transaction<'a> {
     /// The package service still enforces stable ownership at publication;
     /// changing chart part identities or relationship ownership is rejected
     /// before the target package is touched.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn replace_graph(&mut self, graph: Graph) -> Result<bool> {
         validate_graph_value(&graph)?;
         if self.draft == graph {
@@ -162,11 +186,19 @@ impl<'a> Transaction<'a> {
     }
 
     /// Alias for [`Self::replace_graph`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn replace(&mut self, graph: Graph) -> Result<bool> {
         self.replace_graph(graph)
     }
 
     /// Apply a checked, failure-atomic mutation to the staged graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn edit_graph(&mut self, edit: impl FnOnce(&mut Graph) -> Result<()>) -> Result<&mut Self> {
         let mut candidate = self.draft.clone();
         edit(&mut candidate)?;
@@ -176,11 +208,19 @@ impl<'a> Transaction<'a> {
     }
 
     /// Alias for [`Self::edit_graph`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn edit(&mut self, edit: impl FnOnce(&mut Graph) -> Result<()>) -> Result<&mut Self> {
         self.edit_graph(edit)
     }
 
     /// Validate and publish this graph as a reversible source-checked patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn commit(self) -> Result<Commit> {
         let current = Snapshot::load(self.target, self.before.document_name())?;
         if !current.same_source(&self.before) {
@@ -322,6 +362,10 @@ impl Patch {
     }
 
     /// Apply this patch atomically to a package with the captured source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn apply(&self, target: &mut OpcPackage) -> Result<Snapshot> {
         let current = Snapshot::load(target, self.before.document_name())?;
         if !current.same_source(&self.before) {
@@ -346,6 +390,10 @@ impl Patch {
     }
 
     /// Apply the inverse patch atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn undo(&self, target: &mut OpcPackage) -> Result<Snapshot> {
         self.inverse().apply(target)
     }

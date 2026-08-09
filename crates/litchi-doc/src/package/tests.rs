@@ -2,14 +2,14 @@ use super::*;
 use std::path::Path;
 
 #[test]
-#[ignore] // Requires test file
+#[ignore = "requires an external DOC fixture"]
 fn test_open_package() {
     let result = Package::open("test.doc");
     assert!(result.is_ok());
 }
 
 #[test]
-#[ignore] // Requires test file
+#[ignore = "requires an external DOC fixture"]
 fn test_invalid_file() {
     // Create a non-DOC file
     std::fs::write("test_invalid.tmp", b"Not a DOC file").unwrap();

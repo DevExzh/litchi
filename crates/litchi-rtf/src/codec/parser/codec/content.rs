@@ -40,6 +40,11 @@ impl<'a> Parser<'a> {
             return Ok(());
         }
         match control {
+            ControlWord::HtmlTag(_) => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF htmltag destination must be starred".to_string(),
+                ));
+            },
             ControlWord::Par | ControlWord::Line => {
                 let structural_table_boundary =
                     self.finalize_table_before_non_table_body_content(true)?;

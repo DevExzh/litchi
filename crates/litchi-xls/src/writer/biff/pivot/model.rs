@@ -1,4 +1,4 @@
-//! Typed configurations for the BIFF PivotTable record writer.
+//! Typed configurations for the BIFF `PivotTable` record writer.
 
 /// Configuration for an SXVIEW record.
 pub(crate) struct SxViewConfig<'a> {
@@ -69,7 +69,7 @@ pub(crate) struct SxExConfig {
     pub sx_select_count: u16,
     pub page_rows: u16,
     pub page_cols: u16,
-    /// XclPTExtInfo flags (default `0x004F0200`).
+    /// `XclPTExtInfo` flags (default `0x004F0200`).
     pub flags: u32,
 }
 

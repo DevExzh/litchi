@@ -2,7 +2,7 @@
 //!
 //! This module only models the deterministic `ft = 0`, `cft = 0` form. Color,
 //! font, icon, dynamic, date-grouping, worksheet, and producer-extension forms
-//! remain opaque in the ListObject collector. Criteria are metadata only; they
+//! remain opaque in the `ListObject` collector. Criteria are metadata only; they
 //! are never evaluated by the reader or writer.
 
 use super::list_object::{ListObjectId, ListObjectRange};
@@ -66,7 +66,7 @@ fn record(record_type: u16, payload: Vec<u8>) -> Result<Vec<u8>> {
     }
     let mut output = Vec::with_capacity(payload.len() + 4);
     output.extend_from_slice(&record_type.to_le_bytes());
-    output.extend_from_slice(&(payload.len() as u16).to_le_bytes());
+    output.extend_from_slice(&crate::utils::truncate_usize_to_u16(payload.len()).to_le_bytes());
     output.extend_from_slice(&payload);
     Ok(output)
 }
@@ -260,7 +260,12 @@ pub enum AutoFilter12DynamicType {
 
 impl AutoFilter12DynamicType {
     const fn code(self) -> u32 {
-        use AutoFilter12DynamicType::*;
+        use AutoFilter12DynamicType::{
+            AboveAverage, BelowAverage, LastMonth, LastQuarter, LastWeek, LastYear, Month1, Month2,
+            Month3, Month4, Month5, Month6, Month7, Month8, Month9, Month10, Month11, Month12,
+            NextMonth, NextQuarter, NextWeek, NextYear, Quarter1, Quarter2, Quarter3, Quarter4,
+            ThisMonth, ThisQuarter, ThisWeek, ThisYear, Today, Tomorrow, YearToDate, Yesterday,
+        };
         match self {
             AboveAverage => 1,
             BelowAverage => 2,
@@ -300,7 +305,12 @@ impl AutoFilter12DynamicType {
     }
 
     fn from_code(value: u32) -> Option<Self> {
-        use AutoFilter12DynamicType::*;
+        use AutoFilter12DynamicType::{
+            AboveAverage, BelowAverage, LastMonth, LastQuarter, LastWeek, LastYear, Month1, Month2,
+            Month3, Month4, Month5, Month6, Month7, Month8, Month9, Month10, Month11, Month12,
+            NextMonth, NextQuarter, NextWeek, NextYear, Quarter1, Quarter2, Quarter3, Quarter4,
+            ThisMonth, ThisQuarter, ThisWeek, ThisYear, Today, Tomorrow, YearToDate, Yesterday,
+        };
         Some(match value {
             1 => AboveAverage,
             2 => BelowAverage,
@@ -389,6 +399,9 @@ pub struct AutoFilter12DateGroup {
 }
 
 impl AutoFilter12DateGroup {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(
         year: u16,
         month: u16,
@@ -428,24 +441,31 @@ impl AutoFilter12DateGroup {
             level,
         })
     }
+    #[must_use]
     pub const fn year(self) -> u16 {
         self.year
     }
+    #[must_use]
     pub const fn month(self) -> u16 {
         self.month
     }
+    #[must_use]
     pub const fn day(self) -> u32 {
         self.day
     }
+    #[must_use]
     pub const fn hour(self) -> u16 {
         self.hour
     }
+    #[must_use]
     pub const fn minute(self) -> u16 {
         self.minute
     }
+    #[must_use]
     pub const fn second(self) -> u16 {
         self.second
     }
+    #[must_use]
     pub const fn level(self) -> AutoFilter12DateLevel {
         self.level
     }
@@ -463,6 +483,9 @@ pub enum AutoFilter12FormatKind {
 pub struct AutoFilter12DifferentialFormat(Vec<u8>);
 
 impl AutoFilter12DifferentialFormat {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(bytes: Vec<u8>) -> Result<Self> {
         if bytes.is_empty() || bytes.len() > MAX_RECORD_PAYLOAD - 60 {
             return Err(invalid(
@@ -472,12 +495,16 @@ impl AutoFilter12DifferentialFormat {
         }
         Ok(Self(bytes))
     }
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.0
     }
 }
 
 impl AutoFilter12Icon {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(set: AutoFilter12IconSet, index: u32) -> Result<Self> {
         let valid = match set.expected_icon_bound() {
             None => index == u32::MAX,
@@ -492,9 +519,11 @@ impl AutoFilter12Icon {
         Ok(Self { set, index })
     }
 
+    #[must_use]
     pub const fn set(self) -> AutoFilter12IconSet {
         self.set
     }
+    #[must_use]
     pub const fn index(self) -> u32 {
         self.index
     }
@@ -523,15 +552,20 @@ pub struct AutoFilter12Criterion {
 }
 
 impl AutoFilter12Criterion {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(operator: AutoFilter12Operator, value: AutoFilter12Value) -> Result<Self> {
         let criterion = Self { operator, value };
         criterion.validate()?;
         Ok(criterion)
     }
 
+    #[must_use]
     pub const fn operator(&self) -> AutoFilter12Operator {
         self.operator
     }
+    #[must_use]
     pub const fn value(&self) -> &AutoFilter12Value {
         &self.value
     }
@@ -578,6 +612,9 @@ pub struct TableAutoFilter12 {
 }
 
 impl TableAutoFilter12 {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(column_index: u16, criteria: Vec<AutoFilter12Criterion>) -> Result<Self> {
         if criteria.is_empty() {
             return Err(invalid(
@@ -599,6 +636,9 @@ impl TableAutoFilter12 {
         Ok(value)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new_icon(column_index: u16, icon: AutoFilter12Icon) -> Result<Self> {
         let value = Self {
             column_index,
@@ -614,6 +654,9 @@ impl TableAutoFilter12 {
         Ok(value)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new_date_groups(
         column_index: u16,
         date_groupings: Vec<AutoFilter12DateGroup>,
@@ -632,6 +675,9 @@ impl TableAutoFilter12 {
         Ok(value)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new_dynamic(
         column_index: u16,
         dynamic_filter: AutoFilter12DynamicType,
@@ -651,6 +697,9 @@ impl TableAutoFilter12 {
         Ok(value)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new_format(
         column_index: u16,
         kind: AutoFilter12FormatKind,
@@ -670,32 +719,41 @@ impl TableAutoFilter12 {
         Ok(value)
     }
 
+    #[must_use]
     pub fn with_hidden_arrow(mut self, hide: bool) -> Self {
         self.hide_arrow = hide;
         self
     }
 
+    #[must_use]
     pub const fn column_index(&self) -> u16 {
         self.column_index
     }
+    #[must_use]
     pub const fn hides_arrow(&self) -> bool {
         self.hide_arrow
     }
+    #[must_use]
     pub fn criteria(&self) -> &[AutoFilter12Criterion] {
         &self.criteria
     }
+    #[must_use]
     pub fn date_groupings(&self) -> &[AutoFilter12DateGroup] {
         &self.date_groupings
     }
+    #[must_use]
     pub const fn dynamic_filter(&self) -> Option<AutoFilter12DynamicType> {
         self.dynamic_filter
     }
+    #[must_use]
     pub const fn icon_filter(&self) -> Option<AutoFilter12Icon> {
         self.icon
     }
+    #[must_use]
     pub const fn format_kind(&self) -> Option<AutoFilter12FormatKind> {
         self.format_kind
     }
+    #[must_use]
     pub fn differential_format(&self) -> Option<&AutoFilter12DifferentialFormat> {
         self.differential_format.as_ref()
     }
@@ -810,7 +868,7 @@ fn encode_criterion(criterion: &AutoFilter12Criterion, range: ListObjectRange) -
         AutoFilter12Value::String(value) => {
             let units = value.encode_utf16().collect::<Vec<_>>();
             doper[0] = 0x06;
-            doper[2] = units.len() as u8;
+            doper[2] = crate::utils::truncate_usize_to_u8(units.len());
             doper[3] = u8::from(!value.contains(['?', '*']));
             Some(units)
         },
@@ -882,8 +940,12 @@ pub(crate) fn write_table_autofilter12(
             .map_or(0, AutoFilter12DynamicType::code)
             .to_le_bytes(),
     );
-    base.extend_from_slice(&(filter.criteria.len() as u32).to_le_bytes());
-    base.extend_from_slice(&(filter.date_groupings.len() as u32).to_le_bytes());
+    base.extend_from_slice(
+        &crate::utils::truncate_usize_to_u32(filter.criteria.len()).to_le_bytes(),
+    );
+    base.extend_from_slice(
+        &crate::utils::truncate_usize_to_u32(filter.date_groupings.len()).to_le_bytes(),
+    );
     base.extend_from_slice(&0u16.to_le_bytes()); // table ownership
     base.extend_from_slice(&0u32.to_le_bytes());
     base.extend_from_slice(&table_id.value().to_le_bytes());
@@ -986,7 +1048,7 @@ fn parse_criterion(data: &[u8], range: ListObjectRange) -> Result<AutoFilter12Cr
                         .map(|pair| u16::from_le_bytes([pair[0], pair[1]])),
                 )
                 .collect::<Result<String, _>>()
-                .map_err(|_| {
+                .map_err(|_error| {
                     invalid(
                         CONTINUE_FRT12_RECORD_TYPE,
                         "criterion string is invalid UTF-16",

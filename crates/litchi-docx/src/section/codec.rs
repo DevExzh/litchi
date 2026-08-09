@@ -1,4 +1,32 @@
-//! Bounded and lossless `w:sectPr` WordprocessingML codec.
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::expect_used,
+    reason = "the invariant is established immediately before extraction"
+)]
+#![expect(
+    clippy::option_option,
+    reason = "nested options distinguish omitted, present-empty, and present-valued XML"
+)]
+#![expect(
+    clippy::ref_option,
+    reason = "the public API shape is retained for compatibility"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
+#![expect(
+    clippy::struct_excessive_bools,
+    reason = "the public model preserves independent OOXML flags"
+)]
+//! Bounded and lossless `w:sectPr` `WordprocessingML` codec.
 
 use super::model::{
     Column, Columns, Emu, MAX_TWIPS, MAX_XML_BYTES, MAX_XML_DEPTH, MAX_XML_NODES, Margins,
@@ -355,7 +383,7 @@ fn node_rank(node: &Node) -> u8 {
             "cols" => 10,
             _ => u8::MAX,
         },
-        _ => u8::MAX,
+        Node::Element { .. } | Node::Raw(_) => u8::MAX,
     }
 }
 
@@ -435,7 +463,7 @@ fn write_columns(raw: &Raw, columns: &Columns) -> Result<Vec<u8>> {
         "<{} {}=\"{}\" {}=\"{}\"",
         raw.element_name("cols"),
         raw.attribute_name("equalWidth"),
-        if columns.equal_width { 1 } else { 0 },
+        i32::from(columns.equal_width),
         raw.attribute_name("num"),
         columns.count
     )?;
@@ -618,7 +646,13 @@ fn parse_raw(xml: &[u8]) -> Result<Raw> {
             _ if stack.len() == 1 => {
                 children.push(Node::Raw(xml[event_start..event_end].to_vec()));
             },
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 
@@ -756,9 +790,9 @@ fn parse_columns(raw: &Raw, xml: &[u8]) -> Result<Columns> {
             .is_none_or(|value| value != "0" && value != "false"),
         count: attr(&attrs, "num")
             .map(|value| {
-                value
-                    .parse::<u16>()
-                    .map_err(|_| Error::InvalidFormat("invalid section column count".into()))
+                value.parse::<u16>().map_err(|_source_error| {
+                    Error::InvalidFormat("invalid section column count".into())
+                })
             })
             .transpose()?
             .unwrap_or(1),
@@ -824,9 +858,9 @@ fn parse_attr_measurement(
 }
 
 fn parse_measurement(value: &str, description: &str, signed: bool, page_size: bool) -> Result<Emu> {
-    let twips = value
-        .parse::<i64>()
-        .map_err(|_| Error::InvalidFormat(format!("invalid {description} twip value '{value}'")))?;
+    let twips = value.parse::<i64>().map_err(|_source_error| {
+        Error::InvalidFormat(format!("invalid {description} twip value '{value}'"))
+    })?;
     let valid = if signed {
         (-MAX_TWIPS..=MAX_TWIPS).contains(&twips)
     } else if page_size {
@@ -851,12 +885,12 @@ fn direct_children(xml: &[u8]) -> Result<Vec<(String, Vec<u8>)>> {
     let mut output = Vec::new();
     loop {
         let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::InvalidFormat("section XML offset overflow".into()))?;
+            .map_err(|_source_error| Error::InvalidFormat("section XML offset overflow".into()))?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
         let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::InvalidFormat("section XML offset overflow".into()))?;
+            .map_err(|_source_error| Error::InvalidFormat("section XML offset overflow".into()))?;
         match event {
             Event::Start(element) => {
                 if depth == 0 {
@@ -887,7 +921,14 @@ fn direct_children(xml: &[u8]) -> Result<Vec<(String, Vec<u8>)>> {
                 }
             },
             Event::Eof => break,
-            _ => {},
+            Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if !root || depth != 0 {
@@ -909,7 +950,14 @@ fn attributes(xml: &[u8]) -> Result<Vec<(String, String)>> {
                     "section property has no element".into(),
                 ));
             },
-            _ => {},
+            Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     };
     let mut result = Vec::new();
@@ -958,7 +1006,14 @@ fn required_attribute(xml: &[u8], name: &[u8]) -> Result<String> {
                     "section property has no element".into(),
                 ));
             },
-            _ => {},
+            Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     };
     word_attribute_value(&element, name, decoder, &resolver)?.ok_or_else(|| {
@@ -971,7 +1026,7 @@ fn required_attribute(xml: &[u8], name: &[u8]) -> Result<String> {
 
 fn offset(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| Error::InvalidFormat("section XML offset overflow".into()))
+        .map_err(|_source_error| Error::InvalidFormat("section XML offset overflow".into()))
 }
 
 fn element_prefix(element: &BytesStart<'_>) -> Option<Vec<u8>> {

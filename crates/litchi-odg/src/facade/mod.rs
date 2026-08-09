@@ -5,7 +5,8 @@ use std::path::Path;
 
 pub use crate::authoring::Builder;
 pub use crate::package::{
-    Commit, LayerChange, NameChange, Patch, Snapshot, TextChange, Transaction,
+    Change, Commit, GeometryChange, History, HistoryLimits, LayerChange, NameChange, Patch,
+    ResourceChange, Snapshot, StructureChange, StyleChange, TextChange, Transaction,
 };
 
 /// Immutable source-owning drawing facade.
@@ -87,6 +88,21 @@ impl Drawing {
     /// Returns an error when package member validation fails.
     pub fn files(&self) -> Result<Vec<String>> {
         self.package.files()
+    }
+
+    /// Returns package-local image resources referenced by drawing XML.
+    #[must_use]
+    pub fn resources(&self) -> &[crate::resource::Resource] {
+        self.package.resources()
+    }
+
+    /// Reads one package-local resource without activating it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid selector or unreadable member.
+    pub fn resource_bytes(&self, resource: usize) -> Result<Option<Vec<u8>>> {
+        self.package.resource_bytes(resource)
     }
 
     /// Starts a source-bound package semantic transaction.

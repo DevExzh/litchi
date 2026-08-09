@@ -1,3 +1,15 @@
+#![expect(
+    clippy::option_option,
+    reason = "nested options distinguish omitted, present-empty, and present-valued XML"
+)]
+#![expect(
+    clippy::ref_option,
+    reason = "the public API shape is retained for compatibility"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Typed paragraph-property decoding.
 
 use crate::error::{Error, Result};
@@ -15,11 +27,19 @@ use super::xml::{
 
 impl Paragraph {
     /// Return direct paragraph numbering properties, including `numId=0` cancellation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn numbering(&self) -> Result<Option<crate::numbering::Paragraph>> {
         Ok(self.list_properties()?.0)
     }
 
     /// Return the paragraph style identifier from `<w:pPr>`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn style_id(&self) -> Result<Option<String>> {
         Ok(self.list_properties()?.1)
     }
@@ -72,7 +92,7 @@ impl Paragraph {
                         },
                         b"numId" if numpr_depth.is_some_and(|value| depth == value + 1) => {
                             let raw = paragraph_attribute(&element, b"val", decoder)?;
-                            let parsed = raw.parse::<u32>().map_err(|_| {
+                            let parsed = raw.parse::<u32>().map_err(|_source_error| {
                                 Error::InvalidFormat(format!("invalid paragraph numId '{raw}'"))
                             })?;
                             set_paragraph_property(&mut num_id, parsed, "numId")?;
@@ -113,7 +133,7 @@ impl Paragraph {
                         },
                         b"numId" if numpr_depth.is_some_and(|value| child_depth == value + 1) => {
                             let raw = paragraph_attribute(&element, b"val", decoder)?;
-                            let parsed = raw.parse::<u32>().map_err(|_| {
+                            let parsed = raw.parse::<u32>().map_err(|_source_error| {
                                 Error::InvalidFormat(format!("invalid paragraph numId '{raw}'"))
                             })?;
                             set_paragraph_property(&mut num_id, parsed, "numId")?;
@@ -145,7 +165,13 @@ impl Paragraph {
                     })?;
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {},
             }
         }
         let numbering = if saw_numpr {
@@ -164,6 +190,10 @@ impl Paragraph {
 
 impl Paragraph {
     /// Return the HTML division ID referenced by this paragraph, if present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn division_id(&self) -> Result<Option<String>> {
         direct_word_property_value(self.xml_bytes(), b"p", b"pPr", b"divId")?
             .map(|value| normalize_xml_integer(value, "Word paragraph division ID"))
@@ -172,9 +202,13 @@ impl Paragraph {
 
     /// Return the direct spacing properties of this paragraph.
     ///
-    /// The returned values are validated against the WordprocessingML types
-    /// used by CT_Spacing: before/after are non-negative twips, line is a
+    /// The returned values are validated against the `WordprocessingML` types
+    /// used by `CT_Spacing`: before/after are non-negative twips, line is a
     /// signed value, and lineRule is one of the schema-defined tokens.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn spacing(&self) -> Result<Option<ParagraphSpacing>> {
         parse_spacing(self.xml_bytes())
     }
@@ -336,7 +370,13 @@ fn parse_spacing(xml_bytes: &[u8]) -> Result<Option<ParagraphSpacing>> {
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 
@@ -417,9 +457,9 @@ fn parse_spacing_element(
 fn parse_u64(value: Option<String>, name: &str) -> Result<Option<u64>> {
     value
         .map(|value| {
-            value
-                .parse::<u64>()
-                .map_err(|_| Error::InvalidFormat(format!("invalid {name} value '{value}'")))
+            value.parse::<u64>().map_err(|_source_error| {
+                Error::InvalidFormat(format!("invalid {name} value '{value}'"))
+            })
         })
         .transpose()
 }
@@ -427,9 +467,9 @@ fn parse_u64(value: Option<String>, name: &str) -> Result<Option<u64>> {
 fn parse_i32(value: Option<String>, name: &str) -> Result<Option<i32>> {
     value
         .map(|value| {
-            value
-                .parse::<i32>()
-                .map_err(|_| Error::InvalidFormat(format!("invalid {name} value '{value}'")))
+            value.parse::<i32>().map_err(|_source_error| {
+                Error::InvalidFormat(format!("invalid {name} value '{value}'"))
+            })
         })
         .transpose()
 }

@@ -1,4 +1,4 @@
-//! DrawingML image-reference primitives.
+//! `DrawingML` image-reference primitives.
 
 use std::{fmt, fmt::Write as _};
 
@@ -50,14 +50,14 @@ pub fn read_embed(element: &BytesStart<'_>) -> Result<Option<String>> {
     Ok(None)
 }
 
-/// Find the first embedded-image relationship ID in DrawingML XML.
+/// Find the first embedded-image relationship ID in `DrawingML` XML.
 pub fn find_first_embed(xml: &[u8]) -> Result<Option<String>> {
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(true);
 
     loop {
         match reader.read_event() {
-            Ok(Event::Start(element)) | Ok(Event::Empty(element)) => {
+            Ok(Event::Start(element) | Event::Empty(element)) => {
                 if element.local_name().as_ref() == b"blip"
                     && let Some(relationship_id) = read_embed(&element)?
                 {

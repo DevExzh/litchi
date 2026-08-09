@@ -86,12 +86,23 @@ impl Database {
         crate::Catalog::parse(self.content_xml(), limits)
     }
 
-    /// Starts a source-bound stored-query transaction.
+    /// Inventories opaque direct producer-extension subtrees without
+    /// interpreting or activating them.
     ///
-    /// Query commands remain inert text throughout the transaction and are
-    /// never parsed, connected, refreshed, or executed.
+    /// # Errors
+    ///
+    /// Returns an error when the content XML is malformed or an extension
+    /// range cannot be represented safely.
+    pub fn producer_extensions(&self) -> Result<Vec<crate::ProducerExtension>> {
+        crate::authoring::producer_extensions(self.content_xml())
+    }
+
+    /// Starts a source-bound unified database-front-end transaction.
+    ///
+    /// Connection targets, query commands, component links, and producer
+    /// extensions remain inert data and are never opened or executed.
     #[must_use]
-    pub const fn edit(&self) -> crate::Edit<'_> {
+    pub fn edit(&self) -> crate::Edit<'_> {
         crate::Edit::new(self)
     }
 

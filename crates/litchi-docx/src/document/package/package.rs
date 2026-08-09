@@ -1,3 +1,7 @@
+#![expect(
+    clippy::items_after_statements,
+    reason = "the local helper remains adjacent to its sole use"
+)]
 //! OPC relationship and package-graph accessors for the document facade.
 
 use crate::Variables;
@@ -17,39 +21,51 @@ use litchi_opc::constants::relationship_type;
 
 use super::super::model::{Document, ImageWatermarkPart};
 
-impl<'a> Document<'a> {
+impl Document<'_> {
     /// Return the package's glossary/building-block catalog and dialect.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn glossary(
         &self,
     ) -> Result<Option<(crate::glossary::Catalog, crate::glossary::Conformance)>> {
-        Ok(crate::glossary::load(self.opc)?)
+        crate::glossary::load(self.opc)
     }
 
-    /// Load the typed, inert SmartArt (DrawingML diagram) inventory anchored
+    /// Load the typed, inert `SmartArt` (`DrawingML` diagram) inventory anchored
     /// in this document.
     ///
     /// Each returned [`crate::smartart::Diagram`] carries the
     /// parsed data-model node tree, the layout/quick-style/colors part
     /// metadata, and the diagram part names. Both transitional and Strict
     /// namespace dialects are supported.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn smart_arts(&self) -> Result<Vec<crate::smartart::Diagram>> {
         crate::smartart::load_smart_arts(self.opc, self.part.part().partname())
     }
 
-    /// Load the typed, inert text-box and WordArt inventory anchored in this
+    /// Load the typed, inert text-box and `WordArt` inventory anchored in this
     /// document.
     ///
     /// Each returned [`crate::textbox::TextBox`] carries the shape
     /// identity, the `wps:bodyPr` text-body properties, the story as
-    /// paragraphs with runs, and WordArt warp/styling presence flags. Both
-    /// DrawingML shapes and legacy VML `w:pict` fallbacks are recognized, in
+    /// paragraphs with runs, and `WordArt` warp/styling presence flags. Both
+    /// `DrawingML` shapes and legacy VML `w:pict` fallbacks are recognized, in
     /// both the transitional and Strict namespace dialects.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn text_boxes(&self) -> Result<Vec<crate::textbox::TextBox>> {
         crate::textbox::load_text_boxes(self.part.xml_bytes())
     }
     /// Get all headers in the document.
     ///
-    /// Returns header stories in WordprocessingML section-reference order.
+    /// Returns header stories in `WordprocessingML` section-reference order.
     /// Each story carries its typed [`Kind`].
     ///
     /// # Examples
@@ -65,6 +81,10 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn headers(&self) -> Result<Vec<Story>> {
         crate::header_footer::load_headers(self.opc, &self.part)
     }
@@ -74,6 +94,10 @@ impl<'a> Document<'a> {
     /// Word commonly repeats the same watermark in default, first-page, and
     /// even-page headers; equivalent copies are returned once in section
     /// reference order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn watermarks(&self) -> Result<Vec<Watermark>> {
         let mut watermarks = Vec::new();
         for header in self.headers()? {
@@ -92,6 +116,10 @@ impl<'a> Document<'a> {
     /// Each entry pairs a `v:imagedata` anchor discovered in a header with
     /// the relationship-resolved media part name and payload bytes. The
     /// payload is an inert byte view; it is never decoded or displayed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn image_watermarks(&self) -> Result<Vec<ImageWatermarkPart<'_>>> {
         let mut parts = Vec::new();
         for image in crate::header_footer::image_watermarks(self.opc, &self.part)? {
@@ -108,7 +136,7 @@ impl<'a> Document<'a> {
 
     /// Get all footers in the document.
     ///
-    /// Returns footer stories in WordprocessingML section-reference order.
+    /// Returns footer stories in `WordprocessingML` section-reference order.
     /// Each story carries its typed [`Kind`].
     ///
     /// # Examples
@@ -124,6 +152,10 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn footers(&self) -> Result<Vec<Story>> {
         crate::header_footer::load_footers(self.opc, &self.part)
     }
@@ -146,6 +178,10 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn header(&self, hdr_type: Kind) -> Result<Option<Story>> {
         let headers = self.headers()?;
         Ok(headers.into_iter().find(|header| header.kind() == hdr_type))
@@ -169,6 +205,10 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn footer(&self, ftr_type: Kind) -> Result<Option<Story>> {
         let footers = self.footers()?;
         Ok(footers.into_iter().find(|footer| footer.kind() == ftr_type))
@@ -199,14 +239,16 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn hyperlinks(&self) -> Result<Vec<crate::hyperlink::Hyperlink>> {
         let main_part = self.opc.main_document_part()?;
         let rels = main_part.rels();
         let xml_bytes = self.part.xml_bytes();
 
-        Ok(crate::hyperlink::Hyperlink::extract_from_document(
-            xml_bytes, rels,
-        )?)
+        crate::hyperlink::Hyperlink::extract_from_document(xml_bytes, rels)
     }
 
     /// Get the number of `<w:hyperlink>` element hyperlinks in the document.
@@ -222,6 +264,10 @@ impl<'a> Document<'a> {
     /// println!("Document has {} hyperlinks", doc.hyperlink_count()?);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn hyperlink_count(&self) -> Result<usize> {
         Ok(self.hyperlinks()?.len())
     }
@@ -244,6 +290,10 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn footnotes(&self) -> Result<Vec<Note>> {
         let main_part = self.opc.main_document_part()?;
         let rels = main_part.rels();
@@ -280,6 +330,10 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn endnotes(&self) -> Result<Vec<Note>> {
         let main_part = self.opc.main_document_part()?;
         let rels = main_part.rels();
@@ -311,6 +365,10 @@ impl<'a> Document<'a> {
     /// println!("Document has {} footnotes", doc.footnote_count()?);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn footnote_count(&self) -> Result<usize> {
         Ok(self.footnotes()?.len())
     }
@@ -328,6 +386,10 @@ impl<'a> Document<'a> {
     /// println!("Document has {} endnotes", doc.endnote_count()?);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn endnote_count(&self) -> Result<usize> {
         Ok(self.endnotes()?.len())
     }
@@ -350,6 +412,10 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn comments(&self) -> Result<Vec<Comment>> {
         let main_part = self.opc.main_document_part()?;
         let rels = main_part.rels();
@@ -381,6 +447,10 @@ impl<'a> Document<'a> {
     /// println!("Document has {} comments", doc.comment_count()?);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn comment_count(&self) -> Result<usize> {
         Ok(self.comments()?.len())
     }
@@ -403,6 +473,10 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn bookmarks(&self) -> Result<Vec<Bookmark>> {
         let xml_bytes = self.part.xml_bytes();
         Bookmark::extract_from_document(xml_bytes)
@@ -421,6 +495,10 @@ impl<'a> Document<'a> {
     /// println!("Document has {} bookmarks", doc.bookmark_count()?);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn bookmark_count(&self) -> Result<usize> {
         Ok(self.bookmarks()?.len())
     }
@@ -446,6 +524,10 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn numbering(&self) -> Result<Option<Collection>> {
         let main_part = self.opc.main_document_part()?;
         let rels = main_part.rels();
@@ -471,6 +553,10 @@ impl<'a> Document<'a> {
     /// unrelated numbering XML. The document facade itself remains borrowed
     /// and read-only; callers can retain the committed snapshot for package
     /// publication through the package graph APIs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn numbering_snapshot(&self) -> Result<Option<Snapshot>> {
         let main_part = self.opc.main_document_part()?;
         let rels = main_part.rels();
@@ -509,6 +595,10 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn settings(&self) -> Result<Option<DocumentSettings>> {
         let main_part = self.opc.main_document_part()?;
         let mut matches = main_part
@@ -534,6 +624,10 @@ impl<'a> Document<'a> {
     }
 
     /// Load the ISO mail-merge recipient-data part referenced by `settings.xml`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn mail_merge_recipients(&self) -> Result<Option<Recipients>> {
         let Some(settings) = self.settings()? else {
             return Ok(None);
@@ -564,8 +658,12 @@ impl<'a> Document<'a> {
     }
 
     /// Read the document's typed web-output settings and conformance family.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn web(&self) -> Result<Option<(web::Settings, web::Conformance)>> {
-        Ok(web::load(self.opc)?)
+        web::load(self.opc)
     }
     /// Get document variables.
     ///
@@ -587,6 +685,10 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn document_variables(&self) -> Result<Option<Variables>> {
         let main_part = self.opc.main_document_part()?;
         const STRICT_SETTINGS_RELATIONSHIP: &str =
@@ -637,6 +739,10 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn theme(&self) -> Result<Option<Theme>> {
         let main_part = self.opc.main_document_part()?;
         let rels = main_part.rels();
@@ -667,6 +773,10 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn custom_xml(&self) -> Result<Vec<CustomXmlPart>> {
         let mut custom_parts = Vec::new();
 

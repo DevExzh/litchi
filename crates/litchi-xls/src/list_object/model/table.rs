@@ -30,6 +30,9 @@ pub struct ListObject {
     pub(in crate::list_object) source_metadata: Option<ListObjectSourceMetadata>,
 }
 impl ListObject {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(
         id: ListObjectId,
         name: impl Into<String>,
@@ -66,6 +69,9 @@ impl ListObject {
         value.validate()?;
         Ok(value)
     }
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_header_row(mut self, v: bool) -> Result<Self> {
         self.has_header = v;
         if !v {
@@ -82,6 +88,9 @@ impl ListObject {
         self.validate()?;
         Ok(self)
     }
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_totals_row(mut self, v: bool) -> Result<Self> {
         self.has_totals = v;
         if v {
@@ -90,6 +99,9 @@ impl ListObject {
         self.validate()?;
         Ok(self)
     }
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_autofilter(mut self, v: bool) -> Result<Self> {
         self.autofilter = v;
         self.table_flags = self.table_flags.with_auto_filter(v);
@@ -104,17 +116,26 @@ impl ListObject {
     }
     /// Replace the fixed `TableFeatureType` metadata while retaining the
     /// table's row and column semantics.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_table_flags(mut self, flags: TableFlags) -> Result<Self> {
         self.table_flags = flags;
         self.autofilter = flags.auto_filter();
         self.validate()?;
         Ok(self)
     }
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_autofilter12_criteria(mut self, value: TableAutoFilter12) -> Result<Self> {
         self.autofilter12_criteria = Some(value);
         self.validate()?;
         Ok(self)
     }
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_comment(mut self, v: impl Into<String>) -> Result<Self> {
         self.comment = v.into();
         if self.comment.encode_utf16().count() > 255 {
@@ -125,6 +146,9 @@ impl ListObject {
         }
         Ok(self)
     }
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_external_data(mut self, metadata: ExternalTableMetadata) -> Result<Self> {
         metadata.validate()?;
         self.external_metadata = Some(metadata);
@@ -133,6 +157,9 @@ impl ListObject {
         self.validate()?;
         Ok(self)
     }
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_web_source(mut self, metadata: WebTableMetadata) -> Result<Self> {
         metadata.validate()?;
         self.source_metadata = Some(ListObjectSourceMetadata::Web(metadata));
@@ -144,6 +171,9 @@ impl ListObject {
         self.validate()?;
         Ok(self)
     }
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_xml_source(mut self, metadata: XmlTableMetadata) -> Result<Self> {
         metadata.validate()?;
         self.source_metadata = Some(ListObjectSourceMetadata::Xml(metadata));
@@ -155,51 +185,67 @@ impl ListObject {
         self.validate()?;
         Ok(self)
     }
+    #[must_use]
     pub const fn id(&self) -> ListObjectId {
         self.id
     }
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
+    #[must_use]
     pub const fn range(&self) -> ListObjectRange {
         self.range
     }
+    #[must_use]
     pub fn columns(&self) -> &[ListObjectColumn] {
         &self.columns
     }
+    #[must_use]
     pub fn style(&self) -> Option<&ListObjectStyleOptions> {
         self.style.as_ref()
     }
+    #[must_use]
     pub const fn has_header_row(&self) -> bool {
         self.has_header
     }
+    #[must_use]
     pub const fn has_totals_row(&self) -> bool {
         self.has_totals
     }
+    #[must_use]
     pub const fn shows_autofilter(&self) -> bool {
         self.autofilter
     }
+    #[must_use]
     pub const fn table_flags(&self) -> TableFlags {
         self.table_flags
     }
+    #[must_use]
     pub fn comment(&self) -> &str {
         &self.comment
     }
+    #[must_use]
     pub const fn feature_version(&self) -> ListObjectFeatureVersion {
         self.feature_version
     }
+    #[must_use]
     pub fn opaque_feature(&self) -> Option<&OpaqueListObjectFeature> {
         self.opaque_feature.as_ref()
     }
+    #[must_use]
     pub fn opaque_future_records(&self) -> &[OpaqueListObjectFutureRecord] {
         &self.opaque_future_records
     }
+    #[must_use]
     pub fn autofilter12_criteria(&self) -> Option<&TableAutoFilter12> {
         self.autofilter12_criteria.as_ref()
     }
+    #[must_use]
     pub fn external_metadata(&self) -> Option<&ExternalTableMetadata> {
         self.external_metadata.as_ref()
     }
+    #[must_use]
     pub fn source_metadata(&self) -> Option<&ListObjectSourceMetadata> {
         self.source_metadata.as_ref()
     }

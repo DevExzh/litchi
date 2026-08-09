@@ -19,10 +19,12 @@ impl Feature {
         Ok(Self(value))
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
+    #[must_use]
     pub fn into_string(self) -> String {
         self.0
     }
@@ -71,6 +73,7 @@ pub struct Features {
 }
 
 impl Features {
+    #[must_use]
     pub fn new(first: Feature) -> Self {
         Self {
             values: vec![first],
@@ -84,10 +87,17 @@ impl Features {
         Ok(Self { values })
     }
 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.values.len()
     }
 
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+
+    #[must_use]
     pub fn as_slice(&self) -> &[Feature] {
         &self.values
     }
@@ -96,11 +106,13 @@ impl Features {
         self.values.iter()
     }
 
+    #[must_use]
     pub fn get(&self, index: usize) -> Option<&Feature> {
         self.values.get(index)
     }
 
     /// Returns the zero-based occurrence of `name` without normalizing it.
+    #[must_use]
     pub fn occurrence(&self, name: &str, occurrence: usize) -> Option<&Feature> {
         self.values
             .iter()
@@ -108,6 +120,7 @@ impl Features {
             .nth(occurrence)
     }
 
+    #[must_use]
     pub fn occurrence_count(&self, name: &str) -> usize {
         self.values
             .iter()
@@ -165,6 +178,7 @@ impl Features {
         self.remove(index)
     }
 
+    #[must_use]
     pub fn into_vec(self) -> Vec<Feature> {
         self.values
     }

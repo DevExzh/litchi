@@ -1,13 +1,25 @@
-//! Bounded, inert DrawingML text-box and WordArt inventory for a DOCX main document.
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::similar_names,
+    reason = "domain names mirror distinct OOXML roles"
+)]
+#![expect(
+    clippy::struct_excessive_bools,
+    reason = "the public model preserves independent OOXML flags"
+)]
+//! Bounded, inert `DrawingML` text-box and `WordArt` inventory for a DOCX main document.
 //!
 //! A Word text box is anchored in the document body as a `w:drawing` element
 //! holding a wordprocessing shape (`wps:wsp`) whose `wps:txbx` carries a rich
 //! word-processing story (`w:txbxContent`) and whose `wps:bodyPr` carries the
 //! text-body properties (insets, vertical anchor, direction, wrap, autofit,
-//! columns). WordArt is the same shape with an `a:prstTxWarp` text warp preset
+//! columns). `WordArt` is the same shape with an `a:prstTxWarp` text warp preset
 //! plus optional Word 2010 text fill/outline/effect styling on the runs.
 //!
-//! Documents written for compatibility wrap the DrawingML form in
+//! Documents written for compatibility wrap the `DrawingML` form in
 //! `mc:AlternateContent`; markup-compatibility processing then surfaces the
 //! legacy VML `w:pict` fallback (`v:textbox` inside a VML shape). This module
 //! therefore recognizes both representations, in both the transitional and
@@ -130,7 +142,7 @@ impl Default for TextBoxBodyProperties {
     }
 }
 
-/// Inert WordArt styling discovered on a shape.
+/// Inert `WordArt` styling discovered on a shape.
 ///
 /// Styling bodies (fill/outline/effect definitions) are deliberately not
 /// parsed; only their presence is recorded.
@@ -168,12 +180,13 @@ pub struct TextBoxParagraph {
 
 impl TextBoxParagraph {
     /// Concatenated paragraph text.
+    #[must_use]
     pub fn text(&self) -> String {
         self.runs.iter().map(|run| run.text.as_str()).collect()
     }
 }
 
-/// A typed, inert text box or WordArt shape anchored in a Word document.
+/// A typed, inert text box or `WordArt` shape anchored in a Word document.
 #[derive(Clone, Debug)]
 pub struct TextBox {
     /// Drawing element ID (`wp:docPr@id` / `wps:cNvSpPr@id`), when declared.
@@ -187,14 +200,15 @@ pub struct TextBox {
     /// Text-body properties (ECMA-376 defaults when `wps:bodyPr` is absent,
     /// which is always the case for the VML fallback representation).
     pub body: TextBoxBodyProperties,
-    /// WordArt warp preset and styling presence flags, when the shape is WordArt.
+    /// `WordArt` warp preset and styling presence flags, when the shape is `WordArt`.
     pub word_art: Option<WordArt>,
     /// The text-box story as paragraphs with runs.
     pub paragraphs: Vec<TextBoxParagraph>,
 }
 
 impl TextBox {
-    /// Whether this shape carries WordArt styling.
+    /// Whether this shape carries `WordArt` styling.
+    #[must_use]
     pub fn is_word_art(&self) -> bool {
         self.word_art.is_some()
     }
@@ -276,13 +290,17 @@ impl ShapeBuilder {
     }
 }
 
-/// Load the typed, inert text-box and WordArt inventory anchored in a main
+/// Load the typed, inert text-box and `WordArt` inventory anchored in a main
 /// document part.
 ///
 /// `xml_bytes` is the raw `word/document.xml` content; markup-compatibility
 /// processing is applied so `mc:AlternateContent` fallbacks resolve to the
 /// representation this inventory reads. Shapes are returned in document
 /// order, with shapes nested inside another shape's story finishing first.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn load_text_boxes(xml_bytes: &[u8]) -> Result<Vec<TextBox>> {
     if xml_bytes.len() > MAX_DOCUMENT_XML {
         return Err(limit("document XML bytes"));
@@ -417,7 +435,7 @@ fn parse_text_boxes(xml: &[u8]) -> Result<Vec<TextBox>> {
                 return Err(invalid("unterminated document XML"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Comment(_) | Event::Decl(_) => {},
         }
     }
     Ok(text_boxes)
@@ -750,7 +768,7 @@ mod tests {
     /// A floating DrawingML text box with explicit body properties.
     fn floating_text_box() -> String {
         "<w:p><w:r><w:drawing><wp:anchor>\
-         <wp:extent cx=\"1828800\" cy=\"914400\"/><wp:docPr id=\"7\" name=\"Box 7\"/>\
+         <wp:extent cx=\"1828800\" cy=\"914_400\"/><wp:docPr id=\"7\" name=\"Box 7\"/>\
          <a:graphic><a:graphicData uri=\"http://schemas.microsoft.com/office/word/2010/wordprocessingShape\">\
          <wps:wsp><wps:cNvSpPr id=\"7\" name=\"Box 7\"/>\
          <wps:spPr><a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></wps:spPr>\

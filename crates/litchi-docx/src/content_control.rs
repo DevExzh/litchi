@@ -1,3 +1,31 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
+#![expect(
+    clippy::similar_names,
+    reason = "domain names mirror distinct OOXML roles"
+)]
+#![expect(
+    clippy::struct_excessive_bools,
+    reason = "the public model preserves independent OOXML flags"
+)]
+#![expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "the public API shape is retained for compatibility"
+)]
+#![expect(
+    clippy::unnecessary_wraps,
+    reason = "the Result signature preserves a uniform fallible codec API"
+)]
 use crate::error::{Error, Result};
 /// Content control support for Word documents.
 ///
@@ -364,7 +392,7 @@ pub struct ContentControl {
     placeholder: Option<String>,
     /// Keyboard tab order.
     tab_index: Option<u32>,
-    /// XPath of the custom XML data binding.
+    /// `XPath` of the custom XML data binding.
     data_bindings: Vec<DataBinding>,
     /// Word 2024 formatting exception attached to a content lock.
     formatting_allowed: Option<FormattingAllowed>,
@@ -391,7 +419,8 @@ pub struct ContentControl {
 }
 
 impl ContentControl {
-    /// Create a new ContentControl.
+    /// Create a new `ContentControl`.
+    #[must_use]
     pub fn new(
         id: u32,
         tag: Option<String>,
@@ -428,42 +457,49 @@ impl ContentControl {
 
     /// Get the control ID.
     #[inline]
+    #[must_use]
     pub fn id(&self) -> u32 {
         self.id.unwrap_or_default()
     }
 
     /// Get the optional source ID without conflating a missing ID with zero.
     #[inline]
+    #[must_use]
     pub const fn id_opt(&self) -> Option<u32> {
         self.id
     }
 
     /// Get the control tag.
     #[inline]
+    #[must_use]
     pub fn tag(&self) -> Option<&str> {
         self.tag.as_deref()
     }
 
     /// Get the control title.
     #[inline]
+    #[must_use]
     pub fn title(&self) -> Option<&str> {
         self.title.as_deref()
     }
 
     /// Get the semantic control kind.
     #[inline]
+    #[must_use]
     pub fn kind(&self) -> Kind {
         self.kind
     }
 
     /// Check if the control is locked for deletion.
     #[inline]
+    #[must_use]
     pub fn is_lock_delete(&self) -> bool {
         self.lock_delete
     }
 
     /// Check if the content is locked for editing.
     #[inline]
+    #[must_use]
     pub fn is_lock_content(&self) -> bool {
         self.lock_content
     }
@@ -481,29 +517,33 @@ impl ContentControl {
 
     /// Check whether Word should remove the control after it is edited.
     #[inline]
+    #[must_use]
     pub fn is_temporary(&self) -> bool {
         self.temporary
     }
 
     /// Check whether the control is displaying placeholder content.
     #[inline]
+    #[must_use]
     pub fn is_showing_placeholder(&self) -> bool {
         self.showing_placeholder
     }
 
     /// Get the building-block name used for placeholder content.
     #[inline]
+    #[must_use]
     pub fn placeholder(&self) -> Option<&str> {
         self.placeholder.as_deref()
     }
 
     /// Get the keyboard tab order.
     #[inline]
+    #[must_use]
     pub fn tab_index(&self) -> Option<u32> {
         self.tab_index
     }
 
-    /// Get the XPath of the custom XML data binding.
+    /// Get the `XPath` of the custom XML data binding.
     #[inline]
     pub fn data_binding_xpath(&self) -> Option<&str> {
         self.data_binding().map(DataBinding::xpath)
@@ -515,7 +555,7 @@ impl ContentControl {
         self.data_binding().map(DataBinding::store_item_id)
     }
 
-    /// Get namespace prefix mappings used by the data-binding XPath.
+    /// Get namespace prefix mappings used by the data-binding `XPath`.
     #[inline]
     pub fn data_binding_prefix_mappings(&self) -> Option<&str> {
         self.data_binding().and_then(DataBinding::prefix_mappings)
@@ -523,6 +563,7 @@ impl ContentControl {
 
     /// Get the complete typed inert data binding.
     #[inline]
+    #[must_use]
     pub fn data_binding(&self) -> Option<&DataBinding> {
         self.data_bindings
             .iter()
@@ -532,17 +573,23 @@ impl ContentControl {
 
     /// Get every exact binding occurrence in source order.
     #[inline]
+    #[must_use]
     pub fn data_bindings(&self) -> &[DataBinding] {
         &self.data_bindings
     }
 
     /// Get the Word 2024 formatting exception, preserving absence.
     #[inline]
+    #[must_use]
     pub const fn formatting_allowed(&self) -> Option<FormattingAllowed> {
         self.formatting_allowed
     }
 
-    /// Validate binding metadata without evaluating the XPath or resolving URIs.
+    /// Validate binding metadata without evaluating the `XPath` or resolving URIs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn validate_data_binding(&self) -> Result<()> {
         for binding in &self.data_bindings {
             validate_data_binding_values(
@@ -556,60 +603,70 @@ impl ContentControl {
 
     /// Get the display text and values declared by a list control.
     #[inline]
+    #[must_use]
     pub fn list_items(&self) -> &[(String, String)] {
         &self.list_items
     }
 
     /// Get the checked state of a checkbox control.
     #[inline]
+    #[must_use]
     pub fn checked(&self) -> Option<bool> {
         self.checked
     }
 
     /// Get the display format of a date control.
     #[inline]
+    #[must_use]
     pub fn date_format(&self) -> Option<&str> {
         self.date_format.as_deref()
     }
 
     /// Get the ISO date value stored on a date control.
     #[inline]
+    #[must_use]
     pub fn date_value(&self) -> Option<&str> {
         self.date_value.as_deref()
     }
 
     /// Get the calendar selected by a date control, preserving absence.
     #[inline]
+    #[must_use]
     pub fn date_calendar(&self) -> Option<&Calendar> {
         self.date_calendar.as_ref()
     }
 
     /// Get the title of a repeating-section control.
     #[inline]
+    #[must_use]
     pub fn repeating_section_title(&self) -> Option<&str> {
         self.repeating_section_title.as_deref()
     }
 
     /// Return the requested visual treatment of this control.
     #[inline]
+    #[must_use]
     pub const fn appearance(&self) -> Option<Appearance> {
         self.appearance
     }
 
     /// Return the requested visual base color of this control.
     #[inline]
+    #[must_use]
     pub const fn color(&self) -> Option<SdtColor> {
         self.color
     }
 
     /// Return the exact inert `webExtensionLinked` marker, preserving absence.
     #[inline]
+    #[must_use]
     pub const fn web_extension_linked(&self) -> Option<bool> {
         self.web_extension_linked
     }
 
     /// Return the exact inert `webExtensionCreated` marker, preserving absence.
     #[inline]
+    #[must_use]
     pub const fn web_extension_created(&self) -> Option<bool> {
         self.web_extension_created
     }
@@ -619,6 +676,7 @@ impl ContentControl {
     /// Per [MS-DOCX] 2.5.1.12-13, `webExtensionCreated` takes precedence
     /// when both markers are present. No relationship is resolved or run.
     #[inline]
+    #[must_use]
     pub const fn web_extension_binding(&self) -> Option<WebExtensionBinding> {
         if let Some(value) = self.web_extension_created {
             Some(WebExtensionBinding::Created(value))
@@ -830,7 +888,13 @@ fn parse_selected_inventory(doc_xml: &[u8], limits: &Limits) -> Result<Inventory
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 
@@ -879,7 +943,11 @@ fn push_occurrence(
     Ok(())
 }
 
-/// Validate the lexical form of an SDT data binding without executing XPath.
+/// Validate the lexical form of an SDT data binding without executing `XPath`.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn validate_data_binding_values(
     xpath: &str,
     store_item_id: &str,
@@ -1141,7 +1209,7 @@ fn parse_direct_property(
                 set_once(&mut control.tab_index, value, "content-control tab index")?;
             },
             b"dataBinding" => {
-                parse_data_binding(element, decoder, resolver, BindingFlavor::Core, control)?
+                parse_data_binding(element, decoder, resolver, BindingFlavor::Core, control)?;
             },
             b"placeholder" => {
                 if control.placeholder_seen {
@@ -1220,7 +1288,7 @@ fn parse_direct_property(
                 )?;
             },
             b"dataBinding" => {
-                parse_data_binding(element, decoder, resolver, BindingFlavor::Word2012, control)?
+                parse_data_binding(element, decoder, resolver, BindingFlavor::Word2012, control)?;
             },
             b"repeatingSection" => {
                 set_kind(control, Kind::RepeatingSection)?;
@@ -1329,7 +1397,11 @@ fn parse_nested_property(
                 "repeating-section title",
             )?;
         },
-        _ => {},
+        PropertyContext::Placeholder
+        | PropertyContext::Date
+        | PropertyContext::List
+        | PropertyContext::Checkbox
+        | PropertyContext::RepeatingSection => {},
     }
     Ok(())
 }
@@ -1456,9 +1528,9 @@ fn required_u32(
     description: &str,
 ) -> Result<u32> {
     let value = required_word_attribute(element, name, decoder, resolver, description)?;
-    value
-        .parse::<u32>()
-        .map_err(|_| Error::InvalidFormat(format!("invalid {description} value '{value}'")))
+    value.parse::<u32>().map_err(|_source_error| {
+        Error::InvalidFormat(format!("invalid {description} value '{value}'"))
+    })
 }
 
 fn required_word_attribute(
@@ -1714,7 +1786,13 @@ fn validate_extension_ignorable(
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     Ok(())

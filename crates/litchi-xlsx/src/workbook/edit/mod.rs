@@ -2,7 +2,10 @@
 //!
 //! The parent keeps a private context namespace for the existing codec and
 //! package siblings, whose `super::*` imports are intentionally unchanged.
-#![allow(unused_imports)]
+#![allow(
+    unused_imports,
+    reason = "the edit facade deliberately retains its complete crate-visible vocabulary"
+)]
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, btree_map::Entry};
 use std::sync::Arc;

@@ -1,4 +1,10 @@
-use crate::writer::core::{codec, model::*};
+use crate::writer::core::{
+    codec,
+    model::{
+        CharacterFormatting, NoteStoryData, ParagraphFormatting, WriteError, Writer,
+        utf16_code_unit_len,
+    },
+};
 use crate::writer::font_table::FontTableBuilder;
 use crate::writer::footnotes::FootnoteEntry;
 use crate::writer::piece_table::Piece;
@@ -7,12 +13,15 @@ impl Writer {
     ///
     /// Per MS-DOC spec:
     /// - Each note text MUST begin with U+0002 (auto-numbered reference mark) with fSpec=1
-    /// - PlcffndRef final CP MUST equal `ccp_text` (main document character count)
-    /// - PlcffndTxt CPs are relative to the note subdocument start
+    /// - `PlcffndRef` final CP MUST equal `ccp_text` (main document character count)
+    /// - `PlcffndTxt` CPs are relative to the note subdocument start
     ///
     /// `actual_ref_cps`: actual CPs in main doc where U+0002 refs were injected (entry order).
-    /// `ccp_text`: FibRgLw97.ccpText — needed for the mandatory final CP in PlcffndRef.
-    #[allow(clippy::too_many_arguments)]
+    /// `ccp_text`: FibRgLw97.ccpText — needed for the mandatory final CP in `PlcffndRef`.
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "parameters map one-to-one to a fixed DOC record or semantic construction"
+    )]
     pub(in crate::writer::core::package) fn build_note_story(
         entries: &[FootnoteEntry],
         actual_ref_cps: &[u32],

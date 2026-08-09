@@ -23,6 +23,7 @@ pub enum HyperlinkType {
 
 impl HyperlinkType {
     /// Determine hyperlink type from destination string
+    #[must_use]
     pub fn from_destination(dest: &str) -> Self {
         let dest_lower = dest.to_lowercase();
         if dest_lower.starts_with("http://")
@@ -37,7 +38,7 @@ impl HyperlinkType {
             || dest_lower.starts_with("\\\\")
         {
             HyperlinkType::File
-        } else if dest_lower.starts_with("#") {
+        } else if dest_lower.starts_with('#') {
             HyperlinkType::Bookmark
         } else {
             HyperlinkType::Unknown
@@ -63,6 +64,7 @@ pub struct Hyperlink {
 
 impl Hyperlink {
     /// Create a new hyperlink
+    #[must_use]
     pub fn new(start_cp: u32, end_cp: u32, field_code: String, display_text: String) -> Self {
         let destination = Self::extract_destination(&field_code);
         let link_type = HyperlinkType::from_destination(&destination);
@@ -98,7 +100,7 @@ impl Hyperlink {
             // Extract bookmark name
             let bookmark_part = code.strip_prefix("\\l").unwrap_or("").trim();
             if let Some(dest) = Self::extract_quoted_string(bookmark_part) {
-                return format!("#{}", dest);
+                return format!("#{dest}");
             }
         }
 
@@ -135,6 +137,7 @@ impl Hyperlink {
     }
 
     /// Get the length of the hyperlink text
+    #[must_use]
     pub fn length(&self) -> u32 {
         self.end_cp.saturating_sub(self.start_cp)
     }
@@ -156,7 +159,7 @@ impl HyperlinksTable {
     ///
     /// # Returns
     ///
-    /// A parsed HyperlinksTable
+    /// A parsed `HyperlinksTable`
     pub fn from_fields<F>(fields_table: &FieldsTable, text_extractor: F) -> Result<Self>
     where
         F: Fn(u32, u32) -> Result<String>,
@@ -196,11 +199,13 @@ impl HyperlinksTable {
     }
 
     /// Get all hyperlinks
+    #[must_use]
     pub fn hyperlinks(&self) -> &[Hyperlink] {
         &self.hyperlinks
     }
 
     /// Find hyperlinks that overlap with a character position
+    #[must_use]
     pub fn find_at_position(&self, cp: u32) -> Vec<&Hyperlink> {
         self.hyperlinks
             .iter()
@@ -209,6 +214,7 @@ impl HyperlinksTable {
     }
 
     /// Get hyperlinks by type
+    #[must_use]
     pub fn by_type(&self, link_type: HyperlinkType) -> Vec<&Hyperlink> {
         self.hyperlinks
             .iter()
@@ -217,6 +223,7 @@ impl HyperlinksTable {
     }
 
     /// Get the count of hyperlinks
+    #[must_use]
     pub fn count(&self) -> usize {
         self.hyperlinks.len()
     }

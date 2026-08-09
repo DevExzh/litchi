@@ -80,6 +80,7 @@ pub struct Styles {
 impl Styles {
     /// Create a new empty styles collection.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -104,36 +105,42 @@ impl Styles {
     ///
     /// Returns both built-in and custom number formats.
     #[inline]
+    #[must_use]
     pub fn get_number_format(&self, id: u32) -> Option<&NumberFormat> {
         self.number_formats.get(&id)
     }
 
     /// Get a font by ID (index).
     #[inline]
+    #[must_use]
     pub fn get_font(&self, id: usize) -> Option<&Font> {
         self.fonts.get(id)
     }
 
     /// Get a fill by ID (index).
     #[inline]
+    #[must_use]
     pub fn get_fill(&self, id: usize) -> Option<&Fill> {
         self.fills.get(id)
     }
 
     /// Get a border by ID (index).
     #[inline]
+    #[must_use]
     pub fn get_border(&self, id: usize) -> Option<&Border> {
         self.borders.get(id)
     }
 
     /// Get a differential format by its zero-based DXF index.
     #[inline]
+    #[must_use]
     pub fn get_differential_format(&self, id: usize) -> Option<&Differential> {
         self.differential_formats.get(id)
     }
 
     /// Number of differential formats available to conditional formatting.
     #[inline]
+    #[must_use]
     pub fn differential_format_count(&self) -> usize {
         self.differential_formats.len()
     }
@@ -143,30 +150,35 @@ impl Styles {
     /// This returns the actual cell format (from cellXfs) that is
     /// referenced by cells in the workbook.
     #[inline]
+    #[must_use]
     pub fn get_cell_style(&self, id: usize) -> Option<&CellStyle> {
         self.cell_xfs.get(id)
     }
 
     /// Get the number of fonts defined.
     #[inline]
+    #[must_use]
     pub fn font_count(&self) -> usize {
         self.fonts.len()
     }
 
     /// Get the number of fills defined.
     #[inline]
+    #[must_use]
     pub fn fill_count(&self) -> usize {
         self.fills.len()
     }
 
     /// Get the number of borders defined.
     #[inline]
+    #[must_use]
     pub fn border_count(&self) -> usize {
         self.borders.len()
     }
 
     /// Get the number of cell styles defined.
     #[inline]
+    #[must_use]
     pub fn cell_style_count(&self) -> usize {
         self.cell_xfs.len()
     }

@@ -37,11 +37,12 @@ impl Snapshot {
     }
 
     /// Returns the exact source artifact bytes.
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
-    /// Projects the standard SummaryInformation section, when present.
+    /// Projects the standard `SummaryInformation` section, when present.
     pub fn summary_information(
         &self,
     ) -> Result<Option<property_set::summary_information::Snapshot>> {
@@ -53,7 +54,7 @@ impl Snapshot {
             .map_err(Into::into)
     }
 
-    /// Projects the standard DocumentSummaryInformation section, when present.
+    /// Projects the standard `DocumentSummaryInformation` section, when present.
     pub fn document_summary_information(
         &self,
     ) -> Result<Option<property_set::document_summary::Snapshot>> {
@@ -109,6 +110,7 @@ impl Snapshot {
     }
 
     /// Consumes the snapshot into its owned source bytes.
+    #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
         self.bytes.to_vec()
     }
@@ -132,11 +134,12 @@ impl Transaction {
     }
 
     /// Whether a successful edit has changed the transaction state.
+    #[must_use]
     pub const fn is_changed(&self) -> bool {
         self.changed
     }
 
-    /// Projects the current transaction-local SummaryInformation section.
+    /// Projects the current transaction-local `SummaryInformation` section.
     pub fn summary_information(
         &self,
     ) -> Result<Option<property_set::summary_information::Snapshot>> {
@@ -148,7 +151,7 @@ impl Transaction {
             .map_err(Into::into)
     }
 
-    /// Projects the current transaction-local DocumentSummaryInformation section.
+    /// Projects the current transaction-local `DocumentSummaryInformation` section.
     pub fn document_summary_information(
         &self,
     ) -> Result<Option<property_set::document_summary::Snapshot>> {
@@ -170,7 +173,7 @@ impl Transaction {
             .map_err(Into::into)
     }
 
-    /// Applies a typed SummaryInformation edit through the common PIDSI owner.
+    /// Applies a typed `SummaryInformation` edit through the common PIDSI owner.
     ///
     /// The common typed transaction is committed before its replacement is
     /// handed to the common CFB editor. A no-op typed commit does not stage a
@@ -201,7 +204,7 @@ impl Transaction {
         Ok(true)
     }
 
-    /// Applies a typed DocumentSummaryInformation edit through the common PIDDSI owner.
+    /// Applies a typed `DocumentSummaryInformation` edit through the common PIDDSI owner.
     pub fn edit_document_summary_information<F>(&mut self, edit: F) -> Result<bool>
     where
         F: for<'a> FnOnce(
@@ -251,7 +254,7 @@ impl Transaction {
     }
 
     /// Removes the user-defined section while retaining the rest of the
-    /// DocumentSummaryInformation stream.
+    /// `DocumentSummaryInformation` stream.
     pub fn remove_user_defined_properties(&mut self) -> Result<bool> {
         if self
             .editor
@@ -340,6 +343,7 @@ impl Transaction {
     }
 
     /// Discards the transaction and recovers its exact source snapshot.
+    #[must_use]
     pub fn rollback(self) -> Snapshot {
         self.source
     }
@@ -355,26 +359,31 @@ pub struct Commit {
 
 impl Commit {
     /// Whether the complete output differs from the source artifact.
+    #[must_use]
     pub const fn changed(&self) -> bool {
         self.changed
     }
 
     /// Borrows the validated output snapshot.
+    #[must_use]
     pub const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrows the source-checked reversible whole-package patch.
+    #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Consumes the commit into its owned output bytes.
+    #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
         self.snapshot.into_bytes()
     }
 
     /// Consumes the commit into its output snapshot and patch.
+    #[must_use]
     pub fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
@@ -389,11 +398,13 @@ pub struct Patch {
 
 impl Patch {
     /// Returns the exact source bytes bound to this patch.
+    #[must_use]
     pub fn source(&self) -> &[u8] {
         &self.source
     }
 
     /// Returns the exact replacement bytes produced by the commit.
+    #[must_use]
     pub fn replacement(&self) -> &[u8] {
         &self.replacement
     }

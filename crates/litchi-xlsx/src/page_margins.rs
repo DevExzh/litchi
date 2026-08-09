@@ -16,22 +16,25 @@ const MAX_DEPTH: usize = 128;
 const MAX_EVENTS: usize = 1_000_000;
 const MAX_OFFICE_MARGIN_INCHES: f64 = 49.0;
 
-/// A validated physical page margin stored by SpreadsheetML in inches.
+/// A validated physical page margin stored by `SpreadsheetML` in inches.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct PageMargin(f64);
 
 impl PageMargin {
-    /// Margin in the native SpreadsheetML unit, inches.
+    /// Margin in the native `SpreadsheetML` unit, inches.
+    #[must_use]
     pub fn inches(self) -> f64 {
         self.0
     }
 
     /// Margin converted to typographic points.
+    #[must_use]
     pub fn points(self) -> f64 {
         self.0 * 72.0
     }
 
     /// Margin converted to millimeters.
+    #[must_use]
     pub fn millimeters(self) -> f64 {
         self.0 * 25.4
     }
@@ -49,21 +52,27 @@ pub struct Margins {
 }
 
 impl Margins {
+    #[must_use]
     pub fn left(&self) -> PageMargin {
         self.left
     }
+    #[must_use]
     pub fn right(&self) -> PageMargin {
         self.right
     }
+    #[must_use]
     pub fn top(&self) -> PageMargin {
         self.top
     }
+    #[must_use]
     pub fn bottom(&self) -> PageMargin {
         self.bottom
     }
+    #[must_use]
     pub fn header(&self) -> PageMargin {
         self.header
     }
+    #[must_use]
     pub fn footer(&self) -> PageMargin {
         self.footer
     }

@@ -1,4 +1,4 @@
-//! Structural and scalar validation for DrawingML color fragments.
+//! Structural and scalar validation for `DrawingML` color fragments.
 
 use quick_xml::Reader;
 use quick_xml::events::Event;
@@ -77,7 +77,7 @@ pub(super) fn parse_positive_angle(value: &str) -> Result<u32> {
     positive_angle(value)
 }
 
-/// Parse the DrawingML percentage lexical union.
+/// Parse the `DrawingML` percentage lexical union.
 ///
 /// The standard stores values as thousandths of a percent. Office also reads
 /// a human-readable percent sign form; accepting both keeps the shared owner

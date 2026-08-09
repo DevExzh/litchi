@@ -70,7 +70,7 @@ fn transaction_preserves_auxiliary_members() {
         .add_file("content.xml", MATHML.as_bytes())
         .expect("content");
     writer
-        .add_file("Configurations2/accelerator/current.xml", b"opaque")
+        .add_file("Configurations2/accelerator/current.xml", b"<config/>")
         .expect("auxiliary");
     let source = Formula::from_bytes(writer.finish_to_bytes().expect("package")).expect("open");
 
@@ -87,7 +87,7 @@ fn transaction_preserves_auxiliary_members() {
         package
             .get_file("Configurations2/accelerator/current.xml")
             .expect("auxiliary member"),
-        b"opaque"
+        b"<config/>"
     );
 }
 

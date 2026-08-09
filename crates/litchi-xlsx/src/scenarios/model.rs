@@ -34,7 +34,7 @@ impl Conformance {
     }
 }
 
-/// A validated A1 cell reference (ST_CellRef).
+/// A validated A1 cell reference (`ST_CellRef`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CellReference(String);
 
@@ -45,6 +45,7 @@ impl CellReference {
         Ok(Self(value))
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -61,6 +62,7 @@ impl RangeReference {
         Ok(Self(value))
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -75,10 +77,12 @@ pub struct UnknownAttribute {
 }
 
 impl UnknownAttribute {
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.qualified_name
     }
 
+    #[must_use]
     pub fn value(&self) -> &str {
         &self.value
     }
@@ -118,6 +122,7 @@ impl UnknownElement {
         Self::from_parts(xml.into(), Vec::new())
     }
 
+    #[must_use]
     pub fn as_xml(&self) -> &[u8] {
         &self.xml
     }
@@ -241,7 +246,7 @@ impl OpaqueFields {
     }
 }
 
-/// One substitute value assignment (CT_InputCells).
+/// One substitute value assignment (`CT_InputCells`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InputCell {
     pub(crate) reference: CellReference,
@@ -265,42 +270,51 @@ impl InputCell {
         })
     }
 
+    #[must_use]
     pub fn with_deleted(mut self, value: bool) -> Self {
         self.deleted = value;
         self
     }
 
+    #[must_use]
     pub fn with_undone(mut self, value: bool) -> Self {
         self.undone = value;
         self
     }
 
+    #[must_use]
     pub fn with_number_format_id(mut self, value: u32) -> Self {
         self.number_format_id = Some(value);
         self
     }
 
+    #[must_use]
     pub fn reference(&self) -> &CellReference {
         &self.reference
     }
 
+    #[must_use]
     pub fn deleted(&self) -> bool {
         self.deleted
     }
 
+    #[must_use]
     pub fn undone(&self) -> bool {
         self.undone
     }
 
+    #[must_use]
     pub fn value(&self) -> &str {
         &self.value
     }
 
+    #[must_use]
     pub fn number_format_id(&self) -> Option<u32> {
         self.number_format_id
     }
 
     /// Unknown attributes retained on the inputCells element.
+    #[must_use]
     pub fn unknown_attributes(&self) -> &[UnknownAttribute] {
         self.opaque
             .as_deref()
@@ -308,6 +322,7 @@ impl InputCell {
     }
 
     /// Unknown child elements retained inertly and in document order.
+    #[must_use]
     pub fn unknown_elements(&self) -> &[UnknownElement] {
         self.opaque
             .as_deref()
@@ -321,7 +336,7 @@ impl InputCell {
     }
 }
 
-/// One named what-if scenario (CT_Scenario).
+/// One named what-if scenario (`CT_Scenario`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Scenario {
     pub(crate) name: String,
@@ -349,16 +364,19 @@ impl Scenario {
         })
     }
 
+    #[must_use]
     pub fn with_locked(mut self, value: bool) -> Self {
         self.locked = value;
         self
     }
 
+    #[must_use]
     pub fn with_hidden(mut self, value: bool) -> Self {
         self.hidden = value;
         self
     }
 
+    #[must_use]
     pub fn with_count(mut self, value: u32) -> Self {
         self.count = Some(value);
         self
@@ -397,35 +415,43 @@ impl Scenario {
         Ok(self)
     }
 
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    #[must_use]
     pub fn locked(&self) -> bool {
         self.locked
     }
 
+    #[must_use]
     pub fn hidden(&self) -> bool {
         self.hidden
     }
 
+    #[must_use]
     pub fn count(&self) -> Option<u32> {
         self.count
     }
 
+    #[must_use]
     pub fn user(&self) -> Option<&str> {
         self.user.as_deref()
     }
 
+    #[must_use]
     pub fn comment(&self) -> Option<&str> {
         self.comment.as_deref()
     }
 
+    #[must_use]
     pub fn input_cells(&self) -> &[InputCell] {
         &self.input_cells
     }
 
     /// Unknown attributes retained on the scenario element.
+    #[must_use]
     pub fn unknown_attributes(&self) -> &[UnknownAttribute] {
         self.opaque
             .as_deref()
@@ -433,6 +459,7 @@ impl Scenario {
     }
 
     /// Unknown child elements retained inertly and in document order.
+    #[must_use]
     pub fn unknown_elements(&self) -> &[UnknownElement] {
         self.opaque
             .as_deref()
@@ -469,11 +496,13 @@ impl Collection {
         })
     }
 
+    #[must_use]
     pub fn with_current(mut self, value: u32) -> Self {
         self.current = Some(value);
         self
     }
 
+    #[must_use]
     pub fn with_show(mut self, value: u32) -> Self {
         self.show = Some(value);
         self
@@ -489,23 +518,28 @@ impl Collection {
         Ok(self)
     }
 
+    #[must_use]
     pub fn current(&self) -> Option<u32> {
         self.current
     }
 
+    #[must_use]
     pub fn show(&self) -> Option<u32> {
         self.show
     }
 
+    #[must_use]
     pub fn ranges(&self) -> &[RangeReference] {
         &self.ranges
     }
 
+    #[must_use]
     pub fn scenarios(&self) -> &[Scenario] {
         &self.scenarios
     }
 
     /// Unknown attributes retained on the scenarios element.
+    #[must_use]
     pub fn unknown_attributes(&self) -> &[UnknownAttribute] {
         self.opaque
             .as_deref()
@@ -513,6 +547,7 @@ impl Collection {
     }
 
     /// Unknown child elements retained inertly and in document order.
+    #[must_use]
     pub fn unknown_elements(&self) -> &[UnknownElement] {
         self.opaque
             .as_deref()

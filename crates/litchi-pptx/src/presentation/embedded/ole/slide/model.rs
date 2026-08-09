@@ -93,6 +93,7 @@ impl Definition {
         self.target.as_deref()
     }
 
+    #[must_use]
     pub fn set_name(mut self, value: impl Into<String>) -> Self {
         self.name = Some(value.into());
         self
@@ -104,6 +105,7 @@ impl Definition {
         self
     }
 
+    #[must_use]
     pub fn set_program_id(mut self, value: impl Into<String>) -> Self {
         self.program_id = Some(value.into());
         self

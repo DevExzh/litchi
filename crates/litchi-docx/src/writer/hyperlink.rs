@@ -1,3 +1,11 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
 //! Hyperlink support for DOCX documents.
 
 use super::field::MutableField;
@@ -9,7 +17,10 @@ use std::fmt::Write as FmtWrite;
 
 /// Elements that can appear in a hyperlink.
 #[derive(Debug)]
-#[allow(clippy::large_enum_variant)] // writer-internal type; boxing would churn all match sites
+#[allow(
+    clippy::large_enum_variant,
+    reason = "writer-internal variants are moved and boxing would add churn"
+)] // writer-internal type; boxing would churn all match sites
 pub(crate) enum HyperlinkElement {
     Run(MutableRun),
     Field(MutableField),
@@ -114,8 +125,7 @@ impl MutableHyperlink {
                 .map_err(|e| Error::Xml(e.to_string()))?;
         } else if let Some(rid) = r_id {
             // External URL hyperlink
-            write!(xml, r#"<w:hyperlink r:id="{}">"#, rid)
-                .map_err(|e| Error::Xml(e.to_string()))?;
+            write!(xml, r#"<w:hyperlink r:id="{rid}">"#).map_err(|e| Error::Xml(e.to_string()))?;
         } else {
             return Err(Error::Xml(
                 "Hyperlink must have either anchor or r:id".to_string(),

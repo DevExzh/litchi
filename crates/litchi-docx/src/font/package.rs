@@ -1,4 +1,8 @@
-//! OPC relationship graph ownership for the WordprocessingML font table.
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+//! OPC relationship graph ownership for the `WordprocessingML` font table.
 
 use crate::{Error, Result};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, XmlPart};
@@ -86,7 +90,7 @@ impl Table {
                     data: part.blob_arc(),
                 };
                 cached.insert(target_name, resource.clone());
-                embed.resource = Some(resource)
+                embed.resource = Some(resource);
             }
         }
         for rel in source.rels().iter() {
@@ -107,6 +111,10 @@ impl Table {
 /// Embedded payload allocations are shared with the OPC package rather than
 /// copied. The returned table can therefore be queried repeatedly without
 /// reparsing or rediscovering the package graph.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn read(package: &OpcPackage) -> Result<Option<Table>> {
     let (main_name, table_name, _) = locate_font_table(package)?;
     validate_font_table_relationship_sources(package, &main_name)?;
@@ -127,6 +135,10 @@ pub fn read(package: &OpcPackage) -> Result<Option<Table>> {
 /// package signatures immediately before the mutation phase. Moving a default,
 /// empty [`Table`] removes the optional font-table graph and any font resources
 /// that become unreferenced.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn put(package: &mut OpcPackage, mut value: Table, conformance: Conformance) -> Result<bool> {
     validate_package_conformance(package, conformance)?;
     let old = read(package)?.unwrap_or_default();
@@ -351,6 +363,10 @@ pub fn put(package: &mut OpcPackage, mut value: Table, conformance: Conformance)
 ///
 /// The complete relationship graph is validated before signatures, parts, or
 /// relationships are mutated. Resources shared by another source are retained.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn remove(package: &mut OpcPackage) -> Result<bool> {
     let old = read(package)?.unwrap_or_default();
     let (main_name, table_name, relationship_id) = locate_font_table(package)?;
@@ -432,6 +448,10 @@ fn remove_graph(
 
 /// Reject embedded typefaces that are not directly named by any `w:rFonts`.
 /// Theme-based font resolution is intentionally not attempted.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn validate_usage(package: &OpcPackage, table: &Table) -> Result<()> {
     let used = directly_used_font_names(package)?;
     let unused = table
@@ -532,13 +552,12 @@ fn allocate_font_identifiers(package: &OpcPackage, table: &mut Table) -> Result<
                 .ok_or_else(|| invalid("embedded-font resource is required"))?;
             if resource.part_name.is_empty() {
                 let identity = Arc::as_ptr(&resource.data) as usize;
-                resource.part_name = match shared_names.get(&identity) {
-                    Some(name) => name.clone(),
-                    None => {
-                        let name = next_font_part_name(&part_names)?;
-                        shared_names.insert(identity, name.clone());
-                        name
-                    },
+                resource.part_name = if let Some(name) = shared_names.get(&identity) {
+                    name.clone()
+                } else {
+                    let name = next_font_part_name(&part_names)?;
+                    shared_names.insert(identity, name.clone());
+                    name
                 };
             }
             part_names.insert(resource.part_name.clone());
@@ -837,7 +856,14 @@ fn directly_used_font_names(package: &OpcPackage) -> Result<HashSet<String>> {
                     return Err(invalid("DTDs and processing instructions are rejected"));
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Start(_)
+                | Event::End(_)
+                | Event::Empty(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::GeneralRef(_) => {},
             }
         }
     }

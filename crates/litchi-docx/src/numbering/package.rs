@@ -1,4 +1,4 @@
-//! OOXML package boundary for WordprocessingML numbering.
+//! OOXML package boundary for `WordprocessingML` numbering.
 //!
 //! The semantic model and bounded XML codec live in
 //! [`crate::numbering`]. Numbering snapshots retain the authored part bytes so

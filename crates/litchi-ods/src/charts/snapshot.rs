@@ -14,11 +14,17 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parse an owned ODS package under the supplied chart resource budget.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn from_bytes(source: Vec<u8>) -> Result<Self> {
         Self::from_bytes_with(source, Limits::default())
     }
 
     /// Parse an owned ODS package with an explicit resource budget.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn from_bytes_with(source: Vec<u8>, limits: Limits) -> Result<Self> {
         let package = Package::from_bytes(source.clone())?;
         let charts = inventory(&package, limits)?.charts;
@@ -48,6 +54,9 @@ impl Snapshot {
     }
 
     /// Select a chart by exact drawing name or checked discovery position.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn get<'a, S>(&self, selector: S) -> Result<Option<&Chart>>
     where
         S: Into<Selector<'a>>,
@@ -81,6 +90,9 @@ impl Edit {
 
     /// Replace one selected chart part and every occurrence sharing its
     /// package-backed chart owner.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn replace<'a, S>(&mut self, selector: S, part: Part) -> Result<()>
     where
         S: Into<Selector<'a>>,
@@ -108,6 +120,9 @@ impl Edit {
     }
 
     /// Validate package topology, reparse the candidate, and atomically publish it.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn commit(self) -> Result<Commit> {
         let changed = self.before.charts != self.draft;
         let snapshot = if changed {
@@ -161,6 +176,9 @@ impl Patch {
     }
 
     /// Apply this patch only to its exact source snapshot.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn apply(&self, snapshot: &Snapshot) -> Result<Commit> {
         if snapshot.source != self.source {
             return Err(Error::InvalidFormat(
@@ -204,7 +222,7 @@ impl Commit {
     }
 }
 
-fn select<'a>(charts: &[Chart], selector: Selector<'a>) -> Result<Option<usize>> {
+fn select(charts: &[Chart], selector: Selector<'_>) -> Result<Option<usize>> {
     match selector {
         Selector::Index(index) => Ok((index < charts.len()).then_some(index)),
         Selector::Name(name) => {

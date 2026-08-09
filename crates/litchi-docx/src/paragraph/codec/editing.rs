@@ -1,3 +1,15 @@
+#![expect(
+    clippy::if_same_then_else,
+    reason = "separate branches document distinct XML conditions"
+)]
+#![expect(
+    clippy::option_option,
+    reason = "nested options distinguish omitted, present-empty, and present-valued XML"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Lossless-ish typed editing of direct paragraph spacing.
 
 use crate::error::{Error, Result};
@@ -28,11 +40,15 @@ struct Layout {
 impl Paragraph {
     /// Replace the direct spacing properties on this paragraph.
     ///
-    /// Some writes a typed CT_Spacing element under pPr and None removes the
+    /// Some writes a typed `CT_Spacing` element under pPr and None removes the
     /// direct element. Existing paragraph content and unrelated properties remain
     /// byte-for-byte unchanged. Editing a shared paragraph materializes only
     /// this paragraph; the zero-copy runs path remains unchanged until an edit
     /// is requested.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_spacing(&mut self, spacing: Option<ParagraphSpacing>) -> Result<&mut Self> {
         let original = self.xml_bytes();
         let rewritten = rewrite_spacing(original, spacing)?;
@@ -63,7 +79,7 @@ fn rewrite_spacing(xml_bytes: &[u8], spacing: Option<ParagraphSpacing>) -> Resul
                 let ppr_end = format!("</{ppr_name}>");
                 return expand_empty(xml_bytes, range, spacing_bytes, ppr_end.as_bytes());
             }
-            let ppr = format!("<{ppr_name}>{}</{ppr_name}>", spacing);
+            let ppr = format!("<{ppr_name}>{spacing}</{ppr_name}>");
             if let Some(root_start_end) = layout.root_start_end {
                 return Ok(insert_at(xml_bytes, root_start_end, ppr.as_bytes()));
             }
@@ -88,16 +104,18 @@ fn locate_layout(xml_bytes: &[u8]) -> Result<Layout> {
     let mut spacing_start = None;
 
     loop {
-        let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::InvalidFormat("paragraph XML offset does not fit usize".into()))?;
+        let event_start = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+            Error::InvalidFormat("paragraph XML offset does not fit usize".into())
+        })?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
-        let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::InvalidFormat("paragraph XML offset does not fit usize".into()))?;
+        let event_end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+            Error::InvalidFormat("paragraph XML offset does not fit usize".into())
+        })?;
 
         match event {
             Event::Start(element) => {
@@ -219,7 +237,13 @@ fn locate_layout(xml_bytes: &[u8]) -> Result<Layout> {
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 
@@ -263,10 +287,8 @@ fn validate_root(
     layout.root_prefix = element_prefix(element);
     if matches!(namespace, ResolveResult::Bound(_)) {
         layout.root_start_end = Some(event_end);
-    } else {
-        if empty.is_none() {
-            layout.root_start_end = Some(event_end);
-        }
+    } else if empty.is_none() {
+        layout.root_start_end = Some(event_end);
     }
     layout.root_empty = empty;
     Ok(())

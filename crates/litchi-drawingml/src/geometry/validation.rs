@@ -1,5 +1,5 @@
 //! Authoring-time validation of custom geometry against the ECMA-376 value
-//! spaces (ST_Coordinate, ST_PositiveCoordinate, ST_Angle, ST_GeomGuideName)
+//! spaces (`ST_Coordinate`, `ST_PositiveCoordinate`, `ST_Angle`, `ST_GeomGuideName`)
 //! and the module limits.
 //!
 //! Errors are plain strings, matching the shape authoring validators in
@@ -197,7 +197,7 @@ fn validate_guide_reference(name: &Option<String>, field: &str, mode: Mode) -> R
     }
 }
 
-/// Validate an ST_GeomGuideName token.
+/// Validate an `ST_GeomGuideName` token.
 ///
 /// `ST_GeomGuideName` is an `xsd:token`, so internal spaces, empty strings, and
 /// numeric spellings remain schema-valid when parsing. Authoring rejects those

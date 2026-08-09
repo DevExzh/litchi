@@ -20,6 +20,9 @@ pub struct CellRange {
 
 impl CellRange {
     /// Create inert external-range metadata with positive target dimensions.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn new(
         name: impl Into<String>,
         href: impl Into<String>,
@@ -45,6 +48,7 @@ impl CellRange {
     }
 
     /// External source range or object name.
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -55,6 +59,7 @@ impl CellRange {
     }
 
     /// URI of the external source document.
+    #[must_use]
     pub fn href(&self) -> &str {
         &self.href
     }
@@ -65,16 +70,21 @@ impl CellRange {
     }
 
     /// Number of rows populated by the imported range.
+    #[must_use]
     pub fn rows(&self) -> usize {
         self.last_row_spanned.get()
     }
 
     /// Number of columns populated by the imported range.
+    #[must_use]
     pub fn columns(&self) -> usize {
         self.last_column_spanned.get()
     }
 
     /// Change the positive target dimensions.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_dimensions(&mut self, rows: usize, columns: usize) -> Result<()> {
         let rows = NonZeroUsize::new(rows).ok_or_else(|| {
             Error::InvalidFormat("cell range source row span must be positive".to_string())
@@ -88,6 +98,7 @@ impl CellRange {
     }
 
     /// Whether the source explicitly uses `xlink:actuate="onRequest"`.
+    #[must_use]
     pub fn actuate_on_request(&self) -> bool {
         self.actuate_on_request
     }
@@ -98,6 +109,7 @@ impl CellRange {
     }
 
     /// Optional import filter name.
+    #[must_use]
     pub fn filter_name(&self) -> Option<&str> {
         self.filter_name.as_deref()
     }
@@ -108,6 +120,7 @@ impl CellRange {
     }
 
     /// Optional filter-specific arguments.
+    #[must_use]
     pub fn filter_options(&self) -> Option<&str> {
         self.filter_options.as_deref()
     }
@@ -118,11 +131,15 @@ impl CellRange {
     }
 
     /// Optional XML Schema duration controlling refresh frequency.
+    #[must_use]
     pub fn refresh_delay(&self) -> Option<&str> {
         self.refresh_delay.as_deref()
     }
 
     /// Set or clear a validated XML Schema refresh duration.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_refresh_delay(&mut self, value: Option<String>) -> Result<()> {
         if let Some(delay) = &value
             && !is_xsd_duration(delay)

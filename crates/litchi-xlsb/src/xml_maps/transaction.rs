@@ -783,7 +783,10 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
 }
 
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "retained for BIFF12 codec completeness and staged host integration"
+)]
 fn _cell_reference_is_public(_: CellReference) {}
 
 #[cfg(test)]

@@ -567,7 +567,9 @@ fn inspect_end(
         } else if current.depth == depth
             && is_name(namespace, name, &[P_NS, P_STRICT_NS], b"graphicFrame")
         {
-            let completed = frame.take().expect("graphic frame checked above");
+            let completed = frame
+                .take()
+                .ok_or_else(|| animation_relationship_error("graphic-frame state is missing"))?;
             if completed.enabled
                 && let (Some(shape_id), Some(host)) = (completed.shape_id, completed.host)
                 && hosts.insert(shape_id, host).is_some()

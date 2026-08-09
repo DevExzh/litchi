@@ -40,8 +40,8 @@ impl ExternalTableVersion {
 
 /// Inert formatting metadata for a headerless external-table column.
 ///
-/// The DXFN12List payload is preserved without interpretation. Parsed values
-/// retain the original XLUnicodeString encoding of the optional style name.
+/// The `DXFN12List` payload is preserved without interpretation. Parsed values
+/// retain the original `XLUnicodeString` encoding of the optional style name.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CachedDiskHeader {
     pub(in crate::list_object) encoded: Vec<u8>,
@@ -50,7 +50,10 @@ pub struct CachedDiskHeader {
 }
 
 impl CachedDiskHeader {
-    /// Construct a cached header from an inert serialized DXFN12List payload.
+    /// Construct a cached header from an inert serialized `DXFN12List` payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(formatting: Vec<u8>) -> Result<Self> {
         if formatting.len() > MAX_FEATURE_BYTES.saturating_sub(4)
             || formatting.len() > u32::MAX as usize
@@ -61,7 +64,9 @@ impl CachedDiskHeader {
             ));
         }
         let mut encoded = Vec::with_capacity(4 + formatting.len());
-        encoded.extend_from_slice(&(formatting.len() as u32).to_le_bytes());
+        encoded.extend_from_slice(
+            &crate::utils::truncate_usize_to_u32(formatting.len()).to_le_bytes(),
+        );
         encoded.extend_from_slice(&formatting);
         Ok(Self {
             format_end: encoded.len(),
@@ -83,7 +88,7 @@ impl CachedDiskHeader {
             return Err(invalid(rt, "cached header exceeds resource bound"));
         }
         let format_len = usize::try_from(u32_at(&encoded, 0, rt, "cbdxfHdrDisk")?)
-            .map_err(|_| invalid(rt, "cached header format length overflows"))?;
+            .map_err(|_error| invalid(rt, "cached header format length overflows"))?;
         let format_end = 4usize
             .checked_add(format_len)
             .ok_or_else(|| invalid(rt, "cached header format length overflows"))?;
@@ -113,6 +118,9 @@ impl CachedDiskHeader {
         })
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_style_name(mut self, name: impl Into<String>) -> Result<Self> {
         let name = name.into();
         validate_name(&name, "cached header style name")?;
@@ -128,22 +136,26 @@ impl CachedDiskHeader {
         Ok(self)
     }
 
+    #[must_use]
     pub fn without_style_name(mut self) -> Self {
         self.encoded.truncate(self.format_end);
         self.style_name = None;
         self
     }
 
-    /// Complete CachedDiskHeader bytes, including the format-length prefix.
+    /// Complete `CachedDiskHeader` bytes, including the format-length prefix.
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         &self.encoded
     }
 
-    /// Inert DXFN12List bytes without the CachedDiskHeader length prefix.
+    /// Inert `DXFN12List` bytes without the `CachedDiskHeader` length prefix.
+    #[must_use]
     pub fn formatting_bytes(&self) -> &[u8] {
         &self.encoded[4..self.format_end]
     }
 
+    #[must_use]
     pub fn style_name(&self) -> Option<&str> {
         self.style_name.as_deref()
     }
@@ -152,7 +164,7 @@ impl CachedDiskHeader {
 /// Inert metadata that associates one table column with a query-table field.
 ///
 /// Opaque byte slices are retained for BIFF substructures that litchi does not
-/// execute or render. `auto_filter` contains the complete Feat11FdaAutoFilter.
+/// execute or render. `auto_filter` contains the complete `Feat11FdaAutoFilter`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExternalTableField {
     pub(in crate::list_object) column_id: ListColumnId,
@@ -170,6 +182,9 @@ pub struct ExternalTableField {
     pub(in crate::list_object) auto_create_calculated_column: bool,
 }
 impl ExternalTableField {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(
         column_id: ListColumnId,
         source_name: impl Into<String>,
@@ -233,72 +248,101 @@ impl ExternalTableField {
         }
         Ok(())
     }
+    #[must_use]
     pub const fn column_id(&self) -> ListColumnId {
         self.column_id
     }
+    #[must_use]
     pub fn source_name(&self) -> &str {
         &self.source_name
     }
+    #[must_use]
     pub const fn query_field_id(&self) -> u32 {
         self.query_field_id
     }
+    #[must_use]
     pub fn aggregate_format_bytes(&self) -> &[u8] {
         &self.aggregate_format
     }
+    #[must_use]
     pub fn insert_row_format_bytes(&self) -> &[u8] {
         &self.insert_row_format
     }
+    #[must_use]
     pub fn auto_filter_bytes(&self) -> &[u8] {
         &self.auto_filter
     }
+    #[must_use]
     pub fn formula_extra_bytes(&self) -> &[u8] {
         &self.formula_extra
     }
+    #[must_use]
     pub fn header_cache_bytes(&self) -> &[u8] {
         self.header_cache.as_bytes()
     }
+    #[must_use]
     pub const fn cached_disk_header(&self) -> &CachedDiskHeader {
         &self.header_cache
     }
+    #[must_use]
     pub const fn aggregate_style_index(&self) -> u32 {
         self.aggregate_style
     }
+    #[must_use]
     pub const fn insert_row_style_index(&self) -> u32 {
         self.insert_row_style
     }
+    #[must_use]
     pub const fn is_filter_hidden(&self) -> bool {
         self.filter_hidden
     }
+    #[must_use]
     pub const fn is_total_array_formula(&self) -> bool {
         self.total_array_formula
     }
+    #[must_use]
     pub const fn auto_creates_calculated_column(&self) -> bool {
         self.auto_create_calculated_column
     }
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_aggregate_format_bytes(mut self, bytes: Vec<u8>) -> Result<Self> {
         self.aggregate_format = bytes;
         self.validate()?;
         Ok(self)
     }
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_insert_row_format_bytes(mut self, bytes: Vec<u8>) -> Result<Self> {
         self.insert_row_format = bytes;
         self.validate()?;
         Ok(self)
     }
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_auto_filter_bytes(mut self, bytes: Vec<u8>) -> Result<Self> {
         self.auto_filter = bytes;
         self.validate()?;
         Ok(self)
     }
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_formula_extra_bytes(mut self, bytes: Vec<u8>, array: bool) -> Result<Self> {
         self.formula_extra = bytes;
         self.total_array_formula = array;
         self.validate()?;
         Ok(self)
     }
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_header_cache_bytes(mut self, bytes: Vec<u8>) -> Result<Self> {
         let format_len = usize::try_from(u32_at(&bytes, 0, FEATURE12_RECORD_TYPE, "cbdxfHdrDisk")?)
-            .map_err(|_| invalid(FEATURE12_RECORD_TYPE, "cached header length overflows"))?;
+            .map_err(|_error| invalid(FEATURE12_RECORD_TYPE, "cached header length overflows"))?;
         let format_end = 4usize
             .checked_add(format_len)
             .ok_or_else(|| invalid(FEATURE12_RECORD_TYPE, "cached header length overflows"))?;
@@ -307,6 +351,9 @@ impl ExternalTableField {
         self.validate()?;
         Ok(self)
     }
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_cached_disk_header(mut self, header: CachedDiskHeader) -> Result<Self> {
         self.header_cache = header;
         self.validate()?;
@@ -350,6 +397,7 @@ impl WebColumnType {
         Self::Counter,
         Self::MultipleChoices,
     ];
+    #[must_use]
     pub const fn value(self) -> u32 {
         self as u32 + 1
     }
@@ -423,6 +471,7 @@ pub struct WebFieldInfo {
     pub(in crate::list_object) ignored_validation_flags: u32,
 }
 impl WebFieldInfo {
+    #[must_use]
     pub fn new(locale: u32) -> Self {
         Self {
             locale,
@@ -446,16 +495,21 @@ impl WebFieldInfo {
             ignored_validation_flags: 0,
         }
     }
+    #[must_use]
     pub fn with_decimal_display(mut self, places: u32, percent: bool) -> Self {
         self.decimal_places = places;
         self.fixed_decimal = true;
         self.percent = percent;
         self
     }
+    #[must_use]
     pub fn with_default_value(mut self, value: WebDefaultValue) -> Self {
         self.default_value = Some(value);
         self
     }
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_validation_formula(mut self, value: impl Into<String>) -> Result<Self> {
         let value = value.into();
         if value.encode_utf16().count() > 255 {
@@ -467,31 +521,39 @@ impl WebFieldInfo {
         self.validation_formula = Some(value);
         Ok(self)
     }
+    #[must_use]
     pub fn with_read_only(mut self, value: bool) -> Self {
         self.read_only = value;
         self
     }
+    #[must_use]
     pub fn with_required(mut self, value: bool) -> Self {
         self.required = value;
         self
     }
+    #[must_use]
     pub const fn locale(&self) -> u32 {
         self.locale
     }
+    #[must_use]
     pub const fn decimal_places(&self) -> u32 {
         self.decimal_places
     }
+    #[must_use]
     pub fn default_value(&self) -> Option<&WebDefaultValue> {
         self.default_value.as_ref()
     }
+    #[must_use]
     pub fn validation_formula(&self) -> Option<&str> {
         self.validation_formula.as_deref()
     }
     /// Undefined display-flag bits retained from a parsed WSS field.
+    #[must_use]
     pub const fn ignored_display_flags(&self) -> u32 {
         self.ignored_display_flags
     }
     /// Undefined validation-flag bits retained from a parsed WSS field.
+    #[must_use]
     pub const fn ignored_validation_flags(&self) -> u32 {
         self.ignored_validation_flags
     }
@@ -545,6 +607,9 @@ pub struct WebTableField {
     pub(in crate::list_object) ignored_flags: u32,
 }
 impl WebTableField {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(
         column_id: ListColumnId,
         source_name: impl Into<String>,
@@ -567,6 +632,9 @@ impl WebTableField {
         value.validate()?;
         Ok(value)
     }
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_calculated_formula_tokens(mut self, tokens: Vec<u8>) -> Result<Self> {
         if tokens.is_empty() || tokens.len() > u16::MAX as usize {
             return Err(invalid(
@@ -577,22 +645,28 @@ impl WebTableField {
         self.calculated_formula = Some(tokens);
         Ok(self)
     }
+    #[must_use]
     pub const fn column_id(&self) -> ListColumnId {
         self.column_id
     }
+    #[must_use]
     pub fn source_name(&self) -> &str {
         &self.source_name
     }
+    #[must_use]
     pub const fn data_type(&self) -> WebColumnType {
         self.data_type
     }
+    #[must_use]
     pub const fn info(&self) -> &WebFieldInfo {
         &self.info
     }
+    #[must_use]
     pub fn calculated_formula_tokens(&self) -> Option<&[u8]> {
         self.calculated_formula.as_deref()
     }
-    /// Undefined Feat11FieldDataItem flag bits retained from parsed input.
+    /// Undefined `Feat11FieldDataItem` flag bits retained from parsed input.
+    #[must_use]
     pub const fn ignored_flags(&self) -> u32 {
         self.ignored_flags
     }
@@ -666,12 +740,15 @@ pub struct WebInvalidCell {
     pub(in crate::list_object) column_id: ListColumnId,
 }
 impl WebInvalidCell {
+    #[must_use]
     pub fn new(row_id: u32, column_id: ListColumnId) -> Self {
         Self { row_id, column_id }
     }
+    #[must_use]
     pub const fn row_id(self) -> u32 {
         self.row_id
     }
+    #[must_use]
     pub const fn column_id(self) -> ListColumnId {
         self.column_id
     }
@@ -697,6 +774,9 @@ pub struct WebTableMetadata {
     pub(in crate::list_object) ignored_flags: u32,
 }
 impl WebTableMetadata {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(fields: Vec<WebTableField>) -> Result<Self> {
         let value = Self {
             version: ExternalTableVersion::Excel2003,
@@ -720,48 +800,70 @@ impl WebTableMetadata {
         value.validate()?;
         Ok(value)
     }
+    #[must_use]
     pub fn fields(&self) -> &[WebTableField] {
         &self.fields
     }
+    #[must_use]
     pub const fn edit_mode(&self) -> WebEditMode {
         self.edit_mode
     }
+    #[must_use]
     pub fn deleted_row_ids(&self) -> &[u32] {
         &self.deleted_row_ids
     }
+    #[must_use]
     pub fn changed_row_ids(&self) -> &[u32] {
         &self.changed_row_ids
     }
+    #[must_use]
     pub fn invalid_cells(&self) -> &[WebInvalidCell] {
         &self.invalid_cells
     }
+    #[must_use]
     pub const fn ignored_fixed_word(&self) -> u16 {
         self.ignored_fixed_word
     }
+    #[must_use]
     pub const fn ignored_flags(&self) -> u32 {
         self.ignored_flags
     }
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_deleted_row_ids(mut self, v: Vec<u32>) -> Result<Self> {
         self.deleted_row_ids = v;
         self.validate()?;
         Ok(self)
     }
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_changed_row_ids(mut self, v: Vec<u32>) -> Result<Self> {
         self.changed_row_ids = v;
         self.validate()?;
         Ok(self)
     }
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_invalid_cells(mut self, v: Vec<WebInvalidCell>) -> Result<Self> {
         self.invalid_cells = v;
         self.validate()?;
         Ok(self)
     }
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_provider_name(mut self, v: impl Into<String>) -> Result<Self> {
         let v = v.into();
         validate_name(&v, "Web cryptographic provider")?;
         self.provider_name = Some(v);
         Ok(self)
     }
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_entry_id(mut self, v: impl Into<String>) -> Result<Self> {
         let v = v.into();
         validate_name(&v, "Web entry id")?;
@@ -952,6 +1054,9 @@ impl XmlDataType {
         Self::NullAnyAttribute,
         Self::NullElement,
     ];
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(v: u32) -> Result<Self> {
         Self::ALL
             .iter()
@@ -959,6 +1064,7 @@ impl XmlDataType {
             .find(|value| value.value() == v)
             .ok_or_else(|| invalid(FEATURE11_RECORD_TYPE, "invalid XML column data type"))
     }
+    #[must_use]
     pub const fn value(self) -> u32 {
         self as u32
     }
@@ -970,29 +1076,37 @@ pub struct XmlColumnMapping {
     pub(in crate::list_object) xpath: XPath,
 }
 impl XmlColumnMapping {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(map_id: u32, xpath: impl Into<String>, can_be_single: bool) -> Result<Self> {
-        let map_id =
-            MapId::new(map_id).map_err(|_| invalid(FEATURE11_RECORD_TYPE, "invalid XML map id"))?;
+        let map_id = MapId::new(map_id)
+            .map_err(|_error| invalid(FEATURE11_RECORD_TYPE, "invalid XML map id"))?;
         let xpath = XPath::new(xpath.into())
-            .map_err(|_| invalid(FEATURE11_RECORD_TYPE, "invalid XML XPath"))?;
+            .map_err(|_error| invalid(FEATURE11_RECORD_TYPE, "invalid XML XPath"))?;
         Ok(Self {
             can_be_single,
             map_id,
             xpath,
         })
     }
+    #[must_use]
     pub const fn map_id(&self) -> u32 {
         self.map_id.get()
     }
+    #[must_use]
     pub const fn map_identifier(&self) -> MapId {
         self.map_id
     }
+    #[must_use]
     pub fn xpath(&self) -> &str {
         self.xpath.as_str()
     }
+    #[must_use]
     pub const fn path(&self) -> &XPath {
         &self.xpath
     }
+    #[must_use]
     pub const fn can_be_single(&self) -> bool {
         self.can_be_single
     }
@@ -1011,6 +1125,9 @@ pub struct XmlTableField {
     pub(in crate::list_object) ignored_flags: u32,
 }
 impl XmlTableField {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(
         column_id: ListColumnId,
         source_name: impl Into<String>,
@@ -1031,23 +1148,29 @@ impl XmlTableField {
         validate_name(&value.source_name, "XML source field name")?;
         Ok(value)
     }
+    #[must_use]
     pub fn with_mapping(mut self, v: XmlColumnMapping) -> Self {
         self.mapping = Some(v);
         self
     }
+    #[must_use]
     pub const fn column_id(&self) -> ListColumnId {
         self.column_id
     }
+    #[must_use]
     pub fn source_name(&self) -> &str {
         &self.source_name
     }
+    #[must_use]
     pub const fn data_type(&self) -> XmlDataType {
         self.data_type
     }
+    #[must_use]
     pub fn mapping(&self) -> Option<&XmlColumnMapping> {
         self.mapping.as_ref()
     }
-    /// Undefined Feat11FieldDataItem flag bits retained from parsed input.
+    /// Undefined `Feat11FieldDataItem` flag bits retained from parsed input.
+    #[must_use]
     pub const fn ignored_flags(&self) -> u32 {
         self.ignored_flags
     }
@@ -1064,6 +1187,9 @@ pub struct XmlTableMetadata {
     pub(in crate::list_object) ignored_fixed_tail: [u8; 32],
 }
 impl XmlTableMetadata {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(fields: Vec<XmlTableField>) -> Result<Self> {
         if !(1..=256).contains(&fields.len()) {
             return Err(invalid(
@@ -1084,30 +1210,42 @@ impl XmlTableMetadata {
         value.validate()?;
         Ok(value)
     }
+    #[must_use]
     pub fn fields(&self) -> &[XmlTableField] {
         &self.fields
     }
+    #[must_use]
     pub const fn is_single_cell(&self) -> bool {
         self.single_cell
     }
+    #[must_use]
     pub fn entry_id(&self) -> Option<&str> {
         self.entry_id.as_deref()
     }
+    #[must_use]
     pub const fn ignored_fixed_word(&self) -> u16 {
         self.ignored_fixed_word
     }
+    #[must_use]
     pub const fn ignored_flags(&self) -> u32 {
         self.ignored_flags
     }
+    #[must_use]
     pub const fn ignored_fixed_tail(&self) -> &[u8; 32] {
         &self.ignored_fixed_tail
     }
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_entry_id(mut self, v: impl Into<String>) -> Result<Self> {
         let v = v.into();
         validate_name(&v, "XML entry id")?;
         self.entry_id = Some(v);
         Ok(self)
     }
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn with_single_cell(mut self, v: bool) -> Result<Self> {
         self.single_cell = v;
         self.validate()?;
@@ -1140,6 +1278,9 @@ pub enum ListObjectSourceMetadata {
 }
 
 impl ExternalTableMetadata {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(fields: Vec<ExternalTableField>) -> Result<Self> {
         let value = Self {
             version: ExternalTableVersion::Excel2007,
@@ -1173,19 +1314,24 @@ impl ExternalTableMetadata {
         }
         Ok(())
     }
+    #[must_use]
     pub const fn version(&self) -> ExternalTableVersion {
         self.version
     }
+    #[must_use]
     pub const fn build_number(&self) -> u16 {
         self.build_number
     }
+    #[must_use]
     pub fn fields(&self) -> &[ExternalTableField] {
         &self.fields
     }
+    #[must_use]
     pub fn with_version(mut self, version: ExternalTableVersion) -> Self {
         self.version = version;
         self
     }
+    #[must_use]
     pub fn with_build_number(mut self, build_number: u16) -> Self {
         self.build_number = build_number;
         self

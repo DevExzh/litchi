@@ -19,30 +19,37 @@ pub struct FtPioGrbit {
 }
 
 impl FtPioGrbit {
+    #[must_use]
     pub fn is_dde(self) -> bool {
         self.raw & 2 != 0
     }
 
+    #[must_use]
     pub fn display_as_icon(self) -> bool {
         self.raw & 8 != 0
     }
 
+    #[must_use]
     pub fn is_control(self) -> bool {
         self.raw & 0x10 != 0
     }
 
+    #[must_use]
     pub fn uses_control_stream(self) -> bool {
         self.raw & 0x20 != 0
     }
 
+    #[must_use]
     pub fn camera_picture(self) -> bool {
         self.raw & 0x80 != 0
     }
 
+    #[must_use]
     pub fn default_size(self) -> bool {
         self.raw & 0x100 != 0
     }
 
+    #[must_use]
     pub fn auto_load(self) -> bool {
         self.raw & 0x200 != 0
     }
@@ -85,6 +92,7 @@ pub enum ObjectType {
 
 impl ObjectType {
     /// Whether this object type is represented by the form-control view.
+    #[must_use]
     pub const fn is_form_control(self) -> bool {
         matches!(
             self,
@@ -102,6 +110,7 @@ impl ObjectType {
     }
 
     /// Returns the MS-XLS `cmo.ot` code for this object type.
+    #[must_use]
     pub const fn code(self) -> u16 {
         match self {
             Self::Group => 0x0000,
@@ -161,6 +170,7 @@ impl ObjectType {
 impl FtCmo {
     /// The object type decoded per MS-XLS 2.5.143, or `None` for an undefined
     /// value.
+    #[must_use]
     pub fn object_kind(&self) -> Option<ObjectType> {
         ObjectType::from_code(self.object_type)
     }
@@ -187,15 +197,16 @@ pub enum ObjSubrecord {
     End,
 }
 
-/// A complete embedded-OLE Obj record and its adjacent TxO record.
+/// A complete embedded-OLE Obj record and its adjacent `TxO` record.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OleObjectRecord {
     pub subrecords: Vec<ObjSubrecord>,
-    /// Complete adjacent TxO record, retained byte-for-byte.
+    /// Complete adjacent `TxO` record, retained byte-for-byte.
     pub text_object: Option<Vec<u8>>,
 }
 
 impl OleObjectRecord {
+    #[must_use]
     pub fn object_id(&self) -> u16 {
         self.subrecords
             .iter()
@@ -206,6 +217,7 @@ impl OleObjectRecord {
             .unwrap_or(0)
     }
 
+    #[must_use]
     pub fn storage_position(&self) -> Option<u32> {
         self.subrecords.iter().find_map(|value| match value {
             ObjSubrecord::PictureFormula(value) => value.storage_position,
@@ -213,6 +225,7 @@ impl OleObjectRecord {
         })
     }
 
+    #[must_use]
     pub fn storage_name(&self) -> Option<String> {
         let position = self.storage_position()?;
         let dde = self

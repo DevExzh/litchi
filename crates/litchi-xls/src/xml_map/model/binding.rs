@@ -15,6 +15,7 @@ pub enum LoadMode {
 }
 
 impl LoadMode {
+    #[must_use]
     pub const fn code(self) -> u32 {
         match self {
             Self::None => 0,
@@ -25,6 +26,9 @@ impl LoadMode {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn from_code(value: u32) -> Result<Self> {
         match value {
             0 => Ok(Self::None),
@@ -48,6 +52,9 @@ pub struct DataBinding {
 }
 
 impl DataBinding {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(file_binding: impl Into<String>, load_mode: LoadMode) -> Result<Self> {
         Self::from_parts(
             None,
@@ -77,11 +84,10 @@ impl DataBinding {
         let file_binding_name = file_binding_name
             .map(|value| validate_string(value, 65_535, "FileBindingName", false))
             .transpose()?;
-        let load_mode = LoadMode::from_code(
-            load_mode
-                .parse::<u32>()
-                .map_err(|_| invalid("DataBindingLoadMode is not an unsigned decimal value"))?,
-        )?;
+        let load_mode =
+            LoadMode::from_code(load_mode.parse::<u32>().map_err(|_error| {
+                invalid("DataBindingLoadMode is not an unsigned decimal value")
+            })?)?;
         let namespaces = namespaces
             .into_iter()
             .map(|(prefix, uri)| NamespaceDeclaration::try_new(prefix, uri))
@@ -96,26 +102,32 @@ impl DataBinding {
         })
     }
 
+    #[must_use]
     pub fn data_binding_name(&self) -> Option<&str> {
         self.data_binding_name.as_deref()
     }
 
+    #[must_use]
     pub fn file_binding(&self) -> &str {
         &self.file_binding
     }
 
+    #[must_use]
     pub fn file_binding_name(&self) -> Option<&str> {
         self.file_binding_name.as_deref()
     }
 
+    #[must_use]
     pub const fn load_mode(&self) -> LoadMode {
         self.load_mode
     }
 
+    #[must_use]
     pub fn namespaces(&self) -> &[NamespaceDeclaration] {
         &self.namespaces
     }
 
+    #[must_use]
     pub fn payload(&self) -> Option<&OpaqueXml> {
         self.payload.as_ref()
     }

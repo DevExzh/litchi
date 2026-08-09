@@ -12,14 +12,19 @@ pub struct Patch {
 }
 
 impl Patch {
+    #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.before
     }
 
+    #[must_use]
     pub fn after(&self) -> &Snapshot {
         &self.after
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn apply(&self, target: &mut Snapshot) -> Result<()> {
         if target != &self.before {
             return Err(Error::UnsafeEdit(
@@ -47,10 +52,14 @@ impl Transaction {
         }
     }
 
+    #[must_use]
     pub fn snapshot(&self) -> &Snapshot {
         &self.working
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_settings(&mut self, value: Settings) -> Result<()> {
         let mut candidate = self.working.clone();
         if let Some(record) = candidate
@@ -79,6 +88,9 @@ impl Transaction {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn insert_unknown(
         &mut self,
         index: usize,
@@ -91,6 +103,9 @@ impl Transaction {
         )
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn insert(&mut self, index: usize, record: Record) -> Result<()> {
         if index > self.working.records.len() {
             return Err(invalid("record insertion index is out of bounds"));
@@ -102,6 +117,9 @@ impl Transaction {
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn remove(&mut self, index: usize) -> Result<Record> {
         let mut candidate = self.working.clone();
         if index >= candidate.records.len() {
@@ -113,6 +131,9 @@ impl Transaction {
         Ok(removed)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn commit(self) -> Result<Patch> {
         self.working.validate()?;
         Ok(Patch {

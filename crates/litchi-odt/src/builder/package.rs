@@ -39,7 +39,7 @@ impl Builder {
         writer.add_file("content.xml", content_xml.as_bytes())?;
 
         // Add styles.xml with list styles
-        let styles_xml = self.generate_styles_xml();
+        let styles_xml = self.generate_styles_xml()?;
         writer.add_file("styles.xml", styles_xml.as_bytes())?;
 
         // Add meta.xml

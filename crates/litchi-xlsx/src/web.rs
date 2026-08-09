@@ -129,6 +129,7 @@ impl Bindings {
         self.values.is_empty()
     }
 
+    #[must_use]
     pub fn iter(&self) -> impl ExactSizeIterator<Item = &Binding> {
         self.values.iter()
     }
@@ -528,8 +529,8 @@ fn validate_a1_cell(value: &str) -> Result<()> {
         || row
             .parse::<u32>()
             .ok()
-            .filter(|row| (1..=1_048_576).contains(row))
-            .is_none()
+            .as_ref()
+            .is_none_or(|row| !(1..=1_048_576).contains(row))
     {
         return Err(invalid("invalid cell in web-extension range"));
     }

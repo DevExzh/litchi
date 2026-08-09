@@ -1,3 +1,15 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::match_like_matches_macro,
+    reason = "the match keeps the accepted grammar cases visible"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Package-independent Word settings extension values.
 
 use std::fmt::{self, Display, Formatter};
@@ -36,6 +48,10 @@ impl Guid {
     }
 
     /// Parse the braced Word `ST_Guid` lexical form.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn parse(value: &str) -> Result<Self> {
         value.parse()
     }
@@ -192,6 +208,10 @@ impl From<OnOff> for bool {
 
 impl DocumentId {
     /// Construct a checked Word 2010 paragraph-ID context.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn paragraph_context(value: u32) -> Result<Self> {
         if value == 0 || value >= 0x8000_0000 {
             return Err(invalid(
@@ -260,6 +280,10 @@ pub enum Extension {
 
 impl Extension {
     /// Validate the package-independent value constraints.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn validate(&self) -> Result<()> {
         match self {
             Self::DocumentId(value) => match value {
@@ -274,7 +298,11 @@ impl Extension {
             Self::Unknown(value) if value.xml.len() > MAX_OPAQUE_BYTES => Err(invalid(format!(
                 "opaque settings extension exceeds {MAX_OPAQUE_BYTES} bytes"
             ))),
-            _ => Ok(()),
+            Self::ChartTrackingRefBased(_)
+            | Self::ConflictMode(_)
+            | Self::DiscardImageEditingData(_)
+            | Self::DefaultImageDpi(_)
+            | Self::Unknown(_) => Ok(()),
         }
     }
 }
@@ -308,16 +336,25 @@ impl Extensions {
 
     /// Iterate typed and opaque children in their source order.
     #[inline]
+    #[must_use]
     pub fn iter(&self) -> impl ExactSizeIterator<Item = &Extension> {
         self.values.iter()
     }
 
     /// Validate the complete extension snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn validate(&self) -> Result<()> {
         validate_extensions(&self.values)
     }
 
     /// Append one extension while enforcing count and duplicate constraints.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn push(&mut self, value: Extension) -> Result<&mut Self> {
         value.validate()?;
         validate_extensions_with_addition(&self.values, &value)?;
@@ -332,14 +369,23 @@ impl Extensions {
     }
 
     /// Return the first chart-reference tracking value.
+    #[must_use]
     pub fn chart_tracking_ref_based(&self) -> Option<OnOff> {
         self.values.iter().find_map(|value| match value {
             Extension::ChartTrackingRefBased(value) => Some(*value),
-            _ => None,
+            Extension::DocumentId(_)
+            | Extension::ConflictMode(_)
+            | Extension::DiscardImageEditingData(_)
+            | Extension::DefaultImageDpi(_)
+            | Extension::Unknown(_) => None,
         })
     }
 
     /// Set or remove the chart-reference tracking extension.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_chart_tracking_ref_based(&mut self, value: Option<OnOff>) -> Result<&mut Self> {
         self.replace_unique(value.map(Extension::ChartTrackingRefBased), |value| {
             matches!(value, Extension::ChartTrackingRefBased(_))
@@ -347,14 +393,24 @@ impl Extensions {
     }
 
     /// Return the Word 2010 paragraph-ID context from `w14:docId`.
+    #[must_use]
     pub fn document_id(&self) -> Option<u32> {
         self.values.iter().find_map(|value| match value {
             Extension::DocumentId(DocumentId::ParagraphContext(value)) => Some(*value),
-            _ => None,
+            Extension::ChartTrackingRefBased(_)
+            | Extension::DocumentId(_)
+            | Extension::ConflictMode(_)
+            | Extension::DiscardImageEditingData(_)
+            | Extension::DefaultImageDpi(_)
+            | Extension::Unknown(_) => None,
         })
     }
 
     /// Set or remove `w14:docId`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_document_id(&mut self, value: Option<u32>) -> Result<&mut Self> {
         let value = value
             .map(DocumentId::paragraph_context)
@@ -369,14 +425,24 @@ impl Extensions {
     }
 
     /// Return the optional GUID value from `w15:docId`.
+    #[must_use]
     pub fn source_document_id(&self) -> Option<&Guid> {
         self.values.iter().find_map(|value| match value {
             Extension::DocumentId(DocumentId::Source(Some(value))) => Some(value),
-            _ => None,
+            Extension::ChartTrackingRefBased(_)
+            | Extension::DocumentId(_)
+            | Extension::ConflictMode(_)
+            | Extension::DiscardImageEditingData(_)
+            | Extension::DefaultImageDpi(_)
+            | Extension::Unknown(_) => None,
         })
     }
 
     /// Set or remove a present `w15:docId` element without a `val`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_source_document_id_without_value(&mut self, present: bool) -> Result<&mut Self> {
         let value = present.then(|| Extension::DocumentId(DocumentId::source(None)));
         self.replace_unique(value, |value| {
@@ -393,6 +459,10 @@ impl Extensions {
     }
 
     /// Set or remove `w15:docId` with a GUID value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_source_document_id(&mut self, value: Option<Guid>) -> Result<&mut Self> {
         let value = value
             .map(Some)
@@ -404,14 +474,23 @@ impl Extensions {
     }
 
     /// Return the conflict-resolution save marker.
+    #[must_use]
     pub fn conflict_mode(&self) -> Option<OnOff> {
         self.values.iter().find_map(|value| match value {
             Extension::ConflictMode(value) => Some(*value),
-            _ => None,
+            Extension::ChartTrackingRefBased(_)
+            | Extension::DocumentId(_)
+            | Extension::DiscardImageEditingData(_)
+            | Extension::DefaultImageDpi(_)
+            | Extension::Unknown(_) => None,
         })
     }
 
     /// Set or remove the conflict-resolution save marker.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_conflict_mode(&mut self, value: Option<OnOff>) -> Result<&mut Self> {
         self.replace_unique(value.map(Extension::ConflictMode), |value| {
             matches!(value, Extension::ConflictMode(_))
@@ -419,14 +498,23 @@ impl Extensions {
     }
 
     /// Return the image-editing-data discard marker.
+    #[must_use]
     pub fn discard_image_editing_data(&self) -> Option<OnOff> {
         self.values.iter().find_map(|value| match value {
             Extension::DiscardImageEditingData(value) => Some(*value),
-            _ => None,
+            Extension::ChartTrackingRefBased(_)
+            | Extension::DocumentId(_)
+            | Extension::ConflictMode(_)
+            | Extension::DefaultImageDpi(_)
+            | Extension::Unknown(_) => None,
         })
     }
 
     /// Set or remove the image-editing-data discard marker.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_discard_image_editing_data(&mut self, value: Option<OnOff>) -> Result<&mut Self> {
         self.replace_unique(value.map(Extension::DiscardImageEditingData), |value| {
             matches!(value, Extension::DiscardImageEditingData(_))
@@ -434,14 +522,23 @@ impl Extensions {
     }
 
     /// Return the default image DPI setting.
+    #[must_use]
     pub fn default_image_dpi(&self) -> Option<i32> {
         self.values.iter().find_map(|value| match value {
             Extension::DefaultImageDpi(value) => Some(*value),
-            _ => None,
+            Extension::ChartTrackingRefBased(_)
+            | Extension::DocumentId(_)
+            | Extension::ConflictMode(_)
+            | Extension::DiscardImageEditingData(_)
+            | Extension::Unknown(_) => None,
         })
     }
 
     /// Set or remove the default image DPI setting.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_default_image_dpi(&mut self, value: Option<i32>) -> Result<&mut Self> {
         self.replace_unique(value.map(Extension::DefaultImageDpi), |value| {
             matches!(value, Extension::DefaultImageDpi(_))
@@ -449,6 +546,10 @@ impl Extensions {
     }
 
     /// Append a validated opaque direct-child extension.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn push_unknown(&mut self, value: OpaqueExtension) -> Result<&mut Self> {
         self.push(Extension::Unknown(value))
     }
@@ -457,7 +558,11 @@ impl Extensions {
     pub fn unknown(&self) -> impl Iterator<Item = &OpaqueExtension> {
         self.values.iter().filter_map(|value| match value {
             Extension::Unknown(value) => Some(value),
-            _ => None,
+            Extension::ChartTrackingRefBased(_)
+            | Extension::DocumentId(_)
+            | Extension::ConflictMode(_)
+            | Extension::DiscardImageEditingData(_)
+            | Extension::DefaultImageDpi(_) => None,
         })
     }
 
@@ -466,7 +571,7 @@ impl Extensions {
         value: Option<Extension>,
         matches: impl Fn(&Extension) -> bool,
     ) -> Result<&mut Self> {
-        if let Some(index) = self.values.iter().position(|value| matches(value)) {
+        if let Some(index) = self.values.iter().position(matches) {
             if let Some(value) = value {
                 value.validate()?;
                 self.values[index] = value;

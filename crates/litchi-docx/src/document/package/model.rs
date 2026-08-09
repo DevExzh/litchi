@@ -1,4 +1,12 @@
-//! Semantic document queries for the package-bound WordprocessingML facade.
+#![expect(
+    clippy::match_same_arms,
+    reason = "separate arms document distinct OOXML grammar cases"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+//! Semantic document queries for the package-bound `WordprocessingML` facade.
 
 use crate::alt::Chunk;
 use crate::error::{Error, Result};
@@ -31,6 +39,10 @@ impl<'a> Document<'a> {
     /// let text = doc.text()?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn text(&self) -> Result<String> {
         self.part.extract_text()
     }
@@ -38,6 +50,10 @@ impl<'a> Document<'a> {
     /// Return numbered paragraphs with resolved, typed list markers.
     ///
     /// This is separate from [`Self::text`], whose behavior remains unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn list_items(&self) -> Result<Vec<crate::list::ListItem>> {
         Ok(self
             .resolved_list_items()?
@@ -47,6 +63,10 @@ impl<'a> Document<'a> {
     }
 
     /// Return numbered paragraphs with resolved format and counter semantics.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn resolved_list_items(&self) -> Result<Vec<crate::list::ResolvedListItem>> {
         let numbering = self.numbering()?.unwrap_or_default();
         let paragraphs = self.paragraphs()?;
@@ -72,6 +92,10 @@ impl<'a> Document<'a> {
     ///
     /// The returned vector is aligned one-to-one with [`Self::elements`], so a
     /// table never shifts the metadata associated with following paragraphs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn elements_with_resolved_list_items(
         &self,
     ) -> Result<Vec<(Element, Option<crate::list::ResolvedListItem>)>> {
@@ -109,6 +133,10 @@ impl<'a> Document<'a> {
     ///
     /// Picture bullets and unsupported formats remain available as typed markers
     /// through [`Self::list_items`] and are not replaced with fabricated text here.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn text_with_list_labels(&self) -> Result<String> {
         let paragraphs = self.paragraphs()?;
         let items = self.list_items()?;
@@ -121,16 +149,14 @@ impl<'a> Document<'a> {
             if by_paragraph
                 .peek()
                 .is_some_and(|item| item.paragraph_index == index)
+                && let Some(item) = by_paragraph.next()
+                && let crate::list::ListMarker::Text(label) = item.marker
             {
-                if let Some(item) = by_paragraph.next() {
-                    if let crate::list::ListMarker::Text(label) = item.marker {
-                        output.push_str(&label);
-                        match item.suffix {
-                            Suffix::Tab => output.push('\t'),
-                            Suffix::Space => output.push(' '),
-                            Suffix::Nothing => {},
-                        }
-                    }
+                output.push_str(&label);
+                match item.suffix {
+                    Suffix::Tab => output.push('\t'),
+                    Suffix::Space => output.push(' '),
+                    Suffix::Nothing => {},
                 }
             }
             output.push_str(&paragraph.text()?);
@@ -151,6 +177,10 @@ impl<'a> Document<'a> {
     /// println!("Paragraphs: {}", count);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn paragraph_count(&self) -> Result<usize> {
         self.part.paragraph_count()
     }
@@ -168,6 +198,10 @@ impl<'a> Document<'a> {
     /// println!("Tables: {}", count);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn table_count(&self) -> Result<usize> {
         self.part.table_count()
     }
@@ -176,6 +210,7 @@ impl<'a> Document<'a> {
     ///
     /// This provides lower-level access to the document XML.
     #[inline]
+    #[must_use]
     pub fn part(&self) -> &DocumentPart<'a> {
         &self.part
     }
@@ -203,6 +238,10 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
         // Convert SmallVec to Vec for API compatibility
         Ok(self.part.paragraphs()?.into_iter().collect())
@@ -232,12 +271,20 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn tables(&self) -> Result<Vec<Table>> {
         // Convert SmallVec to Vec for API compatibility
         Ok(self.part.tables()?.into_iter().collect())
     }
 
     /// Return all run-level smart tags in document order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn smart_tags(&self) -> Result<Vec<SmartTag>> {
         let mut tags = Vec::new();
         for paragraph in self.part.paragraphs()? {
@@ -247,6 +294,10 @@ impl<'a> Document<'a> {
     }
 
     /// Return the number of run-level smart tags in the document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn smart_tag_count(&self) -> Result<usize> {
         Ok(self.smart_tags()?.len())
     }
@@ -284,16 +335,28 @@ impl<'a> Document<'a> {
     ///
     /// Uses a single-pass XML parser that is significantly faster than
     /// calling `paragraphs()` and `tables()` separately.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn elements(&self) -> Result<Vec<Element>> {
         self.part.elements()
     }
 
     /// Return paragraphs, tables, and alternative-format anchors in document order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn blocks(&self) -> Result<Vec<Block>> {
         self.part.blocks()
     }
 
     /// Return all alternative-format import anchors in XML order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn alts(&self) -> Result<Vec<Chunk>> {
         self.part.alts()
     }
@@ -317,6 +380,10 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn paragraph(&self, index: usize) -> Result<Option<Paragraph>> {
         let paragraphs = self.paragraphs()?;
         Ok(paragraphs.into_iter().nth(index))
@@ -341,6 +408,10 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn table(&self, index: usize) -> Result<Option<Table>> {
         let tables = self.tables()?;
         Ok(tables.into_iter().nth(index))
@@ -365,6 +436,10 @@ impl<'a> Document<'a> {
     /// println!("{}", text);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn text_range(&self, start: usize, end: usize) -> Result<String> {
         let paragraphs = self.paragraphs()?;
         let mut result = String::new();
@@ -399,6 +474,10 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn has_tables(&self) -> Result<bool> {
         Ok(self.table_count()? > 0)
     }
@@ -407,6 +486,7 @@ impl<'a> Document<'a> {
     ///
     /// This provides access to low-level package operations.
     #[inline]
+    #[must_use]
     pub fn opc_package(&self) -> &OpcPackage {
         self.opc
     }
@@ -437,6 +517,10 @@ impl<'a> Document<'a> {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn search(&self, query: &str) -> Result<Vec<usize>> {
         let paragraphs = self.paragraphs()?;
         let mut matches = Vec::new();
@@ -469,6 +553,10 @@ impl<'a> Document<'a> {
     /// let matches = doc.search_ignore_case("IMPORTANT")?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn search_ignore_case(&self, query: &str) -> Result<Vec<usize>> {
         let paragraphs = self.paragraphs()?;
         let query_lower = query.to_lowercase();
@@ -508,6 +596,10 @@ impl<'a> Document<'a> {
     /// println!("Pages (estimate): {}", stats.page_count());
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn statistics(&self) -> Result<Statistics> {
         // Get all text content
         let text = self.text()?;

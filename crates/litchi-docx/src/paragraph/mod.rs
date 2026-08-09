@@ -1,6 +1,10 @@
-//! Layered WordprocessingML paragraph and run models.
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
+//! Layered `WordprocessingML` paragraph and run models.
 //!
-//! The semantic XML-backed values live in [`model`], streaming WordprocessingML
+//! The semantic XML-backed values live in [`model`], streaming `WordprocessingML`
 //! parsing lives in [`codec`], and relationship-backed hyperlink resolution
 //! lives in [`package`]. This module remains the historical `crate::paragraph`
 //! facade.

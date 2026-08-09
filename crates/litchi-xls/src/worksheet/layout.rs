@@ -59,60 +59,79 @@ impl Default for Layout {
 }
 
 impl Layout {
+    #[must_use]
     pub fn default_row_height_twips(&self) -> u16 {
         self.default_row_height_twips
     }
+    #[must_use]
     pub fn empty_rows_hidden(&self) -> bool {
         self.empty_rows_hidden
     }
+    #[must_use]
     pub fn default_row_height_unsynced(&self) -> bool {
         self.default_row_height_unsynced
     }
+    #[must_use]
     pub fn thick_top_border(&self) -> bool {
         self.thick_top_border
     }
+    #[must_use]
     pub fn thick_bottom_border(&self) -> bool {
         self.thick_bottom_border
     }
+    #[must_use]
     pub fn default_column_width_chars(&self) -> u16 {
         self.default_column_width_chars
     }
+    #[must_use]
     pub fn max_row_outline_level(&self) -> u8 {
         self.max_row_outline_level
     }
+    #[must_use]
     pub fn max_column_outline_level(&self) -> u8 {
         self.max_column_outline_level
     }
+    #[must_use]
     pub fn row_gutter_width(&self) -> u16 {
         self.row_gutter_width
     }
+    #[must_use]
     pub fn column_gutter_height(&self) -> u16 {
         self.column_gutter_height
     }
+    #[must_use]
     pub fn show_automatic_page_breaks(&self) -> bool {
         self.show_automatic_page_breaks
     }
+    #[must_use]
     pub fn apply_styles_to_outlines(&self) -> bool {
         self.apply_styles_to_outlines
     }
+    #[must_use]
     pub fn summary_rows_below(&self) -> bool {
         self.summary_rows_below
     }
+    #[must_use]
     pub fn summary_columns_right(&self) -> bool {
         self.summary_columns_right
     }
+    #[must_use]
     pub fn fit_to_page(&self) -> bool {
         self.fit_to_page
     }
+    #[must_use]
     pub fn synchronize_horizontal_scrolling(&self) -> bool {
         self.synchronize_horizontal_scrolling
     }
+    #[must_use]
     pub fn synchronize_vertical_scrolling(&self) -> bool {
         self.synchronize_vertical_scrolling
     }
+    #[must_use]
     pub fn alternate_expression_evaluation(&self) -> bool {
         self.alternate_expression_evaluation
     }
+    #[must_use]
     pub fn alternate_formula_entry(&self) -> bool {
         self.alternate_formula_entry
     }
@@ -248,7 +267,7 @@ impl Collector {
 fn decode_outline_level(encoded: u16) -> Result<u8> {
     match encoded {
         0 => Ok(0),
-        2..=8 => Ok((encoded - 1) as u8),
+        2..=8 => Ok(crate::utils::truncate_u16_to_u8(encoded - 1)),
         _ => invalid(
             GUTS_RECORD_TYPE,
             "outline level encoding must be 0 or 2..=8",

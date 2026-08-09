@@ -168,6 +168,7 @@ pub enum MergeFileToken {
 
 impl MergeFileToken {
     /// Map a raw `tkField`/`tkRec` value to its token, when it is defined.
+    #[must_use]
     pub fn from_raw(raw: i16) -> Option<Self> {
         Some(match raw {
             0x00 => Self::None,
@@ -224,16 +225,19 @@ impl Fnpi {
     }
 
     /// `fnpt`: the type of the referenced file name.
+    #[must_use]
     pub fn file_type(&self) -> u8 {
         (self.raw & FNPI_TYPE_MASK) as u8
     }
 
     /// `fnpd`: the raw 12-bit identifier of the file name within its type.
+    #[must_use]
     pub fn identifier(&self) -> u16 {
         self.raw >> FNPI_IDENTIFIER_SHIFT
     }
 
     /// Whether this references a mail merge data source file (`fnpt` = 3).
+    #[must_use]
     pub fn is_mail_merge_source(&self) -> bool {
         self.raw & FNPI_TYPE_MASK == FNPI_TYPE_MAIL_MERGE
     }
@@ -266,11 +270,13 @@ pub struct Pmfs {
 
 impl Pmfs {
     /// The typed field separator token, when the raw value is defined.
+    #[must_use]
     pub fn field_separator(&self) -> Option<MergeFileToken> {
         MergeFileToken::from_raw(self.field_token)
     }
 
     /// The typed record separator token, when the raw value is defined.
+    #[must_use]
     pub fn record_separator(&self) -> Option<MergeFileToken> {
         MergeFileToken::from_raw(self.record_token)
     }
@@ -319,27 +325,32 @@ pub struct SttbfRfs {
 
 impl SttbfRfs {
     /// All strings in table order (4 or 5 entries).
+    #[must_use]
     pub fn strings(&self) -> &[String] {
         &self.strings
     }
 
     /// `Data0`: the connection string to the merge data source.
+    #[must_use]
     pub fn connection_string(&self) -> &str {
         &self.strings[0]
     }
 
     /// `Data1`: the connection string to the field-name source; empty when
     /// field names come from the same source as the data.
+    #[must_use]
     pub fn header_connection_string(&self) -> &str {
         &self.strings[1]
     }
 
     /// `Data2`: the e-mail subject line for e-mail merges.
+    #[must_use]
     pub fn email_subject(&self) -> &str {
         &self.strings[2]
     }
 
     /// `Data3`: the data column holding e-mail addresses or fax numbers.
+    #[must_use]
     pub fn address_column(&self) -> &str {
         &self.strings[3]
     }
@@ -571,6 +582,7 @@ pub struct DocumentMailMerge {
 
 impl DocumentMailMerge {
     /// The Word 97 merge state (`Pms`), when the document carries one.
+    #[must_use]
     pub fn state(&self) -> Option<&Pms> {
         self.state.as_ref()
     }
@@ -578,12 +590,14 @@ impl DocumentMailMerge {
     /// The Word 2002+ merge state (`fcPmsNew`, a new `Pms` recording the
     /// current state of the print merge operation), when the document
     /// carries one.
+    #[must_use]
     pub fn new_state(&self) -> Option<&Pms> {
         self.new_state.as_ref()
     }
 
     /// The Word 2002+ ODSO properties in storage order (empty when the
     /// document carries no ODSO data).
+    #[must_use]
     pub fn odso_properties(&self) -> &[OdsoProperty] {
         &self.odso_properties
     }

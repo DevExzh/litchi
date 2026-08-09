@@ -37,7 +37,7 @@ fn parse_reaction(
 ) -> Result<Reaction> {
     only_attributes(&fragment.attributes, &["type"], "reaction")?;
     let reaction_type = attribute(&fragment.attributes, "type", true)?
-        .unwrap()
+        .ok_or_else(|| invalid("reaction requires type"))?
         .to_owned();
     let scan = scan_with_context(&fragment.xml, "reaction", context)?;
     let mut instances = Vec::with_capacity(scan.children.len());
@@ -64,10 +64,10 @@ fn parse_instance(
         "reaction instance",
     )?;
     let time = attribute(&fragment.attributes, "time", true)?
-        .unwrap()
+        .ok_or_else(|| invalid("reaction instance requires time"))?
         .to_owned();
     let author_id = attribute(&fragment.attributes, "authorId", true)?
-        .unwrap()
+        .ok_or_else(|| invalid("reaction instance requires authorId"))?
         .to_owned();
     let scan = scan_with_context(&fragment.xml, "reaction instance", context)?;
     let mut extension = None;

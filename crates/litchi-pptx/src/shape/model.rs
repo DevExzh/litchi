@@ -291,15 +291,15 @@ macro_rules! leaf {
     };
 }
 
-leaf!(/// An ordinary PresentationML auto shape (`p:sp`).
+leaf!(/// An ordinary `PresentationML` auto shape (`p:sp`).
     Auto);
 leaf!(/// A picture (`p:pic`).
     Picture);
-leaf!(/// A graphic frame whose payload is a DrawingML table.
+leaf!(/// A graphic frame whose payload is a `DrawingML` table.
     Table);
-leaf!(/// A graphic frame whose payload is a DrawingML chart.
+leaf!(/// A graphic frame whose payload is a `DrawingML` chart.
     Chart);
-leaf!(/// A graphic frame whose payload is a DrawingML diagram.
+leaf!(/// A graphic frame whose payload is a `DrawingML` diagram.
     Diagram);
 leaf!(/// A graphic frame whose payload is an embedded or linked OLE object.
     Ole);

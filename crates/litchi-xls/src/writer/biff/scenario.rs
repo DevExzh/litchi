@@ -12,11 +12,16 @@ pub(crate) fn write_scenario_manager<W: Write>(
 ) -> Result<()> {
     manager.validate_for_write()?;
     let manager_len = 8usize + manager.result_ranges.len() * 8;
-    write_record_header(writer, 0x00AE, manager_len as u16)?;
-    writer.write_all(&(manager.scenarios.len() as i16).to_le_bytes())?;
+    write_record_header(
+        writer,
+        0x00AE,
+        crate::utils::truncate_usize_to_u16(manager_len),
+    )?;
+    writer.write_all(&crate::utils::wrap_usize_to_i16(manager.scenarios.len()).to_le_bytes())?;
     write_index(writer, manager.current_scenario)?;
     write_index(writer, manager.shown_scenario)?;
-    writer.write_all(&(manager.result_ranges.len() as i16).to_le_bytes())?;
+    writer
+        .write_all(&crate::utils::wrap_usize_to_i16(manager.result_ranges.len()).to_le_bytes())?;
     for range in &manager.result_ranges {
         writer.write_all(&range.first_row.to_le_bytes())?;
         writer.write_all(&range.last_row.to_le_bytes())?;
@@ -30,29 +35,27 @@ pub(crate) fn write_scenario_manager<W: Write>(
 }
 
 fn write_index<W: Write>(writer: &mut W, index: Option<usize>) -> Result<()> {
-    let value = index.map(|value| value as i16).unwrap_or(-1);
+    let value = index.map_or(-1, crate::utils::wrap_usize_to_i16);
     writer.write_all(&value.to_le_bytes())?;
     Ok(())
 }
 
 fn write_scenario<W: Write>(writer: &mut W, scenario: &crate::scenario::Scenario) -> Result<()> {
     let mut prefix = Vec::new();
-    prefix.extend_from_slice(&(scenario.cells.len() as u16).to_le_bytes());
+    prefix.extend_from_slice(
+        &crate::utils::truncate_usize_to_u16(scenario.cells.len()).to_le_bytes(),
+    );
     prefix.push(u8::from(scenario.locked));
     prefix.push(u8::from(scenario.hidden));
-    prefix.push(scenario.name.encode_utf16().count() as u8);
-    prefix.push(
-        scenario
-            .comment
-            .as_ref()
-            .map_or(0, |value| value.encode_utf16().count() as u8),
-    );
-    prefix.push(
-        scenario
-            .creator
-            .as_ref()
-            .map_or(0, |value| value.encode_utf16().count() as u8),
-    );
+    prefix.push(crate::utils::truncate_usize_to_u8(
+        scenario.name.encode_utf16().count(),
+    ));
+    prefix.push(scenario.comment.as_ref().map_or(0, |value| {
+        crate::utils::truncate_usize_to_u8(value.encode_utf16().count())
+    }));
+    prefix.push(scenario.creator.as_ref().map_or(0, |value| {
+        crate::utils::truncate_usize_to_u8(value.encode_utf16().count())
+    }));
     encode_no_cch(&mut prefix, &scenario.name);
     if let Some(creator) = &scenario.creator {
         encode_unicode(&mut prefix, creator)?;
@@ -82,7 +85,7 @@ fn write_scenario<W: Write>(writer: &mut W, scenario: &crate::scenario::Scenario
         write_record_header(
             writer,
             if index == 0 { 0x00AF } else { 0x003C },
-            chunk.len() as u16,
+            crate::utils::truncate_usize_to_u16(chunk.len()),
         )?;
         writer.write_all(chunk)?;
     }
@@ -110,7 +113,7 @@ fn encode_unicode(output: &mut Vec<u8>, value: &str) -> Result<()> {
             "Scenario string exceeds 65535 UTF-16 code units".to_string(),
         ));
     }
-    output.extend_from_slice(&(count as u16).to_le_bytes());
+    output.extend_from_slice(&crate::utils::truncate_usize_to_u16(count).to_le_bytes());
     encode_no_cch(output, value);
     Ok(())
 }

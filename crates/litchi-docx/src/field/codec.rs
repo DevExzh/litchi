@@ -1,3 +1,15 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::expect_used,
+    reason = "the invariant is established immediately before extraction"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Bounded Word field-instruction and document XML codecs.
 
 #[allow(
@@ -21,6 +33,10 @@ impl Field {
     /// # Returns
     ///
     /// A vector of fields
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn extract_from_document(doc_xml: &[u8]) -> Result<Vec<Field>> {
         let mut reader = Reader::from_reader(doc_xml);
         reader.config_mut().trim_text(false);
@@ -59,7 +75,7 @@ impl Field {
                     next_order += 1;
                     fields.push((field.order, field.finish()));
                 },
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+                Ok(Event::Start(e) | Event::Empty(e)) => {
                     match e.local_name().as_ref() {
                         b"fldChar" => {
                             // Field character marks field boundaries
@@ -297,7 +313,7 @@ pub(super) fn optional_field_switch_argument<'a>(
 }
 
 pub(super) fn parse_authority_category(value: &str, minimum: u8, field_type: &str) -> Result<u8> {
-    let value = value.parse::<u8>().map_err(|_| {
+    let value = value.parse::<u8>().map_err(|_source_error| {
         Error::Invalid(format!("{field_type} authority category is not an integer"))
     })?;
     if !(minimum..=16).contains(&value) {
@@ -309,9 +325,9 @@ pub(super) fn parse_authority_category(value: &str, minimum: u8, field_type: &st
 }
 
 pub(super) fn parse_index_columns(value: &str) -> Result<u8> {
-    let columns = value
-        .parse::<u8>()
-        .map_err(|_| Error::Invalid("INDEX column count is not an integer".to_string()))?;
+    let columns = value.parse::<u8>().map_err(|_source_error| {
+        Error::Invalid("INDEX column count is not an integer".to_string())
+    })?;
     if !(1..=4).contains(&columns) {
         return Err(Error::Invalid(
             "INDEX column count must be in 1..=4".to_string(),
@@ -342,7 +358,7 @@ pub(super) fn field_instruction_remainder<'a>(
         return None;
     }
     match remainder.chars().next() {
-        None | Some('\\') | Some('"') => Some(remainder),
+        None | Some('\\' | '"') => Some(remainder),
         Some(character) if character.is_whitespace() => Some(remainder),
         Some(_) => None,
     }
@@ -383,7 +399,10 @@ pub(super) fn parse_field_operand_and_switches(
     Ok(Some((operand, switches)))
 }
 
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "tuple layout mirrors the parsed OOXML grammar"
+)]
 pub(super) fn parse_mail_merge_data_field_parts(
     instruction: &str,
 ) -> Result<Option<(String, Option<String>, Vec<Switch>)>> {
@@ -416,7 +435,10 @@ pub(super) fn parse_mail_merge_data_field_parts(
     Ok(Some((data_source, header_source, switches)))
 }
 
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "tuple layout mirrors the parsed OOXML grammar"
+)]
 pub(super) fn parse_info_field_parts(
     instruction: &str,
 ) -> Result<Option<(String, Option<String>, Vec<Switch>)>> {
@@ -483,7 +505,10 @@ pub(super) fn parse_go_to_button_operands(instruction: &str) -> Result<Option<(S
     Ok(Some((target, button_text)))
 }
 
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "tuple layout mirrors the parsed OOXML grammar"
+)]
 pub(super) fn parse_user_identity_field_parts(
     instruction: &str,
 ) -> Result<Option<(UserIdentityKind, Option<String>, Option<UserIdentityFormat>)>> {
@@ -565,7 +590,7 @@ pub(super) fn parse_advance_field_adjustments(
                 switch.name
             ))
         })?;
-        let points = points.parse::<i64>().map_err(|_| {
+        let points = points.parse::<i64>().map_err(|_source_error| {
             Error::Invalid(format!(
                 "ADVANCE \\{} switch must specify an integral number of points",
                 switch.name
@@ -577,14 +602,20 @@ pub(super) fn parse_advance_field_adjustments(
     Ok(Some(adjustments))
 }
 
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "tuple layout mirrors the parsed OOXML grammar"
+)]
 pub(super) fn parse_link_operands_and_switches(
     instruction: &str,
 ) -> Result<Option<(String, String, Option<String>, Vec<Switch>)>> {
     parse_external_link_operands_and_switches(instruction, "LINK")
 }
 
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "tuple layout mirrors the parsed OOXML grammar"
+)]
 pub(super) fn parse_dde_operands_and_switches(
     instruction: &str,
 ) -> Result<Option<(DdeKind, String, String, Option<String>, Vec<Switch>)>> {
@@ -609,7 +640,10 @@ pub(super) fn parse_dde_operands_and_switches(
     )
 }
 
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "tuple layout mirrors the parsed OOXML grammar"
+)]
 pub(super) fn parse_external_include_operands_and_switches(
     instruction: &str,
 ) -> Result<Option<(IncludeKind, String, Option<String>, Vec<Switch>)>> {
@@ -654,7 +688,10 @@ pub(super) fn required_external_include_option_argument(
     })
 }
 
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "tuple layout mirrors the parsed OOXML grammar"
+)]
 pub(super) fn parse_external_link_operands_and_switches(
     instruction: &str,
     field_type: &str,
@@ -769,7 +806,10 @@ pub(super) fn parse_formula_field_formula(instruction: &str) -> Result<Option<St
     Ok(Some(formula.to_string()))
 }
 
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "tuple layout mirrors the parsed OOXML grammar"
+)]
 pub(super) fn parse_style_reference_field_parts(
     instruction: &str,
 ) -> Result<Option<(String, Vec<StyleOption>, Vec<Switch>)>> {
@@ -840,7 +880,10 @@ pub(super) fn parse_auto_text_field_parts(
     Ok(Some((kind, entry_name, unknown_switches)))
 }
 
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "tuple layout mirrors the parsed OOXML grammar"
+)]
 pub(super) fn parse_auto_text_list_field_parts(
     instruction: &str,
 ) -> Result<Option<(Option<String>, Vec<AutoTextListOption>, Vec<Switch>)>> {
@@ -882,7 +925,10 @@ pub(super) fn parse_auto_text_list_field_parts(
     Ok(Some((display_text, options, unknown_switches)))
 }
 
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "tuple layout mirrors the parsed OOXML grammar"
+)]
 pub(super) fn parse_prompt_field_parts(
     instruction: &str,
 ) -> Result<
@@ -971,7 +1017,10 @@ pub(super) fn parse_prompt_field_parts(
     )))
 }
 
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "tuple layout mirrors the parsed OOXML grammar"
+)]
 pub(super) fn parse_mail_merge_recipient_field_parts(
     instruction: &str,
 ) -> Result<
@@ -1273,12 +1322,12 @@ pub(super) fn parse_toc_level_range(value: &str) -> Result<TocLevelRange> {
         .next()
         .ok_or_else(|| Error::Invalid("TOC level range is empty".to_string()))?
         .parse::<u8>()
-        .map_err(|_| Error::Invalid("invalid TOC start level".to_string()))?;
+        .map_err(|_source_error| Error::Invalid("invalid TOC start level".to_string()))?;
     let end = levels
         .next()
         .ok_or_else(|| Error::Invalid("TOC level range is incomplete".to_string()))?
         .parse::<u8>()
-        .map_err(|_| Error::Invalid("invalid TOC end level".to_string()))?;
+        .map_err(|_source_error| Error::Invalid("invalid TOC end level".to_string()))?;
     if levels.next().is_some() {
         return Err(Error::Invalid(
             "TOC level range contains too many separators".to_string(),

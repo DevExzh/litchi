@@ -12,7 +12,7 @@ use crate::parts::fib::FileInformationBlock;
 use crate::writer::fib::FibBuilder;
 use litchi_ole_common::object::{Editor as ObjectEditor, Limits, Patch as ObjectPatch, Targets};
 
-/// FibRgFcLcb97 index of fcCmds/lcbCmds (MS-DOC 2.5).
+/// `FibRgFcLcb97` index of fcCmds/lcbCmds (MS-DOC 2.5).
 pub const FIB_INDEX_CMDS: usize = 24;
 
 /// Parse the optional command-bar table addressed by fcCmds/lcbCmds.

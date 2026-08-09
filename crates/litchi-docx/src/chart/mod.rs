@@ -1,4 +1,4 @@
-//! Contextual DOCX host facade for embedded DrawingML chart parts.
+//! Contextual DOCX host facade for embedded `DrawingML` chart parts.
 //!
 //! [`litchi_drawingml::chart`] owns chart-schema semantics. This module owns
 //! the DOCX placement, relationship graph, companion parts, and opaque bytes.

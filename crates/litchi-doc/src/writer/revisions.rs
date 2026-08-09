@@ -30,6 +30,7 @@ impl TextRevision {
     }
 
     /// Set the revision timestamp.
+    #[must_use]
     pub fn with_timestamp(mut self, timestamp: DateTime) -> Self {
         self.timestamp = Some(timestamp);
         self
@@ -38,18 +39,21 @@ impl TextRevision {
     /// Set a legacy raw edit-reason code.
     ///
     /// Prefer [`Self::with_reason`]; invalid raw values are rejected when writing.
+    #[must_use]
     pub fn with_id(mut self, revision_id: u16) -> Self {
         self.revision_id = Some(revision_id);
         self
     }
 
     /// Set the edit reason.
+    #[must_use]
     pub fn with_reason(mut self, reason: RevisionReason) -> Self {
         self.reason = Some(reason);
         self
     }
 
     /// Set the single-session revision-save ID.
+    #[must_use]
     pub fn with_revision_save_id(mut self, revision_save_id: u32) -> Self {
         self.revision_save_id = Some(revision_save_id);
         self
@@ -81,18 +85,21 @@ impl FormattingRevision {
     }
 
     /// Set the revision timestamp.
+    #[must_use]
     pub fn with_timestamp(mut self, timestamp: DateTime) -> Self {
         self.timestamp = Some(timestamp);
         self
     }
 
     /// Set the single-session revision-save ID.
+    #[must_use]
     pub fn with_revision_save_id(mut self, revision_save_id: u32) -> Self {
         self.revision_save_id = Some(revision_save_id);
         self
     }
 
     /// Set the edit reason.
+    #[must_use]
     pub fn with_reason(mut self, reason: RevisionReason) -> Self {
         self.reason = Some(reason);
         self
@@ -133,6 +140,7 @@ impl NumberingRevision {
     }
 
     /// Set the revision timestamp.
+    #[must_use]
     pub fn with_timestamp(mut self, timestamp: DateTime) -> Self {
         self.timestamp = Some(timestamp);
         self
@@ -161,6 +169,7 @@ impl DisplayFieldRevision {
     }
 
     /// Set the revision timestamp.
+    #[must_use]
     pub fn with_timestamp(mut self, timestamp: DateTime) -> Self {
         self.timestamp = Some(timestamp);
         self

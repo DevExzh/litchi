@@ -4,7 +4,24 @@ Format-agnostic Markdown emission helpers for the Litchi office-formats library.
 
 ## Overview
 
-`litchi-markdown` provides the `ToMarkdown` trait and configuration types used by Litchi's higher-level format crates (and the `litchi` umbrella crate) to render Office documents and presentations as Markdown. It deliberately has no knowledge of any concrete document format; per-format `impl ToMarkdown for ...` blocks live alongside their respective format crates.
+`litchi-markdown` provides bounded, exact-source CommonMark/GFM snapshots and
+reversible block edits, plus the `ToMarkdown` trait and configuration types
+used by Litchi's higher-level format adapters. It deliberately has no knowledge
+of any concrete document format.
+
+```rust
+use litchi_markdown::reader::Snapshot;
+
+let source = Snapshot::read("# Original\n\nBody")?;
+let mut edit = source.edit();
+edit.replace_block_with_text(0, "# literal heading marker")?;
+let commit = edit.commit()?;
+assert_eq!(commit.snapshot().source(), "\\# literal heading marker\n\nBody");
+
+let restored = commit.snapshot().apply(&commit.patch().inverse())?;
+assert_eq!(restored.snapshot().source(), source.source());
+# Ok::<(), litchi_markdown::reader::Error>(())
+```
 
 ## Usage
 

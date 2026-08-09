@@ -40,7 +40,7 @@ pub use model::{
     WebEditMode, WebFieldInfo, WebInvalidCell, WebReadingOrder, WebTableField, WebTableMetadata,
     XmlColumnMapping, XmlDataType, XmlTableField, XmlTableMetadata,
 };
-#[allow(unreachable_pub)]
+#[allow(unreachable_pub, reason = "public within this staged feature module")]
 pub use table_metadata::TableFlags;
 
 pub(crate) use package::{ListObjectCollector, feature_header_record};

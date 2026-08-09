@@ -64,7 +64,10 @@ impl SingleCellsSource {
     }
 
     /// Inert `dwConnID` values aligned with [`Self::value`].
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "retained for BIFF12 codec completeness and staged host integration"
+    )]
     pub(crate) fn connection_ids(&self) -> &[u32] {
         &self.connection_ids
     }

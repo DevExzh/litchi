@@ -12,9 +12,6 @@ use std::{ops::Range, sync::Arc};
 
 const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const CHART: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:chart:1.0";
-const MAX_BYTES: usize = 64 * 1024 * 1024;
-const MAX_DEPTH: usize = 256;
-const MAX_AXES: usize = 16_384;
 const MAX_NAME_BYTES: usize = 64 * 1024;
 
 #[derive(Clone, Debug)]
@@ -23,6 +20,7 @@ struct State {
     chart: Element,
     axes: Vec<AxisRecord>,
     root_kind: RootKind,
+    limits: crate::Limits,
 }
 
 #[derive(Clone, Debug)]
@@ -50,11 +48,20 @@ impl FlatChart {
     /// Returns an error when the input is not a bounded, structurally valid
     /// flat ODC document.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        parse(bytes, RootKind::Flat).map(|state| Self(Arc::new(state)))
+        Self::from_bytes_with_limits(bytes, crate::Limits::default())
     }
 
-    pub(crate) fn from_content_xml(bytes: Vec<u8>) -> Result<Self> {
-        parse(bytes, RootKind::Content).map(|state| Self(Arc::new(state)))
+    /// Opens flat ODC XML under caller-selected limits retained by edits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when XML structure, semantics, or a limit is invalid.
+    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: crate::Limits) -> Result<Self> {
+        parse(bytes, RootKind::Flat, limits).map(|state| Self(Arc::new(state)))
+    }
+
+    pub(crate) fn from_content_xml(bytes: Vec<u8>, limits: crate::Limits) -> Result<Self> {
+        parse(bytes, RootKind::Content, limits).map(|state| Self(Arc::new(state)))
     }
 
     /// Returns the retained semantic chart tree.
@@ -81,6 +88,12 @@ impl FlatChart {
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         &self.0.bytes
+    }
+
+    /// Return the limits retained for subsequent edits and patch application.
+    #[must_use]
+    pub fn limits(&self) -> crate::Limits {
+        self.0.limits
     }
 
     /// Starts a detached transaction bound to this source snapshot.
@@ -152,11 +165,10 @@ impl FlatChartEdit {
         let Some(after) = update.name else {
             return Ok(());
         };
-        if after
-            .as_ref()
-            .is_some_and(|name| name.len() > MAX_NAME_BYTES)
-        {
-            return Err(invalid_error("flat ODC axis name exceeds 64 KiB"));
+        if after.as_ref().is_some_and(|name| {
+            name.len() > MAX_NAME_BYTES || name.len() > self.source.0.limits.max_scalar_bytes()
+        }) {
+            return Err(invalid_error("flat ODC axis name exceeds its byte limit"));
         }
         let before = self.source.axis_name(index)?.map(str::to_owned);
         if before == after {
@@ -234,7 +246,7 @@ impl FlatChartEdit {
             bytes.splice(replacement.range.clone(), replacement.value);
             previous = replacement.range.start;
         }
-        let snapshot = FlatChart(Arc::new(parse(bytes, source.0.root_kind)?));
+        let snapshot = FlatChart(Arc::new(parse(bytes, source.0.root_kind, source.0.limits)?));
         for change in &changes {
             if snapshot.axis_name(change.index)? != change.after.as_deref() {
                 return Err(invalid_error("flat ODC edit failed typed readback"));
@@ -402,9 +414,11 @@ enum NamespaceKind {
     Other,
 }
 
-fn parse(bytes: Vec<u8>, root_kind: RootKind) -> Result<State> {
-    if bytes.len() > MAX_BYTES {
-        return Err(invalid_error("flat ODC exceeds the 64 MiB input limit"));
+fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<State> {
+    if bytes.len() > limits.max_content_bytes() {
+        return Err(invalid_error(
+            "flat ODC exceeds the caller-selected content limit",
+        ));
     }
     if root_kind == RootKind::Flat
         && litchi_odf_common::detect::flat(&bytes) != Some(FileFormat::Odc)
@@ -442,7 +456,7 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind) -> Result<State> {
             .map_err(|_overflow| invalid_error("ODC XML event offset exceeds this platform"))?;
         match event {
             Event::Start(element) => {
-                let event_depth = checked_depth(depth)?;
+                let event_depth = checked_depth(depth, limits.max_depth())?;
                 let local = element.local_name();
                 if event_depth == 1 {
                     let expected = match root_kind {
@@ -489,12 +503,19 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind) -> Result<State> {
                     && local.as_ref() == b"axis"
                     && plot_depth == Some(event_depth - 1)
                 {
-                    push_axis(&reader, &element, event_start..event_end, &bytes, &mut axes)?;
+                    push_axis(
+                        &reader,
+                        &element,
+                        event_start..event_end,
+                        &bytes,
+                        &mut axes,
+                        limits,
+                    )?;
                 }
                 depth = event_depth;
             },
             Event::Empty(element) => {
-                let event_depth = checked_depth(depth)?;
+                let event_depth = checked_depth(depth, limits.max_depth())?;
                 let local = element.local_name();
                 if event_depth == 1
                     || (namespace == NamespaceKind::Office
@@ -513,7 +534,14 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind) -> Result<State> {
                     && local.as_ref() == b"axis"
                     && plot_depth == Some(event_depth - 1)
                 {
-                    push_axis(&reader, &element, event_start..event_end, &bytes, &mut axes)?;
+                    push_axis(
+                        &reader,
+                        &element,
+                        event_start..event_end,
+                        &bytes,
+                        &mut axes,
+                        limits,
+                    )?;
                 }
             },
             Event::End(element) => {
@@ -604,6 +632,7 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind) -> Result<State> {
         .map_err(|_utf8_error| invalid_error("normalized ODC is not UTF-8"))?;
     let chart = chart::read(normalized_xml)?;
     let _ = chart.chart_class()?;
+    crate::codec::validate_tree(&chart, limits)?;
     if let Some(plot_area) = chart.plot_area() {
         for axis in plot_area.axes() {
             let _ = axis.dimension()?;
@@ -614,6 +643,7 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind) -> Result<State> {
         chart,
         axes,
         root_kind,
+        limits,
     })
 }
 
@@ -623,9 +653,12 @@ fn push_axis(
     tag: Range<usize>,
     bytes: &[u8],
     axes: &mut Vec<AxisRecord>,
+    limits: crate::Limits,
 ) -> Result<()> {
-    if axes.len() >= MAX_AXES {
-        return Err(invalid_error("flat ODC axis count exceeds the limit"));
+    if axes.len() >= limits.max_axes() {
+        return Err(invalid_error(
+            "flat ODC axis count exceeds the caller-selected limit",
+        ));
     }
     let mut name = None;
     let mut key = None;
@@ -641,8 +674,8 @@ fn push_axis(
                 .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
                 .map_err(|error| invalid_error(format!("invalid flat ODC axis name: {error}")))?
                 .into_owned();
-            if value.len() > MAX_NAME_BYTES {
-                return Err(invalid_error("flat ODC axis name exceeds 64 KiB"));
+            if value.len() > MAX_NAME_BYTES || value.len() > limits.max_scalar_bytes() {
+                return Err(invalid_error("flat ODC axis name exceeds its byte limit"));
             }
             name = Some(value);
             key = Some(attribute.key.as_ref().to_vec());
@@ -757,12 +790,14 @@ fn root_content_name(name: &[u8]) -> Result<Vec<u8>> {
     Ok(format!("{prefix}document-content").into_bytes())
 }
 
-fn checked_depth(depth: usize) -> Result<usize> {
+fn checked_depth(depth: usize, max_depth: usize) -> Result<usize> {
     let next_depth = depth
         .checked_add(1)
         .ok_or_else(|| invalid_error("flat ODC XML depth overflow"))?;
-    if next_depth > MAX_DEPTH {
-        return Err(invalid_error("flat ODC XML depth exceeds 256"));
+    if next_depth > max_depth {
+        return Err(invalid_error(
+            "flat ODC XML depth exceeds the caller-selected limit",
+        ));
     }
     Ok(next_depth)
 }

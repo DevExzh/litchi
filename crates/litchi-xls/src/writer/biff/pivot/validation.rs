@@ -1,4 +1,4 @@
-//! Input validation for PivotTable cache writers.
+//! Input validation for `PivotTable` cache writers.
 
 use super::model::PivotCacheFieldInfo;
 use crate::{Error, Result};
@@ -30,11 +30,11 @@ pub(super) fn validate_sxdbb_inputs(
 
 /// Validate one packed SXDBB item index without changing its wire encoding.
 pub(super) fn validate_sxdbb_index(index: u16, use_16bit: bool) -> Result<()> {
-    if !use_16bit {
+    if use_16bit {
+        Ok(())
+    } else {
         u8::try_from(index)
             .map(|_| ())
-            .map_err(|_| Error::InvalidData("SXINDEXLIST 8-bit index overflow".to_string()))
-    } else {
-        Ok(())
+            .map_err(|_error| Error::InvalidData("SXINDEXLIST 8-bit index overflow".to_string()))
     }
 }

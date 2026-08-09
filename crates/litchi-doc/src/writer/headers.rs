@@ -76,6 +76,7 @@ impl HeadersWriter {
     }
 
     /// Create a new headers writer
+    #[must_use]
     pub fn new() -> Self {
         Self {
             entries: Vec::new(),
@@ -156,9 +157,9 @@ impl HeadersWriter {
         Ok((text_bytes, char_positions))
     }
 
-    /// Generate the PlcfHdd structure
+    /// Generate the `PlcfHdd` structure
     ///
-    /// The PlcfHdd is a PLCF with element_size=0 (just character positions)
+    /// The `PlcfHdd` is a PLCF with `element_size=0` (just character positions)
     /// that maps character positions in the header subdocument
     ///
     /// # Errors
@@ -196,6 +197,7 @@ impl HeadersWriter {
     }
 
     /// Check if there are any headers/footers
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }

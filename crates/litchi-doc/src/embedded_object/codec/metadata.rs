@@ -1,4 +1,4 @@
-//! `[MS-OLEDS]` metadata codecs for DOC ObjectPool storages.
+//! `[MS-OLEDS]` metadata codecs for DOC `ObjectPool` storages.
 
 use super::super::model::{Clipboard, CompObj, Info, Kind, Metadata, Ole, Unknown};
 use super::{array_at, corrupted, u32_at};
@@ -240,7 +240,7 @@ impl Ole {
 }
 
 impl Metadata {
-    /// Reads one selected ObjectPool storage without activating its payload.
+    /// Reads one selected `ObjectPool` storage without activating its payload.
     pub fn of(object: &Object) -> Result<Self> {
         let mut comp_obj = None;
         let mut ole = None;

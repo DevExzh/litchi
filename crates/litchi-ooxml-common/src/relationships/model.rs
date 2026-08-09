@@ -6,7 +6,7 @@ use crate::XmlError;
 
 /// A checked OPC relationship identifier (`xsd:ID`/`ST_RelationshipId`).
 ///
-/// Relationship identifiers are NCNames, not arbitrary strings. Keeping the
+/// Relationship identifiers are `NCNames`, not arbitrary strings. Keeping the
 /// lexical check at the shared boundary lets package owners use a compact
 /// value without repeating validation or carrying spare `String` capacity.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]

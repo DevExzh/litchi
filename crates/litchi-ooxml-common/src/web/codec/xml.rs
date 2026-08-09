@@ -454,8 +454,7 @@ pub(in crate::web) fn push_element(
     let parent_namespaces = state
         .stack
         .last()
-        .map(|frame| Arc::clone(&frame.namespaces))
-        .unwrap_or_else(NamespaceScope::xml);
+        .map_or_else(NamespaceScope::xml, |frame| Arc::clone(&frame.namespaces));
     let mut local_namespaces = HashMap::new();
     let mut raw_attributes = Vec::new();
     let mut declared_prefixes = HashSet::new();

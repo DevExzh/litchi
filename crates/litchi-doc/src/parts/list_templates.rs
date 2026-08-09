@@ -30,10 +30,12 @@ fn read_u32(data: &[u8], offset: usize, field: &str) -> Result<u32> {
 pub struct ListTemplateLanguageId(u16);
 
 impl ListTemplateLanguageId {
+    #[must_use]
     pub const fn new(raw: u16) -> Self {
         Self(raw)
     }
 
+    #[must_use]
     pub const fn raw(self) -> u16 {
         self.0
     }
@@ -117,6 +119,7 @@ impl ListTemplateCode {
         })
     }
 
+    #[must_use]
     pub const fn raw(self) -> u32 {
         match self {
             Self::BuiltIn { format, language } => {
@@ -219,18 +222,22 @@ impl ListTemplateTable {
         Self::try_new(entries)
     }
 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.entries.len()
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
 
+    #[must_use]
     pub fn entries(&self) -> &[ListTemplateEntry] {
         &self.entries
     }
 
+    #[must_use]
     pub fn get(&self, definition: usize) -> Option<&[ListTemplateCode; LEVEL_COUNT]> {
         self.entries.get(definition)?.as_ref()
     }

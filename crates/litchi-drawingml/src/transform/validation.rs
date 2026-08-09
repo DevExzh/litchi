@@ -1,4 +1,4 @@
-//! Bounds and structural validation for DrawingML transforms.
+//! Bounds and structural validation for `DrawingML` transforms.
 
 use crate::{Error, Result};
 
@@ -10,7 +10,7 @@ const MAX_SERIALIZED_BYTES: usize = 1 << 20;
 ///
 /// Coordinates, extents, and angles are private checked domains, so this
 /// pass focuses on the aggregate output budget and keeps the validation seam
-/// explicit for future DrawingML transform extensions.
+/// explicit for future `DrawingML` transform extensions.
 pub fn validate(transform: &Transform) -> Result<()> {
     let mut size = 7usize; // `<a:xfrm/>`
     if let Some(value) = transform.authored_rotation() {
@@ -28,15 +28,17 @@ pub fn validate(transform: &Transform) -> Result<()> {
                 .ok_or_else(|| limit("serialized transform bytes"))?;
         }
     }
-    for value in [transform.offset(), transform.child_offset()] {
-        if let Some(value) = value {
-            size = add_point(size, value)?;
-        }
+    for value in [transform.offset(), transform.child_offset()]
+        .into_iter()
+        .flatten()
+    {
+        size = add_point(size, value)?;
     }
-    for value in [transform.extent(), transform.child_extent()] {
-        if let Some(value) = value {
-            size = add_size(size, value)?;
-        }
+    for value in [transform.extent(), transform.child_extent()]
+        .into_iter()
+        .flatten()
+    {
+        size = add_size(size, value)?;
     }
     if size > MAX_SERIALIZED_BYTES {
         return Err(limit("serialized transform bytes"));

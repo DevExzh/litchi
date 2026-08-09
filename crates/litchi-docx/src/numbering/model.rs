@@ -1,4 +1,4 @@
-//! Package-neutral WordprocessingML numbering definitions.
+//! Package-neutral `WordprocessingML` numbering definitions.
 //!
 //! The owner keeps the compact semantic vocabulary here; the OOXML host
 //! supplies only package and relationship orchestration around it.
@@ -26,11 +26,13 @@ pub struct PictureBullet {
 
 impl PictureBullet {
     /// The `w:numPicBulletId` key referenced by `w:lvlPicBulletId` on a level.
+    #[must_use]
     pub fn id(&self) -> u32 {
         self.id
     }
 
     /// Relationship ID of the bullet image, when the definition carries one.
+    #[must_use]
     pub fn image_relationship_id(&self) -> Option<&str> {
         self.image_relationship_id.as_deref()
     }
@@ -88,7 +90,7 @@ pub enum MultiLevel {
 }
 
 impl MultiLevel {
-    /// Return the exact WordprocessingML token.
+    /// Return the exact `WordprocessingML` token.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -284,7 +286,7 @@ impl FromStr for Format {
 }
 
 impl Format {
-    /// Return the exact WordprocessingML token.
+    /// Return the exact `WordprocessingML` token.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -400,6 +402,7 @@ pub struct Override {
 }
 
 impl Collection {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             abstract_nums: Vec::new(),
@@ -408,27 +411,35 @@ impl Collection {
         }
     }
 
+    #[must_use]
     pub fn abstract_nums(&self) -> &[Definition] {
         &self.abstract_nums
     }
+    #[must_use]
     pub fn nums(&self) -> &[Instance] {
         &self.nums
     }
+    #[must_use]
     pub fn abstract_num_count(&self) -> usize {
         self.abstract_nums.len()
     }
+    #[must_use]
     pub fn num_count(&self) -> usize {
         self.nums.len()
     }
+    #[must_use]
     pub fn get_abstract_num(&self, id: u32) -> Option<&Definition> {
         self.abstract_nums.iter().find(|value| value.id == id)
     }
+    #[must_use]
     pub fn get_num(&self, id: u32) -> Option<&Instance> {
         self.nums.iter().find(|value| value.id == id)
     }
+    #[must_use]
     pub fn picture_bullets(&self) -> &[PictureBullet] {
         &self.picture_bullets
     }
+    #[must_use]
     pub fn get_picture_bullet(&self, id: u32) -> Option<&PictureBullet> {
         self.picture_bullets.iter().find(|value| value.id == id)
     }
@@ -441,15 +452,19 @@ impl Default for Collection {
 }
 
 impl Definition {
+    #[must_use]
     pub fn id(&self) -> u32 {
         self.id
     }
+    #[must_use]
     pub fn num_type(&self) -> Option<MultiLevel> {
         self.num_type
     }
+    #[must_use]
     pub fn num_style_link(&self) -> Option<&str> {
         self.num_style_link.as_deref()
     }
+    #[must_use]
     pub fn style_link(&self) -> Option<&str> {
         self.style_link.as_deref()
     }
@@ -458,21 +473,26 @@ impl Definition {
     pub const fn restart_numbering_after_break(&self) -> Option<bool> {
         self.restart_numbering_after_break
     }
+    #[must_use]
     pub fn levels(&self) -> &[Level] {
         &self.levels
     }
+    #[must_use]
     pub fn level(&self, level: u8) -> Option<&Level> {
         self.levels.iter().find(|value| value.level == level)
     }
 }
 
 impl Instance {
+    #[must_use]
     pub fn id(&self) -> u32 {
         self.id
     }
+    #[must_use]
     pub fn abstract_num_id(&self) -> u32 {
         self.abstract_num_id
     }
+    #[must_use]
     pub fn overrides(&self) -> &[Override] {
         &self.overrides
     }

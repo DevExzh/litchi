@@ -40,7 +40,7 @@ pub const SORT_TYPE: u16 = 0x0090;
 /// FILTERMODE record type identifier.
 pub const FILTERMODE_TYPE: u16 = 0x009B;
 
-/// Comparison operators for AutoFilter conditions.
+/// Comparison operators for `AutoFilter` conditions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FilterOperator {
     /// No filter applied.
@@ -110,10 +110,10 @@ pub enum FilterJoin {
     Or,
 }
 
-/// A single AutoFilter column definition.
+/// A single `AutoFilter` column definition.
 #[derive(Debug, Clone)]
 pub struct AutoFilterColumn {
-    /// Column index within the AutoFilter range (0-based relative to the filter area).
+    /// Column index within the `AutoFilter` range (0-based relative to the filter area).
     pub column_index: u16,
     /// Join logic between conditions.
     pub join: FilterJoin,
@@ -129,10 +129,10 @@ pub struct AutoFilterColumn {
     pub condition2: FilterCondition,
 }
 
-/// Complete AutoFilter state for a worksheet.
+/// Complete `AutoFilter` state for a worksheet.
 #[derive(Debug, Clone)]
 pub struct AutoFilterInfo {
-    /// Number of columns in the AutoFilter range.
+    /// Number of columns in the `AutoFilter` range.
     pub column_count: u16,
     /// Per-column filter definitions (populated from AUTOFILTER records).
     pub columns: Vec<AutoFilterColumn>,
@@ -166,6 +166,9 @@ pub struct SortInfo {
 }
 
 /// Parse an AUTOFILTERINFO record.
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn parse_autofilterinfo(data: &[u8]) -> Result<u16> {
     if data.len() < 2 {
         return Err(Error::InvalidLength {
@@ -180,6 +183,9 @@ pub fn parse_autofilterinfo(data: &[u8]) -> Result<u16> {
 ///
 /// The record body is empty ([MS-XLS] 2.4.119); its presence alone specifies
 /// that the containing sheet data was filtered.
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn parse_filtermode(data: &[u8]) -> Result<()> {
     if !data.is_empty() {
         return Err(Error::InvalidLength {
@@ -263,6 +269,9 @@ fn parse_doper(data: &[u8], offset: usize) -> Result<(FilterCondition, usize)> {
 /// Parse an AUTOFILTER record.
 ///
 /// The record data starts after the standard BIFF header.
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn parse_autofilter(data: &[u8]) -> Result<AutoFilterColumn> {
     // Minimum: 2 (iEntry) + 2 (grbit) + 10 (doper1) + 10 (doper2) = 24
     if data.len() < 24 {
@@ -354,6 +363,9 @@ pub fn parse_autofilter(data: &[u8]) -> Result<AutoFilterColumn> {
 }
 
 /// Parse a SORT record (0x0090).
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn parse_sort(data: &[u8]) -> Result<SortInfo> {
     // Minimum 10 bytes (flags + 3 sort key column indices + 3 reserved)
     if data.len() < 10 {

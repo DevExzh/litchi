@@ -1,4 +1,4 @@
-//! Strict BIFF8/MS-XLS HLink and HLinkTooltip codecs.
+//! Strict BIFF8/MS-XLS `HLink` and `HLinkTooltip` codecs.
 
 use super::model::{
     FileMoniker, Hyperlink, HyperlinkMoniker, HyperlinkRange, ItemMoniker, TOOLTIP_RECORD_TYPE,
@@ -19,6 +19,9 @@ pub(super) const URL_SERIAL_GUID: [u8; 16] = [
     0x79, 0x58, 0x81, 0xF4, 0x3B, 0x1D, 0x7F, 0x48, 0xAF, 0x2C, 0x82, 0x5D, 0xC4, 0x85, 0x27, 0x63,
 ];
 
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn parse_hlink_record(data: &[u8]) -> Result<Hyperlink> {
     let mut cursor = Cursor::new(data);
     let range = cursor.range()?;
@@ -275,8 +278,9 @@ fn decode_terminated_utf16(data: &[u8]) -> Result<String> {
     if units.last() != Some(&0) || units[..units.len() - 1].contains(&0) {
         return invalid("hyperlink string must contain exactly one trailing NUL".to_string());
     }
-    String::from_utf16(&units[..units.len() - 1])
-        .map_err(|_| Error::InvalidData("hyperlink string contains invalid UTF-16".to_string()))
+    String::from_utf16(&units[..units.len() - 1]).map_err(|_error| {
+        Error::InvalidData("hyperlink string contains invalid UTF-16".to_string())
+    })
 }
 fn decode_unterminated_utf16(data: &[u8]) -> Result<String> {
     if !data.len().is_multiple_of(2) {
@@ -289,8 +293,9 @@ fn decode_unterminated_utf16(data: &[u8]) -> Result<String> {
     if units.contains(&0) {
         return invalid("unterminated hyperlink string contains NUL".to_string());
     }
-    String::from_utf16(&units)
-        .map_err(|_| Error::InvalidData("hyperlink string contains invalid UTF-16".to_string()))
+    String::from_utf16(&units).map_err(|_error| {
+        Error::InvalidData("hyperlink string contains invalid UTF-16".to_string())
+    })
 }
 fn decode_terminated_ansi(data: &[u8]) -> Result<String> {
     if data.last() != Some(&0) || data[..data.len() - 1].contains(&0) {
@@ -348,8 +353,8 @@ impl<'a> Cursor<'a> {
         Ok(HyperlinkRange {
             first_row,
             last_row,
-            first_column: first_column as u8,
-            last_column: last_column as u8,
+            first_column: crate::utils::truncate_u16_to_u8(first_column),
+            last_column: crate::utils::truncate_u16_to_u8(last_column),
         })
     }
     fn hyperlink_string(&mut self) -> Result<String> {

@@ -15,10 +15,10 @@ pub(in crate::parts::tap_parser) fn read_byte(data: &[u8], offset: usize) -> Bin
 /// Convert a binary operand error into the DOC package error surface.
 #[inline]
 pub(in crate::parts::tap_parser) fn binary_to_doc_result<T>(result: BinaryResult<T>) -> Result<T> {
-    result.map_err(|e| PackageError::InvalidFormat(format!("Binary read error: {}", e)))
+    result.map_err(|e| PackageError::InvalidFormat(format!("Binary read error: {e}")))
 }
 
-impl<'arena> TapParser<'arena> {
+impl TapParser<'_> {
     pub(in crate::parts::tap_parser) fn parse_bool8(sprm: &Sprm, name: &str) -> Result<bool> {
         let operand = sprm.operand_bytes();
         if operand.len() != 1 || !matches!(operand[0], 0 | 1) {

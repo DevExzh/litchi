@@ -1,6 +1,7 @@
 //! Concise family entry points.
 
-use litchi_core::{Error, Metadata, Position, Result};
+use litchi_core::{Error, HistoryLimits, Metadata, PatchError, Position, Result};
+use std::fmt;
 use std::{path::Path, sync::Arc};
 
 pub use crate::authoring::Builder;
@@ -10,12 +11,39 @@ const MAX_PARAGRAPH_BYTES: usize = 16 * 1024 * 1024;
 /// A read-only semantic text-web body projection.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TextBody {
+    bookmarks: Vec<crate::bookmark::Bookmark>,
+    forms: Vec<crate::form::Form>,
     headings: Vec<crate::heading::Heading>,
+    lists: Vec<crate::list::List>,
     order: Vec<crate::codec::BlockOrder>,
     paragraphs: Vec<crate::paragraph::Paragraph>,
+    resources: Vec<crate::resource::Resource>,
 }
 
 impl TextBody {
+    /// Bookmarks in source-close order.
+    #[must_use]
+    pub fn bookmarks(&self) -> &[crate::bookmark::Bookmark] {
+        &self.bookmarks
+    }
+
+    /// Lists in source-close order. Nested lists carry their explicit level.
+    #[must_use]
+    pub fn lists(&self) -> &[crate::list::List] {
+        &self.lists
+    }
+
+    /// Inert image and object references.
+    #[must_use]
+    pub fn resources(&self) -> &[crate::resource::Resource] {
+        &self.resources
+    }
+
+    /// Inert forms and their controls.
+    #[must_use]
+    pub fn forms(&self) -> &[crate::form::Form] {
+        &self.forms
+    }
     /// Iterates paragraphs and headings in source document order.
     #[must_use]
     pub fn blocks(&self) -> impl ExactSizeIterator<Item = Block<'_>> + '_ {
@@ -112,6 +140,12 @@ impl Template {
         self.package.metadata()
     }
 
+    /// Returns named style declarations from `content.xml` and `styles.xml`.
+    #[must_use]
+    pub fn styles(&self) -> &[crate::style::Style] {
+        self.package.styles()
+    }
+
     /// Returns the raw package bytes.
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
@@ -139,9 +173,13 @@ impl Template {
     /// without changing this public entry point.
     pub fn text_body(&self) -> Result<TextBody> {
         Ok(TextBody {
+            bookmarks: self.package.bookmarks().to_vec(),
+            forms: self.package.forms().to_vec(),
             headings: self.package.headings().to_vec(),
+            lists: self.package.lists().to_vec(),
             order: self.package.order().to_vec(),
             paragraphs: self.package.paragraphs().to_vec(),
+            resources: self.package.resources().to_vec(),
         })
     }
 
@@ -149,6 +187,7 @@ impl Template {
     #[must_use]
     pub fn edit(&self) -> Edit<'_> {
         Edit {
+            appended: Vec::new(),
             changes: Vec::new(),
             source: self,
         }
@@ -163,11 +202,31 @@ impl Template {
 
 /// A source-bound web-template text transaction.
 pub struct Edit<'a> {
+    appended: Vec<crate::ContentBlock>,
     changes: Vec<ParagraphChange>,
     source: &'a Template,
 }
 
 impl Edit<'_> {
+    /// Appends one typed block at the end of `office:text`.
+    ///
+    /// The block is rendered as compact XML and the complete package is
+    /// reopened before publication.
+    ///
+    /// # Errors
+    ///
+    /// Returns an allocation error if the bounded staging collection cannot grow.
+    pub fn append_block(&mut self, block: impl Into<crate::ContentBlock>) -> Result<()> {
+        self.appended
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "OTH appended blocks",
+                source,
+            })?;
+        self.appended.push(block.into());
+        Ok(())
+    }
+
     /// Replaces one paragraph's sole direct character-data XML span.
     ///
     /// Nested, split, CDATA, and empty paragraphs remain readable but are not
@@ -242,10 +301,14 @@ impl Edit<'_> {
     /// Returns an error if the source cannot be losslessly rewritten or the
     /// fully reopened candidate fails semantic readback.
     pub fn commit(self) -> Result<Commit> {
-        if self.changes.is_empty() {
+        if self.changes.is_empty() && self.appended.is_empty() {
             return Ok(Commit::unchanged(self.source.clone()));
         }
-        let content = replace_texts(self.source, &self.changes)?;
+        let content = crate::codec::compact_for_publication(&replace_texts(
+            self.source,
+            &self.changes,
+            &self.appended,
+        )?)?;
         let snapshot = Template {
             package: self.source.package.rebuild_with_content(&content)?,
         };
@@ -263,15 +326,115 @@ impl Edit<'_> {
                 ));
             }
         }
+        let appended_block_count = self.appended.iter().fold(0_usize, |count, block| {
+            count.saturating_add(match block {
+                crate::ContentBlock::Heading(_) | crate::ContentBlock::Paragraph(_) => 1,
+                crate::ContentBlock::List(list) => list
+                    .items()
+                    .iter()
+                    .map(|item| item.paragraphs().len())
+                    .fold(0_usize, usize::saturating_add),
+            })
+        });
+        if snapshot.package.order().len()
+            != self
+                .source
+                .package
+                .order()
+                .len()
+                .saturating_add(appended_block_count)
+        {
+            return Err(Error::InvalidFormat(
+                "OTH appended blocks failed semantic readback".to_string(),
+            ));
+        }
         Ok(Commit {
             snapshot: snapshot.clone(),
             patch: Patch {
                 source: self.source.clone(),
                 target: snapshot,
+                appended: self.appended,
                 changes: self.changes,
             },
             changed: true,
         })
+    }
+}
+
+impl<'a> Edit<'a> {
+    /// Joins an independently prepared transaction when its effects are disjoint.
+    ///
+    /// Two append sequences conflict because their relative order was not
+    /// established by either author. On failure this edit is unchanged and the
+    /// rejected edit remains recoverable from [`JoinError`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the rejected transaction with a typed source or overlap reason.
+    pub fn join(&mut self, other: Self) -> std::result::Result<&mut Self, JoinError<'a>> {
+        let failure = if !self.source.package.is_same(&other.source.package) {
+            Some(JoinFailure::DifferentSnapshot)
+        } else if !self.appended.is_empty() && !other.appended.is_empty() {
+            Some(JoinFailure::Append)
+        } else {
+            self.changes.iter().find_map(|accepted| {
+                other
+                    .changes
+                    .iter()
+                    .any(|incoming| incoming.paragraph == accepted.paragraph)
+                    .then_some(JoinFailure::Paragraph(accepted.paragraph))
+            })
+        };
+        if let Some(reason) = failure {
+            return Err(JoinError {
+                failure: reason,
+                rejected: Box::new(other),
+            });
+        }
+        self.changes.extend(other.changes);
+        self.appended.extend(other.appended);
+        Ok(self)
+    }
+}
+
+/// Deterministic edit-composition refusal.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum JoinFailure {
+    /// Transactions originated from distinct immutable snapshots.
+    DifferentSnapshot,
+    /// Both transactions append at the same structural tail.
+    Append,
+    /// Both transactions replace the same paragraph.
+    Paragraph(Position),
+}
+
+/// A join refusal that retains the rejected transaction.
+pub struct JoinError<'a> {
+    failure: JoinFailure,
+    rejected: Box<Edit<'a>>,
+}
+
+impl fmt::Debug for JoinError<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("JoinError")
+            .field("failure", &self.failure)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'a> JoinError<'a> {
+    /// Structured refusal reason.
+    #[must_use]
+    pub const fn failure(&self) -> JoinFailure {
+        self.failure
+    }
+
+    /// Recovers the rejected work.
+    #[must_use]
+    pub fn into_rejected(self) -> Edit<'a> {
+        *self.rejected
     }
 }
 
@@ -314,6 +477,7 @@ impl Commit {
     fn unchanged(snapshot: Template) -> Self {
         Self {
             patch: Patch {
+                appended: Vec::new(),
                 changes: Vec::new(),
                 source: snapshot.clone(),
                 target: snapshot.clone(),
@@ -351,6 +515,7 @@ impl Commit {
 /// A source-checked reversible OTH paragraph-text patch.
 #[derive(Clone)]
 pub struct Patch {
+    appended: Vec<crate::ContentBlock>,
     changes: Vec<ParagraphChange>,
     source: Template,
     target: Template,
@@ -392,10 +557,17 @@ impl Patch {
         &self.changes
     }
 
+    /// Typed blocks appended by the transaction.
+    #[must_use]
+    pub fn appended(&self) -> &[crate::ContentBlock] {
+        &self.appended
+    }
+
     /// Returns the patch that restores the exact source snapshot.
     #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
+            appended: Vec::new(),
             changes: self
                 .changes
                 .iter()
@@ -411,10 +583,71 @@ impl Patch {
     }
 }
 
-fn replace_texts(source: &Template, changes: &[ParagraphChange]) -> Result<String> {
+/// Explicit bounded undo/redo history for immutable OTH snapshots.
+pub struct History {
+    inner: litchi_core::History<Template>,
+}
+
+impl History {
+    /// Starts history at one immutable template.
+    #[must_use]
+    pub fn new(current: Template, limits: HistoryLimits) -> Self {
+        Self {
+            inner: litchi_core::History::new(current, limits),
+        }
+    }
+
+    /// Current immutable snapshot.
+    #[must_use]
+    pub const fn current(&self) -> &Template {
+        self.inner.current()
+    }
+
+    /// Records a commit using its exact target package size as finite weight.
+    ///
+    /// # Errors
+    ///
+    /// Returns a history budget error without changing the selected snapshot.
+    pub fn record(&mut self, commit: Commit) -> std::result::Result<Vec<Template>, PatchError> {
+        let weight = u64::try_from(commit.template().as_bytes().len()).unwrap_or(u64::MAX);
+        self.inner.record(commit.into_template(), weight)
+    }
+
+    /// Selects the previous retained snapshot.
+    pub fn undo(&mut self) -> bool {
+        self.inner.undo()
+    }
+
+    /// Selects the next retained snapshot.
+    pub fn redo(&mut self) -> bool {
+        self.inner.redo()
+    }
+
+    /// Whether undo is available.
+    #[must_use]
+    pub fn can_undo(&self) -> bool {
+        self.inner.can_undo()
+    }
+
+    /// Whether redo is available.
+    #[must_use]
+    pub fn can_redo(&self) -> bool {
+        self.inner.can_redo()
+    }
+}
+
+fn replace_texts(
+    source: &Template,
+    changes: &[ParagraphChange],
+    appended: &[crate::ContentBlock],
+) -> Result<String> {
     let mut replacements = Vec::new();
     replacements
-        .try_reserve_exact(changes.len())
+        .try_reserve_exact(
+            changes
+                .len()
+                .saturating_add(usize::from(!appended.is_empty())),
+        )
         .map_err(|allocation_error| Error::Allocation {
             resource: "OTH paragraph replacements",
             source: allocation_error,
@@ -426,7 +659,17 @@ fn replace_texts(source: &Template, changes: &[ParagraphChange]) -> Result<Strin
             .ok_or_else(|| {
                 Error::InvalidFormat("OTH paragraph edit site disappeared".to_string())
             })?;
-        replacements.push((site, quick_xml::escape::escape(&change.after)));
+        replacements.push((site.clone(), quick_xml::escape::escape(&change.after)));
+    }
+    if !appended.is_empty() {
+        replacements.push((
+            crate::codec::ReplacementSite {
+                prefix: String::new(),
+                range: source.package.text_close()..source.package.text_close(),
+                suffix: String::new(),
+            },
+            std::borrow::Cow::Owned(crate::authoring::render_fragment(appended)?),
+        ));
     }
     replacements.sort_unstable_by_key(|(site, _replacement)| site.range.start);
 

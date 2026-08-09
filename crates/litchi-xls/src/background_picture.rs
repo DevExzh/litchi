@@ -64,6 +64,12 @@ pub struct BackgroundImage {
 
 impl BackgroundImage {
     /// Parse a `BkHim` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// # Panics
+    ///
+    /// Panics only if an internal BIFF invariant has been violated.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < HEADER_LEN {
             return Err(Error::InvalidLength {
@@ -95,26 +101,30 @@ impl BackgroundImage {
     }
 
     /// Serialize back to a complete `BkHim` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(HEADER_LEN + self.image.len());
         payload.extend_from_slice(&(self.format as u16).to_le_bytes());
         payload.extend_from_slice(&self.reserved.to_le_bytes());
-        payload.extend_from_slice(&(self.image.len() as i32).to_le_bytes());
+        payload.extend_from_slice(&crate::utils::wrap_usize_to_i32(self.image.len()).to_le_bytes());
         payload.extend_from_slice(&self.image);
         payload
     }
 
     /// Image format (`cf`).
+    #[must_use]
     pub fn format(&self) -> BackgroundImageFormat {
         self.format
     }
 
     /// Raw `reserved` field value.
+    #[must_use]
     pub fn reserved(&self) -> u16 {
         self.reserved
     }
 
     /// The opaque `imageBlob` bytes.
+    #[must_use]
     pub fn image(&self) -> &[u8] {
         &self.image
     }

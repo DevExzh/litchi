@@ -1,9 +1,13 @@
-//! Bounded SpreadsheetML Custom XML Maps XML codec.
+//! Bounded `SpreadsheetML` Custom XML Maps XML codec.
 
 use std::collections::{HashMap, HashSet};
 
 use super::invalid;
-use super::model::*;
+use super::model::{
+    DataBindingRef, NS, NS_TEXT, ParsedXmlMapInfo, STRICT_NS, STRICT_NS_TEXT, XmlMap,
+    XmlMapConformance, XmlMapDataBinding, XmlMapInfo, XmlMapInfoRef, XmlMapLimits, XmlMapRef,
+    XmlMapSchema, XmlSchemaRef,
+};
 use super::validation::{validate_xml_map_info_ref_with_limits, validate_xml_map_info_with_limits};
 use crate::Result;
 use quick_xml::encoding::Decoder;
@@ -802,7 +806,7 @@ fn add_inherited_bindings(
     let declared: HashSet<Vec<u8>> = e
         .attributes()
         .with_checks(true)
-        .filter_map(|a| a.ok())
+        .filter_map(std::result::Result::ok)
         .filter(|a| a.key.as_ref() == b"xmlns" || a.key.as_ref().starts_with(b"xmlns:"))
         .map(|a| a.key.as_ref().to_vec())
         .collect();
@@ -1012,8 +1016,8 @@ fn patch_xml_map_info_source_impl(
         &tree,
         root,
         "SelectionNamespaces",
-        Some(&before.selection_namespaces),
-        Some(&after.selection_namespaces),
+        Some(before.selection_namespaces),
+        Some(after.selection_namespaces),
         &mut edits,
     )?;
     if before_strict != after_strict {
@@ -1051,32 +1055,32 @@ fn patch_xml_map_info_source_impl(
             &tree,
             *node,
             "ID",
-            Some(&before_schema.id),
-            Some(&after_schema.id),
+            Some(before_schema.id),
+            Some(after_schema.id),
             &mut edits,
         )?;
         patch_attribute(
             &tree,
             *node,
             "SchemaRef",
-            before_schema.schema_reference.as_deref(),
-            after_schema.schema_reference.as_deref(),
+            before_schema.schema_reference,
+            after_schema.schema_reference,
             &mut edits,
         )?;
         patch_attribute(
             &tree,
             *node,
             "Namespace",
-            before_schema.namespace.as_deref(),
-            after_schema.namespace.as_deref(),
+            before_schema.namespace,
+            after_schema.namespace,
             &mut edits,
         )?;
         patch_payload(
             &tree,
             source,
             *node,
-            before_schema.payload_xml.as_deref(),
-            after_schema.payload_xml.as_deref(),
+            before_schema.payload_xml,
+            after_schema.payload_xml,
             &mut edits,
         )?;
     }
@@ -1105,24 +1109,24 @@ fn patch_xml_map_info_source_impl(
             &tree,
             *node,
             "Name",
-            Some(&before_map.name),
-            Some(&after_map.name),
+            Some(before_map.name),
+            Some(after_map.name),
             &mut edits,
         )?;
         patch_attribute(
             &tree,
             *node,
             "RootElement",
-            Some(&before_map.root_element),
-            Some(&after_map.root_element),
+            Some(before_map.root_element),
+            Some(after_map.root_element),
             &mut edits,
         )?;
         patch_attribute(
             &tree,
             *node,
             "SchemaID",
-            Some(&before_map.schema_id),
-            Some(&after_map.schema_id),
+            Some(before_map.schema_id),
+            Some(after_map.schema_id),
             &mut edits,
         )?;
         patch_bool_attribute(
@@ -1177,8 +1181,8 @@ fn patch_xml_map_info_source_impl(
                     &tree,
                     binding_node,
                     "DataBindingName",
-                    before_binding.data_binding_name.as_deref(),
-                    after_binding.data_binding_name.as_deref(),
+                    before_binding.data_binding_name,
+                    after_binding.data_binding_name,
                     &mut edits,
                 )?;
                 patch_bool_optional_attribute(
@@ -1201,8 +1205,8 @@ fn patch_xml_map_info_source_impl(
                     &tree,
                     binding_node,
                     "FileBindingName",
-                    before_binding.file_binding_name.as_deref(),
-                    after_binding.file_binding_name.as_deref(),
+                    before_binding.file_binding_name,
+                    after_binding.file_binding_name,
                     &mut edits,
                 )?;
                 patch_number_attribute(
@@ -1217,8 +1221,8 @@ fn patch_xml_map_info_source_impl(
                     &tree,
                     source,
                     binding_node,
-                    before_binding.payload_xml.as_deref(),
-                    after_binding.payload_xml.as_deref(),
+                    before_binding.payload_xml,
+                    after_binding.payload_xml,
                     &mut edits,
                 )?;
             },
@@ -1405,18 +1409,10 @@ fn patch_attribute(
 fn binding_fragment(binding: &DataBindingRef<'_>, limits: &XmlMapLimits) -> Result<Vec<u8>> {
     let mut xml = BoundedXml::new(limits.max_part_bytes);
     xml.push_str("<DataBinding")?;
-    optional_string_attr(
-        &mut xml,
-        "DataBindingName",
-        binding.data_binding_name.as_deref(),
-    )?;
+    optional_string_attr(&mut xml, "DataBindingName", binding.data_binding_name)?;
     optional_bool_attr(&mut xml, "FileBinding", binding.file_binding)?;
     optional_u32_attr(&mut xml, "ConnectionID", binding.connection_id)?;
-    optional_string_attr(
-        &mut xml,
-        "FileBindingName",
-        binding.file_binding_name.as_deref(),
-    )?;
+    optional_string_attr(&mut xml, "FileBindingName", binding.file_binding_name)?;
     optional_u32_attr(&mut xml, "DataBindingLoadMode", Some(binding.load_mode))?;
     if let Some(payload) = &binding.payload_xml {
         xml.push_char('>')?;
@@ -1614,7 +1610,7 @@ impl SourceTree {
                 let raw = std::str::from_utf8(&source[attribute.value_start..attribute.value_end])
                     .map_err(xml_error)?;
                 quick_xml::escape::unescape(raw)
-                    .map(|value| value.into_owned())
+                    .map(std::borrow::Cow::into_owned)
                     .map_err(xml_error)
             })
             .transpose()
@@ -1771,7 +1767,7 @@ fn source_local(value: &[u8]) -> Result<String> {
     Ok(value.rsplit(':').next().unwrap_or(value).to_owned())
 }
 
-/// Parse a bounded, namespace-aware, MCE-processed SpreadsheetML MapInfo part.
+/// Parse a bounded, namespace-aware, MCE-processed `SpreadsheetML` `MapInfo` part.
 pub fn parse_xml_map_info(xml: &[u8]) -> Result<XmlMapInfo> {
     XmlMapInfo::parse(xml)
 }
@@ -1781,7 +1777,7 @@ pub fn parse_xml_map_info_with_limits(xml: &[u8], limits: &XmlMapLimits) -> Resu
     XmlMapInfo::parse_with_limits(xml, limits)
 }
 
-/// Parse and report the SpreadsheetML namespace family observed at the root.
+/// Parse and report the `SpreadsheetML` namespace family observed at the root.
 pub fn parse_xml_map_info_with_conformance(xml: &[u8]) -> Result<ParsedXmlMapInfo> {
     parse_xml_map_info_with_conformance_and_limits(xml, &XmlMapLimits::DEFAULT)
 }
@@ -1794,7 +1790,7 @@ pub fn parse_xml_map_info_with_conformance_and_limits(
     parse_xml_map_info_with_conformance_and_limits_impl(xml, limits)
 }
 
-/// Serialize MapInfo canonically for the selected OOXML conformance family.
+/// Serialize `MapInfo` canonically for the selected OOXML conformance family.
 pub fn serialize_xml_map_info(
     info: &XmlMapInfo,
     conformance: XmlMapConformance,
@@ -1812,7 +1808,7 @@ pub fn serialize_xml_map_info_with_limits(
     serialize_xml_map_info_ref_with_limits(&info, conformance, limits)
 }
 
-/// Serialize a borrowed MapInfo projection using default resource ceilings.
+/// Serialize a borrowed `MapInfo` projection using default resource ceilings.
 pub fn serialize_xml_map_info_ref(
     info: &XmlMapInfoRef<'_>,
     conformance: XmlMapConformance,
@@ -1820,7 +1816,7 @@ pub fn serialize_xml_map_info_ref(
     serialize_xml_map_info_ref_with_limits(info, conformance, &XmlMapLimits::DEFAULT)
 }
 
-/// Serialize a borrowed MapInfo projection without cloning referenced data.
+/// Serialize a borrowed `MapInfo` projection without cloning referenced data.
 pub fn serialize_xml_map_info_ref_with_limits(
     info: &XmlMapInfoRef<'_>,
     conformance: XmlMapConformance,

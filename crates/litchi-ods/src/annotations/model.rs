@@ -18,6 +18,9 @@ pub struct Cell {
 
 impl Cell {
     /// Construct a checked logical cell selector.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn new(sheet: impl Into<String>, row: usize, column: usize) -> Result<Self> {
         let cell = Self {
             sheet: sheet.into(),
@@ -29,16 +32,19 @@ impl Cell {
     }
 
     /// Exact ODF `table:name` of the selected worksheet.
+    #[must_use]
     pub fn sheet(&self) -> &str {
         &self.sheet
     }
 
     /// Zero-based logical row.
+    #[must_use]
     pub const fn row(&self) -> usize {
         self.row
     }
 
     /// Zero-based logical column.
+    #[must_use]
     pub const fn column(&self) -> usize {
         self.column
     }
@@ -62,16 +68,19 @@ impl Entry {
     }
 
     /// Source-order index within the annotation owner.
+    #[must_use]
     pub const fn index(&self) -> usize {
         self.index
     }
 
     /// Logical sheet/cell anchor.
+    #[must_use]
     pub fn cell(&self) -> &Cell {
         &self.cell
     }
 
     /// Common ODF annotation value, including rich body elements and metadata.
+    #[must_use]
     pub fn annotation(&self) -> &Annotation {
         &self.annotation
     }

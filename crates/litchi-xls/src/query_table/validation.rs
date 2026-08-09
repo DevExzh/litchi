@@ -3,7 +3,17 @@ use litchi_core::binary;
 use super::super::pivot_table::parse_qsi_sx_tag;
 use super::super::records::Encoding;
 use super::super::utils::parse_string_record;
-use super::{codec::*, model::*};
+use super::{
+    codec::{
+        CONTINUE_FRT12_RECORD_TYPE, DB_OR_PARAM_QRY_RECORD_TYPE, DB_QUERY_EXT_RECORD_TYPE,
+        EXT_STRING_RECORD_TYPE, OLE_DB_CONN_RECORD_TYPE, OLECONN_LOCAL, OLECONN_PASSWD_STRIPPED,
+        QSI_RECORD_TYPE, QSI_SX_TAG_RECORD_TYPE, QSIF_RECORD_TYPE, QSIR_RECORD_TYPE,
+        SORT_DATA_RECORD_TYPE, SX_STRING_RECORD_TYPE, SXADDL_RECORD_TYPE, SXC_QSI_CLASS, SXD_END,
+        TXT_QRY_RECORD_TYPE, parse_db_query, parse_db_query_ext, parse_param_qry, parse_qsi,
+        parse_txt_qry,
+    },
+    model::{OleDbConnection, QueryTable},
+};
 
 #[derive(Debug)]
 pub(crate) enum ExtContext {
@@ -18,8 +28,8 @@ pub(crate) enum ExtContext {
 pub(crate) struct QueryTableBuild {
     pub(crate) table: QueryTable,
     pub(crate) dbquery_seen: bool,
-    /// Previous record was an SXString or a ParamQry: a following 0x00DC is
-    /// a ParamQry rather than a DbQuery (MS-XLS 2.4.79).
+    /// Previous record was an `SXString` or a `ParamQry`: a following 0x00DC is
+    /// a `ParamQry` rather than a `DbQuery` (MS-XLS 2.4.79).
     pub(crate) last_string_or_param: bool,
     pub(crate) remaining_query: u16,
     pub(crate) remaining_odbc_conn: u16,

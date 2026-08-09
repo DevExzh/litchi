@@ -1,7 +1,7 @@
 //! Internal chart-reader state and namespace-preserving XML stream adapter.
 //!
 //! The adapter keeps the semantic parser focused on chart elements while
-//! retaining self-contained DrawingML fragments and skipping unknown content
+//! retaining self-contained `DrawingML` fragments and skipping unknown content
 //! without changing the public chart model.
 
 use crate::{Error, Result};
@@ -19,9 +19,9 @@ pub(super) const INVALID_COLOR_MAPPING_ELEMENT: &str = "invalidColorMappingEleme
 
 /// Namespace-aware streaming adapter for the chart model parser.
 ///
-/// Core chart elements are exposed unchanged. DrawingML text and color-map choice
+/// Core chart elements are exposed unchanged. `DrawingML` text and color-map choice
 /// elements are also kept so their typed models can be decoded, while all other
-/// namespaces are skipped as extension content. Rewriting the remaining DrawingML
+/// namespaces are skipped as extension content. Rewriting the remaining `DrawingML`
 /// container names prevents them from being mistaken for same-local-name chart
 /// elements by the focused parsers below.
 pub(super) struct ChartXmlReader<R: BufRead> {

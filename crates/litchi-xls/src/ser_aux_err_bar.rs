@@ -110,6 +110,12 @@ pub struct SerAuxErrBar {
 
 impl SerAuxErrBar {
     /// Parse a `SerAuxErrBar` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// # Panics
+    ///
+    /// Panics only if an internal BIFF invariant has been violated.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != PAYLOAD_LEN {
             return Err(Error::InvalidLength {
@@ -138,6 +144,7 @@ impl SerAuxErrBar {
     }
 
     /// Serialize back to a complete `SerAuxErrBar` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(PAYLOAD_LEN);
         payload.push(self.direction as u8);
@@ -150,33 +157,39 @@ impl SerAuxErrBar {
     }
 
     /// Direction of the error bars (`sertm`).
+    #[must_use]
     pub fn direction(&self) -> ErrorBarDirection {
         self.direction
     }
 
     /// Error amount type (`ebsrc`).
+    #[must_use]
     pub fn source(&self) -> ErrorBarSource {
         self.source
     }
 
     /// Whether the error bars are T-shaped (`fTeeTop`).
+    #[must_use]
     pub fn tee_top(&self) -> bool {
         self.tee_top
     }
 
     /// The preserved `reserved` byte.
+    #[must_use]
     pub fn reserved(&self) -> u8 {
         self.reserved
     }
 
     /// Fixed value, percentage, or number of standard deviations (`numValue`);
     /// preserved verbatim when `ebsrc` is `Custom` or `StandardError`.
+    #[must_use]
     pub fn value(&self) -> f64 {
         self.value
     }
 
     /// Number of value or cell references for custom error bars (`cnum`);
     /// preserved verbatim when `ebsrc` is not `Custom`.
+    #[must_use]
     pub fn value_count(&self) -> u16 {
         self.value_count
     }

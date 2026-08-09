@@ -1,7 +1,7 @@
-//! State machine for collecting one contiguous worksheet ListObject family.
+//! State machine for collecting one contiguous worksheet `ListObject` family.
 
 use super::super::codec::{PendingFeature, u16_at, u32_at, validate_frt, validate_frt_any};
-use super::super::model::*;
+use super::super::model::ListObject;
 use super::super::{
     AUTO_FILTER12_RECORD_TYPE, CONTINUE_FRT11_RECORD_TYPE, FEAT_HDR11_RECORD_TYPE,
     FEATURE11_RECORD_TYPE, FEATURE12_RECORD_TYPE, ISF_LIST, LIST12_RECORD_TYPE, MAX_FEATURE_BYTES,

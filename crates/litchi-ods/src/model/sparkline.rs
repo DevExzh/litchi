@@ -1,6 +1,6 @@
-//! Inert LibreOffice `calcext` sparkline metadata.
+//! Inert `LibreOffice` `calcext` sparkline metadata.
 //!
-//! LibreOffice Calc persists sparklines in the experimental `calcext`
+//! `LibreOffice` Calc persists sparklines in the experimental `calcext`
 //! namespace (`urn:org:documentfoundation:names:experimental:calc:xmlns:
 //! calcext:1.0`) as a `calcext:sparkline-groups` container attached to
 //! `table:table`, written after the rows and any conditional formats. Each
@@ -17,7 +17,7 @@ use super::structure::validate_cell_range_addresses;
 use litchi_core::{Error, Result, xml::escape_xml};
 use litchi_odf_common::datatype::lexical;
 
-/// Namespace URI of the LibreOffice `loext` extension used by theme colors.
+/// Namespace URI of the `LibreOffice` `loext` extension used by theme colors.
 pub const LOEXT_NAMESPACE_URI: &str =
     "urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0";
 /// Namespace declaration written on each complex-color element.
@@ -56,6 +56,7 @@ impl Type {
         }
     }
 
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Line => "line",
@@ -88,6 +89,7 @@ impl EmptyCells {
         }
     }
 
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Gap => "gap",
@@ -121,6 +123,7 @@ impl AxisType {
         }
     }
 
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Individual => "individual",
@@ -181,7 +184,7 @@ pub struct Colors {
 
 /// The theme color family of a complex color (`loext:theme-type`).
 ///
-/// The family names follow the OOXML theme slots LibreOffice mirrors; litchi
+/// The family names follow the OOXML theme slots `LibreOffice` mirrors; litchi
 /// never resolves them against a theme.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ThemeColorType {
@@ -225,6 +228,7 @@ impl ThemeColorType {
         })
     }
 
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Dark1 => "dark1",
@@ -268,6 +272,7 @@ impl TransformationType {
         }
     }
 
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Tint => "tint",
@@ -284,12 +289,13 @@ pub struct Transformation {
     /// The transformation kind (`loext:type`).
     pub transformation_type: TransformationType,
     /// The transformation amount (`loext:value`), an integer in the range
-    /// LibreOffice accepts (`i16`).
+    /// `LibreOffice` accepts (`i16`).
     pub value: i16,
 }
 
 impl Transformation {
     /// Create an inert color transformation.
+    #[must_use]
     pub fn new(transformation_type: TransformationType, value: i16) -> Self {
         Self {
             transformation_type,
@@ -311,6 +317,7 @@ pub struct ComplexColor {
 
 impl ComplexColor {
     /// Create an inert theme-based color without transformations.
+    #[must_use]
     pub fn new(theme_type: ThemeColorType) -> Self {
         Self {
             theme_type,
@@ -319,6 +326,7 @@ impl ComplexColor {
     }
 
     /// Append one color transformation.
+    #[must_use]
     pub fn with_transformation(mut self, transformation: Transformation) -> Self {
         self.transformations.push(transformation);
         self
@@ -347,7 +355,7 @@ pub struct ComplexColors {
     pub low: Option<ComplexColor>,
 }
 
-/// The element names of the complex-color slots, in LibreOffice write order.
+/// The element names of the complex-color slots, in `LibreOffice` write order.
 pub const COMPLEX_COLOR_SLOTS: [&str; 8] = [
     "sparkline-series-complex-color",
     "sparkline-negative-complex-color",
@@ -452,6 +460,7 @@ impl Item {
 
 impl Group {
     /// Create an inert sparkline group with only cell assignments set.
+    #[must_use]
     pub fn new(sparklines: Vec<Item>) -> Self {
         Self {
             sparklines,
@@ -466,6 +475,7 @@ impl Group {
     }
 
     /// Set the optional rendering kind.
+    #[must_use]
     pub fn with_type(mut self, sparkline_type: Type) -> Self {
         self.sparkline_type = Some(sparkline_type);
         self
@@ -478,18 +488,21 @@ impl Group {
     }
 
     /// Set the optional empty-cell rendering.
+    #[must_use]
     pub fn with_display_empty_cells_as(mut self, display: EmptyCells) -> Self {
         self.display_empty_cells_as = Some(display);
         self
     }
 
     /// Set the boolean rendering switches.
+    #[must_use]
     pub fn with_flags(mut self, flags: Flags) -> Self {
         self.flags = flags;
         self
     }
 
     /// Set the optional axis scaling types and custom bounds.
+    #[must_use]
     pub fn with_axis(
         mut self,
         min_axis_type: Option<AxisType>,
@@ -505,12 +518,14 @@ impl Group {
     }
 
     /// Set the optional color slots.
+    #[must_use]
     pub fn with_colors(mut self, colors: Colors) -> Self {
         self.colors = colors;
         self
     }
 
     /// Set the optional theme-based color slots.
+    #[must_use]
     pub fn with_complex_colors(mut self, complex_colors: ComplexColors) -> Self {
         self.complex_colors = complex_colors;
         self
@@ -665,7 +680,7 @@ fn validate_measure(name: &str, value: &str) -> Result<()> {
 }
 
 /// Write a sheet's `calcext:sparkline-groups` container after its conditional
-/// formats, matching LibreOffice's element order inside `table:table`.
+/// formats, matching `LibreOffice`'s element order inside `table:table`.
 ///
 /// # Errors
 ///

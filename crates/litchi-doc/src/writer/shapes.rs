@@ -46,7 +46,7 @@ const MAX_SHAPE_DIMENSION_TWIPS: u32 = i16::MAX as u32;
 /// Primitive shape kinds supported by the DOC drawing writer.
 ///
 /// The values are the MSOSPT enumeration ([MS-ODRAW] 2.4.24) that the
-/// OfficeArtFSP record instance carries.
+/// `OfficeArtFSP` record instance carries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
     /// msosptRectangle.
@@ -58,7 +58,7 @@ pub enum Kind {
 }
 
 impl Kind {
-    /// The MSOSPT value written as the OfficeArtFSP record instance.
+    /// The MSOSPT value written as the `OfficeArtFSP` record instance.
     pub(crate) fn shape_type(self) -> u16 {
         match self {
             Self::Rectangle => MSOSPT_RECTANGLE,
@@ -112,52 +112,59 @@ impl Shape {
     }
 
     /// Set the fill color (enables filling).
+    #[must_use]
     pub fn with_fill(mut self, red: u8, green: u8, blue: u8) -> Self {
         self.fill_color = Some((red, green, blue));
         self
     }
 
     /// Disable the fill.
+    #[must_use]
     pub fn without_fill(mut self) -> Self {
         self.fill_color = None;
         self
     }
 
     /// Set the outline color (enables the outline).
+    #[must_use]
     pub fn with_line(mut self, red: u8, green: u8, blue: u8) -> Self {
         self.line_color = Some((red, green, blue));
         self
     }
 
     /// Disable the outline.
+    #[must_use]
     pub fn without_line(mut self) -> Self {
         self.line_color = None;
         self
     }
 
     /// The preset geometry kind.
+    #[must_use]
     pub fn kind(&self) -> Kind {
         self.kind
     }
 
     /// Width in twips.
+    #[must_use]
     pub fn width_twips(&self) -> u32 {
         self.width_twips
     }
 
     /// Height in twips.
+    #[must_use]
     pub fn height_twips(&self) -> u32 {
         self.height_twips
     }
 }
 
-/// Encode an (R, G, B) color as an OfficeArtCOLORREF value
+/// Encode an (R, G, B) color as an `OfficeArtCOLORREF` value
 /// ([MS-ODRAW] 2.2.2): red, green, blue bytes followed by zero flags.
 fn color_ref(red: u8, green: u8, blue: u8) -> u32 {
     u32::from(red) | (u32::from(green) << 8) | (u32::from(blue) << 16)
 }
 
-/// Append the OfficeArtOPT record for a primitive shape: fill and line
+/// Append the `OfficeArtOPT` record for a primitive shape: fill and line
 /// colors, and the boolean properties that explicitly disable the fill or
 /// the line when unset. Properties are emitted in ascending opid order as
 /// Word writes them.
@@ -184,9 +191,9 @@ pub(crate) fn write_shape_opt(out: &mut Vec<u8>, shape: &Shape) {
 // Text boxes: OfficeArtClientTextbox record and PlcftxbxTxt
 // ============================================================================
 
-/// OfficeArtClientTextbox record type ([MS-DOC] 2.9.170, msofbtClientTextbox).
+/// `OfficeArtClientTextbox` record type ([MS-DOC] 2.9.170, msofbtClientTextbox).
 const RECORD_CLIENT_TEXTBOX: u16 = 0xF00D;
-/// Payload length of the OfficeArtClientTextbox record (one TXID).
+/// Payload length of the `OfficeArtClientTextbox` record (one TXID).
 const CLIENT_TEXTBOX_LEN: u32 = 4;
 /// Size of one FTXBXS structure in bytes ([MS-DOC] 2.9.106).
 const FTXBXS_LEN: usize = 22;
@@ -194,12 +201,12 @@ const FTXBXS_LEN: usize = 22;
 const SINGLE_SHAPE_CHAIN: i32 = 1;
 /// FTXBXS `fReusable` flag marking a structure available for reuse.
 const FTXBXS_REUSABLE: u16 = 1;
-/// FTXBXSReusable `iNextReuse` for the last reusable structure.
+/// `FTXBXSReusable` `iNextReuse` for the last reusable structure.
 const NO_NEXT_REUSE: i32 = -1;
-/// Ignored FTXBXS `itxbxsDest` value, as written by LibreOffice.
+/// Ignored FTXBXS `itxbxsDest` value, as written by `LibreOffice`.
 const ITXBXS_DEST_IGNORED: i32 = -1;
 
-/// Append an OfficeArtClientTextbox record linking a shape to its textbox
+/// Append an `OfficeArtClientTextbox` record linking a shape to its textbox
 /// story entry. The TXID encodes the 1-based FTXBXS index in its high two
 /// bytes and the zero-based textbox chain index (always 0 here) in its low
 /// two bytes ([MS-DOC] 2.9.170).
@@ -209,7 +216,7 @@ pub(crate) fn write_client_textbox(out: &mut Vec<u8>, ftxbxs_index: u32) {
     out.extend_from_slice(&txid.to_le_bytes());
 }
 
-/// Build the PlcftxbxTxt ([MS-DOC] 2.8.32): `n + 2` story-relative CPs
+/// Build the `PlcftxbxTxt` ([MS-DOC] 2.8.32): `n + 2` story-relative CPs
 /// followed by `n + 1` FTXBXS records, the last of which is a reusable spare
 /// ([MS-DOC] 2.9.106: "The last FTXBXS in the PLC MUST be a reusable
 /// structure").

@@ -13,7 +13,11 @@ use quick_xml::reader::NsReader;
 use crate::error::{Error, Result};
 use litchi_ooxml_common::mce::{Capabilities, Limits, Name, process_markup_compatibility};
 
-use super::model::*;
+use super::model::{
+    Conformance, Metadata, ProtectedRange, ProtectedRangeCollection, ProtectedRangeSource,
+    Protection, ProtectionPasswordVerifier, ProtectionRangeReference, ProtectionRangeReferenceKind,
+    ProtectionRangeSqref, StrongProtectionPasswordVerifier,
+};
 
 pub(crate) const CORE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 pub(crate) const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -444,13 +448,13 @@ fn parse_sheet_protection(
             b"deleteColumns" => value.delete_columns = parse_bool(&text, "deleteColumns")?,
             b"deleteRows" => value.delete_rows = parse_bool(&text, "deleteRows")?,
             b"selectLockedCells" => {
-                value.select_locked_cells = parse_bool(&text, "selectLockedCells")?
+                value.select_locked_cells = parse_bool(&text, "selectLockedCells")?;
             },
             b"sort" => value.sort = parse_bool(&text, "sort")?,
             b"autoFilter" => value.auto_filter = parse_bool(&text, "autoFilter")?,
             b"pivotTables" => value.pivot_tables = parse_bool(&text, "pivotTables")?,
             b"selectUnlockedCells" => {
-                value.select_unlocked_cells = parse_bool(&text, "selectUnlockedCells")?
+                value.select_unlocked_cells = parse_bool(&text, "selectUnlockedCells")?;
             },
             other => {
                 return Err(invalid(format!(
@@ -492,7 +496,7 @@ fn parse_pending_range(
         match local.as_ref() {
             b"name" => set_once(&mut name, text, "name")?,
             b"sqref" if source == ProtectedRangeSource::Core => {
-                set_once(&mut sqref, text, "sqref")?
+                set_once(&mut sqref, text, "sqref")?;
             },
             b"password" => set_once(&mut credential.password, text, "password")?,
             b"algorithmName" => set_once(&mut credential.algorithm_name, text, "algorithmName")?,
@@ -500,7 +504,7 @@ fn parse_pending_range(
             b"saltValue" => set_once(&mut credential.salt_value, text, "saltValue")?,
             b"spinCount" => set_once(&mut credential.spin_count, text, "spinCount")?,
             b"securityDescriptor" => {
-                set_once(&mut security_descriptor, text, "securityDescriptor")?
+                set_once(&mut security_descriptor, text, "securityDescriptor")?;
             },
             other => {
                 return Err(invalid(format!(
@@ -902,7 +906,7 @@ pub(super) fn validate_range(value: &ProtectedRange) -> Result<()> {
 pub(super) fn validate_xml_text(value: &str, field: &str) -> Result<()> {
     if value.chars().any(|ch| {
         let code = ch as u32;
-        !matches!(code, 0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF)
+        !matches!(code, 0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x0010_FFFF)
     }) {
         return Err(invalid(format!(
             "{field} contains an invalid XML character"
@@ -1104,7 +1108,7 @@ fn scan_protection_xml(xml: &[u8]) -> Result<ProtectionXmlScan> {
                     match local.as_ref() {
                         b"sheetData" => sheet_data_start = Some(depth),
                         b"sheetProtection" | b"protectedRanges" => {
-                            direct_start = Some((depth, start))
+                            direct_start = Some((depth, start));
                         },
                         b"extLst" => ext_lst_depth = Some(depth),
                         _ => {},

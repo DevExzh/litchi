@@ -1,4 +1,4 @@
-//! Bounded SpreadsheetML threaded-comments model and XML codec.
+//! Bounded `SpreadsheetML` threaded-comments model and XML codec.
 
 use std::collections::HashSet;
 use std::fmt::Write as FmtWrite;
@@ -600,8 +600,7 @@ pub fn write_persons(person_list: &People) -> SheetResult<String> {
     xml.push_str(XML_HEADER);
     write!(
         &mut xml,
-        r#"<personList xmlns="{}" xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#,
-        THREADED_COMMENTS_NS
+        r#"<personList xmlns="{THREADED_COMMENTS_NS}" xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#
     )?;
 
     for person in &person_list.persons {
@@ -643,8 +642,7 @@ pub fn write_comments(comments: &Comments) -> SheetResult<String> {
     xml.push_str(XML_HEADER);
     write!(
         &mut xml,
-        r#"<ThreadedComments xmlns="{}">"#,
-        THREADED_COMMENTS_NS
+        r#"<ThreadedComments xmlns="{THREADED_COMMENTS_NS}">"#
     )?;
 
     for comment in &comments.comments {
@@ -827,8 +825,7 @@ pub fn validate_graph(graph: &Graph) -> SheetResult<()> {
     let persons = graph
         .persons
         .as_ref()
-        .map(|part| &part.persons)
-        .unwrap_or(&empty_persons);
+        .map_or(&empty_persons, |part| &part.persons);
     write_persons(persons)?;
     let person_ids: HashSet<&str> = persons
         .persons

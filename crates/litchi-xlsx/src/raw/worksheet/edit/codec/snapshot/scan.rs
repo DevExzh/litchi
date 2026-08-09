@@ -1,4 +1,4 @@
-//! Streaming SpreadsheetML scanner for worksheet snapshots.
+//! Streaming `SpreadsheetML` scanner for worksheet snapshots.
 
 use std::collections::HashMap;
 
@@ -1155,7 +1155,7 @@ impl Scanner {
                         first_column: formula.address.column().get(),
                         last_row: formula.address.row().get(),
                         last_column: formula.address.column().get(),
-                    }))
+                    }));
                 },
                 "shared" => {
                     if let (Some(index), Some(range)) = (formula.index, formula.range) {

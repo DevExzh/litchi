@@ -1,4 +1,4 @@
-//! Streaming SpreadsheetML event codec.
+//! Streaming `SpreadsheetML` event codec.
 
 use std::collections::HashSet;
 

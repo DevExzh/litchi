@@ -52,7 +52,7 @@ const C_USR_MAX_COUNT: u16 = 255;
 const USR_INFO_PREFIX_LEN: usize = 4 + 16 + 8;
 /// Byte length of a GUID as stored in `UsrInfo.guid` (MS-DTYP 2.3.4).
 const GUID_LEN: usize = 16;
-/// Byte length of a ShortDTR structure (MS-XLS 2.5.239).
+/// Byte length of a `ShortDTR` structure (MS-XLS 2.5.239).
 const SHORT_DTR_LEN: usize = 8;
 /// Header of an `XLUnicodeString`: `cch` (2) + option flags (1)
 /// (MS-XLS 2.5.294).
@@ -176,6 +176,9 @@ pub struct CUsr {
 
 impl CUsr {
     /// Parse a `CUsr` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != C_USR_LEN {
             return Err(Error::InvalidLength {
@@ -194,11 +197,13 @@ impl CUsr {
     }
 
     /// Serialize back to a complete `CUsr` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         self.count.to_le_bytes().to_vec()
     }
 
     /// Number of unique users that have the shared workbook open.
+    #[must_use]
     pub fn count(&self) -> u16 {
         self.count
     }
@@ -218,6 +223,9 @@ pub struct CbUsr {
 
 impl CbUsr {
     /// Parse a `CbUsr` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != CB_USR_LEN {
             return Err(invalid(
@@ -233,6 +241,7 @@ impl CbUsr {
     }
 
     /// Serialize back to a complete `CbUsr` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(CB_USR_LEN);
         for size in &self.sizes {
@@ -242,6 +251,7 @@ impl CbUsr {
     }
 
     /// Byte counts of the `UsrInfo` records, in user order.
+    #[must_use]
     pub fn sizes(&self) -> &[u16; CB_USR_COUNT] {
         &self.sizes
     }
@@ -265,6 +275,12 @@ pub struct UsrInfo {
 
 impl UsrInfo {
     /// Parse a `UsrInfo` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// # Panics
+    ///
+    /// Panics only if an internal BIFF invariant has been violated.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < USR_INFO_PREFIX_LEN + XL_UNICODE_STRING_HEADER_LEN + 1 {
             return Err(Error::InvalidLength {
@@ -328,6 +344,7 @@ impl UsrInfo {
     }
 
     /// Serialize back to a complete `UsrInfo` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(USR_INFO_PREFIX_LEN + XL_UNICODE_STRING_HEADER_LEN);
         payload.extend_from_slice(&self.user_id.to_le_bytes());
@@ -341,7 +358,9 @@ impl UsrInfo {
         payload.push(dtr.second());
         payload.push(dtr.weekday());
         let high_byte = self.user_name.chars().any(|ch| u32::from(ch) > 0xFF);
-        payload.extend_from_slice(&(self.user_name.chars().count() as u16).to_le_bytes());
+        payload.extend_from_slice(
+            &crate::utils::truncate_usize_to_u16(self.user_name.chars().count()).to_le_bytes(),
+        );
         payload.push(if high_byte { STRING_HIGH_BYTE } else { 0 });
         if high_byte {
             for unit in self.user_name.encode_utf16() {
@@ -355,21 +374,25 @@ impl UsrInfo {
     }
 
     /// Unique user identifier.
+    #[must_use]
     pub fn user_id(&self) -> i32 {
         self.user_id
     }
 
     /// GUID of the last set of revisions synced to by this user.
+    #[must_use]
     pub fn guid(&self) -> &[u8; GUID_LEN] {
         &self.guid
     }
 
     /// Date and time the user opened the shared workbook.
+    #[must_use]
     pub fn opened_at(&self) -> ShortDtr {
         self.opened_at
     }
 
     /// Name of this user.
+    #[must_use]
     pub fn user_name(&self) -> &str {
         &self.user_name
     }
@@ -426,6 +449,9 @@ pub struct DocRoute {
 
 impl DocRoute {
     /// Parse a `DocRoute` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < DOC_ROUTE_HEADER_LEN {
             return Err(Error::InvalidLength {
@@ -577,6 +603,7 @@ impl DocRoute {
     }
 
     /// Serialize back to a complete `DocRoute` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(DOC_ROUTE_HEADER_LEN);
         payload.extend_from_slice(&self.stage.to_le_bytes());
@@ -608,10 +635,13 @@ impl DocRoute {
             &self.book_title,
             &self.originator_name,
         ] {
-            payload.extend_from_slice(&(nul_terminated_len(content) as u16).to_le_bytes());
+            payload.extend_from_slice(
+                &crate::utils::truncate_usize_to_u16(nul_terminated_len(content)).to_le_bytes(),
+            );
         }
         payload.extend_from_slice(
-            &(nul_terminated_len(&self.originator_address) as u32).to_le_bytes(),
+            &crate::utils::truncate_usize_to_u32(nul_terminated_len(&self.originator_address))
+                .to_le_bytes(),
         );
         push_nul_terminated_ansi(&mut payload, &self.subject);
         push_nul_terminated_ansi(&mut payload, &self.message);
@@ -624,72 +654,86 @@ impl DocRoute {
     }
 
     /// Routing stage of the slip.
+    #[must_use]
     pub fn stage(&self) -> u16 {
         self.stage
     }
 
     /// Number of `RecipName` records that follow this record.
+    #[must_use]
     pub fn recipient_count(&self) -> u16 {
         self.recipient_count
     }
 
     /// Delivery option of the routing slip.
+    #[must_use]
     pub fn delivery(&self) -> RoutingDelivery {
         self.delivery
     }
 
     /// Whether the document has been routed.
+    #[must_use]
     pub fn routed(&self) -> bool {
         self.routed
     }
 
     /// Whether the document returns to the originator after the last recipient.
+    #[must_use]
     pub fn return_to_originator(&self) -> bool {
         self.return_to_originator
     }
 
     /// Whether a status message is sent to the originator after routing.
+    #[must_use]
     pub fn track_status(&self) -> bool {
         self.track_status
     }
 
     /// Whether a custom message type is defined by [`Self::custom_type`].
+    #[must_use]
     pub fn custom_type_defined(&self) -> bool {
         self.custom_type_defined
     }
 
     /// Subject of the routed document (ANSI bytes without the NULL).
+    #[must_use]
     pub fn subject(&self) -> &[u8] {
         &self.subject
     }
 
     /// Message of the routed document (ANSI bytes without the NULL).
+    #[must_use]
     pub fn message(&self) -> &[u8] {
         &self.message
     }
 
     /// Name of the routing identifier (ANSI bytes without the NULL).
+    #[must_use]
     pub fn route_id(&self) -> &[u8] {
         &self.route_id
     }
 
     /// Custom message type (ANSI bytes without the NULL).
+    #[must_use]
     pub fn custom_type(&self) -> &[u8] {
         &self.custom_type
     }
 
     /// Workbook title (ANSI bytes without the NULL).
+    #[must_use]
     pub fn book_title(&self) -> &[u8] {
         &self.book_title
     }
 
     /// Originator's friendly name (ANSI bytes without the NULL).
+    #[must_use]
     pub fn originator_name(&self) -> &[u8] {
         &self.originator_name
     }
 
     /// Originator's messaging-system address identifier (ANSI bytes without
     /// the NULL).
+    #[must_use]
     pub fn originator_address(&self) -> &[u8] {
         &self.originator_address
     }
@@ -710,6 +754,9 @@ pub struct RecipName {
 
 impl RecipName {
     /// Parse a `RecipName` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < RECIP_NAME_HEADER_LEN {
             return Err(Error::InvalidLength {
@@ -756,21 +803,29 @@ impl RecipName {
     }
 
     /// Serialize back to a complete `RecipName` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(RECIP_NAME_HEADER_LEN);
-        payload.extend_from_slice(&(nul_terminated_len(&self.friendly_name) as u16).to_le_bytes());
-        payload.extend_from_slice(&(self.address.len() as u32).to_le_bytes());
+        payload.extend_from_slice(
+            &crate::utils::truncate_usize_to_u16(nul_terminated_len(&self.friendly_name))
+                .to_le_bytes(),
+        );
+        payload.extend_from_slice(
+            &crate::utils::truncate_usize_to_u32(self.address.len()).to_le_bytes(),
+        );
         push_nul_terminated_ansi(&mut payload, &self.friendly_name);
         payload.extend_from_slice(&self.address);
         payload
     }
 
     /// Recipient's friendly name (ANSI bytes without the NULL).
+    #[must_use]
     pub fn friendly_name(&self) -> &[u8] {
         &self.friendly_name
     }
 
     /// Recipient's messaging-system address identifier.
+    #[must_use]
     pub fn address(&self) -> &[u8] {
         &self.address
     }

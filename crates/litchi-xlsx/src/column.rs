@@ -8,7 +8,7 @@ use crate::error::{Result, allocation, invalid};
 pub use crate::outline::{Outline, OutlineAt, OutlineError};
 use crate::style::StyleState;
 
-/// Checked SpreadsheetML column width in character units.
+/// Checked `SpreadsheetML` column width in character units.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Width(u64);
 
@@ -22,13 +22,14 @@ impl Width {
         Ok(Self(normalized.to_bits()))
     }
 
-    /// Return the width in SpreadsheetML character units.
+    /// Return the width in `SpreadsheetML` character units.
+    #[must_use]
     pub const fn get(self) -> f64 {
         f64::from_bits(self.0)
     }
 }
 
-/// Invalid SpreadsheetML column width.
+/// Invalid `SpreadsheetML` column width.
 #[derive(Debug, Clone, Copy, PartialEq, Error)]
 #[error("column width {value} is outside the finite Office range 0..=255")]
 pub struct WidthError {
@@ -37,6 +38,7 @@ pub struct WidthError {
 
 impl WidthError {
     /// Rejected numeric value.
+    #[must_use]
     pub const fn value(self) -> f64 {
         self.value
     }
@@ -99,7 +101,7 @@ bitflags! {
     }
 }
 
-/// Complete effective state of one SpreadsheetML column-property record.
+/// Complete effective state of one `SpreadsheetML` column-property record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Properties {
     pub(crate) width: Option<Width>,
@@ -121,41 +123,49 @@ pub struct Props {
 
 impl Props {
     /// Producer-stored width, if the record has one.
+    #[must_use]
     pub const fn width(&self) -> Option<Width> {
         self.width
     }
 
     /// Exact local shared-style state without a physical style index.
+    #[must_use]
     pub const fn style(&self) -> &StyleState {
         &self.style
     }
 
     /// Checked outline level.
+    #[must_use]
     pub const fn outline(&self) -> Outline {
         self.outline
     }
 
     /// Whether the column is hidden.
+    #[must_use]
     pub const fn hidden(&self) -> bool {
         self.flags.contains(Flags::HIDDEN)
     }
 
     /// Whether the producer marked the width as best-fit.
+    #[must_use]
     pub const fn best_fit(&self) -> bool {
         self.flags.contains(Flags::BEST_FIT)
     }
 
     /// Whether the width is explicitly customized.
+    #[must_use]
     pub const fn custom_width(&self) -> bool {
         self.flags.contains(Flags::CUSTOM_WIDTH)
     }
 
     /// Whether phonetic information is shown by default.
+    #[must_use]
     pub const fn phonetic(&self) -> bool {
         self.flags.contains(Flags::PHONETIC)
     }
 
     /// Whether the outline is stored in its collapsed state.
+    #[must_use]
     pub const fn collapsed(&self) -> bool {
         self.flags.contains(Flags::COLLAPSED)
     }
@@ -191,7 +201,7 @@ impl State {
     }
 }
 
-/// One disjoint effective SpreadsheetML column-property range.
+/// One disjoint effective `SpreadsheetML` column-property range.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Stored {
     pub(crate) first: Index,
@@ -225,16 +235,19 @@ impl<'a> Column<'a> {
     }
 
     /// Checked zero-based column coordinate.
+    #[must_use]
     pub const fn index(self) -> Index {
         self.index
     }
 
     /// Whether an explicit column-property record applies here.
+    #[must_use]
     pub const fn stored(self) -> bool {
         self.stored.is_some()
     }
 
     /// Whether the effective column-property record hides this column.
+    #[must_use]
     pub const fn hidden(self) -> bool {
         match self.stored {
             Some(column) => column.properties.flags.contains(Flags::HIDDEN),
@@ -243,6 +256,7 @@ impl<'a> Column<'a> {
     }
 
     /// Producer-stored width in character units, if present.
+    #[must_use]
     pub const fn width(self) -> Option<Width> {
         match self.stored {
             Some(column) => column.properties.width,
@@ -251,6 +265,7 @@ impl<'a> Column<'a> {
     }
 
     /// Whether the producer marked this column as best-fit.
+    #[must_use]
     pub const fn best_fit(self) -> bool {
         match self.stored {
             Some(column) => column.properties.flags.contains(Flags::BEST_FIT),
@@ -259,6 +274,7 @@ impl<'a> Column<'a> {
     }
 
     /// Whether the producer stored a custom width flag.
+    #[must_use]
     pub const fn custom_width(self) -> bool {
         match self.stored {
             Some(column) => column.properties.flags.contains(Flags::CUSTOM_WIDTH),
@@ -267,6 +283,7 @@ impl<'a> Column<'a> {
     }
 
     /// Whether phonetic information is shown by default in this column.
+    #[must_use]
     pub const fn phonetic(self) -> bool {
         match self.stored {
             Some(column) => column.properties.flags.contains(Flags::PHONETIC),
@@ -275,6 +292,7 @@ impl<'a> Column<'a> {
     }
 
     /// Effective checked column outline level.
+    #[must_use]
     pub const fn outline(self) -> Outline {
         match self.stored {
             Some(column) => column.properties.outline,
@@ -283,6 +301,7 @@ impl<'a> Column<'a> {
     }
 
     /// Whether the affected outline is stored in the collapsed state.
+    #[must_use]
     pub const fn collapsed(self) -> bool {
         match self.stored {
             Some(column) => column.properties.flags.contains(Flags::COLLAPSED),

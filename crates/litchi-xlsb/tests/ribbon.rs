@@ -1,3 +1,10 @@
+#![allow(
+    clippy::pedantic,
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "integration tests use panic-on-failure extraction and exact package fixture comparisons"
+)]
+
 use litchi_ooxml_common::ribbon::{Family, Set, Version};
 use litchi_opc::constants::relationship_type;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};

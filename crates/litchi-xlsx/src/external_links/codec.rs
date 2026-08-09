@@ -1,4 +1,4 @@
-//! Bounded SpreadsheetML external-link XML codec.
+//! Bounded `SpreadsheetML` external-link XML codec.
 
 use crate::error::{Error, Result};
 use crate::raw::namespace::{is_spreadsheetml_name, relationship_attribute_value};
@@ -10,11 +10,17 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use super::model::*;
+use super::model::{
+    Cell, CellType, Conformance, Dde, DdeItem, DdeValue, DdeValueType, DdeValues, DefinedName,
+    ItemSource, Link, MAX_CACHE_TEXT_BYTES, MAX_CACHED_CELLS, MAX_CACHED_ROWS, MAX_CACHED_SHEETS,
+    MAX_CELL_COLUMN, MAX_CELL_ROW, MAX_COLUMN_LETTERS, MAX_DEFINED_NAMES,
+    MAX_EXTERNAL_TARGET_BYTES, MAX_LINK_ITEMS, MAX_SHEET_NAMES, Ole, OleItem, Row, SheetData,
+    Target, Workbook, X14,
+};
 use super::{invalid, limit};
 
 impl Link {
-    /// Serialize this link as a canonical transitional SpreadsheetML external-link part.
+    /// Serialize this link as a canonical transitional `SpreadsheetML` external-link part.
     ///
     /// External targets are represented only as OPC relationship metadata and are never opened.
     pub fn to_xml(&self) -> Result<Vec<u8>> {
@@ -29,7 +35,7 @@ impl Link {
             conformance.sml()
         );
         if matches!(self, Self::Workbook(_) | Self::Ole(_)) {
-            xml.push_str(r#" xmlns:r="#);
+            xml.push_str(r" xmlns:r=");
             xml.push('"');
             xml.push_str(conformance.rel());
             xml.push('"');
@@ -385,7 +391,7 @@ fn push_xml_text(xml: &mut String, value: &str) -> Result<()> {
             '\'' => xml.push_str("&apos;"),
             '\t' | '\n' | '\r' => xml.push(character),
             value if value >= '\u{20}' && value != '\u{fffe}' && value != '\u{ffff}' => {
-                xml.push(value)
+                xml.push(value);
             },
             value => {
                 return Err(invalid(format!(
@@ -1782,7 +1788,7 @@ fn patch_text(
 }
 
 fn apply_source_edits(source: &[u8], mut edits: Vec<SourceEdit>) -> Result<Vec<u8>> {
-    edits.sort_by(|left, right| right.range.start.cmp(&left.range.start));
+    edits.sort_by_key(|edit| std::cmp::Reverse(edit.range.start));
     for pair in edits.windows(2) {
         if pair[0].range.start < pair[1].range.end {
             return Err(invalid("external-link source edits overlap"));
@@ -2047,7 +2053,7 @@ fn parse_cell_type(value: Option<&str>) -> Result<CellType> {
 
 /// Validate an `A1`-style cached cell reference.
 ///
-/// Accepts the full SpreadsheetML address space, so multi-letter columns
+/// Accepts the full `SpreadsheetML` address space, so multi-letter columns
 /// (`AA1` through `XFD1048576`) are valid. The column prefix is bounded to
 /// [`MAX_COLUMN_LETTERS`] so a long letter run cannot drive the accumulator.
 fn validate_cell_reference(value: &str) -> Result<()> {

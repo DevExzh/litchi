@@ -61,6 +61,12 @@ struct WriterEncryption {
     password: Zeroizing<String>,
 }
 
+#[derive(Clone, Copy)]
+enum PayloadOrigin {
+    AuthoredOrChanged,
+    ExactSource,
+}
+
 /// Entry in the ODF manifest
 #[derive(Debug, Clone)]
 struct ManifestEntry {
@@ -302,7 +308,7 @@ impl<W: Write> PackageWriter<W> {
         // Determine media type based on file extension
         let media_type = Self::guess_media_type(path);
 
-        self.write_file(path, content, media_type)
+        self.write_file(path, content, media_type, PayloadOrigin::AuthoredOrChanged)
     }
 
     /// Add a file to the package with a specific media type
@@ -332,10 +338,19 @@ impl<W: Write> PackageWriter<W> {
             return Err(Error::InvalidFormat("MIME type not set".to_string()));
         }
 
-        self.write_file(path, content, media_type)
+        self.write_file(path, content, media_type, PayloadOrigin::AuthoredOrChanged)
     }
 
-    fn write_file(&mut self, path: &str, content: &[u8], media_type: &str) -> Result<()> {
+    fn write_file(
+        &mut self,
+        path: &str,
+        content: &[u8],
+        media_type: &str,
+        origin: PayloadOrigin,
+    ) -> Result<()> {
+        if matches!(origin, PayloadOrigin::AuthoredOrChanged) {
+            Self::validate_authored_xml(path, content, media_type)?;
+        }
         let encrypt = self
             .encryption
             .as_ref()
@@ -367,6 +382,26 @@ impl<W: Write> PackageWriter<W> {
             self.wrote_payload_entry = true;
         }
         Ok(())
+    }
+
+    fn write_exact_source_file(
+        &mut self,
+        path: &str,
+        content: &[u8],
+        media_type: &str,
+    ) -> Result<()> {
+        self.write_file(path, content, media_type, PayloadOrigin::ExactSource)
+    }
+
+    fn validate_authored_xml(path: &str, content: &[u8], media_type: &str) -> Result<()> {
+        if !xml_minifier::audit::package::is_xml_part(path, media_type) {
+            return Ok(());
+        }
+        xml_minifier::audit::verify_authored(content, xml_minifier::audit::Limits::default())
+            .map(|_report| ())
+            .map_err(|source| {
+                Error::InvalidFormat(format!("XML publication rejected for '{path}': {source}"))
+            })
     }
 
     /// Add an entry to the package manifest without writing a ZIP member.
@@ -415,28 +450,22 @@ impl<W: Write> PackageWriter<W> {
             ));
         }
 
-        let mut files = Vec::new();
-        for path in package.files()? {
-            if path.ends_with('/') || Self::is_regenerated_package_part(&path) {
-                continue;
-            }
-            let bytes = package.get_file(&path)?;
-            let manifest_media_type = package.manifest().get_media_type(&path).map(str::to_string);
-            files.push((path, bytes, manifest_media_type));
-        }
-
         for (path, entry) in &package.manifest().entries {
             if path.ends_with('/') && !Self::is_regenerated_package_part(path) {
                 self.add_manifest_entry(path, &entry.media_type)?;
             }
         }
 
-        for (path, bytes, manifest_media_type) in files {
-            if let Some(media_type) = manifest_media_type {
-                self.add_file_with_media_type(&path, &bytes, &media_type)?;
-            } else {
-                self.add_file(&path, &bytes)?;
+        for path in package.files()? {
+            if path.ends_with('/') || Self::is_regenerated_package_part(&path) {
+                continue;
             }
+            let bytes = package.get_file(&path)?;
+            let media_type = package
+                .manifest()
+                .get_media_type(&path)
+                .unwrap_or_else(|| Self::guess_media_type(&path));
+            self.write_exact_source_file(&path, &bytes, media_type)?;
         }
 
         Ok(())
@@ -482,27 +511,21 @@ impl<W: Write> PackageWriter<W> {
                     .any(|candidate| path.starts_with(candidate))
         };
 
-        let mut files = Vec::new();
-        for path in package.files()? {
-            if path.ends_with('/') || Self::is_regenerated_package_part(&path) || excluded(&path) {
-                continue;
-            }
-            let bytes = package.get_file(&path)?;
-            let manifest_media_type = package.manifest().get_media_type(&path).map(str::to_string);
-            files.push((path, bytes, manifest_media_type));
-        }
-
         for (path, entry) in &package.manifest().entries {
             if path.ends_with('/') && !Self::is_regenerated_package_part(path) && !excluded(path) {
                 self.add_manifest_entry(path, &entry.media_type)?;
             }
         }
-        for (path, bytes, manifest_media_type) in files {
-            if let Some(media_type) = manifest_media_type {
-                self.add_file_with_media_type(&path, &bytes, &media_type)?;
-            } else {
-                self.add_file(&path, &bytes)?;
+        for path in package.files()? {
+            if path.ends_with('/') || Self::is_regenerated_package_part(&path) || excluded(&path) {
+                continue;
             }
+            let bytes = package.get_file(&path)?;
+            let media_type = package
+                .manifest()
+                .get_media_type(&path)
+                .unwrap_or_else(|| Self::guess_media_type(&path));
+            self.write_exact_source_file(&path, &bytes, media_type)?;
         }
         Ok(())
     }
@@ -534,6 +557,8 @@ impl<W: Write> PackageWriter<W> {
         let extension = path.rsplit('.').next().unwrap_or_default();
         if extension.eq_ignore_ascii_case("xml") {
             "text/xml"
+        } else if extension.eq_ignore_ascii_case("rdf") {
+            "application/rdf+xml"
         } else if extension.eq_ignore_ascii_case("png") {
             "image/png"
         } else if extension.eq_ignore_ascii_case("jpg") || extension.eq_ignore_ascii_case("jpeg") {
@@ -578,6 +603,11 @@ impl<W: Write> PackageWriter<W> {
 
         // Generate and write manifest
         let manifest_content = self.generate_manifest();
+        Self::validate_authored_xml(
+            "META-INF/manifest.xml",
+            manifest_content.as_bytes(),
+            "text/xml",
+        )?;
         self.zip_writer
             .write_deflated("META-INF/manifest.xml", manifest_content.as_bytes())
             .map_err(|e| Error::ZipError(e.to_string()))?;
@@ -809,6 +839,7 @@ impl Structure {
 )]
 mod tests {
     use super::*;
+    use soapberry_zip::office::ArchiveReader;
     use std::io::{Cursor, Write};
 
     #[test]
@@ -900,6 +931,100 @@ mod tests {
     }
 
     #[test]
+    fn arbitrary_writer_bytes_are_refused_for_every_xml_classification() {
+        for (path, media_type) in [
+            ("manifest.rdf", "application/octet-stream"),
+            ("custom/metadata", "application/rdf+xml"),
+            (
+                "META-INF/custom-signature",
+                "application/vnd.oasis.opendocument.digital-signature+xml",
+            ),
+        ] {
+            let mut writer = PackageWriter::new();
+            writer
+                .set_mimetype("application/vnd.oasis.opendocument.text")
+                .unwrap();
+            let error = writer
+                .add_file_with_media_type(path, b"<root> <child/></root>", media_type)
+                .unwrap_err();
+            assert!(error.to_string().contains("XML publication rejected"));
+        }
+    }
+
+    #[test]
+    fn real_package_enumeration_includes_rdf_and_manifest_declared_xml() {
+        let mut writer = PackageWriter::new();
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.text")
+            .unwrap();
+        writer
+            .add_file_with_media_type(
+                "manifest.rdf",
+                b"<rdf:RDF xmlns:rdf=\"urn:test\"><rdf:Description/></rdf:RDF>",
+                "application/rdf+xml",
+            )
+            .unwrap();
+        writer
+            .add_file_with_media_type(
+                "custom/metadata",
+                b"<metadata><value>content</value></metadata>",
+                "application/vnd.example.metadata+xml",
+            )
+            .unwrap();
+        let bytes = writer.finish().unwrap();
+        let archive = ArchiveReader::new(&bytes).unwrap();
+        let manifest_xml = archive.read("META-INF/manifest.xml").unwrap();
+        let manifest_text = std::str::from_utf8(&manifest_xml).unwrap();
+        let manifest = super::super::manifest::Manifest::parse(manifest_text).unwrap();
+        let mut audited = Vec::new();
+        for name in archive.file_names() {
+            let media_type = manifest.get_media_type(name).unwrap_or_default();
+            if xml_minifier::audit::package::is_xml_part(name, media_type) {
+                let payload = archive.read(name).unwrap();
+                let _report = xml_minifier::audit::verify_authored(
+                    &payload,
+                    xml_minifier::audit::Limits::default(),
+                )
+                .unwrap();
+                audited.push(name.to_string());
+            }
+        }
+        audited.sort();
+        assert_eq!(
+            audited,
+            ["META-INF/manifest.xml", "custom/metadata", "manifest.rdf"]
+        );
+    }
+
+    #[test]
+    fn auxiliary_copy_preserves_noncompact_source_rdf_exactly() {
+        let mut source_bytes = Vec::new();
+        let source_rdf = b"<rdf:RDF xmlns:rdf=\"urn:test\">\n <rdf:Description/>\n</rdf:RDF>";
+        {
+            let mut zip = zip::ZipWriter::new(Cursor::new(&mut source_bytes));
+            let options = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
+            zip.start_file("mimetype", options).unwrap();
+            zip.write_all(b"application/vnd.oasis.opendocument.text")
+                .unwrap();
+            zip.start_file("manifest.rdf", options).unwrap();
+            zip.write_all(source_rdf).unwrap();
+            zip.start_file("META-INF/manifest.xml", options).unwrap();
+            zip.write_all(br#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.text"/><manifest:file-entry manifest:full-path="manifest.rdf" manifest:media-type="application/rdf+xml"/></manifest:manifest>"#).unwrap();
+            zip.finish().unwrap();
+        }
+        let source = OwnedPackage::from_bytes(source_bytes).unwrap();
+        let mut writer = PackageWriter::new();
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.text")
+            .unwrap();
+        writer.copy_auxiliary_files_from(&source).unwrap();
+        let output = writer.finish().unwrap();
+        let archive = ArchiveReader::new(&output).unwrap();
+        assert_eq!(archive.read("manifest.rdf").unwrap(), source_rdf);
+    }
+
+    #[test]
     fn copying_auxiliary_files_rejects_encrypted_manifest_entries() {
         let mut bytes = Vec::new();
         {
@@ -929,6 +1054,10 @@ mod tests {
     fn test_guess_media_type() {
         type MemoryWriter = PackageWriter<Cursor<Vec<u8>>>;
         assert_eq!(MemoryWriter::guess_media_type("content.xml"), "text/xml");
+        assert_eq!(
+            MemoryWriter::guess_media_type("manifest.rdf"),
+            "application/rdf+xml"
+        );
         assert_eq!(MemoryWriter::guess_media_type("image.png"), "image/png");
         assert_eq!(MemoryWriter::guess_media_type("image.jpg"), "image/jpeg");
         assert_eq!(MemoryWriter::guess_media_type("image.jpeg"), "image/jpeg");
@@ -947,7 +1076,7 @@ mod tests {
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
-        writer.add_file("content.xml", b"test").unwrap();
+        writer.add_file("content.xml", b"<content/>").unwrap();
 
         let manifest = writer.generate_manifest();
         assert!(manifest.contains("manifest:manifest"));

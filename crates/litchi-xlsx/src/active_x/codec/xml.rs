@@ -1,6 +1,9 @@
-//! SpreadsheetML and ActiveX XML codecs.
+//! `SpreadsheetML` and `ActiveX` XML codecs.
 
-use super::super::model::*;
+use super::super::model::{
+    Control, ControlProperties, Controls, Descriptor, Font, Marker, ObjectAnchor, Persistence,
+    Picture, Property, PropertyObject,
+};
 use super::super::validation::{
     bounded, nonempty, validate_controls, validate_descriptor, validate_font,
 };

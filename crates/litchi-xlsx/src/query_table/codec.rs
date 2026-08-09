@@ -1,4 +1,4 @@
-//! Bounded SpreadsheetML query-table XML codec.
+//! Bounded `SpreadsheetML` query-table XML codec.
 //!
 //! MCE preprocessing is delegated to the shared OOXML helper; the query-table
 //! tree and extension payload handling stay local because their resource caps

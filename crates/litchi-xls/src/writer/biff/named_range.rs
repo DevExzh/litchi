@@ -46,18 +46,18 @@ pub(crate) fn write_name<W: Write>(writer: &mut W, name: &DefinedName, rgce: &[u
                     "Defined name must be at most 255 characters".to_string(),
                 ));
             }
-            let cch = char_count as u8;
+            let cch = crate::utils::truncate_usize_to_u8(char_count);
             let is_16bit = has_multibyte_char(&name.name);
             (cch, is_16bit, None, Some(name.name.as_str()))
         };
 
     let name_bytes_len: u16 = if is_16bit {
-        1u16 + (cch as u16) * 2
+        1u16 + u16::from(cch) * 2
     } else {
-        1u16 + (cch as u16)
+        1u16 + u16::from(cch)
     };
 
-    let cce = rgce.len() as u16;
+    let cce = crate::utils::truncate_usize_to_u16(rgce.len());
     let data_len: u16 = 14u16.saturating_add(name_bytes_len).saturating_add(cce);
 
     // Option flags (grbit) map directly to Apache POI's NameRecord.Option
@@ -130,7 +130,7 @@ fn push_no_cch_string(data: &mut Vec<u8>, value: &str) {
     data.push(u8::from(!compressed));
     for unit in units {
         if compressed {
-            data.push(unit as u8);
+            data.push(crate::utils::truncate_u16_to_u8(unit));
         } else {
             data.extend_from_slice(&unit.to_le_bytes());
         }
@@ -140,12 +140,20 @@ fn push_no_cch_string(data: &mut Vec<u8>, value: &str) {
 fn write_continued_record<W: Write>(writer: &mut W, record_type: u16, data: &[u8]) -> Result<()> {
     let mut offset = 0;
     let first = data.len().min(8224);
-    write_record_header(writer, record_type, first as u16)?;
+    write_record_header(
+        writer,
+        record_type,
+        crate::utils::truncate_usize_to_u16(first),
+    )?;
     writer.write_all(&data[..first])?;
     offset += first;
     while offset < data.len() {
         let end = (offset + 8224).min(data.len());
-        write_record_header(writer, 0x003c, (end - offset) as u16)?;
+        write_record_header(
+            writer,
+            0x003c,
+            crate::utils::truncate_usize_to_u16(end - offset),
+        )?;
         writer.write_all(&data[offset..end])?;
         offset = end;
     }
@@ -173,13 +181,16 @@ pub(crate) fn write_defined_name_record<W: Write>(
         Some(value) => (1usize, Some(value.code())),
         None => (name.name.encode_utf16().count(), None),
     };
-    data.push(name_len as u8);
-    data.extend_from_slice(&(name.formula_tokens.len() as u16).to_le_bytes());
+    data.push(crate::utils::truncate_usize_to_u8(name_len));
+    data.extend_from_slice(
+        &crate::utils::truncate_usize_to_u16(name.formula_tokens.len()).to_le_bytes(),
+    );
     data.extend_from_slice(&0u16.to_le_bytes());
     let itab = match name.scope {
         NameScope::Workbook => 0,
-        NameScope::Worksheet(index) => u16::try_from(index + 1)
-            .map_err(|_| Error::InvalidData("defined name sheet scope exceeds u16".to_string()))?,
+        NameScope::Worksheet(index) => u16::try_from(index + 1).map_err(|_error| {
+            Error::InvalidData("defined name sheet scope exceeds u16".to_string())
+        })?,
     };
     data.extend_from_slice(&itab.to_le_bytes());
     for value in [
@@ -188,7 +199,7 @@ pub(crate) fn write_defined_name_record<W: Write>(
         &name.help_topic,
         &name.status_bar,
     ] {
-        data.push(value.chars().count() as u8);
+        data.push(crate::utils::truncate_usize_to_u8(value.chars().count()));
     }
     if let Some(code) = built_in {
         data.extend_from_slice(&[0, code]);
@@ -228,11 +239,15 @@ pub(crate) fn write_name_comment<W: Write>(
     data.extend_from_slice(&0x0894u16.to_le_bytes());
     data.extend_from_slice(&0u16.to_le_bytes());
     data.extend_from_slice(&0u64.to_le_bytes());
-    data.extend_from_slice(&(name_len as u16).to_le_bytes());
-    data.extend_from_slice(&(comment_len as u16).to_le_bytes());
+    data.extend_from_slice(&crate::utils::truncate_usize_to_u16(name_len).to_le_bytes());
+    data.extend_from_slice(&crate::utils::truncate_usize_to_u16(comment_len).to_le_bytes());
     push_no_cch_string(&mut data, name);
     push_no_cch_string(&mut data, comment);
-    write_record_header(writer, 0x0894, data.len() as u16)?;
+    write_record_header(
+        writer,
+        0x0894,
+        crate::utils::truncate_usize_to_u16(data.len()),
+    )?;
     writer.write_all(&data)?;
     Ok(())
 }
@@ -244,14 +259,14 @@ fn push_frt_header(data: &mut Vec<u8>, record_type: u16) {
 }
 fn push_xl_name_unicode(data: &mut Vec<u8>, value: &str) {
     let units = value.encode_utf16().collect::<Vec<_>>();
-    data.extend_from_slice(&(units.len() as u16).to_le_bytes());
+    data.extend_from_slice(&crate::utils::truncate_usize_to_u16(units.len()).to_le_bytes());
     let compressed = units.iter().all(|unit| *unit <= 0xff);
     data.push(u8::from(!compressed));
     for unit in units {
         if compressed {
-            data.push(unit as u8)
+            data.push(crate::utils::truncate_u16_to_u8(unit));
         } else {
-            data.extend_from_slice(&unit.to_le_bytes())
+            data.extend_from_slice(&unit.to_le_bytes());
         }
     }
 }
@@ -263,10 +278,14 @@ pub(crate) fn write_name_function_group<W: Write>(
     let mut data = Vec::new();
     push_frt_header(&mut data, 0x0899);
     let count = value.function_name.encode_utf16().count();
-    data.extend_from_slice(&(count as u16).to_le_bytes());
+    data.extend_from_slice(&crate::utils::truncate_usize_to_u16(count).to_le_bytes());
     data.extend_from_slice(&u16::from(value.category).to_le_bytes());
     push_xl_name_unicode(&mut data, &value.function_name);
-    write_record_header(writer, 0x0899, data.len() as u16)?;
+    write_record_header(
+        writer,
+        0x0899,
+        crate::utils::truncate_usize_to_u16(data.len()),
+    )?;
     writer.write_all(&data)?;
     Ok(())
 }
@@ -280,7 +299,11 @@ pub(crate) fn write_name_publish<W: Write>(
     let flags = u16::from(value.published) | (u16::from(value.workbook_parameter) << 1);
     data.extend_from_slice(&flags.to_le_bytes());
     push_xl_name_unicode(&mut data, &value.name);
-    write_record_header(writer, 0x0893, data.len() as u16)?;
+    write_record_header(
+        writer,
+        0x0893,
+        crate::utils::truncate_usize_to_u16(data.len()),
+    )?;
     writer.write_all(&data)?;
     Ok(())
 }

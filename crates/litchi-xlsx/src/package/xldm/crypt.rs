@@ -27,6 +27,7 @@ pub enum CryptAlgorithm {
 }
 
 impl CryptAlgorithm {
+    #[must_use]
     pub const fn blob_algorithm(self) -> u32 {
         match self {
             Self::TripleDes => 0x0000_6603,
@@ -35,6 +36,7 @@ impl CryptAlgorithm {
         }
     }
 
+    #[must_use]
     pub const fn key_len(self) -> usize {
         match self {
             Self::TripleDes => 24,

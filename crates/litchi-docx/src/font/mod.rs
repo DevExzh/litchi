@@ -1,4 +1,8 @@
-//! Typed WordprocessingML font tables and inert embedded-font resources.
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
+//! Typed `WordprocessingML` font tables and inert embedded-font resources.
 //!
 //! The owner is layered internally as semantic model, bounded XML codec, and
 //! OPC relationship graph. The public facade keeps the contextual vocabulary

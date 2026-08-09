@@ -1,3 +1,7 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
 use crate::error::{Error, Result};
 use quick_xml::events::Event;
 
@@ -57,7 +61,14 @@ pub(super) fn validate_header_footer_xml(xml: &str, header: bool) -> Result<()> 
                 })?;
             },
             Event::Eof => break,
-            _ => {},
+            Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     if !root || depth != 0 {
@@ -101,7 +112,10 @@ impl SectionProperties {
                     ));
                 }
                 if let Some(part) = &reference.part {
-                    validate_header_footer_xml(&part.xml, std::ptr::eq(references, &self.headers))?;
+                    validate_header_footer_xml(
+                        &part.xml,
+                        std::ptr::eq(references, &raw const self.headers),
+                    )?;
                 }
             }
         }
@@ -125,7 +139,33 @@ impl SectionProperties {
                 if let Some(size) = border.size {
                     let max = match border.style {
                         Style::Art(_) => MAX_PAGE_BORDER_ART_SIZE,
-                        _ => MAX_PAGE_BORDER_LINE_SIZE,
+                        Style::Nil
+                        | Style::None
+                        | Style::Single
+                        | Style::Thick
+                        | Style::Double
+                        | Style::Dotted
+                        | Style::Dashed
+                        | Style::DotDash
+                        | Style::DotDotDash
+                        | Style::Triple
+                        | Style::ThinThickSmallGap
+                        | Style::ThinThickMediumGap
+                        | Style::ThinThickLargeGap
+                        | Style::ThickThinSmallGap
+                        | Style::ThickThinMediumGap
+                        | Style::ThickThinLargeGap
+                        | Style::ThinThickThinSmallGap
+                        | Style::ThinThickThinMediumGap
+                        | Style::ThinThickThinLargeGap
+                        | Style::Wave
+                        | Style::DoubleWave
+                        | Style::DashSmallGap
+                        | Style::DashDotStroked
+                        | Style::ThreeDEmboss
+                        | Style::ThreeDEngrave
+                        | Style::Outset
+                        | Style::Inset => MAX_PAGE_BORDER_LINE_SIZE,
                     };
                     if size > max {
                         return Err(Error::InvalidFormat(format!(

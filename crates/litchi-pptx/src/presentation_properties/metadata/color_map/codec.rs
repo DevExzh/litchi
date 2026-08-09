@@ -169,12 +169,9 @@ fn scan_empty(
             .ok_or_else(|| Error::Invalid("color-map XML nesting is too deep".to_string()))?,
         namespace,
         element,
-    ) {
-        store_map_attributes(
-            &mut state.map_attributes,
-            map_attribute_spans(element, start)?,
-        )?;
-    } else if state.override_depth == Some(state.depth) && is_override_mapping(namespace, element) {
+    ) || (state.override_depth == Some(state.depth)
+        && is_override_mapping(namespace, element))
+    {
         store_map_attributes(
             &mut state.map_attributes,
             map_attribute_spans(element, start)?,
@@ -399,7 +396,7 @@ struct Replacement {
 }
 
 fn apply_replacements(source: &[u8], mut replacements: Vec<Replacement>) -> Result<Vec<u8>> {
-    replacements.sort_by(|left, right| right.range.start.cmp(&left.range.start));
+    replacements.sort_by_key(|replacement| std::cmp::Reverse(replacement.range.start));
     let mut output = source.to_vec();
     let mut upper = source.len();
     for replacement in replacements {

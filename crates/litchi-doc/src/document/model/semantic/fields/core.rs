@@ -6,6 +6,7 @@ impl Document {
     /// Contains information about all fields in the main document,
     /// including embedded objects and hyperlinks.
     #[inline]
+    #[must_use]
     pub fn fields_table(&self) -> Option<&FieldsTable> {
         self.fields_table.as_ref()
     }
@@ -26,7 +27,7 @@ impl Document {
     }
     /// Get stored instruction and cached-result text for one parsed field.
     ///
-    /// Field positions are relative to their FieldStory. This method reads only
+    /// Field positions are relative to their `FieldStory`. This method reads only
     /// that stored text range and performs no field evaluation or external
     /// action.
     pub fn field_text(&self, field: &Field) -> Result<FieldText> {

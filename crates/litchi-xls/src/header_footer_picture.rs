@@ -65,6 +65,12 @@ pub struct HeaderFooterPicture {
 
 impl HeaderFooterPicture {
     /// Parse an `HFPicture` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// # Panics
+    ///
+    /// Panics only if an internal BIFF invariant has been violated.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < FRT_HEADER_LEN + FLAGS_LEN {
             return Err(Error::InvalidLength {
@@ -100,6 +106,7 @@ impl HeaderFooterPicture {
     }
 
     /// Serialize back to a complete `HFPicture` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(FRT_HEADER_LEN + FLAGS_LEN + self.drawing.len());
         payload.extend_from_slice(&HF_PICTURE_RECORD_TYPE.to_le_bytes());
@@ -112,33 +119,39 @@ impl HeaderFooterPicture {
     }
 
     /// Whether `rgDrawing` is an `OfficeArtDgContainer` record (`fIsDrawing`).
+    #[must_use]
     pub fn is_drawing(&self) -> bool {
         self.flags & FLAG_IS_DRAWING != 0
     }
 
     /// Whether `rgDrawing` is an `OfficeArtDggContainer` record
     /// (`fIsDrawingGroup`).
+    #[must_use]
     pub fn is_drawing_group(&self) -> bool {
         self.flags & FLAG_IS_DRAWING_GROUP != 0
     }
 
     /// Whether this record continues the previous `HFPicture` record
     /// (`fContinue`).
+    #[must_use]
     pub fn is_continuation(&self) -> bool {
         self.flags & FLAG_CONTINUE != 0
     }
 
     /// Raw flags byte, including the five undefined bits.
+    #[must_use]
     pub fn flags(&self) -> u8 {
         self.flags
     }
 
     /// Raw `frtHeader.grbitFrt` bitfield (`fFrtRef`/`fFrtAlert` are zero).
+    #[must_use]
     pub fn frt_flags(&self) -> u16 {
         self.frt_flags
     }
 
     /// The opaque `rgDrawing` bytes.
+    #[must_use]
     pub fn drawing(&self) -> &[u8] {
         &self.drawing
     }

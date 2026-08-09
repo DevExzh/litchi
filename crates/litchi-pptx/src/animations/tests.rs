@@ -128,7 +128,7 @@ mod recursive_timing_tests {
 }
 
 #[cfg(test)]
-mod tests {
+mod integration_tests {
     use super::*;
 
     const P: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";

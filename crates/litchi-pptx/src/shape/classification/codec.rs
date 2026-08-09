@@ -565,13 +565,10 @@ fn parse_snapshot(
     let mut reader = NsReader::from_reader(bytes);
     let decoder = reader.decoder();
     let (_, event) = reader.read_resolved_event().map_err(xml_error)?;
-    let element = match event {
-        Event::Start(element) | Event::Empty(element) => element,
-        _ => {
-            return Err(invalid(
-                "classification range does not begin with an element",
-            ));
-        },
+    let (Event::Start(element) | Event::Empty(element)) = event else {
+        return Err(invalid(
+            "classification range does not begin with an element",
+        ));
     };
     let outcome = unqualified_attribute_value(&element, b"val", decoder)?
         .map(|value| Outcome::parse(&value))

@@ -1,5 +1,9 @@
 //! `OpenDocument` Drawing support with semantic responsibility layers.
 #![forbid(unsafe_code)]
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "drawing package helpers stay in manifest and content traversal order"
+)]
 
 mod authoring;
 mod codec;
@@ -10,12 +14,15 @@ mod package;
 
 pub use facade::{Builder, Drawing};
 pub use facade::{
-    Commit as PackageCommit, LayerChange as PackageLayerChange, NameChange as PackageNameChange,
-    Patch as PackagePatch, Snapshot as PackageSnapshot, TextChange as PackageTextChange,
-    Transaction as PackageTransaction,
+    Change as PackageChange, Commit as PackageCommit, GeometryChange as PackageGeometryChange,
+    History as PackageHistory, HistoryLimits as PackageHistoryLimits,
+    LayerChange as PackageLayerChange, NameChange as PackageNameChange, Patch as PackagePatch,
+    ResourceChange as PackageResourceChange, Snapshot as PackageSnapshot,
+    StructureChange as PackageStructureChange, StyleChange as PackageStyleChange,
+    TextChange as PackageTextChange, Transaction as PackageTransaction,
 };
 pub use flat::{
     FlatDrawing, FlatDrawingCommit, FlatDrawingEdit, FlatDrawingPatch, FlatPage, FlatShape,
     TextChange,
 };
-pub use model::{layer, page, shape};
+pub use model::{layer, page, resource, shape};

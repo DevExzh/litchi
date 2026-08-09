@@ -116,7 +116,6 @@ impl Asset {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    #[must_use]
     pub fn embedded(data: Data) -> Self {
         Self {
             embedded: Some(data),
@@ -389,28 +388,25 @@ pub struct Model {
 impl Model {
     /// Borrow the shared semantic scene.
     #[inline]
-    #[must_use]
     pub fn scene(&self) -> &Scene {
         &self.scene
     }
 
     /// Borrow the embedded or linked model asset metadata.
     #[inline]
-    #[must_use]
     pub fn asset(&self) -> &Asset {
         &self.asset
     }
 
     /// Borrow the optional raster preview.
     #[inline]
-    #[must_use]
+    #[must_use = "borrowing the preview has no effect unless the result is used"]
     pub fn preview(&self) -> Option<&Preview> {
         self.preview.as_ref()
     }
 
     /// Borrow the semantic shape anchor.
     #[inline]
-    #[must_use]
     pub fn shape(&self) -> &Shape {
         &self.shape
     }

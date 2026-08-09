@@ -137,7 +137,7 @@ pub fn parse_differential_formats(xml: &[u8]) -> Result<Vec<Differential>> {
             Event::End(_) => {
                 depth = depth
                     .checked_sub(1)
-                    .ok_or_else(|| invalid("invalid dxfs nesting"))?
+                    .ok_or_else(|| invalid("invalid dxfs nesting"))?;
             },
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid("DTD and processing instructions are rejected"));
@@ -1260,15 +1260,12 @@ fn decode_raw_text(bytes: &[u8]) -> Result<String> {
             _ => return Err(invalid(format!("unknown XML entity '&{entity};'"))),
         }
         let consumed = cursor + end + 1;
-        match raw[consumed..].find('&') {
-            Some(next) => {
-                value.push_str(&raw[consumed..consumed + next]);
-                cursor = consumed + next;
-            },
-            None => {
-                value.push_str(&raw[consumed..]);
-                break;
-            },
+        if let Some(next) = raw[consumed..].find('&') {
+            value.push_str(&raw[consumed..consumed + next]);
+            cursor = consumed + next;
+        } else {
+            value.push_str(&raw[consumed..]);
+            break;
         }
     }
     Ok(value)

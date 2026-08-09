@@ -64,24 +64,28 @@ pub struct Part {
 
 impl Part {
     /// Create a detached Custom XML part view.
+    #[must_use]
     pub fn new(id: String, xml: String, props: HashMap<String, String>) -> Self {
         Self { id, xml, props }
     }
 
     /// Get the part ID.
     #[inline]
+    #[must_use]
     pub fn id(&self) -> &str {
         &self.id
     }
 
     /// Get the XML content.
     #[inline]
+    #[must_use]
     pub fn xml(&self) -> &str {
         &self.xml
     }
 
     /// Get the properties.
     #[inline]
+    #[must_use]
     pub fn props(&self) -> &HashMap<String, String> {
         &self.props
     }

@@ -1,3 +1,19 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::needless_range_loop,
+    reason = "parallel indexed collections require the shared story index"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::similar_names,
+    reason = "domain names mirror distinct OOXML roles"
+)]
 //! Reachable-story inventory, checksum verification, and atomic publication.
 
 use std::collections::{HashMap, HashSet};
@@ -87,7 +103,7 @@ impl PackageLimits {
     }
 }
 
-/// One reachable WordprocessingML story with an exact content-control snapshot.
+/// One reachable `WordprocessingML` story with an exact content-control snapshot.
 #[derive(Debug, Clone)]
 pub struct Story {
     part: PackURI,
@@ -146,7 +162,7 @@ pub struct PackageSnapshot {
 impl PackageSnapshot {
     fn capture(package: &OpcPackage, limits: PackageLimits) -> Result<Self> {
         limits.validate()?;
-        let inventory = story::capture(package, limits.stories.clone())?;
+        let inventory = story::capture(package, limits.stories)?;
         let mut stories = Vec::new();
         stories
             .try_reserve_exact(inventory.stories().len())
@@ -207,6 +223,10 @@ impl PackageSnapshot {
     }
 
     /// Start a bounded package-wide transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn edit(&self) -> Result<PackageTransaction> {
         let mut transactions = Vec::new();
         transactions
@@ -224,10 +244,14 @@ impl PackageSnapshot {
         })
     }
 
-    /// Verify every declared checksum without executing XPath or interpreting XML.
+    /// Verify every declared checksum without executing `XPath` or interpreting XML.
     ///
     /// Snapshot capture rejects duplicate Custom XML datastore item GUIDs, so
     /// verification never selects an arbitrary payload for an ambiguous ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn verify_checksums(&self) -> Result<Vec<ChecksumEntry>> {
         verify(self, None)
     }
@@ -366,6 +390,10 @@ impl PackageTransaction {
     }
 
     /// Set, repair, or remove one checksum by stable package occurrence.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_checksum(
         &mut self,
         part: &PackURI,
@@ -397,6 +425,10 @@ impl PackageTransaction {
     }
 
     /// Set, repair, or remove one exact source-order binding checksum.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_binding_checksum(
         &mut self,
         part: &PackURI,
@@ -419,6 +451,10 @@ impl PackageTransaction {
     }
 
     /// Refresh one checksum from its exact current Custom XML part bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn refresh_checksum(&mut self, part: &PackURI, occurrence: usize) -> Result<&mut Self> {
         let story = self.base.story_index(part)?;
         let semantic = self.base.stories[story]
@@ -450,6 +486,10 @@ impl PackageTransaction {
     ///
     /// Each unique Custom XML part is processed once, irrespective of the
     /// number of bindings that reference it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn refresh_checksums(&mut self) -> Result<&mut Self> {
         let mut target_count = 0usize;
         let mut additional_mutations = 0usize;
@@ -498,11 +538,7 @@ impl PackageTransaction {
         self.mutations
             .try_reserve(additional_mutations)
             .map_err(alloc("content-control package mutations"))?;
-        for (transaction, additional) in self
-            .transactions
-            .iter_mut()
-            .zip(story_additions.into_iter())
-        {
+        for (transaction, additional) in self.transactions.iter_mut().zip(story_additions) {
             transaction.try_reserve_edits(additional)?;
         }
 
@@ -589,6 +625,10 @@ impl PackageTransaction {
     }
 
     /// Set or remove the formatting exception on one exact lock.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_formatting_allowed(
         &mut self,
         part: &PackURI,
@@ -610,6 +650,10 @@ impl PackageTransaction {
     }
 
     /// Materialize and fully reparse every changed story.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn commit(&self) -> Result<PackageCommit> {
         let mut commits = Vec::new();
         commits
@@ -770,6 +814,10 @@ impl PackagePatch {
     /// requires the exact candidate story bytes. Signatures are never restored
     /// by an inverse story edit; a re-signed package must be explicitly
     /// unsigned again before a changed inverse can be published.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn inverse(&self) -> Result<Self> {
         let mut stories = Vec::new();
         stories
@@ -822,12 +870,20 @@ impl PackagePatch {
 
 impl Package {
     /// Capture all reachable content-control stories and Custom XML preconditions.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn content_control_snapshot(&self) -> Result<PackageSnapshot> {
         self.ensure_story_opc_current("content_control_snapshot")?;
         PackageSnapshot::capture(self.opc_package(), PackageLimits::default())
     }
 
     /// Capture with explicit aggregate resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn content_control_snapshot_with_limits(
         &self,
         limits: PackageLimits,
@@ -837,18 +893,30 @@ impl Package {
     }
 
     /// Verify declared checksums across every reachable story.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn verify_content_control_checksums(&self) -> Result<Vec<ChecksumEntry>> {
         self.ensure_story_opc_current("verify_content_control_checksums")?;
         PackageSnapshot::capture(self.opc_package(), PackageLimits::default())?.verify_checksums()
     }
 
     /// Publish a prepared package transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn apply_content_controls(&mut self, commit: &PackageCommit) -> Result<()> {
         self.ensure_story_opc_current("apply_content_controls")?;
         self.apply_content_control_patch(commit.patch())
     }
 
     /// Publish one exact package patch atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn apply_content_control_patch(&mut self, patch: &PackagePatch) -> Result<()> {
         // Guard before claiming the shared retry-safe gate. A pending facade
         // edit must not consume even an exact no-op patch.
@@ -905,7 +973,7 @@ impl Package {
                         match replacement.source_owner() {
                             super::snapshot::Source::Package(value) => value,
                             super::snapshot::Source::Detached(value) => {
-                                Arc::new(value.as_ref().to_vec())
+                                Arc::new(value.as_ref().clone())
                             },
                         },
                     );
@@ -1067,7 +1135,7 @@ fn capture_stores(
         )?;
         let props_xml = item
             .props_part()
-            .map(|part| package.get_part(part).map(|value| value.blob()))
+            .map(|part| package.get_part(part).map(litchi_opc::Part::blob))
             .transpose()?;
         charge_custom_graph_field(
             &mut graph_bytes,
@@ -1130,7 +1198,7 @@ fn capture_stores(
         put_field(&mut graph, item.content_type().as_bytes())?;
         let props_xml = item
             .props_part()
-            .map(|part| package.get_part(part).map(|value| value.blob()))
+            .map(|part| package.get_part(part).map(litchi_opc::Part::blob))
             .transpose()?;
         put_field(&mut graph, props_xml.unwrap_or_default())?;
         let id = item
@@ -1624,7 +1692,7 @@ fn same_stores(left: &[Store], right: &[Store]) -> bool {
 
 fn put_field(output: &mut Vec<u8>, value: &[u8]) -> Result<()> {
     let length = u64::try_from(value.len())
-        .map_err(|_| invalid("content-control topology field is too large"))?;
+        .map_err(|_source_error| invalid("content-control topology field is too large"))?;
     let additional = 8usize
         .checked_add(value.len())
         .ok_or_else(|| invalid("content-control topology size overflow"))?;
@@ -1637,8 +1705,8 @@ fn put_field(output: &mut Vec<u8>, value: &[u8]) -> Result<()> {
 }
 
 fn put_number(output: &mut Vec<u8>, value: usize) -> Result<()> {
-    let value =
-        u64::try_from(value).map_err(|_| invalid("content-control topology count is too large"))?;
+    let value = u64::try_from(value)
+        .map_err(|_source_error| invalid("content-control topology count is too large"))?;
     output
         .try_reserve(8)
         .map_err(alloc("content-control topology token"))?;

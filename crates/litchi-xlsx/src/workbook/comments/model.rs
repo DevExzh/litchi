@@ -11,7 +11,7 @@ pub struct Comment {
     pub author: String,
     /// The zero-based author index stored on `comment/@authorId`.
     pub author_id: u32,
-    /// Plain text collected from simple or rich SpreadsheetML text runs.
+    /// Plain text collected from simple or rich `SpreadsheetML` text runs.
     pub text: String,
     /// Optional producer extension GUID.
     pub guid: Option<String>,
@@ -30,16 +30,19 @@ pub struct Comments {
 
 impl Comments {
     /// Return a comment by its checked A1 cell reference.
+    #[must_use]
     pub fn get(&self, cell_ref: &str) -> Option<&Comment> {
         self.comments.get(cell_ref)
     }
 
     /// Number of notes in this part.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.comments.len()
     }
 
     /// Whether this part contains no notes.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.comments.is_empty()
     }

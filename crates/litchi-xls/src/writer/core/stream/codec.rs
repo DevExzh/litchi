@@ -19,7 +19,11 @@ const DEFAULT_WRITE_ACCESS_USER: &str = "litchi";
 
 // BIFF requires records to be emitted in a strict workbook-stream order. Keep
 // that ordering visible in one coordinator while leaf encoders stay separate.
-#[allow(clippy::cognitive_complexity, clippy::too_many_arguments)]
+#[allow(
+    clippy::cognitive_complexity,
+    clippy::too_many_arguments,
+    reason = "single-pass BIFF stream encoding keeps state transitions together"
+)]
 pub(crate) fn generate_workbook_stream(
     use_1904_dates: bool,
     calculation_settings: CalculationSettings,
@@ -65,20 +69,19 @@ pub(crate) fn generate_workbook_stream(
     // cache stream name use the corresponding one-based stream ID.
     let mut stream = Vec::new();
     let has_pivot_tables = worksheets.iter().any(|ws| !ws.pivot_tables.is_empty());
-    let sheet_count = u16::try_from(worksheets.len())
-        .map_err(|_| Error::InvalidData("worksheet count exceeds the BIFF8 limit".to_string()))?;
+    let sheet_count = u16::try_from(worksheets.len()).map_err(|_error| {
+        Error::InvalidData("worksheet count exceeds the BIFF8 limit".to_string())
+    })?;
     let (protect_structure, protect_windows, password_hash, protect_revisions, revision_hash) =
-        workbook_protection
-            .map(|protection| {
-                (
-                    protection.protect_structure,
-                    protection.protect_windows,
-                    protection.password_hash.unwrap_or(0),
-                    protection.protect_revisions,
-                    protection.revision_password_hash.unwrap_or(0),
-                )
-            })
-            .unwrap_or((false, false, 0, false, 0));
+        workbook_protection.map_or((false, false, 0, false, 0), |protection| {
+            (
+                protection.protect_structure,
+                protection.protect_windows,
+                protection.password_hash.unwrap_or(0),
+                protection.protect_revisions,
+                protection.revision_password_hash.unwrap_or(0),
+            )
+        });
 
     // === Workbook Globals ===
 
@@ -284,8 +287,8 @@ pub(crate) fn generate_workbook_stream(
                 &mut stream,
                 pt.source_first_row,
                 pt.source_last_row,
-                pt.source_first_col as u8,
-                pt.source_last_col as u8,
+                crate::utils::truncate_u16_to_u8(pt.source_first_col),
+                crate::utils::truncate_u16_to_u8(pt.source_last_col),
                 &pt.source_sheet_name,
             )?;
             biff::write_pivot_cache_sxaddl_block(&mut stream)?;
@@ -314,7 +317,7 @@ pub(crate) fn generate_workbook_stream(
                         .collect();
                     vals.sort_unstable();
                     vals.dedup();
-                    vals.len() as u16
+                    crate::utils::truncate_usize_to_u16(vals.len())
                 })
                 .collect();
 
@@ -329,7 +332,7 @@ pub(crate) fn generate_workbook_stream(
                     is_numeric: f.is_numeric,
                     unique_numeric_count: uniq_count,
                     grouping: f.grouping.as_ref(),
-                    group_child: pt.fields.iter().position(|candidate| matches!(&candidate.grouping, Some(crate::PivotCacheGrouping::Discrete(value)) if usize::from(value.base_field_index) == field_index)).map(|index| index as u16),
+                    group_child: pt.fields.iter().position(|candidate| matches!(&candidate.grouping, Some(crate::PivotCacheGrouping::Discrete(value)) if usize::from(value.base_field_index) == field_index)).map(crate::utils::truncate_usize_to_u16),
                     is_source_field: !matches!(f.grouping, Some(crate::PivotCacheGrouping::Discrete(_))),
                 })
                 .collect();
@@ -369,10 +372,10 @@ pub(crate) fn generate_workbook_stream(
                         && field.grouping.is_none();
                     match val {
                         super::super::PivotCacheValue::StringIndex(idx) if !is_num => {
-                            si.push(u16::from(*idx))
+                            si.push(u16::from(*idx));
                         },
                         super::super::PivotCacheValue::SharedItemIndex(idx) if !is_num => {
-                            si.push(*idx)
+                            si.push(*idx);
                         },
                         super::super::PivotCacheValue::Number(v) if is_num => nv.push(*v),
                         value if !is_num => {
@@ -388,7 +391,7 @@ pub(crate) fn generate_workbook_stream(
                                     .iter()
                                     .position(|candidate| candidate == &item)
                             {
-                                si.push(index as u16);
+                                si.push(crate::utils::truncate_usize_to_u16(index));
                             }
                         },
                         _ => {}, // type mismatch — skip
@@ -411,7 +414,7 @@ pub(crate) fn generate_workbook_stream(
                 })
                 .collect();
 
-            let record_count = pt.source_last_row.saturating_sub(pt.source_first_row) as u32;
+            let record_count = u32::from(pt.source_last_row.saturating_sub(pt.source_first_row));
             let cache_stream = biff::generate_pivot_cache_stream(&biff::PivotCacheStreamInfo {
                 stream_id: id,
                 record_count,
@@ -453,7 +456,10 @@ pub(crate) fn generate_workbook_stream(
             next_drawing_id = next_drawing_id.checked_add(1).ok_or_else(|| {
                 Error::InvalidData("workbook drawing IDs are exhausted".to_string())
             })?;
-            drawing_clusters.push((drawing_id, object_count as u32 + 1));
+            drawing_clusters.push((
+                drawing_id,
+                crate::utils::truncate_usize_to_u32(object_count) + 1,
+            ));
             worksheet_drawing_ids.push(Some(drawing_id));
         }
     }
@@ -535,7 +541,7 @@ pub(crate) fn generate_workbook_stream(
 
     for (worksheet_index, worksheet) in worksheets.iter().enumerate() {
         // Record the position of this worksheet's BOF
-        let worksheet_pos = u32::try_from(stream.len()).map_err(|_| {
+        let worksheet_pos = u32::try_from(stream.len()).map_err(|_error| {
             Error::InvalidData("workbook stream position exceeds the BIFF8 limit".to_string())
         })?;
         actual_positions.push(worksheet_pos);
@@ -552,25 +558,25 @@ pub(crate) fn generate_workbook_stream(
             }
         }
 
-        let pivot_first_col = if !worksheet.pivot_tables.is_empty() {
+        let pivot_first_col = if worksheet.pivot_tables.is_empty() {
+            0
+        } else {
             worksheet
                 .pivot_tables
                 .iter()
                 .map(|pt| pt.first_col)
                 .min()
                 .unwrap_or(0)
-        } else {
-            0
         };
-        let pivot_last_col_plus1 = if !worksheet.pivot_tables.is_empty() {
+        let pivot_last_col_plus1 = if worksheet.pivot_tables.is_empty() {
+            0
+        } else {
             worksheet
                 .pivot_tables
                 .iter()
                 .map(|pt| pt.last_col.saturating_add(1))
                 .max()
                 .unwrap_or(0)
-        } else {
-            0
         };
 
         let emitted_rows: Vec<u32> = {
@@ -663,7 +669,7 @@ pub(crate) fn generate_workbook_stream(
             let width = u32::from(af.last_col)
                 .saturating_sub(u32::from(af.first_col))
                 .saturating_add(1);
-            let c_entries = u16::try_from(width).map_err(|_| {
+            let c_entries = u16::try_from(width).map_err(|_error| {
                 Error::InvalidData(
                     "set_auto_filter: auto-filter column span exceeds BIFF8 limit".to_string(),
                 )
@@ -760,10 +766,10 @@ pub(crate) fn generate_workbook_stream(
                     // Excel-authored pivot sheets use the default row height
                     // stored in DEFAULTROWHEIGHT (0x0116) for emitted ROW records.
                     .copied()
-                    .unwrap_or(if !worksheet.pivot_tables.is_empty() {
-                        0x0116u16
-                    } else {
+                    .unwrap_or(if worksheet.pivot_tables.is_empty() {
                         0x00FFu16
+                    } else {
+                        0x0116u16
                     });
                 let hidden = worksheet.hidden_rows.contains(row);
                 biff::write_row(&mut stream, *row, first_col, last_col_plus1, height, hidden)?;
@@ -889,29 +895,29 @@ pub(crate) fn generate_workbook_stream(
         }
 
         let staged_row_table = stream.split_off(row_table_start);
-        let plan = crate::writer::row_blocks::RowBlockLayoutPlan::generate_from_staged(
-            u64::try_from(index_record_pos)
-                .map_err(|_| Error::InvalidData("worksheet INDEX position overflow".to_string()))?,
-            u64::try_from(
-                row_table_start
-                    .checked_sub(index_record_pos)
-                    .ok_or_else(|| {
-                        Error::InvalidData("worksheet row table precedes INDEX".to_string())
-                    })?,
-            )
-            .map_err(|_| Error::InvalidData("worksheet row-table position overflow".to_string()))?,
-            u64::try_from(
-                def_col_width_pos
-                    .checked_sub(index_record_pos)
-                    .ok_or_else(|| {
-                        Error::InvalidData("worksheet DEFCOLWIDTH precedes INDEX".to_string())
-                    })?,
-            )
-            .map_err(|_| {
-                Error::InvalidData("worksheet DEFCOLWIDTH position overflow".to_string())
-            })?,
-            &staged_row_table,
-        )?;
+        let plan =
+            crate::writer::row_blocks::RowBlockLayoutPlan::generate_from_staged(
+                u64::try_from(index_record_pos).map_err(|_error| {
+                    Error::InvalidData("worksheet INDEX position overflow".to_string())
+                })?,
+                u64::try_from(
+                    row_table_start
+                        .checked_sub(index_record_pos)
+                        .ok_or_else(|| {
+                            Error::InvalidData("worksheet row table precedes INDEX".to_string())
+                        })?,
+                )
+                .map_err(|_error| {
+                    Error::InvalidData("worksheet row-table position overflow".to_string())
+                })?,
+                u64::try_from(def_col_width_pos.checked_sub(index_record_pos).ok_or_else(
+                    || Error::InvalidData("worksheet DEFCOLWIDTH precedes INDEX".to_string()),
+                )?)
+                .map_err(|_error| {
+                    Error::InvalidData("worksheet DEFCOLWIDTH position overflow".to_string())
+                })?,
+                &staged_row_table,
+            )?;
         let (index_record, row_table) = plan.into_records();
         stream.splice(index_record_pos..index_record_pos, index_record);
         stream.extend_from_slice(&row_table);
@@ -1051,7 +1057,7 @@ pub(crate) fn generate_workbook_stream(
         if !worksheet.data_validations.is_empty()
             || worksheet.data_validation_table_options.is_some()
         {
-            let dv_count = worksheet.data_validations.len() as u32;
+            let dv_count = crate::utils::truncate_usize_to_u32(worksheet.data_validations.len());
             let table = worksheet.data_validation_table_options.unwrap_or_default();
             biff::write_dval(
                 &mut stream,
@@ -1128,8 +1134,8 @@ pub(crate) fn generate_workbook_stream(
                 biff::write_cfheader_with_identifier(
                     &mut stream,
                     &ranges,
-                    group.rules.len() as u16,
-                    identifier as u16,
+                    crate::utils::truncate_usize_to_u16(group.rules.len()),
+                    crate::utils::truncate_usize_to_u16(identifier),
                 )?;
                 for rule in &group.rules {
                     let (condition_type, comparison_op, formula1, formula2) =
@@ -1170,8 +1176,8 @@ pub(crate) fn generate_workbook_stream(
             biff::write_condfmt12(
                 &mut stream,
                 &ranges,
-                group.rules.len() as u16,
-                identifier as u16,
+                crate::utils::truncate_usize_to_u16(group.rules.len()),
+                crate::utils::truncate_usize_to_u16(identifier),
             )?;
             for rule in &group.rules {
                 let (condition_type, comparison, formula1, formula2, active_formula, payload) =
@@ -1214,8 +1220,8 @@ pub(crate) fn generate_workbook_stream(
             .iter()
             .zip(worksheet_pivot_cache_identities)
         {
-            let field_count = pt.fields.len() as u16;
-            let data_field_count = pt.data_items.len() as u16;
+            let field_count = crate::utils::truncate_usize_to_u16(pt.fields.len());
+            let data_field_count = crate::utils::truncate_usize_to_u16(pt.data_items.len());
 
             // Collect field indices per axis.
             let mut row_field_indices: Vec<u16> = Vec::new();
@@ -1223,8 +1229,8 @@ pub(crate) fn generate_workbook_stream(
             let mut page_field_count: u16 = 0;
             for (i, f) in pt.fields.iter().enumerate() {
                 match f.axis {
-                    0x0001 => row_field_indices.push(i as u16),
-                    0x0002 => col_field_indices.push(i as u16),
+                    0x0001 => row_field_indices.push(crate::utils::truncate_usize_to_u16(i)),
+                    0x0002 => col_field_indices.push(crate::utils::truncate_usize_to_u16(i)),
                     0x0004 => page_field_count += 1,
                     _ => {},
                 }
@@ -1247,10 +1253,11 @@ pub(crate) fn generate_workbook_stream(
 
                 if let Some(axis_fields) = target_axis {
                     if let Some(existing_pos) = axis_fields.iter().position(|&idx| idx == 0xFFFE) {
-                        if axis_fields.last().copied() != Some(0xFFFE) {
-                            effective_data_position = existing_pos as u16;
-                        } else {
+                        if axis_fields.last().copied() == Some(0xFFFE) {
                             effective_data_position = 0xFFFF;
+                        } else {
+                            effective_data_position =
+                                crate::utils::truncate_usize_to_u16(existing_pos);
                         }
                     } else {
                         axis_fields.push(0xFFFE);
@@ -1259,8 +1266,8 @@ pub(crate) fn generate_workbook_stream(
                 }
             }
 
-            let row_fields = row_field_indices.len() as u16;
-            let col_fields = col_field_indices.len() as u16;
+            let row_fields = crate::utils::truncate_usize_to_u16(row_field_indices.len());
+            let col_fields = crate::utils::truncate_usize_to_u16(col_field_indices.len());
 
             // cRw / cCol = visible data body dimensions.
             // Per LO Finalize():
@@ -1310,7 +1317,7 @@ pub(crate) fn generate_workbook_stream(
                         axis: field.axis,
                         subtotal_count: field.subtotal_count,
                         subtotal_flags: field.subtotal_flags,
-                        item_count: field.items.len() as u16,
+                        item_count: crate::utils::truncate_usize_to_u16(field.items.len()),
                         name: field.name.as_deref(),
                     },
                 )?;
@@ -1371,7 +1378,7 @@ pub(crate) fn generate_workbook_stream(
                 &mut stream,
                 &biff::SxExConfig {
                     page_rows: page_field_count,
-                    page_cols: if page_field_count > 0 { 1 } else { 0 },
+                    page_cols: u16::from(page_field_count > 0),
                     ..biff::SxExConfig::default()
                 },
             )?;

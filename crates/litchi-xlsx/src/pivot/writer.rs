@@ -111,10 +111,10 @@ fn write_location(xml: &mut String, location: &Location) -> SheetResult<()> {
     )?;
 
     if let Some(row_page_count) = location.row_page_count {
-        write!(xml, r#" rowPageCount="{}""#, row_page_count)?;
+        write!(xml, r#" rowPageCount="{row_page_count}""#)?;
     }
     if let Some(col_page_count) = location.col_page_count {
-        write!(xml, r#" colPageCount="{}""#, col_page_count)?;
+        write!(xml, r#" colPageCount="{col_page_count}""#)?;
     }
 
     xml.push_str("/>");
@@ -245,7 +245,7 @@ fn write_field_items(xml: &mut String, items: &[FieldItem]) -> SheetResult<()> {
 
         let item_type_str = item.item_type.as_str();
         if item_type_str != "data" {
-            write!(xml, r#" t="{}""#, item_type_str)?;
+            write!(xml, r#" t="{item_type_str}""#)?;
         }
 
         if let Some(hidden) = item.hidden {
@@ -273,7 +273,7 @@ fn write_row_col_items(xml: &mut String, tag_name: &str, items: &[AxisItem]) -> 
 
         let item_type_str = item.item_type.as_str();
         if item_type_str != "data" {
-            write!(xml, r#" t="{}""#, item_type_str)?;
+            write!(xml, r#" t="{item_type_str}""#)?;
         }
         if item.r != 0 {
             write!(xml, r#" r="{}""#, item.r)?;
@@ -287,13 +287,13 @@ fn write_row_col_items(xml: &mut String, tag_name: &str, items: &[AxisItem]) -> 
         } else {
             xml.push('>');
             for &x_val in &item.x {
-                write!(xml, r#"<x v="{}"/>"#, x_val)?;
+                write!(xml, r#"<x v="{x_val}"/>"#)?;
             }
             xml.push_str("</i>");
         }
     }
 
-    write!(xml, "</{}>", tag_name)?;
+    write!(xml, "</{tag_name}>")?;
     Ok(())
 }
 
@@ -304,10 +304,10 @@ fn write_page_fields(xml: &mut String, page_fields: &[PageField]) -> SheetResult
         write!(xml, r#"<pageField fld="{}""#, field.fld)?;
 
         if let Some(item) = field.item {
-            write!(xml, r#" item="{}""#, item)?;
+            write!(xml, r#" item="{item}""#)?;
         }
         if let Some(hier) = field.hier {
-            write!(xml, r#" hier="{}""#, hier)?;
+            write!(xml, r#" hier="{hier}""#)?;
         }
         if let Some(name) = &field.name {
             write!(xml, r#" name="{}""#, escape_xml(name))?;
@@ -327,7 +327,7 @@ fn write_data_fields(xml: &mut String, data_fields: &[DataField]) -> SheetResult
     write!(xml, r#"<dataFields count="{}">"#, data_fields.len())?;
 
     for field in data_fields {
-        write!(xml, r#"<dataField"#)?;
+        write!(xml, r"<dataField")?;
 
         if let Some(name) = &field.name {
             write!(xml, r#" name="{}""#, escape_xml(name))?;
@@ -337,7 +337,7 @@ fn write_data_fields(xml: &mut String, data_fields: &[DataField]) -> SheetResult
 
         let subtotal_str = field.subtotal.as_str();
         if subtotal_str != "sum" {
-            write!(xml, r#" subtotal="{}""#, subtotal_str)?;
+            write!(xml, r#" subtotal="{subtotal_str}""#)?;
         }
 
         if field.show_data_as != "normal" {
@@ -346,11 +346,11 @@ fn write_data_fields(xml: &mut String, data_fields: &[DataField]) -> SheetResult
         if field.base_field != -1 {
             write!(xml, r#" baseField="{}""#, field.base_field)?;
         }
-        if field.base_item != 1048832 {
+        if field.base_item != 1_048_832 {
             write!(xml, r#" baseItem="{}""#, field.base_item)?;
         }
         if let Some(num_fmt_id) = field.num_fmt_id {
-            write!(xml, r#" numFmtId="{}""#, num_fmt_id)?;
+            write!(xml, r#" numFmtId="{num_fmt_id}""#)?;
         }
 
         xml.push_str("/>");
@@ -373,10 +373,10 @@ fn write_filters(xml: &mut String, filters: &[Filter]) -> SheetResult<()> {
         )?;
 
         if let Some(mp_fld) = filter.mp_fld {
-            write!(xml, r#" mpFld="{}""#, mp_fld)?;
+            write!(xml, r#" mpFld="{mp_fld}""#)?;
         }
         if let Some(eval_order) = filter.eval_order {
-            write!(xml, r#" evalOrder="{}""#, eval_order)?;
+            write!(xml, r#" evalOrder="{eval_order}""#)?;
         }
         if let Some(name) = &filter.name {
             write!(xml, r#" name="{}""#, escape_xml(name))?;
@@ -511,8 +511,7 @@ pub fn write_pivot_cache_definition(cache_def: &Definition) -> SheetResult<Strin
     xml.push_str(XML_HEADER);
     write!(
         xml,
-        r#"<pivotCacheDefinition xmlns="{}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships""#,
-        SPREADSHEET_NS
+        r#"<pivotCacheDefinition xmlns="{SPREADSHEET_NS}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships""#
     )?;
 
     if let Some(id) = &cache_def.id {
@@ -538,7 +537,7 @@ pub fn write_pivot_cache_definition(cache_def: &Definition) -> SheetResult<Strin
         write!(xml, r#" refreshedBy="{}""#, escape_xml(value))?;
     }
     if let Some(value) = cache_def.refreshed_date {
-        write!(xml, r#" refreshedDate="{}""#, value)?;
+        write!(xml, r#" refreshedDate="{value}""#)?;
     }
     if let Some(value) = &cache_def.refreshed_date_iso {
         write!(xml, r#" refreshedDateIso="{}""#, escape_xml(value))?;
@@ -547,7 +546,7 @@ pub fn write_pivot_cache_definition(cache_def: &Definition) -> SheetResult<Strin
         xml.push_str(r#" backgroundQuery="1""#);
     }
     if let Some(value) = cache_def.missing_items_limit {
-        write!(xml, r#" missingItemsLimit="{}""#, value)?;
+        write!(xml, r#" missingItemsLimit="{value}""#)?;
     }
 
     write!(
@@ -556,7 +555,7 @@ pub fn write_pivot_cache_definition(cache_def: &Definition) -> SheetResult<Strin
         cache_def.created_version, cache_def.refreshed_version, cache_def.min_refreshable_version
     )?;
     if let Some(value) = cache_def.record_count {
-        write!(xml, r#" recordCount="{}""#, value)?;
+        write!(xml, r#" recordCount="{value}""#)?;
     }
     if let Some(value) = cache_def.upgrade_on_refresh {
         write_bool_attribute(&mut xml, "upgradeOnRefresh", value)?;
@@ -574,7 +573,7 @@ pub fn write_pivot_cache_definition(cache_def: &Definition) -> SheetResult<Strin
 
     write!(xml, r#"<cacheSource type="{}""#, cache_def.source_type)?;
     if let Some(connection_id) = cache_def.source_connection_id {
-        write!(xml, r#" connectionId="{}""#, connection_id)?;
+        write!(xml, r#" connectionId="{connection_id}""#)?;
     }
     if cache_def.source_type == "worksheet" {
         xml.push('>');
@@ -613,7 +612,7 @@ fn write_cache_fields(xml: &mut String, fields: &[CacheField]) -> SheetResult<()
         write!(xml, r#"<cacheField name="{}""#, escape_xml(&field.name))?;
 
         if let Some(num_fmt_id) = field.num_fmt_id {
-            write!(xml, r#" numFmtId="{}""#, num_fmt_id)?;
+            write!(xml, r#" numFmtId="{num_fmt_id}""#)?;
         }
         if !field.database_field {
             xml.push_str(r#" databaseField="0""#);
@@ -634,16 +633,16 @@ fn write_cache_fields(xml: &mut String, fields: &[CacheField]) -> SheetResult<()
             write!(xml, r#" formula="{}""#, escape_xml(formula))?;
         }
         if let Some(sql_type) = field.sql_type {
-            write!(xml, r#" sqlType="{}""#, sql_type)?;
+            write!(xml, r#" sqlType="{sql_type}""#)?;
         }
         if let Some(hierarchy) = field.hierarchy {
-            write!(xml, r#" hierarchy="{}""#, hierarchy)?;
+            write!(xml, r#" hierarchy="{hierarchy}""#)?;
         }
         if let Some(level) = field.level {
-            write!(xml, r#" level="{}""#, level)?;
+            write!(xml, r#" level="{level}""#)?;
         }
         if let Some(mapping_count) = field.mapping_count {
-            write!(xml, r#" mappingCount="{}""#, mapping_count)?;
+            write!(xml, r#" mappingCount="{mapping_count}""#)?;
         }
         if let Some(member_property_field) = field.member_property_field {
             write_bool_attribute(xml, "memberPropertyField", member_property_field)?;
@@ -671,7 +670,7 @@ fn write_shared_items(xml: &mut String, items: &[Item]) -> SheetResult<()> {
             Item::Index(_) => {
                 return Err("shared-item indexes are only valid in pivot cache records".into());
             },
-            Item::Number(n) => write!(xml, r#"<n v="{}"/>"#, n)?,
+            Item::Number(n) => write!(xml, r#"<n v="{n}"/>"#)?,
             Item::Boolean(b) => write!(xml, r#"<b v="{}"/>"#, if *b { "1" } else { "0" })?,
             Item::Error(e) => write!(xml, r#"<e v="{}"/>"#, escape_xml(e))?,
             Item::String(s) => write!(xml, r#"<s v="{}"/>"#, escape_xml(s))?,
@@ -708,8 +707,8 @@ pub fn write_pivot_cache_records(records: &Records) -> SheetResult<String> {
         for value in &record.values {
             match value {
                 Item::Missing => xml.push_str("<m/>"),
-                Item::Index(index) => write!(xml, r#"<x v="{}"/>"#, index)?,
-                Item::Number(n) => write!(xml, r#"<n v="{}"/>"#, n)?,
+                Item::Index(index) => write!(xml, r#"<x v="{index}"/>"#)?,
+                Item::Number(n) => write!(xml, r#"<n v="{n}"/>"#)?,
                 Item::Boolean(b) => write!(xml, r#"<b v="{}"/>"#, if *b { "1" } else { "0" })?,
                 Item::Error(e) => write!(xml, r#"<e v="{}"/>"#, escape_xml(e))?,
                 Item::String(s) => write!(xml, r#"<s v="{}"/>"#, escape_xml(s))?,

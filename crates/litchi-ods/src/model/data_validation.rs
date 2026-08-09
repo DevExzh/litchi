@@ -220,6 +220,9 @@ pub struct ContentValidation {
 }
 
 impl ContentValidation {
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn new(name: impl Into<String>) -> Result<Self> {
         let validation = Self {
             name: name.into(),
@@ -237,6 +240,9 @@ impl ContentValidation {
     }
 
     /// Set a validation condition, inferring standard `of` and `oooc` bindings.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_condition(&mut self, condition: impl Into<String>) -> Result<&mut Self> {
         let condition = condition.into();
         let namespace = default_formula_namespace(&condition);
@@ -251,6 +257,9 @@ impl ContentValidation {
     }
 
     /// Set a validation condition with an explicit formula namespace URI.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_condition_with_namespace(
         &mut self,
         condition: impl Into<String>,
@@ -283,6 +292,9 @@ impl ContentValidation {
         self.formula_namespace = None;
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn validate(&self) -> Result<()> {
         if self.name.is_empty() {
             return Err(Error::InvalidFormat(
@@ -886,7 +898,16 @@ pub fn parse(xml: &str) -> Result<Vec<ContentValidation>> {
                 inside_event_listeners = false;
             },
             Event::Eof => break,
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         buf.clear();
     }
@@ -1014,7 +1035,7 @@ fn parse_presentation_event_listener(
     .map(|value| {
         value
             .parse::<u64>()
-            .map_err(|_| Error::InvalidFormat(format!("invalid presentation:verb '{value}'")))
+            .map_err(|_error| Error::InvalidFormat(format!("invalid presentation:verb '{value}'")))
     })
     .transpose()?;
     Ok(PresentationEventListener {
@@ -1325,7 +1346,7 @@ fn optional_text_space_count(
                 .map_err(|error| Error::InvalidFormat(format!("invalid text:s count: {error}")))?;
             return value
                 .parse::<usize>()
-                .map_err(|_| Error::InvalidFormat(format!("invalid text:s count '{value}'")));
+                .map_err(|_error| Error::InvalidFormat(format!("invalid text:s count '{value}'")));
         }
     }
     Ok(1)
@@ -1365,7 +1386,7 @@ fn formula_namespace(
         if let PrefixDeclaration::Named(candidate) = declaration
             && candidate == prefix.as_bytes()
         {
-            let uri = String::from_utf8(namespace.as_ref().to_vec()).map_err(|_| {
+            let uri = String::from_utf8(namespace.as_ref().to_vec()).map_err(|_error| {
                 Error::InvalidFormat(format!(
                     "validation formula namespace for prefix '{prefix}' is not UTF-8"
                 ))

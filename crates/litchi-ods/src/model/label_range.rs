@@ -67,6 +67,9 @@ pub struct Range {
 
 impl Range {
     /// Create a validated label range.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn new(
         label_cell_range_address: impl Into<String>,
         data_cell_range_address: impl Into<String>,
@@ -82,6 +85,9 @@ impl Range {
     }
 
     /// Validate both ODF cell-range address attributes.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn validate(&self) -> Result<()> {
         validate_cell_range_addresses(std::slice::from_ref(&self.label_cell_range_address))?;
         validate_cell_range_addresses(std::slice::from_ref(&self.data_cell_range_address))
@@ -137,7 +143,16 @@ pub fn parse(xml: &str) -> Result<Vec<Range>> {
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
 
         // A non-empty container is consumed in full by `parse_container`, so it
@@ -191,14 +206,14 @@ fn parse_container(reader: &mut NsReader<&[u8]>) -> Result<Vec<Range>> {
                 break;
             },
             Event::Text(text) => {
-                ensure_whitespace(&text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
-                    Error::InvalidFormat(format!("invalid label-range text: {error}"))
-                })?)?
+                ensure_whitespace(&text.xml_content(XmlVersion::Explicit1_0).map_err(
+                    |error| Error::InvalidFormat(format!("invalid label-range text: {error}")),
+                )?)?;
             },
             Event::CData(text) => {
-                ensure_whitespace(&text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
-                    Error::InvalidFormat(format!("invalid label-range CDATA: {error}"))
-                })?)?
+                ensure_whitespace(&text.xml_content(XmlVersion::Explicit1_0).map_err(
+                    |error| Error::InvalidFormat(format!("invalid label-range CDATA: {error}")),
+                )?)?;
             },
             Event::Comment(_) | Event::PI(_) => {},
             Event::Eof => {
@@ -206,7 +221,12 @@ fn parse_container(reader: &mut NsReader<&[u8]>) -> Result<Vec<Range>> {
                     "unterminated table:label-ranges".to_string(),
                 ));
             },
-            _ => {
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Decl(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {
                 return Err(Error::InvalidFormat(
                     "unsupported table:label-ranges child".to_string(),
                 ));
@@ -228,9 +248,9 @@ fn consume_empty_range(reader: &mut NsReader<&[u8]>) -> Result<()> {
                 return Ok(());
             },
             Event::Text(text) => {
-                ensure_whitespace(&text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
-                    Error::InvalidFormat(format!("invalid label-range text: {error}"))
-                })?)?
+                ensure_whitespace(&text.xml_content(XmlVersion::Explicit1_0).map_err(
+                    |error| Error::InvalidFormat(format!("invalid label-range text: {error}")),
+                )?)?;
             },
             Event::Comment(_) | Event::PI(_) => {},
             Event::Eof => {
@@ -238,7 +258,13 @@ fn consume_empty_range(reader: &mut NsReader<&[u8]>) -> Result<()> {
                     "unterminated table:label-range".to_string(),
                 ));
             },
-            _ => {
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::CData(_)
+            | Event::Decl(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {
                 return Err(Error::InvalidFormat(
                     "table:label-range must be empty".to_string(),
                 ));
@@ -291,7 +317,7 @@ fn required_attribute(
         if is_namespace(&namespace, TABLE_NAMESPACE) && local.as_ref() == local_name {
             return attribute
                 .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
-                .map(|value| value.into_owned())
+                .map(std::borrow::Cow::into_owned)
                 .map_err(|error| {
                     Error::InvalidFormat(format!("invalid label-range attribute value: {error}"))
                 });

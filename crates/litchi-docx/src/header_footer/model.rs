@@ -1,4 +1,8 @@
-//! Typed semantic values for WordprocessingML header and footer stories.
+#![expect(
+    clippy::let_underscore_must_use,
+    reason = "the builder return is intentionally ignored after mutation"
+)]
+//! Typed semantic values for `WordprocessingML` header and footer stories.
 
 use crate::error::Result;
 use crate::namespace::scan_word_element_ranges;
@@ -17,7 +21,7 @@ pub const MAX_XML_DEPTH: usize = 128;
 /// Maximum XML element count accepted by the story boundary.
 pub const MAX_XML_NODES: usize = 1_000_000;
 
-/// The WordprocessingML story root carried by a package part.
+/// The `WordprocessingML` story root carried by a package part.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Role {
     /// A `<w:hdr>` story.
@@ -29,6 +33,7 @@ pub enum Role {
 impl Role {
     /// The local XML root name for this story role.
     #[inline]
+    #[must_use]
     pub const fn root(self) -> &'static str {
         match self {
             Self::Header => "hdr",
@@ -50,8 +55,9 @@ pub enum Kind {
 }
 
 impl Kind {
-    /// Convert the kind to its WordprocessingML `w:type` value.
+    /// Convert the kind to its `WordprocessingML` `w:type` value.
     #[inline]
+    #[must_use]
     pub const fn to_xml(self) -> &'static str {
         match self {
             Self::Primary => "default",
@@ -60,8 +66,9 @@ impl Kind {
         }
     }
 
-    /// Parse a WordprocessingML `w:type` value.
+    /// Parse a `WordprocessingML` `w:type` value.
     #[inline]
+    #[must_use]
     pub fn from_xml(value: &str) -> Option<Self> {
         match value {
             "default" => Some(Self::Primary),
@@ -89,7 +96,7 @@ impl std::fmt::Display for Kind {
     }
 }
 
-/// A lossless, immutable view of one WordprocessingML header or footer story.
+/// A lossless, immutable view of one `WordprocessingML` header or footer story.
 //
 // The raw package bytes are shared with the OPC part. Markup-compatibility
 // processing is lazy and cached, so repeated semantic queries do not copy or
@@ -104,6 +111,10 @@ pub struct Story {
 
 impl Story {
     /// Construct a story from validated XML bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_xml_bytes(xml_bytes: Vec<u8>, kind: Kind) -> Result<Self> {
         let role = codec::validate(&xml_bytes)?;
         Ok(Self {
@@ -127,29 +138,40 @@ impl Story {
 
     /// Return whether this story is a header or footer.
     #[inline]
+    #[must_use]
     pub const fn role(&self) -> Role {
         self.role
     }
 
     /// Return the section page kind associated with this story reference.
     #[inline]
+    #[must_use]
     pub const fn kind(&self) -> Kind {
         self.kind
     }
 
     /// Return the original XML bytes without MCE rewriting.
     #[inline]
+    #[must_use]
     pub fn xml_bytes(&self) -> &[u8] {
         self.xml_bytes.as_slice()
     }
 
     /// Extract all text content from this story.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn text(&self) -> Result<String> {
         let xml = self.semantic_xml()?;
         extract_word_text(xml.as_slice())
     }
 
     /// Return all paragraphs in authored order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
         let xml = self.semantic_xml()?;
         let mut paragraphs = Vec::new();
@@ -161,6 +183,10 @@ impl Story {
     }
 
     /// Return all tables in authored order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn tables(&self) -> Result<Vec<Table>> {
         let xml = self.semantic_xml()?;
         let mut tables = Vec::new();
@@ -172,6 +198,10 @@ impl Story {
     }
 
     /// Count paragraphs in this story.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn paragraph_count(&self) -> Result<usize> {
         let xml = self.semantic_xml()?;
         let mut count = 0;
@@ -183,6 +213,10 @@ impl Story {
     }
 
     /// Count tables in this story.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn table_count(&self) -> Result<usize> {
         let xml = self.semantic_xml()?;
         let mut count = 0;
@@ -194,12 +228,20 @@ impl Story {
     }
 
     /// Return standard VML text watermarks embedded in this story.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn watermarks(&self) -> Result<Vec<Watermark>> {
         let xml = self.semantic_xml()?;
         Watermark::from_header_xml(xml.as_slice())
     }
 
     /// Return picture watermark anchors embedded in this story.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn image_watermarks(&self) -> Result<Vec<crate::writer::ImageWatermarkAnchor>> {
         let xml = self.semantic_xml()?;
         crate::writer::ImageWatermarkAnchor::from_header_xml(xml.as_slice())

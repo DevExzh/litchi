@@ -22,7 +22,7 @@ const OFFICE_EXT_NAMESPACE: &[u8] = b"http://openoffice.org/2009/office";
 pub struct Key {
     pub value: Option<String>,
     pub digest_algorithm: Option<String>,
-    /// LibreOffice's secondary digest URI for legacy Excel-compatible hashes.
+    /// `LibreOffice`'s secondary digest URI for legacy Excel-compatible hashes.
     pub secondary_digest_algorithm: Option<String>,
 }
 
@@ -34,7 +34,7 @@ pub struct Protection {
     pub key: Key,
 }
 
-/// Granular edit permissions used by LibreOffice's table-protection extension.
+/// Granular edit permissions used by `LibreOffice`'s table-protection extension.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Options {
     pub select_protected_cells: Option<bool>,
@@ -172,7 +172,16 @@ pub(crate) fn parse_protection(xml: &str) -> Result<(Protection, Vec<Sheet>)> {
                 spreadsheet_depth = None;
             },
             Event::Eof => break,
-            _ => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         if is_end {
             element_depth = element_depth.saturating_sub(1);

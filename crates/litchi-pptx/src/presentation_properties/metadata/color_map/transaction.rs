@@ -416,16 +416,19 @@ fn mapped_value(value: &Value) -> Option<Map> {
 }
 
 fn same_shape(left: &Value, right: &Value) -> bool {
-    match (left, right) {
-        (Value::Master(_), Value::Master(_)) => true,
-        (Value::Override(None), Value::Override(None)) => true,
-        (Value::Override(Some(Override::Master)), Value::Override(Some(Override::Master))) => true,
-        (
-            Value::Override(Some(Override::Override(_))),
-            Value::Override(Some(Override::Override(_))),
-        ) => true,
-        _ => false,
-    }
+    matches!(
+        (left, right),
+        (Value::Master(_), Value::Master(_))
+            | (Value::Override(None), Value::Override(None))
+            | (
+                Value::Override(Some(Override::Master)),
+                Value::Override(Some(Override::Master))
+            )
+            | (
+                Value::Override(Some(Override::Override(_))),
+                Value::Override(Some(Override::Override(_)))
+            )
+    )
 }
 
 fn fingerprint(bytes: &[u8]) -> Revision {

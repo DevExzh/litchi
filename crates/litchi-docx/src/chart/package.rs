@@ -1,3 +1,7 @@
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
 //! OPC relationship graph loading and deterministic snapshot storage.
 
 use super::codec::{
@@ -16,6 +20,10 @@ use litchi_opc::{OpcPackage, PackURI};
 use std::collections::{BTreeSet, HashSet};
 
 /// Load the complete bounded chart graph owned by a DOCX main document.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn load(package: &OpcPackage, document_name: &PackURI) -> Result<Graph> {
     let document = package.get_part(document_name)?;
     if document.content_type() != DOCUMENT_CT {
@@ -211,6 +219,10 @@ pub fn load(package: &OpcPackage, document_name: &PackURI) -> Result<Graph> {
 
 /// Deterministically replace an already coherent, owned chart graph.
 /// All validation completes before package mutation.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn store(package: &mut OpcPackage, document_name: &PackURI, graph: &Graph) -> Result<()> {
     let current = load(package, document_name)?;
     validate_graph_value(graph)?;

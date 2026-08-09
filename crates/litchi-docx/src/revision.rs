@@ -1,3 +1,19 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::items_after_statements,
+    reason = "the local helper remains adjacent to its sole use"
+)]
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
+#![expect(
+    clippy::struct_field_names,
+    reason = "the public model retains established field names"
+)]
 /// Track changes (revisions) support for DOCX documents.
 ///
 /// This module provides structures and functions for reading tracked changes
@@ -142,6 +158,7 @@ impl Revision {
     /// * `date` - Date/time of the change
     /// * `id` - Revision ID
     #[inline]
+    #[must_use]
     pub fn new(
         revision_type: RevisionType,
         author: String,
@@ -159,30 +176,35 @@ impl Revision {
 
     /// Get the revision type.
     #[inline]
+    #[must_use]
     pub fn revision_type(&self) -> RevisionType {
         self.revision_type
     }
 
     /// Get the author who made the change.
     #[inline]
+    #[must_use]
     pub fn author(&self) -> &str {
         &self.author
     }
 
     /// Get the date/time of the change.
     #[inline]
+    #[must_use]
     pub fn date(&self) -> Option<&str> {
         self.date.as_deref()
     }
 
     /// Get the revision ID.
     #[inline]
+    #[must_use]
     pub fn id(&self) -> &str {
         &self.id
     }
 
     /// Get the text content affected by this revision.
     #[inline]
+    #[must_use]
     pub fn text(&self) -> &str {
         &self.text
     }
@@ -211,7 +233,7 @@ impl Revision {
 ///
 /// # Performance
 ///
-/// Uses streaming XML parsing with pre-allocated SmallVec for efficient
+/// Uses streaming XML parsing with pre-allocated `SmallVec` for efficient
 /// storage of typically small revision collections.
 ///
 /// # Example XML Structure
@@ -279,7 +301,7 @@ pub(crate) fn parse_revisions(xml_bytes: &[u8]) -> Result<SmallVec<[Revision; 4]
             let value = std::str::from_utf8(attr.value.as_ref())
                 .ok()
                 .and_then(|value| quick_xml::escape::unescape(value).ok())
-                .map(|value| value.into_owned())
+                .map(std::borrow::Cow::into_owned)
                 .unwrap_or_default();
             match attr.key.as_ref() {
                 b"w:author" | b"author" => author = value,

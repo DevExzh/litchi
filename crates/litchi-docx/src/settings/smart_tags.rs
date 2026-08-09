@@ -9,7 +9,7 @@ pub const MAX_SMART_TAG_NAME_CHARS: usize = 255;
 /// Maximum number of Unicode scalar values accepted in a smart-tag download URL.
 pub const MAX_SMART_TAG_URL_CHARS: usize = 2083;
 
-/// A smart-tag vocabulary declaration from a WordprocessingML settings part.
+/// A smart-tag vocabulary declaration from a `WordprocessingML` settings part.
 ///
 /// The value is deliberately package-neutral: relationship resolution,
 /// document matching, and settings-part orchestration remain in the host
@@ -25,6 +25,10 @@ pub struct SmartTagType {
 
 impl SmartTagType {
     /// Construct a validated smart-tag vocabulary declaration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(
         namespace_uri: impl Into<String>,
         name: impl Into<String>,
@@ -40,30 +44,41 @@ impl SmartTagType {
     }
 
     /// Validate the client length limits for this smart-tag declaration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn validate(&self) -> Result<()> {
         validate_smart_tag_type(&self.namespace_uri, &self.name, &self.url)
     }
 
     /// Return the smart-tag vocabulary namespace URI.
     #[inline]
+    #[must_use]
     pub fn namespace_uri(&self) -> &str {
         &self.namespace_uri
     }
 
     /// Return the smart-tag type name.
     #[inline]
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Return the vocabulary download URL.
     #[inline]
+    #[must_use]
     pub fn url(&self) -> &str {
         &self.url
     }
 }
 
 /// Validate the bounded client representation of a smart-tag declaration.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn validate_smart_tag_type(namespace_uri: &str, name: &str, url: &str) -> Result<()> {
     validate_smart_tag_value(
         namespace_uri,

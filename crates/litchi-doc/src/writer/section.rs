@@ -12,8 +12,9 @@ use crate::section::columns::{Layout, WireView};
 ///
 /// - When `first_page_header` is true, emits `sprmSFTitlePage` to enable different first page.
 /// - When `grpf_ihdt` != 0, emits `sprmSGprfIhdt` to declare which headers/footers exist in this section.
-///   Bits follow LibreOffice nsHdFtFlags/Word semantics:
+///   Bits follow `LibreOffice` nsHdFtFlags/Word semantics:
 ///   0x01=HeaderEven, 0x02=HeaderOdd, 0x04=FooterEven, 0x08=FooterOdd, 0x10=HeaderFirst, 0x20=FooterFirst
+#[must_use]
 pub fn generate_sepx(first_page_header: bool, grpf_ihdt: u8) -> Vec<u8> {
     generate_sepx_with_revision(first_page_header, grpf_ihdt, None)
 }
@@ -184,6 +185,7 @@ fn push_indexed_twips(
 
 /// Generate minimal SEPX (Section Properties) structure (no section SPRMs)
 #[inline]
+#[must_use]
 pub fn generate_minimal_sepx() -> Vec<u8> {
     generate_sepx(false, 0)
 }
@@ -195,7 +197,8 @@ pub fn generate_minimal_sepx() -> Vec<u8> {
 /// # Arguments
 ///
 /// * `text_length` - Total length of document text in characters  
-/// * `sepx_offset` - Offset in WordDocument stream where SEPX was written
+/// * `sepx_offset` - Offset in `WordDocument` stream where SEPX was written
+#[must_use]
 pub fn generate_section_table(text_length: u32, sepx_offset: u32) -> Vec<u8> {
     let mut plcfsed = Vec::new();
 

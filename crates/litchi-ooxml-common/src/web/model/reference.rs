@@ -1,7 +1,9 @@
-use super::super::codec::*;
-use super::super::validation::*;
-use super::super::*;
-use super::*;
+use super::super::Result;
+use super::super::codec::{invalid, require_nonempty};
+use super::super::validation::{
+    validate_binding, validate_extension_list, validate_store_reference,
+};
+use super::{ExtKind, ExtList};
 /// Catalog provider type from MS-OWEXML section 2.2.5.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Store {
@@ -18,6 +20,7 @@ pub enum Store {
 }
 
 impl Store {
+    #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Omex => "OMEX",

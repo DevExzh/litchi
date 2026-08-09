@@ -1,4 +1,4 @@
-//! SpreadsheetML calculation-chain XML codec.
+//! `SpreadsheetML` calculation-chain XML codec.
 
 use std::borrow::Cow;
 use std::collections::HashSet;
@@ -197,7 +197,7 @@ pub(crate) fn read_with_projection(xml: &[u8]) -> Result<(Chain, bool)> {
             Event::End(element)
                 if saw_root && !closed_root && element.local_name().as_ref() == b"calcChain" =>
             {
-                closed_root = true
+                closed_root = true;
             },
             Event::Text(text)
                 if text

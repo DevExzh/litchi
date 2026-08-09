@@ -63,6 +63,9 @@ pub struct Range {
 
 impl Range {
     /// Create an inclusive range, rejecting inverted endpoints.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(first_row: u16, last_row: u16, first_column: u8, last_column: u8) -> Result<Self> {
         if first_row > last_row || first_column > last_column {
             return Err(Error::InvalidData(
@@ -78,6 +81,7 @@ impl Range {
     }
 
     /// Create a one-cell range.
+    #[must_use]
     pub const fn cell(row: u16, column: u8) -> Self {
         Self {
             first_row: row,
@@ -87,15 +91,19 @@ impl Range {
         }
     }
 
+    #[must_use]
     pub const fn first_row(&self) -> u16 {
         self.first_row
     }
+    #[must_use]
     pub const fn last_row(&self) -> u16 {
         self.last_row
     }
+    #[must_use]
     pub const fn first_column(&self) -> u8 {
         self.first_column
     }
+    #[must_use]
     pub const fn last_column(&self) -> u8 {
         self.last_column
     }
@@ -112,18 +120,23 @@ pub struct Selection {
 }
 
 impl Selection {
+    #[must_use]
     pub fn pane(&self) -> PaneType {
         self.pane
     }
+    #[must_use]
     pub fn active_row(&self) -> u16 {
         self.active_row
     }
+    #[must_use]
     pub fn active_column(&self) -> u8 {
         self.active_column
     }
+    #[must_use]
     pub fn active_range_index(&self) -> u16 {
         self.active_range_index
     }
+    #[must_use]
     pub fn ranges(&self) -> &[Range] {
         &self.ranges
     }
@@ -141,19 +154,24 @@ pub struct Pane {
 
 impl Pane {
     /// Horizontal split in columns when frozen, otherwise in twips.
+    #[must_use]
     pub fn horizontal_split(&self) -> u16 {
         self.horizontal_split
     }
     /// Vertical split in rows when frozen, otherwise in twips.
+    #[must_use]
     pub fn vertical_split(&self) -> u16 {
         self.vertical_split
     }
+    #[must_use]
     pub fn bottom_pane_top_row(&self) -> u16 {
         self.bottom_pane_top_row
     }
+    #[must_use]
     pub fn right_pane_left_column(&self) -> u8 {
         self.right_pane_left_column
     }
+    #[must_use]
     pub fn active_pane(&self) -> PaneType {
         self.active_pane
     }
@@ -174,63 +192,83 @@ pub struct View {
 }
 
 impl View {
+    #[must_use]
     pub fn shows_formulas(&self) -> bool {
         self.flags & 0x0001 != 0
     }
+    #[must_use]
     pub fn shows_gridlines(&self) -> bool {
         self.flags & 0x0002 != 0
     }
+    #[must_use]
     pub fn shows_row_column_headers(&self) -> bool {
         self.flags & 0x0004 != 0
     }
+    #[must_use]
     pub fn has_frozen_panes(&self) -> bool {
         self.flags & 0x0008 != 0
     }
+    #[must_use]
     pub fn shows_zero_values(&self) -> bool {
         self.flags & 0x0010 != 0
     }
+    #[must_use]
     pub fn uses_default_gridline_color(&self) -> bool {
         self.flags & 0x0020 != 0
     }
+    #[must_use]
     pub fn is_right_to_left(&self) -> bool {
         self.flags & 0x0040 != 0
     }
+    #[must_use]
     pub fn shows_outline_symbols(&self) -> bool {
         self.flags & 0x0080 != 0
     }
+    #[must_use]
     pub fn is_frozen_without_split(&self) -> bool {
         self.flags & 0x0100 != 0
     }
+    #[must_use]
     pub fn is_selected(&self) -> bool {
         self.flags & 0x0200 != 0
     }
+    #[must_use]
     pub fn is_displayed(&self) -> bool {
         self.flags & 0x0400 != 0
     }
+    #[must_use]
     pub fn is_page_break_preview(&self) -> bool {
         self.flags & 0x0800 != 0
     }
+    #[must_use]
     pub fn first_visible_row(&self) -> u16 {
         self.first_visible_row
     }
+    #[must_use]
     pub fn first_visible_column(&self) -> u8 {
         self.first_visible_column
     }
+    #[must_use]
     pub fn gridline_color_index(&self) -> u16 {
         self.gridline_color_index
     }
+    #[must_use]
     pub fn page_break_zoom_percent(&self) -> Option<u16> {
         self.page_break_zoom_percent
     }
+    #[must_use]
     pub fn normal_zoom_percent(&self) -> Option<u16> {
         self.normal_zoom_percent
     }
+    #[must_use]
     pub fn zoom_fraction(&self) -> Option<(u16, u16)> {
         self.zoom_fraction
     }
+    #[must_use]
     pub fn pane(&self) -> Option<&Pane> {
         self.pane.as_ref()
     }
+    #[must_use]
     pub fn selections(&self) -> &[Selection] {
         &self.selections
     }

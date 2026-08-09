@@ -22,7 +22,7 @@ pub(crate) struct WorkbookStreams {
 pub(super) struct PivotCacheIdentity {
     /// Zero-based index used by SXVIEW.iCache.
     pub(super) cache_index: u16,
-    /// One-based identifier used by SXStreamID and `_SX_DB_CUR/nnnn`.
+    /// One-based identifier used by `SXStreamID` and `_SX_DB_CUR/nnnn`.
     pub(super) stream_id: u16,
 }
 
@@ -36,7 +36,7 @@ pub(super) fn lookup_shared_string_index(
             "string cell value {value:?} is missing from the shared string table"
         ))
     })?;
-    let table_index = usize::try_from(index).map_err(|_| {
+    let table_index = usize::try_from(index).map_err(|_error| {
         Error::InvalidData(format!(
             "shared string index {index} for value {value:?} cannot be represented"
         ))
@@ -73,7 +73,7 @@ pub(super) fn stage_pivot_cache_identities(
         .map(|worksheet| {
             (0..worksheet.pivot_tables.len())
                 .map(|_| {
-                    let cache_index = u16::try_from(next_index).map_err(|_| {
+                    let cache_index = u16::try_from(next_index).map_err(|_error| {
                         Error::InvalidData("PivotTable cache index overflow".to_string())
                     })?;
                     let stream_id = cache_index.checked_add(1).ok_or_else(|| {

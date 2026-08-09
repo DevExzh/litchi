@@ -7,6 +7,7 @@ use crate::parts::document_properties::DocumentProperties;
 /// - `facing_pages`: sets DOP.fFacingPages (enables different odd/even pages in UI)
 /// - `doc_grpf_ihdt`: section `grpfIhdt` bitfield to derive include header/footer flags
 /// - `embed_factoids`: emits the Word 2002 `fEmbedFactoids` preservation flag
+#[must_use]
 pub fn generate_dop(facing_pages: bool, doc_grpf_ihdt: u8, embed_factoids: bool) -> Vec<u8> {
     let has_header = (doc_grpf_ihdt & (0x01 | 0x02 | 0x10)) != 0;
     let has_footer = (doc_grpf_ihdt & (0x04 | 0x08 | 0x20)) != 0;
@@ -15,6 +16,7 @@ pub fn generate_dop(facing_pages: bool, doc_grpf_ihdt: u8, embed_factoids: bool)
 
 /// Generate minimal document properties (no facing pages, no headers/footers)
 #[inline]
+#[must_use]
 pub fn generate_minimal_dop() -> Vec<u8> {
     generate_dop(false, 0, false)
 }

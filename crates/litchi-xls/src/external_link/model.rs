@@ -24,6 +24,7 @@ pub enum ClipboardFormat {
 
 impl ClipboardFormat {
     /// Returns the BIFF clipboard-format code.
+    #[must_use]
     pub const fn code(self) -> i16 {
         self as i16
     }
@@ -38,6 +39,9 @@ pub struct ValueMatrix {
 }
 
 impl ValueMatrix {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn validate(&self) -> Result<()> {
         let count = (usize::from(self.last_column) + 1)
             .checked_mul(usize::from(self.last_row) + 1)
@@ -95,30 +99,39 @@ pub struct Name {
 }
 
 impl Name {
+    #[must_use]
     pub fn supporting_book_index(&self) -> u16 {
         self.supporting_book_index
     }
+    #[must_use]
     pub fn built_in(&self) -> bool {
         self.built_in
     }
+    #[must_use]
     pub fn automatic(&self) -> bool {
         self.automatic
     }
+    #[must_use]
     pub fn picture(&self) -> bool {
         self.picture
     }
+    #[must_use]
     pub fn standard_document_name(&self) -> bool {
         self.standard_document_name
     }
+    #[must_use]
     pub fn ole_link(&self) -> bool {
         self.ole_link
     }
+    #[must_use]
     pub fn clipboard_format(&self) -> ClipboardFormat {
         self.clipboard_format
     }
+    #[must_use]
     pub fn displayed_as_icon(&self) -> bool {
         self.displayed_as_icon
     }
+    #[must_use]
     pub fn body(&self) -> &NameBody {
         &self.body
     }
@@ -168,12 +181,15 @@ pub struct CacheRow {
 }
 
 impl CacheRow {
+    #[must_use]
     pub fn row(&self) -> u16 {
         self.row
     }
+    #[must_use]
     pub fn first_column(&self) -> u8 {
         self.first_column
     }
+    #[must_use]
     pub fn values(&self) -> &[CachedValue] {
         &self.values
     }
@@ -188,12 +204,15 @@ pub struct Sheet {
 }
 
 impl Sheet {
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
+    #[must_use]
     pub fn cache_valid(&self) -> bool {
         self.cache_valid
     }
+    #[must_use]
     pub fn cache_rows(&self) -> &[CacheRow] {
         &self.cache_rows
     }
@@ -207,9 +226,11 @@ pub struct Workbook {
 
 impl Workbook {
     /// Encoded BIFF virtual path. It is retained as inert metadata and never resolved.
+    #[must_use]
     pub fn encoded_virtual_path(&self) -> &str {
         &self.encoded_virtual_path
     }
+    #[must_use]
     pub fn sheets(&self) -> &[Sheet] {
         &self.sheets
     }
@@ -233,12 +254,15 @@ pub struct SheetReference {
 }
 
 impl SheetReference {
+    #[must_use]
     pub fn supporting_book_index(&self) -> u16 {
         self.supporting_book_index
     }
+    #[must_use]
     pub fn first_sheet_index(&self) -> i16 {
         self.first_sheet_index
     }
+    #[must_use]
     pub fn last_sheet_index(&self) -> i16 {
         self.last_sheet_index
     }
@@ -252,12 +276,15 @@ pub struct Links {
 }
 
 impl Links {
+    #[must_use]
     pub fn supporting_books(&self) -> &[SupportingBook] {
         &self.supporting_books
     }
+    #[must_use]
     pub fn external_names(&self) -> &[Name] {
         &self.external_names
     }
+    #[must_use]
     pub fn sheet_references(&self) -> &[SheetReference] {
         &self.sheet_references
     }

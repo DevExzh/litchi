@@ -6,6 +6,9 @@ use crate::Result;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ListObjectId(u32);
 impl ListObjectId {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(value: u32) -> Result<Self> {
         if value == 0 {
             Err(invalid(FEATURE11_RECORD_TYPE, "table id must be nonzero"))
@@ -13,6 +16,7 @@ impl ListObjectId {
             Ok(Self(value))
         }
     }
+    #[must_use]
     pub const fn value(self) -> u32 {
         self.0
     }
@@ -20,6 +24,9 @@ impl ListObjectId {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ListColumnId(u32);
 impl ListColumnId {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(value: u32) -> Result<Self> {
         if value == 0 {
             Err(invalid(FEATURE11_RECORD_TYPE, "column id must be nonzero"))
@@ -27,6 +34,7 @@ impl ListColumnId {
             Ok(Self(value))
         }
     }
+    #[must_use]
     pub const fn value(self) -> u32 {
         self.0
     }
@@ -39,6 +47,9 @@ pub struct ListObjectRange {
     pub(in crate::list_object) last_column: u16,
 }
 impl ListObjectRange {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(
         first_row: u16,
         last_row: u16,
@@ -59,21 +70,27 @@ impl ListObjectRange {
             })
         }
     }
+    #[must_use]
     pub const fn first_row(self) -> u16 {
         self.first_row
     }
+    #[must_use]
     pub const fn last_row(self) -> u16 {
         self.last_row
     }
+    #[must_use]
     pub const fn first_column(self) -> u16 {
         self.first_column
     }
+    #[must_use]
     pub const fn last_column(self) -> u16 {
         self.last_column
     }
+    #[must_use]
     pub const fn column_count(self) -> usize {
         (self.last_column - self.first_column + 1) as usize
     }
+    #[must_use]
     pub const fn overlaps(self, other: Self) -> bool {
         self.first_row <= other.last_row
             && other.first_row <= self.last_row

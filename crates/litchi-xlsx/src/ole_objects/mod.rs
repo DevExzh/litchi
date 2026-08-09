@@ -1,4 +1,4 @@
-//! Layered SpreadsheetML OLE-object ownership.
+//! Layered `SpreadsheetML` OLE-object ownership.
 //!
 //! Semantic anchors and inert payloads live in the model module, worksheet XML in
 //! the codec module, and OPC relationship/part ownership in the package module.

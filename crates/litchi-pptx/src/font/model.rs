@@ -327,11 +327,11 @@ impl Charset {
     }
 
     pub(super) const fn from_wire(value: i8) -> Self {
-        Self(value as u8)
+        Self(value.cast_unsigned())
     }
 
     pub(super) const fn wire(self) -> i8 {
-        self.0 as i8
+        self.0.cast_signed()
     }
 }
 
@@ -584,6 +584,7 @@ impl Font {
     }
 
     /// Set the PANOSE classification with struct-update-like builder syntax.
+    #[must_use]
     pub fn with_panose(mut self, value: impl Into<Panose>) -> Self {
         self.panose = Some(value.into());
         self

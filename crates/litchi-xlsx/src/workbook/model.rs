@@ -26,7 +26,7 @@ use litchi_ooxml_common::package_encryption::PackageEncryption;
 ///
 /// Names and checked zero-based positions are the ordinary entry points. The
 /// uninhabited identity variant reserves room for a future lineage-checked
-/// durable selector without exposing native SpreadsheetML IDs.
+/// durable selector without exposing native `SpreadsheetML` IDs.
 pub type Selector<'a> = litchi_sheet::SheetSelector<'a, Infallible>;
 
 /// Runtime workbook flavor derived from the main-part content type.
@@ -40,11 +40,13 @@ pub enum Flavor {
 
 impl Flavor {
     /// Whether this flavor can contain a VBA project without promotion.
+    #[must_use]
     pub const fn allows_macros(self) -> bool {
         matches!(self, Self::MacroWorkbook | Self::MacroTemplate)
     }
 
     /// Whether opening the file is intended to create a new workbook.
+    #[must_use]
     pub const fn is_template(self) -> bool {
         matches!(self, Self::Template | Self::MacroTemplate)
     }
@@ -80,16 +82,19 @@ pub enum Visibility {
 
 impl Visibility {
     /// Whether Excel displays this sheet tab.
+    #[must_use]
     pub const fn is_visible(&self) -> bool {
         matches!(self, Self::Visible)
     }
 
     /// Whether this tab is hidden by either recognized mechanism.
+    #[must_use]
     pub const fn is_hidden(&self) -> bool {
         matches!(self, Self::Hidden | Self::VeryHidden)
     }
 
     /// Whether Excel omits this tab from its ordinary Unhide dialog.
+    #[must_use]
     pub const fn is_very_hidden(&self) -> bool {
         matches!(self, Self::VeryHidden)
     }
@@ -105,7 +110,10 @@ pub(super) struct SheetData {
     pub(super) part_uri: PackURI,
     pub(super) cells: OnceLock<Store>,
     pub(super) web_bindings: OnceCell<crate::web::Bindings>,
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "the cached column index supports internal workbook edit planning"
+    )]
     pub(super) native_id: u32,
     pub(super) relationship_id: String,
 }
@@ -113,7 +121,10 @@ pub(super) struct SheetData {
 #[derive(Debug)]
 pub(crate) struct Inner {
     pub(super) package: OpcPackage,
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "the cached row index supports internal workbook edit planning"
+    )]
     pub(super) workbook_uri: PackURI,
     pub(super) shared_strings_uri: Option<PackURI>,
     pub(super) shared_strings: OnceLock<Box<[Text]>>,
@@ -302,7 +313,7 @@ impl Workbook {
         Self::from_package_with_styles(package, None)
     }
 
-    /// Adopt a parsed OPC package after validating its SpreadsheetML graph.
+    /// Adopt a parsed OPC package after validating its `SpreadsheetML` graph.
     pub fn from_opc(package: OpcPackage) -> Result<Self> {
         Self::from_package(package)
     }
@@ -407,26 +418,31 @@ impl Workbook {
     }
 
     /// Workbook flavor derived from package content, never its filename.
+    #[must_use]
     pub fn flavor(&self) -> Flavor {
         self.inner.flavor
     }
 
     /// Date serial system used by the workbook.
+    #[must_use]
     pub fn date_system(&self) -> DateSystem {
         self.inner.date_system
     }
 
     /// Number of logical workbook sheets, including chart and dialog sheets.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.inner.sheets.len()
     }
 
     /// Whether the workbook catalog contains no sheets.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.inner.sheets.is_empty()
     }
 
     /// Iterate lightweight sheet handles in workbook order.
+    #[must_use]
     pub fn sheets(&self) -> impl ExactSizeIterator<Item = Worksheet> + DoubleEndedIterator + '_ {
         self.inner.sheets.iter().cloned().map(|data| Worksheet {
             owner: Arc::clone(&self.inner),
@@ -456,6 +472,7 @@ impl Workbook {
     }
 
     /// Return the active sheet when the workbook contains sheets.
+    #[must_use]
     pub fn active_sheet(&self) -> Option<Worksheet> {
         let data = self
             .inner
@@ -469,16 +486,19 @@ impl Workbook {
     }
 
     /// Low-level inert defined-name records retained by the catalog parser.
+    #[must_use]
     pub fn defined_names(&self) -> &[raw::DefinedName] {
         &self.inner.defined_names
     }
 
     /// Low-level workbook pivot-cache references.
+    #[must_use]
     pub fn pivot_caches(&self) -> &[raw::PivotCache] {
         &self.inner.pivot_caches
     }
 
     /// Inert external-workbook relationship IDs, for package diagnostics.
+    #[must_use]
     pub fn external_reference_ids(&self) -> &[String] {
         &self.inner.external_reference_ids
     }
@@ -585,6 +605,7 @@ impl Workbook {
     /// Encryption profile retained from source ingress or the latest
     /// successful encrypted save. In-memory byte generation is side-effect-free.
     #[cfg(feature = "encryption")]
+    #[must_use]
     pub const fn encryption(&self) -> Option<crate::encryption::Mode> {
         self.encryption.mode()
     }
@@ -679,14 +700,13 @@ impl Workbook {
         patch.apply_to(self)
     }
 
-    fn ensure_ordinary_output(&self, _operation: &'static str) -> Result<()> {
+    fn ensure_ordinary_output(&self, operation: &'static str) -> Result<()> {
         #[cfg(feature = "encryption")]
         self.encryption
             .ordinary_output()
-            .map_err(|source| Error::EncryptionPolicy {
-                operation: _operation,
-                source,
-            })?;
+            .map_err(|source| Error::EncryptionPolicy { operation, source })?;
+        #[cfg(not(feature = "encryption"))]
+        let _ = operation;
         Ok(())
     }
 
@@ -724,16 +744,19 @@ pub struct Worksheet {
 
 impl Worksheet {
     /// Developer-facing sheet name.
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.data.name
     }
 
     /// Checked zero-based workbook position.
+    #[must_use]
     pub fn position(&self) -> usize {
         self.data.position
     }
 
     /// Semantic sheet kind resolved from its relationship.
+    #[must_use]
     pub fn kind(&self) -> WorksheetKind {
         self.data.kind
     }
@@ -743,16 +766,19 @@ impl Worksheet {
     }
 
     /// Retained visibility state.
+    #[must_use]
     pub fn visibility(&self) -> &Visibility {
         &self.data.visibility
     }
 
     /// Whether this is the active sheet in its immutable workbook snapshot.
+    #[must_use]
     pub fn is_active(&self) -> bool {
         self.owner.active_sheet == Some(self.data.position)
     }
 
     /// Whether two handles belong to the same immutable workbook snapshot.
+    #[must_use]
     pub fn same_workbook(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.owner, &other.owner)
     }
@@ -892,7 +918,7 @@ impl Worksheet {
         worksheet::query_tables(self)
     }
 
-    /// Load this worksheet's inert ActiveX graph.
+    /// Load this worksheet's inert `ActiveX` graph.
     pub fn active_x(&self) -> Result<crate::active_x::ControlSet> {
         worksheet::active_x(self)
     }
@@ -1064,7 +1090,7 @@ impl Worksheet {
         let part = self.owner.package.get_part(&self.data.part_uri)?;
         let parsed = raw::worksheet::parse(part.blob(), || self.owner.shared_strings())?;
         self.owner.validate_styles(&parsed)?;
-        let _ = self.data.cells.set(parsed);
+        let _publish_result = self.data.cells.set(parsed);
         self.data
             .cells
             .get()
@@ -1083,7 +1109,7 @@ impl Inner {
 
         let part = self.package.get_part(uri)?;
         let parsed = raw::strings::parse(part.blob())?;
-        let _ = self.shared_strings.set(parsed);
+        let _publish_result = self.shared_strings.set(parsed);
         self.shared_strings
             .get()
             .map(|strings| Some(strings.as_ref()))
@@ -1100,7 +1126,7 @@ impl Inner {
 
         let part = self.package.get_part(uri)?;
         let parsed = raw::styles::parse(part.blob())?;
-        let _ = self.styles.set(parsed);
+        let _publish_result = self.styles.set(parsed);
         self.styles
             .get()
             .map(Some)

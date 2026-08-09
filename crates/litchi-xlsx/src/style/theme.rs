@@ -67,6 +67,7 @@ impl ThemeColorSlot {
     ];
 
     /// Zero-based slot index in the scheme.
+    #[must_use]
     pub const fn index(self) -> usize {
         match self {
             Self::Dk1 => 0,
@@ -85,6 +86,7 @@ impl ThemeColorSlot {
     }
 
     /// The `a:clrScheme` child element name of this slot.
+    #[must_use]
     pub const fn element_name(self) -> &'static str {
         match self {
             Self::Dk1 => "dk1",
@@ -142,32 +144,38 @@ pub struct Theme {
 
 impl Theme {
     /// The theme name (`a:theme name`), when present.
+    #[must_use]
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
     }
 
     /// The color scheme name (`a:clrScheme name`).
+    #[must_use]
     pub fn color_scheme_name(&self) -> &str {
         &self.color_scheme_name
     }
 
     /// The major (heading) latin typeface, when declared.
+    #[must_use]
     pub fn major_font(&self) -> Option<&str> {
         self.major_font.as_deref()
     }
 
     /// The minor (body) latin typeface, when declared.
+    #[must_use]
     pub fn minor_font(&self) -> Option<&str> {
         self.minor_font.as_deref()
     }
 
     /// The value of one color slot.
+    #[must_use]
     pub fn color(&self, slot: ThemeColorSlot) -> &ThemeColorValue {
         &self.colors[slot.index()]
     }
 
     /// The effective RGB triple of one color slot (the cached value for
     /// system colors).
+    #[must_use]
     pub fn rgb(&self, slot: ThemeColorSlot) -> [u8; 3] {
         match self.color(slot) {
             ThemeColorValue::Srgb(rgb) => *rgb,
@@ -176,6 +184,7 @@ impl Theme {
     }
 
     /// Verbatim `a:fmtScheme` XML, preserved inert.
+    #[must_use]
     pub fn format_scheme_xml(&self) -> &str {
         &self.format_scheme_xml
     }

@@ -9,12 +9,14 @@
 /// - 4: SEP (Section Properties)
 /// - 5: TAP (Table Properties)
 #[inline]
+#[must_use]
 pub fn get_sprm_type(opcode: u16) -> u8 {
     ((opcode >> 10) & 0x07) as u8
 }
 
 /// Extract SPRM operation code from opcode (bits 0-8).
 #[inline]
+#[must_use]
 pub fn get_sprm_operation(opcode: u16) -> u16 {
     opcode & 0x01FF
 }
@@ -28,12 +30,14 @@ pub fn get_sprm_operation(opcode: u16) -> u16 {
 /// - 6: Variable length
 /// - 7: 3-byte operand
 #[inline]
+#[must_use]
 pub fn get_sprm_size_code(opcode: u16) -> u8 {
     ((opcode >> 13) & 0x07) as u8
 }
 
 /// Check if SPRM is a "special" operation (bit 9).
 #[inline]
+#[must_use]
 pub fn is_sprm_special(opcode: u16) -> bool {
     (opcode & 0x0200) != 0
 }

@@ -1,4 +1,4 @@
-//! Source-bound flat OpenDocument Spreadsheet (`.fods`) support.
+//! Source-bound flat `OpenDocument` Spreadsheet (`.fods`) support.
 
 use crate::{Cell, CellValue, CellView, Row, Sheet};
 use litchi_core::{Error, Metadata, Result};
@@ -41,11 +41,13 @@ impl Default for Limits {
 }
 
 impl Limits {
+    #[must_use]
     pub fn with_input_bytes(mut self, input_bytes: usize) -> Self {
         self.input_bytes = input_bytes;
         self
     }
 
+    #[must_use]
     pub fn with_output_bytes(mut self, output_bytes: usize) -> Self {
         self.output_bytes = output_bytes;
         self
@@ -71,7 +73,7 @@ impl<'a> From<&'a str> for SheetSelector<'a> {
     }
 }
 
-impl<'a> From<usize> for SheetSelector<'a> {
+impl From<usize> for SheetSelector<'_> {
     fn from(value: usize) -> Self {
         Self::Index(value)
     }
@@ -94,17 +96,23 @@ pub struct Snapshot {
 pub type FlatSpreadsheet = Snapshot;
 
 impl Snapshot {
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         Self::from_bytes_with(bytes, Limits::default())
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn from_bytes_with(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
         if bytes.len() > limits.input_bytes {
             return Err(invalid("flat ODS XML exceeds the input byte limit"));
         }
-        let source =
-            String::from_utf8(bytes).map_err(|_| invalid("flat ODS XML is not valid UTF-8"))?;
+        let source = String::from_utf8(bytes)
+            .map_err(|_error| invalid("flat ODS XML is not valid UTF-8"))?;
         Self::from_source(Arc::from(source), limits)
     }
 
@@ -134,19 +142,25 @@ impl Snapshot {
         })
     }
 
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         self.state.source.as_bytes()
     }
 
     /// Share the exact source owner without copying its bytes.
+    #[must_use]
     pub fn to_bytes(&self) -> Arc<str> {
         self.state.source.clone()
     }
 
+    #[must_use]
     pub fn sheets(&self) -> &[Sheet] {
         &self.state.sheets
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn sheet<'s, 'q>(
         &'s self,
         selector: impl Into<SheetSelector<'q>>,
@@ -154,6 +168,9 @@ impl Snapshot {
         select(&self.state.sheets, selector.into())
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn cell<'q>(
         &self,
         selector: impl Into<SheetSelector<'q>>,
@@ -165,10 +182,12 @@ impl Snapshot {
             .map(|sheet| sheet.cell_view(row, column)))
     }
 
+    #[must_use]
     pub fn metadata(&self) -> &Metadata {
         &self.state.metadata
     }
 
+    #[must_use]
     pub fn odf_metadata(&self) -> &OdfMetadata {
         &self.state.odf_metadata
     }
@@ -199,16 +218,22 @@ impl Snapshot {
         })
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn transaction(&self) -> Result<Transaction> {
         self.transaction_with(Limits::default())
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn transaction_with(&self, limits: Limits) -> Result<Transaction> {
         let limits = limits.validate()?;
         let mut staged = Vec::new();
         staged
             .try_reserve_exact(self.state.sheets.len())
-            .map_err(|_| invalid("flat ODS transaction allocation failed"))?;
+            .map_err(|_error| invalid("flat ODS transaction allocation failed"))?;
         staged.resize_with(self.state.sheets.len(), || None);
         Ok(Transaction {
             base: self.clone(),
@@ -244,6 +269,9 @@ pub struct Transaction {
 pub type FlatEdit = Transaction;
 
 impl Transaction {
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn set_cell<'q>(
         &mut self,
         selector: impl Into<SheetSelector<'q>>,
@@ -286,6 +314,9 @@ impl Transaction {
         Ok(Some(()))
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn commit(self) -> Result<Commit> {
         if self.staged.iter().all(Option::is_none) {
             let patch = Patch {
@@ -332,14 +363,21 @@ pub struct Patch {
 }
 
 impl Patch {
+    #[must_use]
     pub fn changed(&self) -> bool {
         self.before != self.after
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn apply(&self, snapshot: &Snapshot) -> Result<Snapshot> {
         self.apply_with(snapshot, Limits::default())
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn apply_with(&self, snapshot: &Snapshot, limits: Limits) -> Result<Snapshot> {
         let limits = limits.validate()?;
         if snapshot.state.source.as_ref() != self.before.as_ref() {
@@ -352,6 +390,7 @@ impl Patch {
         Snapshot::from_source(self.after.clone(), limits)
     }
 
+    #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
@@ -368,26 +407,32 @@ pub struct Commit {
 pub type FlatCommit = Commit;
 
 impl Commit {
+    #[must_use]
     pub fn changed(&self) -> bool {
         self.patch.changed()
     }
 
+    #[must_use]
     pub fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
+    #[must_use]
     pub fn spreadsheet(&self) -> &Snapshot {
         &self.snapshot
     }
 
+    #[must_use]
     pub fn patch(&self) -> &Patch {
         &self.patch
     }
 
+    #[must_use]
     pub fn into_snapshot(self) -> Snapshot {
         self.snapshot
     }
 
+    #[must_use]
     pub fn into_spreadsheet(self) -> Snapshot {
         self.snapshot
     }
@@ -410,7 +455,7 @@ fn clone_string_fallible(value: &str) -> Result<String> {
     let mut cloned = String::new();
     cloned
         .try_reserve_exact(value.len())
-        .map_err(|_| invalid("flat ODS string clone allocation failed"))?;
+        .map_err(|_error| invalid("flat ODS string clone allocation failed"))?;
     cloned.push_str(value);
     Ok(cloned)
 }
@@ -459,7 +504,7 @@ fn clone_row_fallible(row: &Row) -> Result<Row> {
     cloned
         .cells
         .try_reserve_exact(row.cells.len())
-        .map_err(|_| invalid("flat ODS row clone allocation failed"))?;
+        .map_err(|_error| invalid("flat ODS row clone allocation failed"))?;
     for cell in &row.cells {
         cloned.cells.push(clone_cell_fallible(cell)?);
     }
@@ -472,7 +517,7 @@ fn clone_sheet_fallible(sheet: &Sheet) -> Result<Sheet> {
     cloned
         .rows
         .try_reserve_exact(sheet.rows.len())
-        .map_err(|_| invalid("flat ODS sheet clone allocation failed"))?;
+        .map_err(|_error| invalid("flat ODS sheet clone allocation failed"))?;
     for row in &sheet.rows {
         cloned.rows.push(clone_row_fallible(row)?);
     }
@@ -677,13 +722,11 @@ fn calcext(namespace: FlatNamespace, element_local: &[u8], local: &[u8]) -> bool
 
 fn flat_namespace(namespace: &ResolveResult<'_>) -> FlatNamespace {
     match namespace {
-        ResolveResult::Bound(Namespace(uri)) if uri.as_ref() == OFFICE_NAMESPACE => {
-            FlatNamespace::Office
+        ResolveResult::Bound(Namespace(uri)) if *uri == OFFICE_NAMESPACE => FlatNamespace::Office,
+        ResolveResult::Bound(Namespace(uri)) if *uri == CALCEXT_NAMESPACE => FlatNamespace::Calcext,
+        ResolveResult::Unbound | ResolveResult::Bound(_) | ResolveResult::Unknown(_) => {
+            FlatNamespace::Other
         },
-        ResolveResult::Bound(Namespace(uri)) if uri.as_ref() == CALCEXT_NAMESPACE => {
-            FlatNamespace::Calcext
-        },
-        _ => FlatNamespace::Other,
     }
 }
 
@@ -696,7 +739,7 @@ fn office_attribute(
         let attribute =
             attribute.map_err(|error| invalid(format!("invalid flat ODS attribute: {error}")))?;
         let (namespace, name) = reader.resolver().resolve_attribute(attribute.key);
-        if matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri.as_ref() == OFFICE_NAMESPACE)
+        if matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
             && name.as_ref() == local
         {
             return attribute

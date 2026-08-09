@@ -1,7 +1,7 @@
-//! Snapshot-safe package transactions for inert ActiveX graphs.
+//! Snapshot-safe package transactions for inert `ActiveX` graphs.
 
 use super::super::codec::{controls_span, descriptor_relationship_ids, replace_controls_xml};
-use super::super::model::*;
+use super::super::model::{ControlSet, Controls};
 use super::super::validation::{validate_control_set, validate_part_location, validate_rel_id};
 use super::super::{
     BINARY_CONTENT_TYPE, BINARY_REL, CONTROL_REL, CONTROL_REL_STRICT, DESCRIPTOR_CONTENT_TYPE,

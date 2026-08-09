@@ -1,4 +1,13 @@
-use super::*;
+use super::{
+    BarShape, BufRead, BytesStart, ChartXmlReader, DataLabel, DataLabels, DataPoint, DataSourceRef,
+    Error, ErrorBar, ErrorBarDirection, ErrorBarType, ErrorBarValueType, Event, ExtensionList,
+    IGNORED_NAMESPACE_ELEMENT, Layout, Lines, Marker, NumberFormat, NumericData, PictureOptions,
+    Result, RichText, Series, ShapeProperties, StringData, TextProperties, TitleText, Trendline,
+    TrendlineType, bounded_u32_attr, decode_xml_reference, get_attr, invalid_attribute,
+    missing_attribute, parse_bool_attr, parse_chart_lines, parse_data_label_position, parse_layout,
+    parse_marker_style, parse_number_format, parse_picture_options, required_enum_attr,
+    required_f64_attr, required_nonnegative_f64_attr, required_u32_attr, set_chart_lines,
+};
 
 pub(crate) fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Series>> {
     let mut series = Series::new(0);
@@ -88,7 +97,7 @@ pub(crate) fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result
                 saw_marker = true;
                 series.marker_present = true;
             },
-            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
+            Ok(Event::Start(ref e) | Event::Empty(ref e)) => {
                 let tag_name = e.local_name();
                 match tag_name.as_ref() {
                     b"idx" => {
@@ -266,7 +275,7 @@ pub(crate) fn parse_series_marker<R: BufRead>(reader: &mut ChartXmlReader<R>) ->
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
-            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
+            Ok(Event::Start(ref element) | Event::Empty(ref element)) => {
                 match element.local_name().as_ref() {
                     b"symbol" => {
                         if symbol.is_some() {
@@ -390,7 +399,7 @@ pub(crate) fn parse_data_point<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Re
                     reader.capture_empty_fragment(element)?,
                 )?);
             },
-            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
+            Ok(Event::Start(ref element) | Event::Empty(ref element)) => {
                 match element.local_name().as_ref() {
                     b"idx" => {
                         index = Some(required_u32_attr(element, "chart data-point index")?);
@@ -541,7 +550,7 @@ pub(crate) fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> R
                 saw_shared_settings = true;
                 labels.separator = Some(parse_text_element(reader, b"separator")?);
             },
-            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
+            Ok(Event::Start(ref element) | Event::Empty(ref element)) => {
                 match element.local_name().as_ref() {
                     b"delete" => {
                         if saw_delete {
@@ -724,7 +733,7 @@ pub(crate) fn parse_data_label<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Re
                 label.separator = Some(parse_text_element(reader, b"separator")?);
                 saw_settings = true;
             },
-            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
+            Ok(Event::Start(ref element) | Event::Empty(ref element)) => {
                 let is_setting = match element.local_name().as_ref() {
                     b"idx" => {
                         if saw_index {
@@ -952,7 +961,7 @@ pub(crate) fn parse_trendline<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Res
                 }
                 trendline.show_label = true;
             },
-            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => match e.local_name().as_ref() {
+            Ok(Event::Start(ref e) | Event::Empty(ref e)) => match e.local_name().as_ref() {
                 b"trendlineType" => {
                     let value = get_attr(e, b"val")
                         .ok_or_else(|| missing_attribute("chart trendline type"))?;
@@ -969,17 +978,18 @@ pub(crate) fn parse_trendline<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Res
                 },
                 b"order" => trendline.order = Some(bounded_u32_attr(e, "trendline order", 2, 6)?),
                 b"period" => {
-                    trendline.period = Some(bounded_u32_attr(e, "trendline period", 2, 255)?)
+                    trendline.period = Some(bounded_u32_attr(e, "trendline period", 2, 255)?);
                 },
                 b"forward" => {
-                    trendline.forward = Some(required_nonnegative_f64_attr(e, "trendline forward")?)
+                    trendline.forward =
+                        Some(required_nonnegative_f64_attr(e, "trendline forward")?);
                 },
                 b"backward" => {
                     trendline.backward =
-                        Some(required_nonnegative_f64_attr(e, "trendline backward")?)
+                        Some(required_nonnegative_f64_attr(e, "trendline backward")?);
                 },
                 b"intercept" => {
-                    trendline.intercept = Some(required_f64_attr(e, "trendline intercept")?)
+                    trendline.intercept = Some(required_f64_attr(e, "trendline intercept")?);
                 },
                 b"dispEq" => trendline.display_equation = parse_bool_attr(e)?,
                 b"dispRSqr" => trendline.display_r_squared = parse_bool_attr(e)?,
@@ -1070,7 +1080,7 @@ pub(crate) fn parse_trendline_label<R: BufRead>(
                 saw_text = true;
                 text = parse_label_text(reader)?;
             },
-            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
+            Ok(Event::Start(ref element) | Event::Empty(ref element))
                 if element.local_name().as_ref() == b"numFmt" =>
             {
                 if number_format.is_some() {
@@ -1217,12 +1227,12 @@ pub(crate) fn parse_error_bar<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Res
                 extension_list = Some(ExtensionList::from_xml(reader.capture_empty_fragment(e)?)?);
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"plus" => {
-                plus_values = parse_numeric_data(reader)?
+                plus_values = parse_numeric_data(reader)?;
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"minus" => {
-                minus_values = parse_numeric_data(reader)?
+                minus_values = parse_numeric_data(reader)?;
             },
-            Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => match e.local_name().as_ref() {
+            Ok(Event::Start(ref e) | Event::Empty(ref e)) => match e.local_name().as_ref() {
                 b"errDir" => {
                     direction = Some(
                         match required_enum_attr(e, "error-bar direction")?.as_str() {
@@ -1235,7 +1245,7 @@ pub(crate) fn parse_error_bar<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Res
                                 ));
                             },
                         },
-                    )
+                    );
                 },
                 b"errBarType" => {
                     error_type = Some(match required_enum_attr(e, "error-bar type")?.as_str() {
@@ -1243,7 +1253,7 @@ pub(crate) fn parse_error_bar<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Res
                         "plus" => ErrorBarType::Plus,
                         "minus" => ErrorBarType::Minus,
                         value => return Err(invalid_attribute("error-bar type", value.as_bytes())),
-                    })
+                    });
                 },
                 b"errValType" => {
                     value_type = Some(
@@ -1260,7 +1270,7 @@ pub(crate) fn parse_error_bar<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Res
                                 ));
                             },
                         },
-                    )
+                    );
                 },
                 b"noEndCap" => no_end_cap = parse_bool_attr(e)?,
                 b"val" => value = Some(required_nonnegative_f64_attr(e, "error-bar value")?),
@@ -1533,9 +1543,9 @@ pub(crate) fn parse_text_element<R: BufRead>(
                 text.push_str(&decode_xml_reference(&reference)?);
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == end_name => break,
-            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element))
+            Ok(Event::Start(ref element) | Event::Empty(ref element))
                 if element.local_name().as_ref() == IGNORED_NAMESPACE_ELEMENT.as_bytes() => {},
-            Ok(Event::Start(_)) | Ok(Event::Empty(_)) => {
+            Ok(Event::Start(_) | Event::Empty(_)) => {
                 return Err(Error::Invalid(
                     "chart text element contains nested markup".to_string(),
                 ));

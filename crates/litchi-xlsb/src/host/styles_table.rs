@@ -73,34 +73,52 @@ impl StylesTable {
         }
     }
 
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "retained for BIFF12 codec completeness and staged host integration"
+    )]
     pub(crate) fn parse_font(data: &[u8]) -> Result<Font> {
         crate::styles::parse_font(data).map_err(map_owner_error)
     }
 
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "retained for BIFF12 codec completeness and staged host integration"
+    )]
     pub(crate) fn parse_fill(data: &[u8]) -> Result<Fill> {
         crate::styles::parse_fill(data).map_err(map_owner_error)
     }
 
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "retained for BIFF12 codec completeness and staged host integration"
+    )]
     pub(crate) fn parse_direct_color(data: &[u8], offset: usize) -> Result<Option<u32>> {
         crate::styles::parse_direct_color(data, offset).map_err(map_owner_error)
     }
 
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "retained for BIFF12 codec completeness and staged host integration"
+    )]
     pub(crate) fn parse_border(data: &[u8]) -> Result<Border> {
         crate::styles::parse_border(data)
             .map(from_owner_border)
             .map_err(map_owner_error)
     }
 
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "retained for BIFF12 codec completeness and staged host integration"
+    )]
     pub(crate) fn parse_num_fmt(data: &[u8]) -> Result<(u32, String)> {
         crate::styles::parse_num_fmt(data).map_err(map_owner_error)
     }
 
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "retained for BIFF12 codec completeness and staged host integration"
+    )]
     pub(crate) fn parse_xf(data: &[u8]) -> Result<CellFormat> {
         crate::styles::parse_cell_format(data)
             .map(from_owner_cell_format)

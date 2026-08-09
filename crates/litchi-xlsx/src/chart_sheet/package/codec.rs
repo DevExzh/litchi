@@ -394,7 +394,7 @@ pub(super) fn parse_document_with_capabilities(
             },
             Event::Decl(_) | Event::Comment(_) => {},
             Event::Eof => break,
-        };
+        }
         buffer.clear();
     }
     if !stack.is_empty() {

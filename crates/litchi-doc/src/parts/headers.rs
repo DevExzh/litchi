@@ -1,6 +1,6 @@
 /// Headers and footers parser for Word binary format.
 ///
-/// Based on Apache POI's HeaderStories and LibreOffice's implementation.
+/// Based on Apache POI's `HeaderStories` and `LibreOffice`'s implementation.
 /// Headers and footers in DOC files are stored as a subdocument with character positions
 /// defined in the FIB, and their mapping to sections is defined in a PLCF structure.
 use super::super::package::{Error as PackageError, Result};
@@ -27,6 +27,7 @@ impl HeaderFooterType {
     /// Get all header/footer types in stable semantic order.
     ///
     /// This differs from the interleaved storage order used by `PlcfHdd`.
+    #[must_use]
     pub fn all_types() -> &'static [HeaderFooterType] {
         &[
             HeaderFooterType::FirstPageHeader,
@@ -39,6 +40,7 @@ impl HeaderFooterType {
     }
 
     /// Check if this is a header type
+    #[must_use]
     pub fn is_header(&self) -> bool {
         matches!(
             self,
@@ -49,6 +51,7 @@ impl HeaderFooterType {
     }
 
     /// Check if this is a footer type
+    #[must_use]
     pub fn is_footer(&self) -> bool {
         !self.is_header()
     }
@@ -66,6 +69,7 @@ pub struct HeaderFooterStory {
 
 impl HeaderFooterStory {
     /// Create a new header/footer story
+    #[must_use]
     pub fn new(story_type: HeaderFooterType, start_cp: u32, end_cp: u32) -> Self {
         Self {
             story_type,
@@ -75,11 +79,13 @@ impl HeaderFooterStory {
     }
 
     /// Get the length in characters
+    #[must_use]
     pub fn length(&self) -> u32 {
         self.end_cp.saturating_sub(self.start_cp)
     }
 
     /// Check if this story is empty
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.length() == 0
     }
@@ -105,7 +111,7 @@ impl HeadersTable {
     ///
     /// # Returns
     ///
-    /// A parsed HeadersTable or an error
+    /// A parsed `HeadersTable` or an error
     pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Self> {
         let mut stories = Vec::new();
 
@@ -131,7 +137,7 @@ impl HeadersTable {
 
     /// Parse the PLCF structure for headers/footers
     ///
-    /// The plcfHdd PLCF has element_size = 0 (just character positions).
+    /// The plcfHdd PLCF has `element_size` = 0 (just character positions).
     /// It contains character positions that divide the header subdocument into stories.
     /// The first six stories are footnote/endnote separators. Each section then contributes
     /// six stories in even-header, odd-header, even-footer, odd-footer, first-header,
@@ -219,11 +225,13 @@ impl HeadersTable {
     }
 
     /// Get all header/footer stories
+    #[must_use]
     pub fn stories(&self) -> &[HeaderFooterStory] {
         &self.stories
     }
 
     /// Get stories of a specific type
+    #[must_use]
     pub fn stories_by_type(&self, story_type: HeaderFooterType) -> Vec<&HeaderFooterStory> {
         self.stories
             .iter()
@@ -232,6 +240,7 @@ impl HeadersTable {
     }
 
     /// Get all header stories
+    #[must_use]
     pub fn headers(&self) -> Vec<&HeaderFooterStory> {
         self.stories
             .iter()
@@ -240,6 +249,7 @@ impl HeadersTable {
     }
 
     /// Get all footer stories
+    #[must_use]
     pub fn footers(&self) -> Vec<&HeaderFooterStory> {
         self.stories
             .iter()
@@ -248,6 +258,7 @@ impl HeadersTable {
     }
 
     /// Get the total count of header/footer stories
+    #[must_use]
     pub fn count(&self) -> usize {
         self.stories.len()
     }

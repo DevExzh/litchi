@@ -1,4 +1,4 @@
-//! DOC-specific OfficeArt and textbox-story decoding.
+//! DOC-specific `OfficeArt` and textbox-story decoding.
 
 use super::model::Shape;
 use crate::Document;
@@ -12,10 +12,10 @@ use std::{
 };
 
 /// FIB index (into `FileInformationBlock::get_table_pointer`) of the
-/// `fcDggInfo`/`lcbDggInfo` pair holding the document's OfficeArtContent.
+/// `fcDggInfo`/`lcbDggInfo` pair holding the document's `OfficeArtContent`.
 pub(crate) const FIB_INDEX_DGG_INFO: usize = 50;
 
-/// Size of an OfficeArt record header in bytes.
+/// Size of an `OfficeArt` record header in bytes.
 const RECORD_HEADER_LEN: usize = 8;
 
 fn project(data: &[u8]) -> std::io::Result<Vec<Shape>> {
@@ -100,9 +100,9 @@ fn has_text_links(shapes: &[Shape]) -> bool {
 
 /// Extract shapes from the document's drawing group (`fcDggInfo`).
 ///
-/// The OfficeArtContent in the table stream holds one OfficeArtWordDrawing
+/// The `OfficeArtContent` in the table stream holds one `OfficeArtWordDrawing`
 /// per story; each consists of a `dgglbl` byte followed by an
-/// OfficeArtDgContainer with the story's floating shapes.
+/// `OfficeArtDgContainer` with the story's floating shapes.
 pub(crate) fn extract_dgg_shapes(
     fib: &FileInformationBlock,
     table_stream: &[u8],
@@ -162,7 +162,7 @@ pub(crate) fn extract_dgg_shapes(
     Ok(shapes)
 }
 
-/// Extract all floating shapes from a Word document's OfficeArt content.
+/// Extract all floating shapes from a Word document's `OfficeArt` content.
 pub fn extract_shapes<R: Read + Seek>(ole: &mut OleFile<R>) -> std::io::Result<Vec<Shape>> {
     extract_drawing_shapes(ole)
 }

@@ -72,7 +72,7 @@ pub(in crate::parts::fields) fn private_field_opaque_instructions(
     }
     let remainder = instruction.get("PRIVATE".len()..)?;
     match remainder.chars().next() {
-        None | Some('"') | Some('\\') => Some(remainder.trim().to_string()),
+        None | Some('"' | '\\') => Some(remainder.trim().to_string()),
         Some(character) if character.is_whitespace() => Some(remainder.trim().to_string()),
         Some(_) => None,
     }

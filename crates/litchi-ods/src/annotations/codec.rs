@@ -585,10 +585,10 @@ fn apply_namespace_declarations(
         })?;
         let raw_name = attribute.key.as_ref();
         let prefix = if raw_name == b"xmlns" {
-            "".to_string()
+            String::new()
         } else if let Some(prefix) = raw_name.strip_prefix(b"xmlns:") {
             String::from_utf8(prefix.to_vec())
-                .map_err(|_| invalid("invalid XML namespace prefix"))?
+                .map_err(|_error| invalid("invalid XML namespace prefix"))?
         } else {
             continue;
         };
@@ -640,7 +640,7 @@ fn positive_attribute(
     };
     let value = value
         .parse::<usize>()
-        .map_err(|_| Error::InvalidFormat(format!("ODS {label} must be positive")))?;
+        .map_err(|_error| Error::InvalidFormat(format!("ODS {label} must be positive")))?;
     if value == 0 {
         return Err(Error::InvalidFormat(format!(
             "ODS {label} must be positive"
@@ -678,12 +678,12 @@ fn attribute_value(
 
 fn qname(bytes: &[u8]) -> Result<String> {
     String::from_utf8(bytes.to_vec())
-        .map_err(|_| invalid("ODS annotation XML qualified name is not UTF-8"))
+        .map_err(|_error| invalid("ODS annotation XML qualified name is not UTF-8"))
 }
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("ODS annotation XML position overflows usize"))
+        .map_err(|_error| invalid("ODS annotation XML position overflows usize"))
 }
 
 pub(crate) fn serialize(annotation: &Annotation) -> Result<String> {
@@ -703,7 +703,7 @@ pub(crate) fn serialize(annotation: &Annotation) -> Result<String> {
         ("style", STYLE_NS.as_bytes()),
     ] {
         let uri = std::str::from_utf8(uri)
-            .map_err(|_| invalid("ODS annotation namespace URI is not UTF-8"))?;
+            .map_err(|_error| invalid("ODS annotation namespace URI is not UTF-8"))?;
         annotation.set_namespace(prefix, uri)?;
     }
     let mut output = String::new();

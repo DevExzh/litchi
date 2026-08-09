@@ -1,4 +1,7 @@
-use crate::writer::core::{codec, model::*};
+use crate::writer::core::{
+    codec,
+    model::{RevisionWriterData, WritableParagraph, WriteError, Writer, utf16_code_unit_len},
+};
 use crate::writer::font_table::FontTableBuilder;
 use crate::writer::piece_table::Piece;
 impl Writer {
@@ -125,7 +128,10 @@ impl Writer {
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "parameters map one-to-one to a fixed DOC record or semantic construction"
+    )]
     pub(in crate::writer::core::package) fn append_table_paragraph(
         paragraph: &WritableParagraph,
         terminator: u16,

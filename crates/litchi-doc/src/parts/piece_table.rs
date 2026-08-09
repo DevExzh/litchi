@@ -1,9 +1,9 @@
 use crate::plcf::Plcf;
 /// Piece Table parser for DOC files.
 ///
-/// Based on Apache POI's ComplexFileTable and TextPieceTable.
+/// Based on Apache POI's `ComplexFileTable` and `TextPieceTable`.
 /// The piece table maps Character Positions (CP) to File Characters (FC)
-/// in the WordDocument stream, handling text stored in different locations.
+/// in the `WordDocument` stream, handling text stored in different locations.
 ///
 /// References:
 /// - org.apache.poi.hwpf.model.ComplexFileTable
@@ -20,16 +20,16 @@ const UNICODE_CHAR_BYTES: u32 = 2;
 /// Bytes per character in a single-byte (ANSI) text piece.
 const ANSI_CHAR_BYTES: u32 = 1;
 
-/// A text piece - maps a range of CPs to an FC in the WordDocument stream.
+/// A text piece - maps a range of CPs to an FC in the `WordDocument` stream.
 ///
-/// Based on Apache POI's TextPiece.
+/// Based on Apache POI's `TextPiece`.
 #[derive(Debug, Clone)]
 pub struct TextPiece {
     /// Start character position (CP)
     pub cp_start: u32,
     /// End character position (CP)
     pub cp_end: u32,
-    /// File character position (FC) - byte offset in WordDocument stream
+    /// File character position (FC) - byte offset in `WordDocument` stream
     pub fc: u32,
     /// Whether the text is Unicode (true) or single-byte (false)
     pub is_unicode: bool,
@@ -44,11 +44,13 @@ impl TextPiece {
     /// table can violate that; such a piece reports no length rather than
     /// wrapping the subtraction.
     #[inline]
+    #[must_use]
     pub fn length(&self) -> u32 {
         self.cp_end.saturating_sub(self.cp_start)
     }
 
     /// Convert a CP within this piece to an FC.
+    #[must_use]
     pub fn cp_to_fc(&self, cp: u32) -> Option<u32> {
         if cp < self.cp_start || cp > self.cp_end {
             return None;
@@ -65,6 +67,7 @@ impl TextPiece {
     }
 
     /// Convert an FC to a CP within this piece.
+    #[must_use]
     pub fn fc_to_cp(&self, fc: u32) -> Option<u32> {
         if fc < self.fc {
             return None;
@@ -95,6 +98,7 @@ impl TextPiece {
 
     /// Additional property modifiers applied after FKP properties.
     #[inline]
+    #[must_use]
     pub fn property_modifier(&self) -> &[u8] {
         &self.property_modifier
     }
@@ -102,7 +106,7 @@ impl TextPiece {
 
 /// Piece Table - manages the mapping between CP and FC.
 ///
-/// Based on Apache POI's TextPieceTable.
+/// Based on Apache POI's `TextPieceTable`.
 #[derive(Debug, Clone)]
 pub struct PieceTable {
     /// All text pieces, sorted by CP
@@ -112,7 +116,7 @@ pub struct PieceTable {
 impl PieceTable {
     /// Parse a piece table from CLX (Complex file information) data.
     ///
-    /// Based on Apache POI's ComplexFileTable.parse().
+    /// Based on Apache POI's `ComplexFileTable.parse()`.
     ///
     /// # Arguments
     ///
@@ -121,6 +125,7 @@ impl PieceTable {
     /// # Returns
     ///
     /// Parsed piece table or None if invalid
+    #[must_use]
     pub fn parse(clx_data: &[u8]) -> Option<Self> {
         if clx_data.is_empty() {
             return None;
@@ -229,11 +234,13 @@ impl PieceTable {
 
     /// Get all text pieces.
     #[inline]
+    #[must_use]
     pub fn pieces(&self) -> &[TextPiece] {
         &self.pieces
     }
 
     /// Find the text piece containing a given CP.
+    #[must_use]
     pub fn piece_for_cp(&self, cp: u32) -> Option<&TextPiece> {
         // Binary search for efficiency
         self.pieces
@@ -319,12 +326,14 @@ impl PieceTable {
     }
 
     /// Convert a CP to an FC.
+    #[must_use]
     pub fn cp_to_fc(&self, cp: u32) -> Option<u32> {
         let piece = self.piece_for_cp(cp)?;
         piece.cp_to_fc(cp)
     }
 
     /// Convert an FC to a CP.
+    #[must_use]
     pub fn fc_to_cp(&self, fc: u32) -> Option<u32> {
         // Linear search through pieces
         // Could be optimized with a secondary index if needed
@@ -341,6 +350,7 @@ impl PieceTable {
     /// Fast-saved documents can store logically adjacent text pieces in disjoint
     /// physical locations. A single FKP range therefore can map to more than one
     /// CP interval; returning every intersection avoids inventing CPs from raw FCs.
+    #[must_use]
     pub fn fc_range_to_cp_ranges(&self, start_fc: u32, end_fc: u32) -> Vec<(u32, u32)> {
         if start_fc >= end_fc {
             return Vec::new();
@@ -370,8 +380,9 @@ impl PieceTable {
     }
 
     /// Get the total number of characters (last CP).
+    #[must_use]
     pub fn total_cps(&self) -> u32 {
-        self.pieces.last().map(|p| p.cp_end).unwrap_or(0)
+        self.pieces.last().map_or(0, |p| p.cp_end)
     }
 }
 

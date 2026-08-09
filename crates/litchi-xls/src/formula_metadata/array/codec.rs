@@ -40,13 +40,13 @@ pub(crate) fn parse_payload(data: &[u8], limits: Limits) -> Result<Owner> {
     let mut tokens = Vec::new();
     tokens
         .try_reserve_exact(token_len)
-        .map_err(|_| Error::Allocation("retaining ArrayParsedFormula rgce"))?;
+        .map_err(|_error| Error::Allocation("retaining ArrayParsedFormula rgce"))?;
     tokens.extend_from_slice(&data[FIXED_BYTES..token_end]);
     let extra_len = data.len() - token_end;
     let mut extra = Vec::new();
     extra
         .try_reserve_exact(extra_len)
-        .map_err(|_| Error::Allocation("retaining ArrayParsedFormula rgcb"))?;
+        .map_err(|_error| Error::Allocation("retaining ArrayParsedFormula rgcb"))?;
     extra.extend_from_slice(&data[token_end..]);
 
     let owner = Owner::from_wire(
@@ -69,11 +69,11 @@ pub(crate) fn write_payload(owner: &Owner) -> Result<Vec<u8>> {
         .and_then(|value| value.checked_add(owner.extra().len()))
         .ok_or_else(|| invalid("Array payload length overflows"))?;
     let token_len = u16::try_from(owner.tokens().len())
-        .map_err(|_| invalid("ArrayParsedFormula cce exceeds u16"))?;
+        .map_err(|_error| invalid("ArrayParsedFormula cce exceeds u16"))?;
     let mut output = Vec::new();
     output
         .try_reserve_exact(length)
-        .map_err(|_| Error::Allocation("serializing Array record"))?;
+        .map_err(|_error| Error::Allocation("serializing Array record"))?;
     let first = owner.range().first();
     let last = owner.range().last();
     output.extend_from_slice(&first.row().to_le_bytes());

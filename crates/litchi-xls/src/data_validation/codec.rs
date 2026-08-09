@@ -28,7 +28,7 @@ pub(crate) fn parse_dval(data: &[u8]) -> Result<Settings> {
     let object_id = cursor.i32()?;
     let dropdown_object_id = match object_id {
         -1 => None,
-        1..=32_767 => Some(u16::try_from(object_id).map_err(|_| {
+        1..=32_767 => Some(u16::try_from(object_id).map_err(|_error| {
             Error::InvalidData(format!("invalid DVAL dropdown object id: {object_id}"))
         })?),
         _ => return invalid(format!("invalid DVAL dropdown object id: {object_id}")),
@@ -42,7 +42,7 @@ pub(crate) fn parse_dval(data: &[u8]) -> Result<Settings> {
         x_left,
         y_top,
         dropdown_object_id,
-        declared_rule_count: u16::try_from(rule_count).map_err(|_| {
+        declared_rule_count: u16::try_from(rule_count).map_err(|_error| {
             Error::InvalidData(format!("DVAL rule count exceeds 65534: {rule_count}"))
         })?,
     })
@@ -151,10 +151,10 @@ pub(crate) fn parse_dv(data: &[u8], formula_context: Option<&FormulaContext>) ->
         if first_row > last_row || first_column > last_column || last_column > 255 {
             return invalid("DV contains an invalid or out-of-range cell range".to_string());
         }
-        let first_column = u8::try_from(first_column).map_err(|_| {
+        let first_column = u8::try_from(first_column).map_err(|_error| {
             Error::InvalidData("DV contains an invalid or out-of-range cell range".to_string())
         })?;
-        let last_column = u8::try_from(last_column).map_err(|_| {
+        let last_column = u8::try_from(last_column).map_err(|_error| {
             Error::InvalidData("DV contains an invalid or out-of-range cell range".to_string())
         })?;
         ranges.push(Range {
@@ -219,7 +219,7 @@ impl<'a> Cursor<'a> {
         let bytes: [u8; N] = self
             .take(N)?
             .try_into()
-            .map_err(|_| Error::InvalidData("truncated DV record".to_string()))?;
+            .map_err(|_error| Error::InvalidData("truncated DV record".to_string()))?;
         Ok(bytes)
     }
 
@@ -251,7 +251,7 @@ impl<'a> Cursor<'a> {
         };
         let extension_size = if flags & 0x04 != 0 {
             usize::try_from(self.u32()?)
-                .map_err(|_| Error::InvalidData("DV string size overflow".to_string()))?
+                .map_err(|_error| Error::InvalidData("DV string size overflow".to_string()))?
         } else {
             0
         };
@@ -264,7 +264,7 @@ impl<'a> Cursor<'a> {
             let mut chunks = characters.chunks_exact(2);
             let mut utf16 = Vec::with_capacity(units);
             for bytes in &mut chunks {
-                let bytes: [u8; 2] = bytes.try_into().map_err(|_| {
+                let bytes: [u8; 2] = bytes.try_into().map_err(|_error| {
                     Error::InvalidData("DV string contains invalid UTF-16".to_string())
                 })?;
                 utf16.push(u16::from_le_bytes(bytes));
@@ -272,8 +272,9 @@ impl<'a> Cursor<'a> {
             if !chunks.remainder().is_empty() {
                 return invalid("DV string contains invalid UTF-16".to_string());
             }
-            String::from_utf16(&utf16)
-                .map_err(|_| Error::InvalidData("DV string contains invalid UTF-16".to_string()))?
+            String::from_utf16(&utf16).map_err(|_error| {
+                Error::InvalidData("DV string contains invalid UTF-16".to_string())
+            })?
         } else {
             characters.iter().map(|&byte| char::from(byte)).collect()
         };

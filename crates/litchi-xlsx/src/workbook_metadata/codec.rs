@@ -1,4 +1,4 @@
-//! Bounded SpreadsheetML workbook-metadata XML and MCE codec.
+//! Bounded `SpreadsheetML` workbook-metadata XML and MCE codec.
 
 use crate::error::{Error, Result, invalid};
 use litchi_ooxml_common::XmlError;
@@ -189,11 +189,13 @@ impl Metadata {
         Ok(out.into_bytes())
     }
 
+    #[must_use]
     pub fn cell_block(&self, one_based_index: u32) -> Option<&MetadataBlock> {
         one_based_index
             .checked_sub(1)
             .and_then(|v| self.cell_blocks.get(v as usize))
     }
+    #[must_use]
     pub fn value_block(&self, one_based_index: u32) -> Option<&MetadataBlock> {
         one_based_index
             .checked_sub(1)
@@ -781,14 +783,14 @@ fn write_opaque(out: &mut String, node: &Node) {
     out.push('>');
 }
 fn count_attr(out: &mut String, count: usize) {
-    qattr(out, "count", &count.to_string())
+    qattr(out, "count", &count.to_string());
 }
 fn qattr(out: &mut String, name: &str, value: &str) {
     out.push(' ');
     out.push_str(name);
     out.push_str("=\"");
     escape_attr(out, value);
-    out.push('"')
+    out.push('"');
 }
 fn escape_attr(out: &mut String, value: &str) {
     for c in value.chars() {

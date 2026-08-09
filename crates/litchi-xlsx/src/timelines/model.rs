@@ -47,9 +47,11 @@ impl Range {
         validate_range(&v)?;
         Ok(v)
     }
+    #[must_use]
     pub fn start_date(&self) -> &str {
         &self.start_date
     }
+    #[must_use]
     pub fn end_date(&self) -> &str {
         &self.end_date
     }
@@ -126,7 +128,18 @@ pub enum FilterType {
 }
 impl FilterType {
     pub(super) fn parse(v: &str) -> Result<Self> {
-        use FilterType::*;
+        use FilterType::{
+            CaptionBeginsWith, CaptionBetween, CaptionContains, CaptionEndsWith, CaptionEqual,
+            CaptionGreaterThan, CaptionGreaterThanOrEqual, CaptionLessThan, CaptionLessThanOrEqual,
+            CaptionNotBeginsWith, CaptionNotBetween, CaptionNotContains, CaptionNotEndsWith,
+            CaptionNotEqual, Count, DateBetween, DateEqual, DateNewerThan, DateNewerThanOrEqual,
+            DateNotBetween, DateNotEqual, DateOlderThan, DateOlderThanOrEqual, LastMonth,
+            LastQuarter, LastWeek, LastYear, M1, M2, M3, M4, M5, M6, M7, M8, M9, M10, M11, M12,
+            NextMonth, NextQuarter, NextWeek, NextYear, Percent, Q1, Q2, Q3, Q4, Sum, ThisMonth,
+            ThisQuarter, ThisWeek, ThisYear, Today, Tomorrow, Unknown, ValueBetween, ValueEqual,
+            ValueGreaterThan, ValueGreaterThanOrEqual, ValueLessThan, ValueLessThanOrEqual,
+            ValueNotBetween, ValueNotEqual, YearToDate, Yesterday,
+        };
         Ok(match v {
             "unknown" => Unknown,
             "count" => Count,
@@ -198,7 +211,18 @@ impl FilterType {
         })
     }
     pub(super) fn as_str(self) -> &'static str {
-        use FilterType::*;
+        use FilterType::{
+            CaptionBeginsWith, CaptionBetween, CaptionContains, CaptionEndsWith, CaptionEqual,
+            CaptionGreaterThan, CaptionGreaterThanOrEqual, CaptionLessThan, CaptionLessThanOrEqual,
+            CaptionNotBeginsWith, CaptionNotBetween, CaptionNotContains, CaptionNotEndsWith,
+            CaptionNotEqual, Count, DateBetween, DateEqual, DateNewerThan, DateNewerThanOrEqual,
+            DateNotBetween, DateNotEqual, DateOlderThan, DateOlderThanOrEqual, LastMonth,
+            LastQuarter, LastWeek, LastYear, M1, M2, M3, M4, M5, M6, M7, M8, M9, M10, M11, M12,
+            NextMonth, NextQuarter, NextWeek, NextYear, Percent, Q1, Q2, Q3, Q4, Sum, ThisMonth,
+            ThisQuarter, ThisWeek, ThisYear, Today, Tomorrow, Unknown, ValueBetween, ValueEqual,
+            ValueGreaterThan, ValueGreaterThanOrEqual, ValueLessThan, ValueLessThanOrEqual,
+            ValueNotBetween, ValueNotEqual, YearToDate, Yesterday,
+        };
         match self {
             Unknown => "unknown",
             Count => "count",
@@ -285,6 +309,7 @@ pub struct State {
     pub filter_type: FilterType,
 }
 impl State {
+    #[must_use]
     pub fn new(bounds: Range, pivot_cache_id: u32, filter_type: FilterType) -> Self {
         Self {
             selection: None,
@@ -297,6 +322,7 @@ impl State {
             filter_type,
         }
     }
+    #[must_use]
     pub fn effective_single_range_filter_state(&self) -> bool {
         self.single_range_filter_state.unwrap_or(true)
     }
@@ -311,6 +337,7 @@ pub struct PivotFilter {
     pub auto_filter: Option<Definition>,
 }
 impl PivotFilter {
+    #[must_use]
     pub fn new(field: u32, id: u32) -> Self {
         Self {
             use_whole_day: None,
@@ -321,6 +348,7 @@ impl PivotFilter {
             auto_filter: None,
         }
     }
+    #[must_use]
     pub fn effective_use_whole_day(&self) -> bool {
         self.use_whole_day.unwrap_or(false)
     }
@@ -443,7 +471,7 @@ pub(super) fn validate_state(v: &State) -> Result<()> {
         }
     }
     if let Some(e) = &v.extension_list {
-        validate_opaque_kind(e, &[X15, SML, STRICT_SML], "extLst")?
+        validate_opaque_kind(e, &[X15, SML, STRICT_SML], "extLst")?;
     }
     Ok(())
 }
@@ -641,10 +669,10 @@ fn looks_like_r1c1(value: &str) -> bool {
         && col.bytes().all(|b| b.is_ascii_digit())
 }
 fn validate_guid(value: &str) -> Result<()> {
-    if !valid_guid(value) {
-        Err(invalid(format!("invalid GUID '{value}'")))
-    } else {
+    if valid_guid(value) {
         Ok(())
+    } else {
+        Err(invalid(format!("invalid GUID '{value}'")))
     }
 }
 #[derive(Clone, Debug, Eq, PartialEq)]

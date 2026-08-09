@@ -3,7 +3,11 @@
 use super::codec::{
     calculation_chain_removal, compose_part, compose_part_optional, removal_reference_part,
 };
-use super::*;
+use super::{
+    ActiveTab, Arc, BTreeSet, Change, Commit, Edit, Error, GraphAction, GraphChange, HashSet,
+    OpcPackage, OrderPlan, PackURI, Part, PartChange, Patch, Relationship, RemoveBlock, Result,
+    TabAction, TabEditBlock, Target, Visibility, Workbook, WorksheetKind, allocation, invalid, raw,
+};
 
 pub(super) fn commit_removals(edit: Edit) -> Result<Commit> {
     if edit.has_non_removal() {

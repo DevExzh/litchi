@@ -11,7 +11,7 @@ use litchi_odraw::image::write::{BlipBuilder, digest};
 pub(super) const PICF_HEADER_LEN: usize = 0x44;
 /// PICF `cbHeader` value, matching [`PICF_HEADER_LEN`].
 pub(super) const PICF_CB_HEADER: i16 = 0x44;
-/// PICF `mfp.mm` value Word writes for OfficeArt shape pictures.
+/// PICF `mfp.mm` value Word writes for `OfficeArt` shape pictures.
 pub(super) const PICF_MM_SHAPE: i16 = 0x64;
 /// Unscaled picture factor in permille (1000 = 100%).
 pub(super) const SCALE_100_PERCENT: i16 = 1000;
@@ -41,26 +41,26 @@ pub(super) const VERSION_ATOM: u16 = 0x0;
 
 /// MSOSHAPETYPE value for a picture frame shape.
 pub(super) const SHAPE_TYPE_PICTURE_FRAME: u16 = 0x4B;
-/// OfficeArtFSP `fHaveAnchor` flag.
+/// `OfficeArtFSP` `fHaveAnchor` flag.
 pub(super) const SP_FLAG_HAVE_ANCHOR: u32 = 0x0200;
-/// OfficeArtFSP `fHaveShapeType` flag.
+/// `OfficeArtFSP` `fHaveShapeType` flag.
 pub(super) const SP_FLAG_HAVE_SHAPE_TYPE: u32 = 0x0800;
-/// OfficeArtFSP `fGroup` flag, set on the group shape of a drawing.
+/// `OfficeArtFSP` `fGroup` flag, set on the group shape of a drawing.
 pub(super) const SP_FLAG_GROUP: u32 = 0x0001;
-/// OfficeArtFSP `fPatriarch` flag, set on the topmost group shape.
+/// `OfficeArtFSP` `fPatriarch` flag, set on the topmost group shape.
 pub(super) const SP_FLAG_PATRIARCH: u32 = 0x0004;
-/// OfficeArt `pib` property (0x0104) with the fBid bit set, meaning the
+/// `OfficeArt` `pib` property (0x0104) with the fBid bit set, meaning the
 /// value is a 1-based index of the BSE within the same drawing block.
 pub(super) const OPT_PIB_BLIP_INDEX: u16 = 0x4104;
-/// The single BSE stored inside each OfficeArtWordDrawing block.
+/// The single BSE stored inside each `OfficeArtWordDrawing` block.
 pub(super) const OPT_PIB_FIRST_BSE: u32 = 1;
-/// Payload length of the empty ClientAnchor record used for inline pictures.
+/// Payload length of the empty `ClientAnchor` record used for inline pictures.
 pub(super) const CLIENT_ANCHOR_PAYLOAD_LEN: u32 = 4;
-/// Payload length of the OfficeArtFSP record (spid + flags).
+/// Payload length of the `OfficeArtFSP` record (spid + flags).
 pub(super) const SP_PAYLOAD_LEN: u32 = 8;
-/// Payload length of the OfficeArtOPT record holding one simple property.
+/// Payload length of the `OfficeArtOPT` record holding one simple property.
 pub(super) const OPT_PAYLOAD_LEN: u32 = 6;
-/// Total length of the OfficeArtSpContainer record including its header.
+/// Total length of the `OfficeArtSpContainer` record including its header.
 pub(super) const SHAPE_CONTAINER_LEN: u32 = (RECORD_HEADER_LEN as u32 + SP_PAYLOAD_LEN)
     + (RECORD_HEADER_LEN as u32 + OPT_PAYLOAD_LEN)
     + (RECORD_HEADER_LEN as u32 + CLIENT_ANCHOR_PAYLOAD_LEN)
@@ -68,18 +68,18 @@ pub(super) const SHAPE_CONTAINER_LEN: u32 = (RECORD_HEADER_LEN as u32 + SP_PAYLO
 
 /// Length of an Escher record header in bytes.
 pub(super) const RECORD_HEADER_LEN: usize = 8;
-/// Fixed OfficeArtFBSE payload length when no name is stored.
+/// Fixed `OfficeArtFBSE` payload length when no name is stored.
 pub(super) const BSE_HEADER_LEN: usize = 36;
-/// OfficeArtFBSE `foDelay` value when the BLIP is embedded in the BSE record
+/// `OfficeArtFBSE` `foDelay` value when the BLIP is embedded in the BSE record
 /// (no delay-stream position).
 pub(super) const BSE_NO_DELAY_STREAM: u32 = u32::MAX;
 
 /// Shape id assigned to the first inline picture. Word numbers inline shapes
-/// starting at 1025 in documents without an OfficeArtDgContainer.
+/// starting at 1025 in documents without an `OfficeArtDgContainer`.
 pub(crate) const FIRST_PICTURE_SHAPE_ID: u32 = 1025;
 /// Shape id of the group shape that parents the shapes of a drawing.
 pub(super) const GROUP_SHAPE_ID: u32 = 1024;
-/// Number of shape ids in one OfficeArt drawing cluster.
+/// Number of shape ids in one `OfficeArt` drawing cluster.
 pub(super) const SHAPE_IDS_PER_CLUSTER: u32 = 1024;
 
 /// Twips per inch; the writer assumes 96 DPI when converting pixel sizes.
@@ -131,7 +131,7 @@ pub(crate) fn write_record_header(
     out.extend_from_slice(&payload_len.to_le_bytes());
 }
 
-/// Append an OfficeArtOPT record holding simple (non-complex) properties as
+/// Append an `OfficeArtOPT` record holding simple (non-complex) properties as
 /// (opid, value) pairs.
 pub(crate) fn write_opt_record(out: &mut Vec<u8>, properties: &[(u16, u32)]) {
     write_record_header(
@@ -149,7 +149,7 @@ pub(crate) fn write_opt_record(out: &mut Vec<u8>, properties: &[(u16, u32)]) {
 
 /// Append the PICF picture descriptor ([MS-DOC] 2.9.161).
 ///
-/// The 68-byte header is followed by the OfficeArt shape data; `lcb` covers
+/// The 68-byte header is followed by the `OfficeArt` shape data; `lcb` covers
 /// both, matching the layout Word writes for inline pictures.
 fn write_picf(out: &mut Vec<u8>, picture: &Picture, lcb: u32) {
     out.extend_from_slice(&(lcb as i32).to_le_bytes());
@@ -175,11 +175,11 @@ fn write_picf(out: &mut Vec<u8>, picture: &Picture, lcb: u32) {
     out.extend_from_slice(&0i16.to_le_bytes()); // cProps
 }
 
-/// Append the OfficeArtSpContainer describing the inline picture shape.
+/// Append the `OfficeArtSpContainer` describing the inline picture shape.
 ///
 /// The shape is a picture frame whose single `pib` property references the
 /// BSE that follows inside the same drawing block. Inline pictures carry an
-/// empty ClientAnchor record, as Word writes for 0x0001-anchored pictures.
+/// empty `ClientAnchor` record, as Word writes for 0x0001-anchored pictures.
 fn write_shape_container(out: &mut Vec<u8>, shape_id: u32) {
     let container_payload_len = SHAPE_CONTAINER_LEN - RECORD_HEADER_LEN as u32;
 
@@ -215,9 +215,9 @@ fn write_shape_container(out: &mut Vec<u8>, shape_id: u32) {
     out.extend_from_slice(&[0; CLIENT_ANCHOR_PAYLOAD_LEN as usize]);
 }
 
-/// Append an OfficeArtFBSE record with the embedded OfficeArtBlip record for
+/// Append an `OfficeArtFBSE` record with the embedded `OfficeArtBlip` record for
 /// a picture. Used both for the Data-stream picture blocks and for the
-/// BStoreContainer inside the drawing group of floating pictures.
+/// `BStoreContainer` inside the drawing group of floating pictures.
 fn write_bse_with_embedded_blip(out: &mut Vec<u8>, picture: &Picture) -> Result<(), WriteError> {
     let blip = picture_blip(picture)?;
     let blip_record_len = blip.wire_len()?;
@@ -249,7 +249,7 @@ fn write_bse_with_embedded_blip(out: &mut Vec<u8>, picture: &Picture) -> Result<
     Ok(())
 }
 
-/// Append an OfficeArtWordDrawing block (PICF + shape container + BSE with an
+/// Append an `OfficeArtWordDrawing` block (PICF + shape container + BSE with an
 /// embedded BLIP) to the Data stream.
 pub(crate) fn write_picture_block(
     picture: &Picture,
@@ -290,7 +290,7 @@ pub(crate) fn write_picture_block(
 // Floating pictures: PlcfSpa and OfficeArtContent (DggInfo)
 // ============================================================================
 
-/// Build the PlcfSpa for the Main Document ([MS-DOC] 2.8.27).
+/// Build the `PlcfSpa` for the Main Document ([MS-DOC] 2.8.27).
 ///
 /// `shapes` must be ordered by ascending anchor CP (guaranteed by the
 /// writer's append-only story). `final_cp` is the document's ccpText; the
@@ -307,38 +307,38 @@ pub(crate) fn build_plcf_spa(shapes: &[FloatingShapeInfo<'_>], final_cp: u32) ->
     out
 }
 
-/// OfficeArtWordDrawing `dgglbl` value for the Main Document drawing.
+/// `OfficeArtWordDrawing` `dgglbl` value for the Main Document drawing.
 pub(super) const DGGLBL_MAIN_DOCUMENT: u8 = 0x00;
-/// OfficeArtWordDrawing `dgglbl` value for the Header Document drawing.
+/// `OfficeArtWordDrawing` `dgglbl` value for the Header Document drawing.
 const DGGLBL_HEADER_DOCUMENT: u8 = 0x01;
 /// Shape id assigned to the first header-story shape. Each drawing owns a
 /// cluster of shape ids ([MS-ODRAW] OfficeArtIDCL): the Main Document
 /// drawing uses the cluster starting at 1024, the Header Document drawing
 /// the next one.
 pub(crate) const HEADER_FIRST_SHAPE_ID: u32 = FIRST_PICTURE_SHAPE_ID + SHAPE_IDS_PER_CLUSTER;
-/// OfficeArtFDG `csp` counting mode: shapes plus the group shape.
+/// `OfficeArtFDG` `csp` counting mode: shapes plus the group shape.
 const DG_GROUP_SHAPE_COUNT: u32 = 1;
-/// OfficeArtFSP payload length (spid + flags).
+/// `OfficeArtFSP` payload length (spid + flags).
 const FSP_PAYLOAD_LEN: u32 = 8;
-/// OfficeArtSpgr payload length (empty group bounds rectangle).
+/// `OfficeArtSpgr` payload length (empty group bounds rectangle).
 const SPGR_PAYLOAD_LEN: u32 = 16;
-/// Word's ClientAnchor payload: a 4-byte index into the PlcfSpa aCP array.
+/// Word's `ClientAnchor` payload: a 4-byte index into the `PlcfSpa` aCP array.
 const WORD_CLIENT_ANCHOR_LEN: u32 = 4;
-/// OfficeArtClientData payload length used by Word for shapes.
+/// `OfficeArtClientData` payload length used by Word for shapes.
 const CLIENT_DATA_LEN: u32 = 4;
-/// OfficeArtIDCL `dgid` of the Main Document drawing.
+/// `OfficeArtIDCL` `dgid` of the Main Document drawing.
 const DGID_MAIN_DOCUMENT: u32 = 1;
-/// OfficeArtIDCL `dgid` of the Header Document drawing.
+/// `OfficeArtIDCL` `dgid` of the Header Document drawing.
 const DGID_HEADER_DOCUMENT: u32 = 2;
 
-/// Compute the OfficeArtFDGG `spidMax`: the start of the next shape-id
+/// Compute the `OfficeArtFDGG` `spidMax`: the start of the next shape-id
 /// cluster beyond the highest allocated shape id.
 pub(super) fn spid_max(highest_shape_id: u32) -> u32 {
     highest_shape_id
         .saturating_add(SHAPE_IDS_PER_CLUSTER - highest_shape_id % SHAPE_IDS_PER_CLUSTER)
 }
 
-/// Append one OfficeArtWordDrawing element (dgglbl byte + OfficeArtDgContainer
+/// Append one `OfficeArtWordDrawing` element (dgglbl byte + `OfficeArtDgContainer`
 /// holding the drawing's group shape and one shape per floating picture or
 /// primitive). `dgid` is the drawing identifier (1 = Main, 2 = Header).
 fn write_dg_container(
@@ -426,9 +426,9 @@ fn write_dg_container(
     patch_record_len(out, dg_container_start);
 }
 
-/// Build the OfficeArtContent referenced by `fcDggInfo` ([MS-DOC] 2.9.171):
-/// an OfficeArtDggContainer (drawing defaults plus the blip store) followed
-/// by one OfficeArtWordDrawing per non-empty drawing — the Main Document
+/// Build the `OfficeArtContent` referenced by `fcDggInfo` ([MS-DOC] 2.9.171):
+/// an `OfficeArtDggContainer` (drawing defaults plus the blip store) followed
+/// by one `OfficeArtWordDrawing` per non-empty drawing — the Main Document
 /// drawing first, then the Header Document drawing.
 ///
 /// `allocated_main_shapes` counts every shape id allocated in the Main

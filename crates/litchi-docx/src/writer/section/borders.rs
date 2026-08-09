@@ -1,4 +1,4 @@
-//! WordprocessingML section page-border vocabulary.
+//! `WordprocessingML` section page-border vocabulary.
 //!
 //! The section module owns the `sectPr` container; this focused module owns
 //! the page-border model used by that container.

@@ -1,15 +1,15 @@
 use super::chp::CharacterProperties;
-/// CHPBinTable (Character Property Bin Table) parser.
+/// `CHPBinTable` (Character Property Bin Table) parser.
 ///
-/// Based on Apache POI's CHPBinTable class.
+/// Based on Apache POI's `CHPBinTable` class.
 /// This handles the two-level structure of character properties in DOC files:
-/// 1. PlcfBteChpx: Contains BTE entries with page numbers
+/// 1. `PlcfBteChpx`: Contains BTE entries with page numbers
 /// 2. CHPXFKP pages: 512-byte pages containing actual character runs
 ///
 /// References:
 /// - org.apache.poi.hwpf.model.CHPBinTable
 /// - org.apache.poi.hwpf.model.CHPFormattedDiskPage
-/// - [MS-DOC] 2.8.5 PlcfBteChpx
+/// - [MS-DOC] 2.8.5 `PlcfBteChpx`
 use super::fkp::ChpxFkp;
 use super::piece_table::PieceTable;
 use litchi_core::binary::read_u32_le;
@@ -29,9 +29,9 @@ pub struct CharacterRun {
     pub(crate) direct_grpprl: Vec<u8>,
 }
 
-/// CHPBinTable - manages character property bin table.
+/// `CHPBinTable` - manages character property bin table.
 ///
-/// Based on Apache POI's CHPBinTable.
+/// Based on Apache POI's `CHPBinTable`.
 #[derive(Debug)]
 pub struct ChpBinTable {
     /// All character runs extracted from FKP pages
@@ -39,17 +39,18 @@ pub struct ChpBinTable {
 }
 
 impl ChpBinTable {
-    /// Parse CHPBinTable from PlcfBteChpx data.
+    /// Parse `CHPBinTable` from `PlcfBteChpx` data.
     ///
     /// # Arguments
     ///
-    /// * `plcf_bte_chpx_data` - The PlcfBteChpx data from table stream
-    /// * `word_document` - The WordDocument stream (FKP pages are stored here!)
+    /// * `plcf_bte_chpx_data` - The `PlcfBteChpx` data from table stream
+    /// * `word_document` - The `WordDocument` stream (FKP pages are stored here!)
     /// * `piece_table` - The piece table for FC-to-CP conversion
     ///
     /// # Returns
     ///
-    /// Parsed CHPBinTable or None if invalid
+    /// Parsed `CHPBinTable` or None if invalid
+    #[must_use]
     pub fn parse(
         plcf_bte_chpx_data: &[u8],
         word_document: &[u8],
@@ -120,7 +121,7 @@ impl ChpBinTable {
                     {
                         let piece_modifier = piece_table
                             .piece_for_cp(start_cp)
-                            .map(|piece| piece.property_modifier())
+                            .map(super::piece_table::TextPiece::property_modifier)
                             .unwrap_or_default();
                         let (properties, direct_grpprl) =
                             Self::parse_chpx(&entry.grpprl, piece_modifier);
@@ -168,10 +169,10 @@ impl ChpBinTable {
         Some(Self { runs: all_runs })
     }
 
-    /// Parse CHPX data (grpprl) into CharacterProperties.
+    /// Parse CHPX data (grpprl) into `CharacterProperties`.
     ///
-    /// Delegates to CharacterProperties::from_sprm for consistent behavior
-    /// with the full SPRM parser (handles is_spec, is_obj, is_data flags correctly).
+    /// Delegates to `CharacterProperties::from_sprm` for consistent behavior
+    /// with the full SPRM parser (handles `is_spec`, `is_obj`, `is_data` flags correctly).
     #[inline]
     fn parse_chpx(grpprl: &[u8], piece_modifier: &[u8]) -> (CharacterProperties, Vec<u8>) {
         if grpprl.is_empty() && piece_modifier.is_empty() {
@@ -188,6 +189,7 @@ impl ChpBinTable {
 
     /// Get all character runs.
     #[inline]
+    #[must_use]
     pub fn runs(&self) -> &[CharacterRun] {
         &self.runs
     }

@@ -1,3 +1,7 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
 //! OPC/package integration for document settings.
 
 use super::model::DocumentSettings;
@@ -34,7 +38,7 @@ pub(crate) fn extract_document_variables(part: &dyn Part) -> Result<Variables> {
         )));
     }
     let xml = litchi_ooxml_common::mce::process_part(part)?;
-    Ok(crate::parse_variables(xml.as_ref())?)
+    crate::parse_variables(xml.as_ref())
 }
 
 impl DocumentSettings {

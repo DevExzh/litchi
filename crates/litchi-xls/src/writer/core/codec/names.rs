@@ -1,5 +1,5 @@
 use super::super::named_range;
-use super::super::*;
+use super::super::{DefinedName, DefinedNameRecordOptions, Writer};
 use crate::error::{Error, Result};
 
 impl Writer {
@@ -31,6 +31,9 @@ impl Writer {
     /// The reference must currently be a simple A1 or A1:B10 style range
     /// without sheet qualifiers. More complex formulas will be rejected
     /// at serialization time to avoid emitting invalid BIFF payloads.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn define_name(&mut self, name: &str, reference: &str) -> Result<()> {
         Self::validate_defined_name(name)?;
 
@@ -63,15 +66,18 @@ impl Writer {
     /// Define a sheet-scoped named range.
     ///
     /// `sheet` is a 0-based worksheet index.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn define_name_local(&mut self, name: &str, reference: &str, sheet: usize) -> Result<()> {
         Self::validate_defined_name(name)?;
 
         let _ = self
             .worksheets
             .get(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
 
-        let itab = u16::try_from(sheet + 1).map_err(|_| {
+        let itab = u16::try_from(sheet + 1).map_err(|_error| {
             Error::InvalidData(
                 "define_name_local: sheet index exceeds BIFF8 itab limit".to_string(),
             )
@@ -82,7 +88,7 @@ impl Writer {
             reference: reference.to_string(),
             comment: None,
             local_sheet: Some(itab),
-            target_sheet: Some(sheet as u16),
+            target_sheet: Some(crate::utils::truncate_usize_to_u16(sheet)),
             hidden: false,
             is_function: false,
             is_built_in: false,
@@ -93,6 +99,9 @@ impl Writer {
     }
 
     /// Define a workbook-scoped named range with a user-visible comment.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn define_name_with_comment(
         &mut self,
         name: &str,
@@ -134,11 +143,15 @@ impl Writer {
     }
 
     /// Get all defined names in this workbook.
+    #[must_use]
     pub fn named_ranges(&self) -> &[DefinedName] {
         &self.defined_names
     }
 
     /// Add complete inert BIFF8 defined-name metadata.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_defined_name_record(&mut self, options: DefinedNameRecordOptions) -> Result<usize> {
         options.validate(self.worksheets.len())?;
         if self.defined_names.len() + self.defined_name_records.len() >= usize::from(u16::MAX) {
@@ -153,6 +166,9 @@ impl Writer {
     }
 
     /// Add complete inert `Lbl` metadata and its ordered BIFF8 future records.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_defined_name_record_with_future_records(
         &mut self,
         options: DefinedNameRecordOptions,

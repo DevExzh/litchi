@@ -1,5 +1,6 @@
 //! Master-document content validation.
 
+use litchi_core::Position;
 use litchi_core::{Error, Result};
 use litchi_odf_common::compact_xml;
 use quick_xml::{
@@ -30,6 +31,7 @@ enum NamespaceKind {
 #[derive(Clone, Debug)]
 struct ActiveSection {
     depth: usize,
+    position: Position,
     name: String,
     child_seen: bool,
     source_seen: bool,
@@ -40,6 +42,7 @@ struct ActiveSection {
 pub(crate) struct Semantics {
     references: Vec<crate::model::subdocument::Reference>,
     href_spans: Vec<Range<usize>>,
+    tree: crate::model::section::Tree,
 }
 
 impl Semantics {
@@ -49,6 +52,10 @@ impl Semantics {
 
     pub(crate) fn href_span(&self, reference: usize) -> Option<&Range<usize>> {
         self.href_spans.get(reference)
+    }
+
+    pub(crate) const fn tree(&self) -> &crate::model::section::Tree {
+        &self.tree
     }
 }
 
@@ -79,6 +86,7 @@ fn parse_structure(xml: &str) -> Result<Semantics> {
     let mut section_names = HashSet::new();
     let mut xml_ids = HashSet::new();
     let mut sections: Vec<ActiveSection> = Vec::new();
+    let mut tree = crate::model::section::Tree::default();
     let mut references = Vec::new();
     let mut href_spans = Vec::new();
     let mut section_source_depth = None;
@@ -107,6 +115,7 @@ fn parse_structure(xml: &str) -> Result<Semantics> {
                     &mut section_names,
                     &mut xml_ids,
                     &mut sections,
+                    &mut tree,
                     &mut references,
                     &mut href_spans,
                     &mut section_source_depth,
@@ -132,6 +141,7 @@ fn parse_structure(xml: &str) -> Result<Semantics> {
                     &mut section_names,
                     &mut xml_ids,
                     &mut sections,
+                    &mut tree,
                     &mut references,
                     &mut href_spans,
                     &mut section_source_depth,
@@ -193,6 +203,7 @@ fn parse_structure(xml: &str) -> Result<Semantics> {
     Ok(Semantics {
         references,
         href_spans,
+        tree,
     })
 }
 
@@ -214,6 +225,7 @@ fn observe(
     section_names: &mut HashSet<String>,
     xml_ids: &mut HashSet<String>,
     sections: &mut Vec<ActiveSection>,
+    tree: &mut crate::model::section::Tree,
     references: &mut Vec<crate::model::subdocument::Reference>,
     href_spans: &mut Vec<Range<usize>>,
     section_source_depth: &mut Option<usize>,
@@ -274,6 +286,58 @@ fn observe(
         ensure_short(&name, "ODM text:section name")?;
         let section = name.clone();
         insert_identity(section_names, name, "duplicate ODM section name")?;
+        let style_name = attribute(reader, element, TEXT, b"style-name")?;
+        let xml_id = attribute(reader, element, XML, b"id")?;
+        let protected = attribute(reader, element, TEXT, b"protected")?
+            .map(|value| parse_bool(&value, "ODM text:section text:protected"))
+            .transpose()?;
+        for (value, scope) in [
+            (style_name.as_deref(), "ODM section style name"),
+            (xml_id.as_deref(), "ODM section xml:id"),
+        ] {
+            if let Some(value) = value {
+                ensure_short(value, scope)?;
+            }
+        }
+        let position = Position::new(tree.sections.len());
+        let parent = sections.last().map(|active| active.position);
+        tree.sections
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "ODM section tree",
+                source,
+            })?;
+        tree.sections.push(crate::model::section::Node {
+            name: section.clone(),
+            style_name,
+            xml_id,
+            protected,
+            parent,
+            children: Vec::new(),
+            reference: None,
+        });
+        if let Some(parent_position) = parent {
+            let parent_node = tree
+                .sections
+                .get_mut(parent_position.get())
+                .ok_or_else(|| invalid("ODM section-tree parent disappeared"))?;
+            parent_node
+                .children
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "ODM section-tree children",
+                    source,
+                })?;
+            parent_node.children.push(position);
+        } else {
+            tree.roots
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "ODM section-tree roots",
+                    source,
+                })?;
+            tree.roots.push(position);
+        }
         if !empty {
             sections
                 .try_reserve(1)
@@ -283,6 +347,7 @@ fn observe(
                 })?;
             sections.push(ActiveSection {
                 depth,
+                position,
                 name: section,
                 child_seen: false,
                 source_seen: false,
@@ -347,6 +412,10 @@ fn observe(
                 source_section,
                 filter_name,
             ));
+            tree.sections
+                .get_mut(section.position.get())
+                .ok_or_else(|| invalid("ODM linked section disappeared from its tree"))?
+                .reference = Some(Position::new(references.len() - 1));
             href_spans.push(tag_start + span_start..tag_start + span_end);
         }
         if !empty {
@@ -358,6 +427,14 @@ fn observe(
         insert_identity(xml_ids, xml_id, "duplicate ODM xml:id")?;
     }
     Ok(())
+}
+
+fn parse_bool(value: &str, scope: &str) -> Result<bool> {
+    match value {
+        "true" => Ok(true),
+        "false" => Ok(false),
+        _ => Err(invalid(format!("{scope} must be true or false"))),
+    }
 }
 
 fn insert_identity(set: &mut HashSet<String>, value: String, message: &str) -> Result<()> {

@@ -2,4 +2,5 @@
 
 pub mod layer;
 pub mod page;
+pub mod resource;
 pub mod shape;

@@ -28,11 +28,13 @@ impl RevisionReason {
     pub const MAX_VALUE: u16 = 0x002B;
 
     /// Construct a reason from its MS-DOC value.
+    #[must_use]
     pub fn from_raw(value: u16) -> Option<Self> {
         (value <= Self::MAX_VALUE).then_some(Self(value))
     }
 
     /// Return the underlying MS-DOC reason value.
+    #[must_use]
     pub fn raw(self) -> u16 {
         self.0
     }

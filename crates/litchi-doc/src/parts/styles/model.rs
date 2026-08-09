@@ -128,6 +128,7 @@ pub struct StyleDefinition {
 
 impl StyleDefinition {
     /// The table-property UPX for a table style.
+    #[must_use]
     pub fn table_properties(&self) -> Option<&[u8]> {
         (self.kind == StyleKind::Table)
             .then(|| self.property_sets.first().map(Vec::as_slice))
@@ -169,26 +170,31 @@ impl StyleSheet {
     ///
     /// Always empty after a strict parse.
     #[inline]
+    #[must_use]
     pub fn tolerance_report(&self) -> &ToleranceReport {
         &self.tolerance
     }
 
     /// General stylesheet information.
+    #[must_use]
     pub fn header(&self) -> &StyleSheetHeader {
         &self.header
     }
 
     /// All style slots, including required null fixed-index slots.
+    #[must_use]
     pub fn styles(&self) -> &[Option<StyleDefinition>] {
         &self.styles
     }
 
     /// Resolve one style index to a non-empty definition.
+    #[must_use]
     pub fn get(&self, index: u16) -> Option<&StyleDefinition> {
         self.styles.get(usize::from(index))?.as_ref()
     }
 
     /// Uninterpreted STSHI extension bytes following the 18-byte Stshif.
+    #[must_use]
     pub fn stshi_tail(&self) -> &[u8] {
         &self.stshi_tail
     }

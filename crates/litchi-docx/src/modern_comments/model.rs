@@ -1,6 +1,6 @@
 //! Package-neutral modern Word comment metadata models.
 
-/// Transitional WordprocessingML namespace.
+/// Transitional `WordprocessingML` namespace.
 pub const WORD_2012_NAMESPACE: &str = "http://schemas.microsoft.com/office/word/2012/wordml";
 /// Comments IDs namespace.
 pub const COMMENTS_IDS_NAMESPACE: &str = "http://schemas.microsoft.com/office/word/2016/wordml/cid";
@@ -13,10 +13,10 @@ pub const WORD_2018_NAMESPACE: &str = "http://schemas.microsoft.com/office/word/
 pub const REACTIONS_NAMESPACE: &str = "http://schemas.microsoft.com/office/comments/2020/reactions";
 /// Office extension-list namespace.
 pub const OFFICE_EXTENSION_LIST_NAMESPACE: &str = "http://schemas.microsoft.com/office/2019/extlst";
-/// Transitional WordprocessingML namespace used by generated parts.
+/// Transitional `WordprocessingML` namespace used by generated parts.
 pub const TRANSITIONAL_WORD_NAMESPACE: &str =
     "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-/// Strict WordprocessingML namespace used by generated parts.
+/// Strict `WordprocessingML` namespace used by generated parts.
 pub const STRICT_WORD_NAMESPACE: &str = "http://purl.oclc.org/ooxml/wordprocessingml/main";
 
 /// Maximum accepted modern-comment part size.
@@ -28,7 +28,7 @@ pub const MAX_MODERN_COMMENT_ITEMS: usize = 65_536;
 /// Maximum bytes retained for XML strings.
 pub const MAX_MODERN_COMMENT_STRING_BYTES: usize = 8 * 1024 * 1024;
 
-/// WordprocessingML conformance used when serializing a metadata part.
+/// `WordprocessingML` conformance used when serializing a metadata part.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Conformance {
     Transitional,

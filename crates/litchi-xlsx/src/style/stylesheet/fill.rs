@@ -30,6 +30,7 @@ pub enum Fill {
 impl Fill {
     /// Create a new solid fill with the given color.
     #[inline]
+    #[must_use]
     pub fn solid(color: String) -> Self {
         Fill::Pattern {
             pattern_type: "solid".to_string(),
@@ -40,6 +41,7 @@ impl Fill {
 
     /// Create a new pattern fill.
     #[inline]
+    #[must_use]
     pub fn pattern(
         pattern_type: String,
         fg_color: Option<String>,
@@ -53,6 +55,7 @@ impl Fill {
     }
 
     /// Check if this is a solid fill.
+    #[must_use]
     pub fn is_solid(&self) -> bool {
         matches!(self, Fill::Pattern { pattern_type, .. } if pattern_type == "solid")
     }

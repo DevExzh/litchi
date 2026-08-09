@@ -1,7 +1,40 @@
 //! Typed, inert field views derived from parsed instructions.
 
-use super::super::model::*;
-use super::parser::*;
+use super::super::model::{
+    ActiveContentField, ActiveContentFieldKind, AdvanceField, AutoNumberField, AutoNumberFieldKind,
+    AutoTextField, AutoTextFieldKind, AutoTextListField, BarcodeField, BidiOutlineField,
+    CompareField, DdeField, DdeFieldKind, DocumentContextField, DocumentContextFieldKind,
+    DocumentInformationField, DocumentInformationFieldKind, DocumentPropertyField,
+    DocumentVariableField, EmbedField, EquationField, ExternalIncludeField, FieldText, FieldType,
+    FormulaField, GoToButtonField, HyperlinkField, IfField, IncludeFieldKind, IndexField,
+    InfoField, LegacyFormField, LegacyFormFieldKind, LinkField, ListNumberField, MacroButtonField,
+    MailMergeConditionalControlField, MailMergeConditionalControlKind, MailMergeCounterField,
+    MailMergeCounterKind, MailMergeDataField, MailMergeNextField, MailMergeRecipientField,
+    MailMergeRecipientFieldKind, MergeField, PrintField, PromptField, PromptFieldKind, QuoteField,
+    ReferenceField, ReferenceFieldKind, SequenceField, SetField, ShapeField, StyleReferenceField,
+    SymbolField, TableOfAuthoritiesField, TableOfContentsField, UserIdentityField,
+    UserIdentityFieldKind,
+};
+use super::parser::{
+    is_mail_merge_next_instruction, parse_advance_field_adjustments, parse_auto_number_field_parts,
+    parse_auto_text_field_parts, parse_auto_text_list_field_parts,
+    parse_barcode_field_instructions, parse_bidi_outline_field_instructions,
+    parse_compare_field_comparison, parse_dde_field_parts, parse_document_context_field_parts,
+    parse_document_information_field_parts, parse_document_property_field_parts,
+    parse_document_variable_field_parts, parse_embed_field_instructions,
+    parse_equation_field_expression, parse_external_include_field_parts,
+    parse_formula_field_formula, parse_go_to_button_parts, parse_hyperlink_field_parts,
+    parse_if_field_expression, parse_index_field_parts, parse_info_field_parts,
+    parse_legacy_form_field_instructions, parse_link_field_parts, parse_list_number_field_parts,
+    parse_macro_button_parts, parse_mail_merge_conditional_control_parts,
+    parse_mail_merge_counter_kind, parse_mail_merge_data_field_parts,
+    parse_mail_merge_recipient_field_parts, parse_merge_field_parts,
+    parse_print_field_instructions, parse_prompt_field_parts, parse_quote_field_parts,
+    parse_reference_field_parts, parse_sequence_field_parts, parse_set_field_parts,
+    parse_shape_field_instructions, parse_style_reference_field_parts, parse_symbol_field_parts,
+    parse_table_of_authorities_field_parts, parse_table_of_contents_field_parts,
+    parse_user_identity_field_parts,
+};
 impl FieldText {
     /// Return inert typed metadata when this is a well-formed `MACROBUTTON`
     /// field.
@@ -10,6 +43,7 @@ impl FieldText {
     /// field text. Neither is resolved, loaded, invoked, or executed.
     /// Malformed instructions remain available through this generic type and
     /// return `None` here.
+    #[must_use]
     pub fn macro_button(&self) -> Option<MacroButtonField> {
         if self.field.field_type != FieldType::MacroButton {
             return None;
@@ -30,6 +64,7 @@ impl FieldText {
     /// The destination and button text are parsed only from stored field text.
     /// Neither is resolved, navigated to, or activated. Malformed instructions
     /// remain available through this generic type and return `None` here.
+    #[must_use]
     pub fn go_to_button(&self) -> Option<GoToButtonField> {
         if self.field.field_type != FieldType::GoToButton {
             return None;
@@ -49,6 +84,7 @@ impl FieldText {
     /// The stored instruction and cached result are never interpreted to load
     /// an add-in, instantiate a control, invoke code, execute script, render
     /// content, or access an external resource.
+    #[must_use]
     pub fn active_content_field(&self) -> Option<ActiveContentField> {
         let kind = match self.field.field_type {
             FieldType::AddIn => ActiveContentFieldKind::AddIn,
@@ -71,6 +107,7 @@ impl FieldText {
     /// codes, opens a printer, sends output, changes print settings, or
     /// refreshes a field. Malformed instructions remain available through this
     /// generic type and return `None` here.
+    #[must_use]
     pub fn print_field(&self) -> Option<PrintField> {
         if self.field.field_type != FieldType::Print {
             return None;
@@ -92,6 +129,7 @@ impl FieldText {
     /// accesses an external resource, or refreshes a field. Malformed
     /// instructions remain available through this generic type and return
     /// `None` here.
+    #[must_use]
     pub fn embed_field(&self) -> Option<EmbedField> {
         if self.field.field_type != FieldType::EmbeddedObject {
             return None;
@@ -112,6 +150,7 @@ impl FieldText {
     /// barcode data or symbology, generates or renders a barcode, accesses an
     /// external resource, or refreshes a field. Malformed instructions remain
     /// available through this generic type and return `None` here.
+    #[must_use]
     pub fn barcode_field(&self) -> Option<BarcodeField> {
         if self.field.field_type != FieldType::BarCode {
             return None;
@@ -132,6 +171,7 @@ impl FieldText {
     /// paragraph outline, or layout state; chooses a numbering system;
     /// calculates a result; or refreshes a field. Malformed instructions remain
     /// available through this generic type and return `None` here.
+    #[must_use]
     pub fn bidi_outline_field(&self) -> Option<BidiOutlineField> {
         if self.field.field_type != FieldType::BidiOutline {
             return None;
@@ -152,6 +192,7 @@ impl FieldText {
     /// positions, lays out, or renders a drawing or canvas, or refreshes a
     /// field. Malformed instructions remain available through this generic type
     /// and return `None` here.
+    #[must_use]
     pub fn shape_field(&self) -> Option<ShapeField> {
         if self.field.field_type != FieldType::Shape {
             return None;
@@ -172,6 +213,7 @@ impl FieldText {
     /// properties, fills a form, changes a selection or checkbox state, invokes
     /// entry or exit macros, or refreshes a field. Malformed instructions remain
     /// available through this generic type and return `None` here.
+    #[must_use]
     pub fn legacy_form_field(&self) -> Option<LegacyFormField> {
         let (kind, keyword) = match self.field.field_type {
             FieldType::FormText => (LegacyFormFieldKind::Text, "FORMTEXT"),
@@ -197,6 +239,7 @@ impl FieldText {
     /// number, create a link, calculate relative position, or refresh a field.
     /// Malformed instructions remain available through this generic type and
     /// return `None` here.
+    #[must_use]
     pub fn reference_field(&self) -> Option<ReferenceField> {
         let kind = match self.field.field_type {
             FieldType::Ref => ReferenceFieldKind::Reference,
@@ -224,6 +267,7 @@ impl FieldText {
     /// evaluate an expression, look up or change a bookmark, change document
     /// state, or refresh a field. Malformed instructions remain available
     /// through this generic type and return `None` here.
+    #[must_use]
     pub fn set_field(&self) -> Option<SetField> {
         if self.field.field_type != FieldType::Set {
             return None;
@@ -244,6 +288,7 @@ impl FieldText {
     /// a formula, read table cells or bookmarks, resolve field values, or
     /// refresh a field. Malformed instructions remain available through this
     /// generic type and return `None` here.
+    #[must_use]
     pub fn formula_field(&self) -> Option<FormulaField> {
         if self.field.field_type != FieldType::Formula {
             return None;
@@ -262,6 +307,7 @@ impl FieldText {
     /// Stored equation syntax and cached results are never parsed, calculated,
     /// formatted, rendered, or refreshed. Malformed instructions remain
     /// available through this generic type and return `None` here.
+    #[must_use]
     pub fn equation_field(&self) -> Option<EquationField> {
         if self.field.field_type != FieldType::Equation {
             return None;
@@ -280,6 +326,7 @@ impl FieldText {
     /// Stored targets, options, and cached results are never opened, resolved,
     /// followed, activated, or refreshed. Malformed instructions remain
     /// available through this generic type and return `None` here.
+    #[must_use]
     pub fn hyperlink_field(&self) -> Option<HyperlinkField> {
         if self.field.field_type != FieldType::Hyperlink {
             return None;
@@ -305,6 +352,7 @@ impl FieldText {
     /// character codes, expand nested fields, insert text, or refresh a field.
     /// Malformed instructions remain available through this generic type and
     /// return `None` here.
+    #[must_use]
     pub fn quote_field(&self) -> Option<QuoteField> {
         if self.field.field_type != FieldType::Quote {
             return None;
@@ -325,6 +373,7 @@ impl FieldText {
     /// to map a character code, look up a font, insert a glyph, change
     /// formatting or layout, or refresh a field. Malformed instructions remain
     /// available through this generic type and return `None` here.
+    #[must_use]
     pub fn symbol_field(&self) -> Option<SymbolField> {
         if self.field.field_type != FieldType::Symbol {
             return None;
@@ -345,6 +394,7 @@ impl FieldText {
     /// paragraph numbers, read heading or style state, change paragraphs or
     /// layout, or refresh a field. Malformed instructions remain available
     /// through this generic type and return `None` here.
+    #[must_use]
     pub fn auto_number_field(&self) -> Option<AutoNumberField> {
         let kind = AutoNumberFieldKind::from_field_type(self.field.field_type)?;
         let (instruction_kind, switches) = parse_auto_number_field_parts(&self.instruction)?;
@@ -366,6 +416,7 @@ impl FieldText {
     /// to look up a list, determine a level or start value, calculate a number,
     /// change layout, or refresh a field. Malformed instructions remain
     /// available through this generic type and return `None` here.
+    #[must_use]
     pub fn list_number_field(&self) -> Option<ListNumberField> {
         if self.field.field_type != FieldType::ListNumber {
             return None;
@@ -386,6 +437,7 @@ impl FieldText {
     /// used to look up a bookmark, increment or reset a sequence, calculate a
     /// number, or refresh a field. Malformed instructions remain available
     /// through this generic type and return `None` here.
+    #[must_use]
     pub fn sequence_field(&self) -> Option<SequenceField> {
         if self.field.field_type != FieldType::Sequence {
             return None;
@@ -408,6 +460,7 @@ impl FieldText {
     /// numbers or relative positions, resolve page layout, or refresh a field.
     /// Malformed instructions remain available through this generic type and
     /// return `None` here.
+    #[must_use]
     pub fn style_reference_field(&self) -> Option<StyleReferenceField> {
         if self.field.field_type != FieldType::StyleRef {
             return None;
@@ -429,6 +482,7 @@ impl FieldText {
     /// read bookmarks, resolve links, calculate page numbers, regenerate a
     /// table of contents, or refresh a field. Malformed instructions remain
     /// available through this generic type and return `None` here.
+    #[must_use]
     pub fn table_of_contents(&self) -> Option<TableOfContentsField> {
         if self.field.field_type != FieldType::TableOfContents {
             return None;
@@ -450,6 +504,7 @@ impl FieldText {
     /// paginate, regenerate a table of authorities, or refresh a field.
     /// Malformed instructions remain available through this generic type and
     /// return `None` here.
+    #[must_use]
     pub fn table_of_authorities(&self) -> Option<TableOfAuthoritiesField> {
         if self.field.field_type != FieldType::TableOfAuthorities {
             return None;
@@ -470,6 +525,7 @@ impl FieldText {
     /// markers, read bookmarks, calculate page numbers, sort entries,
     /// paginate, generate an index, or refresh a field. Malformed instructions
     /// remain available through this generic type and return `None` here.
+    #[must_use]
     pub fn index(&self) -> Option<IndexField> {
         if self.field.field_type != FieldType::Index {
             return None;
@@ -491,6 +547,7 @@ impl FieldText {
     /// up a building block, read a template, insert content, change bookmarks,
     /// open a resource, or refresh a field. Malformed instructions remain
     /// available through this generic type and return `None` here.
+    #[must_use]
     pub fn auto_text_field(&self) -> Option<AutoTextField> {
         let kind = match self.field.field_type {
             FieldType::Glossary => AutoTextFieldKind::Glossary,
@@ -514,6 +571,7 @@ impl FieldText {
     /// used to show a selection UI, look up a building block, read a template,
     /// insert content, or refresh a field. Malformed instructions remain
     /// available through this generic type and return `None` here.
+    #[must_use]
     pub fn auto_text_list_field(&self) -> Option<AutoTextListField> {
         if self.field.field_type != FieldType::AutoTextList {
             return None;
@@ -535,6 +593,7 @@ impl FieldText {
     /// resolved against a data source, merged into the document, or refreshed.
     /// Malformed instructions remain available through this generic type and
     /// return `None` here.
+    #[must_use]
     pub fn merge_field(&self) -> Option<MergeField> {
         if self.field.field_type != FieldType::MergeField {
             return None;
@@ -557,6 +616,7 @@ impl FieldText {
     /// selects a record, performs a merge, or refreshes a field. Malformed
     /// instructions remain available through this generic type and return
     /// `None` here.
+    #[must_use]
     pub fn mail_merge_data(&self) -> Option<MailMergeDataField> {
         if self.field.field_type != FieldType::Data {
             return None;
@@ -579,6 +639,7 @@ impl FieldText {
     /// The stored variable name, switches, and cached result are never resolved
     /// against document variables or refreshed. Malformed instructions remain
     /// available through this generic type and return `None` here.
+    #[must_use]
     pub fn document_variable(&self) -> Option<DocumentVariableField> {
         if self.field.field_type != FieldType::DocumentVariable {
             return None;
@@ -600,6 +661,7 @@ impl FieldText {
     /// The stored property name, switches, and cached result are never resolved
     /// against document properties or refreshed. Malformed instructions remain
     /// available through this generic type and return `None` here.
+    #[must_use]
     pub fn document_property(&self) -> Option<DocumentPropertyField> {
         if self.field.field_type != FieldType::DocumentProperty {
             return None;
@@ -622,6 +684,7 @@ impl FieldText {
     /// refreshes a field. The native field type permits recognition of both
     /// explicit and keyword-omitted instruction forms. Malformed instructions
     /// remain available through this generic type and return `None` here.
+    #[must_use]
     pub fn info_field(&self) -> Option<InfoField> {
         if self.field.field_type != FieldType::Info {
             return None;
@@ -646,6 +709,7 @@ impl FieldText {
     /// or statistics, resolves a value, or refreshes a field. Malformed
     /// instructions and mismatched native field types remain available through
     /// this generic type and return `None` here.
+    #[must_use]
     pub fn document_information(&self) -> Option<DocumentInformationField> {
         let native_kind = DocumentInformationFieldKind::from_field_type(self.field.field_type)?;
         let (kind, switches) = parse_document_information_field_parts(&self.instruction)?;
@@ -671,6 +735,7 @@ impl FieldText {
     /// and section layout, resolves a value, or refreshes a field. Malformed
     /// instructions and mismatched native field types remain available through
     /// this generic type and return `None` here.
+    #[must_use]
     pub fn document_context(&self) -> Option<DocumentContextField> {
         let native_kind = DocumentContextFieldKind::from_field_type(self.field.field_type)?;
         let (kind, switches) = parse_document_context_field_parts(&self.instruction)?;
@@ -694,6 +759,7 @@ impl FieldText {
     /// request data, refresh a field, convert content, or execute code.
     /// Malformed instructions remain available through this generic type and
     /// return `None` here.
+    #[must_use]
     pub fn dde_link(&self) -> Option<DdeField> {
         let parts = parse_dde_field_parts(&self.instruction)?;
         if !matches!(
@@ -724,6 +790,7 @@ impl FieldText {
     /// data, refresh a field, convert content, or execute code. Malformed
     /// instructions remain available through this generic type and return
     /// `None` here.
+    #[must_use]
     pub fn link_field(&self) -> Option<LinkField> {
         if self.field.field_type != FieldType::Link {
             return None;
@@ -750,14 +817,18 @@ impl FieldText {
     /// to open, resolve, import, fetch, refresh, transform, convert, evaluate,
     /// or execute source content. Malformed instructions remain available
     /// through this generic type and return `None` here.
+    #[must_use]
     pub fn external_include(&self) -> Option<ExternalIncludeField> {
         let parts = parse_external_include_field_parts(&self.instruction)?;
         if !matches!(
             (self.field.field_type, parts.kind),
-            (FieldType::Include, IncludeFieldKind::Text)
-                | (FieldType::IncludeText, IncludeFieldKind::Text)
-                | (FieldType::Import, IncludeFieldKind::Picture)
-                | (FieldType::IncludePicture, IncludeFieldKind::Picture)
+            (
+                FieldType::Include | FieldType::IncludeText,
+                IncludeFieldKind::Text
+            ) | (
+                FieldType::Import | FieldType::IncludePicture,
+                IncludeFieldKind::Picture
+            )
         ) {
             return None;
         }
@@ -781,6 +852,7 @@ impl FieldText {
     /// records, open a data source, perform a merge, or refresh a field
     /// result. Malformed instructions remain available through this generic
     /// type and return `None` here.
+    #[must_use]
     pub fn mail_merge_counter(&self) -> Option<MailMergeCounterField> {
         let kind = parse_mail_merge_counter_kind(&self.instruction)?;
         if !matches!(
@@ -804,6 +876,7 @@ impl FieldText {
     /// data source, perform a merge, or refresh a field result. Malformed
     /// instructions remain available through this generic type and return
     /// `None` here.
+    #[must_use]
     pub fn mail_merge_next(&self) -> Option<MailMergeNextField> {
         if self.field.field_type != FieldType::Next
             || !is_mail_merge_next_instruction(&self.instruction)
@@ -824,6 +897,7 @@ impl FieldText {
     /// performs a merge, or refreshes a field result. Instructions without a
     /// comparison remain available through this generic type and return `None`
     /// here.
+    #[must_use]
     pub fn mail_merge_conditional_control(&self) -> Option<MailMergeConditionalControlField> {
         let (kind, comparison) = parse_mail_merge_conditional_control_parts(&self.instruction)?;
         if !matches!(
@@ -848,6 +922,7 @@ impl FieldText {
     /// This method never resolves field values or refreshes a field result.
     /// Instructions without an expression remain available through this generic
     /// type and return `None` here.
+    #[must_use]
     pub fn if_field(&self) -> Option<IfField> {
         if self.field.field_type != FieldType::If {
             return None;
@@ -867,6 +942,7 @@ impl FieldText {
     /// This method never resolves nested field values or refreshes a field
     /// result. Instructions without a comparison remain available through this
     /// generic type and return `None` here.
+    #[must_use]
     pub fn compare_field(&self) -> Option<CompareField> {
         if self.field.field_type != FieldType::Compare {
             return None;
@@ -886,6 +962,7 @@ impl FieldText {
     /// never used to display a prompt, capture a response, create or update a
     /// bookmark, perform a merge, or refresh a field. Malformed instructions
     /// remain available through this generic type and return `None` here.
+    #[must_use]
     pub fn prompt_field(&self) -> Option<PromptField> {
         let (kind, bookmark, prompt, default_response, prompts_once_per_mail_merge) =
             parse_prompt_field_parts(&self.instruction)?;
@@ -914,6 +991,7 @@ impl FieldText {
     /// read or modify a host user's identity, apply formatting, or refresh a
     /// field. Malformed instructions remain available through this generic type
     /// and return `None` here.
+    #[must_use]
     pub fn user_identity_field(&self) -> Option<UserIdentityField> {
         let (kind, override_value, formatting) =
             parse_user_identity_field_parts(&self.instruction)?;
@@ -941,6 +1019,7 @@ impl FieldText {
     /// text, change layout, reflow content, or refresh a field. Malformed
     /// instructions remain available through this generic type and return
     /// `None` here.
+    #[must_use]
     pub fn advance_field(&self) -> Option<AdvanceField> {
         if self.field.field_type != FieldType::Advance {
             return None;
@@ -961,6 +1040,7 @@ impl FieldText {
     /// never used to open a data source, select a record, perform a merge,
     /// expand placeholders, generate text, or refresh a field. Malformed
     /// instructions remain generic fields and return `None` here.
+    #[must_use]
     pub fn mail_merge_recipient_field(&self) -> Option<MailMergeRecipientField> {
         let (
             kind,

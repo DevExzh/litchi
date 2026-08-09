@@ -171,6 +171,7 @@ pub struct TapBuilder {
 
 impl TapBuilder {
     /// Create a new TAP builder
+    #[must_use]
     pub fn new() -> Self {
         Self { rows: Vec::new() }
     }
@@ -181,6 +182,7 @@ impl TapBuilder {
     }
 
     /// Generate TAP SPRMs for a specific row
+    #[must_use]
     pub fn generate_row_sprms(&self, row_index: usize) -> Vec<u8> {
         self.try_generate_row_sprms(row_index).unwrap_or_default()
     }
@@ -195,11 +197,13 @@ impl TapBuilder {
     }
 
     /// Borrow the configured rows.
+    #[must_use]
     pub fn rows(&self) -> &[TableRow] {
         &self.rows
     }
 
     /// Get the number of rows
+    #[must_use]
     pub fn row_count(&self) -> usize {
         self.rows.len()
     }
@@ -212,6 +216,7 @@ impl Default for TapBuilder {
 }
 
 /// Helper to create a simple table
+#[must_use]
 pub fn create_simple_table(rows: usize, cols: usize, cell_width: u16) -> TapBuilder {
     let mut builder = TapBuilder::new();
 

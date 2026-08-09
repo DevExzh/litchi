@@ -1,10 +1,13 @@
-//! Structural and resource validation for the inert ActiveX graph.
+//! Structural and resource validation for the inert `ActiveX` graph.
 //!
 //! Validation is intentionally independent from XML and OPC mutation. It
 //! checks semantic invariants before a codec allocates output or a package
 //! transaction changes state; binary payloads are only size-accounted.
 
-use super::model::*;
+use super::model::{
+    ControlProperties, ControlSet, Controls, Descriptor, Font, Persistence, Property,
+    PropertyObject,
+};
 use super::{
     MAX_BINARY, MAX_CONTROL_NAME_CHARS, MAX_CONTROLS, MAX_DEPTH, MAX_PROPERTIES, MAX_SHAPE_ID,
     MAX_STRING, MAX_TOTAL_BINARY, Result, invalid, limit, relerr,
@@ -225,6 +228,7 @@ pub(super) fn nonempty(value: &str, what: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::active_x::{Binary, Control, LoadedControl};
 
     fn control_set() -> ControlSet {
         ControlSet {

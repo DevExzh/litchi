@@ -317,9 +317,9 @@ pub(super) fn encode_sttb_fnm(files: &[Name]) -> Result<Vec<u8>> {
         );
         let mut fnfb = file.raw_fnfb;
         fnfb = (fnfb & !(FNFB_FAT | FNFB_NTFS | FNFB_NON_FILE_SYS))
-            | u8::from(file.valid_on_fat) * FNFB_FAT
-            | u8::from(file.valid_on_ntfs) * FNFB_NTFS
-            | u8::from(file.is_non_file_system_path) * FNFB_NON_FILE_SYS;
+            | (u8::from(file.valid_on_fat) * FNFB_FAT)
+            | (u8::from(file.valid_on_ntfs) * FNFB_NTFS)
+            | (u8::from(file.is_non_file_system_path) * FNFB_NON_FILE_SYS);
         data.push(fnfb);
         data.extend_from_slice(&file.fnif_unused);
     }
@@ -379,12 +379,12 @@ fn validate_name(file: &Name) -> Result<()> {
         return Err(corrupted("SttbFnm FNIF fnpd is the reserved nil value"));
     }
     let units = file.path.encode_utf16().count();
-    if let Some(offset) = file.relative_path_offset {
-        if offset >= units || offset > usize::from(ICH_RELATIVE_NONE) - 1 {
-            return Err(corrupted(
-                "SttbFnm FNIF ichRelative exceeds the file name length",
-            ));
-        }
+    if let Some(offset) = file.relative_path_offset
+        && (offset >= units || offset > usize::from(ICH_RELATIVE_NONE) - 1)
+    {
+        return Err(corrupted(
+            "SttbFnm FNIF ichRelative exceeds the file name length",
+        ));
     }
     if file.is_non_file_system_path && (file.valid_on_fat || file.valid_on_ntfs) {
         return Err(corrupted(

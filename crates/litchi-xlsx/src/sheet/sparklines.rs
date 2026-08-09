@@ -1,4 +1,7 @@
-#![allow(dead_code)]
+#![allow(
+    dead_code,
+    reason = "the sparkline wire model is retained for lossless round trips before public exposure"
+)]
 
 use litchi_core::sheet::Result as SheetResult;
 use litchi_core::{id::generate_guid_braced, xml::escape_xml};
@@ -82,6 +85,7 @@ pub struct Color {
 }
 
 impl Color {
+    #[must_use]
     pub fn new(rgb: String) -> Self {
         Self {
             rgb,
@@ -179,6 +183,7 @@ pub struct Group {
 }
 
 impl Group {
+    #[must_use]
     pub fn new(sparkline_type: Type) -> Self {
         Self {
             sparkline_type,
@@ -382,7 +387,7 @@ fn write_color(xml: &mut String, name: &str, color: &Color) -> SheetResult<()> {
             .map_err(|error| format!("XML write error: {error}"))?;
     }
     if let Some(automatic) = color.automatic {
-        write!(xml, r#" auto="{}""#, if automatic { 1 } else { 0 })
+        write!(xml, r#" auto="{}""#, i32::from(automatic))
             .map_err(|error| format!("XML write error: {error}"))?;
     }
     if let Some(theme) = color.theme {

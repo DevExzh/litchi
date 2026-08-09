@@ -1,3 +1,23 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::match_same_arms,
+    reason = "separate arms document distinct OOXML grammar cases"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::unnecessary_wraps,
+    reason = "the Result signature preserves a uniform fallible codec API"
+)]
+#![expect(
+    clippy::unwrap_used,
+    reason = "the invariant is established immediately before extraction"
+)]
 use crate::OfficeMath;
 use crate::alt::{Chunk, Conformance};
 /// Document writer implementation for DOCX.
@@ -73,7 +93,7 @@ pub struct MutableDocument {
     next_ole_shape_number: u32,
     /// Next VML shape number tried when allocating VML shape identities.
     next_vml_shape_number: u32,
-    /// Next SmartArt anchor number used when allocating anchor keys.
+    /// Next `SmartArt` anchor number used when allocating anchor keys.
     next_smartart_anchor: u32,
 }
 
@@ -161,7 +181,18 @@ impl CollectGlyphs for MutableParagraph {
                 ParagraphElement::Run(r) => r.collect_glyphs(),
                 ParagraphElement::Hyperlink(h) => h.collect_glyphs(),
                 ParagraphElement::SmartTag(tag) => tag.collect_glyphs(),
-                _ => continue,
+                ParagraphElement::DisplayOfficeMath(_)
+                | ParagraphElement::InlineImage(_)
+                | ParagraphElement::TextBox(_)
+                | ParagraphElement::OleObject(_)
+                | ParagraphElement::SmartArt(_)
+                | ParagraphElement::VmlShape(_)
+                | ParagraphElement::BookmarkStart(_)
+                | ParagraphElement::BookmarkEnd(_)
+                | ParagraphElement::Field(_)
+                | ParagraphElement::Revision(_)
+                | ParagraphElement::Conflict(_)
+                | ParagraphElement::CustomXmlConflictRange(_) => continue,
             };
             for (font, bitmap) in element_glyphs {
                 *glyphs.entry(font).or_default() |= bitmap;
@@ -180,7 +211,18 @@ impl CollectGlyphs for MutableSmartTag {
                 ParagraphElement::Run(run) => run.collect_glyphs(),
                 ParagraphElement::Hyperlink(hyperlink) => hyperlink.collect_glyphs(),
                 ParagraphElement::SmartTag(tag) => tag.collect_glyphs(),
-                _ => continue,
+                ParagraphElement::DisplayOfficeMath(_)
+                | ParagraphElement::InlineImage(_)
+                | ParagraphElement::TextBox(_)
+                | ParagraphElement::OleObject(_)
+                | ParagraphElement::SmartArt(_)
+                | ParagraphElement::VmlShape(_)
+                | ParagraphElement::BookmarkStart(_)
+                | ParagraphElement::BookmarkEnd(_)
+                | ParagraphElement::Field(_)
+                | ParagraphElement::Revision(_)
+                | ParagraphElement::Conflict(_)
+                | ParagraphElement::CustomXmlConflictRange(_) => continue,
             };
             for (font, bitmap) in element_glyphs {
                 *glyphs.entry(font).or_default() |= bitmap;
@@ -209,6 +251,7 @@ impl CollectGlyphs for MutableTable {
 
 impl MutableDocument {
     /// Create a new empty mutable document.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             body: DocumentBody::new(),
@@ -236,6 +279,10 @@ impl MutableDocument {
     }
 
     /// Create a mutable document from existing XML content.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_xml(xml: &str) -> Result<Self> {
         let parsed = DocumentBody::from_xml(xml)?;
         parsed.body.validate_section_placement()?;
@@ -279,16 +326,25 @@ impl MutableDocument {
     }
 
     /// Get a reference to the section properties.
+    #[must_use]
     pub fn section(&self) -> &SectionProperties {
         &self.section
     }
 
     /// Number of paragraph-level section breaks, excluding the body-final section.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn section_break_count(&self) -> Result<usize> {
         self.body.section_break_count()
     }
 
     /// Insert a section break at the end of the selected paragraph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn insert_section_break(
         &mut self,
         paragraph_index: usize,
@@ -302,11 +358,19 @@ impl MutableDocument {
     }
 
     /// Return an owned snapshot of a paragraph-level section break.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn section_break(&self, index: usize) -> Result<SectionProperties> {
         self.body.section_break(index)
     }
 
     /// Mutate a paragraph-level section break without rewriting unrelated paragraph XML.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn update_section_break(
         &mut self,
         index: usize,
@@ -318,6 +382,10 @@ impl MutableDocument {
     }
 
     /// Remove and return a paragraph-level section break.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove_section_break(&mut self, index: usize) -> Result<SectionProperties> {
         let properties = self.body.remove_section_break(index)?;
         self.modified = true;
@@ -325,6 +393,10 @@ impl MutableDocument {
     }
 
     /// Move a section break to the end of another paragraph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn move_section_break(&mut self, index: usize, after_paragraph: usize) -> Result<()> {
         let properties = self.remove_section_break(index)?;
         self.insert_section_break(after_paragraph, properties)
@@ -387,6 +459,10 @@ impl MutableDocument {
     }
 
     /// Parse and add a paragraph containing one display Office Math equation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_display_office_math_xml(
         &mut self,
         xml: impl Into<String>,
@@ -396,6 +472,10 @@ impl MutableDocument {
     }
 
     /// Add a heading paragraph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_heading(&mut self, text: &str, level: u8) -> Result<&mut MutableParagraph> {
         if level > 9 {
             return Err(Error::InvalidFormat(
@@ -421,7 +501,7 @@ impl MutableDocument {
 
     /// Add an inline text box in a new paragraph at the end of the document.
     ///
-    /// The text box is serialized as a DrawingML wordprocessing shape
+    /// The text box is serialized as a `DrawingML` wordprocessing shape
     /// (`wps:wsp`) and reappears in the
     /// [`crate::Document::text_boxes`] inventory after save and reopen.
     pub fn add_text_box(
@@ -439,6 +519,10 @@ impl MutableDocument {
     /// payload is stored verbatim as an inert `/word/embeddings/oleObjectN.bin`
     /// part and is discoverable through
     /// [`crate::Package::embedded`] after save and reopen.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_ole_object(
         &mut self,
         mut object: MutableOleObject,
@@ -492,7 +576,7 @@ impl MutableDocument {
             | BodyElement::PreservedSectionProperties(raw)
             | BodyElement::PreservedOther(raw) => raw.contains(shape_id),
             BodyElement::PreservedAlt(raw, _) => raw.contains(shape_id),
-            _ => false,
+            BodyElement::Paragraph(_) | BodyElement::Table(_) => false,
         })
     }
 
@@ -503,6 +587,10 @@ impl MutableDocument {
     /// authored shapes or present in preserved document XML. A shape with a
     /// `v:textbox` story is discoverable through
     /// [`crate::Document::text_boxes`] after save and reopen.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_vml_shape(&mut self, mut shape: MutableVmlShape) -> Result<&mut MutableVmlShape> {
         if shape.id.is_empty() {
             let mut number = self.next_vml_shape_number;
@@ -528,7 +616,7 @@ impl MutableDocument {
         Ok(self.add_paragraph().add_vml_shape(shape))
     }
 
-    /// Add a SmartArt (DrawingML diagram) graphic in a new paragraph at the
+    /// Add a `SmartArt` (`DrawingML` diagram) graphic in a new paragraph at the
     /// end of the document.
     ///
     /// Assigns the anchor key binding the four diagram relationship IDs at
@@ -536,7 +624,11 @@ impl MutableDocument {
     /// under `/word/diagrams/`, and the diagram is discoverable through
     /// [`crate::Document::smart_arts`] after save and reopen. The
     /// optional pre-rendered drawing part is not generated; Word and
-    /// LibreOffice re-render from the layout and data parts.
+    /// `LibreOffice` re-render from the layout and data parts.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_smart_art(&mut self, mut smartart: MutableSmartArt) -> Result<&mut MutableSmartArt> {
         if self.collect_smart_arts().len() >= MAX_SMART_ARTS {
             return Err(Error::InvalidFormat(format!(
@@ -564,6 +656,10 @@ impl MutableDocument {
     /// preserved paragraphs share one sequence, matching [`Self::paragraph`].
     /// Passing `index == paragraph_count()` appends at the end of the body
     /// content, before the body-final `w:sectPr` (ECMA-376 §17.2.2).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn insert_paragraph(&mut self, index: usize) -> Result<&mut MutableParagraph> {
         let (position, paragraph) = self.body.insert_paragraph(index)?;
         shift_toc_index_on_insert(&mut self.toc_config, position);
@@ -577,6 +673,10 @@ impl MutableDocument {
     /// Indices follow table order across the whole body, matching
     /// [`Self::table`]; `index == table_count()` appends at the end of the
     /// body content, before the body-final `w:sectPr`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn insert_table(
         &mut self,
         index: usize,
@@ -595,6 +695,10 @@ impl MutableDocument {
     /// Removing a paragraph whose `w:pPr` holds a `w:sectPr` removes that
     /// section break as well, merging the section with the following one —
     /// the same behavior as deleting the paragraph mark in Word.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove_paragraph(&mut self, index: usize) -> Result<()> {
         let position = self.body.remove_paragraph(index)?;
         shift_toc_index_on_remove(&mut self.toc_config, position);
@@ -603,6 +707,10 @@ impl MutableDocument {
     }
 
     /// Remove the table at `index` (table order, matching [`Self::table`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove_table(&mut self, index: usize) -> Result<()> {
         let position = self.body.remove_table(index)?;
         shift_toc_index_on_remove(&mut self.toc_config, position);
@@ -611,21 +719,28 @@ impl MutableDocument {
     }
 
     /// Get the number of paragraphs in the document.
+    #[must_use]
     pub fn paragraph_count(&self) -> usize {
         self.body.paragraph_count()
     }
 
     /// Get the number of tables in the document.
+    #[must_use]
     pub fn table_count(&self) -> usize {
         self.body.table_count()
     }
 
     /// Check if the document has been modified.
+    #[must_use]
     pub fn is_modified(&self) -> bool {
         self.modified
     }
 
     /// Get or create the header.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal writer invariant is violated.
     pub fn header(&mut self) -> &mut Vec<MutableParagraph> {
         if self.header.is_none() {
             self.header = Some(Vec::new());
@@ -636,6 +751,10 @@ impl MutableDocument {
     }
 
     /// Get or create the footer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal writer invariant is violated.
     pub fn footer(&mut self) -> &mut Vec<MutableParagraph> {
         if self.footer.is_none() {
             self.footer = Some(Vec::new());
@@ -646,16 +765,22 @@ impl MutableDocument {
     }
 
     /// Check if the document has a header.
+    #[must_use]
     pub fn has_header(&self) -> bool {
         self.header.is_some()
     }
 
     /// Check if the document has a footer.
+    #[must_use]
     pub fn has_footer(&self) -> bool {
         self.footer.is_some()
     }
 
     /// Add a header to the document.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal writer invariant is violated.
     pub fn add_header_paragraph(&mut self) -> &mut MutableParagraph {
         if self.header.is_none() {
             self.header = Some(Vec::new());
@@ -667,6 +792,10 @@ impl MutableDocument {
     }
 
     /// Add a footer to the document.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal writer invariant is violated.
     pub fn add_footer_paragraph(&mut self) -> &mut MutableParagraph {
         if self.footer.is_none() {
             self.footer = Some(Vec::new());
@@ -678,6 +807,10 @@ impl MutableDocument {
     }
 
     /// Add a footnote and return its ID and mutable reference.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal writer invariant is violated.
     pub fn add_footnote(&mut self) -> (u32, &mut Note) {
         let id = Self::next_note_id(self.footnotes.iter().map(|note| note.id));
         let note = Note::new(id);
@@ -694,6 +827,10 @@ impl MutableDocument {
     /// ECMA-376 §17.11.14) are stripped from typed body, table, header,
     /// and footer paragraphs so the saved document never dangles a
     /// reference into the footnotes part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove_footnote(&mut self, id: u32) -> Result<Note> {
         let index = self
             .footnotes
@@ -708,6 +845,10 @@ impl MutableDocument {
     }
 
     /// Add an endnote and return its ID and mutable reference.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal writer invariant is violated.
     pub fn add_endnote(&mut self) -> (u32, &mut Note) {
         let id = Self::next_note_id(self.endnotes.iter().map(|note| note.id));
         let note = Note::new(id);
@@ -722,6 +863,10 @@ impl MutableDocument {
     ///
     /// Runs referencing the removed endnote (`w:endnoteReference`,
     /// ECMA-376 §17.11.7) are stripped like in [`Self::remove_footnote`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove_endnote(&mut self, id: u32) -> Result<Note> {
         let index = self
             .endnotes
@@ -761,7 +906,11 @@ impl MutableDocument {
                         }
                     }
                 },
-                _ => {},
+                BodyElement::PreservedParagraph(_)
+                | BodyElement::PreservedTable(_)
+                | BodyElement::PreservedSectionProperties(_)
+                | BodyElement::PreservedAlt(..)
+                | BodyElement::PreservedOther(_) => {},
             }
         }
         for paragraphs in [&mut self.header, &mut self.footer].into_iter().flatten() {
@@ -772,18 +921,20 @@ impl MutableDocument {
     }
 
     /// Check if the document has footnotes.
+    #[must_use]
     pub fn has_footnotes(&self) -> bool {
         !self.footnotes.is_empty()
     }
 
     /// Check if the document has endnotes.
+    #[must_use]
     pub fn has_endnotes(&self) -> bool {
         !self.endnotes.is_empty()
     }
 
     /// Add a comment without a timestamp and return its ID and mutable reference.
     ///
-    /// The optional WordprocessingML `w:date` attribute is omitted so this
+    /// The optional `WordprocessingML` `w:date` attribute is omitted so this
     /// convenience API is deterministic. Use [`Self::add_comment_with_date`]
     /// when the caller has explicit timestamp metadata.
     ///
@@ -799,7 +950,7 @@ impl MutableDocument {
     /// comment.set_initials(Some("JD".to_string()));
     /// ```
     pub fn add_comment(&mut self, author: &str, text: &str) -> (u32, &mut MutableComment) {
-        let id = Self::next_note_id(self.comments.iter().map(|comment| comment.id()));
+        let id = Self::next_note_id(self.comments.iter().map(MutableComment::id));
         let comment = MutableComment::new(id, author.to_string(), text.to_string());
         self.push_comment(comment)
     }
@@ -811,7 +962,7 @@ impl MutableDocument {
         text: &str,
         date: CommentDate,
     ) -> (u32, &mut MutableComment) {
-        let id = Self::next_note_id(self.comments.iter().map(|comment| comment.id()));
+        let id = Self::next_note_id(self.comments.iter().map(MutableComment::id));
         let comment = MutableComment::new_with_date(id, author.to_string(), text.to_string(), date);
         self.push_comment(comment)
     }
@@ -830,6 +981,10 @@ impl MutableDocument {
     /// Authored comments carry no range markers or reference runs in this
     /// writer model, so removal only affects the comments part emitted on
     /// save.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove_comment(&mut self, id: u32) -> Result<MutableComment> {
         let index = self
             .comments
@@ -841,11 +996,13 @@ impl MutableDocument {
     }
 
     /// Check if the document has comments.
+    #[must_use]
     pub fn has_comments(&self) -> bool {
         !self.comments.is_empty()
     }
 
     /// Get the number of comments in the document.
+    #[must_use]
     pub fn comment_count(&self) -> usize {
         self.comments.len()
     }
@@ -910,11 +1067,13 @@ impl MutableDocument {
     }
 
     /// Check if the document has protection set.
+    #[must_use]
     pub fn is_protected(&self) -> bool {
         self.protection.is_some()
     }
 
     /// Get the protection type if set.
+    #[must_use]
     pub fn protection_type(&self) -> Option<ProtectionType> {
         self.protection.as_ref().map(|p| p.protection_type)
     }
@@ -943,6 +1102,7 @@ impl MutableDocument {
     }
 
     /// Get a reference to the document theme.
+    #[must_use]
     pub fn theme(&self) -> Option<&MutableTheme> {
         self.theme.as_ref()
     }
@@ -981,6 +1141,7 @@ impl MutableDocument {
     }
 
     /// Check if the document has a watermark.
+    #[must_use]
     pub fn has_watermark(&self) -> bool {
         self.watermark.is_some()
     }
@@ -1005,6 +1166,7 @@ impl MutableDocument {
     }
 
     /// Check if the document has an image watermark.
+    #[must_use]
     pub fn has_image_watermark(&self) -> bool {
         self.image_watermark.is_some()
     }
@@ -1025,6 +1187,10 @@ impl MutableDocument {
     ///     .title("Contents");
     /// doc.add_toc(toc);
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_toc(&mut self, toc: TableOfContents) -> Result<()> {
         // Add optional title paragraph with TOCHeading style
         if let Some(title) = toc.get_title() {
@@ -1091,7 +1257,7 @@ impl MutableDocument {
                     }
 
                     // Generate unique bookmark name
-                    let bookmark_name = format!("_Toc{}", 213359267 + bookmark_counter);
+                    let bookmark_name = format!("_Toc{}", 213_359_267 + bookmark_counter);
                     let bookmark_id = bookmark_counter;
                     bookmark_counter += 1;
 
@@ -1130,7 +1296,7 @@ impl MutableDocument {
             let mut toc_entry = MutableParagraph::new();
 
             // Set TOC style
-            toc_entry.style = Some(format!("TOC{}", level));
+            toc_entry.style = Some(format!("TOC{level}"));
 
             // Set paragraph properties (tab and indent)
             toc_entry
@@ -1146,7 +1312,7 @@ impl MutableDocument {
                 1 => 0,
                 2 => 440,
                 3 => 880,
-                _ => (level as i32 - 1) * 440,
+                _ => (i32::from(level) - 1) * 440,
             };
             toc_entry.properties.indent_left = Some(indent);
 
@@ -1172,7 +1338,7 @@ impl MutableDocument {
                 ));
 
             let mut pageref_instr = String::new();
-            write!(&mut pageref_instr, " PAGEREF {} \\h ", bookmark_name).unwrap();
+            write!(&mut pageref_instr, " PAGEREF {bookmark_name} \\h ").unwrap();
             hyperlink
                 .elements
                 .push(super::super::hyperlink::HyperlinkElement::Field(
@@ -1280,7 +1446,7 @@ impl MutableDocument {
         objects
     }
 
-    /// Collect all SmartArt diagrams from the document in document order.
+    /// Collect all `SmartArt` diagrams from the document in document order.
     pub(crate) fn collect_smart_arts(&self) -> Vec<&MutableSmartArt> {
         let mut smartarts = Vec::new();
 
@@ -1298,7 +1464,10 @@ impl MutableDocument {
     }
 
     /// Generate header XML content.
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "writer helper is retained for package integration"
+    )]
     pub(crate) fn generate_header_xml(&self) -> Result<Option<String>> {
         if self.header.is_none() {
             return Ok(None);
@@ -1323,7 +1492,10 @@ impl MutableDocument {
     }
 
     /// Generate footer XML content.
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "writer helper is retained for package integration"
+    )]
     pub(crate) fn generate_footer_xml(&self) -> Result<Option<String>> {
         if self.footer.is_none() {
             return Ok(None);
@@ -1432,18 +1604,17 @@ impl MutableDocument {
 
     /// Patch document protection while preserving every unrelated setting byte-for-byte.
     pub(crate) fn generate_settings_xml(&self, existing: Option<&[u8]>) -> Result<Vec<u8>> {
-        match existing {
-            Some(existing) => patch_document_protection(existing, self.protection.as_ref()),
-            None => {
-                let mut xml = String::with_capacity(512);
-                xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
-                xml.push_str(r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">"#);
-                if let Some(protection) = &self.protection {
-                    write_document_protection(&mut xml, protection, "w", None)?;
-                }
-                xml.push_str("</w:settings>");
-                Ok(xml.into_bytes())
-            },
+        if let Some(existing) = existing {
+            patch_document_protection(existing, self.protection.as_ref())
+        } else {
+            let mut xml = String::with_capacity(512);
+            xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
+            xml.push_str(r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">"#);
+            if let Some(protection) = &self.protection {
+                write_document_protection(&mut xml, protection, "w", None)?;
+            }
+            xml.push_str("</w:settings>");
+            Ok(xml.into_bytes())
         }
     }
 
@@ -1458,6 +1629,7 @@ impl MutableDocument {
     }
 
     /// Return the direct alternative-format anchors in body order.
+    #[must_use]
     pub fn alts(&self) -> Vec<Chunk> {
         self.body.alts()
     }
@@ -1503,6 +1675,10 @@ impl MutableDocument {
     }
 
     /// Serialize the document to XML.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn to_xml(&self) -> Result<String> {
         let mut xml = String::with_capacity(4096);
         self.write_document_prefix(&mut xml);

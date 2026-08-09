@@ -550,7 +550,7 @@ fn namespace_declarations(tag: &StartTag<'_>) -> Result<Vec<(String, String)>> {
             validate_name(prefix)?;
             result.push((
                 String::from_utf8(prefix.to_vec())
-                    .map_err(|_| invalid("namespace prefix is not UTF-8"))?,
+                    .map_err(|_error| invalid("namespace prefix is not UTF-8"))?,
                 attribute.value.clone(),
             ));
         }
@@ -622,7 +622,7 @@ fn decode_entities(input: &[u8]) -> Result<String> {
                     .get(start..index)
                     .ok_or_else(|| invalid("XML entity range is invalid"))?,
             )
-            .map_err(|_| invalid("XML text is not UTF-8"))?,
+            .map_err(|_error| invalid("XML text is not UTF-8"))?,
         );
         let end = input
             .get(index + 1..)
@@ -652,7 +652,7 @@ fn decode_entities(input: &[u8]) -> Result<String> {
                 .get(start..)
                 .ok_or_else(|| invalid("XML text range is invalid"))?,
         )
-        .map_err(|_| invalid("XML text is not UTF-8"))?,
+        .map_err(|_error| invalid("XML text is not UTF-8"))?,
     );
     if output.chars().any(|character| !is_xml_char(character)) {
         return Err(invalid("XML text contains a forbidden character"));
@@ -661,9 +661,10 @@ fn decode_entities(input: &[u8]) -> Result<String> {
 }
 
 fn numeric(output: &mut String, digits: &[u8], radix: u32) -> Result<()> {
-    let text = std::str::from_utf8(digits).map_err(|_| invalid("XML numeric entity is invalid"))?;
-    let value =
-        u32::from_str_radix(text, radix).map_err(|_| invalid("XML numeric entity is invalid"))?;
+    let text =
+        std::str::from_utf8(digits).map_err(|_error| invalid("XML numeric entity is invalid"))?;
+    let value = u32::from_str_radix(text, radix)
+        .map_err(|_error| invalid("XML numeric entity is invalid"))?;
     let character = char::from_u32(value).ok_or_else(|| invalid("XML entity is not a scalar"))?;
     if !is_xml_char(character) {
         return Err(invalid("XML entity contains a forbidden character"));

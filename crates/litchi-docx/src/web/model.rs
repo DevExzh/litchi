@@ -1,4 +1,12 @@
-//! Typed WordprocessingML web-settings models and semantic mutation.
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::struct_field_names,
+    reason = "the public model retains established field names"
+)]
+//! Typed `WordprocessingML` web-settings models and semantic mutation.
 
 use super::codec::{
     div_position, parse_i64, validate_border_style, validate_divs, validate_encoding,
@@ -41,6 +49,7 @@ pub enum Conformance {
 
 impl Conformance {
     /// Relationship type used by a document to own its web-settings part.
+    #[must_use]
     pub const fn relationship(self) -> &'static str {
         match self {
             Self::Transitional => litchi_opc::constants::relationship_type::WEB_SETTINGS,
@@ -132,6 +141,10 @@ impl From<usize> for Key {
 
 impl Id {
     /// Create a checked nonzero identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(value: i64) -> Result<Self> {
         NonZeroI64::new(value)
             .map(Self)
@@ -139,12 +152,17 @@ impl Id {
     }
 
     /// Parse a checked decimal identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn parse(value: &str) -> Result<Self> {
         let value = parse_i64(value, "HTML division ID")?;
         Self::new(value)
     }
 
     /// Return the numeric identifier.
+    #[must_use]
     pub const fn get(self) -> i64 {
         self.0.get()
     }
@@ -174,16 +192,22 @@ impl TryFrom<&str> for Id {
 
 impl Twips {
     /// Create a signed twip measure.
+    #[must_use]
     pub const fn new(value: i64) -> Self {
         Self(value)
     }
 
     /// Parse a signed decimal twip measure.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn parse(value: &str) -> Result<Self> {
         parse_i64(value, "HTML division margin").map(Self)
     }
 
     /// Return the signed twip count.
+    #[must_use]
     pub const fn get(self) -> i64 {
         self.0
     }
@@ -220,7 +244,8 @@ pub enum BorderSide {
 }
 
 impl BorderSide {
-    /// Return the WordprocessingML element name for this side.
+    /// Return the `WordprocessingML` element name for this side.
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Top => "top",
@@ -345,6 +370,7 @@ impl Screen {
     }
 
     /// Return the OOXML lexical representation.
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Pixels544x376 => "544x376",
@@ -373,6 +399,7 @@ impl Layout {
     }
 
     /// Return the OOXML lexical representation.
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Rows => "rows",
@@ -393,6 +420,7 @@ impl Scrollbar {
     }
 
     /// Return the OOXML lexical representation.
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::On => "on",
@@ -404,26 +432,34 @@ impl Scrollbar {
 
 impl Frameset {
     /// Return the size expression for this frameset, if explicitly present.
+    #[must_use]
     pub fn size(&self) -> Option<&str> {
         self.size.as_deref()
     }
 
     /// Return splitter-bar properties, if explicitly present.
+    #[must_use]
     pub fn split_bar(&self) -> Option<&SplitBar> {
         self.split_bar.as_ref()
     }
 
     /// Return the explicit child layout. Absence has the schema-defined row default.
+    #[must_use]
     pub fn layout(&self) -> Option<Layout> {
         self.layout
     }
 
     /// Return nested frames and framesets in document order.
+    #[must_use]
     pub fn children(&self) -> &[Child] {
         &self.children
     }
 
     /// Set the frameset size expression.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_size(&mut self, value: impl Into<String>) -> Result<&mut Self> {
         let value = value.into();
         validate_text(&value, "frameset size", false)?;
@@ -467,6 +503,10 @@ impl Frameset {
     }
 
     /// Append an empty frame and return it for configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_frame(&mut self) -> Result<&mut Frame> {
         reserve_one(&mut self.children, "frameset child insertion")?;
         self.children.push(Child::Frame(Frame::default()));
@@ -477,6 +517,10 @@ impl Frameset {
     }
 
     /// Append a configured frame.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn push_frame(&mut self, frame: Frame) -> Result<&mut Self> {
         reserve_one(&mut self.children, "frameset child insertion")?;
         self.children.push(Child::Frame(frame));
@@ -484,6 +528,10 @@ impl Frameset {
     }
 
     /// Append an empty nested frameset and return it for configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_frameset(&mut self) -> Result<&mut Frameset> {
         reserve_one(&mut self.children, "frameset child insertion")?;
         self.children.push(Child::Frameset(Frameset::default()));
@@ -494,6 +542,10 @@ impl Frameset {
     }
 
     /// Append a configured nested frameset.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn push_frameset(&mut self, frameset: Frameset) -> Result<&mut Self> {
         reserve_one(&mut self.children, "frameset child insertion")?;
         self.children.push(Child::Frameset(frameset));
@@ -508,10 +560,12 @@ impl Frameset {
 }
 
 impl Frame {
+    #[must_use]
     pub fn size(&self) -> Option<&str> {
         self.size.as_deref()
     }
 
+    #[must_use]
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
     }
@@ -520,30 +574,40 @@ impl Frame {
     ///
     /// Prefer package-level [`load`] and [`put`], which validate this identifier
     /// against the part relationship graph.
+    #[must_use]
     pub fn rel(&self) -> Option<&str> {
         self.source_file_relationship_id.as_deref()
     }
 
+    #[must_use]
     pub fn margin_width(&self) -> Option<u64> {
         self.margin_width
     }
 
+    #[must_use]
     pub fn margin_height(&self) -> Option<u64> {
         self.margin_height
     }
 
+    #[must_use]
     pub fn scrollbar(&self) -> Option<Scrollbar> {
         self.scrollbar
     }
 
+    #[must_use]
     pub fn no_resize_allowed(&self) -> Option<bool> {
         self.no_resize_allowed
     }
 
+    #[must_use]
     pub fn linked_to_file(&self) -> Option<bool> {
         self.linked_to_file
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_size(&mut self, value: impl Into<String>) -> Result<&mut Self> {
         let value = value.into();
         validate_text(&value, "frame size", false)?;
@@ -556,6 +620,10 @@ impl Frame {
         self
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_name(&mut self, value: impl Into<String>) -> Result<&mut Self> {
         let value = value.into();
         validate_text(&value, "frame name", false)?;
@@ -569,6 +637,10 @@ impl Frame {
     }
 
     /// Set a checked low-level frame relationship ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_rel(&mut self, value: impl Into<String>) -> Result<&mut Self> {
         let value = value.into();
         validate_relationship_id(&value)?;
@@ -634,18 +706,22 @@ impl Frame {
 }
 
 impl SplitBar {
+    #[must_use]
     pub fn width_twips(&self) -> Option<u64> {
         self.width_twips
     }
 
+    #[must_use]
     pub fn color(&self) -> Option<&Color> {
         self.color.as_ref()
     }
 
+    #[must_use]
     pub fn no_border(&self) -> Option<bool> {
         self.no_border
     }
 
+    #[must_use]
     pub fn flat_borders(&self) -> Option<bool> {
         self.flat_borders
     }
@@ -697,6 +773,10 @@ impl SplitBar {
 
 impl Color {
     /// Create a validated automatic or six-digit RGB splitter color.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(value: impl Into<String>) -> Result<Self> {
         Ok(Self {
             value: validate_word_color(value.into(), "frameset splitter color")?,
@@ -706,22 +786,30 @@ impl Color {
         })
     }
 
+    #[must_use]
     pub fn value(&self) -> &str {
         &self.value
     }
 
+    #[must_use]
     pub fn theme_color(&self) -> Option<Theme> {
         self.theme_color
     }
 
+    #[must_use]
     pub fn theme_tint(&self) -> Option<u8> {
         self.theme_tint
     }
 
+    #[must_use]
     pub fn theme_shade(&self) -> Option<u8> {
         self.theme_shade
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_value(&mut self, value: impl Into<String>) -> Result<&mut Self> {
         self.value = validate_word_color(value.into(), "frameset splitter color")?;
         Ok(self)
@@ -760,6 +848,7 @@ impl Color {
 
 impl Div {
     /// Create a schema-valid HTML division with zero margins.
+    #[must_use]
     pub fn new(id: Id) -> Self {
         Self {
             id,
@@ -774,42 +863,51 @@ impl Div {
         }
     }
 
+    #[must_use]
     pub const fn id(&self) -> Id {
         self.id
     }
 
+    #[must_use]
     pub fn is_block_quote(&self) -> Option<bool> {
         self.block_quote
     }
 
+    #[must_use]
     pub fn is_body_div(&self) -> Option<bool> {
         self.body_div
     }
 
     /// Return the required left margin.
+    #[must_use]
     pub const fn left(&self) -> Twips {
         self.left
     }
 
     /// Return the required right margin.
+    #[must_use]
     pub const fn right(&self) -> Twips {
         self.right
     }
 
     /// Return the required top margin.
+    #[must_use]
     pub const fn top(&self) -> Twips {
         self.top
     }
 
     /// Return the required bottom margin.
+    #[must_use]
     pub const fn bottom(&self) -> Twips {
         self.bottom
     }
 
+    #[must_use]
     pub fn borders(&self) -> Option<&Borders> {
         self.borders.as_ref()
     }
 
+    #[must_use]
     pub fn children(&self) -> &[Div] {
         &self.children
     }
@@ -878,11 +976,19 @@ impl Div {
     }
 
     /// Select a child by its stable identifier or raw position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn child(&self, key: impl Into<Key>) -> Result<Option<&Div>> {
         Ok(div_position(&self.children, key.into())?.and_then(|index| self.children.get(index)))
     }
 
     /// Append a uniquely identified child division.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_child(&mut self, child: Div) -> Result<&mut Self> {
         if div_position(&self.children, Key::Id(child.id()))?.is_some() {
             return Err(invalid(format!(
@@ -896,29 +1002,38 @@ impl Div {
     }
 
     /// Insert or replace a child by its identifier, retaining its position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn put_child(&mut self, child: Div) -> Result<Option<Div>> {
-        match div_position(&self.children, Key::Id(child.id()))? {
-            Some(index) => {
-                let slot = self
-                    .children
-                    .get_mut(index)
-                    .ok_or_else(|| invalid("HTML child selector changed during replacement"))?;
-                Ok(Some(std::mem::replace(slot, child)))
-            },
-            None => {
-                reserve_one(&mut self.children, "HTML child division insertion")?;
-                self.children.push(child);
-                Ok(None)
-            },
+        if let Some(index) = div_position(&self.children, Key::Id(child.id()))? {
+            let slot = self
+                .children
+                .get_mut(index)
+                .ok_or_else(|| invalid("HTML child selector changed during replacement"))?;
+            Ok(Some(std::mem::replace(slot, child)))
+        } else {
+            reserve_one(&mut self.children, "HTML child division insertion")?;
+            self.children.push(child);
+            Ok(None)
         }
     }
 
     /// Remove a child selected semantically or positionally.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove_child(&mut self, key: impl Into<Key>) -> Result<Option<Div>> {
         Ok(div_position(&self.children, key.into())?.map(|index| self.children.remove(index)))
     }
 
     /// Move a selected child to a checked final position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn move_child(&mut self, key: impl Into<Key>, to: usize) -> Result<&mut Self> {
         let Some(from) = div_position(&self.children, key.into())? else {
             return Err(invalid("HTML child selector does not exist"));
@@ -943,18 +1058,22 @@ impl Div {
 }
 
 impl Borders {
+    #[must_use]
     pub fn top(&self) -> Option<&Border> {
         self.top.as_ref()
     }
 
+    #[must_use]
     pub fn left(&self) -> Option<&Border> {
         self.left.as_ref()
     }
 
+    #[must_use]
     pub fn bottom(&self) -> Option<&Border> {
         self.bottom.as_ref()
     }
 
+    #[must_use]
     pub fn right(&self) -> Option<&Border> {
         self.right.as_ref()
     }
@@ -1018,6 +1137,10 @@ impl Borders {
 
 impl Border {
     /// Create a division border with its required style.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(style: impl Into<String>) -> Result<Self> {
         let style = style.into();
         validate_border_style(&style)?;
@@ -1034,42 +1157,55 @@ impl Border {
         })
     }
 
+    #[must_use]
     pub fn style(&self) -> &str {
         &self.style
     }
 
+    #[must_use]
     pub fn color(&self) -> Option<&str> {
         self.color.as_deref()
     }
 
+    #[must_use]
     pub fn theme_color(&self) -> Option<Theme> {
         self.theme_color
     }
 
+    #[must_use]
     pub fn theme_tint(&self) -> Option<u8> {
         self.theme_tint
     }
 
+    #[must_use]
     pub fn theme_shade(&self) -> Option<u8> {
         self.theme_shade
     }
 
+    #[must_use]
     pub fn size_eighth_points(&self) -> Option<u64> {
         self.size_eighth_points
     }
 
+    #[must_use]
     pub fn space_points(&self) -> Option<u64> {
         self.space_points
     }
 
+    #[must_use]
     pub fn shadow(&self) -> Option<bool> {
         self.shadow
     }
 
+    #[must_use]
     pub fn frame(&self) -> Option<bool> {
         self.frame
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_style(&mut self, value: impl Into<String>) -> Result<&mut Self> {
         let value = value.into();
         validate_border_style(&value)?;
@@ -1077,6 +1213,10 @@ impl Border {
         Ok(self)
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_color(&mut self, value: impl Into<String>) -> Result<&mut Self> {
         self.color = Some(validate_word_color(
             value.into(),
@@ -1163,6 +1303,7 @@ impl Border {
 
 impl Settings {
     /// Return the root frameset definition, if present.
+    #[must_use]
     pub fn frameset(&self) -> Option<&Frameset> {
         self.frameset.as_ref()
     }
@@ -1185,11 +1326,16 @@ impl Settings {
     }
 
     /// Return the top-level HTML division definitions, preserving part absence.
+    #[must_use]
     pub fn divs(&self) -> Option<&[Div]> {
         self.divs.as_deref()
     }
 
     /// Replace the top-level HTML divisions after validating unique identifiers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_divs(&mut self, value: Vec<Div>) -> Result<&mut Self> {
         if value.is_empty() {
             return Err(invalid("Word HTML division container must not be empty"));
@@ -1200,6 +1346,10 @@ impl Settings {
     }
 
     /// Select a top-level division by stable identifier or raw position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn get(&self, key: impl Into<Key>) -> Result<Option<&Div>> {
         let key = key.into();
         let Some(divs) = &self.divs else {
@@ -1210,55 +1360,60 @@ impl Settings {
     }
 
     /// Append a uniquely identified top-level division.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add(&mut self, div: Div) -> Result<&mut Self> {
-        match &mut self.divs {
-            Some(divs) => {
-                if div_position(divs, Key::Id(div.id()))?.is_some() {
-                    return Err(invalid(format!(
-                        "HTML division '{}' already exists",
-                        div.id()
-                    )));
-                }
-                reserve_one(divs, "HTML division insertion")?;
-                divs.push(div);
-            },
-            None => {
-                let mut divs = Vec::new();
-                reserve_one(&mut divs, "HTML division insertion")?;
-                divs.push(div);
-                self.divs = Some(divs);
-            },
+        if let Some(divs) = &mut self.divs {
+            if div_position(divs, Key::Id(div.id()))?.is_some() {
+                return Err(invalid(format!(
+                    "HTML division '{}' already exists",
+                    div.id()
+                )));
+            }
+            reserve_one(divs, "HTML division insertion")?;
+            divs.push(div);
+        } else {
+            let mut divs = Vec::new();
+            reserve_one(&mut divs, "HTML division insertion")?;
+            divs.push(div);
+            self.divs = Some(divs);
         }
         Ok(self)
     }
 
     /// Insert or replace a top-level division by identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn put(&mut self, div: Div) -> Result<Option<Div>> {
-        match &mut self.divs {
-            Some(divs) => match div_position(divs, Key::Id(div.id()))? {
-                Some(index) => {
-                    let slot = divs.get_mut(index).ok_or_else(|| {
-                        invalid("HTML division selector changed during replacement")
-                    })?;
-                    Ok(Some(std::mem::replace(slot, div)))
-                },
-                None => {
-                    reserve_one(divs, "HTML division insertion")?;
-                    divs.push(div);
-                    Ok(None)
-                },
-            },
-            None => {
-                let mut divs = Vec::new();
-                reserve_one(&mut divs, "HTML division insertion")?;
+        if let Some(divs) = &mut self.divs {
+            if let Some(index) = div_position(divs, Key::Id(div.id()))? {
+                let slot = divs
+                    .get_mut(index)
+                    .ok_or_else(|| invalid("HTML division selector changed during replacement"))?;
+                Ok(Some(std::mem::replace(slot, div)))
+            } else {
+                reserve_one(divs, "HTML division insertion")?;
                 divs.push(div);
-                self.divs = Some(divs);
                 Ok(None)
-            },
+            }
+        } else {
+            let mut divs = Vec::new();
+            reserve_one(&mut divs, "HTML division insertion")?;
+            divs.push(div);
+            self.divs = Some(divs);
+            Ok(None)
         }
     }
 
     /// Remove a top-level division selected semantically or positionally.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn remove(&mut self, key: impl Into<Key>) -> Result<Option<Div>> {
         let key = key.into();
         let (removed, empty) = {
@@ -1278,6 +1433,10 @@ impl Settings {
     }
 
     /// Move a selected division to a checked final position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn move_to(&mut self, key: impl Into<Key>, to: usize) -> Result<&mut Self> {
         let Some(divs) = &mut self.divs else {
             return Err(invalid("HTML division container does not exist"));
@@ -1305,61 +1464,76 @@ impl Settings {
     }
 
     /// Return the requested output encoding, if declared.
+    #[must_use]
     pub fn encoding(&self) -> Option<&str> {
         self.encoding.as_deref()
     }
 
     /// Return the browser-optimization setting, preserving absence.
+    #[must_use]
     pub fn optimize_for_browser(&self) -> Option<bool> {
         self.optimize_for_browser
     }
 
     /// Return whether web output should rely on VML, preserving absence.
+    #[must_use]
     pub fn rely_on_vml(&self) -> Option<bool> {
         self.rely_on_vml
     }
 
     /// Return whether PNG images are allowed, preserving absence.
+    #[must_use]
     pub fn allow_png(&self) -> Option<bool> {
         self.allow_png
     }
 
     /// Return whether web output should avoid CSS, preserving absence.
+    #[must_use]
     pub fn do_not_rely_on_css(&self) -> Option<bool> {
         self.do_not_rely_on_css
     }
 
     /// Return whether web output should use multiple files, preserving absence.
+    #[must_use]
     pub fn do_not_save_as_single_file(&self) -> Option<bool> {
         self.do_not_save_as_single_file
     }
 
     /// Return whether supporting files should avoid a folder, preserving absence.
+    #[must_use]
     pub fn do_not_organize_in_folder(&self) -> Option<bool> {
         self.do_not_organize_in_folder
     }
 
     /// Return whether web output should avoid long file names, preserving absence.
+    #[must_use]
     pub fn do_not_use_long_file_names(&self) -> Option<bool> {
         self.do_not_use_long_file_names
     }
 
     /// Return Word's bounded web-output pixel density.
+    #[must_use]
     pub fn pixels_per_inch(&self) -> Option<u16> {
         self.pixels_per_inch
     }
 
     /// Return the target screen size, if declared.
+    #[must_use]
     pub fn target_screen_size(&self) -> Option<Screen> {
         self.target_screen_size
     }
 
     /// Return whether smart tags should be saved as XML, preserving absence.
+    #[must_use]
     pub fn save_smart_tags_as_xml(&self) -> Option<bool> {
         self.save_smart_tags_as_xml
     }
 
     /// Set the requested output encoding.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_encoding(&mut self, value: impl Into<String>) -> Result<&mut Self> {
         let value = value.into();
         validate_encoding(&value)?;
@@ -1458,6 +1632,10 @@ impl Settings {
     }
 
     /// Set Word's web-output pixel density in the inclusive range `0..=1023`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_pixels_per_inch(&mut self, value: u16) -> Result<&mut Self> {
         validate_pixels_per_inch(value)?;
         self.pixels_per_inch = Some(value);
@@ -1495,6 +1673,10 @@ impl Settings {
     }
 
     /// Serialize deterministically using the selected namespace family.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn xml(&self, conformance: Conformance) -> Result<Vec<u8>> {
         write(self, conformance)
     }

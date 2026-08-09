@@ -10,6 +10,7 @@ pub enum Item {
 }
 
 impl Item {
+    #[must_use]
     pub fn as_string(&self) -> String {
         match self {
             Self::Missing => String::new(),

@@ -32,6 +32,7 @@ soapberry-zip = { workspace = true }
 subtle = { workspace = true }
 x509-cert = { workspace = true }
 zeroize = { workspace = true }
+xml-minifier = { workspace = true }
 
 [dev-dependencies]
 zip = { version = "8", default-features = false, features = ["deflate"] }

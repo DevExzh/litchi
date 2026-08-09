@@ -1,8 +1,25 @@
 //! Bounded binary codecs and FIB routing for mail-merge parts.
 //! Every slice is consumed exactly; no external data source is opened.
 
-use super::model::*;
-use super::validation::*;
+use super::model::{
+    DocumentMailMerge, FieldMapInfo, FieldMapping, FilterComparison, FilterCondition,
+    FilterDataItem, Fnpi, MailMergeDocumentType, MergeDataSourceKind, OdsoProperty, Pmfs, Pms,
+    RecipientEntry, RecipientInfo, Rfs, SortColumnAndDirection, SortDirection, SttbfRfs, Wpms,
+};
+use super::validation::{
+    CB_COUNT, COUNT_MARKER, FC_ODSO, FC_PMS, FC_PMS_NEW, FIELD_MAP_COLUMN_INDEX,
+    FIELD_MAP_COLUMN_NAME, FIELD_MAP_COLUMN_NIL, FIELD_MAP_COUNT, FIELD_MAP_FIELD_NAME,
+    FIELD_MAP_MAPPED, FIELD_MAP_MAPPED_VALUE, FILTER_ITEM_HEADER_LEN, IREC_MAX, IREC_NIL,
+    ITEM_TERMINATOR, LIST_SIZE_MARKER, LIST_SIZE_OVERFLOW, MAX_COLUMN_INDEX, MAX_FILTER_CHARS,
+    MAX_SORT_KEYS, ODSO_ID_COLUMN_DELIMITER, ODSO_ID_CONNECTION_STRING, ODSO_ID_CONNECTION_TYPE,
+    ODSO_ID_DATA_SOURCE_FILE, ODSO_ID_DATA_TABLE, ODSO_ID_FIELD_MAP, ODSO_ID_FIRST_ROW_IS_HEADER,
+    ODSO_ID_RECIPIENT_FILTERS, ODSO_ID_RECIPIENTS, ODSO_ID_SORT_ORDER, ODSO_ID_WIZARD_STEP,
+    ODSO_LARGE, PMFS_LEN, PMFS_LINK_TO_CONNECTION, PMFS_LINK_TO_FILE, PMFS_NO_PROMPT_QT,
+    PMFS_QUERY, PMS_HEADER_LEN, RECIPIENT_HASH, RECIPIENT_INCLUDED, RECIPIENT_UNIQUE_COLUMN,
+    RECIPIENT_UNIQUE_VALUE, SORT_KEY_LEN, SQL_MAX_BYTES, SQL_MIN_BYTES, STTB_F_EXTEND,
+    STTBF_RFS_CB_EXTRA, STTBF_RFS_MAX_CHARS, STTBF_RFS_MAX_STRINGS, STTBF_RFS_MIN_STRINGS,
+    WIZARD_STEP_MAX, WIZARD_STEP_MIN, WPMSDT_DOC_TYPE_MASK, corrupted,
+};
 use crate::package::Result;
 use crate::parts::fib::{FileInformationBlock, WORD_97_NFIB};
 

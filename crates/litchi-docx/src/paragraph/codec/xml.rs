@@ -1,4 +1,20 @@
-//! Shared WordprocessingML namespace and attribute primitives.
+#![expect(
+    clippy::option_option,
+    reason = "nested options distinguish omitted, present-empty, and present-valued XML"
+)]
+#![expect(
+    clippy::ref_option,
+    reason = "the public API shape is retained for compatibility"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::shadow_unrelated,
+    reason = "local parser names mirror the OOXML role currently being decoded"
+)]
+//! Shared `WordprocessingML` namespace and attribute primitives.
 
 use crate::error::{Error, Result};
 use crate::namespace::is_wordprocessing_namespace;
@@ -66,7 +82,7 @@ pub(super) fn paragraph_attribute(
         if attribute.key.local_name().as_ref() == name {
             return attribute
                 .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
-                .map(|value| value.into_owned())
+                .map(std::borrow::Cow::into_owned)
                 .map_err(|error| Error::Xml(error.to_string()));
         }
     }

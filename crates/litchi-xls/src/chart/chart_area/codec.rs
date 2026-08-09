@@ -12,6 +12,9 @@ use crate::{Error, Result};
 const PAYLOAD_BYTES: usize = 16;
 
 /// Decodes one complete 16-byte `Chart` record payload.
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn decode(payload: &[u8]) -> Result<Snapshot> {
     exact(payload, PAYLOAD_BYTES, CHART)?;
     Ok(Snapshot::from_wire(Rect {
@@ -23,6 +26,9 @@ pub fn decode(payload: &[u8]) -> Result<Snapshot> {
 }
 
 /// Encodes a semantically valid 16-byte `Chart` record payload.
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn encode(snapshot: &Snapshot) -> Result<[u8; PAYLOAD_BYTES]> {
     validation::ensure(snapshot.rect())?;
     let rect = snapshot.rect();

@@ -7,7 +7,7 @@
 
 use super::codec::GUID_LEN;
 
-/// Revision kind stored in `RRD.revt` (MS-XLS 2.5.212 RevisionType).
+/// Revision kind stored in `RRD.revt` (MS-XLS 2.5.212 `RevisionType`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RevisionType {
     InsertRow,
@@ -30,7 +30,7 @@ pub enum RevisionType {
     TrashQueryTableField,
 }
 
-/// Date and time of a revision action (MS-XLS 2.5.239 ShortDTR).
+/// Date and time of a revision action (MS-XLS 2.5.239 `ShortDTR`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ShortDtr {
     pub(super) year: u16,
@@ -42,7 +42,7 @@ pub struct ShortDtr {
     pub(super) weekday: u8,
 }
 
-/// Cell range used by insert/delete and move revisions (MS-XLS 2.5.209 Ref8U).
+/// Cell range used by insert/delete and move revisions (MS-XLS 2.5.209 `Ref8U`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RevisionCellRange {
     pub(super) first_row: u16,
@@ -51,7 +51,7 @@ pub struct RevisionCellRange {
     pub(super) last_column: u16,
 }
 
-/// Location of a changed cell (MS-XLS 2.5.198.109 RgceLoc).
+/// Location of a changed cell (MS-XLS 2.5.198.109 `RgceLoc`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RevisionCellLocation {
     pub(super) row: u16,
@@ -125,7 +125,7 @@ pub struct RrdHead {
     pub(super) next_tab_id: i16,
 }
 
-/// MS-XLS 2.4.241 `RRTabId`: sheet identifiers in BoundSheet8 order.
+/// MS-XLS 2.4.241 `RRTabId`: sheet identifiers in `BoundSheet8` order.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RrTabId {
     pub(super) sheet_ids: Vec<u16>,

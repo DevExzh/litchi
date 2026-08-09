@@ -679,13 +679,13 @@ fn stage(
         },
         (None, Some(value)) => insert_properties(source, &located, value, inner_extensions, limits),
         (None, None) => fallible_copy_vec(source, "Designer no-op output"),
-        (Some(current), None) => remove_properties_xml(
-            source,
-            &located,
-            occurrence.expect("current properties have an outer occurrence"),
-            current,
-            limits,
-        ),
+        (Some(current), None) => {
+            let occurrence = occurrence.ok_or(Error::UnsafeEdit {
+                operation: "stage_shape_designer_properties",
+                reason: "current Designer properties have no outer occurrence",
+            })?;
+            remove_properties_xml(source, &located, occurrence, current, limits)
+        },
     }
 }
 

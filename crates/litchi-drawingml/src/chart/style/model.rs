@@ -1,4 +1,4 @@
-//! Contextual values for DrawingML chart-style companion XML.
+//! Contextual values for `DrawingML` chart-style companion XML.
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Document {
@@ -120,7 +120,7 @@ pub struct MarkerLayout {
     pub size: Option<u8>,
 }
 
-/// A bounded summary of an inert DrawingML formatting subtree.
+/// A bounded summary of an inert `DrawingML` formatting subtree.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Payload {
     pub child_elements: usize,

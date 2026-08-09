@@ -1,6 +1,6 @@
-//! Format-agnostic SmartArt/diagram model and DrawingML part generators.
+//! Format-agnostic SmartArt/diagram model and `DrawingML` part generators.
 //!
-//! SmartArt graphics are represented as diagrams in OOXML. This module holds
+//! `SmartArt` graphics are represented as diagrams in OOXML. This module holds
 //! the semantic model (`SmartArt`, `DiagramNode`, `DiagramType`), the builder,
 //! and the generators for the five diagram parts (data, layout, quick style,
 //! colors, pre-rendered drawing). The model is shared by the format modules
@@ -11,7 +11,7 @@ use litchi_core::xml::escape_xml;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
-/// SmartArt diagram type.
+/// `SmartArt` diagram type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiagramType {
     /// List diagram
@@ -36,6 +36,7 @@ pub enum DiagramType {
 
 impl DiagramType {
     /// Parse diagram type from layout type URI.
+    #[must_use]
     pub fn from_layout_uri(uri: &str) -> Self {
         let uri_lower = uri.to_lowercase();
         if uri_lower.contains("list") {
@@ -60,7 +61,7 @@ impl DiagramType {
     }
 }
 
-/// A SmartArt diagram node/item.
+/// A `SmartArt` diagram node/item.
 #[derive(Debug, Clone)]
 pub struct DiagramNode {
     /// Node text content
@@ -87,6 +88,7 @@ impl DiagramNode {
     }
 
     /// Get all text from this node and its children.
+    #[must_use]
     pub fn all_text(&self) -> String {
         let mut result = self.text.clone();
         for child in &self.children {
@@ -99,7 +101,7 @@ impl DiagramNode {
     }
 }
 
-/// SmartArt diagram information.
+/// `SmartArt` diagram information.
 #[derive(Debug, Clone)]
 pub struct SmartArt {
     /// Diagram type
@@ -113,7 +115,8 @@ pub struct SmartArt {
 }
 
 impl SmartArt {
-    /// Create a new SmartArt diagram.
+    /// Create a new `SmartArt` diagram.
+    #[must_use]
     pub fn new(diagram_type: DiagramType) -> Self {
         Self {
             diagram_type,
@@ -129,20 +132,22 @@ impl SmartArt {
     }
 
     /// Get all text content from the diagram.
+    #[must_use]
     pub fn text(&self) -> String {
         self.nodes
             .iter()
-            .map(|n| n.all_text())
+            .map(DiagramNode::all_text)
             .collect::<Vec<_>>()
             .join("\n")
     }
 
     /// Get the number of root nodes.
+    #[must_use]
     pub fn node_count(&self) -> usize {
         self.nodes.len()
     }
 
-    /// Parse SmartArt data XML (dgm:data).
+    /// Parse `SmartArt` data XML (dgm:data).
     pub fn parse_data_xml(xml: &str) -> Result<Vec<DiagramNode>> {
         let xml = litchi_ooxml_common::mce::process_str(xml)?;
         let mut reader = Reader::from_str(xml.as_ref());
@@ -185,7 +190,7 @@ impl SmartArt {
     }
 }
 
-/// Builder for creating SmartArt diagrams.
+/// Builder for creating `SmartArt` diagrams.
 pub struct SmartArtBuilder {
     diagram_type: DiagramType,
     nodes: Vec<DiagramNode>,
@@ -193,7 +198,8 @@ pub struct SmartArtBuilder {
 }
 
 impl SmartArtBuilder {
-    /// Create a new SmartArt builder with the specified diagram type.
+    /// Create a new `SmartArt` builder with the specified diagram type.
+    #[must_use]
     pub fn new(diagram_type: DiagramType) -> Self {
         Self {
             diagram_type,
@@ -226,7 +232,8 @@ impl SmartArtBuilder {
         self
     }
 
-    /// Build the SmartArt diagram.
+    /// Build the `SmartArt` diagram.
+    #[must_use]
     pub fn build(self) -> SmartArt {
         SmartArt {
             diagram_type: self.diagram_type,
@@ -237,7 +244,8 @@ impl SmartArtBuilder {
     }
 }
 
-/// Generate SmartArt data XML.
+/// Generate `SmartArt` data XML.
+#[must_use]
 pub fn generate_smartart_data_xml(smartart: &SmartArt) -> String {
     let mut xml = String::with_capacity(2048);
 
@@ -300,8 +308,7 @@ pub fn generate_smartart_data_xml(smartart: &SmartArt) -> String {
 
     xml.push_str("<dgm:pt modelId=\"0\" type=\"doc\">");
     xml.push_str(&format!(
-        "<dgm:prSet loTypeId=\"{}\" loCatId=\"{}\" qsTypeId=\"{}\" qsCatId=\"{}\" csTypeId=\"{}\" csCatId=\"{}\"/>",
-        lo_type_id, lo_cat_id, qs_type_id, qs_cat_id, cs_type_id, cs_cat_id
+        "<dgm:prSet loTypeId=\"{lo_type_id}\" loCatId=\"{lo_cat_id}\" qsTypeId=\"{qs_type_id}\" qsCatId=\"{qs_cat_id}\" csTypeId=\"{cs_type_id}\" csCatId=\"{cs_cat_id}\"/>"
     ));
     xml.push_str(
         r#"<dgm:spPr/><dgm:t><a:bodyPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/><a:lstStyle xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/><a:p xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:endParaRPr/></a:p></dgm:t></dgm:pt>"#,
@@ -367,8 +374,7 @@ pub fn generate_smartart_data_xml(smartart: &SmartArt) -> String {
 
         // Diagram-level presentation point associated with the document root.
         xml.push_str(&format!(
-            r#"<dgm:pt modelId="{}" type="pres"><dgm:prSet presAssocID="0" presName="diagram" presStyleCnt="0"><dgm:presLayoutVars><dgm:dir/><dgm:resizeHandles val="exact"/></dgm:presLayoutVars></dgm:prSet><dgm:spPr/></dgm:pt>"#,
-            diagram_pres_id,
+            r#"<dgm:pt modelId="{diagram_pres_id}" type="pres"><dgm:prSet presAssocID="0" presName="diagram" presStyleCnt="0"><dgm:presLayoutVars><dgm:dir/><dgm:resizeHandles val="exact"/></dgm:presLayoutVars></dgm:prSet><dgm:spPr/></dgm:pt>"#,
         ));
 
         // One presentation point per logical node, each associated with that
@@ -377,9 +383,7 @@ pub fn generate_smartart_data_xml(smartart: &SmartArt) -> String {
             let node_id = (idx + 1) as i32;
             let pres_id = first_node_pres_id + idx as i32;
             xml.push_str(&format!(
-                r#"<dgm:pt modelId="{}" type="pres"><dgm:prSet presAssocID="{}" presName="node" presStyleLbl="node0" presStyleIdx="0" presStyleCnt="1"><dgm:presLayoutVars><dgm:bulletEnabled val="1"/></dgm:presLayoutVars></dgm:prSet><dgm:spPr/></dgm:pt>"#,
-                pres_id,
-                node_id,
+                r#"<dgm:pt modelId="{pres_id}" type="pres"><dgm:prSet presAssocID="{node_id}" presName="node" presStyleLbl="node0" presStyleIdx="0" presStyleCnt="1"><dgm:presLayoutVars><dgm:bulletEnabled val="1"/></dgm:presLayoutVars></dgm:prSet><dgm:spPr/></dgm:pt>"#,
             ));
         }
 
@@ -395,14 +399,10 @@ pub fn generate_smartart_data_xml(smartart: &SmartArt) -> String {
             let sib_pt_id = base_sibtrans_id + idx as i32;
 
             xml.push_str(&format!(
-                r#"<dgm:pt modelId="{}" type="parTrans" cxnId="{}"><dgm:prSet/><dgm:spPr/></dgm:pt>"#,
-                par_pt_id,
-                cxn_model_id,
+                r#"<dgm:pt modelId="{par_pt_id}" type="parTrans" cxnId="{cxn_model_id}"><dgm:prSet/><dgm:spPr/></dgm:pt>"#,
             ));
             xml.push_str(&format!(
-                r#"<dgm:pt modelId="{}" type="sibTrans" cxnId="{}"><dgm:prSet/><dgm:spPr/></dgm:pt>"#,
-                sib_pt_id,
-                cxn_model_id,
+                r#"<dgm:pt modelId="{sib_pt_id}" type="sibTrans" cxnId="{cxn_model_id}"><dgm:prSet/><dgm:spPr/></dgm:pt>"#,
             ));
         }
     }
@@ -436,18 +436,11 @@ pub fn generate_smartart_data_xml(smartart: &SmartArt) -> String {
             let sib_pt_id = base_sibtrans_id + idx as i32;
 
             xml.push_str(&format!(
-                r#"<dgm:cxn modelId="{}" srcId="{}" destId="{}" srcOrd="{}" destOrd="0" parTransId="{}" sibTransId="{}"/>"#,
-                cxn_model_id,
-                parent_id,
-                node_id,
-                src_ord,
-                par_pt_id,
-                sib_pt_id,
+                r#"<dgm:cxn modelId="{cxn_model_id}" srcId="{parent_id}" destId="{node_id}" srcOrd="{src_ord}" destOrd="0" parTransId="{par_pt_id}" sibTransId="{sib_pt_id}"/>"#,
             ));
         } else {
             xml.push_str(&format!(
-                r#"<dgm:cxn modelId="{}" srcId="{}" destId="{}" srcOrd="{}" destOrd="0"/>"#,
-                cxn_model_id, parent_id, node_id, src_ord,
+                r#"<dgm:cxn modelId="{cxn_model_id}" srcId="{parent_id}" destId="{node_id}" srcOrd="{src_ord}" destOrd="0"/>"#,
             ));
         }
     }
@@ -473,11 +466,7 @@ pub fn generate_smartart_data_xml(smartart: &SmartArt) -> String {
             let pres_id = first_node_pres_id + idx as i32;
             let cxn_id = 300 + idx as i32;
             xml.push_str(&format!(
-                r#"<dgm:cxn modelId="{}" type="presOf" srcId="{}" destId="{}" srcOrd="0" destOrd="0" presId="{}"/>"#,
-                cxn_id,
-                node_id,
-                pres_id,
-                pres_layout_id,
+                r#"<dgm:cxn modelId="{cxn_id}" type="presOf" srcId="{node_id}" destId="{pres_id}" srcOrd="0" destOrd="0" presId="{pres_layout_id}"/>"#,
             ));
         }
 
@@ -487,12 +476,7 @@ pub fn generate_smartart_data_xml(smartart: &SmartArt) -> String {
             let pres_id = first_node_pres_id + idx as i32;
             let cxn_id = 500 + idx as i32;
             xml.push_str(&format!(
-                r#"<dgm:cxn modelId="{}" type="presParOf" srcId="{}" destId="{}" srcOrd="{}" destOrd="0" presId="{}"/>"#,
-                cxn_id,
-                diagram_pres_id,
-                pres_id,
-                idx,
-                pres_layout_id,
+                r#"<dgm:cxn modelId="{cxn_id}" type="presParOf" srcId="{diagram_pres_id}" destId="{pres_id}" srcOrd="{idx}" destOrd="0" presId="{pres_layout_id}"/>"#,
             ));
         }
     }
@@ -505,9 +489,10 @@ pub fn generate_smartart_data_xml(smartart: &SmartArt) -> String {
     xml
 }
 
-/// Generate SmartArt layout XML.
+/// Generate `SmartArt` layout XML.
 ///
 /// This generates a simple layout definition for the diagram.
+#[must_use]
 pub fn generate_smartart_layout_xml(smartart: &SmartArt) -> String {
     let mut xml = String::with_capacity(4096);
 
@@ -528,8 +513,7 @@ pub fn generate_smartart_layout_xml(smartart: &SmartArt) -> String {
         },
     };
     xml.push_str(&format!(
-        "<dgm:layoutDef xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\" uniqueId=\"{}\">",
-        layout_type_id,
+        "<dgm:layoutDef xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\" uniqueId=\"{layout_type_id}\">",
     ));
 
     // Category type for the layout, aligned with loCatId in the data model.
@@ -577,7 +561,7 @@ pub fn generate_smartart_layout_xml(smartart: &SmartArt) -> String {
 
     // Category list
     xml.push_str("<dgm:catLst>");
-    xml.push_str(&format!("<dgm:cat type=\"{}\" pri=\"1000\"/>", cat_type));
+    xml.push_str(&format!("<dgm:cat type=\"{cat_type}\" pri=\"1000\"/>"));
     // Many built-in layouts also advertise themselves as convertible to/from
     // other layouts using a secondary "convert" category. Mirroring this
     // helps Office treat our embedded layouts more like full SmartArt
@@ -604,7 +588,7 @@ pub fn generate_smartart_layout_xml(smartart: &SmartArt) -> String {
     xml.push_str("<dgm:ptLst>");
     xml.push_str(r#"<dgm:pt modelId="0" type="doc"/>"#);
     for i in 1..=3 {
-        xml.push_str(&format!(r#"<dgm:pt modelId="{}"/>"#, i));
+        xml.push_str(&format!(r#"<dgm:pt modelId="{i}"/>"#));
     }
     xml.push_str("</dgm:ptLst>");
     xml.push_str("<dgm:cxnLst/>");
@@ -662,41 +646,37 @@ pub fn generate_smartart_layout_xml(smartart: &SmartArt) -> String {
         xml.push_str("<dgm:shape/>");
         xml.push_str("<dgm:presOf/>");
         xml.push_str("<dgm:constrLst>");
-        xml.push_str(r#"<dgm:constr type=\"primFontSz\" val=\"65\"/>"#);
-        xml.push_str(r#"<dgm:constr type=\"w\" for=\"ch\" forName=\"node\" refType=\"w\"/>"#);
-        xml.push_str(r#"<dgm:constr type=\"h\" for=\"ch\" forName=\"node\" refType=\"w\" refFor=\"ch\" refForName=\"node\" fact=\"0.5\"/>"#);
-        xml.push_str(r#"<dgm:constr type=\"w\" for=\"ch\" forName=\"sibTrans\" refType=\"w\" refFor=\"ch\" refForName=\"node\" fact=\"0.15\"/>"#);
-        xml.push_str(
-            r#"<dgm:constr type=\"sp\" refType=\"w\" refFor=\"ch\" refForName=\"sibTrans\"/>"#,
-        );
+        xml.push_str(r#"<dgm:constr type="primFontSz" val="65"/>"#);
+        xml.push_str(r#"<dgm:constr type="w" for="ch" forName="node" refType="w"/>"#);
+        xml.push_str(r#"<dgm:constr type="h" for="ch" forName="node" refType="w" refFor="ch" refForName="node" fact="0.5"/>"#);
+        xml.push_str(r#"<dgm:constr type="w" for="ch" forName="sibTrans" refType="w" refFor="ch" refForName="node" fact="0.15"/>"#);
+        xml.push_str(r#"<dgm:constr type="sp" refType="w" refFor="ch" refForName="sibTrans"/>"#);
         xml.push_str("</dgm:constrLst>");
         xml.push_str("<dgm:ruleLst/>");
 
-        xml.push_str(r#"<dgm:forEach name=\"items\" axis=\"ch\" ptType=\"node\">"#);
-        xml.push_str(r#"<dgm:layoutNode name=\"node\">"#);
+        xml.push_str(r#"<dgm:forEach name="items" axis="ch" ptType="node">"#);
+        xml.push_str(r#"<dgm:layoutNode name="node">"#);
         xml.push_str("<dgm:varLst>");
-        xml.push_str(r#"<dgm:bulletEnabled val=\"1\"/>"#);
+        xml.push_str(r#"<dgm:bulletEnabled val="1"/>"#);
         xml.push_str("</dgm:varLst>");
-        xml.push_str(r#"<dgm:alg type=\"tx\"/>"#);
-        xml.push_str(&format!("<dgm:shape type=\"{}\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" r:blip=\"\"><dgm:adjLst/></dgm:shape>", node_shape_type));
-        xml.push_str(r#"<dgm:presOf axis=\"desOrSelf\" ptType=\"node\"/>"#);
+        xml.push_str(r#"<dgm:alg type="tx"/>"#);
+        xml.push_str(&format!("<dgm:shape type=\"{node_shape_type}\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" r:blip=\"\"><dgm:adjLst/></dgm:shape>"));
+        xml.push_str(r#"<dgm:presOf axis="desOrSelf" ptType="node"/>"#);
         xml.push_str("<dgm:constrLst>");
-        xml.push_str(r#"<dgm:constr type=\"lMarg\" refType=\"primFontSz\" fact=\"0.4\"/>"#);
-        xml.push_str(r#"<dgm:constr type=\"rMarg\" refType=\"primFontSz\" fact=\"0.4\"/>"#);
-        xml.push_str(r#"<dgm:constr type=\"tMarg\" refType=\"primFontSz\" fact=\"0.4\"/>"#);
-        xml.push_str(r#"<dgm:constr type=\"bMarg\" refType=\"primFontSz\" fact=\"0.4\"/>"#);
+        xml.push_str(r#"<dgm:constr type="lMarg" refType="primFontSz" fact="0.4"/>"#);
+        xml.push_str(r#"<dgm:constr type="rMarg" refType="primFontSz" fact="0.4"/>"#);
+        xml.push_str(r#"<dgm:constr type="tMarg" refType="primFontSz" fact="0.4"/>"#);
+        xml.push_str(r#"<dgm:constr type="bMarg" refType="primFontSz" fact="0.4"/>"#);
         xml.push_str("</dgm:constrLst>");
         xml.push_str("<dgm:ruleLst>");
-        xml.push_str(r#"<dgm:rule type=\"primFontSz\" val=\"5\"/>"#);
+        xml.push_str(r#"<dgm:rule type="primFontSz" val="5"/>"#);
         xml.push_str("</dgm:ruleLst>");
         xml.push_str("</dgm:layoutNode>");
 
-        xml.push_str(
-            r#"<dgm:forEach name=\"spacing\" axis=\"followSib\" ptType=\"sibTrans\" cnt=\"1\">"#,
-        );
-        xml.push_str(r#"<dgm:layoutNode name=\"sibTrans\">"#);
-        xml.push_str(r#"<dgm:alg type=\"sp\"/>"#);
-        xml.push_str(r#"<dgm:shape xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" r:blip=\"\"><dgm:adjLst/></dgm:shape>"#);
+        xml.push_str(r#"<dgm:forEach name="spacing" axis="followSib" ptType="sibTrans" cnt="1">"#);
+        xml.push_str(r#"<dgm:layoutNode name="sibTrans">"#);
+        xml.push_str(r#"<dgm:alg type="sp"/>"#);
+        xml.push_str(r#"<dgm:shape xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:blip=""><dgm:adjLst/></dgm:shape>"#);
         xml.push_str("<dgm:presOf/>");
         xml.push_str("<dgm:constrLst/>");
         xml.push_str("<dgm:ruleLst/>");
@@ -708,7 +688,7 @@ pub fn generate_smartart_layout_xml(smartart: &SmartArt) -> String {
     } else {
         xml.push_str("<dgm:layoutNode name=\"root\">");
         xml.push_str("<dgm:varLst>");
-        xml.push_str(r#"<dgm:dir val=\"norm\"/>"#);
+        xml.push_str(r#"<dgm:dir val="norm"/>"#);
         xml.push_str("</dgm:varLst>");
         xml.push_str("<dgm:alg type=\"lin\"/>");
         xml.push_str("<dgm:shape/>");
@@ -722,7 +702,7 @@ pub fn generate_smartart_layout_xml(smartart: &SmartArt) -> String {
             _ => 100,
         };
         xml.push_str(r#"<dgm:constr type="primFontSz" val="65"/>"#);
-        xml.push_str(&format!(r#"<dgm:constr type="sp" val="{}"/>"#, spacing));
+        xml.push_str(&format!(r#"<dgm:constr type="sp" val="{spacing}"/>"#));
 
         xml.push_str("</dgm:constrLst>");
         xml.push_str("<dgm:ruleLst/>");
@@ -734,9 +714,10 @@ pub fn generate_smartart_layout_xml(smartart: &SmartArt) -> String {
     xml
 }
 
-/// Generate SmartArt drawing XML.
+/// Generate `SmartArt` drawing XML.
 ///
-/// This converts the SmartArt to a DrawingML representation.
+/// This converts the `SmartArt` to a `DrawingML` representation.
+#[must_use]
 pub fn generate_smartart_drawing_xml(
     smartart: &SmartArt,
     x: i64,
@@ -797,7 +778,7 @@ pub fn generate_smartart_drawing_xml(
             (idx + 1) as i32
         };
 
-        xml.push_str(&format!("<dsp:sp modelId=\"{}\">", model_id));
+        xml.push_str(&format!("<dsp:sp modelId=\"{model_id}\">"));
         xml.push_str("<dsp:nvSpPr>");
         xml.push_str(&format!(
             "<dsp:cNvPr id=\"{}\" name=\"Shape {}\"/>",
@@ -809,7 +790,7 @@ pub fn generate_smartart_drawing_xml(
 
         xml.push_str("<dsp:spPr>");
         xml.push_str("<a:xfrm>");
-        xml.push_str(&format!(r#"<a:off x="{}" y="{}"/>"#, node_x, node_y));
+        xml.push_str(&format!(r#"<a:off x="{node_x}" y="{node_y}"/>"#));
         xml.push_str(&format!(
             r#"<a:ext cx="{}" cy="{}"/>"#,
             node_width * 9 / 10,
@@ -825,8 +806,7 @@ pub fn generate_smartart_drawing_xml(
             _ => "roundRect",
         };
         xml.push_str(&format!(
-            r#"<a:prstGeom prst="{}"><a:avLst/></a:prstGeom>"#,
-            shape_type
+            r#"<a:prstGeom prst="{shape_type}"><a:avLst/></a:prstGeom>"#
         ));
 
         // Default fill and outline
@@ -859,7 +839,7 @@ pub fn generate_smartart_drawing_xml(
         // Text transform (position/size of text box inside the shape). We
         // mirror the shape's geometry so PowerPoint and POI have clear anchors.
         xml.push_str("<dsp:txXfrm>");
-        xml.push_str(&format!(r#"<a:off x="{}" y="{}"/>"#, node_x, node_y));
+        xml.push_str(&format!(r#"<a:off x="{node_x}" y="{node_y}"/>"#));
         xml.push_str(&format!(
             r#"<a:ext cx="{}" cy="{}"/>"#,
             node_width * 9 / 10,
@@ -876,7 +856,8 @@ pub fn generate_smartart_drawing_xml(
     xml
 }
 
-/// Generate SmartArt colors XML.
+/// Generate `SmartArt` colors XML.
+#[must_use]
 pub fn generate_smartart_colors_xml() -> String {
     let mut xml = String::with_capacity(1024);
 
@@ -904,7 +885,8 @@ pub fn generate_smartart_colors_xml() -> String {
     xml
 }
 
-/// Generate SmartArt quick style XML.
+/// Generate `SmartArt` quick style XML.
+#[must_use]
 pub fn generate_smartart_quickstyle_xml() -> String {
     let mut xml = String::with_capacity(1024);
 

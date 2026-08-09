@@ -8,8 +8,26 @@ use crate::elements::parser::OrderElement;
 use crate::elements::table::{Table, TableCell, TableRow};
 use crate::elements::text::{Hyperlink, List, ListItem, Paragraph};
 use crate::page_layout::PageUsage;
+use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
 const MINIMAL_CONTENT: &str = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text><text:p>Original</text:p></office:text></office:body></office:document-content>"#;
+
+fn replace_zip_member_raw(package: &[u8], path: &str, replacement: &[u8]) -> Vec<u8> {
+    let archive = ArchiveReader::new(package).unwrap();
+    let mut writer = StreamingArchiveWriter::new();
+    let mut replaced = false;
+    for name in archive.file_names() {
+        let data = if name == path {
+            replaced = true;
+            replacement.to_vec()
+        } else {
+            archive.read(name).unwrap()
+        };
+        writer.write_stored(name, &data).unwrap();
+    }
+    assert!(replaced, "test ZIP member {path} must exist");
+    writer.finish_to_bytes().unwrap()
+}
 
 fn source_document() -> Document {
     let mut builder = Builder::new();
@@ -346,7 +364,10 @@ fn read_modify_write_preserves_auxiliary_package_parts_and_media_types() {
         .add_file("content.xml", MINIMAL_CONTENT.as_bytes())
         .unwrap();
     writer
-        .add_file("settings.xml", b"document settings")
+        .add_file(
+            "settings.xml",
+            br#"<?xml version="1.0"?><office:document-settings xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"/>"#,
+        )
         .unwrap();
     writer
         .add_file_with_media_type("Pictures/photo.bin", b"image", "image/x-test")
@@ -354,9 +375,7 @@ fn read_modify_write_preserves_auxiliary_package_parts_and_media_types() {
     writer
         .add_manifest_entry("Object 1/", "application/vnd.oasis.opendocument.text")
         .unwrap();
-    writer
-        .add_file("Object 1/content.xml", b"embedded object")
-        .unwrap();
+    writer.add_file("Object 1/content.xml", b"<x/>").unwrap();
     writer
         .add_file_with_media_type(
             "custom/data.bin",
@@ -365,10 +384,21 @@ fn read_modify_write_preserves_auxiliary_package_parts_and_media_types() {
         )
         .unwrap();
     writer
-        .add_file("META-INF/documentsignatures.xml", b"stale signature")
+        .add_file("META-INF/documentsignatures.xml", b"<x/>")
         .unwrap();
 
-    let source_bytes = writer.finish_to_bytes().unwrap();
+    let source_bytes = replace_zip_member_raw(
+        &writer.finish_to_bytes().unwrap(),
+        "settings.xml",
+        b"document settings",
+    );
+    let source_bytes =
+        replace_zip_member_raw(&source_bytes, "Object 1/content.xml", b"embedded object");
+    let source_bytes = replace_zip_member_raw(
+        &source_bytes,
+        "META-INF/documentsignatures.xml",
+        b"stale signature",
+    );
     let source = Document::from_bytes(source_bytes.clone()).unwrap();
     assert_eq!(source.to_bytes().unwrap(), source_bytes);
     let mut mutable = MutableDocument::from_document(source).unwrap();

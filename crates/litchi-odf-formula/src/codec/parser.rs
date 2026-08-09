@@ -28,6 +28,14 @@ pub fn parse(xml: &str) -> Result<Element> {
 /// Returns an error for malformed markup, an invalid root, or any exceeded
 /// byte, depth, element, attribute, or text ceiling.
 pub fn parse_with_limits(xml: &str, limits: Limits) -> Result<Element> {
+    parse_internal(xml, limits, true)
+}
+
+pub(crate) fn parse_fragment_with_limits(xml: &str, limits: Limits) -> Result<Element> {
+    parse_internal(xml, limits, false)
+}
+
+fn parse_internal(xml: &str, limits: Limits, require_math_root: bool) -> Result<Element> {
     if xml.len() > limits.xml_bytes() {
         return Err(Error::InvalidFormat(format!(
             "formula content.xml has {} bytes, exceeding the {} byte limit",
@@ -62,7 +70,8 @@ pub fn parse_with_limits(xml: &str, limits: Limits) -> Result<Element> {
                     &mut node_count,
                     limits,
                 )?;
-                if stack.is_empty()
+                if require_math_root
+                    && stack.is_empty()
                     && (node.namespace_uri() != Some(MATHML_NAMESPACE)
                         || node.local_name() != "math")
                 {
@@ -102,12 +111,15 @@ pub fn parse_with_limits(xml: &str, limits: Limits) -> Result<Element> {
                         &mut node_count,
                         limits,
                     )?;
-                    if node.namespace_uri() != Some(MATHML_NAMESPACE) || node.local_name() != "math"
+                    if require_math_root
+                        && (node.namespace_uri() != Some(MATHML_NAMESPACE)
+                            || node.local_name() != "math")
                     {
                         return Err(Error::InvalidFormat(
                             "formula content must have a MathML math root".to_string(),
                         ));
                     }
+                    super::validation::validate_element(&node)?;
                     root = Some(node);
                     root_closed = true;
                     buffer.clear();
@@ -121,6 +133,7 @@ pub fn parse_with_limits(xml: &str, limits: Limits) -> Result<Element> {
                     &mut node_count,
                     limits,
                 )?;
+                super::validation::validate_element(&node)?;
                 let parent = stack.last_mut().ok_or_else(|| {
                     Error::InvalidFormat("MathML parent stack is empty".to_string())
                 })?;
@@ -130,6 +143,7 @@ pub fn parse_with_limits(xml: &str, limits: Limits) -> Result<Element> {
                 let node = stack.pop().ok_or_else(|| {
                     Error::InvalidFormat("MathML element stack underflow".to_string())
                 })?;
+                super::validation::validate_element(&node)?;
                 if let Some(parent) = stack.last_mut() {
                     parent.content_mut().push(Content::Element(node));
                 } else {

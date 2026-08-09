@@ -256,7 +256,11 @@ impl Patch {
     }
 }
 
-fn replace_attribute_value(source: &str, span: &Range<usize>, value: &str) -> Result<String> {
+pub(crate) fn replace_attribute_value(
+    source: &str,
+    span: &Range<usize>,
+    value: &str,
+) -> Result<String> {
     if span.start > span.end || span.end > source.len() {
         return Err(invalid("ODM subdocument source span is invalid"));
     }
@@ -298,7 +302,7 @@ fn resolve(source: &Master, selector: Selector<'_>) -> Result<Position> {
     }
 }
 
-fn validate_href(href: &str) -> Result<()> {
+pub(crate) fn validate_href(href: &str) -> Result<()> {
     if href.len() > MAX_HREF_BYTES {
         return Err(invalid("ODM subdocument target exceeds the 16 KiB limit"));
     }

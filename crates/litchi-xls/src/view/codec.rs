@@ -21,7 +21,7 @@ pub(super) fn read_u16(data: &[u8], offset: usize, record_type: u16, field: &str
         .ok_or_else(|| invalid(record_type, format!("truncated {field}")))?;
     let bytes: [u8; 2] = bytes
         .try_into()
-        .map_err(|_| invalid(record_type, format!("truncated {field}")))?;
+        .map_err(|_error| invalid(record_type, format!("truncated {field}")))?;
     Ok(u16::from_le_bytes(bytes))
 }
 
@@ -94,7 +94,7 @@ pub(super) fn parse_window2(data: &[u8]) -> Result<View> {
     Ok(View {
         flags,
         first_visible_row,
-        first_visible_column: first_visible_column as u8,
+        first_visible_column: crate::utils::truncate_u16_to_u8(first_visible_column),
         gridline_color_index,
         page_break_zoom_percent: parse_zoom_percent(
             read_u16(data, 10, WINDOW2_RECORD_TYPE, "WINDOW2.page_break_zoom")?,
@@ -139,7 +139,10 @@ pub(super) fn parse_scl(data: &[u8]) -> Result<(u16, u16)> {
             "SCL zoom fraction must be between 1/10 and 4",
         ));
     }
-    Ok((numerator as u16, denominator as u16))
+    Ok((
+        crate::utils::truncate_u32_to_u16(numerator),
+        crate::utils::truncate_u32_to_u16(denominator),
+    ))
 }
 
 pub(super) fn parse_pane(data: &[u8], frozen: bool) -> Result<Pane> {
@@ -174,7 +177,7 @@ pub(super) fn parse_pane(data: &[u8], frozen: bool) -> Result<Pane> {
         horizontal_split,
         vertical_split,
         bottom_pane_top_row: read_u16(data, 4, PANE_RECORD_TYPE, "PANE.bottom_pane_top_row")?,
-        right_pane_left_column: right_pane_left_column as u8,
+        right_pane_left_column: crate::utils::truncate_u16_to_u8(right_pane_left_column),
         active_pane: PaneType::parse(
             read_u8(data, 8, PANE_RECORD_TYPE, "PANE.active_pane")?,
             PANE_RECORD_TYPE,
@@ -245,7 +248,7 @@ pub(super) fn parse_selection(data: &[u8]) -> Result<Selection> {
             SELECTION_RECORD_TYPE,
         )?,
         active_row: read_u16(data, 1, SELECTION_RECORD_TYPE, "SELECTION.active_row")?,
-        active_column: active_column as u8,
+        active_column: crate::utils::truncate_u16_to_u8(active_column),
         active_range_index,
         ranges,
     })

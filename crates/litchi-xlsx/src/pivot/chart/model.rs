@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 use super::invalid;
 
-/// PivotTable field-type zone addressed by a pivot-chart drop-zone switch.
+/// `PivotTable` field-type zone addressed by a pivot-chart drop-zone switch.
 ///
 /// The variants parse from the ECMA-376 axis identifiers (`axisRow`,
 /// `axisCol`, `axisPage`, `axisValues`, `dataFields`) and map to the
@@ -27,6 +27,7 @@ pub enum FieldType {
 
 impl FieldType {
     /// ECMA-376 axis identifier for this field type.
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::AxisRow => "axisRow",
@@ -50,6 +51,7 @@ impl FieldType {
     }
 
     /// The `c14:dropZone*` element name for this field type.
+    #[must_use]
     pub fn drop_zone_element_name(&self) -> &'static str {
         match self {
             Self::AxisRow => "dropZoneCategories",
@@ -81,7 +83,7 @@ impl FromStr for FieldType {
 /// Visibility of one drop zone in a pivot chart.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DropZoneVisibility {
-    /// PivotTable field type occupying the drop zone
+    /// `PivotTable` field type occupying the drop zone
     pub field_type: FieldType,
     /// Whether the drop zone's field buttons are visible
     pub visible: bool,
@@ -98,6 +100,7 @@ pub struct Options {
 
 impl Options {
     /// Visibility recorded for one field-type zone, if present.
+    #[must_use]
     pub fn visibility(&self, field_type: FieldType) -> Option<bool> {
         self.drop_zones
             .iter()
@@ -107,6 +110,7 @@ impl Options {
 
     /// Drop-zone defaults with every field button visible, matching what
     /// Excel writes for newly created pivot charts.
+    #[must_use]
     pub fn all_visible() -> Self {
         // Emission order follows the CT_PivotOptions element sequence.
         const DEFAULT_ORDER: [FieldType; 5] = [

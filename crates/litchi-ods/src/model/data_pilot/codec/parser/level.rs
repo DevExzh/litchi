@@ -46,7 +46,7 @@ pub(super) fn parse_level(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) 
                 if std::mem::replace(&mut subtotals_seen, true) {
                     return Err(invalid_message("duplicate data-pilot subtotals"));
                 }
-                level.subtotals = parse_subtotals(reader)?
+                level.subtotals = parse_subtotals(reader)?;
             },
             Event::Empty(ref element) if is_table(&namespace, element, b"data-pilot-subtotals") => {
                 if std::mem::replace(&mut subtotals_seen, true) {
@@ -57,7 +57,7 @@ pub(super) fn parse_level(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) 
                 if std::mem::replace(&mut members_seen, true) {
                     return Err(invalid_message("duplicate data-pilot members"));
                 }
-                level.members = parse_members(reader)?
+                level.members = parse_members(reader)?;
             },
             Event::Empty(ref element) if is_table(&namespace, element, b"data-pilot-members") => {
                 if std::mem::replace(&mut members_seen, true) {
@@ -95,11 +95,21 @@ pub(super) fn parse_level(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) 
             Event::Text(ref text) if text_is_whitespace(text)? => {},
             Event::Comment(_) => {},
             Event::Start(ref element) if !is_table_namespace(&namespace) => {
-                skip_foreign_element(reader, element)?
+                skip_foreign_element(reader, element)?;
             },
             Event::Empty(_) if !is_table_namespace(&namespace) => {},
             Event::Eof => return Err(invalid_message("unterminated table:data-pilot-level")),
-            _ => return Err(invalid_message("invalid child in table:data-pilot-level")),
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {
+                return Err(invalid_message("invalid child in table:data-pilot-level"));
+            },
         }
         buf.clear();
     }
@@ -130,7 +140,7 @@ fn parse_members(reader: &mut NsReader<&[u8]>) -> Result<Vec<Member>> {
                     name: required_attr(reader, element, b"name")?,
                     display: optional_bool(reader, element, b"display")?,
                     show_details: optional_bool(reader, element, b"show-details")?,
-                })
+                });
             },
             Event::End(ref element) if is_table(&namespace, element, b"data-pilot-members") => {
                 break;
@@ -139,7 +149,17 @@ fn parse_members(reader: &mut NsReader<&[u8]>) -> Result<Vec<Member>> {
             Event::Text(ref text) if text_is_whitespace(text)? => {},
             Event::Comment(_) => {},
             Event::Eof => return Err(invalid_message("unterminated table:data-pilot-members")),
-            _ => return Err(invalid_message("invalid child in table:data-pilot-members")),
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {
+                return Err(invalid_message("invalid child in table:data-pilot-members"));
+            },
         }
         buf.clear();
     }

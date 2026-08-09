@@ -22,6 +22,7 @@ pub use model::{
     Limits, Scope, SharedFontData, validate_eot_facet,
 };
 pub use package::{PackageLimits, PackageOptions};
+pub(crate) use package::{require_stream_only_cfb, validate_unrelated_streams};
 pub use patch::{Patch, Revision};
 pub use snapshot::Snapshot;
 pub use transaction::{Change, ChangeKind, Commit, Transaction};

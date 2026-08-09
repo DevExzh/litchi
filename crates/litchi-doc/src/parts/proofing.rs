@@ -5,7 +5,7 @@ use super::fib::FileInformationBlock;
 
 const SPELLING_FIB_INDEX: usize = 55;
 const GRAMMAR_FIB_INDEX: usize = 90;
-/// Table-pointer index of `fcPlcfLad`/`lcbPlcfLad` (MS-DOC 2.5.7 FibRgFcLcb2000).
+/// Table-pointer index of `fcPlcfLad`/`lcbPlcfLad` (MS-DOC 2.5.7 `FibRgFcLcb2000`).
 const LANGUAGE_DETECTION_FIB_INDEX: usize = 98;
 const MAX_PROOFING_ENTRIES: usize = 1_000_000;
 const MAX_PROOFING_TABLE_BYTES: usize = 4 + MAX_PROOFING_ENTRIES * 6;
@@ -104,15 +104,19 @@ impl ProofingStatus {
         Ok(status)
     }
 
+    #[must_use]
     pub fn state(&self) -> ProofingState {
         self.state
     }
+    #[must_use]
     pub fn is_error(&self) -> bool {
         self.error
     }
+    #[must_use]
     pub fn extend_on_recheck(&self) -> bool {
         self.extend
     }
+    #[must_use]
     pub fn is_typo(&self) -> bool {
         self.typo
     }
@@ -190,13 +194,16 @@ pub struct ProofingEntry {
 }
 
 impl ProofingEntry {
+    #[must_use]
     pub const fn new(start_cp: u32, status: ProofingStatus) -> Self {
         Self { start_cp, status }
     }
 
+    #[must_use]
     pub fn start_cp(&self) -> u32 {
         self.start_cp
     }
+    #[must_use]
     pub fn status(&self) -> ProofingStatus {
         self.status
     }
@@ -211,15 +218,19 @@ pub struct ProofingRange {
 }
 
 impl ProofingRange {
+    #[must_use]
     pub fn start_cp(&self) -> u32 {
         self.start_cp
     }
+    #[must_use]
     pub fn end_cp(&self) -> u32 {
         self.end_cp
     }
+    #[must_use]
     pub fn is_point(&self) -> bool {
         self.start_cp == self.end_cp
     }
+    #[must_use]
     pub fn status(&self) -> ProofingStatus {
         self.status
     }
@@ -288,18 +299,23 @@ impl ProofingStateTable {
         })
     }
 
+    #[must_use]
     pub fn feature(&self) -> ProofingFeature {
         self.feature
     }
+    #[must_use]
     pub fn entries(&self) -> &[ProofingEntry] {
         &self.entries
     }
+    #[must_use]
     pub fn terminal_cp(&self) -> u32 {
         self.terminal_cp
     }
+    #[must_use]
     pub fn len(&self) -> usize {
         self.entries.len()
     }
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
@@ -309,8 +325,7 @@ impl ProofingStateTable {
         let end_cp = self
             .entries
             .get(index + 1)
-            .map(ProofingEntry::start_cp)
-            .unwrap_or(self.terminal_cp);
+            .map_or(self.terminal_cp, ProofingEntry::start_cp);
         Some(ProofingRange {
             start_cp: entry.start_cp,
             end_cp,
@@ -318,6 +333,7 @@ impl ProofingStateTable {
         })
     }
 
+    #[must_use]
     pub fn ranges(&self) -> impl ExactSizeIterator<Item = ProofingRange> + '_ {
         (0..self.entries.len()).map(|index| self.range(index).unwrap())
     }
@@ -451,18 +467,22 @@ impl ProofingTables {
         })
     }
 
+    #[must_use]
     pub fn spelling(&self) -> Option<&ProofingStateTable> {
         self.spelling.as_ref()
     }
+    #[must_use]
     pub fn grammar(&self) -> Option<&ProofingStateTable> {
         self.grammar.as_ref()
     }
 
     /// Language auto-detection state ranges (`Plcflad`, MS-DOC 2.8.24).
+    #[must_use]
     pub fn language_detection(&self) -> Option<&ProofingStateTable> {
         self.language_detection.as_ref()
     }
 
+    #[must_use]
     pub fn get(&self, feature: ProofingFeature) -> Option<&ProofingStateTable> {
         match feature {
             ProofingFeature::Spelling => self.spelling(),

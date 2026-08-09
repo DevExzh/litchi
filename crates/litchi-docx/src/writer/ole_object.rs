@@ -1,8 +1,20 @@
+#![expect(
+    clippy::cast_precision_loss,
+    reason = "OOXML unit conversion intentionally uses floating-point output"
+)]
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "public names retain established OOXML facade terminology"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Embedded OLE/package object authoring for DOCX documents.
 //!
 //! An embedded object is serialized as a `<w:object>` element wrapping a VML
 //! shape (`v:shape`, optionally with a `v:imagedata` preview) and an
-//! `o:OLEObject` descriptor carrying the ProgID, shape identity, and the
+//! `o:OLEObject` descriptor carrying the `ProgID`, shape identity, and the
 //! relationship ID of the payload part. The payload is stored verbatim as
 //! `/word/embeddings/oleObjectN.bin` (content type
 //! `application/vnd.openxmlformats-officedocument.oleObject`) with an
@@ -21,7 +33,7 @@ use std::fmt::Write as FmtWrite;
 
 /// Maximum embedded payload size accepted by the authoring API (64 MiB).
 pub const MAX_OLE_PAYLOAD_BYTES: usize = 64 * 1024 * 1024;
-/// Maximum ProgID length per the COM ProgID contract.
+/// Maximum `ProgID` length per the COM `ProgID` contract.
 const MAX_PROG_ID_LENGTH: usize = 39;
 /// Maximum VML shape ID length accepted by the authoring API.
 const MAX_SHAPE_ID_LENGTH: usize = 255;
@@ -46,7 +58,7 @@ const MAX_SHAPE_ID_LENGTH: usize = 255;
 /// ```
 #[derive(Debug)]
 pub struct MutableOleObject {
-    /// COM ProgID of the embedded object (e.g. `Package`, `Excel.Sheet.12`).
+    /// COM `ProgID` of the embedded object (e.g. `Package`, `Excel.Sheet.12`).
     pub(crate) prog_id: String,
     /// VML shape ID (`v:shape@id` / `o:OLEObject@ShapeID`); assigned by
     /// `MutableDocument::add_ole_object` when left empty.
@@ -55,7 +67,7 @@ pub struct MutableOleObject {
     pub(crate) object_id: u32,
     /// Payload bytes stored verbatim as the embedded object part.
     pub(crate) payload: Vec<u8>,
-    /// Shape width in EMUs (English Metric Units, 1 inch = 914400 EMUs).
+    /// Shape width in EMUs (English Metric Units, 1 inch = `914_400` EMUs).
     pub(crate) width_emu: i64,
     /// Shape height in EMUs.
     pub(crate) height_emu: i64,
@@ -67,7 +79,7 @@ pub struct MutableOleObject {
 }
 
 impl MutableOleObject {
-    /// Create an embedded object with a ProgID and verbatim payload bytes.
+    /// Create an embedded object with a `ProgID` and verbatim payload bytes.
     ///
     /// The shape defaults to one square inch; resize with
     /// [`Self::set_size_emu`]. The payload must not exceed
@@ -75,9 +87,13 @@ impl MutableOleObject {
     ///
     /// # Arguments
     ///
-    /// * `prog_id` - COM ProgID (1–39 chars, letters/digits/`.`, starting
+    /// * `prog_id` - COM `ProgID` (1–39 chars, letters/digits/`.`, starting
     ///   with a letter; e.g. `Package`, `Word.Document.12`)
     /// * `payload` - Opaque payload bytes, stored verbatim and never activated
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn new(prog_id: impl Into<String>, payload: Vec<u8>) -> Result<Self> {
         let prog_id = prog_id.into();
         validate_prog_id(&prog_id)?;
@@ -98,17 +114,20 @@ impl MutableOleObject {
         })
     }
 
-    /// Get the ProgID.
+    /// Get the `ProgID`.
+    #[must_use]
     pub fn prog_id(&self) -> &str {
         &self.prog_id
     }
 
     /// Get the payload bytes.
+    #[must_use]
     pub fn payload(&self) -> &[u8] {
         &self.payload
     }
 
     /// Get the optional preview image bytes and detected format.
+    #[must_use]
     pub fn preview(&self) -> Option<(&[u8], ImageFormat)> {
         self.preview
             .as_ref()
@@ -117,11 +136,13 @@ impl MutableOleObject {
 
     /// Get the assigned VML shape ID (empty until the object is added to a
     /// document or explicitly set).
+    #[must_use]
     pub fn shape_id(&self) -> &str {
         &self.shape_id
     }
 
     /// Return the optional Word 2010 identifier on the enclosing object.
+    #[must_use]
     pub fn anchor_id(&self) -> Option<AnchorId> {
         self.anchor_id
     }
@@ -139,6 +160,10 @@ impl MutableOleObject {
     }
 
     /// Set the shape extents in EMUs (both must be positive).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_size_emu(&mut self, width_emu: i64, height_emu: i64) -> Result<&mut Self> {
         if width_emu <= 0 || height_emu <= 0 {
             return Err(Error::InvalidFormat(
@@ -155,6 +180,10 @@ impl MutableOleObject {
     /// The ID must be unique within the document;
     /// [`crate::writer::MutableDocument::add_ole_object`] rejects
     /// collisions with existing shapes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_shape_id(&mut self, shape_id: impl Into<String>) -> Result<&mut Self> {
         let shape_id = shape_id.into();
         validate_shape_id(&shape_id)?;
@@ -167,6 +196,10 @@ impl MutableOleObject {
     /// The image format is detected from the bytes (PNG, JPEG, GIF, EMF, and
     /// the other formats supported by [`ImageFormat`]); the image is stored
     /// as an ordinary media part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_preview(&mut self, data: Vec<u8>) -> Result<&mut Self> {
         let format = ImageFormat::detect_from_bytes(&data)
             .ok_or_else(|| Error::InvalidFormat("Unknown preview image format".to_string()))?;
@@ -194,9 +227,10 @@ impl MutableOleObject {
                     .to_string(),
             ));
         }
-        let ole_rid = ole_rid
-            .map(str::to_owned)
-            .unwrap_or_else(|| format!("{{{{OLE_OBJECT_{}}}}}", self.shape_id));
+        let ole_rid = ole_rid.map_or_else(
+            || format!("{{{{OLE_OBJECT_{}}}}}", self.shape_id),
+            str::to_owned,
+        );
         let shape_id = escape_xml(&self.shape_id);
         let width_twips = self.width_emu / EMUS_PER_TWIP;
         let height_twips = self.height_emu / EMUS_PER_TWIP;
@@ -215,9 +249,10 @@ impl MutableOleObject {
         )
         .map_err(|error| Error::Xml(error.to_string()))?;
         if self.preview.is_some() {
-            let preview_rid = preview_rid
-                .map(str::to_owned)
-                .unwrap_or_else(|| format!("{{{{OLE_PREVIEW_{}}}}}", self.shape_id));
+            let preview_rid = preview_rid.map_or_else(
+                || format!("{{{{OLE_PREVIEW_{}}}}}", self.shape_id),
+                str::to_owned,
+            );
             write!(xml, r#"<v:imagedata r:id="{preview_rid}" o:title=""/>"#)
                 .map_err(|error| Error::Xml(error.to_string()))?;
         }
@@ -234,7 +269,7 @@ impl MutableOleObject {
     }
 }
 
-/// Validate a COM ProgID: 1–39 characters, ASCII letters/digits/`.`,
+/// Validate a COM `ProgID`: 1–39 characters, ASCII letters/digits/`.`,
 /// starting with a letter.
 fn validate_prog_id(prog_id: &str) -> Result<()> {
     let mut characters = prog_id.chars();
@@ -291,8 +326,8 @@ mod tests {
         assert!(object.set_shape_id("_x0000_i1025").is_ok());
         assert!(object.set_shape_id("bad id").is_err());
         assert!(object.set_shape_id("").is_err());
-        assert!(object.set_size_emu(0, 914400).is_err());
-        assert!(object.set_size_emu(914400, -1).is_err());
+        assert!(object.set_size_emu(0, 914_400).is_err());
+        assert!(object.set_size_emu(914_400, -1).is_err());
     }
 
     #[test]
@@ -460,13 +495,13 @@ mod tests {
         {
             let document = package.document_mut().unwrap();
 
-            let mut text_box = MutableTextBox::new("Companion Box", 914400, 457200).unwrap();
+            let mut text_box = MutableTextBox::new("Companion Box", 914_400, 457200).unwrap();
             text_box.add_run("box story").unwrap();
             document.add_text_box(text_box);
 
             document
                 .add_paragraph()
-                .add_picture_from_bytes(PNG_HEADER.to_vec(), Some(914400), Some(914400))
+                .add_picture_from_bytes(PNG_HEADER.to_vec(), Some(914_400), Some(914_400))
                 .unwrap();
 
             let mut object = MutableOleObject::new("Package", b"coexist payload".to_vec()).unwrap();

@@ -1,4 +1,4 @@
-//! Bounded BIFF8 wire codecs for RealTimeData records.
+//! Bounded BIFF8 wire codecs for `RealTimeData` records.
 
 use super::model::Value;
 use crate::error::{Error, Result};
@@ -72,20 +72,20 @@ fn decode_chars(bytes: &[u8], wide: bool) -> Result<String> {
         let mut value = String::new();
         value
             .try_reserve(bytes.len())
-            .map_err(|_| Error::Allocation("decoding RTD UTF-16 text"))?;
+            .map_err(|_error| Error::Allocation("decoding RTD UTF-16 text"))?;
         for result in char::decode_utf16(
             bytes
                 .chunks_exact(2)
                 .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]])),
         ) {
-            value.push(result.map_err(|_| invalid("RTD string is not valid UTF-16LE"))?);
+            value.push(result.map_err(|_error| invalid("RTD string is not valid UTF-16LE"))?);
         }
         Ok(value)
     } else {
         let mut value = String::new();
         value
             .try_reserve(bytes.len())
-            .map_err(|_| Error::Allocation("decoding RTD compressed text"))?;
+            .map_err(|_error| Error::Allocation("decoding RTD compressed text"))?;
         value.extend(bytes.iter().map(|&byte| char::from(byte)));
         Ok(value)
     }
@@ -100,7 +100,7 @@ pub(super) fn join_segments(segments: &[String]) -> Result<String> {
     let mut value = String::new();
     value
         .try_reserve(byte_len)
-        .map_err(|_| Error::Allocation("reassembling RTD topic text"))?;
+        .map_err(|_error| Error::Allocation("reassembling RTD topic text"))?;
     for segment in segments {
         value.push_str(segment);
     }
@@ -126,7 +126,7 @@ impl Payload {
         if self.bytes.len() == self.bytes.capacity() {
             self.bytes
                 .try_reserve(1)
-                .map_err(|_| Error::Allocation("serializing RealTimeData payload"))?;
+                .map_err(|_error| Error::Allocation("serializing RealTimeData payload"))?;
         }
         self.bytes.push(byte);
         Ok(())
@@ -145,7 +145,7 @@ impl Payload {
         }
         self.bytes
             .try_reserve(bytes.len())
-            .map_err(|_| Error::Allocation("serializing RealTimeData payload"))?;
+            .map_err(|_error| Error::Allocation("serializing RealTimeData payload"))?;
         self.bytes.extend_from_slice(bytes);
         Ok(())
     }
@@ -235,21 +235,21 @@ pub(super) fn write_segmented_topic(
         return Err(invalid("RTD topic exceeds the string resource limit"));
     }
     let cch = u32::try_from(rgb_units)
-        .map_err(|_| invalid("RTD topic encoded-unit count overflows u32"))?;
+        .map_err(|_error| invalid("RTD topic encoded-unit count overflows u32"))?;
     out.extend_from_slice(&cch.to_le_bytes())?;
     out.push(if wide { HIGH_BYTE } else { 0u8 })?;
     for (index, segment) in segments.iter().enumerate() {
         let count = segment_counts[index];
         if wide {
             let count = u16::try_from(count)
-                .map_err(|_| invalid("RTD topic sub-string exceeds 65535 characters"))?;
+                .map_err(|_error| invalid("RTD topic sub-string exceeds 65535 characters"))?;
             out.extend_from_slice(&count.to_le_bytes())?;
             for unit in segment.encode_utf16() {
                 out.extend_from_slice(&unit.to_le_bytes())?;
             }
         } else {
             let count = u8::try_from(count)
-                .map_err(|_| invalid("RTD topic sub-string exceeds 255 characters"))?;
+                .map_err(|_error| invalid("RTD topic sub-string exceeds 255 characters"))?;
             out.push(count)?;
             for ch in segment.chars() {
                 out.push(ch as u8)?;
@@ -269,7 +269,7 @@ pub(super) fn parse_segmented_topic(data: &[u8], prefixed: bool) -> Result<(Vec<
         });
     }
     let cch = usize::try_from(read_u32(data, 0)?)
-        .map_err(|_| invalid("RealTimeData stTopic.cch overflows"))?;
+        .map_err(|_error| invalid("RealTimeData stTopic.cch overflows"))?;
     if cch > MAX_STRING_CHARACTERS {
         return Err(invalid(
             "RealTimeData stTopic exceeds the string resource limit",
@@ -301,7 +301,7 @@ pub(super) fn parse_segmented_topic(data: &[u8], prefixed: bool) -> Result<(Vec<
     };
     segments
         .try_reserve(minimum_segments)
-        .map_err(|_| Error::Allocation("retaining RTD topic segments"))?;
+        .map_err(|_error| Error::Allocation("retaining RTD topic segments"))?;
     let mut units_read = 0usize;
     while units_read < cch {
         if segments.len() >= MAX_TOPIC_SEGMENTS {
@@ -349,7 +349,7 @@ pub(super) fn parse_segmented_topic(data: &[u8], prefixed: bool) -> Result<(Vec<
         })?;
         segments
             .try_reserve(1)
-            .map_err(|_| Error::Allocation("retaining RTD topic segments"))?;
+            .map_err(|_error| Error::Allocation("retaining RTD topic segments"))?;
         segments.push(decode_chars(bytes, wide)?);
         offset = byte_end;
         units_read = next_units;
@@ -385,7 +385,7 @@ pub(super) fn parse_rtd_oper(data: &[u8]) -> Result<(Value, usize)> {
                 expected: 12,
                 found: data.len(),
             })?;
-            let bytes = <[u8; 8]>::try_from(bytes).map_err(|_| Error::InvalidLength {
+            let bytes = <[u8; 8]>::try_from(bytes).map_err(|_error| Error::InvalidLength {
                 expected: 12,
                 found: data.len(),
             })?;
@@ -423,7 +423,7 @@ pub(super) fn parse_rtd_oper(data: &[u8]) -> Result<(Value, usize)> {
                 expected: 8,
                 found: data.len(),
             })?;
-            let raw = <[u8; 4]>::try_from(raw).map_err(|_| Error::InvalidLength {
+            let raw = <[u8; 4]>::try_from(raw).map_err(|_error| Error::InvalidLength {
                 expected: 8,
                 found: data.len(),
             })?;
@@ -451,7 +451,7 @@ fn parse_rtd_oper_str(data: &[u8]) -> Result<(String, usize, usize)> {
         });
     }
     let char_count = usize::try_from(read_u32(data, 0)?)
-        .map_err(|_| invalid("RTDOperStr.cchRTDOperStr overflows"))?;
+        .map_err(|_error| invalid("RTDOperStr.cchRTDOperStr overflows"))?;
     if char_count > MAX_STRING_CHARACTERS {
         return Err(invalid("RTDOperStr exceeds the string resource limit"));
     }

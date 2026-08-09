@@ -25,12 +25,15 @@ pub struct SynchronizationReference {
 }
 
 impl SynchronizationReference {
+    #[must_use]
     pub fn value(&self) -> &str {
         &self.value
     }
+    #[must_use]
     pub fn row(&self) -> u32 {
         self.row
     }
+    #[must_use]
     pub fn column(&self) -> u32 {
         self.column
     }
@@ -47,18 +50,23 @@ pub struct TabColor {
 }
 
 impl TabColor {
+    #[must_use]
     pub fn automatic(&self) -> bool {
         self.automatic
     }
+    #[must_use]
     pub fn indexed(&self) -> Option<u32> {
         self.indexed
     }
+    #[must_use]
     pub fn argb(&self) -> Option<[u8; 4]> {
         self.argb
     }
+    #[must_use]
     pub fn theme(&self) -> Option<u32> {
         self.theme
     }
+    #[must_use]
     pub fn tint(&self) -> f64 {
         self.tint
     }
@@ -72,9 +80,11 @@ pub struct PageSetupProperties {
 }
 
 impl PageSetupProperties {
+    #[must_use]
     pub fn automatic_page_breaks(&self) -> bool {
         self.automatic_page_breaks
     }
+    #[must_use]
     pub fn fit_to_page(&self) -> bool {
         self.fit_to_page
     }
@@ -99,39 +109,51 @@ pub struct SheetProperties {
 
 impl SheetProperties {
     /// Stable VBA-facing name, retained as inert metadata only.
+    #[must_use]
     pub fn code_name(&self) -> Option<&str> {
         self.code_name.as_deref()
     }
+    #[must_use]
     pub fn synchronization_reference(&self) -> Option<&SynchronizationReference> {
         self.synchronization_reference.as_ref()
     }
+    #[must_use]
     pub fn synchronize_horizontally(&self) -> bool {
         self.synchronize_horizontally
     }
+    #[must_use]
     pub fn synchronize_vertically(&self) -> bool {
         self.synchronize_vertically
     }
+    #[must_use]
     pub fn transition_evaluation_enabled(&self) -> bool {
         self.transition_evaluation
     }
+    #[must_use]
     pub fn transition_entry_enabled(&self) -> bool {
         self.transition_entry
     }
+    #[must_use]
     pub fn published(&self) -> bool {
         self.published
     }
+    #[must_use]
     pub fn filter_mode(&self) -> bool {
         self.filter_mode
     }
+    #[must_use]
     pub fn format_condition_calculation_enabled(&self) -> bool {
         self.format_condition_calculation_enabled
     }
+    #[must_use]
     pub fn tab_color(&self) -> Option<&TabColor> {
         self.tab_color.as_ref()
     }
+    #[must_use]
     pub fn outline_properties(&self) -> Option<&OutlineProperties> {
         self.outline_properties.as_ref()
     }
+    #[must_use]
     pub fn page_setup_properties(&self) -> Option<&PageSetupProperties> {
         self.page_setup_properties.as_ref()
     }
@@ -194,7 +216,10 @@ struct Parser {
 
 /// Parse the worksheet's exact `worksheet/sheetPr` child path.
 // Text/CData arms keep `?`-bearing whitespace checks out of guards; guards cannot use `?`.
-#[allow(clippy::collapsible_match)]
+#[allow(
+    clippy::collapsible_match,
+    reason = "separate event and element matches keep XML state transitions explicit"
+)]
 pub fn parse_sheet_properties(xml: &[u8]) -> Result<Option<SheetProperties>> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("worksheet XML is too large"));

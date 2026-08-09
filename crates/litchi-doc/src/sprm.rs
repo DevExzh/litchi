@@ -3,7 +3,7 @@
 /// SPRMs are variable-length records used in both DOC and PPT formats
 /// to modify properties. This module provides common SPRM parsing logic
 /// based on Apache POI's SPRM handling.
-/// SPRM operation types based on size code (from POI's SprmOperation).
+/// SPRM operation types based on size code (from POI's `SprmOperation`).
 use litchi_core::binary::{read_i16_le, read_u16_le, read_u32_le};
 use smallvec::SmallVec;
 
@@ -99,7 +99,7 @@ impl From<u8> for SprmOperation {
 
 /// An SPRM (Single Property Modifier).
 ///
-/// Based on Apache POI's SprmBuffer and related classes.
+/// Based on Apache POI's `SprmBuffer` and related classes.
 ///
 /// **Performance:** Uses `SmallVec` with 8-byte inline storage for operands
 /// to eliminate heap allocations for common cases (most operands are 1-4 bytes).
@@ -120,30 +120,35 @@ pub struct Sprm {
 impl Sprm {
     /// Get the operand as a byte.
     #[inline]
+    #[must_use]
     pub fn operand_byte(&self) -> Option<u8> {
         self.operand.first().copied()
     }
 
     /// Get the operand as a word (u16).
     #[inline]
+    #[must_use]
     pub fn operand_word(&self) -> Option<u16> {
         read_u16_le(&self.operand, 0).ok()
     }
 
     /// Get the operand as a signed word (i16).
     #[inline]
+    #[must_use]
     pub fn operand_i16(&self) -> Option<i16> {
         read_i16_le(&self.operand, 0).ok()
     }
 
     /// Get the operand as a dword (u32).
     #[inline]
+    #[must_use]
     pub fn operand_dword(&self) -> Option<u32> {
         read_u32_le(&self.operand, 0).ok()
     }
 
     /// Get the operand as raw bytes.
     #[inline]
+    #[must_use]
     pub fn operand_bytes(&self) -> &[u8] {
         &self.operand
     }
@@ -151,7 +156,7 @@ impl Sprm {
 
 /// Parse SPRMs from a byte array (grpprl - group of SPRMs).
 ///
-/// Based on Apache POI's SprmBuffer.findSprms() and SprmIterator.
+/// Based on Apache POI's `SprmBuffer.findSprms()` and `SprmIterator`.
 ///
 /// **Important:** Apache POI always uses 2-byte SPRM opcodes for all Word versions,
 /// including Word 6/7. This is the standard format used by Microsoft Word.
@@ -172,7 +177,7 @@ pub fn parse_sprms(grpprl: &[u8]) -> Result<Vec<Sprm>> {
 ///
 /// **Performance optimizations:**
 /// - Pre-allocates vector capacity based on input size estimate
-/// - Uses SmallVec for operands to avoid heap allocations (most are ≤8 bytes)
+/// - Uses `SmallVec` for operands to avoid heap allocations (most are ≤8 bytes)
 /// - Extracts size code masking constant for better code generation
 fn parse_sprms_two_byte(grpprl: &[u8]) -> Result<Vec<Sprm>> {
     // Pre-allocate: estimate ~4 bytes per SPRM on average (2 opcode + 1-2 operand)
@@ -333,6 +338,7 @@ fn parse_sprms_two_byte(grpprl: &[u8]) -> Result<Vec<Sprm>> {
 ///
 /// Reference to the first matching SPRM, or None if not found
 #[inline]
+#[must_use]
 pub fn find_sprm(sprms: &[Sprm], opcode: u16) -> Option<&Sprm> {
     sprms.iter().find(|sprm| sprm.opcode == opcode)
 }
@@ -341,17 +347,19 @@ pub fn find_sprm(sprms: &[Sprm], opcode: u16) -> Option<&Sprm> {
 ///
 /// Based on Apache POI's SPRM boolean handling.
 #[inline]
+#[must_use]
 pub fn get_bool_from_sprm(sprm: &Sprm) -> bool {
     sprm.operand_byte().unwrap_or(0) != 0
 }
 
 /// Get an integer value from an SPRM operand.
 #[inline]
+#[must_use]
 pub fn get_int_from_sprm(sprm: &Sprm) -> Option<i32> {
     match sprm.operation {
-        SprmOperation::Byte | SprmOperation::Toggle => sprm.operand_byte().map(|b| b as i32),
+        SprmOperation::Byte | SprmOperation::Toggle => sprm.operand_byte().map(i32::from),
         SprmOperation::Word | SprmOperation::Word2 | SprmOperation::Word3 => {
-            sprm.operand_i16().map(|w| w as i32)
+            sprm.operand_i16().map(i32::from)
         },
         SprmOperation::DWord => sprm.operand_dword().map(|d| d as i32),
         _ => None,

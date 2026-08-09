@@ -35,7 +35,7 @@ pub struct Shape {
 }
 
 impl Shape {
-    /// Project a host-neutral OfficeArt shape and its following XLS TXO text.
+    /// Project a host-neutral `OfficeArt` shape and its following XLS TXO text.
     fn from_odraw(
         shape: &DrawShape<'_>,
         texts: &mut VecDeque<Option<String>>,
@@ -214,13 +214,13 @@ fn standalone_textbox(data: &[u8]) -> std::io::Result<bool> {
     Ok(true)
 }
 
-/// Whether the final top-level OfficeArt record still needs bytes from a later
-/// MsoDrawing BIFF record.
+/// Whether the final top-level `OfficeArt` record still needs bytes from a later
+/// `MsoDrawing` BIFF record.
 ///
-/// Excel is allowed to interleave an OBJ record between a shape's ClientData
-/// and its final ClientTextbox. In that sequence, the second MsoDrawing record
-/// consists solely of the ClientTextbox atom, but it remains part of the open
-/// SpContainer. A standalone ClientTextbox after a complete drawing belongs to
+/// Excel is allowed to interleave an OBJ record between a shape's `ClientData`
+/// and its final `ClientTextbox`. In that sequence, the second `MsoDrawing` record
+/// consists solely of the `ClientTextbox` atom, but it remains part of the open
+/// `SpContainer`. A standalone `ClientTextbox` after a complete drawing belongs to
 /// a comment/control instead and must not be appended to the drawing tree.
 fn officeart_needs_continuation(data: &[u8]) -> std::io::Result<bool> {
     let mut offset = 0usize;
@@ -231,9 +231,9 @@ fn officeart_needs_continuation(data: &[u8]) -> std::io::Result<bool> {
         let payload_len = usize::try_from(u32::from_le_bytes(
             header[4..8]
                 .try_into()
-                .map_err(|_| invalid_data("truncated OfficeArt record header"))?,
+                .map_err(|_error| invalid_data("truncated OfficeArt record header"))?,
         ))
-        .map_err(|_| invalid_data("OfficeArt record length exceeds usize"))?;
+        .map_err(|_error| invalid_data("OfficeArt record length exceeds usize"))?;
         let end = offset
             .checked_add(8)
             .and_then(|value| value.checked_add(payload_len))
@@ -342,7 +342,7 @@ impl PendingTxo {
         }
         String::from_utf16(&self.code_units)
             .map(Some)
-            .map_err(|_| invalid_data("XLS TXO text contains invalid UTF-16"))
+            .map_err(|_error| invalid_data("XLS TXO text contains invalid UTF-16"))
     }
 }
 
@@ -363,7 +363,7 @@ fn walk<'shape>(shapes: &'shape [Shape], out: &mut Vec<&'shape Shape>) {
     }
 }
 
-/// Extract shapes from Excel workbook MsoDrawing records.
+/// Extract shapes from Excel workbook `MsoDrawing` records.
 ///
 /// # Arguments
 ///
@@ -372,6 +372,9 @@ fn walk<'shape>(shapes: &'shape [Shape], out: &mut Vec<&'shape Shape>) {
 /// # Returns
 ///
 /// A vector of shapes found in the workbook.
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn extract_shapes_from_workbook(workbook_data: &[u8]) -> std::io::Result<Vec<Shape>> {
     WorkbookDrawing::parse(workbook_data)?.project()
 }
@@ -385,6 +388,9 @@ pub fn extract_shapes_from_workbook(workbook_data: &[u8]) -> std::io::Result<Vec
 /// # Returns
 ///
 /// A string containing all text extracted from shapes.
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn extract_shape_text_from_workbook(workbook_data: &[u8]) -> std::io::Result<String> {
     let shapes = extract_shapes_from_workbook(workbook_data)?;
     let mut flat = Vec::new();
@@ -405,6 +411,9 @@ pub fn extract_shape_text_from_workbook(workbook_data: &[u8]) -> std::io::Result
 /// # Returns
 ///
 /// The number of shapes found.
+/// # Errors
+///
+/// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn count_shapes_in_workbook(workbook_data: &[u8]) -> std::io::Result<usize> {
     let shapes = extract_shapes_from_workbook(workbook_data)?;
     let mut flat = Vec::new();

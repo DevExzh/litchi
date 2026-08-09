@@ -1,3 +1,7 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 use crate::error::{Error, Result};
 /// Comment support for reading comments from Word documents.
 ///
@@ -68,6 +72,7 @@ impl Comment {
     /// * `initials` - Author initials
     /// * `date` - Date of comment creation
     /// * `xml_bytes` - The XML content of the comment
+    #[must_use]
     pub fn new(
         id: u32,
         author: String,
@@ -104,30 +109,35 @@ impl Comment {
 
     /// Get the comment ID.
     #[inline]
+    #[must_use]
     pub fn id(&self) -> u32 {
         self.id
     }
 
     /// Get the author name.
     #[inline]
+    #[must_use]
     pub fn author(&self) -> &str {
         &self.author
     }
 
     /// Get the author initials.
     #[inline]
+    #[must_use]
     pub fn initials(&self) -> Option<&str> {
         self.initials.as_deref()
     }
 
     /// Get the comment date.
     #[inline]
+    #[must_use]
     pub fn date(&self) -> Option<&str> {
         self.date.as_deref()
     }
 
     /// Get the XML bytes of this comment.
     #[inline]
+    #[must_use]
     pub fn xml_bytes(&self) -> &[u8] {
         self.xml_data.as_bytes()
     }
@@ -147,6 +157,10 @@ impl Comment {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn text(&self) -> Result<String> {
         extract_word_text(self.xml_bytes())
     }
@@ -196,7 +210,7 @@ fn parse_comment_metadata(xml_bytes: &[u8]) -> Result<Option<CommentMetadata>> {
     let mut reader = Reader::from_reader(xml_bytes);
     let element = loop {
         match reader.read_event() {
-            Ok(Event::Start(element)) | Ok(Event::Empty(element)) => break element,
+            Ok(Event::Start(element) | Event::Empty(element)) => break element,
             Ok(Event::Eof) => {
                 return Err(Error::InvalidFormat(
                     "missing Word comment element".to_string(),
@@ -231,7 +245,7 @@ fn parse_comment_metadata(xml_bytes: &[u8]) -> Result<Option<CommentMetadata>> {
 fn decode_comment_attribute(value: &[u8]) -> Result<String> {
     let value = std::str::from_utf8(value).map_err(|error| Error::Xml(error.to_string()))?;
     quick_xml::escape::unescape(value)
-        .map(|value| value.into_owned())
+        .map(std::borrow::Cow::into_owned)
         .map_err(|error| Error::Xml(error.to_string()))
 }
 

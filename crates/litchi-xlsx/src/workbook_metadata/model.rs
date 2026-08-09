@@ -1,4 +1,4 @@
-//! Semantic SpreadsheetML workbook-metadata values.
+//! Semantic `SpreadsheetML` workbook-metadata values.
 //!
 //! These types are intentionally contextual to the `workbook_metadata`
 //! owner, so their canonical names do not repeat the owner prefix.

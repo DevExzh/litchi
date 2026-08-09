@@ -24,6 +24,7 @@ pub struct Piece {
 
 impl Piece {
     /// Create a new piece
+    #[must_use]
     pub fn new(cp_start: u32, cp_end: u32, fc: u32, is_unicode: bool) -> Self {
         Self {
             cp_start,
@@ -34,11 +35,13 @@ impl Piece {
     }
 
     /// Get the length of this piece in characters
+    #[must_use]
     pub fn len(&self) -> u32 {
         self.cp_end - self.cp_start
     }
 
     /// Check if piece is empty
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.cp_end <= self.cp_start
     }
@@ -52,6 +55,7 @@ pub struct PieceTableBuilder {
 
 impl PieceTableBuilder {
     /// Create a new piece table builder
+    #[must_use]
     pub fn new() -> Self {
         Self { pieces: Vec::new() }
     }
@@ -67,7 +71,7 @@ impl PieceTableBuilder {
     ///
     /// Clx structure containing piece descriptors
     ///
-    /// Based on Apache POI's ComplexFileTable.writeTo() (line 96-106)
+    /// Based on Apache POI's `ComplexFileTable.writeTo()` (line 96-106)
     pub fn generate(&self) -> Result<Vec<u8>, IoError> {
         let mut clx = Vec::new();
 
@@ -115,6 +119,7 @@ impl PieceTableBuilder {
     }
 
     /// Get the number of pieces
+    #[must_use]
     pub fn piece_count(&self) -> usize {
         self.pieces.len()
     }

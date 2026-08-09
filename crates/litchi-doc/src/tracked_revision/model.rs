@@ -8,9 +8,9 @@ use crate::parts::fkp::ParagraphHeight;
 pub enum RevisionKind {
     Insertion,
     Deletion,
-    /// The deletion half of a move, paired by revision_save_id.
+    /// The deletion half of a move, paired by `revision_save_id`.
     MoveFrom,
-    /// The insertion half of a move, paired by revision_save_id.
+    /// The insertion half of a move, paired by `revision_save_id`.
     MoveTo,
     CharacterFormatting,
     ParagraphFormatting,
@@ -36,16 +36,19 @@ impl RevisionMetadata {
         }
     }
 
+    #[must_use]
     pub fn with_timestamp(mut self, timestamp: DateTime) -> Self {
         self.timestamp = Some(timestamp);
         self
     }
 
+    #[must_use]
     pub fn with_reason(mut self, reason: u16) -> Self {
         self.reason = Some(reason);
         self
     }
 
+    #[must_use]
     pub fn with_revision_save_id(mut self, revision_save_id: u32) -> Self {
         self.revision_save_id = Some(revision_save_id);
         self

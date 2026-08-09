@@ -28,14 +28,24 @@ pub(super) fn parse_empty_children(
             {
                 values.push(super::super::xml::required_attr(
                     reader, element, attribute,
-                )?)
+                )?);
             },
             Event::End(ref element) if is_table(&namespace, element, parent) => break,
             Event::End(ref element) if is_table(&namespace, element, child) => {},
             Event::Text(ref text) if text_is_whitespace(text)? => {},
             Event::Comment(_) => {},
             Event::Eof => return Err(invalid_message("unterminated data-pilot child container")),
-            _ => return Err(invalid_message("invalid data-pilot child element")),
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {
+                return Err(invalid_message("invalid data-pilot child element"));
+            },
         }
         buf.clear();
     }

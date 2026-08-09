@@ -426,13 +426,12 @@ pub(crate) fn set_display_blanks(xml: &[u8], mode: DisplayBlanks) -> Result<Vec<
     let chart = document.chart()?;
     let node = document.child(chart, b"dispBlanksAs", NamespaceKind::Chart)?;
     let value = mode.xml_value();
-    match node {
-        Some(node) => replace_attribute_if_changed(xml, &document, node, b"val", value),
-        None => {
-            let prefix = document.prefix(chart);
-            let fragment = element(&prefix, "dispBlanksAs", &format!(r#" val="{value}""#), "");
-            append_to_parent(xml, &document, chart, &fragment)
-        },
+    if let Some(node) = node {
+        replace_attribute_if_changed(xml, &document, node, b"val", value)
+    } else {
+        let prefix = document.prefix(chart);
+        let fragment = element(&prefix, "dispBlanksAs", &format!(r#" val="{value}""#), "");
+        append_to_parent(xml, &document, chart, &fragment)
     }
 }
 
@@ -505,34 +504,30 @@ pub(crate) fn set_series_data_label_flag(
     let series = document.series(xml, index)?;
     let labels = document.child(series, b"dLbls", NamespaceKind::Chart)?;
     let name = flag.element().as_bytes();
-    match labels {
-        Some(labels) => match document.child(labels, name, NamespaceKind::Chart)? {
-            Some(node) => {
-                let lexical = if value { "1" } else { "0" };
-                replace_attribute_if_changed(xml, &document, node, b"val", lexical)
-            },
-            None => {
-                let prefix = document.prefix(labels);
-                let fragment = element(
-                    &prefix,
-                    flag.element(),
-                    &format!(r#" val="{}""#, if value { 1 } else { 0 }),
-                    "",
-                );
-                append_to_parent(xml, &document, labels, &fragment)
-            },
-        },
-        None => {
-            let prefix = document.prefix(series);
-            let child = element(
+    if let Some(labels) = labels {
+        if let Some(node) = document.child(labels, name, NamespaceKind::Chart)? {
+            let lexical = if value { "1" } else { "0" };
+            replace_attribute_if_changed(xml, &document, node, b"val", lexical)
+        } else {
+            let prefix = document.prefix(labels);
+            let fragment = element(
                 &prefix,
                 flag.element(),
-                &format!(r#" val="{}""#, if value { 1 } else { 0 }),
+                &format!(r#" val="{}""#, i32::from(value)),
                 "",
             );
-            let labels = element(&prefix, "dLbls", "", &child);
-            append_to_parent(xml, &document, series, &labels)
-        },
+            append_to_parent(xml, &document, labels, &fragment)
+        }
+    } else {
+        let prefix = document.prefix(series);
+        let child = element(
+            &prefix,
+            flag.element(),
+            &format!(r#" val="{}""#, i32::from(value)),
+            "",
+        );
+        let labels = element(&prefix, "dLbls", "", &child);
+        append_to_parent(xml, &document, series, &labels)
     }
 }
 
@@ -572,13 +567,12 @@ pub(crate) fn set_series_data_label_separator(
         },
         (Some(labels), Some(separator)) => {
             let fragment = escape_xml(separator);
-            match document.child(labels, b"separator", NamespaceKind::Chart)? {
-                Some(node) => replace_text(xml, &document, node, &fragment),
-                None => {
-                    let prefix = document.prefix(labels);
-                    let element = element(&prefix, "separator", "", &fragment);
-                    append_to_parent(xml, &document, labels, &element)
-                },
+            if let Some(node) = document.child(labels, b"separator", NamespaceKind::Chart)? {
+                replace_text(xml, &document, node, &fragment)
+            } else {
+                let prefix = document.prefix(labels);
+                let element = element(&prefix, "separator", "", &fragment);
+                append_to_parent(xml, &document, labels, &element)
             }
         },
         (None, Some(separator)) => {
@@ -598,13 +592,12 @@ pub(crate) fn set_axis_position(
     let document = Document::parse(xml)?;
     let axis = document.axis(xml, axis_id)?;
     let value = position.xml_value();
-    match document.child(axis, b"axPos", NamespaceKind::Chart)? {
-        Some(node) => replace_attribute_if_changed(xml, &document, node, b"val", value),
-        None => {
-            let prefix = document.prefix(axis);
-            let fragment = element(&prefix, "axPos", &format!(r#" val="{value}""#), "");
-            insert_after_child(xml, &document, axis, b"scaling", &fragment)
-        },
+    if let Some(node) = document.child(axis, b"axPos", NamespaceKind::Chart)? {
+        replace_attribute_if_changed(xml, &document, node, b"val", value)
+    } else {
+        let prefix = document.prefix(axis);
+        let fragment = element(&prefix, "axPos", &format!(r#" val="{value}""#), "");
+        insert_after_child(xml, &document, axis, b"scaling", &fragment)
     }
 }
 
@@ -897,8 +890,7 @@ fn parse_attributes_with_base(raw: &[u8], base: usize) -> Result<Vec<Attribute>>
 
 fn decode_attribute(value: &[u8]) -> Vec<u8> {
     std::str::from_utf8(value)
-        .map(|value| unescape_xml(value).into_bytes())
-        .unwrap_or_else(|_| value.to_vec())
+        .map_or_else(|_| value.to_vec(), |value| unescape_xml(value).into_bytes())
 }
 
 fn parse_u32(value: &[u8]) -> Result<u32> {

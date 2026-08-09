@@ -3,8 +3,8 @@
     reason = "tests are expected to panic on unexpected fixture failures"
 )]
 
-use litchi_odf_common::core::PackageWriter;
 use litchi_odg::Drawing;
+use soapberry_zip::office::StreamingArchiveWriter;
 
 const CONTENT: &str =
     include_str!("../../../test-data/odf/odg/drawing-style-resources-content.xml");
@@ -15,12 +15,19 @@ const LIBREOFFICE_ODG: &[u8] = include_bytes!(
 
 #[test]
 fn real_drawing_resource_xml_remains_exact_and_opaque() {
-    let mut writer = PackageWriter::new();
+    const MIMETYPE: &[u8] = b"application/vnd.oasis.opendocument.graphics";
+    const MANIFEST: &[u8] = br#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.graphics"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/><manifest:file-entry manifest:full-path="styles.xml" manifest:media-type="text/xml"/></manifest:manifest>"#;
+    let mut writer = StreamingArchiveWriter::new();
+    writer.write_stored("mimetype", MIMETYPE).unwrap();
     writer
-        .set_mimetype("application/vnd.oasis.opendocument.graphics")
+        .write_deflated("content.xml", CONTENT.as_bytes())
         .unwrap();
-    writer.add_file("content.xml", CONTENT.as_bytes()).unwrap();
-    writer.add_file("styles.xml", STYLES.as_bytes()).unwrap();
+    writer
+        .write_deflated("styles.xml", STYLES.as_bytes())
+        .unwrap();
+    writer
+        .write_deflated("META-INF/manifest.xml", MANIFEST)
+        .unwrap();
     let bytes = writer.finish_to_bytes().unwrap();
 
     let drawing = Drawing::from_bytes(bytes.clone()).unwrap();

@@ -59,7 +59,7 @@ impl<'a> DataLabReader<'a> {
                 expected: end,
                 found: self.data.len(),
             })?;
-        let value: [u8; N] = bytes.try_into().map_err(|_| Error::InvalidLength {
+        let value: [u8; N] = bytes.try_into().map_err(|_error| Error::InvalidLength {
             expected: N,
             found: bytes.len(),
         })?;
@@ -145,6 +145,9 @@ pub struct DataLabExt {
 
 impl DataLabExt {
     /// Parse a `DataLabExt` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         // MS-XLS 2.4.75: the record contains only the FrtHeader.
         if data.len() != FRT_HEADER_LEN {
@@ -163,6 +166,7 @@ impl DataLabExt {
     }
 
     /// Serialize back to a complete `DataLabExt` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(FRT_HEADER_LEN);
         payload.extend_from_slice(&DATA_LAB_EXT_RECORD_TYPE.to_le_bytes());
@@ -172,6 +176,7 @@ impl DataLabExt {
     }
 
     /// Raw `frtHeader.grbitFrt` bitfield (`fFrtRef`/`fFrtAlert` are zero).
+    #[must_use]
     pub fn frt_flags(&self) -> u16 {
         self.frt_flags
     }
@@ -214,6 +219,9 @@ impl DataLabExtContents {
     const FLAG_BUBBLE_SIZES: u16 = 0x0010;
 
     /// Parse a `DataLabExtContents` record payload.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         // FrtHeader (12) + flags (2) + cch (2); the string option flags and
         // characters follow when cch is greater than zero.
@@ -288,6 +296,7 @@ impl DataLabExtContents {
     }
 
     /// Serialize back to a complete `DataLabExtContents` record payload.
+    #[must_use]
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::new();
         payload.extend_from_slice(&DATA_LAB_EXT_CONTENTS_RECORD_TYPE.to_le_bytes());
@@ -303,32 +312,38 @@ impl DataLabExtContents {
     }
 
     /// Whether the series name is displayed (`fSerName`).
+    #[must_use]
     pub fn show_series_name(&self) -> bool {
         self.flags & Self::FLAG_SERIES_NAME != 0
     }
 
     /// Whether the category name or horizontal value is displayed
     /// (`fCatName`).
+    #[must_use]
     pub fn show_category_name(&self) -> bool {
         self.flags & Self::FLAG_CATEGORY_NAME != 0
     }
 
     /// Whether the data value or vertical value is displayed (`fValue`).
+    #[must_use]
     pub fn show_value(&self) -> bool {
         self.flags & Self::FLAG_VALUE != 0
     }
 
     /// Whether the percentage of the series sum is displayed (`fPercent`).
+    #[must_use]
     pub fn show_percent(&self) -> bool {
         self.flags & Self::FLAG_PERCENT != 0
     }
 
     /// Whether the bubble size is displayed (`fBubSizes`).
+    #[must_use]
     pub fn show_bubble_sizes(&self) -> bool {
         self.flags & Self::FLAG_BUBBLE_SIZES != 0
     }
 
     /// Raw flags word, including the 11 reserved bits.
+    #[must_use]
     pub fn flags(&self) -> u16 {
         self.flags
     }
@@ -336,6 +351,7 @@ impl DataLabExtContents {
     /// The decoded `rgchSep` separator string. Compressed characters
     /// (`fHighByte` 0) are single low bytes of UTF-16 code units (MS-XLS
     /// 2.5.296).
+    #[must_use]
     pub fn separator(&self) -> String {
         let units: Vec<u16> = if self.separator_flags & HIGH_BYTE != 0 {
             self.separator_bytes
@@ -352,11 +368,13 @@ impl DataLabExtContents {
     }
 
     /// The raw `rgchSep` option flags byte (`fHighByte` and 7 reserved bits).
+    #[must_use]
     pub fn separator_flags(&self) -> u8 {
         self.separator_flags
     }
 
     /// The raw `rgchSep` character bytes, preserved verbatim.
+    #[must_use]
     pub fn separator_bytes(&self) -> &[u8] {
         &self.separator_bytes
     }

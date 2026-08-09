@@ -1,3 +1,7 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Paragraph content adapters for drawings, revisions, and Office Math.
 
 use crate::drawing::{LegacyAnchor, Object, parse, parse_legacy};
@@ -16,6 +20,10 @@ impl Paragraph {
     ///
     /// Returns a vector of OMML formula strings found in any run within this paragraph.
     /// This extracts inline formulas (formulas within runs).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn omml_formulas(&self) -> Result<Vec<String>> {
         let mut run_ranges = Vec::new();
         scan_word_element_ranges(self.xml_bytes(), &[b"r".as_slice()], |_, start, length| {
@@ -50,6 +58,10 @@ impl Paragraph {
     /// exact raw XML remains available through [`Self::omml_formulas`]; this
     /// method turns each fragment into a validated [`OfficeMath`] value
     /// suitable for reuse with the mutable writer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn inline_office_math(&self) -> Result<Vec<OfficeMath>> {
         self.omml_formulas()?
             .into_iter()
@@ -76,6 +88,10 @@ impl Paragraph {
     /// }
     /// ```
     #[inline]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn images(&self) -> Result<SmallVec<[InlineImage; 4]>> {
         parse_inline_images(self.xml_bytes())
     }
@@ -83,7 +99,7 @@ impl Paragraph {
     /// Extract all drawing objects (shapes, text boxes) from this paragraph.
     ///
     /// Returns a vector of [`Object`] values found in `<w:drawing>` elements
-    /// within this paragraph. This includes shapes, text boxes, and other DrawingML objects.
+    /// within this paragraph. This includes shapes, text boxes, and other `DrawingML` objects.
     ///
     /// # Example
     ///
@@ -101,6 +117,10 @@ impl Paragraph {
     /// }
     /// ```
     #[inline]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn drawing_objects(&self) -> Result<SmallVec<[Object; 4]>> {
         parse(self.xml_bytes())
     }
@@ -112,6 +132,10 @@ impl Paragraph {
     /// or `w:pict`. VML, OLE, image payloads, and layout are intentionally
     /// inert and are not interpreted.
     #[inline]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn legacy_anchors(&self) -> Result<SmallVec<[LegacyAnchor; 4]>> {
         parse_legacy(self.xml_bytes())
     }
@@ -135,6 +159,10 @@ impl Paragraph {
     /// }
     /// ```
     #[inline]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn revisions(&self) -> Result<SmallVec<[Revision; 4]>> {
         parse_revisions(self.xml_bytes())
     }
@@ -152,6 +180,10 @@ impl Paragraph {
     ///     println!("Display formula: {}", formula);
     /// }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn paragraph_level_formulas(&self) -> Result<Vec<String>> {
         let mut run_ranges = Vec::new();
         scan_word_element_ranges(self.xml_bytes(), &[b"r".as_slice()], |_, start, length| {
@@ -186,6 +218,10 @@ impl Paragraph {
     /// enclosed by an `<m:oMathPara>` math paragraph.  The result is flattened
     /// into document order; use [`Self::paragraph_level_formulas`] when the
     /// original XML strings are required.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn display_office_math(&self) -> Result<Vec<OfficeMath>> {
         self.paragraph_level_formulas()?
             .into_iter()

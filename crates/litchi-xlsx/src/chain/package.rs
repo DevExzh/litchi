@@ -36,7 +36,7 @@ pub(crate) fn validate_package(package: &OpcPackage) -> Result<()> {
     validate_part(package, &relationship.part_name)
 }
 
-/// Store a caller-authored inert calculation chain in a SpreadsheetML package.
+/// Store a caller-authored inert calculation chain in a `SpreadsheetML` package.
 ///
 /// The supplied order is serialized without recalculating formulas or inferring
 /// dependencies. Existing calculation-chain graph violations are rejected
@@ -329,7 +329,7 @@ fn validate_part_set(package: &OpcPackage, relationship_target: Option<&PackURI>
     let mut parts = package
         .iter_parts()
         .filter(|part| part.content_type() == CONTENT_TYPE);
-    let part_name = parts.next().map(|part| part.partname());
+    let part_name = parts.next().map(litchi_opc::Part::partname);
     if parts.next().is_some() {
         return Err(invalid(
             "package contains more than one calculation-chain part",

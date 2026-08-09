@@ -55,14 +55,17 @@ pub struct BorderSide {
 }
 
 impl BorderSide {
+    #[must_use]
     pub fn style(&self) -> BorderStyle {
         self.style
     }
 
+    #[must_use]
     pub fn color_index(&self) -> u16 {
         self.color_index
     }
 
+    #[must_use]
     pub fn color(&self, palette: &Palette) -> Option<Color> {
         palette.color(self.color_index)
     }
@@ -81,32 +84,39 @@ pub struct CellBorders {
 }
 
 impl CellBorders {
+    #[must_use]
     pub fn left(&self) -> &BorderSide {
         &self.left
     }
 
+    #[must_use]
     pub fn right(&self) -> &BorderSide {
         &self.right
     }
 
+    #[must_use]
     pub fn top(&self) -> &BorderSide {
         &self.top
     }
 
+    #[must_use]
     pub fn bottom(&self) -> &BorderSide {
         &self.bottom
     }
 
+    #[must_use]
     pub fn diagonal(&self) -> &BorderSide {
         &self.diagonal
     }
 
     /// Returns whether the diagonal runs from top-left to bottom-right.
+    #[must_use]
     pub fn diagonal_down(&self) -> bool {
         self.diagonal_down
     }
 
     /// Returns whether the diagonal runs from bottom-left to top-right.
+    #[must_use]
     pub fn diagonal_up(&self) -> bool {
         self.diagonal_up
     }
@@ -176,22 +186,27 @@ pub struct CellFill {
 }
 
 impl CellFill {
+    #[must_use]
     pub fn pattern(&self) -> FillPattern {
         self.pattern
     }
 
+    #[must_use]
     pub fn foreground_color_index(&self) -> u16 {
         self.foreground_color_index
     }
 
+    #[must_use]
     pub fn background_color_index(&self) -> u16 {
         self.background_color_index
     }
 
+    #[must_use]
     pub fn foreground_color(&self, palette: &Palette) -> Option<Color> {
         palette.color(self.foreground_color_index)
     }
 
+    #[must_use]
     pub fn background_color(&self, palette: &Palette) -> Option<Color> {
         palette.color(self.background_color_index)
     }

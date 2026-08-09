@@ -38,7 +38,7 @@ pub enum Error {
     #[error("invalid OOXML data: {0}")]
     Invalid(String),
 
-    /// A SpreadsheetML Custom XML Maps part violates its bounded vocabulary.
+    /// A `SpreadsheetML` Custom XML Maps part violates its bounded vocabulary.
     #[error("{0}")]
     SpreadsheetXmlMaps(String),
 

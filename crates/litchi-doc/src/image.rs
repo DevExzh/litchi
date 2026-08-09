@@ -75,10 +75,11 @@ fn get_mm_mode_type(data_buff: &[u8], pic_offset: u32) -> Result<u8, ImageError>
 fn is_picture_recognized(block_type: BlockType, mm_mode_type: u8) -> bool {
     matches!(
         (block_type, mm_mode_type),
-        (BlockType::Image, _)
-            | (BlockType::ImagePastedFromClipboard, _)
-            | (BlockType::ImageWord2000, 0x64)
-            | (BlockType::ImagePastedFromClipboardWord2000, 0x64)
+        (BlockType::Image | BlockType::ImagePastedFromClipboard, _)
+            | (
+                BlockType::ImageWord2000 | BlockType::ImagePastedFromClipboardWord2000,
+                0x64
+            )
     )
 }
 
@@ -176,7 +177,7 @@ pub struct PictureFields {
 }
 
 impl PictureFields {
-    /// Try to parse PictureFields from raw bytes
+    /// Try to parse `PictureFields` from raw bytes
     ///
     /// # Arguments
     /// * `data` - Raw byte slice
@@ -185,6 +186,7 @@ impl PictureFields {
     /// # Returns
     /// * `Some(PictureFields)` if parsing succeeds
     /// * `None` if data is too short
+    #[must_use]
     pub fn try_parse(data: &[u8], offset: usize) -> Option<Self> {
         let fields = data.get(offset..offset.checked_add(size_of::<Self>())?)?;
         Some(Self {
@@ -237,19 +239,21 @@ const _: () = {
 /// is loaded lazily via `Document::image_data()` to minimize memory usage.
 #[derive(Debug, Clone, Copy)]
 pub struct Image {
-    /// Offset in WordDocument stream where picture data starts
+    /// Offset in `WordDocument` stream where picture data starts
     pic_offset: u32,
 }
 
 impl Image {
     /// Create a new Image with the given offset.
     #[inline]
+    #[must_use]
     pub fn new(pic_offset: u32) -> Self {
         Self { pic_offset }
     }
 
-    /// Get the picture offset in the WordDocument stream.
+    /// Get the picture offset in the `WordDocument` stream.
     #[inline]
+    #[must_use]
     pub fn pic_offset(&self) -> u32 {
         self.pic_offset
     }
@@ -327,12 +331,12 @@ impl Image {
 
             // Try to extract image from this record
             // Pass data_stream for delay-loaded BLIPs
-            match litchi_odraw::image::record_with_delay(&next_record, Some(word_document)) {
-                Ok(img) => return Ok(img),
-                Err(_) => {
-                    // TODO: log this error?
-                },
+            if let Ok(img) =
+                litchi_odraw::image::record_with_delay(&next_record, Some(word_document))
+            {
+                return Ok(img);
             }
+            // TODO: log this error?
         }
 
         Err(ImageError::NoPicture)

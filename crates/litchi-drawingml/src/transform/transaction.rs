@@ -47,7 +47,7 @@ impl Snapshot {
         &self.value
     }
 
-    /// Alias using the shared DrawingML vocabulary.
+    /// Alias using the shared `DrawingML` vocabulary.
     #[inline]
     #[must_use]
     pub const fn transform(&self) -> &Transform {

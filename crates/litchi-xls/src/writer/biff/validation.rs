@@ -84,7 +84,7 @@ pub(crate) fn write_dv<W: Write>(
             "DV contains a reversed target range".to_string(),
         ));
     }
-    let dv_count_u16 = ranges.len() as u16;
+    let dv_count_u16 = crate::utils::truncate_usize_to_u16(ranges.len());
 
     // Normalise titles/text: Excel encodes "not present" as a single NUL character.
     let prompt_title_val: &str = match cfg.prompt_title {
@@ -107,7 +107,7 @@ pub(crate) fn write_dv<W: Write>(
     let f1_len: u16 = cfg
         .formula1
         .map(|f| {
-            u16::try_from(f.len()).map_err(|_| {
+            u16::try_from(f.len()).map_err(|_error| {
                 Error::InvalidData("Data validation formula1 exceeds BIFF8 size limit".to_string())
             })
         })
@@ -117,7 +117,7 @@ pub(crate) fn write_dv<W: Write>(
     let f2_len: u16 = cfg
         .formula2
         .map(|f| {
-            u16::try_from(f.len()).map_err(|_| {
+            u16::try_from(f.len()).map_err(|_error| {
                 Error::InvalidData("Data validation formula2 exceeds BIFF8 size limit".to_string())
             })
         })

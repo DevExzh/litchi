@@ -91,6 +91,16 @@ pub enum OpcError {
     #[error("XML parsing error: {0}")]
     XmlError(String),
 
+    /// Authored or changed XML did not meet the package publication contract.
+    #[error("XML publication rejected for '{part}': {source}")]
+    XmlPublication {
+        /// Package-relative part name.
+        part: String,
+        /// Bounded XML audit failure.
+        #[source]
+        source: xml_minifier::audit::Error,
+    },
+
     #[error("ZIP error: {0}")]
     ZipError(String),
 
@@ -185,6 +195,7 @@ impl From<OpcError> for litchi_core::Error {
             | OpcError::InvalidRelationshipTargetMode(_)
             | OpcError::RelationshipPartCannotBeSource(_)
             | OpcError::MultipleCorePropertiesRelationships
+            | OpcError::XmlPublication { .. }
             | OpcError::Committed { .. }
             | OpcError::IncompleteOutput { .. }
             | OpcError::QuickXmlError(_)

@@ -31,7 +31,7 @@ pub struct TableFlags {
 }
 
 impl TableFlags {
-    /// The canonical flags for a regular headered table with AutoFilter data.
+    /// The canonical flags for a regular headered table with `AutoFilter` data.
     pub const fn default_table() -> Self {
         Self::from_raw(0x001B_0806)
     }

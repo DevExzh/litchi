@@ -39,7 +39,7 @@ pub(crate) fn parse_short_string(data: &[u8], _encoding: &Encoding) -> Result<St
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect();
         String::from_utf16(&utf16)
-            .map_err(|e| Error::Encoding(format!("UTF-16 decoding error: {}", e)))
+            .map_err(|e| Error::Encoding(format!("UTF-16 decoding error: {e}")))
     } else {
         // Compressed Latin-1 (each byte maps directly to U+00xx)
         Ok(string_data.iter().map(|&b| b as char).collect())
@@ -178,7 +178,7 @@ pub(crate) fn decode_string_record(
 /// Otherwise the upper 30 bits are the most-significant bits of an IEEE-754 double.
 pub(crate) fn rk_to_f64(rk: u32) -> f64 {
     let mut value = if rk & 0x02 != 0 {
-        f64::from((rk as i32) >> 2)
+        f64::from(wrap_u32_to_i32(rk) >> 2)
     } else {
         f64::from_bits(u64::from(rk & 0xFFFF_FFFC) << 32)
     };
@@ -290,7 +290,7 @@ pub(crate) fn parse_cell_reference(ref_str: &str) -> Option<(u32, u32)> {
 }
 
 /// Convert serial date to datetime
-#[allow(dead_code)]
+#[allow(dead_code, reason = "retained as a BIFF compatibility building block")]
 pub(crate) fn excel_date_to_datetime(serial: f64, is_1904: bool) -> Option<chrono::NaiveDateTime> {
     use chrono::{Duration, NaiveDate};
 
@@ -300,13 +300,142 @@ pub(crate) fn excel_date_to_datetime(serial: f64, is_1904: bool) -> Option<chron
         NaiveDate::from_ymd_opt(1899, 12, 30)?
     };
 
-    let days = serial.trunc() as i64;
-    let seconds = ((serial.fract() * 86400.0).round() as i64) * 1_000_000; // microseconds
+    let days = saturating_f64_to_i64(serial.trunc());
+    let seconds = saturating_f64_to_i64((serial.fract() * 86400.0).round()) * 1_000_000; // microseconds
 
     let date = base_date + Duration::days(days);
     let time = Duration::microseconds(seconds);
 
     Some(date.and_time(chrono::NaiveTime::from_hms_opt(0, 0, 0)?) + time)
+}
+
+/// Preserve Rust's low-bit integer-cast semantics explicitly for BIFF fields.
+pub(crate) const fn truncate_usize_to_u8(value: usize) -> u8 {
+    value.to_le_bytes()[0]
+}
+
+/// Preserve Rust's low-bit integer-cast semantics explicitly for BIFF fields.
+pub(crate) const fn truncate_usize_to_u16(value: usize) -> u16 {
+    let bytes = value.to_le_bytes();
+    u16::from_le_bytes([bytes[0], bytes[1]])
+}
+
+/// Preserve Rust's low-bit integer-cast semantics explicitly for BIFF fields.
+pub(crate) const fn truncate_usize_to_u32(value: usize) -> u32 {
+    let bytes = value.to_le_bytes();
+    #[cfg(target_pointer_width = "32")]
+    return u32::from_le_bytes(bytes);
+    #[cfg(target_pointer_width = "64")]
+    u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
+}
+
+/// Preserve Rust's low-bit integer-cast semantics explicitly for BIFF fields.
+pub(crate) const fn truncate_u16_to_u8(value: u16) -> u8 {
+    value.to_le_bytes()[0]
+}
+
+/// Preserve Rust's low-bit integer-cast semantics explicitly for BIFF fields.
+pub(crate) const fn truncate_u32_to_u8(value: u32) -> u8 {
+    value.to_le_bytes()[0]
+}
+
+/// Preserve Rust's low-bit integer-cast semantics explicitly for BIFF fields.
+pub(crate) const fn truncate_u32_to_u16(value: u32) -> u16 {
+    let bytes = value.to_le_bytes();
+    u16::from_le_bytes([bytes[0], bytes[1]])
+}
+
+/// Preserve Rust's two's-complement integer-cast semantics explicitly.
+pub(crate) const fn wrap_u8_to_i8(value: u8) -> i8 {
+    i8::from_le_bytes(value.to_le_bytes())
+}
+
+/// Preserve Rust's two's-complement integer-cast semantics explicitly.
+pub(crate) const fn wrap_u16_to_i16(value: u16) -> i16 {
+    i16::from_le_bytes(value.to_le_bytes())
+}
+
+/// Preserve Rust's two's-complement integer-cast semantics explicitly.
+pub(crate) const fn wrap_u32_to_i32(value: u32) -> i32 {
+    i32::from_le_bytes(value.to_le_bytes())
+}
+
+/// Preserve Rust's low-bit integer-cast semantics explicitly for BIFF fields.
+pub(crate) const fn wrap_usize_to_i16(value: usize) -> i16 {
+    let bytes = value.to_le_bytes();
+    i16::from_le_bytes([bytes[0], bytes[1]])
+}
+
+/// Preserve Rust's low-bit integer-cast semantics explicitly for BIFF fields.
+pub(crate) const fn wrap_usize_to_i32(value: usize) -> i32 {
+    let bytes = value.to_le_bytes();
+    #[cfg(target_pointer_width = "32")]
+    return i32::from_le_bytes(bytes);
+    #[cfg(target_pointer_width = "64")]
+    i32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
+}
+
+/// Preserve Rust's same-width signed-to-unsigned bit interpretation explicitly.
+pub(crate) const fn reinterpret_i16_as_u16(value: i16) -> u16 {
+    u16::from_le_bytes(value.to_le_bytes())
+}
+
+/// Preserve Rust's same-width signed-to-unsigned bit interpretation explicitly.
+pub(crate) const fn reinterpret_i32_as_u32(value: i32) -> u32 {
+    u32::from_le_bytes(value.to_le_bytes())
+}
+
+/// Preserve Rust's sign-extending signed-to-pointer-width cast semantics.
+pub(crate) fn sign_extend_i16_to_usize(value: i16) -> usize {
+    #[cfg(target_pointer_width = "32")]
+    return usize::from_le_bytes(i32::from(value).to_le_bytes());
+    #[cfg(target_pointer_width = "64")]
+    usize::from_le_bytes(i64::from(value).to_le_bytes())
+}
+
+/// Preserve Rust's sign-extending signed-to-pointer-width cast semantics.
+pub(crate) fn sign_extend_i32_to_usize(value: i32) -> usize {
+    #[cfg(target_pointer_width = "32")]
+    return usize::from_le_bytes(value.to_le_bytes());
+    #[cfg(target_pointer_width = "64")]
+    usize::from_le_bytes(i64::from(value).to_le_bytes())
+}
+
+/// Preserve Rust's saturating float-to-integer cast semantics for BIFF values.
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "Rust's saturating float-to-integer semantics are required here"
+)]
+pub(crate) fn saturating_f64_to_u16(value: f64) -> u16 {
+    value as u16
+}
+
+/// Preserve Rust's saturating float-to-integer cast semantics for BIFF values.
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "Rust's saturating float-to-integer semantics are required here"
+)]
+pub(crate) fn saturating_f64_to_i32(value: f64) -> i32 {
+    value as i32
+}
+
+/// Preserve Rust's saturating float-to-integer cast semantics for BIFF values.
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "Rust's saturating float-to-integer semantics are required here"
+)]
+pub(crate) fn saturating_f64_to_i64(value: f64) -> i64 {
+    value as i64
+}
+
+/// Preserve the intentional lossy conversion used by Excel serial dates.
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "an f64 Excel serial necessarily approximates large integer values"
+)]
+pub(crate) fn approximate_i64_as_f64(value: i64) -> f64 {
+    value as f64
 }
 
 #[cfg(test)]

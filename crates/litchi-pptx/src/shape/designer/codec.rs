@@ -572,9 +572,8 @@ fn parse_snapshot(
     if !is_p15 {
         return Err(invalid("designElem has the wrong namespace"));
     }
-    let element = match event {
-        Event::Start(element) | Event::Empty(element) => element,
-        _ => return Err(invalid("designElem range does not begin with an element")),
+    let (Event::Start(element) | Event::Empty(element)) = event else {
+        return Err(invalid("designElem range does not begin with an element"));
     };
     let value = unqualified_attribute_value(&element, b"val", decoder)?
         .map(|value| parse_bool(&value))

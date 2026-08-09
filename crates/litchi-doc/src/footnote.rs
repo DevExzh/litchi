@@ -17,6 +17,7 @@ pub struct Footnote {
 
 impl Footnote {
     /// Create a new footnote
+    #[must_use]
     pub fn new(reference_position: u32, number: u16, text: String) -> Self {
         Self {
             reference_position,
@@ -27,6 +28,7 @@ impl Footnote {
     }
 
     /// Get the text content
+    #[must_use]
     pub fn text(&self) -> &str {
         &self.text
     }

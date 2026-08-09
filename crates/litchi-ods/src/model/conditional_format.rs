@@ -1,6 +1,6 @@
-//! Inert LibreOffice `calcext` conditional-format metadata.
+//! Inert `LibreOffice` `calcext` conditional-format metadata.
 //!
-//! LibreOffice Calc persists conditional formatting in the experimental
+//! `LibreOffice` Calc persists conditional formatting in the experimental
 //! `calcext` namespace (`urn:org:documentfoundation:names:experimental:calc:
 //! xmlns:calcext:1.0`) as a `calcext:conditional-formats` container attached to
 //! `table:table`. Each `calcext:conditional-format` names the cell ranges it
@@ -16,7 +16,7 @@ use super::structure::validate_cell_range_addresses;
 use litchi_core::{Error, Result, xml::escape_xml};
 use litchi_odf_common::datatype::lexical;
 
-/// Namespace URI of the LibreOffice `calcext` extension.
+/// Namespace URI of the `LibreOffice` `calcext` extension.
 pub const CALCEXT_NAMESPACE_URI: &str =
     "urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0";
 /// Namespace declaration written when a document contains conditional formats.
@@ -29,7 +29,7 @@ pub const MAX_CONDITIONAL_FORMATS_PER_SHEET: usize = 16_384;
 pub(crate) const MAX_RULES_PER_FORMAT: usize = 1_024;
 /// Most threshold entries one color scale or icon set may carry.
 pub(crate) const MAX_ENTRIES_PER_RULE: usize = 256;
-/// Number of limit entries LibreOffice writes for a data bar.
+/// Number of limit entries `LibreOffice` writes for a data bar.
 pub(crate) const DATA_BAR_ENTRY_COUNT: usize = 2;
 /// Largest accepted length of any single lexical attribute value.
 pub(crate) const MAX_CONDITIONAL_ATTRIBUTE_BYTES: usize = 64 * 1024;
@@ -147,6 +147,7 @@ impl EntryType {
         }
     }
 
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Minimum => "minimum",
@@ -220,6 +221,7 @@ impl DataBarAxisPosition {
         }
     }
 
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Middle => "middle",
@@ -331,6 +333,7 @@ impl IconSetType {
         })
     }
 
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::ThreeArrows => "3Arrows",
@@ -361,7 +364,7 @@ impl IconSetType {
 
 /// One inert `calcext:custom-iconset` icon replacement of an icon set.
 ///
-/// LibreOffice writes these ahead of the threshold entries when an icon set
+/// `LibreOffice` writes these ahead of the threshold entries when an icon set
 /// mixes icons from different families (`calcext:custom="true"`). Litchi
 /// stores the assignment as typed data and never renders it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -375,6 +378,7 @@ pub struct CustomIcon {
 
 impl CustomIcon {
     /// Create an inert custom icon assignment.
+    #[must_use]
     pub fn new(icon_set_type: IconSetType, index: u32) -> Self {
         Self {
             icon_set_type,
@@ -444,6 +448,7 @@ impl DateType {
         })
     }
 
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Today => "today",
@@ -475,6 +480,9 @@ pub struct DateIs {
 
 impl Format {
     /// Create a validated inert conditional format.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn new(target_range_addresses: Vec<String>, rules: Vec<Rule>) -> Result<Self> {
         let format = Self {
             target_range_addresses,
@@ -488,7 +496,7 @@ impl Format {
     pub fn conditions(&self) -> impl Iterator<Item = &Condition> {
         self.rules.iter().filter_map(|rule| match rule {
             Rule::Condition(condition) => Some(condition),
-            _ => None,
+            Rule::ColorScale(_) | Rule::DataBar(_) | Rule::IconSet(_) | Rule::DateIs(_) => None,
         })
     }
 }
@@ -523,6 +531,7 @@ impl ColorScaleEntry {
 
 impl ColorScale {
     /// Create an inert color-scale rule.
+    #[must_use]
     pub fn new(entries: Vec<ColorScaleEntry>) -> Self {
         Self { entries }
     }
@@ -540,6 +549,7 @@ impl DataBarEntry {
 
 impl DataBar {
     /// Create an inert data-bar rule with only limit entries set.
+    #[must_use]
     pub fn new(entries: Vec<DataBarEntry>) -> Self {
         Self {
             positive_color: None,
@@ -566,12 +576,14 @@ impl DataBar {
     }
 
     /// Set whether the bar is drawn as a gradient.
+    #[must_use]
     pub fn with_gradient(mut self, gradient: bool) -> Self {
         self.gradient = Some(gradient);
         self
     }
 
     /// Set the optional axis placement and color.
+    #[must_use]
     pub fn with_axis(mut self, position: DataBarAxisPosition, color: Option<String>) -> Self {
         self.axis_position = Some(position);
         self.axis_color = color;
@@ -579,12 +591,14 @@ impl DataBar {
     }
 
     /// Set whether the cell value is shown next to the bar.
+    #[must_use]
     pub fn with_show_value(mut self, show_value: bool) -> Self {
         self.show_value = Some(show_value);
         self
     }
 
     /// Set the optional minimum and maximum bar lengths as lexical numbers.
+    #[must_use]
     pub fn with_lengths(mut self, min_length: Option<String>, max_length: Option<String>) -> Self {
         self.min_length = min_length;
         self.max_length = max_length;
@@ -603,6 +617,7 @@ impl IconSetEntry {
     }
 
     /// Set whether the threshold comparison includes equality.
+    #[must_use]
     pub fn with_greater_equal(mut self, greater_equal: bool) -> Self {
         self.greater_equal = Some(greater_equal);
         self
@@ -611,6 +626,7 @@ impl IconSetEntry {
 
 impl IconSet {
     /// Create an inert icon-set rule.
+    #[must_use]
     pub fn new(icon_set_type: IconSetType, entries: Vec<IconSetEntry>) -> Self {
         Self {
             icon_set_type,
@@ -622,18 +638,21 @@ impl IconSet {
     }
 
     /// Set whether the cell value is shown next to the icon.
+    #[must_use]
     pub fn with_show_value(mut self, show_value: bool) -> Self {
         self.show_value = Some(show_value);
         self
     }
 
     /// Set whether the icon set uses custom icons.
+    #[must_use]
     pub fn with_custom(mut self, custom: bool) -> Self {
         self.custom = Some(custom);
         self
     }
 
     /// Set the inert custom icon assignments.
+    #[must_use]
     pub fn with_custom_icons(mut self, custom_icons: Vec<CustomIcon>) -> Self {
         self.custom_icons = custom_icons;
         self

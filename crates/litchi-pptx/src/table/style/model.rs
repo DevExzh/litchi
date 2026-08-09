@@ -367,6 +367,7 @@ impl fmt::Debug for List {
             .field("conformance", &self.conformance)
             .field("default", &self.default)
             .field("defs", &self.defs)
+            .field("root_attrs", &self.root_attrs)
             .field("source_bytes", &self.source.len())
             .field("dirty", &self.dirty)
             .finish()

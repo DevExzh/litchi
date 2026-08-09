@@ -779,6 +779,7 @@ mod tests {
     use super::*;
     use litchi_opc::constants::relationship_type;
     use litchi_opc::{PackURI, Part, XmlPart};
+    use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
     use std::io::Cursor;
 
     const COLOR_MAPPING_ATTRIBUTES: &str = r#"bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink""#;
@@ -801,13 +802,31 @@ mod tests {
         root
     }
 
+    fn replace_zip_member_raw(package: &[u8], path: &str, replacement: &[u8]) -> Vec<u8> {
+        let archive = ArchiveReader::new(package).unwrap();
+        let mut writer = StreamingArchiveWriter::new();
+        let path = path.trim_start_matches('/');
+        let mut replaced = false;
+        for name in archive.file_names() {
+            let data = if name == path {
+                replaced = true;
+                replacement.to_vec()
+            } else {
+                archive.read(name).unwrap()
+            };
+            writer.write_stored(name, &data).unwrap();
+        }
+        assert!(replaced, "test ZIP member {path} must exist");
+        writer.finish_to_bytes().unwrap()
+    }
+
     fn animation_package(parts: &[(&str, &str, &str, &[u8])]) -> Vec<u8> {
         let mut package = OpcPackage::new();
-        for (index, (name, content_type, relationship_type, data)) in parts.iter().enumerate() {
+        for (index, (name, content_type, relationship_type, _data)) in parts.iter().enumerate() {
             package.add_part(Box::new(XmlPart::new(
                 PackURI::new(*name).unwrap(),
                 (*content_type).to_string(),
-                data.to_vec(),
+                b"<root/>".to_vec(),
             )));
             package.rels_mut().add_relationship(
                 (*relationship_type).to_string(),
@@ -818,7 +837,11 @@ mod tests {
         }
         let mut output = Cursor::new(Vec::new());
         package.to_stream(&mut output).unwrap();
-        output.into_inner()
+        let mut output = output.into_inner();
+        for (name, _content_type, _relationship_type, data) in parts {
+            output = replace_zip_member_raw(&output, name, data);
+        }
+        output
     }
 
     fn valid_animation_package() -> Vec<u8> {
@@ -858,7 +881,7 @@ mod tests {
         package.add_part(Box::new(XmlPart::new(
             PackURI::new("/theme/theme/theme1.xml").unwrap(),
             theme_content_type.to_string(),
-            theme_xml.to_vec(),
+            b"<root/>".to_vec(),
         )));
         package.rels_mut().add_relationship(
             relationship_type::OFFICE_DOCUMENT.to_string(),
@@ -868,7 +891,7 @@ mod tests {
         );
         let mut output = Cursor::new(Vec::new());
         package.to_stream(&mut output).unwrap();
-        output.into_inner()
+        replace_zip_member_raw(&output.into_inner(), "/theme/theme/theme1.xml", theme_xml)
     }
 
     fn direct_color_mapping_xml() -> Vec<u8> {

@@ -1,10 +1,19 @@
 use super::super::super::biff::AutoFilterConditionWrite;
 use super::super::model::{a1_cell, prepare_data_validation};
-use super::super::*;
+use super::super::{
+    AutoFilterColumnDef, AutoFilterRange, CellPos, CellValue, ConditionalFormat,
+    ConditionalFormat12Group, ConditionalFormat12Type, ConditionalFormatGroup,
+    ConditionalFormatOperator, DataValidation, DataValidationOptions, DataValidationRange,
+    DataValidationTableOptions, DefinedName, HorizontalPageBreak, MergedRange, PageSetupOptions,
+    SortConfig, VerticalPageBreak, WorksheetLayoutOptions, WritableCell, Writer,
+};
 use crate::error::{Error, Result};
 use std::collections::HashSet;
 
 impl Writer {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_auto_filter(
         &mut self,
         sheet: usize,
@@ -36,7 +45,7 @@ impl Writer {
                     "set_auto_filter: sheet index exceeds BIFF8 itab limit".to_string(),
                 )
             })?;
-        let target_sheet = u16::try_from(sheet).map_err(|_| {
+        let target_sheet = u16::try_from(sheet).map_err(|_error| {
             Error::InvalidData("set_auto_filter: sheet index exceeds BIFF8 limit".to_string())
         })?;
 
@@ -73,9 +82,9 @@ impl Writer {
         Ok(())
     }
 
-    /// Add a filter condition to a specific column within the AutoFilter range.
+    /// Add a filter condition to a specific column within the `AutoFilter` range.
     ///
-    /// The AutoFilter range must first be set via [`Self::set_auto_filter`]. The
+    /// The `AutoFilter` range must first be set via [`Self::set_auto_filter`]. The
     /// `column_index` is 0-based relative to the filter range start column.
     ///
     /// # Arguments
@@ -98,6 +107,9 @@ impl Writer {
     ///     AutoFilterConditionWrite::None,
     /// )?;
     /// ```
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_filter_condition(
         &mut self,
         sheet: usize,
@@ -109,7 +121,7 @@ impl Writer {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
 
         let Some(filter) = worksheet.auto_filter else {
             return Err(Error::InvalidData(
@@ -150,6 +162,9 @@ impl Writer {
     /// * `case_sensitive` — whether sorting is case-sensitive
     /// * `sort_by_columns` — `true` for left-to-right sort, `false` for top-to-bottom
     /// * `keys` — up to 3 sort keys as `(column_index, descending)` tuples
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_sort(
         &mut self,
         sheet: usize,
@@ -171,7 +186,7 @@ impl Writer {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
 
         worksheet.set_sort_config(SortConfig {
             case_sensitive,
@@ -188,6 +203,9 @@ impl Writer {
     /// `SortData` model, including an explicit range, more than three keys,
     /// custom lists, differential-format colors, and icon sets. The previous
     /// owned configuration is returned.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn put_sort(
         &mut self,
         sheet: usize,
@@ -213,6 +231,9 @@ impl Writer {
     /// Remove and return the extended BIFF8 sort metadata for a worksheet.
     ///
     /// Removing an absent configuration succeeds and returns `None`.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn remove_sort(&mut self, sheet: usize) -> Result<Option<crate::writer::sort::Config>> {
         let worksheet = self
             .worksheets
@@ -228,6 +249,9 @@ impl Writer {
     /// UI, i.e. the number of characters of the "0" glyph in the default
     /// font. Internally this is converted to BIFF8 units of 1/256 characters
     /// for the COLINFO record.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_column_width(
         &mut self,
         sheet: usize,
@@ -242,42 +266,51 @@ impl Writer {
 
         let max_units = 255u32 * 256u32; // Excel maximum column width
         let width_units_f = (width_chars * 256.0).round();
-        if width_units_f <= 0.0 || width_units_f > max_units as f64 {
+        if width_units_f <= 0.0 || width_units_f > f64::from(max_units) {
             return Err(Error::InvalidData(
                 "set_column_width: width exceeds Excel's maximum (255 characters)".to_string(),
             ));
         }
 
-        let width_units = width_units_f as u16;
+        let width_units = crate::utils::saturating_f64_to_u16(width_units_f);
 
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.set_column_width(column, width_units);
         Ok(())
     }
 
     /// Hide a column.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn hide_column(&mut self, sheet: usize, column: crate::writer::Column) -> Result<()> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.hide_column(column);
         Ok(())
     }
 
     /// Show a previously hidden column.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn show_column(&mut self, sheet: usize, column: crate::writer::Column) -> Result<()> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.show_column(column);
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn merge_cells(
         &mut self,
         sheet: usize,
@@ -291,7 +324,7 @@ impl Writer {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
 
         if worksheet
             .merged_ranges
@@ -310,6 +343,9 @@ impl Writer {
     ///
     /// The checked counts represent the number of rows/columns at the top/left
     /// that remain frozen.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn freeze_panes(&mut self, sheet: usize, panes: crate::writer::FrozenPanes) -> Result<()> {
         if panes.is_empty() {
             let worksheet = self
@@ -327,16 +363,22 @@ impl Writer {
     }
 
     /// Remove any freeze panes from the specified worksheet.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn unfreeze_panes(&mut self, sheet: usize) -> Result<()> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.clear_freeze_panes();
         Ok(())
     }
 
     /// Replace the worksheet's checked BIFF8 zoom scale.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn put_scale(
         &mut self,
         sheet: usize,
@@ -345,11 +387,14 @@ impl Writer {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         Ok(worksheet.put_scale(scale))
     }
 
     /// Replace a worksheet view after validating the complete prospective state.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn put_view(
         &mut self,
         sheet: usize,
@@ -359,11 +404,14 @@ impl Writer {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         Ok(std::mem::replace(&mut worksheet.view, view))
     }
 
     /// Replace a worksheet pane and its selections as one failure-atomic edit.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn put_pane(
         &mut self,
         sheet: usize,
@@ -376,7 +424,7 @@ impl Writer {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.view.put_pane(pane, selections)
     }
 
@@ -385,6 +433,9 @@ impl Writer {
     /// The checked row is zero-based (0 = first row), and the height is specified
     /// in typographic points. Internally this is converted to twips
     /// (1/20th of a point) for the BIFF8 ROW record.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_row_height(
         &mut self,
         sheet: usize,
@@ -398,50 +449,59 @@ impl Writer {
         }
 
         let height_units_f = (height_points * 20.0).round();
-        if height_units_f <= 0.0 || height_units_f > u16::MAX as f64 {
+        if height_units_f <= 0.0 || height_units_f > f64::from(u16::MAX) {
             return Err(Error::InvalidData(
                 "set_row_height: height exceeds BIFF8 row height limit".to_string(),
             ));
         }
 
-        let height_units = height_units_f as u16;
+        let height_units = crate::utils::saturating_f64_to_u16(height_units_f);
 
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.set_row_height(row, height_units);
         Ok(())
     }
 
     /// Hide a row.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn hide_row(&mut self, sheet: usize, row: crate::writer::Row) -> Result<()> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.hide_row(row);
         Ok(())
     }
 
     /// Show a previously hidden row.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn show_row(&mut self, sheet: usize, row: crate::writer::Row) -> Result<()> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.show_row(row);
         Ok(())
     }
 
     /// Add a data validation rule to the specified worksheet.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_data_validation(&mut self, sheet: usize, validation: DataValidation) -> Result<()> {
         let payload = prepare_data_validation(&validation)?;
 
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
 
         let range = validation.range;
         worksheet.add_data_validation(
@@ -455,6 +515,9 @@ impl Writer {
     }
 
     /// Add a validation with typed flags and additional target ranges.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_data_validation_with_options(
         &mut self,
         sheet: usize,
@@ -481,6 +544,9 @@ impl Writer {
     }
 
     /// Configure worksheet-level DVAL window/dropdown metadata.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_data_validation_table_options(
         &mut self,
         sheet: usize,
@@ -498,11 +564,14 @@ impl Writer {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.data_validation_table_options = Some(options);
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_conditional_format(&mut self, sheet: usize, cf: ConditionalFormat) -> Result<()> {
         if cf.first_row > cf.last_row
             || cf.first_col > cf.last_col
@@ -517,7 +586,7 @@ impl Writer {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
 
         worksheet.add_conditional_format(cf);
 
@@ -525,6 +594,9 @@ impl Writer {
     }
 
     /// Add one legacy `CONDFMT` collection with ordered ranges and one to three ordered rules.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_conditional_format_group(
         &mut self,
         sheet: usize,
@@ -563,6 +635,9 @@ impl Writer {
 
     /// Add one future `CondFmt12` collection. Formula tokens and visual
     /// payloads are serialized exactly and are never evaluated.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_conditional_format12_group(
         &mut self,
         sheet: usize,
@@ -666,6 +741,9 @@ impl Writer {
     /// Set a worksheet's tab color as a BIFF8 palette index (SHEETEXT
     /// `icvPlain`, MS-XLS 2.4.259). Valid indices are 0x08 through 0x3F;
     /// `None` clears an explicitly set color.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_worksheet_tab_color(&mut self, sheet: usize, tab_color: Option<u8>) -> Result<()> {
         if let Some(index) = tab_color
             && !(0x08..=0x3F).contains(&index)
@@ -677,7 +755,7 @@ impl Writer {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.tab_color = tab_color;
         Ok(())
     }
@@ -686,6 +764,9 @@ impl Writer {
     /// cell. The anchor cell is written as a `PtgTbl` formula immediately
     /// followed by the `Table` record; it must lie outside the table range
     /// and must not already carry a value.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_data_table(
         &mut self,
         sheet: usize,
@@ -706,7 +787,7 @@ impl Writer {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         if worksheet
             .data_tables
             .iter()
@@ -741,18 +822,21 @@ impl Writer {
         worksheet
             .data_tables
             .try_reserve(1)
-            .map_err(|_| Error::Allocation("reserving worksheet data-table storage"))?;
+            .map_err(|_error| Error::Allocation("reserving worksheet data-table storage"))?;
         if anchor_missing {
             worksheet
                 .cells
                 .try_reserve(1)
-                .map_err(|_| Error::Allocation("reserving data-table anchor cell"))?;
+                .map_err(|_error| Error::Allocation("reserving data-table anchor cell"))?;
             worksheet.add_cell(WritableCell::new(anchor_pos, CellValue::Blank, 0, None));
         }
         worksheet.data_tables.push((anchor_row, anchor_col, table));
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_worksheet_vba_code_name(
         &mut self,
         sheet: usize,
@@ -769,12 +853,15 @@ impl Writer {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.vba_code_name = code_name.map(str::to_string);
         Ok(())
     }
 
     /// Configure the complete primary worksheet print/page settings block.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_worksheet_layout(
         &mut self,
         sheet: usize,
@@ -784,12 +871,15 @@ impl Writer {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.sheet_layout = options;
         Ok(())
     }
 
     /// Configure the complete primary worksheet print/page settings block.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn set_page_setup(&mut self, sheet: usize, options: PageSetupOptions) -> Result<()> {
         let valid_margin = |value: f64| value.is_finite() && (0.0..49.0).contains(&value);
         if !valid_margin(options.left_margin_inches)
@@ -826,16 +916,19 @@ impl Writer {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.page_setup = Some(options);
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn clear_page_setup(&mut self, sheet: usize) -> Result<()> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.page_setup = None;
         worksheet.horizontal_page_breaks.clear();
         worksheet.vertical_page_breaks.clear();
@@ -843,6 +936,9 @@ impl Writer {
     }
 
     /// Add a horizontal break at the first row below the break.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_horizontal_page_break(
         &mut self,
         sheet: usize,
@@ -854,7 +950,7 @@ impl Writer {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         if worksheet.horizontal_page_breaks.len() >= 1026 {
             return Err(Error::InvalidData(
                 "horizontal page-break count exceeds 1026".to_string(),
@@ -874,6 +970,9 @@ impl Writer {
     }
 
     /// Add a vertical break at the first column right of the break.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_vertical_page_break(
         &mut self,
         sheet: usize,
@@ -885,7 +984,7 @@ impl Writer {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         if worksheet.vertical_page_breaks.len() >= 255 {
             return Err(Error::InvalidData(
                 "vertical page-break count exceeds 255".to_string(),

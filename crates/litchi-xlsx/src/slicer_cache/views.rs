@@ -44,6 +44,7 @@ impl SlicerExtensionList {
         Ok(Self(xml))
     }
 
+    #[must_use]
     pub fn xml(&self) -> &[u8] {
         &self.0
     }
@@ -93,6 +94,7 @@ pub struct Slicers {
 }
 
 impl Slicers {
+    #[must_use]
     pub fn new(slicers: Vec<Slicer>) -> Self {
         Self {
             slicers,
@@ -582,7 +584,10 @@ fn parse_attributes(
     Ok(attributes)
 }
 
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "the tuple components correspond directly to slicer-cache view wire fields"
+)]
 fn parse_known_attributes(
     element: &BytesStart<'_>,
     known: &[&str],
@@ -857,7 +862,7 @@ fn exact(namespace: &ResolveResult<'_>, value: &str) -> bool {
 }
 
 fn is_xml_character(character: char) -> bool {
-    matches!(character as u32, 0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF)
+    matches!(character as u32, 0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x0010_FFFF)
 }
 
 fn escape(output: &mut Vec<u8>, value: &str) {

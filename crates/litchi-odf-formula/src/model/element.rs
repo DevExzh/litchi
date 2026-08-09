@@ -40,6 +40,9 @@ pub enum Kind {
     TableCell,
     AlignGroup,
     AlignMark,
+    Action,
+    None,
+    PreScripts,
     /// A future `MathML` element or a vendor element in another namespace.
     Other,
 }
@@ -204,6 +207,9 @@ impl Element {
             "mtd" => Kind::TableCell,
             "maligngroup" => Kind::AlignGroup,
             "malignmark" => Kind::AlignMark,
+            "maction" => Kind::Action,
+            "none" => Kind::None,
+            "mprescripts" => Kind::PreScripts,
             _ => Kind::Other,
         }
     }
@@ -241,25 +247,25 @@ impl Element {
     /// Compose all descendant character content in exact element/text order.
     #[must_use]
     pub fn all_text(&self) -> String {
-        fn append(element: &Element, output: &mut String) {
-            for content in &element.content {
-                match content {
-                    Content::Text(text) => output.push_str(text),
-                    Content::Element(child) => append(child, output),
-                }
+        let mut output = String::new();
+        let mut pending: Vec<_> = self.content.iter().rev().collect();
+        while let Some(content) = pending.pop() {
+            match content {
+                Content::Text(text) => output.push_str(text),
+                Content::Element(child) => pending.extend(child.content.iter().rev()),
             }
         }
-        let mut output = String::new();
-        append(self, &mut output);
         output
     }
 
     pub(crate) fn collect_annotations<'a>(&'a self, output: &mut Vec<&'a Element>) {
-        if matches!(self.kind(), Kind::Annotation | Kind::AnnotationXml) {
-            output.push(self);
-        }
-        for child in self.children() {
-            child.collect_annotations(output);
+        let mut pending = vec![self];
+        while let Some(element) = pending.pop() {
+            if matches!(element.kind(), Kind::Annotation | Kind::AnnotationXml) {
+                output.push(element);
+            }
+            let children: Vec<_> = element.children().collect();
+            pending.extend(children.into_iter().rev());
         }
     }
 }

@@ -2,10 +2,10 @@
 
 use super::prelude::*;
 
-impl<'arena> TapParser<'arena> {
-    /// Parse a BorderCode structure (4 bytes).
+impl TapParser<'_> {
+    /// Parse a `BorderCode` structure (4 bytes).
     ///
-    /// BorderCode format:
+    /// `BorderCode` format:
     /// - byte 0: dptLineWidth (line width in 1/8 points)
     /// - byte 1: brcType (border type)
     /// - byte 2: ico (color index)
@@ -94,7 +94,7 @@ impl<'arena> TapParser<'arena> {
 
     /// Parse table borders (sprmTTableBorders - 0xD605).
     ///
-    /// Contains 6 BorderCode structures (4 bytes each):
+    /// Contains 6 `BorderCode` structures (4 bytes each):
     /// - Top, Left, Bottom, Right, Horizontal, Vertical
 
     pub(in crate::parts::tap_parser) fn parse_table_borders(

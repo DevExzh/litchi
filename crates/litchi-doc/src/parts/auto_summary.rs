@@ -1,4 +1,4 @@
-//! Word AutoSummary priority ranges (`PlcfAsumy`, MS-DOC 2.8.4).
+//! Word `AutoSummary` priority ranges (`PlcfAsumy`, MS-DOC 2.8.4).
 //!
 //! The PLCF assigns document-text ranges a priority for automatic
 //! summarization. It is parsed as inert metadata: no summary is generated.
@@ -11,7 +11,7 @@ use crate::plcf::Plcf;
 const PLCF_ASUMY: usize = 89;
 /// Size in bytes of one `ASUMY` element (MS-DOC 2.9.3).
 const ASUMY_SIZE: usize = 4;
-/// Implementation limit on the number of AutoSummary ranges.
+/// Implementation limit on the number of `AutoSummary` ranges.
 const MAX_ASUMY_ENTRIES: usize = 1_000_000;
 /// A CP is valid only when it is less than `0x7FFF_FFFF` (MS-DOC 2.2.1).
 const MAX_CP: u32 = 0x7FFF_FFFE;
@@ -24,19 +24,19 @@ fn corrupted(message: impl Into<String>) -> PackageError {
     PackageError::Corrupted(message.into())
 }
 
-/// One document-text range and its AutoSummary priority.
+/// One document-text range and its `AutoSummary` priority.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AutoSummaryRange {
     /// First character position of the range in the document parts.
     start: u32,
     /// Character position immediately after the range.
     end: u32,
-    /// AutoSummary priority: smaller values mark more important text.
+    /// `AutoSummary` priority: smaller values mark more important text.
     level: u32,
 }
 
 impl AutoSummaryRange {
-    /// Create one checked AutoSummary range.
+    /// Create one checked `AutoSummary` range.
     ///
     /// The range is half-open. Its CPs and priority are checked against the
     /// domains of `PlcfAsumy`; in particular, empty ranges and values outside
@@ -48,17 +48,20 @@ impl AutoSummaryRange {
     }
 
     /// First character position of the range.
+    #[must_use]
     pub fn start(&self) -> u32 {
         self.start
     }
 
     /// Character position immediately after the range.
+    #[must_use]
     pub fn end(&self) -> u32 {
         self.end
     }
 
-    /// AutoSummary priority of the range. A smaller number implies greater
+    /// `AutoSummary` priority of the range. A smaller number implies greater
     /// importance of the text range to the summary.
+    #[must_use]
     pub fn level(&self) -> u32 {
         self.level
     }
@@ -81,7 +84,7 @@ impl AutoSummaryRange {
     }
 }
 
-/// A document's AutoSummary priority ranges (MS-DOC 2.8.4).
+/// A document's `AutoSummary` priority ranges (MS-DOC 2.8.4).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct DocumentAutoSummary {
     ranges: Vec<AutoSummaryRange>,
@@ -89,6 +92,7 @@ pub struct DocumentAutoSummary {
 
 impl DocumentAutoSummary {
     /// Create an empty authoring table.
+    #[must_use]
     pub const fn new() -> Self {
         Self { ranges: Vec::new() }
     }
@@ -101,16 +105,19 @@ impl DocumentAutoSummary {
     }
 
     /// The priority ranges in character-position order.
+    #[must_use]
     pub fn ranges(&self) -> &[AutoSummaryRange] {
         &self.ranges
     }
 
     /// Number of authored priority ranges.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.ranges.len()
     }
 
     /// Whether this table has no priority ranges.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.ranges.is_empty()
     }
@@ -200,7 +207,7 @@ impl DocumentAutoSummary {
     }
 
     /// Parse the `PlcfAsumy` from the table stream, or `None` when the
-    /// document carries no AutoSummary priorities.
+    /// document carries no `AutoSummary` priorities.
     pub fn parse(
         fib: &FileInformationBlock,
         table_stream: &[u8],
@@ -286,7 +293,7 @@ impl DocumentAutoSummary {
     /// Serialize the complete `PlcfAsumy` payload.
     ///
     /// This writes only the priority PLC. It does not run or embed any
-    /// AutoSummary generation algorithm.
+    /// `AutoSummary` generation algorithm.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         validation::ranges(&self.ranges)?;
         codec::encode(&self.ranges)

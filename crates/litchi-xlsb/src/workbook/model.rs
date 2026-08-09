@@ -13,7 +13,10 @@ use litchi_core::sheet::{
 use litchi_opc::OpcPackage;
 
 /// XLSB workbook implementation
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "retained for BIFF12 codec completeness and staged host integration"
+)]
 pub struct Workbook {
     pub(crate) package: OpcPackage,
     pub(super) worksheets: Vec<Worksheet>,

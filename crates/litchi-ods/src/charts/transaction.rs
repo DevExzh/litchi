@@ -42,22 +42,32 @@ impl<'source> Inventory<'source> {
     }
 
     /// Iterate charts in drawing discovery order.
+    #[must_use]
     pub fn iter(&self) -> impl ExactSizeIterator<Item = &Chart> {
         self.charts.iter()
     }
 
     /// Select a chart by checked zero-based discovery order.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn at(&self, index: usize) -> Result<Option<&Chart>> {
         Ok(self.charts.get(index))
     }
 
     /// Select a chart by exact producer-visible drawing name.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn named(&self, name: &str) -> Result<Option<&Chart>> {
         select(&self.charts, Selector::Name(name))
             .map(|index| index.map(|index| &self.charts[index]))
     }
 
     /// Select by either exact name or checked zero-based position.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn get<'a, S>(&self, selector: S) -> Result<Option<&Chart>>
     where
         S: Into<Selector<'a>>,
@@ -66,6 +76,7 @@ impl<'source> Inventory<'source> {
     }
 
     /// Start an isolated clone-staged transaction.
+    #[must_use]
     pub fn transaction(&self) -> Transaction<'source> {
         Transaction {
             source: self.source,
@@ -86,6 +97,7 @@ pub struct Transaction<'source> {
 
 impl<'source> Transaction<'source> {
     /// Borrow the current staged chart values.
+    #[must_use]
     pub fn charts(&self) -> &[Chart] {
         &self.draft
     }
@@ -96,6 +108,9 @@ impl<'source> Transaction<'source> {
     }
 
     /// Replace one chart part and stage the operation atomically.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn replace<'a, S>(&mut self, selector: S, part: Part) -> Result<()>
     where
         S: Into<Selector<'a>>,
@@ -107,6 +122,9 @@ impl<'source> Transaction<'source> {
     ///
     /// An unchanged transaction borrows the original archive bytes, so a
     /// caller can prove that a no-op did not normalize the ZIP container.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn commit(self) -> Result<Commit<'source>> {
         let changed = self
             .original
@@ -131,13 +149,17 @@ pub struct Editor<'transaction, 'source> {
     transaction: &'transaction mut Transaction<'source>,
 }
 
-impl<'transaction, 'source> Editor<'transaction, 'source> {
+impl Editor<'_, '_> {
     /// Borrow the current staged chart values.
+    #[must_use]
     pub fn charts(&self) -> &[Chart] {
         self.transaction.charts()
     }
 
     /// Replace one chart part after resolving the semantic selector.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn replace<'a, S>(&mut self, selector: S, part: Part) -> Result<()>
     where
         S: Into<Selector<'a>>,
@@ -189,11 +211,13 @@ impl Commit<'_> {
 
 impl<'source> Commit<'source> {
     /// Consume the commit while retaining a borrow for an unchanged result.
+    #[must_use]
     pub fn into_bytes(self) -> Cow<'source, [u8]> {
         self.bytes
     }
 
     /// Consume the commit into owned package bytes.
+    #[must_use]
     pub fn into_owned_bytes(self) -> Vec<u8> {
         self.bytes.into_owned()
     }

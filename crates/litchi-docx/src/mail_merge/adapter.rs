@@ -1,3 +1,7 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! DOCX mail-merge package boundary.
 //!
 //! `crate::mail_merge` owns the settings, ODSO/field-map, recipient, and
@@ -14,7 +18,7 @@ pub(crate) fn map_docx_error(error: Error) -> Error {
 }
 
 pub(crate) fn extract_recipients(part: &dyn Part) -> Result<Recipients> {
-    Ok(Recipients::extract_from_part(part)?)
+    Recipients::extract_from_part(part)
 }
 
 /// Validate only the host package relationship closure around typed settings.
@@ -39,7 +43,7 @@ pub(crate) fn validate_mail_merge_relationships(
         }
         recipient_relationship = Some(relationship);
     }
-    if recipient_relationship.is_some_and(|relationship| relationship.is_external()) {
+    if recipient_relationship.is_some_and(litchi_opc::Relationship::is_external) {
         return Err(invalid("recipient-data relationship must be internal"));
     }
 

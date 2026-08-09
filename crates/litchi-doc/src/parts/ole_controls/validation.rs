@@ -110,7 +110,7 @@ pub(crate) fn metadata(value: &Metadata) -> Result<()> {
     Ok(())
 }
 
-/// Validate a decimal ObjectPool storage name.
+/// Validate a decimal `ObjectPool` storage name.
 pub(crate) fn storage_name(value: &str) -> Result<()> {
     let Some(decimal) = value.strip_prefix('_') else {
         return Err(corrupted("ObjectPool storage name must start with '_'"));
@@ -124,7 +124,7 @@ pub(crate) fn storage_name(value: &str) -> Result<()> {
     Ok(())
 }
 
-/// Validate one ObjectPool entry and its passive ActiveX stream relationship.
+/// Validate one `ObjectPool` entry and its passive `ActiveX` stream relationship.
 pub(crate) fn entry(value: &Entry) -> Result<()> {
     storage_name(value.name().as_str())?;
     if let Some(metadata) = value.metadata() {
@@ -147,7 +147,7 @@ pub(crate) fn entry(value: &Entry) -> Result<()> {
     Ok(())
 }
 
-/// Validate an ordered ObjectPool inventory.
+/// Validate an ordered `ObjectPool` inventory.
 pub(crate) fn pool(values: &[Entry]) -> Result<()> {
     if values.len() > MAX_INFO_COUNT {
         return Err(corrupted(

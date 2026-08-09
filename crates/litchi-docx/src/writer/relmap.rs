@@ -30,7 +30,7 @@ pub(crate) struct RelationshipMapper {
     ole_object_ids: HashMap<String, String>,
     /// Maps OLE object shape IDs to their preview image relationship IDs.
     ole_preview_ids: HashMap<String, String>,
-    /// Maps SmartArt anchor keys to their four diagram relationship IDs.
+    /// Maps `SmartArt` anchor keys to their four diagram relationship IDs.
     smartart_ids: HashMap<String, super::smartart::SmartArtRelIds>,
 }
 
@@ -62,12 +62,12 @@ impl RelationshipMapper {
 
     /// Get the relationship ID for a hyperlink by index.
     pub(crate) fn get_hyperlink_id(&self, index: usize) -> Option<&str> {
-        self.hyperlink_ids.get(&index).map(|s| s.as_str())
+        self.hyperlink_ids.get(&index).map(String::as_str)
     }
 
     /// Get the relationship ID for an image by index.
     pub(crate) fn get_image_id(&self, index: usize) -> Option<&str> {
-        self.image_ids.get(&index).map(|s| s.as_str())
+        self.image_ids.get(&index).map(String::as_str)
     }
 
     /// Get the header relationship ID.
@@ -128,7 +128,7 @@ impl RelationshipMapper {
         self.ole_preview_ids.get(shape_id).map(String::as_str)
     }
 
-    /// Add a SmartArt diagram relationship mapping, keyed by anchor key.
+    /// Add a `SmartArt` diagram relationship mapping, keyed by anchor key.
     pub(crate) fn add_smart_art(
         &mut self,
         anchor_key: &str,
@@ -137,7 +137,7 @@ impl RelationshipMapper {
         self.smartart_ids.insert(anchor_key.to_string(), rel_ids);
     }
 
-    /// Get the four diagram relationship IDs for a SmartArt anchor key.
+    /// Get the four diagram relationship IDs for a `SmartArt` anchor key.
     pub(crate) fn get_smart_art_ids(
         &self,
         anchor_key: &str,

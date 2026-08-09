@@ -1,3 +1,11 @@
+#![expect(
+    clippy::let_underscore_must_use,
+    reason = "the builder return is intentionally ignored after mutation"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Paragraph and document facade integration for `w12:collapsed`.
 
 use crate::error::{Error, Result};
@@ -9,6 +17,10 @@ use super::model::Collapsed;
 
 impl Paragraph {
     /// Return the direct Word 2012 collapse state, if present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn collapsed(&self) -> Result<Option<Collapsed>> {
         codec::read(self.xml_bytes())
     }
@@ -17,6 +29,10 @@ impl Paragraph {
     ///
     /// The paragraph is changed only after the candidate XML has been parsed
     /// and validated. Unknown paragraph and `pPr` content remains untouched.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_collapsed(&mut self, value: Option<Collapsed>) -> Result<&mut Self> {
         let original = self.xml_bytes();
         let rewritten = codec::rewrite(original, value)?;
@@ -63,6 +79,10 @@ impl MutableParagraph {
 impl MutableDocument {
     /// Read the collapse state of any body paragraph, including preserved
     /// paragraphs from an opened document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn paragraph_collapsed(&self, index: usize) -> Result<Option<Collapsed>> {
         self.body.paragraph_collapsed(index)
     }
@@ -71,6 +91,10 @@ impl MutableDocument {
     ///
     /// Existing paragraphs are edited through the bounded snapshot codec, so
     /// opaque runs, relationships, and foreign `pPr` children remain intact.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn set_paragraph_collapsed(
         &mut self,
         index: usize,

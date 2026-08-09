@@ -64,6 +64,7 @@ impl AssociatedStringSlot {
         Self::WriteReservationPassword,
     ];
 
+    #[must_use]
     pub const fn index(self) -> usize {
         self as usize
     }
@@ -188,6 +189,7 @@ impl DocumentAssociatedStrings {
         Ok(Self { values })
     }
 
+    #[must_use]
     pub fn get(&self, slot: AssociatedStringSlot) -> &str {
         &self.values[slot.index()]
     }
@@ -206,6 +208,7 @@ impl DocumentAssociatedStrings {
         std::mem::take(&mut self.values[slot.index()])
     }
 
+    #[must_use]
     pub fn iter(&self) -> impl ExactSizeIterator<Item = (AssociatedStringSlot, &str)> {
         AssociatedStringSlot::ALL
             .into_iter()
@@ -213,32 +216,41 @@ impl DocumentAssociatedStrings {
     }
 
     /// Associated template path as inert metadata.
+    #[must_use]
     pub fn template_path(&self) -> &str {
         self.get(AssociatedStringSlot::TemplatePath)
     }
+    #[must_use]
     pub fn title(&self) -> &str {
         self.get(AssociatedStringSlot::Title)
     }
+    #[must_use]
     pub fn subject(&self) -> &str {
         self.get(AssociatedStringSlot::Subject)
     }
+    #[must_use]
     pub fn keywords(&self) -> &str {
         self.get(AssociatedStringSlot::Keywords)
     }
+    #[must_use]
     pub fn author(&self) -> &str {
         self.get(AssociatedStringSlot::Author)
     }
+    #[must_use]
     pub fn last_revised_by(&self) -> &str {
         self.get(AssociatedStringSlot::LastRevisedBy)
     }
     /// Associated mail-merge data source path as inert metadata.
+    #[must_use]
     pub fn mail_merge_data_source_path(&self) -> &str {
         self.get(AssociatedStringSlot::MailMergeDataSourcePath)
     }
     /// Associated mail-merge header path as inert metadata.
+    #[must_use]
     pub fn mail_merge_header_path(&self) -> &str {
         self.get(AssociatedStringSlot::MailMergeHeaderPath)
     }
+    #[must_use]
     pub fn write_reservation_password(&self) -> &str {
         self.get(AssociatedStringSlot::WriteReservationPassword)
     }

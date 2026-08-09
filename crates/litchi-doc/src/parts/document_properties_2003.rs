@@ -81,10 +81,12 @@ impl DocumentStateToolbars {
         }
     }
 
+    #[must_use]
     pub const fn raw(self) -> u8 {
         self.0
     }
 
+    #[must_use]
     pub const fn contains(self, toolbar: u8) -> bool {
         self.0 & toolbar != 0
     }

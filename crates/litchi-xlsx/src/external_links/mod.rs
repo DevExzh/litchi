@@ -1,4 +1,4 @@
-//! Layered SpreadsheetML external-link ownership.
+//! Layered `SpreadsheetML` external-link ownership.
 //!
 //! Typed link models and bounded XML conversion stay independent from OPC
 //! relationship orchestration. External targets are always inert metadata.

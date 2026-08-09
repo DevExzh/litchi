@@ -1,4 +1,4 @@
-//! Bounded SpreadsheetML slicer XML conversion.
+//! Bounded `SpreadsheetML` slicer XML conversion.
 
 use super::model::{Definition, Slicers};
 use crate::error::Result;

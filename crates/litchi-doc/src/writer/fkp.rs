@@ -14,24 +14,24 @@
 pub type IoError = std::io::Error;
 
 /// Character property (CHPX) entry
-/// Represents a formatting run from fc_start to fc_end
+/// Represents a formatting run from `fc_start` to `fc_end`
 #[derive(Debug, Clone)]
 pub struct ChpxEntry {
-    /// Start file character position (byte offset in WordDocument stream)
+    /// Start file character position (byte offset in `WordDocument` stream)
     pub fc_start: u32,
-    /// End file character position (byte offset in WordDocument stream)
+    /// End file character position (byte offset in `WordDocument` stream)
     pub fc_end: u32,
     /// Character properties (SPRM sequence)
     pub grpprl: Vec<u8>,
 }
 
 /// Paragraph property (PAPX) entry
-/// Represents a formatting run from fc_start to fc_end
+/// Represents a formatting run from `fc_start` to `fc_end`
 #[derive(Debug, Clone)]
 pub struct PapxEntry {
-    /// Start file character position (byte offset in WordDocument stream)
+    /// Start file character position (byte offset in `WordDocument` stream)
     pub fc_start: u32,
-    /// End file character position (byte offset in WordDocument stream)
+    /// End file character position (byte offset in `WordDocument` stream)
     pub fc_end: u32,
     /// Paragraph properties (SPRM sequence)
     pub grpprl: Vec<u8>,
@@ -43,8 +43,8 @@ pub struct PapxEntry {
 pub struct FkpPages {
     /// Each page is exactly 512 bytes.
     pub pages: Vec<Vec<u8>>,
-    /// For each page: (fc_first, fc_last) — the FC range it covers.
-    /// Used to build the bin table (PlcfBte).
+    /// For each page: (`fc_first`, `fc_last`) — the FC range it covers.
+    /// Used to build the bin table (`PlcfBte`).
     pub ranges: Vec<(u32, u32)>,
 }
 
@@ -60,6 +60,7 @@ pub struct ChpxFkpBuilder {
 
 impl ChpxFkpBuilder {
     /// Create a new character FKP builder
+    #[must_use]
     pub fn new() -> Self {
         Self {
             entries: Vec::new(),
@@ -205,6 +206,7 @@ const BX_SIZE: usize = 13;
 
 impl PapxFkpBuilder {
     /// Create a new paragraph FKP builder
+    #[must_use]
     pub fn new() -> Self {
         Self {
             entries: Vec::new(),

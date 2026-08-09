@@ -1015,6 +1015,15 @@ impl Owner {
     }
 }
 
+impl<'a> IntoIterator for &'a Owner {
+    type Item = &'a Zoom;
+    type IntoIter = slice::Iter<'a, Zoom>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 fn replace_range(xml: &mut Vec<u8>, start: usize, end: usize, replacement: &[u8]) -> Result<()> {
     if start > end || end > xml.len() {
         return Err(Error::Invalid(

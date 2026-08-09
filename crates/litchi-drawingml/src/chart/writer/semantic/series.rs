@@ -168,7 +168,7 @@ pub(super) fn write_series_presentation<W: Write>(
     if features.explosion
         && let Some(explosion) = series.explosion
     {
-        write!(writer, r#"<c:explosion val="{}"/>"#, explosion)?;
+        write!(writer, r#"<c:explosion val="{explosion}"/>"#)?;
     }
     for (position, point) in series.data_points.iter().enumerate() {
         if series.data_points[..position]
@@ -230,7 +230,7 @@ pub(super) fn write_data_point<W: Write>(writer: &mut W, point: &DataPoint) -> s
         )?;
     }
     if let Some(explosion) = point.explosion {
-        write!(writer, r#"<c:explosion val="{}"/>"#, explosion)?;
+        write!(writer, r#"<c:explosion val="{explosion}"/>"#)?;
     }
     if let Some(shape_properties) = point.shape_properties.as_ref() {
         write_fragment(writer, shape_properties.as_xml())?;
@@ -593,7 +593,7 @@ pub(super) fn write_error_bar<W: Write>(
         write_numeric_data_ref(writer, "c:minus", values)?;
     }
     if let Some(value) = error_bar.value {
-        write!(writer, r#"<c:val val="{}"/>"#, value)?;
+        write!(writer, r#"<c:val val="{value}"/>"#)?;
     }
     if let Some(shape_properties) = error_bar.shape_properties.as_ref() {
         write_fragment(writer, shape_properties.as_xml())?;
@@ -754,7 +754,7 @@ pub(super) fn write_string_data_ref<W: Write>(
     tag: &str,
     data: &StringData,
 ) -> std::io::Result<()> {
-    write!(writer, "<{}>", tag)?;
+    write!(writer, "<{tag}>")?;
 
     if let Some(ref source_ref) = data.source_ref {
         write!(writer, "<c:strRef>")?;
@@ -789,7 +789,7 @@ pub(super) fn write_string_data_ref<W: Write>(
         write!(writer, "</c:strLit>")?;
     }
 
-    write!(writer, "</{}>", tag)?;
+    write!(writer, "</{tag}>")?;
 
     Ok(())
 }
@@ -799,7 +799,7 @@ pub(super) fn write_numeric_data_ref<W: Write>(
     tag: &str,
     data: &NumericData,
 ) -> std::io::Result<()> {
-    write!(writer, "<{}>", tag)?;
+    write!(writer, "<{tag}>")?;
 
     if let Some(ref source_ref) = data.source_ref {
         write!(writer, "<c:numRef>")?;
@@ -809,12 +809,12 @@ pub(super) fn write_numeric_data_ref<W: Write>(
             write!(writer, "<c:numCache>")?;
             write!(
                 writer,
-                r#"<c:formatCode>{}</c:formatCode>"#,
+                r"<c:formatCode>{}</c:formatCode>",
                 escape_xml(data.format_code.as_deref().unwrap_or("General"))
             )?;
             write!(writer, r#"<c:ptCount val="{}"/>"#, data.values.len())?;
             for (i, val) in data.values.iter().enumerate() {
-                write!(writer, r#"<c:pt idx="{}"><c:v>{}</c:v></c:pt>"#, i, val)?;
+                write!(writer, r#"<c:pt idx="{i}"><c:v>{val}</c:v></c:pt>"#)?;
             }
             write!(writer, "</c:numCache>")?;
         }
@@ -824,17 +824,17 @@ pub(super) fn write_numeric_data_ref<W: Write>(
         write!(writer, "<c:numLit>")?;
         write!(
             writer,
-            r#"<c:formatCode>{}</c:formatCode>"#,
+            r"<c:formatCode>{}</c:formatCode>",
             escape_xml(data.format_code.as_deref().unwrap_or("General"))
         )?;
         write!(writer, r#"<c:ptCount val="{}"/>"#, data.values.len())?;
         for (i, val) in data.values.iter().enumerate() {
-            write!(writer, r#"<c:pt idx="{}"><c:v>{}</c:v></c:pt>"#, i, val)?;
+            write!(writer, r#"<c:pt idx="{i}"><c:v>{val}</c:v></c:pt>"#)?;
         }
         write!(writer, "</c:numLit>")?;
     }
 
-    write!(writer, "</{}>", tag)?;
+    write!(writer, "</{tag}>")?;
 
     Ok(())
 }

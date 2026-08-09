@@ -1,7 +1,7 @@
+use super::super::Result;
 use super::super::codec::invalid;
-use super::super::package::*;
-use super::super::*;
-use super::*;
+use super::super::package::part_names_conflict;
+use super::{Pane, SnapshotResource, SnapshotTarget};
 pub(in crate::web) fn canonicalize_pane_snapshot_resources(
     pane: &mut Pane,
     existing_panes: &[Pane],

@@ -16,34 +16,46 @@ use super::limits::Limits;
 pub struct Integer(Box<str>);
 
 impl Integer {
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn parse(value: &str) -> Result<Self> {
         Self::parse_with_limits(value, &Limits::default())
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn parse_with_limits(value: &str, limits: &Limits) -> Result<Self> {
         canonical_integer(value, false, limits.max_integer_digits()).map(Self)
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
+    #[must_use]
     pub fn digit_count(&self) -> usize {
         self.0.strip_prefix('-').unwrap_or(&self.0).len()
     }
 
+    #[must_use]
     pub fn is_negative(&self) -> bool {
         self.0.starts_with('-')
     }
 
+    #[must_use]
     pub fn is_zero(&self) -> bool {
         &*self.0 == "0"
     }
 
+    #[must_use]
     pub fn is_positive(&self) -> bool {
         !self.is_negative() && !self.is_zero()
     }
 
+    #[must_use]
     pub fn to_usize(&self) -> Option<usize> {
         (!self.is_negative()).then(|| self.0.parse().ok()).flatten()
     }
@@ -54,22 +66,31 @@ impl Integer {
 pub struct PositiveInteger(Box<str>);
 
 impl PositiveInteger {
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn parse(value: &str) -> Result<Self> {
         Self::parse_with_limits(value, &Limits::default())
     }
 
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn parse_with_limits(value: &str, limits: &Limits) -> Result<Self> {
         canonical_integer(value, true, limits.max_integer_digits()).map(Self)
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
+    #[must_use]
     pub fn digit_count(&self) -> usize {
         self.0.len()
     }
 
+    #[must_use]
     pub fn to_usize(&self) -> Option<usize> {
         self.0.parse().ok()
     }
@@ -100,7 +121,7 @@ fn canonical_integer(value: &str, positive: bool, max_digits: usize) -> Result<B
     let mut canonical = String::new();
     canonical
         .try_reserve_exact(magnitude.len() + usize::from(negative))
-        .map_err(|_| allocation_invalid("canonical integer"))?;
+        .map_err(|_error| allocation_invalid("canonical integer"))?;
     if negative {
         canonical.push('-');
     }
@@ -436,6 +457,7 @@ pub enum Change {
 }
 
 impl Change {
+    #[must_use]
     pub fn metadata(&self) -> &Metadata {
         match self {
             Self::Insertion(value) => &value.metadata,
@@ -446,6 +468,9 @@ impl Change {
     }
 
     /// Validate this record's local grammar and values without resolving IDs.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn validate_with_limits(&self, limits: &Limits) -> Result<()> {
         self.resources_with_limits(limits).map(|_| ())
     }
@@ -486,7 +511,7 @@ impl Change {
                 NestedDeletion::Change {
                     change_id: Some(id),
                 } => visit(id, RelationKind::ChangeDeletion),
-                _ => {},
+                NestedDeletion::CellContent { .. } | NestedDeletion::Change { .. } => {},
             }
         }
         if let Change::Deletion(value) = self {
@@ -541,11 +566,17 @@ pub struct Changes {
 
 impl Changes {
     /// Validate with the default authoring resource limits.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn validate(&self) -> Result<()> {
         self.validate_with_limits(&Limits::default())
     }
 
     /// Validate ODF grammar, references, ordering, values and resource use.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn validate_with_limits(&self, limits: &Limits) -> Result<()> {
         self.validate_indexed_with_limits(limits).map(|_| ())
     }
@@ -561,11 +592,11 @@ impl Changes {
 
         let mut ids = HashMap::new();
         ids.try_reserve(self.changes.len())
-            .map_err(|_| allocation_invalid("tracked-change id index"))?;
+            .map_err(|_error| allocation_invalid("tracked-change id index"))?;
         let mut record_resources = Vec::new();
         record_resources
             .try_reserve_exact(self.changes.len())
-            .map_err(|_| allocation_invalid("tracked-change resource index"))?;
+            .map_err(|_error| allocation_invalid("tracked-change resource index"))?;
 
         for (index, change) in self.changes.iter().enumerate() {
             let before_nodes = budget.nodes;
@@ -607,13 +638,16 @@ impl Changes {
     ///
     /// Callers must locally validate changed records first. This split avoids
     /// re-walking large retained cell payloads during graph-only operations.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
     pub fn validate_graph_with_limits(&self, limits: &Limits) -> Result<()> {
         if self.changes.len() > limits.max_changes() || self.changes.len() > limits.max_nodes() {
             return tracked_invalid("spreadsheet tracked-change graph exceeds resource limit");
         }
         let mut ids = HashMap::new();
         ids.try_reserve(self.changes.len())
-            .map_err(|_| allocation_invalid("tracked-change id index"))?;
+            .map_err(|_error| allocation_invalid("tracked-change id index"))?;
         for (index, change) in self.changes.iter().enumerate() {
             let id = change.metadata().id.as_str();
             if id.is_empty() {
@@ -725,7 +759,7 @@ where
     let mut result = Vec::new();
     result
         .try_reserve_exact(values.len())
-        .map_err(|_| allocation_invalid(label))?;
+        .map_err(|_error| allocation_invalid(label))?;
     for value in values {
         result.push(clone(value)?);
     }
@@ -1060,7 +1094,7 @@ fn try_clone_string(value: &str, label: &str) -> Result<String> {
     let mut clone = String::new();
     clone
         .try_reserve_exact(value.len())
-        .map_err(|_| allocation_invalid(label))?;
+        .map_err(|_error| allocation_invalid(label))?;
     clone.push_str(value);
     Ok(clone)
 }
@@ -1148,7 +1182,10 @@ fn validate_cell(cell: &Cell, budget: &mut Budget<'_>) -> Result<()> {
                 budget.string(value, "tracked cell error value", true)?;
             }
         },
-        _ => {},
+        CellValue::Empty
+        | CellValue::Boolean(_)
+        | CellValue::Number(_)
+        | CellValue::Percentage(_) => {},
     }
     Ok(())
 }
@@ -1262,7 +1299,7 @@ fn validate_metadata(metadata: &Metadata, budget: &mut Budget<'_>) -> Result<()>
     budget.add_nodes(metadata.dependencies.len())?;
     let mut seen = HashSet::new();
     seen.try_reserve(metadata.dependencies.len())
-        .map_err(|_| allocation_invalid("dependency set"))?;
+        .map_err(|_error| allocation_invalid("dependency set"))?;
     for dependency in &metadata.dependencies {
         budget.string(dependency, "dependency id", false)?;
         if dependency == &metadata.id || !seen.insert(dependency.as_str()) {
@@ -1415,7 +1452,7 @@ fn validate_record_relations_at(
             } => {
                 earlier_target(id, index, changes, ids, "change-deletion")?;
             },
-            _ => {},
+            NestedDeletion::CellContent { .. } | NestedDeletion::Change { .. } => {},
         }
     }
 
@@ -1484,13 +1521,13 @@ fn validate_dependency_cycles(changes: &[Change], ids: &HashMap<String, usize>) 
     let mut states = Vec::new();
     states
         .try_reserve_exact(changes.len())
-        .map_err(|_| allocation_invalid("dependency state table"))?;
+        .map_err(|_error| allocation_invalid("dependency state table"))?;
     states.resize(changes.len(), 0u8);
 
     let mut stack = Vec::new();
     stack
         .try_reserve(changes.len())
-        .map_err(|_| allocation_invalid("dependency traversal stack"))?;
+        .map_err(|_error| allocation_invalid("dependency traversal stack"))?;
 
     for root in 0..changes.len() {
         if states[root] != 0 {

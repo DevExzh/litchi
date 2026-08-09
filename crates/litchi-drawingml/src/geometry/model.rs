@@ -1,6 +1,6 @@
-//! Typed DrawingML custom geometry (`a:custGeom`).
+//! Typed `DrawingML` custom geometry (`a:custGeom`).
 //!
-//! ECMA-376 part 1 §20.1.9.8 (CT_CustomGeometry2D) describes a shape outline
+//! ECMA-376 part 1 §20.1.9.8 (`CT_CustomGeometry2D`) describes a shape outline
 //! as an adjust-value list (`a:avLst`), a guide list (`a:gdLst`), adjust
 //! handles (`a:ahLst`), connection sites (`a:cxnLst`), an optional text
 //! rectangle (`a:rect`), and a path list (`a:pathLst`) whose paths draw with
@@ -9,7 +9,7 @@
 //! typed path commands ([`PathCommand`]), typed guide formulas
 //! ([`Formula`]), and adjustable values ([`AdjustValue`])
 //! that carry either a literal or a guide reference, mirroring the
-//! ST_AdjCoordinate/ST_AdjAngle unions.
+//! `ST_AdjCoordinate/ST_AdjAngle` unions.
 //!
 //! Format crates own the surrounding shape inventory and authoring pipeline;
 //! this model is inert and performs no rendering or formula evaluation.
@@ -21,15 +21,15 @@ use crate::{Error, Result};
 
 use super::Formula;
 
-/// Smallest ST_Coordinate literal (ECMA-376 §20.1.10.16).
+/// Smallest `ST_Coordinate` literal (ECMA-376 §20.1.10.16).
 pub(crate) const MIN_COORDINATE: i64 = -27_273_042_329_600;
-/// Largest ST_Coordinate literal (ECMA-376 §20.1.10.16).
+/// Largest `ST_Coordinate` literal (ECMA-376 §20.1.10.16).
 pub(crate) const MAX_COORDINATE: i64 = 27_273_042_316_900;
-/// Largest ST_PositiveCoordinate literal (ECMA-376 §20.1.10.42).
+/// Largest `ST_PositiveCoordinate` literal (ECMA-376 §20.1.10.42).
 pub(crate) const MAX_POSITIVE_COORDINATE: i64 = 27_273_042_316_900;
-/// ST_Angle literals are 60000ths of a degree within `xsd:int` bounds.
+/// `ST_Angle` literals are 60000ths of a degree within `xsd:int` bounds.
 pub(crate) const MIN_ANGLE: i64 = i32::MIN as i64;
-/// Largest ST_Angle literal.
+/// Largest `ST_Angle` literal.
 pub(crate) const MAX_ANGLE: i64 = i32::MAX as i64;
 
 /// Maximum entries in the adjust-value list or the guide list.
@@ -45,7 +45,7 @@ pub(crate) const MAX_PATH_COMMANDS: usize = 65_536;
 /// Maximum byte length of a geometry guide name.
 pub(crate) const MAX_GUIDE_NAME_BYTES: usize = 255;
 
-/// An adjustable geometry value (ST_AdjCoordinate or ST_AdjAngle): either a
+/// An adjustable geometry value (`ST_AdjCoordinate` or `ST_AdjAngle)`: either a
 /// literal or a reference to a geometry guide by name.
 ///
 /// Coordinate literals are EMUs when the owning path declares no coordinate
@@ -55,7 +55,7 @@ pub(crate) const MAX_GUIDE_NAME_BYTES: usize = 255;
 pub enum AdjustValue {
     /// A literal value.
     Value(i64),
-    /// A reference to a geometry guide (ST_GeomGuideName).
+    /// A reference to a geometry guide (`ST_GeomGuideName`).
     Guide(String),
 }
 
@@ -91,7 +91,7 @@ impl FromStr for AdjustValue {
     type Err = Error;
 
     /// Numeric tokens become literals; any other non-empty token is kept as
-    /// a guide reference, matching the ST_AdjCoordinate/ST_AdjAngle unions.
+    /// a guide reference, matching the `ST_AdjCoordinate/ST_AdjAngle` unions.
     fn from_str(text: &str) -> Result<Self> {
         let token = normalize_xsd_token(text);
         if token.is_empty() {
@@ -104,7 +104,7 @@ impl FromStr for AdjustValue {
     }
 }
 
-/// A geometry point (`a:pt`, CT_AdjPoint2D) with adjustable coordinates.
+/// A geometry point (`a:pt`, `CT_AdjPoint2D`) with adjustable coordinates.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Point {
     /// Horizontal coordinate (`@x`).
@@ -123,14 +123,14 @@ impl Point {
     }
 }
 
-/// One geometry guide (`a:gd`, CT_GeomGuide): a named, formula-derived value.
+/// One geometry guide (`a:gd`, `CT_GeomGuide)`: a named, formula-derived value.
 ///
 /// Guides in the adjust-value list (`a:avLst`) hold the shape's adjustable
 /// parameters; guides in the guide list (`a:gdLst`) derive further values
 /// from them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Guide {
-    /// Guide name (`@name`, ST_GeomGuideName).
+    /// Guide name (`@name`, `ST_GeomGuideName`).
     pub name: String,
     /// Guide formula (`@fmla`).
     pub formula: Formula,
@@ -154,7 +154,7 @@ pub(crate) fn normalize_xsd_token(value: &str) -> String {
         .join(" ")
 }
 
-/// An XY adjust handle (`a:ahXY`, CT_XYAdjustHandle).
+/// An XY adjust handle (`a:ahXY`, `CT_XYAdjustHandle`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct XyAdjustHandle {
     /// Guide updated by horizontal movement (`@gdRefX`), when declared.
@@ -173,7 +173,7 @@ pub struct XyAdjustHandle {
     pub position: Point,
 }
 
-/// A polar adjust handle (`a:ahPolar`, CT_PolarAdjustHandle).
+/// A polar adjust handle (`a:ahPolar`, `CT_PolarAdjustHandle`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct PolarAdjustHandle {
     /// Guide updated by radial movement (`@gdRefR`), when declared.
@@ -201,16 +201,16 @@ pub enum AdjustHandle {
     Polar(PolarAdjustHandle),
 }
 
-/// One connection site (`a:cxn`, CT_ConnectionSite).
+/// One connection site (`a:cxn`, `CT_ConnectionSite`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ConnectionSite {
-    /// Site angle (`@ang`, ST_AdjAngle).
+    /// Site angle (`@ang`, `ST_AdjAngle`).
     pub angle: AdjustValue,
     /// Site position (`a:pos`).
     pub position: Point,
 }
 
-/// The geometry text rectangle (`a:rect`, CT_GeomRect).
+/// The geometry text rectangle (`a:rect`, `CT_GeomRect`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Rectangle {
     /// Left edge (`@l`).
@@ -223,7 +223,7 @@ pub struct Rectangle {
     pub bottom: AdjustValue,
 }
 
-/// How a geometry path is filled (`a:path@fill`, ST_PathFillMode).
+/// How a geometry path is filled (`a:path@fill`, `ST_PathFillMode`).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub enum PathFillMode {
     /// The path is not filled (`none`).
@@ -242,7 +242,8 @@ pub enum PathFillMode {
 }
 
 impl PathFillMode {
-    /// The ST_PathFillMode token for this mode.
+    /// The `ST_PathFillMode` token for this mode.
+    #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             Self::None => "none",
@@ -316,7 +317,7 @@ pub enum PathCommand {
     Close,
 }
 
-/// One geometry path (`a:path`, CT_Path2D) with its coordinate space and
+/// One geometry path (`a:path`, `CT_Path2D`) with its coordinate space and
 /// fill/stroke/extrusion attributes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Path {
@@ -352,6 +353,7 @@ impl Default for Path {
 impl Path {
     /// An empty path over a `width` by `height` coordinate space with the
     /// ECMA-376 default fill/stroke/extrusion attributes.
+    #[must_use]
     pub fn new(width: i64, height: i64) -> Self {
         Self {
             width,
@@ -361,13 +363,14 @@ impl Path {
     }
 
     /// Append a drawing command to the path.
+    #[must_use]
     pub fn with_command(mut self, command: PathCommand) -> Self {
         self.commands.push(command);
         self
     }
 }
 
-/// A custom shape geometry (`a:custGeom`, CT_CustomGeometry2D).
+/// A custom shape geometry (`a:custGeom`, `CT_CustomGeometry2D`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CustomGeometry {
     /// Adjustable shape parameters (`a:avLst`).
@@ -386,23 +389,27 @@ pub struct CustomGeometry {
 
 impl CustomGeometry {
     /// An empty custom geometry.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Append an adjustable parameter to the adjust-value list.
+    #[must_use]
     pub fn with_adjust_value(mut self, guide: Guide) -> Self {
         self.adjust_values.push(guide);
         self
     }
 
     /// Append a derived guide to the guide list.
+    #[must_use]
     pub fn with_guide(mut self, guide: Guide) -> Self {
         self.guides.push(guide);
         self
     }
 
     /// Append a path to the path list.
+    #[must_use]
     pub fn with_path(mut self, path: Path) -> Self {
         self.paths.push(path);
         self

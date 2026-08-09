@@ -47,6 +47,7 @@ impl CellWatchReference {
         Ok(Self(value))
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -71,6 +72,7 @@ impl CellWatches {
         Ok(Self { references })
     }
 
+    #[must_use]
     pub fn references(&self) -> &[CellWatchReference] {
         &self.references
     }

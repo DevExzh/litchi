@@ -148,7 +148,7 @@ impl Location {
                             automatic = Some(info.clone());
                             None
                         },
-                        _ => None,
+                        ElementKind::Other | ElementKind::DocumentContent => None,
                     };
                     stack.push(OpenElement {
                         kind,
@@ -202,14 +202,14 @@ impl Location {
                                 sheets[index].protection = Some(info);
                             }
                         },
-                        ElementKind::Automatic => {
-                            if automatic.replace(info).is_some() {
-                                return Err(Error::InvalidFormat(
-                                    "duplicate office:automatic-styles element".to_string(),
-                                ));
-                            }
+                        ElementKind::Automatic if automatic.replace(info).is_some() => {
+                            return Err(Error::InvalidFormat(
+                                "duplicate office:automatic-styles element".to_string(),
+                            ));
                         },
-                        _ => {},
+                        ElementKind::Other
+                        | ElementKind::DocumentContent
+                        | ElementKind::Automatic => {},
                     }
                 },
                 Event::End(_) => {
@@ -233,10 +233,10 @@ impl Location {
                             sheet.end_start = Some(event_start);
                         },
                         ElementKind::Protection => {
-                            if let Some(index) = open.sheet_index {
-                                if let Some(protection) = sheets[index].protection.as_mut() {
-                                    protection.full = protection.start.start..full_end;
-                                }
+                            if let Some(index) = open.sheet_index
+                                && let Some(protection) = sheets[index].protection.as_mut()
+                            {
+                                protection.full = protection.start.start..full_end;
                             }
                         },
                         ElementKind::Automatic => {
@@ -244,11 +244,20 @@ impl Location {
                                 value.full = value.start.start..full_end;
                             }
                         },
-                        _ => {},
+                        ElementKind::Other
+                        | ElementKind::DocumentContent
+                        | ElementKind::Body
+                        | ElementKind::Spreadsheet => {},
                     }
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {},
             }
             buffer.clear();
         }
@@ -409,7 +418,7 @@ fn element_location(
             let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
             let namespace = match namespace {
                 ResolveResult::Bound(Namespace(value)) => value.to_vec(),
-                _ => Vec::new(),
+                ResolveResult::Unbound | ResolveResult::Unknown(_) => Vec::new(),
             };
             AttributeLocation {
                 range,
@@ -516,10 +525,11 @@ fn collect_prefixes(
             .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
         let key = attribute.key.as_ref();
         let prefix = if key == b"xmlns" {
-            "".to_string()
+            String::new()
         } else if let Some(value) = key.strip_prefix(b"xmlns:") {
-            String::from_utf8(value.to_vec())
-                .map_err(|_| Error::InvalidFormat("invalid XML namespace prefix".to_string()))?
+            String::from_utf8(value.to_vec()).map_err(|_error| {
+                Error::InvalidFormat("invalid XML namespace prefix".to_string())
+            })?
         } else {
             continue;
         };
@@ -563,7 +573,7 @@ fn is_namespace(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
 fn namespace_uri(namespace: &ResolveResult<'_>) -> Vec<u8> {
     match namespace {
         ResolveResult::Bound(Namespace(value)) => value.to_vec(),
-        _ => Vec::new(),
+        ResolveResult::Unbound | ResolveResult::Unknown(_) => Vec::new(),
     }
 }
 
@@ -1007,8 +1017,7 @@ pub(crate) fn parse(
     let automatic_xml = location
         .automatic_fragment
         .as_ref()
-        .map(|fragment| fragment.xml.as_str())
-        .unwrap_or("");
+        .map_or("", |fragment| fragment.xml.as_str());
     let registry = style_protection::CellStyleRegistry::parse(styles_xml, automatic_xml)?;
     let styles = super::model::styles_from_wire(&registry);
     Ok((

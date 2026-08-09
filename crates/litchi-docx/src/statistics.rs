@@ -44,30 +44,35 @@ pub struct Statistics {
 
 impl Statistics {
     /// Create new document statistics.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Get the word count.
     #[inline]
+    #[must_use]
     pub fn word_count(&self) -> usize {
         self.word_count
     }
 
     /// Get the character count (including spaces).
     #[inline]
+    #[must_use]
     pub fn character_count(&self) -> usize {
         self.character_count
     }
 
     /// Get the character count (excluding spaces).
     #[inline]
+    #[must_use]
     pub fn character_count_no_spaces(&self) -> usize {
         self.character_count_no_spaces
     }
 
     /// Get the paragraph count.
     #[inline]
+    #[must_use]
     pub fn paragraph_count(&self) -> usize {
         self.paragraph_count
     }
@@ -76,6 +81,7 @@ impl Statistics {
     ///
     /// This is an approximation based on text length and formatting.
     #[inline]
+    #[must_use]
     pub fn line_count(&self) -> usize {
         self.line_count
     }
@@ -85,24 +91,28 @@ impl Statistics {
     /// This is an approximation based on text length and formatting.
     /// Actual page count may vary based on fonts, images, and layout.
     #[inline]
+    #[must_use]
     pub fn page_count(&self) -> usize {
         self.page_count
     }
 
     /// Get the table count.
     #[inline]
+    #[must_use]
     pub fn table_count(&self) -> usize {
         self.table_count
     }
 
     /// Get the image count.
     #[inline]
+    #[must_use]
     pub fn image_count(&self) -> usize {
         self.image_count
     }
 
     /// Get the drawing object count (shapes, text boxes).
     #[inline]
+    #[must_use]
     pub fn drawing_count(&self) -> usize {
         self.drawing_count
     }
@@ -150,12 +160,14 @@ impl Statistics {
 ///
 /// Uses iterator-based counting for optimal performance.
 #[inline]
+#[must_use]
 pub fn count_words(text: &str) -> usize {
     text.split_whitespace().count()
 }
 
 /// Calculate character count (with spaces) from text.
 #[inline]
+#[must_use]
 pub fn count_characters(text: &str) -> usize {
     text.chars().count()
 }
@@ -166,6 +178,7 @@ pub fn count_characters(text: &str) -> usize {
 ///
 /// Uses iterator filtering for optimal performance.
 #[inline]
+#[must_use]
 pub fn count_characters_no_spaces(text: &str) -> usize {
     text.chars().filter(|c| !c.is_whitespace()).count()
 }
@@ -180,6 +193,7 @@ pub fn count_characters_no_spaces(text: &str) -> usize {
 /// * `text` - The text to estimate lines for
 /// * `avg_chars_per_line` - Average characters per line (default: 80)
 #[inline]
+#[must_use]
 pub fn estimate_line_count(text: &str, avg_chars_per_line: usize) -> usize {
     let char_count = count_characters(text);
     if avg_chars_per_line == 0 {
@@ -198,6 +212,7 @@ pub fn estimate_line_count(text: &str, avg_chars_per_line: usize) -> usize {
 /// * `line_count` - Total number of lines
 /// * `avg_lines_per_page` - Average lines per page (default: 45)
 #[inline]
+#[must_use]
 pub fn estimate_page_count(line_count: usize, avg_lines_per_page: usize) -> usize {
     if avg_lines_per_page == 0 {
         return 0;

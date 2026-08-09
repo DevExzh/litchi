@@ -1,4 +1,16 @@
-//! Namespace-aware XML codec for WordprocessingML numbering.
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::cast_possible_truncation,
+    reason = "OOXML numeric values are bounded before conversion"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+//! Namespace-aware XML codec for `WordprocessingML` numbering.
 //!
 //! OPC parts and markup-compatibility preprocessing stay in the host crate;
 //! this layer consumes the resulting XML bytes only.
@@ -59,6 +71,10 @@ struct PendingPictureBullet {
 }
 
 impl Collection {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn from_xml(xml: &[u8]) -> Result<Self> {
         validation::validate_xml(xml)?;
         let mut reader = NsReader::from_reader(xml);
@@ -245,7 +261,13 @@ impl Collection {
                     return Err(invalid("unterminated numbering XML"));
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {},
             }
         }
 
@@ -261,7 +283,10 @@ impl Collection {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "signature mirrors the corresponding OOXML record"
+)]
 fn begin_element(
     namespace: &ResolveResult<'_>,
     element: &BytesStart<'_>,
@@ -368,7 +393,10 @@ fn begin_element(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "signature mirrors the corresponding OOXML record"
+)]
 fn empty_element(
     namespace: &ResolveResult<'_>,
     element: &BytesStart<'_>,
@@ -473,7 +501,10 @@ fn empty_element(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "signature mirrors the corresponding OOXML record"
+)]
 fn apply_child(
     element: &BytesStart<'_>,
     decoder: Decoder,
@@ -489,16 +520,16 @@ fn apply_child(
             b"start" => value.value.start = required_i64(element, b"val", decoder, resolver)?,
             b"numFmt" => {
                 let raw = required_string(element, b"val", decoder, resolver)?;
-                value.value.format = raw
-                    .parse()
-                    .map_err(|_| invalid(&format!("invalid numbering format '{raw}'")))?;
+                value.value.format = raw.parse().map_err(|_source_error| {
+                    invalid(&format!("invalid numbering format '{raw}'"))
+                })?;
                 value.value.custom_format =
                     word_attribute_value(element, b"format", decoder, resolver)?;
             },
             b"lvlText" => {
                 value.value.level_text = Some(
                     word_attribute_value(element, b"val", decoder, resolver)?.unwrap_or_default(),
-                )
+                );
             },
             b"suff" => {
                 value.value.suffix = match required_string(element, b"val", decoder, resolver)?
@@ -521,11 +552,11 @@ fn apply_child(
             b"isLgl" => value.value.legal = on_off(element, decoder, resolver)?,
             b"pStyle" => {
                 value.value.paragraph_style =
-                    Some(required_string(element, b"val", decoder, resolver)?)
+                    Some(required_string(element, b"val", decoder, resolver)?);
             },
             b"lvlPicBulletId" => {
                 value.value.picture_bullet_id =
-                    Some(required_u32(element, b"val", decoder, resolver)?)
+                    Some(required_u32(element, b"val", decoder, resolver)?);
             },
             _ => {},
         }
@@ -553,10 +584,9 @@ fn apply_child(
                 if value.value.num_type.is_some() {
                     return Err(invalid("duplicate multiLevelType"));
                 }
-                value.value.num_type = Some(
-                    raw.parse()
-                        .map_err(|_| invalid(&format!("invalid multiLevelType '{raw}'")))?,
-                );
+                value.value.num_type = Some(raw.parse().map_err(|_source_error| {
+                    invalid(&format!("invalid multiLevelType '{raw}'"))
+                })?);
             },
             b"numStyleLink" => {
                 let raw = required_string(element, b"val", decoder, resolver)?;
@@ -676,7 +706,7 @@ fn push_picture_bullet(values: &mut Vec<PictureBullet>, value: PictureBullet) ->
 /// Capture the first image relationship inside a `w:numPicBullet` definition.
 ///
 /// Word writes the bullet picture either as VML (`v:imagedata r:id`) or as
-/// DrawingML (`a:blip r:embed`/`a:link`); everything else inside `w:pict` is
+/// `DrawingML` (`a:blip r:embed`/`a:link`); everything else inside `w:pict` is
 /// inert shape geometry and is ignored.
 fn capture_picture_bullet_image(
     namespace: &ResolveResult<'_>,
@@ -703,7 +733,9 @@ fn capture_picture_bullet_image(
                 _ => return Ok(()),
             }
         },
-        _ => return Ok(()),
+        ResolveResult::Unbound | ResolveResult::Bound(_) | ResolveResult::Unknown(_) => {
+            return Ok(());
+        },
     };
     pending.image_relationship_id = relationship_attribute(element, names, decoder, resolver)?;
     Ok(())
@@ -767,7 +799,7 @@ fn required_u32(
     let value = required_string(element, name, decoder, resolver)?;
     value
         .parse()
-        .map_err(|_| invalid(&format!("invalid Word numbering integer '{value}'")))
+        .map_err(|_source_error| invalid(&format!("invalid Word numbering integer '{value}'")))
 }
 
 fn required_i64(
@@ -779,7 +811,7 @@ fn required_i64(
     let value = required_string(element, name, decoder, resolver)?;
     value
         .parse()
-        .map_err(|_| invalid(&format!("invalid Word numbering integer '{value}'")))
+        .map_err(|_source_error| invalid(&format!("invalid Word numbering integer '{value}'")))
 }
 
 fn required_level(
@@ -1300,7 +1332,13 @@ fn locate_definitions(xml: &[u8]) -> Result<Layout> {
                 return Err(invalid("unterminated numbering XML"));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
     }
     Ok(layout)
@@ -1319,10 +1357,7 @@ fn scope_for(
         let prefix = if attribute.name == b"xmlns" {
             Some(Vec::new())
         } else {
-            attribute
-                .name
-                .strip_prefix(b"xmlns:")
-                .map(|prefix| prefix.to_vec())
+            attribute.name.strip_prefix(b"xmlns:").map(<[u8]>::to_vec)
         };
         let Some(prefix) = prefix else {
             continue;
@@ -1523,10 +1558,14 @@ fn skip_name(tag: &[u8], index: &mut usize) -> Result<()> {
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("numbering XML offset does not fit usize"))
+        .map_err(|_source_error| invalid("numbering XML offset does not fit usize"))
 }
 
-/// Parse a standalone WordprocessingML numbering payload.
+/// Parse a standalone `WordprocessingML` numbering payload.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn parse_numbering(xml: &[u8]) -> Result<Collection> {
     Collection::from_xml(xml)
 }

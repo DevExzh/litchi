@@ -35,7 +35,7 @@ fn compact_query_edit_matches_the_exact_golden_xml() {
 }
 
 #[test]
-fn real_libreoffice_noncompact_query_package_is_refused_without_mutation() {
+fn real_libreoffice_pretty_query_package_edits_losslessly_and_reopens() {
     let bytes = Vec::from(include_bytes!(
         "../../../test-data/libreoffice-core/dbaccess/qa/unit/data/tdf132924.odb"
     ));
@@ -44,17 +44,34 @@ fn real_libreoffice_noncompact_query_package_is_refused_without_mutation() {
     edit.set_query_command("AliasTest", "SELECT 7").unwrap();
     edit.set_query_escape_processing("AliasTest", Some(true))
         .unwrap();
-    assert!(edit.commit().is_err());
+    let commit = edit.commit().unwrap();
+    assert!(commit.changed());
     assert_eq!(database.as_bytes(), bytes.as_slice());
+    assert!(
+        commit
+            .database()
+            .content_xml()
+            .starts_with("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<office:document-content")
+    );
     assert_eq!(
-        database
+        commit
+            .database()
             .catalog()
             .unwrap()
             .query("AliasTest")
             .unwrap()
             .unwrap()
             .command(),
-        "SELECT \"tid\" \"TestId\", \"tname\" \"TestName\" FROM \"test\""
+        "SELECT 7"
+    );
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.database())
+            .unwrap()
+            .as_bytes(),
+        bytes
     );
 }
 

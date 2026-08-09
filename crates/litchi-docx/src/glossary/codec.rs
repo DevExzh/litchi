@@ -1,3 +1,7 @@
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
 //! Bounded glossary codec facade.
 
 mod package;
@@ -13,6 +17,10 @@ pub(in crate::glossary) use xml::*;
 use super::model::{Catalog, Conformance};
 use super::{Error, MAX, MAX_DEPTH, MAX_VALUES, Result};
 
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn read(xml: &[u8]) -> Result<(Catalog, Conformance)> {
     if xml.len() > MAX {
         return Err(invalid("glossary document exceeds 32 MiB"));
@@ -53,6 +61,10 @@ pub fn read(xml: &[u8]) -> Result<(Catalog, Conformance)> {
 }
 
 /// Serialize a catalog canonically in the selected dialect.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn write(value: &Catalog, conformance: Conformance) -> Result<Vec<u8>> {
     let plan = plan_write(value, conformance)?;
     let mut xml = String::new();

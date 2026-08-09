@@ -308,7 +308,10 @@ impl Workbook {
     ///
     /// Public callers must use [`Self::edit_opc`], which stages a structural
     /// candidate and reparses the complete XLSB host before publication.
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "retained for BIFF12 codec completeness and staged host integration"
+    )]
     pub(crate) fn opc_package_mut(&mut self) -> &mut OpcPackage {
         self.package.unsign();
         &mut self.package

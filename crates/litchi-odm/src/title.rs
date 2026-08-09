@@ -169,7 +169,7 @@ impl Patch {
     }
 }
 
-fn validate_title(title: &str) -> Result<()> {
+pub(crate) fn validate_title(title: &str) -> Result<()> {
     if title.len() > MAX_TITLE_BYTES {
         return Err(invalid("ODM title exceeds the 16 KiB limit"));
     }

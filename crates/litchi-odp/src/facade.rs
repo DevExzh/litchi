@@ -1,6 +1,6 @@
 //! Primary API for presentation consumers.
 
-/// Source-checked presentation snapshots, transactions, commits, and patches.
+/// Source-checked slide, shape, media, and RDF package transactions.
 pub mod edit {
     pub use crate::authoring::edit::{Commit, Patch, Selector, Snapshot, Transaction};
 }

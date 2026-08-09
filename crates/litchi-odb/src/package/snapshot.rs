@@ -1,11 +1,12 @@
 //! Immutable database package ownership.
 
 use litchi_core::{Error, Metadata, Result};
-use litchi_odf_common::{
-    compact_xml,
-    core::{PackageWriter, family::Package},
+use litchi_odf_common::core::family::Package;
+use std::{
+    io::{Cursor, Write},
+    path::Path,
+    sync::Arc,
 };
-use std::{path::Path, sync::Arc};
 
 pub(crate) const MIMETYPE: &str = litchi_odf_common::constants::ODF_DATABASE;
 const BODY_MARKER: &str = "<";
@@ -61,7 +62,6 @@ impl Snapshot {
     }
 
     pub(crate) fn rebuild_with_content(&self, content: &str) -> Result<Self> {
-        ensure_compact_rewrite_source(self)?;
         let files = self.files()?;
         if files.iter().any(|path| {
             matches!(
@@ -73,32 +73,53 @@ impl Snapshot {
                 "ODB package edits refuse signed packages".to_string(),
             ));
         }
-        compact_xml::validate(content.as_bytes()).map_err(Error::from)?;
+        // Opened producer documents are edited by byte-splicing only the
+        // selected XML range.  Formatting whitespace in the unchanged source
+        // is therefore lossless input, not generated output that needs the
+        // fresh-authoring compactness gate.
         crate::codec::validate(content)?;
-        let archive = self.0.package.package();
-        let mut writer = PackageWriter::new_bounded(MAX_OUTPUT_BYTES);
-        writer.set_mimetype(MIMETYPE)?;
-        writer.add_file("content.xml", content.as_bytes())?;
-        for path in ["styles.xml", "meta.xml", "settings.xml"] {
-            if archive.has_file(path)? {
-                writer.add_file(path, &archive.get_file(path)?)?;
-            }
-        }
-        writer.copy_auxiliary_files_from(archive)?;
-        Self::from_bytes(writer.finish_to_bounded_bytes()?)
+        Self::from_bytes(rebuild_archive(self.as_bytes(), content)?)
     }
 }
 
-fn ensure_compact_rewrite_source(source: &Snapshot) -> Result<()> {
-    let archive = source.0.package.package();
-    for path in source.files()? {
-        if Path::new(&path)
-            .extension()
-            .is_some_and(|extension| extension.eq_ignore_ascii_case("xml"))
-            && path != "META-INF/manifest.xml"
-        {
-            compact_xml::validate(&archive.get_file(&path)?).map_err(Error::from)?;
+fn rebuild_archive(source: &[u8], content: &str) -> Result<Vec<u8>> {
+    let mut archive = zip::ZipArchive::new(Cursor::new(source))
+        .map_err(|error| Error::ZipError(error.to_string()))?;
+    let mut output = Cursor::new(Vec::new());
+    {
+        let mut writer = zip::ZipWriter::new(&mut output);
+        for index in 0..archive.len() {
+            let file = archive
+                .by_index_raw(index)
+                .map_err(|error| Error::ZipError(error.to_string()))?;
+            if file.name() == "content.xml" {
+                let mut options =
+                    zip::write::SimpleFileOptions::default().compression_method(file.compression());
+                if let Some(mode) = file.unix_mode() {
+                    options = options.unix_permissions(mode);
+                }
+                if let Some(modified) = file.last_modified() {
+                    options = options.last_modified_time(modified);
+                }
+                writer
+                    .start_file("content.xml", options)
+                    .and_then(|()| writer.write_all(content.as_bytes()).map_err(Into::into))
+                    .map_err(|error: zip::result::ZipError| Error::ZipError(error.to_string()))?;
+            } else {
+                writer
+                    .raw_copy_file(file)
+                    .map_err(|error| Error::ZipError(error.to_string()))?;
+            }
         }
+        writer
+            .finish()
+            .map_err(|error| Error::ZipError(error.to_string()))?;
     }
-    Ok(())
+    let bytes = output.into_inner();
+    if bytes.len() > MAX_OUTPUT_BYTES {
+        return Err(Error::InvalidFormat(
+            "ODB rebuilt package exceeds the output limit".to_string(),
+        ));
+    }
+    Ok(bytes)
 }

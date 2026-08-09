@@ -1,4 +1,4 @@
-//! Typed semantic values for BIFF8 RealTimeData records.
+//! Typed semantic values for BIFF8 `RealTimeData` records.
 
 use crate::error::{Error, Result};
 
@@ -30,16 +30,19 @@ pub struct Cell {
 
 impl Cell {
     /// Create a checked RTD subscriber cell from raw zero-based indices.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(row: u32, column: u16, sheet_index: usize) -> Result<Self> {
         let invalid = || {
             Error::InvalidCellReference(format!(
                 "RTD subscriber row {row}, column {column} is outside the BIFF8 grid"
             ))
         };
-        let row = u16::try_from(row).map_err(|_| invalid())?;
-        let column = u8::try_from(column).map_err(|_| invalid())?;
+        let row = u16::try_from(row).map_err(|_error| invalid())?;
+        let column = u8::try_from(column).map_err(|_error| invalid())?;
         let sheet_index = u16::try_from(sheet_index)
-            .map_err(|_| Error::WorksheetNotFound(format!("Sheet {sheet_index}")))?;
+            .map_err(|_error| Error::WorksheetNotFound(format!("Sheet {sheet_index}")))?;
         Ok(Self {
             row,
             column,
@@ -54,7 +57,7 @@ pub struct Record {
     /// record's topic (`ichSamePrefix`); always zero for the first record.
     pub common_prefix_len: u32,
     /// The topic sub-strings as stored (without the shared prefix). The
-    /// first is the RTD server ProgID, the second the server name (empty for
+    /// first is the RTD server `ProgID`, the second the server name (empty for
     /// a local server), and the rest combine into the unique topic.
     pub topic_segments: Vec<String>,
     /// The fully reconstructed topic: the shared prefix of the previous

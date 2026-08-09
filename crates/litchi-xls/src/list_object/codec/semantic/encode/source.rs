@@ -4,7 +4,7 @@ use crate::Result;
 use crate::list_object::codec::binary::{
     append_formula, append_frt, append_range, append_string, append_web_info, record,
 };
-use crate::list_object::model::*;
+use crate::list_object::model::{ListObject, ListObjectFeatureVersion, ListObjectSourceMetadata};
 use crate::list_object::{
     CONTINUE_FRT11_RECORD_TYPE, FEATURE11_RECORD_TYPE, FEATURE12_RECORD_TYPE, ISF_LIST,
     MAX_CONTINUE_RGB, MAX_FEATURE_BYTES, MAX_PAYLOAD, invalid,
@@ -66,12 +66,12 @@ impl ListObject {
                     | u32::from(!v.changed_row_ids.is_empty()) << 15
                     | u32::from(v.entry_id.is_some()) << 20
                     | u32::from(!v.invalid_cells.is_empty()) << 21
-                    | v.ignored_flags
+                    | v.ignored_flags;
             },
             ListObjectSourceMetadata::Xml(v) => {
-                flags |= u32::from(v.entry_id.is_some()) << 20 | v.ignored_flags
+                flags |= u32::from(v.entry_id.is_some()) << 20 | v.ignored_flags;
             },
-        };
+        }
         feature.extend_from_slice(&flags.to_le_bytes());
         match source {
             ListObjectSourceMetadata::Web(v) => {
@@ -79,24 +79,24 @@ impl ListObject {
                 feature.extend_from_slice(&v.cache_size.to_le_bytes());
                 feature.extend_from_slice(&v.cache_characters.to_le_bytes());
                 feature.extend_from_slice(&v.edit_mode.code().to_le_bytes());
-                feature.extend_from_slice(&v.hash_parameters)
+                feature.extend_from_slice(&v.hash_parameters);
             },
             ListObjectSourceMetadata::Xml(v) => feature.extend_from_slice(&v.ignored_fixed_tail),
-        };
+        }
         append_string(&mut feature, &self.name);
-        feature.extend_from_slice(&(fields_len as u16).to_le_bytes());
+        feature.extend_from_slice(&crate::utils::truncate_usize_to_u16(fields_len).to_le_bytes());
         match source {
             ListObjectSourceMetadata::Web(v) => {
                 if let Some(name) = &v.provider_name {
-                    append_string(&mut feature, name)
+                    append_string(&mut feature, name);
                 }
                 if let Some(entry) = &v.entry_id {
-                    append_string(&mut feature, entry)
+                    append_string(&mut feature, entry);
                 }
             },
             ListObjectSourceMetadata::Xml(v) => {
                 if let Some(entry) = &v.entry_id {
-                    append_string(&mut feature, entry)
+                    append_string(&mut feature, entry);
                 }
             },
         }
@@ -148,7 +148,9 @@ impl ListObject {
             feature.extend_from_slice(&web_type.to_le_bytes());
             feature.extend_from_slice(&xml_type.to_le_bytes());
             feature.extend_from_slice(&column.aggregation.code().to_le_bytes());
-            feature.extend_from_slice(&(agg_fmt.len() as u32).to_le_bytes());
+            feature.extend_from_slice(
+                &crate::utils::truncate_usize_to_u32(agg_fmt.len()).to_le_bytes(),
+            );
             feature.extend_from_slice(&u32::MAX.to_le_bytes());
             let ff = u32::from(self.autofilter)
                 | (u32::from(mapped) << 2)
@@ -158,55 +160,63 @@ impl ListObject {
                 | (u32::from(column.total_string.is_some()) << 10)
                 | ignored_flags;
             feature.extend_from_slice(&ff.to_le_bytes());
-            feature.extend_from_slice(&(insert_fmt.len() as u32).to_le_bytes());
+            feature.extend_from_slice(
+                &crate::utils::truncate_usize_to_u32(insert_fmt.len()).to_le_bytes(),
+            );
             feature.extend_from_slice(&u32::MAX.to_le_bytes());
             append_string(&mut feature, source_name);
             if !single {
-                append_string(&mut feature, &column.name)
+                append_string(&mut feature, &column.name);
             }
             feature.extend_from_slice(agg_fmt);
             feature.extend_from_slice(insert_fmt);
             if self.autofilter {
-                feature.extend_from_slice(auto_filter)
+                feature.extend_from_slice(auto_filter);
             }
             if let Some(v) = xml.and_then(|v| v.mapping.as_ref()) {
                 feature.extend_from_slice(&1u16.to_le_bytes());
                 feature.extend_from_slice(&(2u32 | u32::from(v.can_be_single) << 2).to_le_bytes());
                 feature.extend_from_slice(&v.map_id.get().to_le_bytes());
-                append_string(&mut feature, v.xpath.as_str())
+                append_string(&mut feature, v.xpath.as_str());
             }
             if let Some(tokens) = calc {
-                append_formula(&mut feature, tokens)?
+                append_formula(&mut feature, tokens)?;
             }
             if let Some(tokens) = &column.total_formula {
                 append_formula(&mut feature, tokens)?;
-                feature.extend_from_slice(total_extra)
+                feature.extend_from_slice(total_extra);
             }
             if let Some(value) = &column.total_string {
-                append_string(&mut feature, value)
+                append_string(&mut feature, value);
             }
             if let Some(v) = web {
-                append_web_info(&mut feature, &v.info)?
+                append_web_info(&mut feature, &v.info)?;
             }
         }
         if let ListObjectSourceMetadata::Web(v) = source {
             if !v.deleted_row_ids.is_empty() {
-                feature.extend_from_slice(&(v.deleted_row_ids.len() as u16).to_le_bytes());
+                feature.extend_from_slice(
+                    &crate::utils::truncate_usize_to_u16(v.deleted_row_ids.len()).to_le_bytes(),
+                );
                 for id in &v.deleted_row_ids {
-                    feature.extend_from_slice(&id.to_le_bytes())
+                    feature.extend_from_slice(&id.to_le_bytes());
                 }
             }
             if !v.changed_row_ids.is_empty() {
-                feature.extend_from_slice(&(v.changed_row_ids.len() as u16).to_le_bytes());
+                feature.extend_from_slice(
+                    &crate::utils::truncate_usize_to_u16(v.changed_row_ids.len()).to_le_bytes(),
+                );
                 for id in &v.changed_row_ids {
-                    feature.extend_from_slice(&id.to_le_bytes())
+                    feature.extend_from_slice(&id.to_le_bytes());
                 }
             }
             if !v.invalid_cells.is_empty() {
-                feature.extend_from_slice(&(v.invalid_cells.len() as u16).to_le_bytes());
+                feature.extend_from_slice(
+                    &crate::utils::truncate_usize_to_u16(v.invalid_cells.len()).to_le_bytes(),
+                );
                 for cell in &v.invalid_cells {
                     feature.extend_from_slice(&cell.row_id.to_le_bytes());
-                    feature.extend_from_slice(&cell.column_id.value().to_le_bytes())
+                    feature.extend_from_slice(&cell.column_id.value().to_le_bytes());
                 }
             }
         }
@@ -216,7 +226,8 @@ impl ListObject {
         payload.push(0);
         payload.extend_from_slice(&0u32.to_le_bytes());
         payload.extend_from_slice(&1u16.to_le_bytes());
-        payload.extend_from_slice(&(feature.len() as u32).to_le_bytes());
+        payload
+            .extend_from_slice(&crate::utils::truncate_usize_to_u32(feature.len()).to_le_bytes());
         payload.extend_from_slice(&0u16.to_le_bytes());
         append_range(&mut payload, self.range);
         payload.extend_from_slice(&feature);
@@ -232,7 +243,7 @@ impl ListObject {
             let mut continuation = Vec::with_capacity(12 + chunk.len());
             append_frt(&mut continuation, CONTINUE_FRT11_RECORD_TYPE, None);
             continuation.extend_from_slice(chunk);
-            records.push(record(CONTINUE_FRT11_RECORD_TYPE, continuation)?)
+            records.push(record(CONTINUE_FRT11_RECORD_TYPE, continuation)?);
         }
         Ok(records)
     }

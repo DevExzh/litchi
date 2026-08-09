@@ -249,7 +249,7 @@ pub(super) fn required_string_attr(
         .map_err(|error| Error::Xml(error.to_string()))?
         .ok_or_else(|| missing_attribute(description))?
         .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
-        .map(|value| value.into_owned())
+        .map(std::borrow::Cow::into_owned)
         .map_err(|error| Error::Xml(error.to_string()))
 }
 
@@ -418,7 +418,7 @@ pub(super) fn missing_attribute(description: &str) -> Error {
 #[inline]
 pub(super) fn get_attr(e: &BytesStart<'_>, name: &[u8]) -> Option<Vec<u8>> {
     e.attributes()
-        .filter_map(|a| a.ok())
+        .filter_map(std::result::Result::ok)
         .find(|a| a.key.as_ref() == name)
         .map(|a| a.value.to_vec())
 }

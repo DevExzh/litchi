@@ -8,6 +8,9 @@ const MAX_OPAQUE_BYTES: usize = 16 * 1024 * 1024;
 pub struct OpaqueXml(Vec<u8>);
 
 impl OpaqueXml {
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn try_new(bytes: impl Into<Vec<u8>>) -> Result<Self> {
         let bytes = bytes.into();
         if bytes.is_empty() || bytes.len() > MAX_OPAQUE_BYTES {
@@ -30,6 +33,7 @@ impl OpaqueXml {
         Ok(Self(bytes))
     }
 
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
     }

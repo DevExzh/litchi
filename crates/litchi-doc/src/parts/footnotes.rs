@@ -1,6 +1,6 @@
 /// Footnotes and endnotes parser for Word binary format.
 ///
-/// Based on Apache POI's FootnotesTables and LibreOffice's implementation.
+/// Based on Apache POI's `FootnotesTables` and `LibreOffice`'s implementation.
 /// Footnotes and endnotes are stored in separate subdocuments with references in the main text.
 use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
@@ -15,6 +15,7 @@ pub struct FootnoteDescriptor {
 
 impl FootnoteDescriptor {
     /// Parse a footnote descriptor from 2 bytes
+    #[must_use]
     pub fn from_bytes(data: &[u8]) -> Option<Self> {
         if data.len() < 2 {
             return None;
@@ -42,6 +43,7 @@ pub struct FootnoteReference {
 
 impl FootnoteReference {
     /// Create a new footnote reference
+    #[must_use]
     pub fn new(
         ref_cp: u32,
         text_start_cp: u32,
@@ -57,6 +59,7 @@ impl FootnoteReference {
     }
 
     /// Get the length of the footnote/endnote text
+    #[must_use]
     pub fn text_length(&self) -> u32 {
         self.text_end_cp.saturating_sub(self.text_start_cp)
     }
@@ -78,7 +81,7 @@ impl FootnotesTable {
     ///
     /// # Returns
     ///
-    /// A parsed FootnotesTable
+    /// A parsed `FootnotesTable`
     pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Self> {
         let mut references = Vec::new();
 
@@ -208,26 +211,31 @@ impl FootnotesTable {
     }
 
     /// Get all footnote references
+    #[must_use]
     pub fn references(&self) -> &[FootnoteReference] {
         &self.references
     }
 
     /// Get the count of footnotes
+    #[must_use]
     pub fn count(&self) -> usize {
         self.references.len()
     }
 
     /// Find a footnote at a specific character position in the main document
+    #[must_use]
     pub fn find_at_position(&self, cp: u32) -> Option<&FootnoteReference> {
         self.references.iter().find(|f| f.ref_cp == cp)
     }
 
     /// Get the footnote reference at a specific index
+    #[must_use]
     pub fn get_at_index(&self, index: usize) -> Option<&FootnoteReference> {
         self.references.get(index)
     }
 
     /// Check if a footnote exists at a specific character position
+    #[must_use]
     pub fn exists_at_position(&self, cp: u32) -> bool {
         self.references.iter().any(|f| f.ref_cp == cp)
     }
@@ -249,7 +257,7 @@ impl EndnotesTable {
     ///
     /// # Returns
     ///
-    /// A parsed EndnotesTable
+    /// A parsed `EndnotesTable`
     pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Self> {
         let mut references = Vec::new();
 
@@ -294,16 +302,19 @@ impl EndnotesTable {
     }
 
     /// Get all endnote references
+    #[must_use]
     pub fn references(&self) -> &[FootnoteReference] {
         &self.references
     }
 
     /// Find an endnote at a specific character position in the main document
+    #[must_use]
     pub fn find_at_position(&self, cp: u32) -> Option<&FootnoteReference> {
         self.references.iter().find(|e| e.ref_cp == cp)
     }
 
     /// Get the count of endnotes
+    #[must_use]
     pub fn count(&self) -> usize {
         self.references.len()
     }

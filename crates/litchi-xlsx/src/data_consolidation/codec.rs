@@ -1,4 +1,4 @@
-//! Bounded SpreadsheetML data-consolidation parsing and serialization.
+//! Bounded `SpreadsheetML` data-consolidation parsing and serialization.
 
 use std::fmt::Write;
 
@@ -130,7 +130,10 @@ pub fn parse_worksheet_data_consolidation(xml: &[u8]) -> Result<Option<DataConso
     builder.map(finish_builder).transpose()
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "arguments correspond directly to the data-consolidation wire attributes"
+)]
 fn begin_element(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
@@ -358,16 +361,16 @@ fn parse_data_ref_attributes(
             .into_owned();
         match (namespace, local.as_ref()) {
             (NamespaceKind::Unbound, b"name") => {
-                set_once(&mut name, checked_xstring(text, "dataRef name")?, "name")?
+                set_once(&mut name, checked_xstring(text, "dataRef name")?, "name")?;
             },
             (NamespaceKind::Unbound, b"sheet") => {
-                set_once(&mut sheet, checked_xstring(text, "dataRef sheet")?, "sheet")?
+                set_once(&mut sheet, checked_xstring(text, "dataRef sheet")?, "sheet")?;
             },
             (NamespaceKind::Unbound, b"ref") => {
-                set_once(&mut reference, RangeReference::new(text)?, "ref")?
+                set_once(&mut reference, RangeReference::new(text)?, "ref")?;
             },
             (NamespaceKind::Relationship, b"id") => {
-                set_once(&mut relationship_id, checked_relationship_id(text)?, "r:id")?
+                set_once(&mut relationship_id, checked_relationship_id(text)?, "r:id")?;
             },
             _ => return Err(invalid("unknown or spoofed dataRef attribute")),
         }

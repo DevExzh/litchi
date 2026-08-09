@@ -1,6 +1,6 @@
 [package]
 name        = "litchi-markdown"
-description = "Format-agnostic Markdown emission helpers for the Litchi office-formats library."
+description = "Bounded Markdown snapshots, edits, patches, and format-agnostic emission helpers."
 version.workspace      = true
 edition.workspace      = true
 authors.workspace      = true
@@ -11,6 +11,8 @@ rust-version.workspace = true
 [dependencies]
 litchi-core = { workspace = true }
 phf         = { workspace = true }
+pulldown-cmark = { version = "0.13.0", default-features = false }
+thiserror   = { workspace = true }
 
 [lints]
 workspace = true
